@@ -1,0 +1,50 @@
+x-service: &common-dev-test
+  build:
+    context: .
+    target: build
+  env_file:
+    - .env
+  volumes:
+    - .:/src
+  working_dir: /src
+
+version: "3.6"
+services:
+  prod:
+    image: dhis2/im-manager:${IMAGE_TAG:-latest}
+    build: .
+    ports:
+      - "8080:8080"
+
+  test:
+    <<: *common-dev-test
+    command: /bin/sh -c 'go test -v ./...'
+
+  dev-test:
+    <<: *common-dev-test
+    command: reflex -r "Dockerfile|\.go|\.yml$$" -s -- sh -c "go test -v ./..."
+
+  dev:
+    <<: *common-dev-test
+    ports:
+      - "8080:8080"
+    command: reflex -r "Dockerfile|\.go|\.yml$$" -s -- sh -c "go run ./cmd/serve"
+
+  database:
+    image: postgres:13-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: ${DATABASE_USERNAME}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD}
+      POSTGRES_DB: ${DATABASE_NAME}
+
+  redis:
+    image: redis:6.2.5-alpine3.14
+    ports:
+      - "6379:6379"
+
+  redisinsight:
+    image: redislabs/redisinsight:latest
+    ports:
+      - "8001:8001"
