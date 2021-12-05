@@ -1,0 +1,64 @@
+releases:
+  - name: "{{ requiredEnv "INSTANCE_NAME" }}"
+    namespace: "{{ requiredEnv "INSTANCE_NAMESPACE" }}"
+    chart: tons/dhis2-core
+    version: "{{ env "CHART_VERSION" | default "0.4.0" }}"
+    values:
+      - image:
+          repository: dhis2/core
+          tag: "{{ env "IMAGE_TAG" | default "2.36.0-tomcat-8.5.34-jre8-alpine" }}"
+      - ingress:
+          enabled: true
+          hostname: {{ requiredEnv "INSTANCE_HOSTNAME" }}
+          path: /{{ requiredEnv "INSTANCE_NAME" }}
+          certIssuer: cert-issuer-prod
+      - catalinaOpts: "-Dcontext.path=/{{ requiredEnv "INSTANCE_NAME" }}"
+      - livenessProbe:
+          initialDelaySeconds: 180
+          path: /{{ requiredEnv "INSTANCE_NAME" }}
+      - readinessProbe:
+          initialDelaySeconds: 180
+          path: /{{ requiredEnv "INSTANCE_NAME" }}
+      - podLabels:
+          dhis2: "true"
+          dhis2-id: "{{ requiredEnv "INSTANCE_ID" }}"
+          dhis2-ttl: "{{ env "INSTANCE_TTL" | default "" }}"
+      - dhisConfig: |
+          connection.dialect = org.hibernate.dialect.PostgreSQLDialect
+          connection.driver_class = org.postgresql.Driver
+          connection.url = jdbc:postgresql://{{ requiredEnv "INSTANCE_NAME" }}-database-postgresql.{{ requiredEnv "INSTANCE_NAMESPACE" }}.svc.cluster.local/dhis2
+          connection.username = dhis
+          connection.password = dhis
+          # Database schema behavior, can be validate, update, create, create-drop
+          connection.schema = update
+          # Server base URL
+          server.base.url = https://{{ requiredEnv "INSTANCE_HOSTNAME" }}/{{ requiredEnv "INSTANCE_NAME" }}
+
+  - name: {{ requiredEnv "INSTANCE_NAME" }}-database
+    namespace: "{{ requiredEnv "INSTANCE_NAMESPACE" }}"
+    chart: bitnami/postgresql
+    version: "10.9.2"
+    verify: false
+    values:
+      - primary:
+          podLabels:
+            dhis2-data-id: "{{ requiredEnv "INSTANCE_ID" }}"
+      - extraEnv:
+          - name: SEED_URL
+            value: {{ env "SEED_PATH" | default "" }}
+      - initdbScripts:
+          seed.sh: |
+            {{- readFile "./seed.sh" | indent 12 }}
+      - image:
+          tag: {{ env "DATABASE_VERSION" | default 10 }}
+      - postgresqlUsername: dhis
+        postgresqlPassword: dhis
+        postgresqlDatabase: dhis2
+        persistence:
+          size: 5Gi
+
+repositories:
+  - name: bitnami
+    url: https://charts.bitnami.com/bitnami
+  - name: tons
+    url: https://helm-charts.fitfit.dk

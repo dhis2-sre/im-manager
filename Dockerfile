@@ -11,5 +11,6 @@ FROM alpine:3.14
 RUN apk --no-cache -U upgrade
 WORKDIR /app
 COPY --from=build /app/im-manager .
+COPY --from=build /app/stacks ./stacks
 USER guest
 CMD ["/app/im-manager"]

@@ -13,15 +13,18 @@ import (
 
 type Environment struct {
 	Config       config.Config
+	StackService stack.Service
 	StackHandler stack.Handler
 }
 
 func ProvideEnvironment(
 	config config.Config,
+	stackService stack.Service,
 	stackHandler stack.Handler,
 ) Environment {
 	return Environment{
 		config,
+		stackService,
 		stackHandler,
 	}
 }

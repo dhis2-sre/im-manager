@@ -21,7 +21,7 @@ func GetEnvironment() Environment {
 	repository := stack.ProvideRepository(db)
 	service := stack.ProvideService(repository)
 	handler := stack.ProvideHandler(service)
-	environment := ProvideEnvironment(configConfig, handler)
+	environment := ProvideEnvironment(configConfig, service, handler)
 	return environment
 }
 
@@ -29,14 +29,18 @@ func GetEnvironment() Environment {
 
 type Environment struct {
 	Config       config.Config
+	StackService stack.Service
 	StackHandler stack.Handler
 }
 
 func ProvideEnvironment(config2 config.Config,
 
+	stackService stack.Service,
 	stackHandler stack.Handler,
 ) Environment {
-	return Environment{config2, stackHandler}
+	return Environment{config2, stackService,
+		stackHandler,
+	}
 }
 
 func provideDatabase(c config.Config) *gorm.DB {
