@@ -1,3 +1,7 @@
+{{- $livenessProbe := index .Values "livenessProbe" }}
+{{- $readinessProbe := index .Values "readinessProbe" }}
+{{- $environment := index .Values "environment" }}
+{{- $secrets := index .Values "secrets" }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -35,18 +39,33 @@ spec:
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
             - name: http
-              containerPort: 80
+              containerPort: {{ .Values.containerPort }}
               protocol: TCP
+          {{- if $livenessProbe }}
           livenessProbe:
             httpGet:
-              path: /
+              path: {{ .Values.basePath }}{{ .Values.livenessProbe }}
               port: http
+          {{- end }}
+          {{- if $readinessProbe }}
           readinessProbe:
             httpGet:
-              path: /
+              path: {{ .Values.basePath }}{{ .Values.readinessProbe }}
               port: http
+          {{- end }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
+          {{- if or $environment $secrets }}
+          envFrom:
+            {{- if $environment }}
+            - configMapRef:
+                name: {{ include "go-chart.fullname" . }}
+            {{- end }}
+            {{- if $secrets }}
+            - secretRef:
+                name: {{ include "go-chart.fullname" . }}
+            {{- end }}
+          {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

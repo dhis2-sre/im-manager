@@ -1,0 +1,13 @@
+{{- $environment := index .Values "environment" }}
+{{- if $environment }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "go-chart.fullname" . }}
+  labels:
+    {{- include "go-chart.labels" . | nindent 4 }}
+data:
+{{- range $key, $value := $environment }}
+  {{ $key }}: {{ $value | quote }}
+{{- end }}
+{{- end }}
