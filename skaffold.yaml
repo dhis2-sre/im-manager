@@ -1,0 +1,27 @@
+apiVersion: skaffold/v2beta25
+kind: Config
+build:
+  artifacts:
+    - image: dhis2/im-manager
+deploy:
+  helm:
+    releases:
+      - name: im-manager-feature
+        namespace: instance-manager-feature
+        chartPath: helm/chart
+        artifactOverrides:
+          image: dhis2/im-manager
+        imageStrategy:
+          helm: { }
+        useHelmSecrets: true
+        valuesFiles:
+          - helm/data/secrets/feature/values.yaml
+          - helm/data/values/feature/values.yaml
+
+      - name: im-manager-postgresql-feature
+        namespace: instance-manager-feature
+        remoteChart: postgresql
+        repo: https://charts.bitnami.com/bitnami
+        useHelmSecrets: true
+        valuesFiles:
+          - helm/data/secrets/feature/postgresql.yaml
