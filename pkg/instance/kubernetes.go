@@ -95,6 +95,7 @@ func (k kubernetesService) getClient(configuration *models.ClusterConfiguration)
 			return nil, err
 		}
 	}
+
 	client, err := kubernetes.NewForConfig(restClientConfig)
 	if err != nil {
 		return nil, err

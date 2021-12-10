@@ -20,5 +20,7 @@ require (
 	golang.org/x/sys v0.0.0-20211205182925-97ca703d548d // indirect
 	gorm.io/driver/postgres v1.2.3
 	gorm.io/gorm v1.22.4
+	k8s.io/api v0.22.4 // indirect
+	k8s.io/apimachinery v0.22.4 // indirect
 	k8s.io/client-go v0.22.4
 )
