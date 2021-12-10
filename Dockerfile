@@ -26,12 +26,7 @@ COPY . .
 RUN go build -o /app/im-manager -ldflags "-s -w" ./cmd/serve
 
 FROM alpine:3.14
-RUN apk --no-cache -U upgrade \
-    && apk add --no-cache jq \
-    && apk add --no-cache python3 py3-pip \
-    && pip3 install --upgrade pip \
-    && pip3 install --no-cache-dir awscli \
-    && aws --version
+RUN apk --no-cache -U upgrade
 COPY --from=build /usr/bin/kubectl /usr/bin/kubectl
 COPY --from=build /usr/bin/helm /usr/bin/helm
 COPY --from=build /usr/bin/helmfile /usr/bin/helmfile
