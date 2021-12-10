@@ -21,5 +21,7 @@ func GetEngine(environment di.Environment) *gin.Engine {
 	router.GET("/stacks", environment.StackHandler.FindAll)
 	router.GET("/stacks/:id", environment.StackHandler.FindById)
 
+	router.POST("/instances", environment.InstanceHandler.Create)
+
 	return r
 }

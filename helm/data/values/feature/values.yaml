@@ -4,6 +4,10 @@ image:
 
 basePath: /skaffold
 
+serviceAccount:
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::767224633206:role/instance-cluster-test-instance-manager-api-feature
+
 environment:
   BASE_PATH: /skaffold
 
@@ -12,3 +16,6 @@ environment:
 
   DATABASE_HOST: im-manager-postgresql-feature.instance-manager-feature.svc.cluster.local
   DATABASE_PORT: "5432"
+
+groups:
+  names: whoami,play

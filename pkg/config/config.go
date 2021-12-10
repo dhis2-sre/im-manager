@@ -9,6 +9,10 @@ import (
 func ProvideConfig() Config {
 	return Config{
 		BasePath: requireEnv("BASE_PATH"),
+		UserService: service{
+			Host:     requireEnv("USER_SERVICE_HOST"),
+			BasePath: requireEnv("USER_SERVICE_BASE_PATH"),
+		},
 		Postgresql: postgresql{
 			Host:         requireEnv("DATABASE_HOST"),
 			Port:         requireEnvAsInt("DATABASE_PORT"),
@@ -20,8 +24,14 @@ func ProvideConfig() Config {
 }
 
 type Config struct {
-	BasePath   string
-	Postgresql postgresql
+	BasePath    string
+	UserService service
+	Postgresql  postgresql
+}
+
+type service struct {
+	Host     string
+	BasePath string
 }
 
 type postgresql struct {
