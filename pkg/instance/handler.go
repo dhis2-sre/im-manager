@@ -1,6 +1,7 @@
 package instance
 
 import (
+	"github.com/dhis2-sre/im-manager/internal/apperror"
 	"github.com/dhis2-sre/im-manager/internal/handler"
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	userClient "github.com/dhis2-sre/im-users/pkg/client"
@@ -10,12 +11,10 @@ import (
 )
 
 func ProvideHandler(
-	//	instanceAuthorizer service.InstanceAuthorizer,
 	userClient userClient.Client,
 	instanceService Service,
 ) Handler {
 	return Handler{
-		//		instanceAuthorizer,
 		userClient,
 		instanceService,
 	}
@@ -85,14 +84,13 @@ func (i Handler) Create(c *gin.Context) {
 
 	log.Printf("%+v", userWithGroups)
 
-	/* TODO
-	canWrite := i.instanceAuthorizer.CanWrite(userWithGroups, instance)
+	canWrite := handler.CanWriteInstance(userWithGroups, instance)
 	if !canWrite {
 		unauthorized := apperror.NewUnauthorized("Write access denied")
 		_ = c.Error(unauthorized)
 		return
 	}
-	*/
+
 	if err := i.instanceService.Create(instance); err != nil {
 		_ = c.Error(err)
 		return
