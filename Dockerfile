@@ -33,9 +33,7 @@ COPY --from=build /usr/bin/helmfile /usr/bin/helmfile
 COPY --from=build /usr/bin/aws-iam-authenticator /usr/bin/aws-iam-authenticator
 WORKDIR /app
 COPY --from=build /app/im-manager .
-# TODO: --chown=user:group
-COPY --from=build /src/stacks ./stacks
 # helmfile invokes helm in the folder which contains the helmfile.yaml and requires write access to .config/ and .cache/ in the same folder
-RUN ls ./stacks | xargs -I '{}' sh -c 'mkdir ./stacks/{}/.config && chown guest.users ./stacks/{}/.config && mkdir ./stacks/{}/.cache && chown guest.users ./stacks/{}/.cache'
+COPY --from=build --chown=guest:users /src/stacks ./stacks
 USER guest
 CMD ["/app/im-manager"]
