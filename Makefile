@@ -14,6 +14,9 @@ push-docker-image:
 dev:
 	docker compose up --build dev database redis
 
+cluster-dev:
+	skaffold dev
+
 test: clean
 	docker compose up -d database redis
 	docker compose run --no-deps test
