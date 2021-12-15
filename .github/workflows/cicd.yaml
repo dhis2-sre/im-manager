@@ -16,8 +16,8 @@ jobs:
   call-workflow:
     uses: dhis2-sre/gha-workflows/.github/workflows/instance-manager.yaml@master
     with:
-      PROCESS_NAME: im-users
-      POD_NAME: im-users
+      PROCESS_NAME: im-manager
+      POD_NAME: im-manager
     secrets:
       DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
       DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
