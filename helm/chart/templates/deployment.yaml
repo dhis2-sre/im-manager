@@ -55,6 +55,9 @@ spec:
           {{- end }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
+          env:
+            - name: BASE_PATH
+              value: {{ .Values.basePath | default "/" }}
           {{- if or $environment $secrets }}
           envFrom:
             {{- if $environment }}
