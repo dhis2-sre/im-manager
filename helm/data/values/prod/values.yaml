@@ -1,0 +1,16 @@
+image:
+  repository: dhis2/im-manager
+
+serviceAccount:
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::767224633206:role/instance-cluster-test-instance-manager-api-feature
+
+environment:
+  USER_SERVICE_HOST: im-users-prod.instance-manager-prod.svc.cluster.local:8080
+  USER_SERVICE_BASE_PATH: /
+
+  DATABASE_HOST: im-manager-postgresql-prod.instance-manager-prod.svc.cluster.local
+  DATABASE_PORT: "5432"
+
+groups:
+  names: whoami,play
