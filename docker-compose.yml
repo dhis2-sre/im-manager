@@ -13,6 +13,8 @@ services:
   prod:
     image: dhis2/im-manager:${IMAGE_TAG:-latest}
     build: .
+    env_file:
+      - .env
     ports:
       - "8080:8080"
 
