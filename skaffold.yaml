@@ -6,8 +6,8 @@ build:
 deploy:
   helm:
     releases:
-      - name: im-manager-feature
-        namespace: instance-manager-feature
+      - name: im-manager-{{ .ENVIRONMENT }}
+        namespace: instance-manager-{{ .ENVIRONMENT }}
         createNamespace: true
         chartPath: helm/chart
         artifactOverrides:
@@ -16,14 +16,14 @@ deploy:
           helm: { }
         useHelmSecrets: true
         valuesFiles:
-          - helm/data/secrets/feature/values.yaml
-          - helm/data/values/feature/values.yaml
+          - helm/data/secrets/{{ .ENVIRONMENT }}/values.yaml
+          - helm/data/values/{{ .ENVIRONMENT }}/values.yaml
 
-      - name: im-manager-postgresql-feature
-        namespace: instance-manager-feature
+      - name: im-manager-postgresql-{{ .ENVIRONMENT }}
+        namespace: instance-manager-{{ .ENVIRONMENT }}
         createNamespace: true
         remoteChart: postgresql
         repo: https://charts.bitnami.com/bitnami
         useHelmSecrets: true
         valuesFiles:
-          - helm/data/secrets/feature/postgresql.yaml
+          - helm/data/secrets/{{ .ENVIRONMENT }}/postgresql.yaml
