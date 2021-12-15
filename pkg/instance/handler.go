@@ -144,7 +144,6 @@ func convertOptionalParameters(requestParameters *[]ParameterRequest) *[]model.I
 // @Param id path string true "Instance id"
 // @Security OAuth2Password
 func (h Handler) Delete(c *gin.Context) {
-	log.Println("DELETE!!!!!!!!!!!!!!!!!!!!!!!!!!!")
 	idParam := c.Param("id")
 	id, err := strconv.Atoi(idParam)
 	if err != nil {
