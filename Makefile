@@ -17,13 +17,13 @@ push-image:
 	IMAGE_TAG=$(tag) docker compose push prod
 
 dev:
-	docker compose up --build dev database redis
+	docker compose up --build dev database
 
 cluster-dev:
 	skaffold dev
 
 test: clean
-	docker compose up -d database redis
+	docker compose up -d database
 	docker compose run --no-deps test
 	$(clean-cmd)
 
