@@ -38,13 +38,3 @@ services:
       POSTGRES_USER: ${DATABASE_USERNAME}
       POSTGRES_PASSWORD: ${DATABASE_PASSWORD}
       POSTGRES_DB: ${DATABASE_NAME}
-
-  redis:
-    image: redis:6.2.5-alpine3.14
-    ports:
-      - "6379:6379"
-
-  redisinsight:
-    image: redislabs/redisinsight:latest
-    ports:
-      - "8001:8001"
