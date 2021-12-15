@@ -13,7 +13,7 @@ smoke-test:
 prod-image:
 	IMAGE_TAG=$(tag) docker compose build prod
 
-push-image:
+push-prod:
 	IMAGE_TAG=$(tag) docker compose push prod
 
 dev:
