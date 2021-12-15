@@ -5,6 +5,11 @@ clean-cmd = docker compose down --remove-orphans --volumes
 binary:
 	go build -o im-manager -ldflags "-s -w" ./cmd/serve
 
+smoke-test:
+	docker compose up -d database
+	sleep 3
+	IMAGE_TAG=$(tag) docker compose up -d prod
+
 docker-image:
 	IMAGE_TAG=$(tag) docker compose build prod
 
