@@ -4,6 +4,7 @@ build:
   artifacts:
     - image: dhis2/im-manager
 deploy:
+  statusCheckDeadlineSeconds: 120
   helm:
     releases:
       - name: im-manager-{{ .ENVIRONMENT }}
