@@ -16,4 +16,4 @@ environment:
   DATABASE_PORT: "5432"
 
 groups:
-  names: whoami,play
+  names: whoami
