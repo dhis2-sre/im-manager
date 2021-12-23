@@ -19,3 +19,11 @@ func main() {
 		log.Fatal(err)
 	}
 }
+
+func launchConsumers(environment di.Environment) {
+	rabbitMqURL := environment.Config.RabbitMqURL.GetUrl()
+	instanceService := environment.InstanceService
+
+	ttlDestroyConsumer := instance.ProvideTtlDestroyConsumer(rabbitMqURL, instanceService)
+	go ttlDestroyConsumer.Launch()
+}

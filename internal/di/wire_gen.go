@@ -23,13 +23,13 @@ func GetEnvironment() Environment {
 	repository := stack.ProvideRepository(db)
 	service := stack.ProvideService(repository)
 	handler := stack.ProvideHandler(service)
-	clientClient := client.ProvideUser(configConfig)
 	instanceRepository := instance.ProvideRepository(db)
+	clientClient := client.ProvideUser(configConfig)
 	kubernetesService := instance.ProvideKubernetesService()
 	helmfileService := instance.ProvideHelmfileService(service, configConfig)
 	instanceService := instance.ProvideService(configConfig, instanceRepository, clientClient, kubernetesService, helmfileService)
 	instanceHandler := instance.ProvideHandler(clientClient, instanceService)
-	environment := ProvideEnvironment(configConfig, service, handler, instanceHandler)
+	environment := ProvideEnvironment(configConfig, service, handler, instanceService, instanceHandler)
 	return environment
 }
 
@@ -39,6 +39,7 @@ type Environment struct {
 	Config          config.Config
 	StackService    stack.Service
 	StackHandler    stack.Handler
+	InstanceService instance.Service
 	InstanceHandler instance.Handler
 }
 
@@ -46,10 +47,12 @@ func ProvideEnvironment(config2 config.Config,
 
 	stackService stack.Service,
 	stackHandler stack.Handler,
+	instanceService instance.Service,
 	instanceHandler instance.Handler,
 ) Environment {
 	return Environment{config2, stackService,
 		stackHandler,
+		instanceService,
 		instanceHandler,
 	}
 }

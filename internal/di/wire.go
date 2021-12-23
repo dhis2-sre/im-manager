@@ -17,6 +17,7 @@ type Environment struct {
 	Config          config.Config
 	StackService    stack.Service
 	StackHandler    stack.Handler
+	InstanceService instance.Service
 	InstanceHandler instance.Handler
 }
 
@@ -24,12 +25,14 @@ func ProvideEnvironment(
 	config config.Config,
 	stackService stack.Service,
 	stackHandler stack.Handler,
+	instanceService instance.Service,
 	instanceHandler instance.Handler,
 ) Environment {
 	return Environment{
 		config,
 		stackService,
 		stackHandler,
+		instanceService,
 		instanceHandler,
 	}
 }
