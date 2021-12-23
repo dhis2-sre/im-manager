@@ -25,6 +25,17 @@ deploy:
         createNamespace: true
         remoteChart: postgresql
         repo: https://charts.bitnami.com/bitnami
+#        version: ???
         useHelmSecrets: true
         valuesFiles:
           - helm/data/secrets/{{ .ENVIRONMENT }}/postgresql.yaml
+
+      - name: im-manager-rabbitmq-{{ .ENVIRONMENT }}
+        namespace: instance-manager-{{ .ENVIRONMENT }}
+        createNamespace: true
+        remoteChart: rabbitmq
+        repo: https://charts.bitnami.com/bitnami
+#        version: ???
+        useHelmSecrets: true
+        valuesFiles:
+          - helm/data/secrets/{{ .ENVIRONMENT }}/rabbitmq.yaml
