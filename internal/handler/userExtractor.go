@@ -10,15 +10,10 @@ import (
 
 func GetUserFromHttpAuthHeader(c *gin.Context) (*models.User, error) {
 	tokenString := c.GetHeader("Authorization")
-	if strings.HasPrefix(tokenString, "Bearer ") {
-		tokenString = strings.TrimPrefix(tokenString, "Bearer ")
-	}
+	tokenString = strings.TrimPrefix(tokenString, "Bearer ")
 
 	token, err := jwt.Parse(
 		[]byte(tokenString),
-		//		jwt.WithValidate(true),
-		// TODO: Should I verify here as well?
-		//		jwt.WithVerify(jwa.RS256, key),
 	)
 	if err != nil {
 		return nil, err

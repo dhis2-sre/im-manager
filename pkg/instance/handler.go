@@ -68,6 +68,12 @@ func (h Handler) Create(c *gin.Context) {
 		return
 	}
 
+	token, err := handler.GetTokenFromHttpAuthHeader(c)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
 	requiredParameters := convertRequiredParameters(&request.RequiredParameters)
 	optionalParameters := convertOptionalParameters(&request.OptionalParameters)
 
@@ -80,7 +86,7 @@ func (h Handler) Create(c *gin.Context) {
 		OptionalParameters: *optionalParameters,
 	}
 
-	userWithGroups, err := h.userClient.FindUserById(uint(user.ID))
+	userWithGroups, err := h.userClient.FindUserById(token, uint(user.ID))
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -95,7 +101,12 @@ func (h Handler) Create(c *gin.Context) {
 		return
 	}
 
-	if err := h.instanceService.Create(instance); err != nil {
+	group, err := h.userClient.FindGroupById(token, instance.GroupID)
+	if err != nil {
+		_ = c.Error(err)
+	}
+
+	if err := h.instanceService.Create(instance, group); err != nil {
 		_ = c.Error(err)
 		return
 	}
@@ -131,19 +142,21 @@ func convertOptionalParameters(requestParameters *[]ParameterRequest) *[]model.I
 	return &[]model.InstanceOptionalParameter{}
 }
 
-// Delete godoc
-// @Summary Delete instance by id
-// @Description Delete instance by id...
-// @Tags Restricted
-// @Accept json
-// @Produce json
-// @Success 202 {object} map[string]interface{}
-// @Failure 401 {object} map[string]interface{}
-// @Failure 404 {object} map[string]interface{}
-// @Router /instances/{id} [delete]
-// @Param id path string true "Instance id"
-// @Security OAuth2Password
+// Delete instance by id
 func (h Handler) Delete(c *gin.Context) {
+	// swagger:route DELETE /instances/{id} deleteInstanceById
+	//
+	// This will delete an instance by its id
+	//
+	// Security:
+	//  oauth2:
+	//
+	// responses:
+	//   202:
+	//   401: Error
+	//   403: Error
+	//   404: Error
+	//   415: Error
 	idParam := c.Param("id")
 	id, err := strconv.Atoi(idParam)
 	if err != nil {
@@ -158,7 +171,13 @@ func (h Handler) Delete(c *gin.Context) {
 		return
 	}
 
-	userWithGroups, err := h.userClient.FindUserById(uint(user.ID))
+	token, err := handler.GetTokenFromHttpAuthHeader(c)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	userWithGroups, err := h.userClient.FindUserById(token, uint(user.ID))
 	if err != nil {
 		notFound := apperror.NewNotFound("user", strconv.Itoa(int(user.ID)))
 		_ = c.Error(notFound)
@@ -179,7 +198,12 @@ func (h Handler) Delete(c *gin.Context) {
 		return
 	}
 
-	err = h.instanceService.Delete(instance.ID)
+	group, err := h.userClient.FindGroupById(token, instance.GroupID)
+	if err != nil {
+		_ = c.Error(err)
+	}
+
+	err = h.instanceService.Delete(instance.ID, group)
 	if err != nil {
 		message := fmt.Sprintf("Unable to delete instance: %s", err)
 		internal := apperror.NewInternal(message)
@@ -217,7 +241,13 @@ func (h Handler) FindById(c *gin.Context) {
 		return
 	}
 
-	userWithGroups, err := h.userClient.FindUserById(uint(user.ID))
+	token, err := handler.GetTokenFromHttpAuthHeader(c)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	userWithGroups, err := h.userClient.FindUserById(token, uint(user.ID))
 	if err != nil {
 		notFound := apperror.NewNotFound("user", strconv.Itoa(int(user.ID)))
 		_ = c.Error(notFound)
@@ -256,7 +286,13 @@ func (h Handler) Logs(c *gin.Context) {
 		return
 	}
 
-	userWithGroups, err := h.userClient.FindUserById(uint(user.ID))
+	token, err := handler.GetTokenFromHttpAuthHeader(c)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	userWithGroups, err := h.userClient.FindUserById(token, uint(user.ID))
 	if err != nil {
 		notFound := apperror.NewNotFound("user", strconv.Itoa(int(user.ID)))
 		_ = c.Error(notFound)
@@ -277,7 +313,12 @@ func (h Handler) Logs(c *gin.Context) {
 		return
 	}
 
-	readCloser, err := h.instanceService.Logs(instance)
+	group, err := h.userClient.FindGroupById(token, instance.GroupID)
+	if err != nil {
+		_ = c.Error(err)
+	}
+
+	readCloser, err := h.instanceService.Logs(instance, group)
 
 	if err != nil {
 		conflict := apperror.NewConflict(err.Error())
@@ -336,7 +377,13 @@ func (h Handler) NameToId(c *gin.Context) {
 		return
 	}
 
-	userWithGroups, err := h.userClient.FindUserById(uint(user.ID))
+	token, err := handler.GetTokenFromHttpAuthHeader(c)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	userWithGroups, err := h.userClient.FindUserById(token, uint(user.ID))
 	if err != nil {
 		notFound := apperror.NewNotFound("user", strconv.Itoa(int(user.ID)))
 		_ = c.Error(notFound)

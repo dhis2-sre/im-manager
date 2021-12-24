@@ -6,6 +6,7 @@ import (
 	"github.com/dhis2-sre/im-manager/pkg/config"
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	userClient "github.com/dhis2-sre/im-users/pkg/client"
+	"github.com/dhis2-sre/im-users/swagger/sdk/models"
 	"io"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -14,10 +15,10 @@ import (
 )
 
 type Service interface {
-	Create(instance *model.Instance) error
+	Create(instance *model.Instance, group *models.Group) error
 	FindById(id uint) (*model.Instance, error)
-	Delete(id uint) error
-	Logs(instance *model.Instance) (io.ReadCloser, error)
+	Delete(id uint, group *models.Group) error
+	Logs(instance *model.Instance, group *models.Group) (io.ReadCloser, error)
 	FindWithParametersById(id uint) (*model.Instance, error)
 	FindByNameAndGroup(instanceName string, groupId uint) (*model.Instance, error)
 }
@@ -46,18 +47,13 @@ type service struct {
 	kubernetesService  KubernetesService
 }
 
-func (s service) Create(instance *model.Instance) error {
+func (s service) Create(instance *model.Instance, group *models.Group) error {
 	err := s.instanceRepository.Create(instance)
 	if err != nil {
 		return err
 	}
 
 	instanceWithParameters, err := s.instanceRepository.FindWithParametersById(instance.ID)
-	if err != nil {
-		return err
-	}
-
-	group, err := s.userClient.FindGroupById(instance.GroupID)
 	if err != nil {
 		return err
 	}
@@ -89,13 +85,8 @@ func (s service) FindById(id uint) (*model.Instance, error) {
 	return s.instanceRepository.FindById(id)
 }
 
-func (s service) Delete(id uint) error {
+func (s service) Delete(id uint, group *models.Group) error {
 	instanceWithParameters, err := s.instanceRepository.FindWithParametersById(id)
-	if err != nil {
-		return err
-	}
-
-	group, err := s.userClient.FindGroupById(instanceWithParameters.GroupID)
 	if err != nil {
 		return err
 	}
@@ -124,14 +115,10 @@ func (s service) Delete(id uint) error {
 	return s.instanceRepository.Delete(id)
 }
 
-func (s service) Logs(instance *model.Instance) (io.ReadCloser, error) {
-	configuration, err := s.userClient.FindGroupById(instance.GroupID)
-	if err != nil {
-		log.Println(err)
-	}
-
+func (s service) Logs(instance *model.Instance, group *models.Group) (io.ReadCloser, error) {
 	var read io.ReadCloser
-	err = s.kubernetesService.Executor(configuration.ClusterConfiguration, func(client *kubernetes.Clientset) error {
+
+	err := s.kubernetesService.Executor(group.ClusterConfiguration, func(client *kubernetes.Clientset) error {
 		pod := s.getPod(client, instance)
 
 		podLogOptions := v1.PodLogOptions{
