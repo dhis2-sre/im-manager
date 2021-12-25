@@ -6,7 +6,7 @@ binary:
 	go build -o im-manager -ldflags "-s -w" ./cmd/serve
 
 smoke-test:
-	docker compose up -d database
+	docker compose up -d database rabbitmq jwks
 	sleep 3
 	IMAGE_TAG=$(tag) docker compose up -d prod
 
@@ -17,13 +17,13 @@ push-prod:
 	IMAGE_TAG=$(tag) docker compose push prod
 
 dev:
-	docker compose up --build dev database
+	docker compose up --build dev database rabbitmq jwks
 
 cluster-dev:
 	skaffold dev
 
 test: clean
-	docker compose up -d database
+	docker compose up -d database rabbitmq jwks
 	docker compose run --no-deps test
 	$(clean-cmd)
 
