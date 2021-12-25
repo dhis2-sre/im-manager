@@ -21,8 +21,6 @@ func GetEngine(environment di.Environment) *gin.Engine {
 	router.GET("/stacks", environment.StackHandler.FindAll)
 	router.GET("/stacks/:id", environment.StackHandler.FindById)
 
-	router.GET("/instances-name-to-id/:groupId/:name", environment.InstanceHandler.NameToId)
-
 	tokenAuthenticationRouter := router.Group("")
 	tokenAuthenticationRouter.Use(environment.AuthenticationMiddleware.TokenAuthentication)
 	tokenAuthenticationRouter.POST("/instances", environment.InstanceHandler.Create)
@@ -30,6 +28,7 @@ func GetEngine(environment di.Environment) *gin.Engine {
 	tokenAuthenticationRouter.DELETE("/instances/:id", environment.InstanceHandler.Delete)
 	tokenAuthenticationRouter.GET("/instances/:id", environment.InstanceHandler.FindById)
 	tokenAuthenticationRouter.GET("/instances/:id/logs", environment.InstanceHandler.Logs)
+	tokenAuthenticationRouter.GET("/instances-name-to-id/:groupId/:name", environment.InstanceHandler.NameToId)
 
 	return r
 }
