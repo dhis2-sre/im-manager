@@ -3,11 +3,6 @@
 
 # TODO
 * handler tests
-* cicd
-* helmfile with postgreql and rabbitmq
 * Write readme
 * helm - docker registry credentials also
-
-
-* i.instanceAuthorizer.CanWrite
 * 

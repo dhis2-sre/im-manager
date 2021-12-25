@@ -7,6 +7,7 @@ import (
 	"github.com/dhis2-sre/im-manager/internal/handler"
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	userClient "github.com/dhis2-sre/im-users/pkg/client"
+	"github.com/dhis2-sre/im-users/swagger/sdk/models"
 	"github.com/gin-gonic/gin"
 	"io"
 	"net/http"
@@ -402,4 +403,62 @@ func (h Handler) NameToId(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, instance.ID)
+}
+
+type groupWithInstances struct {
+	ID        uint
+	Name      string
+	Hostname  string
+	Instances []*model.Instance
+}
+
+func (h Handler) List(c *gin.Context) {
+	user, err := handler.GetUserFromContext(c)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	token, err := handler.GetTokenFromHttpAuthHeader(c)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	userWithGroups, err := h.userClient.FindUserById(token, user.ID)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	groups := userWithGroups.Groups
+	instances, err := h.instanceService.FindInstances(groups)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	c.JSON(http.StatusOK, h.groupsWithInstances(groups, instances))
+}
+
+func (h Handler) groupsWithInstances(groups []*models.Group, instances []*model.Instance) []groupWithInstances {
+	groupsWithInstances := make([]groupWithInstances, len(groups))
+	for i, group := range groups {
+		groupsWithInstances[i].ID = uint(group.ID)
+		groupsWithInstances[i].Name = group.Name
+		groupsWithInstances[i].Hostname = group.Hostname
+		groupsWithInstances[i].Instances = h.filterByGroupId(instances, func(instance *model.Instance) bool {
+			return instance.GroupID == uint(group.ID)
+		})
+	}
+	return groupsWithInstances
+}
+
+func (h Handler) filterByGroupId(instances []*model.Instance, test func(instance *model.Instance) bool) (ret []*model.Instance) {
+	for _, instance := range instances {
+		if test(instance) {
+			ret = append(ret, instance)
+		}
+	}
+	return
 }

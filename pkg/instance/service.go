@@ -21,6 +21,7 @@ type Service interface {
 	Logs(instance *model.Instance, group *models.Group) (io.ReadCloser, error)
 	FindWithParametersById(id uint) (*model.Instance, error)
 	FindByNameAndGroup(instanceName string, groupId uint) (*model.Instance, error)
+	FindInstances(groups []*models.Group) ([]*model.Instance, error)
 }
 
 func ProvideService(
@@ -160,4 +161,17 @@ func (s service) FindWithParametersById(id uint) (*model.Instance, error) {
 
 func (s service) FindByNameAndGroup(instanceName string, groupId uint) (*model.Instance, error) {
 	return s.instanceRepository.FindByNameAndGroup(instanceName, groupId)
+}
+
+func (s service) FindInstances(groups []*models.Group) ([]*model.Instance, error) {
+	groupIds := make([]uint, len(groups))
+	for i, group := range groups {
+		groupIds[i] = uint(group.ID)
+	}
+
+	instances, err := s.instanceRepository.FindByGroupIds(groupIds)
+	if err != nil {
+		return nil, err
+	}
+	return instances, nil
 }
