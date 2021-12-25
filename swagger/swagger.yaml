@@ -1,0 +1,49 @@
+consumes:
+- application/json
+info:
+  contact:
+    email: info@dhis2.org
+    url: https://github.com/dhis2-sre/im-manager
+  description: Manager Service as part of the Instance Manager environment
+  license:
+    name: TODO
+  termsOfService: there are no TOS at this moment, use at your own risk we take no
+    responsibility
+  title: Instance Manager Manager Service.
+  version: 0.1.0
+paths:
+  /instances/{id}:
+    delete:
+      description: This will delete an instance by its id
+      operationId: deleteInstanceById
+      parameters:
+      - format: uint64
+        in: path
+        name: id
+        required: true
+        type: integer
+        x-go-name: ID
+      responses:
+        "202":
+          description: ""
+        "401":
+          $ref: '#/responses/Error'
+        "403":
+          $ref: '#/responses/Error'
+        "404":
+          $ref: '#/responses/Error'
+        "415":
+          $ref: '#/responses/Error'
+      security:
+      - oauth2: []
+produces:
+- application/json
+responses:
+  Error:
+    description: ""
+securityDefinitions:
+  oauth2:
+    flow: password
+    tokenUrl: /not-valid--endpoint-is-served-from-the-im-user-service
+    type: oauth2
+swagger: "2.0"
