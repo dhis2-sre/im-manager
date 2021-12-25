@@ -32,7 +32,7 @@ func (c *ttlDestroyConsumer) Consume(d amqp.Delivery) {
 		return
 	}
 
-	err := c.instanceService.Delete(payload.ID)
+	err := c.instanceService.Delete(payload.ID, nil)
 	if err != nil {
 		log.Println(err)
 		return

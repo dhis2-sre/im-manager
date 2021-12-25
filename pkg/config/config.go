@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"strconv"
@@ -20,6 +21,12 @@ func ProvideConfig() Config {
 			Password:     requireEnv("DATABASE_PASSWORD"),
 			DatabaseName: requireEnv("DATABASE_NAME"),
 		},
+		RabbitMqURL: rabbitmq{
+			Host:     requireEnv("RABBITMQ_HOST"),
+			Port:     requireEnvAsInt("RABBITMQ_PORT"),
+			Username: requireEnv("RABBITMQ_USERNAME"),
+			Password: requireEnv("RABBITMQ_PASSWORD"),
+		},
 	}
 }
 
@@ -27,6 +34,7 @@ type Config struct {
 	BasePath    string
 	UserService service
 	Postgresql  postgresql
+	RabbitMqURL rabbitmq
 }
 
 type service struct {
@@ -40,6 +48,17 @@ type postgresql struct {
 	Username     string
 	Password     string
 	DatabaseName string
+}
+
+type rabbitmq struct {
+	Host     string
+	Port     int
+	Username string
+	Password string
+}
+
+func (r rabbitmq) GetUrl() string {
+	return fmt.Sprintf("amqp://%s:%s@%s:%d/", r.Username, r.Password, r.Host, r.Port)
 }
 
 func requireEnv(key string) string {

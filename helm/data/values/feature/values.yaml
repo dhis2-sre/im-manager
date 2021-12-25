@@ -15,5 +15,8 @@ environment:
   DATABASE_HOST: im-manager-postgresql-feature.instance-manager-feature.svc.cluster.local
   DATABASE_PORT: "5432"
 
+  RABBITMQ_HOST: im-manager-rabbitmq-feature.instance-manager-feature.svc.cluster.local
+  RABBITMQ_PORT: "5672"
+
 groups:
   names: whoami
