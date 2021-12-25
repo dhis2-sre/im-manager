@@ -79,14 +79,14 @@ func (h Handler) Create(c *gin.Context) {
 
 	instance := &model.Instance{
 		Name:               request.Name,
-		UserID:             uint(user.ID),
+		UserID:             user.ID,
 		GroupID:            request.GroupID,
 		StackID:            request.StackID,
 		RequiredParameters: *requiredParameters,
 		OptionalParameters: *optionalParameters,
 	}
 
-	userWithGroups, err := h.userClient.FindUserById(token, uint(user.ID))
+	userWithGroups, err := h.userClient.FindUserById(token, user.ID)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -175,7 +175,7 @@ func (h Handler) Delete(c *gin.Context) {
 		return
 	}
 
-	userWithGroups, err := h.userClient.FindUserById(token, uint(user.ID))
+	userWithGroups, err := h.userClient.FindUserById(token, user.ID)
 	if err != nil {
 		notFound := apperror.NewNotFound("user", strconv.Itoa(int(user.ID)))
 		_ = c.Error(notFound)
@@ -245,7 +245,7 @@ func (h Handler) FindById(c *gin.Context) {
 		return
 	}
 
-	userWithGroups, err := h.userClient.FindUserById(token, uint(user.ID))
+	userWithGroups, err := h.userClient.FindUserById(token, user.ID)
 	if err != nil {
 		notFound := apperror.NewNotFound("user", strconv.Itoa(int(user.ID)))
 		_ = c.Error(notFound)
@@ -290,7 +290,7 @@ func (h Handler) Logs(c *gin.Context) {
 		return
 	}
 
-	userWithGroups, err := h.userClient.FindUserById(token, uint(user.ID))
+	userWithGroups, err := h.userClient.FindUserById(token, user.ID)
 	if err != nil {
 		notFound := apperror.NewNotFound("user", strconv.Itoa(int(user.ID)))
 		_ = c.Error(notFound)
@@ -381,7 +381,7 @@ func (h Handler) NameToId(c *gin.Context) {
 		return
 	}
 
-	userWithGroups, err := h.userClient.FindUserById(token, uint(user.ID))
+	userWithGroups, err := h.userClient.FindUserById(token, user.ID)
 	if err != nil {
 		notFound := apperror.NewNotFound("user", strconv.Itoa(int(user.ID)))
 		_ = c.Error(notFound)
