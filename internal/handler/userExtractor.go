@@ -2,40 +2,19 @@ package handler
 
 import (
 	"errors"
-	"github.com/dhis2-sre/im-users/swagger/sdk/models"
 	"github.com/gin-gonic/gin"
-	"github.com/lestrrat-go/jwx/jwt"
-	"strings"
 )
 
-func GetUserFromHttpAuthHeader(c *gin.Context) (*models.User, error) {
-	tokenString := c.GetHeader("Authorization")
-	tokenString = strings.TrimPrefix(tokenString, "Bearer ")
+func GetUserFromContext(c *gin.Context) (User, error) {
+	userData, exists := c.Get("user")
 
-	token, err := jwt.Parse(
-		[]byte(tokenString),
-	)
-	if err != nil {
-		return nil, err
+	if !exists {
+		return User{}, errors.New("user not found on context")
 	}
 
-	userData, ok := token.Get("user")
+	user, ok := userData.(User)
 	if !ok {
-		return nil, errors.New("user not found in claims")
+		return User{}, errors.New("failed to parse user data")
 	}
-
-	userMap, ok := userData.(map[string]interface{})
-	if !ok {
-		return nil, errors.New("failed to parse user data")
-	}
-
-	id := userMap["ID"].(float64)
-	email := userMap["Email"].(string)
-
-	user := &models.User{
-		ID:    uint64(id),
-		Email: email,
-	}
-
 	return user, nil
 }

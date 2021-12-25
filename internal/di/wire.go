@@ -4,6 +4,7 @@ package di
 
 import (
 	"github.com/dhis2-sre/im-manager/internal/client"
+	"github.com/dhis2-sre/im-manager/internal/handler"
 	"github.com/dhis2-sre/im-manager/pkg/config"
 	"github.com/dhis2-sre/im-manager/pkg/instance"
 	"github.com/dhis2-sre/im-manager/pkg/stack"
@@ -14,11 +15,12 @@ import (
 )
 
 type Environment struct {
-	Config          config.Config
-	StackService    stack.Service
-	StackHandler    stack.Handler
-	InstanceService instance.Service
-	InstanceHandler instance.Handler
+	Config                   config.Config
+	StackService             stack.Service
+	StackHandler             stack.Handler
+	InstanceService          instance.Service
+	InstanceHandler          instance.Handler
+	AuthenticationMiddleware handler.AuthenticationMiddleware
 }
 
 func ProvideEnvironment(
@@ -27,6 +29,7 @@ func ProvideEnvironment(
 	stackHandler stack.Handler,
 	instanceService instance.Service,
 	instanceHandler instance.Handler,
+	authenticationMiddleware handler.AuthenticationMiddleware,
 ) Environment {
 	return Environment{
 		config,
@@ -34,6 +37,7 @@ func ProvideEnvironment(
 		stackHandler,
 		instanceService,
 		instanceHandler,
+		authenticationMiddleware,
 	}
 }
 
@@ -53,6 +57,8 @@ func GetEnvironment() Environment {
 		instance.ProvideRepository,
 		instance.ProvideService,
 		instance.ProvideHandler,
+
+		handler.ProvideAuthentication,
 
 		ProvideEnvironment,
 	)

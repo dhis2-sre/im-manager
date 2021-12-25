@@ -9,7 +9,6 @@ import (
 	userClient "github.com/dhis2-sre/im-users/pkg/client"
 	"github.com/gin-gonic/gin"
 	"io"
-	"log"
 	"net/http"
 	"strconv"
 )
@@ -62,7 +61,7 @@ func (h Handler) Create(c *gin.Context) {
 		return
 	}
 
-	user, err := handler.GetUserFromHttpAuthHeader(c)
+	user, err := handler.GetUserFromContext(c)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -91,8 +90,6 @@ func (h Handler) Create(c *gin.Context) {
 		_ = c.Error(err)
 		return
 	}
-
-	log.Printf("%+v", userWithGroups)
 
 	canWrite := handler.CanWriteInstance(userWithGroups, instance)
 	if !canWrite {
@@ -165,7 +162,7 @@ func (h Handler) Delete(c *gin.Context) {
 		return
 	}
 
-	user, err := handler.GetUserFromHttpAuthHeader(c)
+	user, err := handler.GetUserFromContext(c)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -235,7 +232,7 @@ func (h Handler) FindById(c *gin.Context) {
 		return
 	}
 
-	user, err := handler.GetUserFromHttpAuthHeader(c)
+	user, err := handler.GetUserFromContext(c)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -280,7 +277,7 @@ func (h Handler) Logs(c *gin.Context) {
 		return
 	}
 
-	user, err := handler.GetUserFromHttpAuthHeader(c)
+	user, err := handler.GetUserFromContext(c)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -371,7 +368,7 @@ func (h Handler) NameToId(c *gin.Context) {
 		return
 	}
 
-	user, err := handler.GetUserFromHttpAuthHeader(c)
+	user, err := handler.GetUserFromContext(c)
 	if err != nil {
 		_ = c.Error(err)
 		return

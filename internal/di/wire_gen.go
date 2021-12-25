@@ -7,6 +7,7 @@ package di
 
 import (
 	"github.com/dhis2-sre/im-manager/internal/client"
+	"github.com/dhis2-sre/im-manager/internal/handler"
 	"github.com/dhis2-sre/im-manager/pkg/config"
 	"github.com/dhis2-sre/im-manager/pkg/instance"
 	"github.com/dhis2-sre/im-manager/pkg/stack"
@@ -22,25 +23,27 @@ func GetEnvironment() Environment {
 	db := provideDatabase(configConfig)
 	repository := stack.ProvideRepository(db)
 	service := stack.ProvideService(repository)
-	handler := stack.ProvideHandler(service)
+	stackHandler := stack.ProvideHandler(service)
 	instanceRepository := instance.ProvideRepository(db)
 	clientClient := client.ProvideUser(configConfig)
 	kubernetesService := instance.ProvideKubernetesService()
 	helmfileService := instance.ProvideHelmfileService(service, configConfig)
 	instanceService := instance.ProvideService(configConfig, instanceRepository, clientClient, kubernetesService, helmfileService)
 	instanceHandler := instance.ProvideHandler(clientClient, instanceService)
-	environment := ProvideEnvironment(configConfig, service, handler, instanceService, instanceHandler)
+	authenticationMiddleware := handler.ProvideAuthentication(configConfig)
+	environment := ProvideEnvironment(configConfig, service, stackHandler, instanceService, instanceHandler, authenticationMiddleware)
 	return environment
 }
 
 // wire.go:
 
 type Environment struct {
-	Config          config.Config
-	StackService    stack.Service
-	StackHandler    stack.Handler
-	InstanceService instance.Service
-	InstanceHandler instance.Handler
+	Config                   config.Config
+	StackService             stack.Service
+	StackHandler             stack.Handler
+	InstanceService          instance.Service
+	InstanceHandler          instance.Handler
+	AuthenticationMiddleware handler.AuthenticationMiddleware
 }
 
 func ProvideEnvironment(config2 config.Config,
@@ -49,11 +52,13 @@ func ProvideEnvironment(config2 config.Config,
 	stackHandler stack.Handler,
 	instanceService instance.Service,
 	instanceHandler instance.Handler,
+	authenticationMiddleware handler.AuthenticationMiddleware,
 ) Environment {
 	return Environment{config2, stackService,
 		stackHandler,
 		instanceService,
 		instanceHandler,
+		authenticationMiddleware,
 	}
 }
 

@@ -27,14 +27,22 @@ func ProvideConfig() Config {
 			Username: requireEnv("RABBITMQ_USERNAME"),
 			Password: requireEnv("RABBITMQ_PASSWORD"),
 		},
+		Authentication: Authentication{
+			Jwks: Jwks{
+				Host:                   requireEnv("JWKS_HOST"),
+				Index:                  requireEnvAsInt("JWKS_INDEX"),
+				MinimumRefreshInterval: requireEnvAsInt("JWKS_MINIMUM_REFRESH_INTERVAL"),
+			},
+		},
 	}
 }
 
 type Config struct {
-	BasePath    string
-	UserService service
-	Postgresql  postgresql
-	RabbitMqURL rabbitmq
+	BasePath       string
+	UserService    service
+	Postgresql     postgresql
+	RabbitMqURL    rabbitmq
+	Authentication Authentication
 }
 
 type service struct {
@@ -59,6 +67,16 @@ type rabbitmq struct {
 
 func (r rabbitmq) GetUrl() string {
 	return fmt.Sprintf("amqp://%s:%s@%s:%d/", r.Username, r.Password, r.Host, r.Port)
+}
+
+type Authentication struct {
+	Jwks Jwks
+}
+
+type Jwks struct {
+	Host                   string
+	Index                  int
+	MinimumRefreshInterval int
 }
 
 func requireEnv(key string) string {
