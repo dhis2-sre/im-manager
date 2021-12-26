@@ -3,7 +3,7 @@ package instance
 import (
 	"bytes"
 	"fmt"
-	"github.com/dhis2-sre/im-users/swagger/sdk/models"
+	"github.com/dhis2-sre/im-user/swagger/sdk/models"
 	"go.mozilla.org/sops/v3/cmd/sops/formats"
 	"go.mozilla.org/sops/v3/decrypt"
 	"io/ioutil"

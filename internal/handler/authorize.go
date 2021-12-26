@@ -2,7 +2,7 @@ package handler
 
 import (
 	"github.com/dhis2-sre/im-manager/pkg/model"
-	"github.com/dhis2-sre/im-users/swagger/sdk/models"
+	"github.com/dhis2-sre/im-user/swagger/sdk/models"
 	"sort"
 )
 

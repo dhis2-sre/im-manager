@@ -5,7 +5,7 @@ import (
 	"github.com/dhis2-sre/im-manager/pkg/config"
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	"github.com/dhis2-sre/im-manager/pkg/stack"
-	"github.com/dhis2-sre/im-users/swagger/sdk/models"
+	"github.com/dhis2-sre/im-user/swagger/sdk/models"
 	"log"
 	"os"
 	"os/exec"
