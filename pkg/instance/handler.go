@@ -196,12 +196,7 @@ func (h Handler) Delete(c *gin.Context) {
 		return
 	}
 
-	group, err := h.userClient.FindGroupById(token, instance.GroupID)
-	if err != nil {
-		_ = c.Error(err)
-	}
-
-	err = h.instanceService.Delete(instance.ID, group)
+	err = h.instanceService.Delete(instance.ID)
 	if err != nil {
 		message := fmt.Sprintf("Unable to delete instance: %s", err)
 		internal := apperror.NewInternal(message)

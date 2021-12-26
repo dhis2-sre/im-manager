@@ -13,6 +13,8 @@ func ProvideConfig() Config {
 		UserService: service{
 			Host:     requireEnv("USER_SERVICE_HOST"),
 			BasePath: requireEnv("USER_SERVICE_BASE_PATH"),
+			Username: requireEnv("USER_SERVICE_USERNAME"),
+			Password: requireEnv("USER_SERVICE_PASSWORD"),
 		},
 		Postgresql: postgresql{
 			Host:         requireEnv("DATABASE_HOST"),
@@ -48,6 +50,8 @@ type Config struct {
 type service struct {
 	Host     string
 	BasePath string
+	Username string
+	Password string
 }
 
 type postgresql struct {

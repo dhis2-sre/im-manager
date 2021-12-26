@@ -17,7 +17,7 @@ import (
 type Service interface {
 	Create(instance *model.Instance, group *models.Group) error
 	FindById(id uint) (*model.Instance, error)
-	Delete(id uint, group *models.Group) error
+	Delete(id uint) error
 	Logs(instance *model.Instance, group *models.Group) (io.ReadCloser, error)
 	FindWithParametersById(id uint) (*model.Instance, error)
 	FindByNameAndGroup(instanceName string, groupId uint) (*model.Instance, error)
@@ -86,8 +86,18 @@ func (s service) FindById(id uint) (*model.Instance, error) {
 	return s.instanceRepository.FindById(id)
 }
 
-func (s service) Delete(id uint, group *models.Group) error {
+func (s service) Delete(id uint) error {
 	instanceWithParameters, err := s.instanceRepository.FindWithParametersById(id)
+	if err != nil {
+		return err
+	}
+
+	tokens, err := s.userClient.SignIn(s.config.UserService.Username, s.config.UserService.Password)
+	if err != nil {
+		return err
+	}
+
+	group, err := s.userClient.FindGroupById(tokens.AccessToken, instanceWithParameters.GroupID)
 	if err != nil {
 		return err
 	}
