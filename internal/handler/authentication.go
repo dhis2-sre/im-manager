@@ -11,7 +11,7 @@ import (
 	"github.com/lestrrat-go/jwx/jwk"
 	"github.com/lestrrat-go/jwx/jwt"
 	"log"
-	"strings"
+	"net/http"
 	"time"
 )
 
@@ -51,9 +51,6 @@ func provideJwkAutoRefresh(host string, minRefreshInterval time.Duration) (*jwk.
 }
 
 func (m AuthenticationMiddleware) TokenAuthentication(c *gin.Context) {
-	token := c.GetHeader("Authorization")
-	token = strings.TrimPrefix(token, "Bearer ")
-
 	keySet, err := m.jwkAutoRefresh.Fetch(context.TODO(), m.c.Authentication.Jwks.Host)
 	if err != nil {
 		internal := apperror.NewInternal("failed to refresh key set")
@@ -69,7 +66,7 @@ func (m AuthenticationMiddleware) TokenAuthentication(c *gin.Context) {
 		}
 	}
 
-	u, err := validateAccessToken(token, publicKey)
+	u, err := parseRequest(c.Request, publicKey)
 	if err != nil {
 		unauthorized := apperror.NewUnauthorized("token not valid")
 		_ = c.Error(unauthorized)
@@ -86,9 +83,9 @@ type User struct {
 	Email string
 }
 
-func validateAccessToken(tokenString string, key *rsa.PublicKey) (User, error) {
-	token, err := jwt.Parse(
-		[]byte(tokenString),
+func parseRequest(request *http.Request, key *rsa.PublicKey) (User, error) {
+	token, err := jwt.ParseRequest(
+		request,
 		jwt.WithValidate(true),
 		jwt.WithVerify(jwa.RS256, key),
 	)
