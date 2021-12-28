@@ -158,7 +158,7 @@ func (h Handler) Delete(c *gin.Context) {
 	idParam := c.Param("id")
 	id, err := strconv.Atoi(idParam)
 	if err != nil {
-		badRequest := apperror.NewBadRequest("Error parsing id")
+		badRequest := apperror.NewBadRequest("error parsing id")
 		_ = c.Error(badRequest)
 		return
 	}
