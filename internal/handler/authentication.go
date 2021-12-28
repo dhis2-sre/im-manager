@@ -55,6 +55,8 @@ func (m AuthenticationMiddleware) TokenAuthentication(c *gin.Context) {
 	if err != nil {
 		internal := apperror.NewInternal("failed to refresh key set")
 		_ = c.Error(internal)
+		c.Abort()
+		return
 	}
 
 	publicKey := &rsa.PublicKey{}
@@ -63,6 +65,8 @@ func (m AuthenticationMiddleware) TokenAuthentication(c *gin.Context) {
 		if err != nil {
 			internal := apperror.NewInternal("failed to extract public key")
 			_ = c.Error(internal)
+			c.Abort()
+			return
 		}
 	}
 
@@ -70,12 +74,18 @@ func (m AuthenticationMiddleware) TokenAuthentication(c *gin.Context) {
 	if err != nil {
 		unauthorized := apperror.NewUnauthorized("token not valid")
 		_ = c.Error(unauthorized)
+		c.Abort()
 		return
 	}
 
-	c.Set("user", u)
-
-	c.Next()
+	// Extra precaution to ensure that no errors has occurred, and it's safe to call c.Next()
+	if len(c.Errors.Errors()) > 0 {
+		c.Abort()
+		return
+	} else {
+		c.Set("user", u)
+		c.Next()
+	}
 }
 
 type User struct {
