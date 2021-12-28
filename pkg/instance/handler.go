@@ -144,7 +144,7 @@ func convertOptionalParameters(requestParameters *[]ParameterRequest) *[]model.I
 func (h Handler) Delete(c *gin.Context) {
 	// swagger:route DELETE /instances/{id} deleteInstanceById
 	//
-	// This will delete an instance by its id
+	// Delete an instance by id
 	//
 	// Security:
 	//  oauth2:
