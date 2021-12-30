@@ -33,6 +33,7 @@ COPY --from=build /usr/bin/helmfile /usr/bin/helmfile
 COPY --from=build /usr/bin/aws-iam-authenticator /usr/bin/aws-iam-authenticator
 WORKDIR /app
 COPY --from=build /app/im-manager .
+COPY --from=build /src/swagger/swagger.yaml ./swagger/
 # helmfile invokes helm in the folder which contains the helmfile.yaml and requires write access to .config/ and .cache/ in the same folder
 COPY --from=build --chown=guest:users /src/stacks ./stacks
 USER guest
