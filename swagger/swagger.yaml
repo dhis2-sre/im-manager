@@ -1,5 +1,223 @@
 consumes:
 - application/json
+definitions:
+  CreateInstanceRequest:
+    properties:
+      groupId:
+        format: uint64
+        type: integer
+        x-go-name: GroupID
+      name:
+        type: string
+        x-go-name: Name
+      optionalParameters:
+        items:
+          $ref: '#/definitions/ParameterRequest'
+        type: array
+        x-go-name: OptionalParameters
+      requiredParameters:
+        items:
+          $ref: '#/definitions/ParameterRequest'
+        type: array
+        x-go-name: RequiredParameters
+      stackId:
+        format: uint64
+        type: integer
+        x-go-name: StackID
+    type: object
+    x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
+  DeletedAt:
+    $ref: '#/definitions/NullTime'
+  GroupWithInstances:
+    properties:
+      Hostname:
+        type: string
+      ID:
+        format: uint64
+        type: integer
+      Instances:
+        items:
+          $ref: '#/definitions/Instance'
+        type: array
+      Name:
+        type: string
+    type: object
+    x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
+  Instance:
+    properties:
+      CreatedAt:
+        format: date-time
+        type: string
+      DeletedAt:
+        $ref: '#/definitions/DeletedAt'
+      DeployLog:
+        type: string
+      GroupID:
+        format: uint64
+        type: integer
+      ID:
+        format: uint64
+        type: integer
+      Name:
+        type: string
+      StackID:
+        format: uint64
+        type: integer
+      UpdatedAt:
+        format: date-time
+        type: string
+      UserID:
+        format: uint64
+        type: integer
+      optionalParameters:
+        items:
+          $ref: '#/definitions/InstanceOptionalParameter'
+        type: array
+        x-go-name: OptionalParameters
+      requiredParameters:
+        items:
+          $ref: '#/definitions/InstanceRequiredParameter'
+        type: array
+        x-go-name: RequiredParameters
+    type: object
+    x-go-package: github.com/dhis2-sre/im-manager/pkg/model
+  InstanceOptionalParameter:
+    properties:
+      CreatedAt:
+        format: date-time
+        type: string
+      DeletedAt:
+        $ref: '#/definitions/DeletedAt'
+      ID:
+        format: uint64
+        type: integer
+      InstanceID:
+        format: uint64
+        type: integer
+      StackOptionalParameter:
+        $ref: '#/definitions/StackOptionalParameter'
+      StackOptionalParameterID:
+        format: uint64
+        type: integer
+      UpdatedAt:
+        format: date-time
+        type: string
+      Value:
+        type: string
+    type: object
+    x-go-package: github.com/dhis2-sre/im-manager/pkg/model
+  InstanceRequiredParameter:
+    properties:
+      CreatedAt:
+        format: date-time
+        type: string
+      DeletedAt:
+        $ref: '#/definitions/DeletedAt'
+      ID:
+        format: uint64
+        type: integer
+      InstanceID:
+        format: uint64
+        type: integer
+      StackRequiredParameter:
+        $ref: '#/definitions/StackRequiredParameter'
+      StackRequiredParameterID:
+        format: uint64
+        type: integer
+      UpdatedAt:
+        format: date-time
+        type: string
+      Value:
+        type: string
+    type: object
+    x-go-package: github.com/dhis2-sre/im-manager/pkg/model
+  Model:
+    description: |-
+      Model a basic GoLang struct which includes the following fields: ID, CreatedAt, UpdatedAt, DeletedAt
+      It may be embedded into your model or you may build your own model without it
+      type User struct {
+      gorm.Model
+      }
+    properties:
+      CreatedAt:
+        format: date-time
+        type: string
+      DeletedAt:
+        $ref: '#/definitions/DeletedAt'
+      ID:
+        format: uint64
+        type: integer
+      UpdatedAt:
+        format: date-time
+        type: string
+    type: object
+    x-go-package: gorm.io/gorm
+  NullTime:
+    description: |-
+      NullTime implements the Scanner interface so
+      it can be used as a scan destination, similar to NullString.
+    properties:
+      Time:
+        format: date-time
+        type: string
+      Valid:
+        type: boolean
+    title: NullTime represents a time.Time that may be null.
+    type: object
+    x-go-package: database/sql
+  ParameterRequest:
+    properties:
+      stackParameterId:
+        format: uint64
+        type: integer
+        x-go-name: StackParameterID
+      value:
+        type: string
+        x-go-name: Value
+    type: object
+    x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
+  StackOptionalParameter:
+    properties:
+      CreatedAt:
+        format: date-time
+        type: string
+      DefaultValue:
+        type: string
+      DeletedAt:
+        $ref: '#/definitions/DeletedAt'
+      ID:
+        format: uint64
+        type: integer
+      Name:
+        type: string
+      StackID:
+        format: uint64
+        type: integer
+      UpdatedAt:
+        format: date-time
+        type: string
+    type: object
+    x-go-package: github.com/dhis2-sre/im-manager/pkg/model
+  StackRequiredParameter:
+    properties:
+      CreatedAt:
+        format: date-time
+        type: string
+      DeletedAt:
+        $ref: '#/definitions/DeletedAt'
+      ID:
+        format: uint64
+        type: integer
+      Name:
+        type: string
+      StackID:
+        format: uint64
+        type: integer
+      UpdatedAt:
+        format: date-time
+        type: string
+    type: object
+    x-go-package: github.com/dhis2-sre/im-manager/pkg/model
 info:
   contact:
     email: info@dhis2.org
@@ -12,10 +230,82 @@ info:
   title: Instance Manager Manager Service.
   version: 0.1.0
 paths:
+  /instances:
+    get:
+      description: List instances
+      operationId: listInstances
+      responses:
+        "200":
+          $ref: '#/responses/GroupWithInstances'
+        "401":
+          $ref: '#/responses/Error'
+        "403":
+          $ref: '#/responses/Error'
+        "415":
+          $ref: '#/responses/Error'
+      security:
+      - oauth2: []
+    post:
+      description: Create instance
+      operationId: createInstance
+      parameters:
+      - description: Create instance request body parameter
+        in: body
+        name: Body
+        required: true
+        schema:
+          $ref: '#/definitions/CreateInstanceRequest'
+      responses:
+        "201":
+          description: Instance
+          schema:
+            $ref: '#/definitions/Instance'
+        "401":
+          $ref: '#/responses/Error'
+        "403":
+          $ref: '#/responses/Error'
+        "404":
+          $ref: '#/responses/Error'
+        "415":
+          $ref: '#/responses/Error'
+      security:
+      - oauth2: []
+  /instances-name-to-id{groupId}/{name}:
+    get:
+      description: Find instance id by name and group id
+      operationId: instanceNameToId
+      parameters:
+      - format: uint64
+        in: path
+        name: groupId
+        required: true
+        type: integer
+        x-go-name: GroupID
+      - format: uint64
+        in: path
+        name: name
+        required: true
+        type: integer
+        x-go-name: Name
+      responses:
+        "200":
+          description: Instance
+          schema:
+            $ref: '#/definitions/Instance'
+        "401":
+          $ref: '#/responses/Error'
+        "403":
+          $ref: '#/responses/Error'
+        "404":
+          $ref: '#/responses/Error'
+        "415":
+          $ref: '#/responses/Error'
+      security:
+      - oauth2: []
   /instances/{id}:
     delete:
-      description: This will delete an instance by its id
-      operationId: deleteInstanceById
+      description: Delete an instance by id
+      operationId: deleteInstance
       parameters:
       - format: uint64
         in: path
@@ -36,11 +326,66 @@ paths:
           $ref: '#/responses/Error'
       security:
       - oauth2: []
+    get:
+      description: Find instance by id
+      operationId: findInstanceById
+      parameters:
+      - format: uint64
+        in: path
+        name: id
+        required: true
+        type: integer
+        x-go-name: ID
+      responses:
+        "200":
+          description: Instance
+          schema:
+            $ref: '#/definitions/Instance'
+        "401":
+          $ref: '#/responses/Error'
+        "403":
+          $ref: '#/responses/Error'
+        "404":
+          $ref: '#/responses/Error'
+        "415":
+          $ref: '#/responses/Error'
+      security:
+      - oauth2: []
+  /instances/{id}/logs:
+    get:
+      description: Stream instance logs in real time
+      operationId: instanceLogs
+      parameters:
+      - format: uint64
+        in: path
+        name: id
+        required: true
+        type: integer
+        x-go-name: ID
+      responses:
+        "200":
+          description: Instance
+          schema:
+            $ref: '#/definitions/Instance'
+        "401":
+          $ref: '#/responses/Error'
+        "403":
+          $ref: '#/responses/Error'
+        "404":
+          $ref: '#/responses/Error'
+        "415":
+          $ref: '#/responses/Error'
+      security:
+      - oauth2: []
 produces:
 - application/json
 responses:
   Error:
     description: ""
+  GroupWithInstances:
+    description: ""
+    schema:
+      $ref: '#/definitions/GroupWithInstances'
 securityDefinitions:
   oauth2:
     flow: password

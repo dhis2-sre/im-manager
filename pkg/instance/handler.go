@@ -42,18 +42,20 @@ type CreateInstanceRequest struct {
 	OptionalParameters []ParameterRequest `json:"optionalParameters"`
 }
 
-// Create godoc
-// @Summary Create instance
-// @Description Create instance
-// @Tags Restricted
-// @Accept json
-// @Produce json
-// @Success 201 {object} map[string]interface{} //model.Instance
-// @Failure 400 {string} string
-// @Failure 401 {string} string
-// @Router /instances [post]
-// @Param createInstanceRequest body CreateInstanceRequest true "Create instance request"
-// @Security OAuth2Password
+// Create instance
+// swagger:route POST /instances createInstance
+//
+// Create instance
+//
+// Security:
+//  oauth2:
+//
+// responses:
+//   201: Instance
+//   401: Error
+//   403: Error
+//   404: Error
+//   415: Error
 func (h Handler) Create(c *gin.Context) {
 	var request CreateInstanceRequest
 
@@ -141,20 +143,20 @@ func convertOptionalParameters(requestParameters *[]ParameterRequest) *[]model.I
 }
 
 // Delete instance by id
+// swagger:route DELETE /instances/{id} deleteInstance
+//
+// Delete an instance by id
+//
+// Security:
+//  oauth2:
+//
+// responses:
+//   202:
+//   401: Error
+//   403: Error
+//   404: Error
+//   415: Error
 func (h Handler) Delete(c *gin.Context) {
-	// swagger:route DELETE /instances/{id} deleteInstanceById
-	//
-	// Delete an instance by id
-	//
-	// Security:
-	//  oauth2:
-	//
-	// responses:
-	//   202:
-	//   401: Error
-	//   403: Error
-	//   404: Error
-	//   415: Error
 	idParam := c.Param("id")
 	id, err := strconv.Atoi(idParam)
 	if err != nil {
@@ -207,18 +209,20 @@ func (h Handler) Delete(c *gin.Context) {
 	c.Status(http.StatusAccepted)
 }
 
-// FindById godoc
-// @Summary Find instance by id
-// @Description Find instance by id...
-// @Tags Restricted
-// @Accept json
-// @Produce json
-// @Success 200 {object} map[string]interface{}
-// @Failure 401 {object} map[string]interface{}
-// @Failure 404 {object} map[string]interface{}
-// @Router /instances/{id} [get]
-// @Param id path string true "Instance id"
-// @Security OAuth2Password
+// FindById instance
+// swagger:route GET /instances/{id} findInstanceById
+//
+// Find instance by id
+//
+// Security:
+//  oauth2:
+//
+// responses:
+//   200: Instance
+//   401: Error
+//   403: Error
+//   404: Error
+//   415: Error
 func (h Handler) FindById(c *gin.Context) {
 	idParam := c.Param("id")
 	id, err := strconv.Atoi(idParam)
@@ -264,6 +268,20 @@ func (h Handler) FindById(c *gin.Context) {
 	c.JSON(http.StatusOK, instance)
 }
 
+// Logs instance
+// swagger:route GET /instances/{id}/logs instanceLogs
+//
+// Stream instance logs in real time
+//
+// Security:
+//  oauth2:
+//
+// responses:
+//   200: Instance
+//   401: Error
+//   403: Error
+//   404: Error
+//   415: Error
 func (h Handler) Logs(c *gin.Context) {
 	idParam := c.Param("id")
 	id, err := strconv.Atoi(idParam)
@@ -341,19 +359,20 @@ func (h Handler) Logs(c *gin.Context) {
 	c.Status(http.StatusOK)
 }
 
-// NameToId godoc
-// @Summary Instance id by instance name
-// @Description Return instance id given instance name
-// @Tags Restricted
-// @Accept json
-// @Produce json
-// @Success 200 {object} string
-// @Failure 401 {object} map[string]interface{}
-// @Failure 404 {object} string
-// @Router /instances-name-to-id/{group}/{name} [get]
-// @Param group path string true "Instance group"
-// @Param name path string true "Instance name"
-// @Security OAuth2Password
+// NameToId instance
+// swagger:route GET /instances-name-to-id{groupId}/{name} instanceNameToId
+//
+// Find instance id by name and group id
+//
+// Security:
+//  oauth2:
+//
+// responses:
+//   200: Instance
+//   401: Error
+//   403: Error
+//   404: Error
+//   415: Error
 func (h Handler) NameToId(c *gin.Context) {
 	name := c.Param("name")
 	groupIdParam := c.Param("groupId")
@@ -400,13 +419,26 @@ func (h Handler) NameToId(c *gin.Context) {
 	c.JSON(http.StatusOK, instance.ID)
 }
 
-type groupWithInstances struct {
+type GroupWithInstances struct {
 	ID        uint
 	Name      string
 	Hostname  string
 	Instances []*model.Instance
 }
 
+// List instances
+// swagger:route GET /instances listInstances
+//
+// List instances
+//
+// Security:
+//  oauth2:
+//
+// responses:
+//   200: []GroupWithInstances
+//   401: Error
+//   403: Error
+//   415: Error
 func (h Handler) List(c *gin.Context) {
 	user, err := handler.GetUserFromContext(c)
 	if err != nil {
@@ -436,8 +468,8 @@ func (h Handler) List(c *gin.Context) {
 	c.JSON(http.StatusOK, h.groupsWithInstances(groups, instances))
 }
 
-func (h Handler) groupsWithInstances(groups []*models.Group, instances []*model.Instance) []groupWithInstances {
-	groupsWithInstances := make([]groupWithInstances, len(groups))
+func (h Handler) groupsWithInstances(groups []*models.Group, instances []*model.Instance) []GroupWithInstances {
+	groupsWithInstances := make([]GroupWithInstances, len(groups))
 	for i, group := range groups {
 		groupsWithInstances[i].ID = uint(group.ID)
 		groupsWithInstances[i].Name = group.Name
