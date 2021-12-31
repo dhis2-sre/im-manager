@@ -13,7 +13,7 @@ func CanReadInstance(user *models.User, instance *model.Instance) bool {
 }
 
 func CanWriteInstance(user *models.User, instance *model.Instance) bool {
-	return isAdministrator(user) || uint(user.ID) == instance.UserID && isMemberOfById(user, instance.GroupID)
+	return isAdministrator(user) || (uint(user.ID) == instance.UserID && isMemberOfById(user, instance.GroupID))
 }
 
 func isMemberOfById(user *models.User, groupId uint) bool {
