@@ -150,8 +150,8 @@ github.com/decred/dcrd/crypto/blake256 v1.0.0/go.mod h1:sQl2p6Y26YV+ZOcSTP6thNdn
 github.com/decred/dcrd/dcrec/secp256k1/v4 v4.0.0-20210816181553-5444fa50b93d h1:1iy2qD6JEhHKKhUOA9IWs7mjco7lnw2qx8FsRI2wirE=
 github.com/decred/dcrd/dcrec/secp256k1/v4 v4.0.0-20210816181553-5444fa50b93d/go.mod h1:tmAIfUFEirG/Y8jhZ9M+h36obRZAk/1fcSpXwAVlfqE=
 github.com/dgrijalva/jwt-go v3.2.0+incompatible/go.mod h1:E3ru+11k8xSBh+hMPgOLZmtrrCbhqsmaPHjLKYnJCaQ=
-github.com/dhis2-sre/im-user v0.3.0 h1:JTd2FlhkaVVOpnH67jXK4xPs77L7YLDGjuUCc2Dovfc=
-github.com/dhis2-sre/im-user v0.3.0/go.mod h1:Ll2RrGDpbMXMsTR8p/izM66WbOXG+Yt8QBRSPnfCYsw=
+github.com/dhis2-sre/im-user v0.4.0 h1:p4p0LK299eJy85F2APJKpO5t6wygoj9P5i5QBlunNoU=
+github.com/dhis2-sre/im-user v0.4.0/go.mod h1:Ll2RrGDpbMXMsTR8p/izM66WbOXG+Yt8QBRSPnfCYsw=
 github.com/dhis2-sre/instance-queue v0.2.0 h1:BwqlnCKnndJUUfyyz8Yl3/+vFflNhfenM0EcXHpb+RA=
 github.com/dhis2-sre/instance-queue v0.2.0/go.mod h1:x8YCST8iW1aMskHbacqxbLJFX/UCGd/NGkCITm3Ymuw=
 github.com/dimchansky/utfbom v1.1.0 h1:FcM3g+nofKgUteL8dm/UpdRXNC9KmADgTpLKsu0TRo4=

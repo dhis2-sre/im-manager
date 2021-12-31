@@ -3,7 +3,7 @@ module github.com/dhis2-sre/im-manager
 go 1.16
 
 require (
-	github.com/dhis2-sre/im-user v0.3.0
+	github.com/dhis2-sre/im-user v0.4.0
 	github.com/dhis2-sre/instance-queue v0.2.0
 	github.com/fatih/color v1.9.0 // indirect
 	github.com/gin-contrib/cors v1.3.1
