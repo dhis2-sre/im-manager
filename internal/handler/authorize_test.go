@@ -123,20 +123,3 @@ func TestCanReadInstance_AccessDenied(t *testing.T) {
 
 	assert.False(t, isAdmin)
 }
-
-func TestIsAdministrator(t *testing.T) {
-	user := &models.User{
-		Groups: []*models.Group{
-			{
-				Name: AdministratorGroupName,
-			},
-			{
-				Name: "other group",
-			},
-		},
-	}
-
-	isAdmin := isAdministrator(user)
-
-	assert.True(t, isAdmin)
-}
