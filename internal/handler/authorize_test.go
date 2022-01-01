@@ -15,8 +15,7 @@ func TestCanWriteInstance_isOwnerAndMember(t *testing.T) {
 		ID: userId,
 		Groups: []*models.Group{
 			{
-				ID:   groupId,
-				Name: "group",
+				ID: groupId,
 			},
 		},
 	}
@@ -37,8 +36,7 @@ func TestCanWriteInstance_isGroupAdministrator(t *testing.T) {
 	user := &models.User{
 		AdminGroups: []*models.Group{
 			{
-				ID:   groupId,
-				Name: "group",
+				ID: groupId,
 			},
 		},
 	}
@@ -75,8 +73,7 @@ func TestCanReadInstance_isMemberOf(t *testing.T) {
 	user := &models.User{
 		Groups: []*models.Group{
 			{
-				ID:   groupId,
-				Name: "group",
+				ID: groupId,
 			},
 		},
 	}
@@ -111,8 +108,7 @@ func TestCanReadInstance_AccessDenied(t *testing.T) {
 	user := &models.User{
 		Groups: []*models.Group{
 			{
-				ID:   123,
-				Name: "other group",
+				ID: 123,
 			},
 		},
 	}
