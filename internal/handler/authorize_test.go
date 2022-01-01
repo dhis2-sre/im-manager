@@ -69,7 +69,7 @@ func TestCanWriteInstance_isAdministrator(t *testing.T) {
 	assert.True(t, isAdmin)
 }
 
-func TestCanReadInstance_isMemberOfById(t *testing.T) {
+func TestCanReadInstance_isMemberOf(t *testing.T) {
 	var groupId uint64 = 123
 
 	user := &models.User{
