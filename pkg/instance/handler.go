@@ -96,7 +96,7 @@ func (h Handler) Create(c *gin.Context) {
 
 	canWrite := handler.CanWriteInstance(userWithGroups, instance)
 	if !canWrite {
-		unauthorized := apperror.NewUnauthorized("Write access denied")
+		unauthorized := apperror.NewUnauthorized("write access denied")
 		_ = c.Error(unauthorized)
 		return
 	}
