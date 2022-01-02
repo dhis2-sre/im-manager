@@ -48,7 +48,7 @@ swagger-check-install:
 
 swagger-clean:
 	rm -rf swagger/sdk/*
-	rm swagger/swagger.yaml
+	rm -f swagger/swagger.yaml
 
 swagger-docs: swagger-check-install
 	swagger generate spec -o swagger/swagger.yaml -x swagger/sdk --scan-models
