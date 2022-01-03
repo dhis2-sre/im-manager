@@ -58,7 +58,6 @@ type CreateInstanceRequest struct {
 //   415: Error
 func (h Handler) Create(c *gin.Context) {
 	var request CreateInstanceRequest
-
 	if err := handler.DataBinder(c, &request); err != nil {
 		_ = c.Error(err)
 		return
