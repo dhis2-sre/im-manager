@@ -329,7 +329,6 @@ func (h Handler) Logs(c *gin.Context) {
 	}
 
 	readCloser, err := h.instanceService.Logs(instance, group)
-
 	if err != nil {
 		conflict := apperror.NewConflict(err.Error())
 		_ = c.Error(conflict)
