@@ -8,6 +8,7 @@ import (
 
 type Repository interface {
 	Create(instance *model.Instance) error
+	Save(instance *model.Instance) error
 	FindWithParametersById(id uint) (*model.Instance, error)
 	FindByNameAndGroup(instanceName string, groupId uint) (*model.Instance, error)
 	SaveDeployLog(instance *model.Instance, log string) error
@@ -26,6 +27,15 @@ type repository struct {
 
 func (r repository) Create(instance *model.Instance) error {
 	return r.db.Create(&instance).Error
+}
+
+func (r repository) Save(instance *model.Instance) error {
+	err := r.db.Save(instance).Error
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (r repository) FindWithParametersById(id uint) (*model.Instance, error) {

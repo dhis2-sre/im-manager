@@ -28,6 +28,7 @@ func GetEngine(environment di.Environment) *gin.Engine {
 	tokenAuthenticationRouter := router.Group("")
 	tokenAuthenticationRouter.Use(environment.AuthenticationMiddleware.TokenAuthentication)
 	tokenAuthenticationRouter.POST("/instances", environment.InstanceHandler.Create)
+	tokenAuthenticationRouter.POST("/instances/:id/deploy", environment.InstanceHandler.Deploy)
 	tokenAuthenticationRouter.GET("/instances", environment.InstanceHandler.List)
 	tokenAuthenticationRouter.DELETE("/instances/:id", environment.InstanceHandler.Delete)
 	tokenAuthenticationRouter.GET("/instances/:id", environment.InstanceHandler.FindById)

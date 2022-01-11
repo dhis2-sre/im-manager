@@ -29,17 +29,10 @@ type Handler struct {
 	instanceService Service
 }
 
-type ParameterRequest struct {
-	StackParameterID uint   `json:"stackParameterId" binding:"required"`
-	Value            string `json:"value" binding:"required"`
-}
-
 type CreateInstanceRequest struct {
-	Name               string             `json:"name" binding:"required"`
-	GroupID            uint               `json:"groupId" binding:"required"`
-	StackID            uint               `json:"stackId" binding:"required"`
-	RequiredParameters []ParameterRequest `json:"requiredParameters"`
-	OptionalParameters []ParameterRequest `json:"optionalParameters"`
+	Name    string `json:"name" binding:"required"`
+	GroupID uint   `json:"groupId" binding:"required"`
+	StackID uint   `json:"stackId" binding:"required"`
 }
 
 // Create instance
@@ -75,21 +68,96 @@ func (h Handler) Create(c *gin.Context) {
 		return
 	}
 
-	requiredParameters := convertRequiredParameters(&request.RequiredParameters)
-	optionalParameters := convertOptionalParameters(&request.OptionalParameters)
+	userWithGroups, err := h.userClient.FindUserById(token, user.ID)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
 
 	instance := &model.Instance{
-		Name:               request.Name,
-		UserID:             user.ID,
-		GroupID:            request.GroupID,
-		StackID:            request.StackID,
-		RequiredParameters: *requiredParameters,
-		OptionalParameters: *optionalParameters,
+		Name:    request.Name,
+		UserID:  user.ID,
+		GroupID: request.GroupID,
+		StackID: request.StackID,
+	}
+
+	canWrite := handler.CanWriteInstance(userWithGroups, instance)
+	if !canWrite {
+		unauthorized := apperror.NewUnauthorized("write access denied")
+		_ = c.Error(unauthorized)
+		return
+	}
+
+	savedInstance, err := h.instanceService.Create(instance)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	c.JSON(http.StatusCreated, savedInstance)
+}
+
+type ParameterRequest struct {
+	StackParameterID uint   `json:"stackParameterId" binding:"required"`
+	Value            string `json:"value" binding:"required"`
+}
+
+type LaunchInstanceRequest struct {
+	RequiredParameters []ParameterRequest `json:"requiredParameters"`
+	OptionalParameters []ParameterRequest `json:"optionalParameters"`
+}
+
+// Deploy instance
+// swagger:route POST /instances/{id}/deploy launchInstance
+//
+// Deploy instance
+//
+// Security:
+//  oauth2:
+//
+// responses:
+//   201: Instance
+//   401: Error
+//   403: Error
+//   404: Error
+//   415: Error
+func (h Handler) Deploy(c *gin.Context) {
+	idParam := c.Param("id")
+	id, err := strconv.Atoi(idParam)
+	if err != nil {
+		badRequest := apperror.NewBadRequest("error parsing id")
+		_ = c.Error(badRequest)
+		return
+	}
+
+	var request LaunchInstanceRequest
+	if err := handler.DataBinder(c, &request); err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	user, err := handler.GetUserFromContext(c)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	token, err := handler.GetTokenFromHttpAuthHeader(c)
+	if err != nil {
+		_ = c.Error(err)
+		return
 	}
 
 	userWithGroups, err := h.userClient.FindUserById(token, user.ID)
 	if err != nil {
 		_ = c.Error(err)
+		return
+	}
+
+	instance, err := h.instanceService.FindById(uint(id))
+	if err != nil {
+		notFound := apperror.NewNotFound("instance", strconv.Itoa(id))
+		_ = c.Error(notFound)
 		return
 	}
 
@@ -105,7 +173,11 @@ func (h Handler) Create(c *gin.Context) {
 		_ = c.Error(err)
 	}
 
-	if err := h.instanceService.Create(instance, group); err != nil {
+	instance.RequiredParameters = convertRequiredParameters(instance.ID, request.RequiredParameters)
+	instance.OptionalParameters = convertOptionalParameters(instance.ID, request.OptionalParameters)
+
+	err = h.instanceService.Deploy(instance, group)
+	if err != nil {
 		_ = c.Error(err)
 		return
 	}
@@ -113,32 +185,34 @@ func (h Handler) Create(c *gin.Context) {
 	c.JSON(http.StatusCreated, instance)
 }
 
-func convertRequiredParameters(requestParameters *[]ParameterRequest) *[]model.InstanceRequiredParameter {
-	if len(*requestParameters) > 0 {
-		var parameters = make([]model.InstanceRequiredParameter, len(*requestParameters))
-		for i, parameter := range *requestParameters {
+func convertRequiredParameters(instanceID uint, requestParameters []ParameterRequest) []model.InstanceRequiredParameter {
+	if len(requestParameters) > 0 {
+		var parameters = make([]model.InstanceRequiredParameter, len(requestParameters))
+		for i, parameter := range requestParameters {
 			parameters[i] = model.InstanceRequiredParameter{
+				InstanceID:               instanceID,
 				StackRequiredParameterID: parameter.StackParameterID,
 				Value:                    parameter.Value,
 			}
 		}
-		return &parameters
+		return parameters
 	}
-	return &[]model.InstanceRequiredParameter{}
+	return []model.InstanceRequiredParameter{}
 }
 
-func convertOptionalParameters(requestParameters *[]ParameterRequest) *[]model.InstanceOptionalParameter {
-	if len(*requestParameters) > 0 {
-		var parameters = make([]model.InstanceOptionalParameter, len(*requestParameters))
-		for i, parameter := range *requestParameters {
+func convertOptionalParameters(instanceID uint, requestParameters []ParameterRequest) []model.InstanceOptionalParameter {
+	if len(requestParameters) > 0 {
+		var parameters = make([]model.InstanceOptionalParameter, len(requestParameters))
+		for i, parameter := range requestParameters {
 			parameters[i] = model.InstanceOptionalParameter{
+				InstanceID:               instanceID,
 				StackOptionalParameterID: parameter.StackParameterID,
 				Value:                    parameter.Value,
 			}
 		}
-		return &parameters
+		return parameters
 	}
-	return &[]model.InstanceOptionalParameter{}
+	return []model.InstanceOptionalParameter{}
 }
 
 // Delete instance by id

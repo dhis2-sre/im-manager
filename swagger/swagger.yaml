@@ -10,16 +10,6 @@ definitions:
       name:
         type: string
         x-go-name: Name
-      optionalParameters:
-        items:
-          $ref: '#/definitions/ParameterRequest'
-        type: array
-        x-go-name: OptionalParameters
-      requiredParameters:
-        items:
-          $ref: '#/definitions/ParameterRequest'
-        type: array
-        x-go-name: RequiredParameters
       stackId:
         format: uint64
         type: integer
@@ -165,17 +155,6 @@ definitions:
     title: NullTime represents a time.Time that may be null.
     type: object
     x-go-package: database/sql
-  ParameterRequest:
-    properties:
-      stackParameterId:
-        format: uint64
-        type: integer
-        x-go-name: StackParameterID
-      value:
-        type: string
-        x-go-name: Value
-    type: object
-    x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
   StackOptionalParameter:
     properties:
       CreatedAt:
@@ -338,6 +317,32 @@ paths:
         x-go-name: ID
       responses:
         "200":
+          description: Instance
+          schema:
+            $ref: '#/definitions/Instance'
+        "401":
+          $ref: '#/responses/Error'
+        "403":
+          $ref: '#/responses/Error'
+        "404":
+          $ref: '#/responses/Error'
+        "415":
+          $ref: '#/responses/Error'
+      security:
+      - oauth2: []
+  /instances/{id}/deploy:
+    post:
+      description: Deploy instance
+      operationId: launchInstance
+      parameters:
+      - format: uint64
+        in: path
+        name: id
+        required: true
+        type: integer
+        x-go-name: ID
+      responses:
+        "201":
           description: Instance
           schema:
             $ref: '#/definitions/Instance'

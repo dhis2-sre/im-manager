@@ -15,7 +15,8 @@ import (
 )
 
 type Service interface {
-	Create(instance *model.Instance, group *models.Group) error
+	Create(instance *model.Instance) (*model.Instance, error)
+	Deploy(instance *model.Instance, group *models.Group) error
 	FindById(id uint) (*model.Instance, error)
 	Delete(id uint) error
 	Logs(instance *model.Instance, group *models.Group) (io.ReadCloser, error)
@@ -48,8 +49,22 @@ type service struct {
 	kubernetesService  KubernetesService
 }
 
-func (s service) Create(instance *model.Instance, group *models.Group) error {
+func (s service) Create(instance *model.Instance) (*model.Instance, error) {
 	err := s.instanceRepository.Create(instance)
+	if err != nil {
+		return nil, err
+	}
+
+	instanceWithParameters, err := s.instanceRepository.FindWithParametersById(instance.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	return instanceWithParameters, nil
+}
+
+func (s service) Deploy(instance *model.Instance, group *models.Group) error {
+	err := s.instanceRepository.Save(instance)
 	if err != nil {
 		return err
 	}
@@ -66,12 +81,17 @@ func (s service) Create(instance *model.Instance, group *models.Group) error {
 
 	deployLog, deployErrorLog, err := s.kubernetesService.CommandExecutor(syncCmd, group.ClusterConfiguration)
 	log.Printf("Deploy log: %s\n", deployLog)
-	log.Printf("Error log: %s", deployErrorLog)
+	log.Printf("Deploy error log: %s\n", deployErrorLog)
+	/* TODO: return error log if relevant
+	if len(deployErrorLog) > 0 {
+		return errors.New(string(deployErrorLog))
+	}
+	*/
 	if err != nil {
 		return err
 	}
 
-	err = s.instanceRepository.SaveDeployLog(instance, string(deployLog))
+	err = s.instanceRepository.SaveDeployLog(instanceWithParameters, string(deployLog))
 	instance.DeployLog = string(deployLog)
 	if err != nil {
 		// TODO
