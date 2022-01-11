@@ -9,7 +9,6 @@ GROUP_NAME=$2
 STACK_ID=$3
 
 GROUP_ID=$($HTTP --check-status "$INSTANCE_HOST/groups-name-to-id/$GROUP_NAME" "Authorization: Bearer $ACCESS_TOKEN")
-echo "GROUP_ID: $GROUP_ID"
 
 echo "{
   \"name\": \"$NAME\",
