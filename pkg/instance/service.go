@@ -122,26 +122,19 @@ func (s service) Delete(id uint) error {
 		return err
 	}
 
-	destroyCmd, err := s.helmfileService.Destroy(instanceWithParameters, group)
-	if err != nil {
-		return err
-	}
-
-	destroyLog, destroyErrorLog, err := s.kubernetesService.CommandExecutor(destroyCmd, group.ClusterConfiguration)
-	log.Printf("Destroy log: %s\n", destroyLog)
-	log.Printf("Destroy error log: %s\n", destroyErrorLog)
-	if err != nil {
-		return err
-	}
-	/*
-		err = s.instanceRepository.SaveDeployLog(instanceWithParameters, string(deployLog))
-		instanceWithParameters.DeployLog = string(deployLog)
+	if instanceWithParameters.DeployLog != "" {
+		destroyCmd, err := s.helmfileService.Destroy(instanceWithParameters, group)
 		if err != nil {
-			// TODO
-			log.Printf("Store error log: %s", deployErrorLog)
 			return err
 		}
-	*/
+
+		destroyLog, destroyErrorLog, err := s.kubernetesService.CommandExecutor(destroyCmd, group.ClusterConfiguration)
+		log.Printf("Destroy log: %s\n", destroyLog)
+		log.Printf("Destroy error log: %s\n", destroyErrorLog)
+		if err != nil {
+			return err
+		}
+	}
 
 	return s.instanceRepository.Delete(id)
 }
