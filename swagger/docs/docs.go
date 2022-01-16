@@ -4,7 +4,7 @@ import (
 	"github.com/dhis2-sre/im-manager/pkg/instance"
 )
 
-// swagger:parameters deleteInstance findInstanceById instanceLogs launchInstance
+// swagger:parameters deleteInstance findInstanceById instanceLogs launchInstance saveInstance
 type IdParameter struct {
 	// in: path
 	// required: true
@@ -44,4 +44,10 @@ type _ struct {
 	// in: body
 	// required: true
 	Body instance.CreateInstanceRequest
+}
+
+// swagger:response
+type RunJobResponse struct {
+	//in: body
+	RunJobResponse instance.RunJobResponse
 }

@@ -35,6 +35,9 @@ func GetEngine(environment di.Environment) *gin.Engine {
 	tokenAuthenticationRouter.GET("/instances/:id/logs", environment.InstanceHandler.Logs)
 	tokenAuthenticationRouter.GET("/instances-name-to-id/:groupId/:name", environment.InstanceHandler.NameToId)
 
+	tokenAuthenticationRouter.POST("/instances/:id/save", environment.InstanceHandler.Save)
+	//tokenAuthenticationRouter.POST("/instances/:id/saveas", health.Health)
+
 	return r
 }
 

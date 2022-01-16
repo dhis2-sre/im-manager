@@ -5,6 +5,6 @@ import (
 	userClient "github.com/dhis2-sre/im-user/pkg/client"
 )
 
-func ProvideUser(config config.Config) userClient.Client {
+func ProvideUserService(config config.Config) userClient.Client {
 	return userClient.ProvideClient(config.UserService.Host, config.UserService.BasePath)
 }

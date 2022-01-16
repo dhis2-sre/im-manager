@@ -3,6 +3,8 @@ package instance
 import (
 	"bufio"
 	"fmt"
+	jobClient "github.com/dhis2-sre/im-job/pkg/client"
+	jobModels "github.com/dhis2-sre/im-job/swagger/sdk/models"
 	"github.com/dhis2-sre/im-manager/internal/apperror"
 	"github.com/dhis2-sre/im-manager/internal/handler"
 	"github.com/dhis2-sre/im-manager/pkg/model"
@@ -16,16 +18,19 @@ import (
 
 func ProvideHandler(
 	userClient userClient.Client,
+	jobClient jobClient.Client,
 	instanceService Service,
 ) Handler {
 	return Handler{
 		userClient,
+		jobClient,
 		instanceService,
 	}
 }
 
 type Handler struct {
 	userClient      userClient.Client
+	jobClient       jobClient.Client
 	instanceService Service
 }
 
@@ -560,4 +565,60 @@ func (h Handler) filterByGroupId(instances []*model.Instance, test func(instance
 		}
 	}
 	return
+}
+
+type RunJobResponse struct {
+	RunId string `json:"runId"`
+}
+
+// Save instance
+// swagger:route POST /instances/{id}/save saveInstance
+//
+// Save instance database
+//
+// Security:
+//  oauth2:
+//
+// responses:
+//   200: RunJobResponse
+//   401: Error
+//   403: Error
+//   404: Error
+//   415: Error
+func (h Handler) Save(c *gin.Context) {
+	idParam := c.Param("id")
+	id, err := strconv.Atoi(idParam)
+	if err != nil {
+		badRequest := apperror.NewBadRequest("Error parsing id")
+		_ = c.Error(badRequest)
+		return
+	}
+
+	token, err := handler.GetTokenFromHttpAuthHeader(c)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	instance, err := h.instanceService.FindById(uint(id))
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	runJobRequest := &jobModels.RunJobRequest{
+		GroupID: uint64(instance.GroupID),
+		Payload: map[string]string{
+			"key": "val",
+		},
+		TargetID: uint64(id),
+	}
+
+	runId, err := h.jobClient.Run(token, uint(3), runJobRequest)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	c.JSON(http.StatusOK, RunJobResponse{runId})
 }

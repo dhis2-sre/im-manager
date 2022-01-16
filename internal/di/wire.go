@@ -1,4 +1,5 @@
-//+build wireinject
+//go:build wireinject
+// +build wireinject
 
 package di
 
@@ -51,7 +52,8 @@ func GetEnvironment() Environment {
 		stack.ProvideService,
 		stack.ProvideHandler,
 
-		client.ProvideUser,
+		client.ProvideUserService,
+		client.ProvideJobService,
 		instance.ProvideHelmfileService,
 		instance.ProvideKubernetesService,
 		instance.ProvideRepository,

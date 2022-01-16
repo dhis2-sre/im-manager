@@ -1,4 +1,4 @@
-FROM golang:1.16-alpine AS build
+FROM golang:1.17-alpine AS build
 RUN apk add gcc musl-dev git && \
 \
     wget https://dl.k8s.io/release/v1.21.0/bin/linux/amd64/kubectl && \

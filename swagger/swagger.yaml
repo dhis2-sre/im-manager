@@ -155,6 +155,13 @@ definitions:
     title: NullTime represents a time.Time that may be null.
     type: object
     x-go-package: database/sql
+  RunJobResponse:
+    properties:
+      runId:
+        type: string
+        x-go-name: RunId
+    type: object
+    x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
   StackOptionalParameter:
     properties:
       CreatedAt:
@@ -382,6 +389,30 @@ paths:
           $ref: '#/responses/Error'
       security:
       - oauth2: []
+  /instances/{id}/save:
+    post:
+      description: Save instance database
+      operationId: saveInstance
+      parameters:
+      - format: uint64
+        in: path
+        name: id
+        required: true
+        type: integer
+        x-go-name: ID
+      responses:
+        "200":
+          $ref: '#/responses/RunJobResponse'
+        "401":
+          $ref: '#/responses/Error'
+        "403":
+          $ref: '#/responses/Error'
+        "404":
+          $ref: '#/responses/Error'
+        "415":
+          $ref: '#/responses/Error'
+      security:
+      - oauth2: []
 produces:
 - application/json
 responses:
@@ -391,6 +422,10 @@ responses:
     description: ""
     schema:
       $ref: '#/definitions/GroupWithInstances'
+  RunJobResponse:
+    description: ""
+    schema:
+      $ref: '#/definitions/RunJobResponse'
 securityDefinitions:
   oauth2:
     flow: password
