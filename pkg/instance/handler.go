@@ -271,7 +271,7 @@ func (h Handler) Delete(c *gin.Context) {
 
 	canWrite := handler.CanWriteInstance(userWithGroups, instance)
 	if !canWrite {
-		unauthorized := apperror.NewUnauthorized("Write access denied")
+		unauthorized := apperror.NewUnauthorized("write access denied")
 		_ = c.Error(unauthorized)
 		return
 	}
@@ -305,7 +305,7 @@ func (h Handler) FindById(c *gin.Context) {
 	idParam := c.Param("id")
 	id, err := strconv.Atoi(idParam)
 	if err != nil {
-		badRequest := apperror.NewBadRequest("Error parsing id")
+		badRequest := apperror.NewBadRequest("error parsing id")
 		_ = c.Error(badRequest)
 		return
 	}
@@ -338,7 +338,7 @@ func (h Handler) FindById(c *gin.Context) {
 
 	canRead := handler.CanReadInstance(userWithGroups, instance)
 	if !canRead {
-		unauthorized := apperror.NewUnauthorized("Read access denied")
+		unauthorized := apperror.NewUnauthorized("read access denied")
 		_ = c.Error(unauthorized)
 		return
 	}
@@ -364,7 +364,7 @@ func (h Handler) Logs(c *gin.Context) {
 	idParam := c.Param("id")
 	id, err := strconv.Atoi(idParam)
 	if err != nil {
-		badRequest := apperror.NewBadRequest("Error parsing id")
+		badRequest := apperror.NewBadRequest("error parsing id")
 		_ = c.Error(badRequest)
 		return
 	}
@@ -397,7 +397,7 @@ func (h Handler) Logs(c *gin.Context) {
 
 	canRead := handler.CanReadInstance(userWithGroups, instance)
 	if !canRead {
-		unauthorized := apperror.NewUnauthorized("Read access denied")
+		unauthorized := apperror.NewUnauthorized("read access denied")
 		_ = c.Error(unauthorized)
 		return
 	}
@@ -455,7 +455,7 @@ func (h Handler) NameToId(c *gin.Context) {
 	groupIdParam := c.Param("groupId")
 	groupId, err := strconv.Atoi(groupIdParam)
 	if err != nil {
-		badRequest := apperror.NewBadRequest("Error parsing id")
+		badRequest := apperror.NewBadRequest("error parsing id")
 		_ = c.Error(badRequest)
 		return
 	}
@@ -488,7 +488,7 @@ func (h Handler) NameToId(c *gin.Context) {
 
 	canRead := handler.CanReadInstance(userWithGroups, instance)
 	if !canRead {
-		unauthorized := apperror.NewUnauthorized("Read access denied")
+		unauthorized := apperror.NewUnauthorized("read access denied")
 		_ = c.Error(unauthorized)
 		return
 	}
@@ -589,7 +589,7 @@ func (h Handler) Save(c *gin.Context) {
 	idParam := c.Param("id")
 	id, err := strconv.Atoi(idParam)
 	if err != nil {
-		badRequest := apperror.NewBadRequest("Error parsing id")
+		badRequest := apperror.NewBadRequest("error parsing id")
 		_ = c.Error(badRequest)
 		return
 	}
