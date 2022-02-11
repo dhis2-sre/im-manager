@@ -2,8 +2,6 @@
 
 set -euo pipefail
 
-HTTP="http --verify=no --check-status"
-
 INSTANCE_NAME=$1
 GROUP_NAME=$2
 

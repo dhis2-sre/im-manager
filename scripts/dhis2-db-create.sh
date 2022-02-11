@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-STACK_ID=1
+STACK_ID=3
 
 NAME=$1
 GROUP_NAME=$2

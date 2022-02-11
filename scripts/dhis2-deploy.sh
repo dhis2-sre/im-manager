@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
 
-set -e
-
-HTTP="http --verify=no --check-status"
+set -euo pipefail
 
 IMAGE_TAG="2.36.0-tomcat-8.5.34-jre8-alpine"
 SEED_PATH="2.36.0/dhis2-db-sierra-leone.sql.gz"

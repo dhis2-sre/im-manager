@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
 
-set -e
-
-HTTP="http --verify=no --check-status"
+set -euo pipefail
 
 STACK_ID=1
 

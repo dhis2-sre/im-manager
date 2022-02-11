@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
 
-#set -euxo pipefail
-
-HTTP="http --verify=no --check-status"
+set -euo pipefail
 
 INSTANCE_NAME=$1
 GROUP_NAME=$2
