@@ -1,0 +1,21 @@
+releases:
+  - name: {{ requiredEnv "INSTANCE_NAME" }}-database
+    namespace: "{{ requiredEnv "INSTANCE_NAMESPACE" }}"
+    chart: bitnami/postgresql
+    version: "{{ env "CHART_VERSION" | default "10.9.2" }}"
+    verify: false
+    values:
+      - primary:
+          podLabels:
+            dhis2-data-id: "{{ requiredEnv "INSTANCE_ID" }}"
+      - image:
+          tag: {{ env "DATABASE_VERSION" | default 10 }}
+      - postgresqlUsername: {{ env "DATABASE_USERNAME" | default "dhis" }}
+        postgresqlPassword: {{ env "DATABASE_PASSWORD" | default "dhis" }}
+        postgresqlDatabase: {{ env "DATABASE_DATABASE" | default "dhis2" }}
+        persistence:
+          size: {{ env "DATABASE_SIZE" | default "5Gi" }}
+
+repositories:
+  - name: bitnami
+    url: https://charts.bitnami.com/bitnami
