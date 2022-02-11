@@ -15,6 +15,9 @@ environment:
   JOB_SERVICE_HOST: im-job-feature.instance-manager-feature.svc.cluster.local:8080
   JOB_SERVICE_BASE_PATH: /skaffold
 
+  DATABASE_MANAGER_SERVICE_HOST: im-database-manager-feature.instance-manager-feature.svc.cluster.local:8080
+  DATABASE_MANAGER_SERVICE_BASE_PATH: /skaffold
+
   DATABASE_HOST: im-manager-postgresql-feature.instance-manager-feature.svc.cluster.local
   DATABASE_PORT: "5432"
 
