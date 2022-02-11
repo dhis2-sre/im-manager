@@ -5,6 +5,17 @@ import (
 	"net/http"
 )
 
+type Response struct {
+	Status string `json:"status"`
+}
+
+// Health
+// swagger:route GET /health health
+//
+// Service health status
+//
+// responses:
+//   200: Response
 func Health(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{"status": "UP"})
+	c.JSON(http.StatusOK, Response{"UP"})
 }

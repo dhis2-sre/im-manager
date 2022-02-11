@@ -155,7 +155,14 @@ definitions:
     title: NullTime represents a time.Time that may be null.
     type: object
     x-go-package: database/sql
-  RunJobResponse:
+  Response:
+    properties:
+      status:
+        type: string
+        x-go-name: Status
+    type: object
+    x-go-package: github.com/dhis2-sre/im-manager/pkg/health
+  SaveInstanceResponse:
     properties:
       runId:
         type: string
@@ -216,6 +223,13 @@ info:
   title: Instance Manager Manager Service.
   version: 0.1.0
 paths:
+  /health:
+    get:
+      description: Service health status
+      operationId: health
+      responses:
+        "200":
+          $ref: '#/responses/Response'
   /instances:
     get:
       description: List instances
@@ -376,9 +390,7 @@ paths:
         x-go-name: ID
       responses:
         "200":
-          description: Instance
-          schema:
-            $ref: '#/definitions/Instance'
+          $ref: '#/responses/InstanceLogsResponse'
         "401":
           $ref: '#/responses/Error'
         "403":
@@ -401,8 +413,8 @@ paths:
         type: integer
         x-go-name: ID
       responses:
-        "200":
-          $ref: '#/responses/RunJobResponse'
+        "202":
+          $ref: '#/responses/SaveInstanceResponse'
         "401":
           $ref: '#/responses/Error'
         "403":
@@ -422,10 +434,16 @@ responses:
     description: ""
     schema:
       $ref: '#/definitions/GroupWithInstances'
-  RunJobResponse:
+  InstanceLogsResponse:
+    description: ""
+  Response:
     description: ""
     schema:
-      $ref: '#/definitions/RunJobResponse'
+      $ref: '#/definitions/Response'
+  SaveInstanceResponse:
+    description: ""
+    schema:
+      $ref: '#/definitions/SaveInstanceResponse'
 securityDefinitions:
   oauth2:
     flow: password
