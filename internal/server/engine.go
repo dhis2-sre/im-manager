@@ -22,11 +22,12 @@ func GetEngine(environment di.Environment) *gin.Engine {
 
 	router.GET("/health", health.Health)
 
-	router.GET("/stacks", environment.StackHandler.FindAll)
-	router.GET("/stacks/:id", environment.StackHandler.FindById)
-
 	tokenAuthenticationRouter := router.Group("")
 	tokenAuthenticationRouter.Use(environment.AuthenticationMiddleware.TokenAuthentication)
+
+	tokenAuthenticationRouter.GET("/stacks", environment.StackHandler.FindAll)
+	tokenAuthenticationRouter.GET("/stacks/:id", environment.StackHandler.FindById)
+
 	tokenAuthenticationRouter.POST("/instances", environment.InstanceHandler.Create)
 	tokenAuthenticationRouter.POST("/instances/:id/deploy", environment.InstanceHandler.Deploy)
 	tokenAuthenticationRouter.GET("/instances", environment.InstanceHandler.List)
