@@ -13,8 +13,8 @@ import (
 )
 
 type HelmfileService interface {
-	Sync(instance *model.Instance, group *models.Group) (*exec.Cmd, error)
-	Destroy(instance *model.Instance, group *models.Group) (*exec.Cmd, error)
+	Sync(token string, instance *model.Instance, group *models.Group) (*exec.Cmd, error)
+	Destroy(token string, instance *model.Instance, group *models.Group) (*exec.Cmd, error)
 }
 
 func ProvideHelmfileService(stackService stack.Service, config config.Config) HelmfileService {
@@ -29,12 +29,12 @@ type helmfileService struct {
 	config       config.Config
 }
 
-func (h helmfileService) Sync(instance *model.Instance, group *models.Group) (*exec.Cmd, error) {
-	return h.executeHelmfileCommand(instance, group, "sync")
+func (h helmfileService) Sync(token string, instance *model.Instance, group *models.Group) (*exec.Cmd, error) {
+	return h.executeHelmfileCommand(token, instance, group, "sync")
 }
 
-func (h helmfileService) Destroy(instance *model.Instance, group *models.Group) (*exec.Cmd, error) {
-	return h.executeHelmfileCommand(instance, group, "destroy")
+func (h helmfileService) Destroy(token string, instance *model.Instance, group *models.Group) (*exec.Cmd, error) {
+	return h.executeHelmfileCommand(token, instance, group, "destroy")
 }
 
 // **Security considerations**
@@ -43,7 +43,7 @@ func (h helmfileService) Destroy(instance *model.Instance, group *models.Group) 
 // * stack.Name is populated by reading the name of a folder and even if that folder name could contain something malicious it won't be running in a shell anyway
 // * stackPath is concatenated using path.Join which also cleans the path and furthermore it's existence is validated
 // * Binaries are executed using their full path and not from $PATH which would be very difficult to exploit anyway
-func (h helmfileService) executeHelmfileCommand(instance *model.Instance, group *models.Group, operation string) (*exec.Cmd, error) {
+func (h helmfileService) executeHelmfileCommand(token string, instance *model.Instance, group *models.Group, operation string) (*exec.Cmd, error) {
 	stack, err := h.stackService.FindById(instance.StackID)
 	if err != nil {
 		return nil, err
@@ -62,17 +62,18 @@ func (h helmfileService) executeHelmfileCommand(instance *model.Instance, group 
 	cmd := exec.Command("/usr/bin/helmfile", "--helm-binary", "/usr/bin/helm", "-f", stackPath, operation)
 	log.Printf("Command: %s\n", cmd.String())
 
-	h.configureInstanceEnvironment(instance, group, cmd)
+	h.configureInstanceEnvironment(token, instance, group, cmd)
 	return cmd, nil
 }
 
-func (h helmfileService) configureInstanceEnvironment(instance *model.Instance, group *models.Group, cmd *exec.Cmd) {
+func (h helmfileService) configureInstanceEnvironment(token string, instance *model.Instance, group *models.Group, cmd *exec.Cmd) {
 	instanceNameEnv := fmt.Sprintf("%s=%s", "INSTANCE_NAME", instance.Name)
 	instanceNamespaceEnv := fmt.Sprintf("%s=%s", "INSTANCE_NAMESPACE", group.Name)
 	instanceIdEnv := fmt.Sprintf("%s=%d", "INSTANCE_ID", instance.ID)
 	instanceHostnameEnv := fmt.Sprintf("%s=%s", "INSTANCE_HOSTNAME", group.Hostname)
 	homeEnv := fmt.Sprintf("%s=%s", "HOME", "/tmp")
-	cmd.Env = append(cmd.Env, instanceNameEnv, instanceNamespaceEnv, instanceIdEnv, instanceHostnameEnv, homeEnv)
+	imTokenEnv := fmt.Sprintf("%s=%s", "IM_TOKEN", token)
+	cmd.Env = append(cmd.Env, instanceNameEnv, instanceNamespaceEnv, instanceIdEnv, instanceHostnameEnv, homeEnv, imTokenEnv)
 
 	h.injectEnv("AWS_ACCESS_KEY_ID", &cmd.Env)
 	h.injectEnv("AWS_SECRET_ACCESS_KEY", &cmd.Env)

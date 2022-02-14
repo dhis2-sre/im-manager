@@ -181,7 +181,7 @@ func (h Handler) Deploy(c *gin.Context) {
 	instance.RequiredParameters = convertRequiredParameters(instance.ID, request.RequiredParameters)
 	instance.OptionalParameters = convertOptionalParameters(instance.ID, request.OptionalParameters)
 
-	err = h.instanceService.Deploy(instance, group)
+	err = h.instanceService.Deploy(token, instance, group)
 	if err != nil {
 		_ = c.Error(err)
 		return

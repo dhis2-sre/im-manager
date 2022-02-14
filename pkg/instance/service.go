@@ -16,7 +16,7 @@ import (
 
 type Service interface {
 	Create(instance *model.Instance) (*model.Instance, error)
-	Deploy(instance *model.Instance, group *models.Group) error
+	Deploy(token string, instance *model.Instance, group *models.Group) error
 	FindById(id uint) (*model.Instance, error)
 	Delete(id uint) error
 	Logs(instance *model.Instance, group *models.Group) (io.ReadCloser, error)
@@ -63,7 +63,7 @@ func (s service) Create(instance *model.Instance) (*model.Instance, error) {
 	return instanceWithParameters, nil
 }
 
-func (s service) Deploy(instance *model.Instance, group *models.Group) error {
+func (s service) Deploy(token string, instance *model.Instance, group *models.Group) error {
 	err := s.instanceRepository.Save(instance)
 	if err != nil {
 		return err
@@ -74,7 +74,7 @@ func (s service) Deploy(instance *model.Instance, group *models.Group) error {
 		return err
 	}
 
-	syncCmd, err := s.helmfileService.Sync(instanceWithParameters, group)
+	syncCmd, err := s.helmfileService.Sync(token, instanceWithParameters, group)
 	if err != nil {
 		return err
 	}
