@@ -107,13 +107,13 @@ type ParameterRequest struct {
 	Value            string `json:"value" binding:"required"`
 }
 
-type LaunchInstanceRequest struct {
+type DeployInstanceRequest struct {
 	RequiredParameters []ParameterRequest `json:"requiredParameters"`
 	OptionalParameters []ParameterRequest `json:"optionalParameters"`
 }
 
 // Deploy instance
-// swagger:route POST /instances/{id}/deploy launchInstance
+// swagger:route POST /instances/{id}/deploy deployInstance
 //
 // Deploy instance
 //
@@ -135,7 +135,7 @@ func (h Handler) Deploy(c *gin.Context) {
 		return
 	}
 
-	var request LaunchInstanceRequest
+	var request DeployInstanceRequest
 	if err := handler.DataBinder(c, &request); err != nil {
 		_ = c.Error(err)
 		return

@@ -4,7 +4,7 @@ import (
 	"github.com/dhis2-sre/im-manager/pkg/instance"
 )
 
-// swagger:parameters deleteInstance findInstanceById instanceLogs launchInstance saveInstance
+// swagger:parameters deleteInstance findInstanceById instanceLogs deployInstance saveInstance
 type IdParameter struct {
 	// in: path
 	// required: true
