@@ -106,24 +106,25 @@ func (s service) FindById(id uint) (*model.Instance, error) {
 	return s.instanceRepository.FindById(id)
 }
 
+// TODO: This should be done differently. If the method is called from an event it should be the service account user. Otherwise it should be the actual user invoking the http request
 func (s service) Delete(id uint) error {
 	instanceWithParameters, err := s.instanceRepository.FindWithParametersById(id)
 	if err != nil {
 		return err
 	}
 
-	tokens, err := s.userClient.SignIn(s.config.UserService.Username, s.config.UserService.Password)
-	if err != nil {
-		return err
-	}
-
-	group, err := s.userClient.FindGroupById(tokens.AccessToken, instanceWithParameters.GroupID)
-	if err != nil {
-		return err
-	}
-
 	if instanceWithParameters.DeployLog != "" {
-		destroyCmd, err := s.helmfileService.Destroy(instanceWithParameters, group)
+		tokens, err := s.userClient.SignIn(s.config.UserService.Username, s.config.UserService.Password)
+		if err != nil {
+			return err
+		}
+
+		group, err := s.userClient.FindGroupById(tokens.AccessToken, instanceWithParameters.GroupID)
+		if err != nil {
+			return err
+		}
+
+		destroyCmd, err := s.helmfileService.Destroy(tokens.AccessToken, instanceWithParameters, group)
 		if err != nil {
 			return err
 		}
