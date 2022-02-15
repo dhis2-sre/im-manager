@@ -10,10 +10,10 @@ smoke-test:
 	sleep 3
 	IMAGE_TAG=$(tag) docker compose up -d prod
 
-prod-image:
+docker-image:
 	IMAGE_TAG=$(tag) docker compose build prod
 
-push-prod:
+push-docker-image:
 	IMAGE_TAG=$(tag) docker compose push prod
 
 dev:
