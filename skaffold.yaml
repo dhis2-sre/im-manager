@@ -4,7 +4,7 @@ build:
   artifacts:
     - image: dhis2/im-manager
 deploy:
-  statusCheckDeadlineSeconds: 120
+  statusCheckDeadlineSeconds: 180
   helm:
     releases:
       - name: im-manager-{{ .ENVIRONMENT }}
@@ -25,7 +25,7 @@ deploy:
         createNamespace: true
         remoteChart: postgresql
         repo: https://charts.bitnami.com/bitnami
-#        version: ???
+        version: 11.0.4
         useHelmSecrets: true
         valuesFiles:
           - helm/data/secrets/{{ .ENVIRONMENT }}/postgresql.yaml
@@ -35,7 +35,7 @@ deploy:
         createNamespace: true
         remoteChart: rabbitmq
         repo: https://charts.bitnami.com/bitnami
-#        version: ???
+        version: 8.29.0
         useHelmSecrets: true
         valuesFiles:
           - helm/data/secrets/{{ .ENVIRONMENT }}/rabbitmq.yaml
