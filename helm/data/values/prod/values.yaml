@@ -24,3 +24,11 @@ environment:
 
 groups:
   names: whoami,play
+
+resources:
+  limits:
+    cpu: 100m
+    memory: 64Mi
+  requests:
+    cpu: 100m
+    memory: 32Mi
