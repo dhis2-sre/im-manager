@@ -37,27 +37,34 @@ releases:
   - name: {{ requiredEnv "INSTANCE_NAME" }}-database
     namespace: "{{ requiredEnv "INSTANCE_NAMESPACE" }}"
     chart: bitnami/postgresql
-    version: "10.9.2"
+    version: 11.0.4
     verify: false
     values:
       - primary:
           podLabels:
             dhis2-data-id: "{{ requiredEnv "INSTANCE_ID" }}"
-      - extraEnv:
-          - name: DATABASE_ID
-            value: "{{ requiredEnv "DATABASE_ID" }}"
-          - name: IM_ACCESS_TOKEN
-            value: {{ requiredEnv "IM_TOKEN" }}
-      - initdbScripts:
-          seed.sh: |
-            {{- readFile "./seed.sh" | indent 12 }}
+
+          extraEnvVars:
+            - name: DATABASE_ID
+              value: "{{ requiredEnv "DATABASE_ID" }}"
+            - name: IM_ACCESS_TOKEN
+              value: {{ requiredEnv "IM_TOKEN" }}
+
+          persistence:
+            size: 5Gi
+
+          initdb:
+            scripts:
+              seed.sh: |
+                {{- readFile "./seed.sh" | indent 16 }}
+
       - image:
           tag: {{ env "DATABASE_VERSION" | default 10 }}
-      - postgresqlUsername: dhis
-        postgresqlPassword: dhis
-        postgresqlDatabase: dhis2
-        persistence:
-          size: 5Gi
+
+      - auth:
+          username: dhis
+          password: dhis
+          database: dhis2
 
 repositories:
   - name: bitnami
