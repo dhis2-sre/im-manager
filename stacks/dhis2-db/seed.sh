@@ -5,7 +5,7 @@ set -euo pipefail
 if [ -n "$DATABASE_ID" ]; then
 #  ABSOLUTE_SEED_URL="https://databases.dhis2.org/sierra-leone/$SEED_URL"
   ABSOLUTE_SEED_URL="$DATABASE_MANAGER_SERVICE_HOST/$DATABASE_MANAGER_SERVICE_BASE_PATH/databases/$DATABASE_ID/download"
-  curl -H "Authorization: $ACCESS_TOKEN" -L "$ABSOLUTE_SEED_URL" -o /tmp/t$$ | cat
+  curl --fail -H "Authorization: $ACCESS_TOKEN" -L "$ABSOLUTE_SEED_URL" -o /tmp/t$$ | cat
   gunzip -c /tmp/t$$ > /tmp/t$$-seed-data
   # file (the unix util) isn't available on in bitnami's postgresql image therefore the following hack is used
   # If the first line of the seed file is "--" it's assumed it's sql and not pgc
