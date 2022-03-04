@@ -69,6 +69,15 @@ spec:
                 name: {{ include "go-chart.fullname" . }}
             {{- end }}
           {{- end }}
+          volumeMounts:
+            - mountPath: /tmp
+              name: tmp
+              subPath: tmp
+      volumes:
+        - name: tmp
+          emptyDir:
+            medium: Memory
+            sizeLimit: 64Mi
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
