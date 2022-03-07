@@ -13,10 +13,13 @@ environment:
   JOB_SERVICE_HOST: im-job-dev.instance-manager-dev.svc.cluster.local:8080
   JOB_SERVICE_BASE_PATH: /skaffold
 
-  DATABASE_HOST: im-manager-postgresql-dev.instance-manager-dev.svc.cluster.local
+  DATABASE_MANAGER_SERVICE_HOST: im-database-manager-dev.instance-manager-dev.svc:8080
+  DATABASE_MANAGER_SERVICE_BASE_PATH: /
+
+  DATABASE_HOST: im-manager-postgresql-dev.instance-manager-dev.svc
   DATABASE_PORT: "5432"
 
-  RABBITMQ_HOST: im-manager-rabbitmq-dev.instance-manager-dev.svc.cluster.local
+  RABBITMQ_HOST: im-rabbitmq-dev.instance-manager-dev.svc
   RABBITMQ_PORT: "5672"
 
   JWKS_HOST: http://im-user-dev.instance-manager-dev.svc:8080/jwks
