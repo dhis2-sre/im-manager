@@ -19,9 +19,9 @@ if [ -n "$DATABASE_ID" ]; then
       psql -U postgres -c "alter table \"$table\" owner to $DATABASE_USERNAME" "$DATABASE_NAME"
     done
   else
-    pg_restore -j 8 -U postgres -d dhis2 /tmp/t$$-seed-data
+    pg_restore -j 8 -U postgres -d "$DATABASE_USERNAME" /tmp/t$$-seed-data
   fi
   rm /tmp/t$$ /tmp/t$$-seed-data
 else
-  psql -U postgres -d dhis2 -p 5432 -c "create extension if not exists postgis;"
+  psql -U postgres -d "$DATABASE_USERNAME" -p 5432 -c "create extension if not exists postgis"
 fi
