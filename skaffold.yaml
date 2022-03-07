@@ -4,7 +4,7 @@ build:
   artifacts:
     - image: dhis2/im-manager
 deploy:
-  statusCheckDeadlineSeconds: 180
+  statusCheckDeadlineSeconds: 240
   helm:
     releases:
       - name: im-rabbitmq-{{ .ENVIRONMENT }}
