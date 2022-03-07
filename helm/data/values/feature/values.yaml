@@ -9,10 +9,10 @@ serviceAccount:
     eks.amazonaws.com/role-arn: arn:aws:iam::767224633206:role/instance-cluster-test-instance-manager-api-feature
 
 environment:
-  USER_SERVICE_HOST: im-user-feature.instance-manager-feature.svc.cluster.local:8080
+  USER_SERVICE_HOST: im-user-feature.instance-manager-feature.svc:8080
   USER_SERVICE_BASE_PATH: /skaffold
 
-  JOB_SERVICE_HOST: im-job-feature.instance-manager-feature.svc.cluster.local:8080
+  JOB_SERVICE_HOST: im-job-feature.instance-manager-feature.svc:8080
   JOB_SERVICE_BASE_PATH: /skaffold
 
   DATABASE_MANAGER_SERVICE_HOST: im-database-manager-feature.instance-manager-feature.svc:8080
