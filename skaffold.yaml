@@ -7,6 +7,27 @@ deploy:
   statusCheckDeadlineSeconds: 180
   helm:
     releases:
+      - name: im-rabbitmq-{{ .ENVIRONMENT }}
+        namespace: instance-manager-{{ .ENVIRONMENT }}
+        createNamespace: true
+        remoteChart: rabbitmq
+        repo: https://charts.bitnami.com/bitnami
+        version: 8.29.0
+        useHelmSecrets: true
+        valuesFiles:
+          - helm/data/secrets/{{ .ENVIRONMENT }}/rabbitmq.yaml
+
+      - name: im-manager-postgresql-{{ .ENVIRONMENT }}
+        namespace: instance-manager-{{ .ENVIRONMENT }}
+        createNamespace: true
+        remoteChart: postgresql
+        repo: https://charts.bitnami.com/bitnami
+        version: 11.0.4
+        useHelmSecrets: true
+        valuesFiles:
+          - helm/data/secrets/{{ .ENVIRONMENT }}/postgresql.yaml
+          - helm/data/values/{{ .ENVIRONMENT }}/postgresql.yaml
+
       - name: im-manager-{{ .ENVIRONMENT }}
         namespace: instance-manager-{{ .ENVIRONMENT }}
         createNamespace: true
@@ -19,23 +40,3 @@ deploy:
         valuesFiles:
           - helm/data/secrets/{{ .ENVIRONMENT }}/values.yaml
           - helm/data/values/{{ .ENVIRONMENT }}/values.yaml
-
-      - name: im-manager-postgresql-{{ .ENVIRONMENT }}
-        namespace: instance-manager-{{ .ENVIRONMENT }}
-        createNamespace: true
-        remoteChart: postgresql
-        repo: https://charts.bitnami.com/bitnami
-        version: 11.0.4
-        useHelmSecrets: true
-        valuesFiles:
-          - helm/data/secrets/{{ .ENVIRONMENT }}/postgresql.yaml
-
-      - name: im-manager-rabbitmq-{{ .ENVIRONMENT }}
-        namespace: instance-manager-{{ .ENVIRONMENT }}
-        createNamespace: true
-        remoteChart: rabbitmq
-        repo: https://charts.bitnami.com/bitnami
-        version: 8.29.0
-        useHelmSecrets: true
-        valuesFiles:
-          - helm/data/secrets/{{ .ENVIRONMENT }}/rabbitmq.yaml
