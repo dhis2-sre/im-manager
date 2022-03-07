@@ -12,7 +12,12 @@ if [ -n "$DATABASE_ID" ]; then
   # If the first line of the seed file is "--" it's assumed it's sql and not pgc
   firstLine=$(head -n 1 /tmp/t$$-seed-data)
   if [ "$firstLine" == "--" ]; then
-    psql -U postgres -d dhis2 -p 5432 -f /tmp/t$$-seed-data
+    psql -U postgres -d "$DATABASE_NAME" -f /tmp/t$$-seed-data
+    tables=$(psql -U postgres -qAt -c "select tablename from pg_tables where schemaname = 'public'" "$DATABASE_NAME")
+    for table in $tables; do
+      echo "Changing owner of $table to $DATABASE_USERNAME"
+      psql -U postgres -c "alter table \"$table\" owner to $DATABASE_USERNAME" "$DATABASE_NAME"
+    done
   else
     pg_restore -j 8 -U postgres -d dhis2 /tmp/t$$-seed-data
   fi
