@@ -169,10 +169,12 @@ func (s service) getPod(client *kubernetes.Clientset, instance *model.Instance) 
 
 	podList, err := client.CoreV1().Pods("").List(context.TODO(), listOptions)
 	if err != nil {
+		// TODO: Don't use fatal logging
 		log.Fatalln(err)
 	}
 
 	if len(podList.Items) > 1 {
+		// TODO: Don't use fatal logging
 		log.Fatalln("More than one pod found... TODO")
 	}
 
