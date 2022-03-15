@@ -14,10 +14,10 @@ releases:
           certIssuer: cert-issuer-prod
       - catalinaOpts: "-Dcontext.path=/{{ requiredEnv "INSTANCE_NAME" }}"
       - livenessProbe:
-          initialDelaySeconds: 300
+          initialDelaySeconds: {{ env "LIVENESS_PROBE_INITIAL_DELAY_SECONDS" | default 600 }}
           path: /{{ requiredEnv "INSTANCE_NAME" }}
       - readinessProbe:
-          initialDelaySeconds: 300
+          initialDelaySeconds: {{ env "READINESS_PROBE_INITIAL_DELAY_SECONDS" | default 600 }}
           path: /{{ requiredEnv "INSTANCE_NAME" }}
       - podLabels:
           dhis2: "true"
