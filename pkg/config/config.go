@@ -9,7 +9,8 @@ import (
 
 func ProvideConfig() Config {
 	return Config{
-		BasePath: requireEnv("BASE_PATH"),
+		BasePath:                       requireEnv("BASE_PATH"),
+		InstanceParameterEncryptionKey: requireEnv("INSTANCE_PARAMETER_ENCRYPTION_kEY"),
 		UserService: service{
 			Host:     requireEnv("USER_SERVICE_HOST"),
 			BasePath: requireEnv("USER_SERVICE_BASE_PATH"),
@@ -19,8 +20,14 @@ func ProvideConfig() Config {
 		JobService: service{
 			Host:     requireEnv("JOB_SERVICE_HOST"),
 			BasePath: requireEnv("JOB_SERVICE_BASE_PATH"),
-			Username: requireEnv("JOB_SERVICE_USERNAME"),
-			Password: requireEnv("JOB_SERVICE_PASSWORD"),
+			//			Username: requireEnv("JOB_SERVICE_USERNAME"),
+			//			Password: requireEnv("JOB_SERVICE_PASSWORD"),
+		},
+		DatabaseManagerService: service{
+			Host:     requireEnv("DATABASE_MANAGER_SERVICE_HOST"),
+			BasePath: requireEnv("DATABASE_MANAGER_SERVICE_BASE_PATH"),
+			//			Username: requireEnv("DATABASE_MANAGER_SERVICE_USERNAME"),
+			//			Password: requireEnv("DATABASE_MANAGER_SERVICE_PASSWORD"),
 		},
 		Postgresql: postgresql{
 			Host:         requireEnv("DATABASE_HOST"),
@@ -46,12 +53,14 @@ func ProvideConfig() Config {
 }
 
 type Config struct {
-	BasePath       string
-	JobService     service
-	UserService    service
-	Postgresql     postgresql
-	RabbitMqURL    rabbitmq
-	Authentication Authentication
+	InstanceParameterEncryptionKey string
+	BasePath                       string
+	JobService                     service
+	UserService                    service
+	DatabaseManagerService         service
+	Postgresql                     postgresql
+	RabbitMqURL                    rabbitmq
+	Authentication                 Authentication
 }
 
 type service struct {

@@ -21,6 +21,7 @@ type Service interface {
 	Delete(id uint) error
 	Logs(instance *model.Instance, group *models.Group) (io.ReadCloser, error)
 	FindWithParametersById(id uint) (*model.Instance, error)
+	FindWithDecryptedParametersById(id uint) (*model.Instance, error)
 	FindByNameAndGroup(instanceName string, groupId uint) (*model.Instance, error)
 	FindInstances(groups []*models.Group) ([]*model.Instance, error)
 }
@@ -64,12 +65,17 @@ func (s service) Create(instance *model.Instance) (*model.Instance, error) {
 }
 
 func (s service) Deploy(token string, instance *model.Instance, group *models.Group) error {
-	err := s.instanceRepository.Save(instance)
+	encryptInstance, err := s.encryptParameters(instance)
 	if err != nil {
 		return err
 	}
 
-	instanceWithParameters, err := s.instanceRepository.FindWithParametersById(instance.ID)
+	err = s.instanceRepository.Save(encryptInstance)
+	if err != nil {
+		return err
+	}
+
+	instanceWithParameters, err := s.FindWithDecryptedParametersById(encryptInstance.ID)
 	if err != nil {
 		return err
 	}
@@ -185,6 +191,20 @@ func (s service) FindWithParametersById(id uint) (*model.Instance, error) {
 	return s.instanceRepository.FindWithParametersById(id)
 }
 
+func (s service) FindWithDecryptedParametersById(id uint) (*model.Instance, error) {
+	instance, err := s.instanceRepository.FindWithParametersById(id)
+	if err != nil {
+		return nil, err
+	}
+
+	err = s.decryptParameters(instance)
+	if err != nil {
+		return nil, err
+	}
+
+	return instance, nil
+}
+
 func (s service) FindByNameAndGroup(instanceName string, groupId uint) (*model.Instance, error) {
 	return s.instanceRepository.FindByNameAndGroup(instanceName, groupId)
 }
@@ -200,4 +220,44 @@ func (s service) FindInstances(groups []*models.Group) ([]*model.Instance, error
 		return nil, err
 	}
 	return instances, nil
+}
+
+func (s service) encryptParameters(instance *model.Instance) (*model.Instance, error) {
+	for i, parameter := range instance.RequiredParameters {
+		value, err := encryptText(parameter.Value, s.config.InstanceParameterEncryptionKey)
+		if err != nil {
+			return nil, err
+		}
+		instance.RequiredParameters[i].Value = value
+	}
+
+	for i, parameter := range instance.OptionalParameters {
+		value, err := encryptText(parameter.Value, s.config.InstanceParameterEncryptionKey)
+		if err != nil {
+			return nil, err
+		}
+		instance.OptionalParameters[i].Value = value
+	}
+
+	return instance, nil
+}
+
+func (s service) decryptParameters(instance *model.Instance) error {
+	for i, parameter := range instance.RequiredParameters {
+		value, err := decryptText(parameter.Value, s.config.InstanceParameterEncryptionKey)
+		if err != nil {
+			return err
+		}
+		instance.RequiredParameters[i].Value = value
+	}
+
+	for i, parameter := range instance.OptionalParameters {
+		value, err := decryptText(parameter.Value, s.config.InstanceParameterEncryptionKey)
+		if err != nil {
+			//			return err
+		}
+		instance.OptionalParameters[i].Value = value
+	}
+
+	return nil
 }

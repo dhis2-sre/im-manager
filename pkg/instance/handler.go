@@ -346,6 +346,65 @@ func (h Handler) FindById(c *gin.Context) {
 	c.JSON(http.StatusOK, instance)
 }
 
+// FindByIdWithDecryptedParameters instance
+// swagger:route GET /instances/{id}/parameters findInstanceByIdWithParameters
+//
+// Find instance by id with decrypted parameters
+//
+// Security:
+//  oauth2:
+//
+// responses:
+//   200: Instance
+//   401: Error
+//   403: Error
+//   404: Error
+//   415: Error
+func (h Handler) FindByIdWithDecryptedParameters(c *gin.Context) {
+	idParam := c.Param("id")
+	id, err := strconv.Atoi(idParam)
+	if err != nil {
+		badRequest := apperror.NewBadRequest("error parsing id")
+		_ = c.Error(badRequest)
+		return
+	}
+
+	user, err := handler.GetUserFromContext(c)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	token, err := handler.GetTokenFromHttpAuthHeader(c)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	userWithGroups, err := h.userClient.FindUserById(token, user.ID)
+	if err != nil {
+		notFound := apperror.NewNotFound("user", strconv.Itoa(int(user.ID)))
+		_ = c.Error(notFound)
+		return
+	}
+
+	instance, err := h.instanceService.FindWithDecryptedParametersById(uint(id))
+	if err != nil {
+		notFound := apperror.NewNotFound("instance", strconv.Itoa(id))
+		_ = c.Error(notFound)
+		return
+	}
+
+	canRead := handler.CanWriteInstance(userWithGroups, instance)
+	if !canRead {
+		unauthorized := apperror.NewUnauthorized("read access denied")
+		_ = c.Error(unauthorized)
+		return
+	}
+
+	c.JSON(http.StatusOK, instance)
+}
+
 // Logs instance
 // swagger:route GET /instances/{id}/logs instanceLogs
 //
