@@ -414,7 +414,7 @@ func (h Handler) FindByIdWithDecryptedParameters(c *gin.Context) {
 //  oauth2:
 //
 // responses:
-//   200: Instance
+//   200: InstanceLogsResponse
 //   401: Error
 //   403: Error
 //   404: Error
