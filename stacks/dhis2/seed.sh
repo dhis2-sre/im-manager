@@ -14,11 +14,28 @@ if [ -n "$DATABASE_ID" ]; then
   firstLine=$(head -n 1 /tmp/t$$-seed-data)
   if [ "$firstLine" == "--" ]; then
     psql -U postgres -d "$DATABASE_NAME" -f /tmp/t$$-seed-data
-    tables=$(psql -U postgres -qAt -c "select tablename from pg_tables where schemaname = 'public'" "$DATABASE_NAME")
-    for table in $tables; do
-      echo "Changing owner of $table to $DATABASE_USERNAME"
-      psql -U postgres -c "alter table \"$table\" owner to $DATABASE_USERNAME" "$DATABASE_NAME"
+
+    # Tables
+    entities=$(psql -U postgres -qAt -c "select tablename from pg_tables where schemaname = 'public'" "$DATABASE_NAME")
+    for entity in $entities; do
+      echo "Changing owner of $entity to $DATABASE_USERNAME"
+      psql -U postgres -c "alter table \"$entity\" owner to $DATABASE_USERNAME" "$DATABASE_NAME"
     done
+
+    # Sequences
+    entities=$(psql -U postgres -qAt -c "select sequence_name from information_schema.sequences where sequence_schema = 'public'" "$DATABASE_NAME")
+    for entity in $entities; do
+      echo "Changing owner of $entity to $DATABASE_USERNAME"
+      psql -U postgres -c "alter sequence \"$entity\" owner to $DATABASE_USERNAME" "$DATABASE_NAME"
+    done
+
+    # Views
+    entities=$(psql -U postgres -qAt -c "select table_name from information_schema.views where table_schema = 'public'" "$DATABASE_NAME")
+    for entity in $entities; do
+      echo "Changing owner of $entity to $DATABASE_USERNAME"
+      psql -U postgres -c "alter view \"$entity\" owner to $DATABASE_USERNAME" "$DATABASE_NAME"
+    done
+
   else
     pg_restore -j 8 -U postgres -d "$DATABASE_USERNAME" /tmp/t$$-seed-data
   fi
