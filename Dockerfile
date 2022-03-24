@@ -1,21 +1,34 @@
 FROM golang:1.17-alpine AS build
+
+ARG KUBECTL_VERSION=v1.23.5
+ARG KUBECTL_CHECKSUM=715da05c56aa4f8df09cb1f9d96a2aa2c33a1232f6fd195e3ffce6e98a50a879
+
+ARG HELM_VERSION=v3.8.1
+ARG HELM_CHECKSUM=d643f48fe28eeb47ff68a1a7a26fc5142f348d02c8bc38d699674016716f61cd
+
+ARG HELMFILE_VERSION=v0.143.3
+ARG HELMFILE_CHECKSUM=a30a5c9f64c8eba2123625497913f9ad210a047e997f2363cda3189cbac8f970
+
+ARG AWS_IAM_AUTHENTICATOR_VERSION=1.21.2/2021-07-05
+ARG AWS_IAM_AUTHENTICATOR_CHECKSUM=fe958eff955bea1499015b45dc53392a33f737630efd841cd574559cc0f41800
+
 RUN apk add gcc musl-dev git && \
 \
-    wget https://dl.k8s.io/release/v1.21.0/bin/linux/amd64/kubectl && \
-    echo "9f74f2fa7ee32ad07e17211725992248470310ca1988214518806b39b1dad9f0  kubectl" | sha256sum -c - && \
+    wget https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl && \
+    echo "${KUBECTL_CHECKSUM}  kubectl" | sha256sum -c - && \
     install -o root -g root -m 0755 kubectl /usr/bin/kubectl && \
 \
-    wget https://get.helm.sh/helm-v3.6.0-linux-amd64.tar.gz && \
-    echo "0a9c80b0f211791d6a9d36022abd0d6fd125139abe6d1dcf4c5bf3bc9dcec9c8  helm-v3.6.0-linux-amd64.tar.gz" | sha256sum -c - && \
-    tar -xvf helm-v3.6.0-linux-amd64.tar.gz && \
+    wget https://get.helm.sh/helm-${HELM_VERSION}-linux-amd64.tar.gz && \
+    echo "${HELM_CHECKSUM}  helm-${HELM_VERSION}-linux-amd64.tar.gz" | sha256sum -c - && \
+    tar -xvf helm-${HELM_VERSION}-linux-amd64.tar.gz && \
     install -o root -g root -m 0755 linux-amd64/helm /usr/bin/helm && \
 \
-    wget -O helmfile https://github.com/roboll/helmfile/releases/download/v0.139.8/helmfile_linux_amd64 && \
-    echo "674efc68fb0771cde17389435c7c37672270efe84d06f74afff977b98ac43b84  helmfile" | sha256sum -c - && \
+    wget -O helmfile https://github.com/roboll/helmfile/releases/download/${HELMFILE_VERSION}/helmfile_linux_amd64 && \
+    echo "${HELMFILE_CHECKSUM}  helmfile" | sha256sum -c - && \
     install -o root -g root -m 0755 helmfile /usr/bin/helmfile && \
 \
-    wget -O aws-iam-authenticator https://amazon-eks.s3.us-west-2.amazonaws.com/1.19.6/2021-01-05/bin/linux/amd64/aws-iam-authenticator && \
-    echo "fe958eff955bea1499015b45dc53392a33f737630efd841cd574559cc0f41800  aws-iam-authenticator" | sha256sum -c - && \
+    wget -O aws-iam-authenticator https://amazon-eks.s3.us-west-2.amazonaws.com/${AWS_IAM_AUTHENTICATOR_VERSION}/bin/linux/amd64/aws-iam-authenticator && \
+    echo "${AWS_IAM_AUTHENTICATOR_CHECKSUM}  aws-iam-authenticator" | sha256sum -c - && \
     install -o root -g root -m 0755 aws-iam-authenticator /usr/bin/aws-iam-authenticator
 
 WORKDIR /src
