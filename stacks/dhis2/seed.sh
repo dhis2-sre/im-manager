@@ -3,22 +3,31 @@
 set -euo pipefail
 
 if [ -n "$DATABASE_ID" ]; then
-#  ABSOLUTE_SEED_URL="https://databases.dhis2.org/sierra-leone/$SEED_URL"
 #  ABSOLUTE_SEED_URL="$DATABASE_MANAGER_SERVICE_HOST/$DATABASE_MANAGER_SERVICE_BASE_PATH/databases/$DATABASE_ID/download"
   ABSOLUTE_SEED_URL="im-database-manager-dev.instance-manager-dev.svc:8080/databases/$DATABASE_ID/download"
   echo "DATABASE_HOST: $ABSOLUTE_SEED_URL"
-  DATA_FOLDER="$POSTGRESQL_VOLUME_DIR/t$$"
-  curl --fail -H "Authorization: $IM_ACCESS_TOKEN" -L "$ABSOLUTE_SEED_URL" -o "$DATA_FOLDER" | cat
-  gunzip -v -c "$DATA_FOLDER" > "$DATA_FOLDER-seed-data"
+
+  DOWNLOAD_FOLDER="$POSTGRESQL_VOLUME_DIR/t$$"
+  DATA_FOLDER="$DOWNLOAD_FOLDER-seed-data"
+
+  curl --fail -H "Authorization: $IM_ACCESS_TOKEN" -L "$ABSOLUTE_SEED_URL" -o "$DOWNLOAD_FOLDER" | cat
+
+  if gunzip -t "$DOWNLOAD_FOLDER"; then
+    gunzip -v -c "$DOWNLOAD_FOLDER" > "$DATA_FOLDER"
+  else
+    DATA_FOLDER=$DOWNLOAD_FOLDER
+  fi
+
   # file (the unix util) isn't available on bitnami's postgresql image therefore the following hack is used
   # If the first line of the seed file is "--" it's assumed it's sql and not pgc
-  firstLine=$(head -n 1 "$DATA_FOLDER-seed-data")
+  firstLine=$(head -n 1 "$DATA_FOLDER")
   if [ "$firstLine" == "--" ]; then
-    psql -U postgres -d "$DATABASE_NAME" -f "$DATA_FOLDER-seed-data"
+    psql -U postgres -d "$DATABASE_NAME" -f "$DATA_FOLDER"
   else
-    pg_restore -j 8 -U postgres -d "$DATABASE_USERNAME" "$DATA_FOLDER-seed-data"
+    pg_restore -j 8 -U postgres -d "$DATABASE_USERNAME" "$DATA_FOLDER"
   fi
-  rm "$DATA_FOLDER" "$DATA_FOLDER-seed-data"
+
+  rm -f "$DOWNLOAD_FOLDER" "$DATA_FOLDER"
 
   ## Change ownership to $DATABASE_USERNAME
   # Tables
