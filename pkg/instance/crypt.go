@@ -4,7 +4,6 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"encoding/base64"
-	"fmt"
 )
 
 var iv = []byte{83, 108, 97, 118, 97, 32, 85, 107, 114, 97, 105, 110, 105, 33, 33, 33}
@@ -26,7 +25,6 @@ func encryptText(text string, key string) (string, error) {
 }
 
 func decryptText(text string, key string) (string, error) {
-	fmt.Println("Snot")
 	cipherText, err := base64.StdEncoding.DecodeString(text)
 	if err != nil {
 		return "", err
