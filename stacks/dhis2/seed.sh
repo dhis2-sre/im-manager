@@ -7,7 +7,7 @@ if [ -n "$DATABASE_ID" ]; then
 #  ABSOLUTE_SEED_URL="$DATABASE_MANAGER_SERVICE_HOST/$DATABASE_MANAGER_SERVICE_BASE_PATH/databases/$DATABASE_ID/download"
   ABSOLUTE_SEED_URL="im-database-manager-dev.instance-manager-dev.svc:8080/databases/$DATABASE_ID/download"
   echo "DATABASE_HOST: $ABSOLUTE_SEED_URL"
-  DATA_FOLDER="/bitnami/postgresql/t$$"
+  DATA_FOLDER="$POSTGRESQL_VOLUME_DIR/t$$"
   curl --fail -H "Authorization: $IM_ACCESS_TOKEN" -L "$ABSOLUTE_SEED_URL" -o "$DATA_FOLDER" | cat
   gunzip -v -c "$DATA_FOLDER" > "$DATA_FOLDER-seed-data"
   # file (the unix util) isn't available on bitnami's postgresql image therefore the following hack is used
