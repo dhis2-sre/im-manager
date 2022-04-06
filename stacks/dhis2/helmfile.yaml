@@ -2,7 +2,7 @@ releases:
   - name: "{{ requiredEnv "INSTANCE_NAME" }}"
     namespace: "{{ requiredEnv "INSTANCE_NAMESPACE" }}"
     chart: tons/dhis2-core
-    version: "{{ env "CHART_VERSION" | default "0.5.0" }}"
+    version: "{{ env "CHART_VERSION" | default "0.6.0" }}"
     values:
       - image:
           repository: dhis2/core
