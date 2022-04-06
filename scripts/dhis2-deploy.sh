@@ -24,8 +24,12 @@ echo "{
   ],
   \"optionalParameters\": [
       {
-        \"stackParameterId\": 4,
+        \"stackParameterId\": 10,
         \"value\": \"$tag\"
+      },
+      {
+        \"stackParameterId\": 4,
+        \"value\": \"600\"
       }
     ]
 }" | $HTTP post "$INSTANCE_HOST/instances/$INSTANCE_ID/deploy" "Authorization: Bearer $ACCESS_TOKEN"
