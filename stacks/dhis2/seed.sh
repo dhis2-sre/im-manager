@@ -8,7 +8,9 @@ if [ -n "$DATABASE_ID" ]; then
   echo "DATABASE_HOST: $ABSOLUTE_SEED_URL"
 
   MY_UID=$(tr -dc A-Za-z0-9 </dev/urandom | head -c 32 ; echo '')
-  DOWNLOAD_FOLDER="$POSTGRESQL_VOLUME_DIR/im/$MY_UID"
+  BASE_FOLDER="$POSTGRESQL_VOLUME_DIR/im"
+  mkdir -p $BASE_FOLDER
+  DOWNLOAD_FOLDER="$BASE_FOLDER/$MY_UID"
   DATA_FOLDER="$DOWNLOAD_FOLDER-seed-data"
 
   curl --fail -H "Authorization: $IM_ACCESS_TOKEN" -L "$ABSOLUTE_SEED_URL" -o "$DOWNLOAD_FOLDER" | cat
