@@ -12,11 +12,15 @@ if [ -n "$DATABASE_ID" ]; then
   DATA_FOLDER="$DOWNLOAD_FOLDER-seed-data"
 
   curl --fail -H "Authorization: $IM_ACCESS_TOKEN" -L "$ABSOLUTE_SEED_URL" -o "$DOWNLOAD_FOLDER" | cat
+  echo "Download completed!"
 
   if gunzip -t "$DOWNLOAD_FOLDER"; then
+    echo "Unzipping..."
     gunzip -v -c "$DOWNLOAD_FOLDER" > "$DATA_FOLDER"
+    echo "Unzipping completed!"
   else
-    DATA_FOLDER=$DOWNLOAD_FOLDER
+    echo "No unzip!"
+    DATA_FOLDER="$DOWNLOAD_FOLDER"
   fi
 
   # file (the unix util) isn't available on bitnami's postgresql image therefore the following hack is used
