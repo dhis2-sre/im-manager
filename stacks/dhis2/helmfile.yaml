@@ -13,6 +13,7 @@ releases:
           path: /{{ requiredEnv "INSTANCE_NAME" }}
           certIssuer: cert-issuer-prod
       - catalinaOpts: "-Dcontext.path=/{{ requiredEnv "INSTANCE_NAME" }}"
+      - javaOpts: "{{ env "JAVA_OPTS" | default "" }}"
       - livenessProbe:
           initialDelaySeconds: {{ env "LIVENESS_PROBE_INITIAL_DELAY_SECONDS" | default 300 }}
           path: /{{ requiredEnv "INSTANCE_NAME" }}
