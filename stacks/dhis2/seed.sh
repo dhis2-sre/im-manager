@@ -10,31 +10,31 @@ if [ -n "$DATABASE_ID" ]; then
   MY_UID=$(tr -dc A-Za-z0-9 </dev/urandom | head -c 32 ; echo '')
   BASE_FOLDER="$POSTGRESQL_VOLUME_DIR/im"
   mkdir -p $BASE_FOLDER
-  DOWNLOAD_FOLDER="$BASE_FOLDER/$MY_UID"
-  DATA_FOLDER="$DOWNLOAD_FOLDER-seed-data"
+  DOWNLOAD_FILE="$BASE_FOLDER/$MY_UID"
+  DATA_FILE="$DOWNLOAD_FILE-seed-data"
 
-  curl --fail -H "Authorization: $IM_ACCESS_TOKEN" -L "$ABSOLUTE_SEED_URL" -o "$DOWNLOAD_FOLDER" | cat
+  curl --fail -H "Authorization: $IM_ACCESS_TOKEN" -L "$ABSOLUTE_SEED_URL" -o "$DOWNLOAD_FILE" | cat
   echo "Download completed!"
 
-  if gunzip -t "$DOWNLOAD_FOLDER"; then
+  if gunzip -t "$DOWNLOAD_FILE"; then
     echo "Unzipping..."
-    gunzip -v -c "$DOWNLOAD_FOLDER" > "$DATA_FOLDER"
+    gunzip -v -c "$DOWNLOAD_FILE" > "$DATA_FILE"
     echo "Unzipping completed!"
   else
     echo "No unzip!"
-    DATA_FOLDER="$DOWNLOAD_FOLDER"
+    DATA_FILE="$DOWNLOAD_FILE"
   fi
 
   # file (the unix util) isn't available on bitnami's postgresql image therefore the following hack is used
   # If the first line of the seed file is "--" it's assumed it's sql and not pgc
-  firstLine=$(head -n 1 "$DATA_FOLDER")
+  firstLine=$(head -n 1 "$DATA_FILE")
   if [ "$firstLine" == "--" ]; then
-    psql -U postgres -d "$DATABASE_NAME" -f "$DATA_FOLDER"
+    psql -U postgres -d "$DATABASE_NAME" -f "$DATA_FILE"
   else
-    pg_restore -j 8 -U postgres -d "$DATABASE_NAME" "$DATA_FOLDER"
+    pg_restore -j 8 -U postgres -d "$DATABASE_NAME" "$DATA_FILE"
   fi
 
-  rm -f "$DOWNLOAD_FOLDER" "$DATA_FOLDER"
+  rm -f "$DOWNLOAD_FILE" "$DATA_FILE"
 
   ## Change ownership to $DATABASE_USERNAME
   # Tables
