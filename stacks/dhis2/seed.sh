@@ -29,7 +29,7 @@ if [ -n "$DATABASE_ID" ]; then
   if [ "$firstLine" == "--" ]; then
     psql -U postgres -d "$DATABASE_NAME" -f "$DATA_FOLDER"
   else
-    pg_restore -j 8 -U postgres -d "$DATABASE_USERNAME" "$DATA_FOLDER"
+    pg_restore -j 8 -U postgres -d "$DATABASE_NAME" "$DATA_FOLDER"
   fi
 
   rm -f "$DOWNLOAD_FOLDER" "$DATA_FOLDER"
