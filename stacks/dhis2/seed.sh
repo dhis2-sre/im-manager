@@ -7,7 +7,8 @@ if [ -n "$DATABASE_ID" ]; then
   ABSOLUTE_SEED_URL="im-database-manager-dev.instance-manager-dev.svc:8080/databases/$DATABASE_ID/download"
   echo "DATABASE_HOST: $ABSOLUTE_SEED_URL"
 
-  DOWNLOAD_FOLDER="$POSTGRESQL_VOLUME_DIR/t$$"
+  MY_UID=$(tr -dc A-Za-z0-9 </dev/urandom | head -c 32 ; echo '')
+  DOWNLOAD_FOLDER="$POSTGRESQL_VOLUME_DIR/im/$MY_UID"
   DATA_FOLDER="$DOWNLOAD_FOLDER-seed-data"
 
   curl --fail -H "Authorization: $IM_ACCESS_TOKEN" -L "$ABSOLUTE_SEED_URL" -o "$DOWNLOAD_FOLDER" | cat
