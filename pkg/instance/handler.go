@@ -128,7 +128,7 @@ type DeployInstanceRequest struct {
 //   415: Error
 func (h Handler) Deploy(c *gin.Context) {
 	idParam := c.Param("id")
-	id, err := strconv.Atoi(idParam)
+	id, err := strconv.ParseUint(idParam, 10, 64)
 	if err != nil {
 		badRequest := apperror.NewBadRequest("error parsing id")
 		_ = c.Error(badRequest)
@@ -161,7 +161,7 @@ func (h Handler) Deploy(c *gin.Context) {
 
 	instance, err := h.instanceService.FindById(uint(id))
 	if err != nil {
-		notFound := apperror.NewNotFound("instance", strconv.Itoa(id))
+		notFound := apperror.NewNotFound("instance", idParam)
 		_ = c.Error(notFound)
 		return
 	}
@@ -236,7 +236,7 @@ func convertOptionalParameters(instanceID uint, requestParameters []ParameterReq
 //   415: Error
 func (h Handler) Delete(c *gin.Context) {
 	idParam := c.Param("id")
-	id, err := strconv.Atoi(idParam)
+	id, err := strconv.ParseUint(idParam, 10, 64)
 	if err != nil {
 		badRequest := apperror.NewBadRequest("error parsing id")
 		_ = c.Error(badRequest)
@@ -264,7 +264,7 @@ func (h Handler) Delete(c *gin.Context) {
 
 	instance, err := h.instanceService.FindById(uint(id))
 	if err != nil {
-		notFound := apperror.NewNotFound("instance", strconv.Itoa(id))
+		notFound := apperror.NewNotFound("instance", idParam)
 		_ = c.Error(notFound)
 		return
 	}
@@ -303,7 +303,7 @@ func (h Handler) Delete(c *gin.Context) {
 //   415: Error
 func (h Handler) FindById(c *gin.Context) {
 	idParam := c.Param("id")
-	id, err := strconv.Atoi(idParam)
+	id, err := strconv.ParseUint(idParam, 10, 64)
 	if err != nil {
 		badRequest := apperror.NewBadRequest("error parsing id")
 		_ = c.Error(badRequest)
@@ -331,7 +331,7 @@ func (h Handler) FindById(c *gin.Context) {
 
 	instance, err := h.instanceService.FindWithParametersById(uint(id))
 	if err != nil {
-		notFound := apperror.NewNotFound("instance", strconv.Itoa(id))
+		notFound := apperror.NewNotFound("instance", idParam)
 		_ = c.Error(notFound)
 		return
 	}
@@ -362,7 +362,7 @@ func (h Handler) FindById(c *gin.Context) {
 //   415: Error
 func (h Handler) FindByIdWithDecryptedParameters(c *gin.Context) {
 	idParam := c.Param("id")
-	id, err := strconv.Atoi(idParam)
+	id, err := strconv.ParseUint(idParam, 10, 64)
 	if err != nil {
 		badRequest := apperror.NewBadRequest("error parsing id")
 		_ = c.Error(badRequest)
@@ -390,7 +390,7 @@ func (h Handler) FindByIdWithDecryptedParameters(c *gin.Context) {
 
 	instance, err := h.instanceService.FindWithDecryptedParametersById(uint(id))
 	if err != nil {
-		notFound := apperror.NewNotFound("instance", strconv.Itoa(id))
+		notFound := apperror.NewNotFound("instance", idParam)
 		_ = c.Error(notFound)
 		return
 	}
@@ -421,7 +421,7 @@ func (h Handler) FindByIdWithDecryptedParameters(c *gin.Context) {
 //   415: Error
 func (h Handler) Logs(c *gin.Context) {
 	idParam := c.Param("id")
-	id, err := strconv.Atoi(idParam)
+	id, err := strconv.ParseUint(idParam, 10, 64)
 	if err != nil {
 		badRequest := apperror.NewBadRequest("error parsing id")
 		_ = c.Error(badRequest)
@@ -449,7 +449,7 @@ func (h Handler) Logs(c *gin.Context) {
 
 	instance, err := h.instanceService.FindById(uint(id))
 	if err != nil {
-		notFound := apperror.NewNotFound("instance", strconv.Itoa(id))
+		notFound := apperror.NewNotFound("instance", idParam)
 		_ = c.Error(notFound)
 		return
 	}
@@ -646,7 +646,7 @@ type RunJobResponse struct {
 //   415: Error
 func (h Handler) Save(c *gin.Context) {
 	idParam := c.Param("id")
-	id, err := strconv.Atoi(idParam)
+	id, err := strconv.ParseUint(idParam, 10, 64)
 	if err != nil {
 		badRequest := apperror.NewBadRequest("error parsing id")
 		_ = c.Error(badRequest)
