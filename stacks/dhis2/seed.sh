@@ -6,7 +6,6 @@ if [ -n "$DATABASE_ID" ]; then
 #  ABSOLUTE_SEED_URL="$DATABASE_MANAGER_SERVICE_HOST/$DATABASE_MANAGER_SERVICE_BASE_PATH/databases/$DATABASE_ID/download"
   ABSOLUTE_SEED_URL="im-database-manager-prod.instance-manager-prod.svc:8080/databases/$DATABASE_ID/download"
   echo "DATABASE_HOST: $ABSOLUTE_SEED_URL"
-  printenv
 
   DOWNLOAD_FOLDER="$POSTGRESQL_VOLUME_DIR/t$$"
   DATA_FOLDER="$DOWNLOAD_FOLDER-seed-data"
@@ -51,6 +50,13 @@ if [ -n "$DATABASE_ID" ]; then
     echo "Changing owner of $entity to $DATABASE_USERNAME"
     psql -U postgres -c "alter view \"$entity\" owner to $DATABASE_USERNAME" "$DATABASE_NAME"
   done
+
+  # Functions
+#  functions=$(psql -U postgres -qAt -c "select routine_name from information_schema.routines where routine_type = 'FUNCTION' and  routine_schema = 'public'" "$DATABASE_NAME")
+#  for function in $functions; do
+#      echo "Changing owner of $function to $DATABASE_USERNAME"
+#      psql -U postgres -c "alter function \"$function\" owner to $DATABASE_USERNAME" "$DATABASE_NAME"
+#  done
 
 else
   psql -U postgres -d "$DATABASE_USERNAME" -p 5432 -c "create extension if not exists postgis"
