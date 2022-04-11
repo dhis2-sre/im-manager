@@ -52,9 +52,8 @@ if [ -n "$DATABASE_ID" ]; then
   done
 
   # Functions
-  psql -U postgres -c -qAt "select 'alter function '||p.proname||'('||pg_get_function_identity_arguments(p.oid)||') owner to dhis;' from pg_proc p join pg_namespace nsp ON p.pronamespace = nsp.oid where nsp.nspname = 'public'" > functions.sql
-  echo "Changing owner of functions to $DATABASE_USERNAME"
-  psql -U postgres -f functions.sql
+  echo "Changing owner of generate_uid() to $DATABASE_USERNAME"
+  psql -U postgres -c "alter function generate_uid() owner to $DATABASE_USERNAME" "$DATABASE_NAME"
 
 else
   psql -U postgres -d "$DATABASE_USERNAME" -p 5432 -c "create extension if not exists postgis"
