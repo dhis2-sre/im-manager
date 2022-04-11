@@ -52,11 +52,11 @@ if [ -n "$DATABASE_ID" ]; then
   done
 
   # Functions
-#  functions=$(psql -U postgres -qAt -c "select routine_name from information_schema.routines where routine_type = 'FUNCTION' and  routine_schema = 'public'" "$DATABASE_NAME")
-#  for function in $functions; do
-#      echo "Changing owner of $function to $DATABASE_USERNAME"
-#      psql -U postgres -c "alter function \"$function\" owner to $DATABASE_USERNAME" "$DATABASE_NAME"
-#  done
+  functions=$(psql -U postgres -qAt -c "select format('%I(%s)', p.proname, oidvectortypes(p.proargtypes)) from pg_proc p inner join pg_namespace ns on (p.pronamespace = ns.oid)" "$DATABASE_NAME")
+  for function in $functions; do
+    echo "Changing owner of $function to $DATABASE_USERNAME"
+    psql -U postgres -c "alter function ${function@Q} owner to $DATABASE_USERNAME" "$DATABASE_NAME"
+  done
 
 else
   psql -U postgres -d "$DATABASE_USERNAME" -p 5432 -c "create extension if not exists postgis"
