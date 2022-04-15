@@ -38,7 +38,7 @@ RUN go install github.com/cespare/reflex@${REFLEX_VERSION}
 COPY go.mod go.sum ./
 RUN go mod download -x
 COPY . .
-RUN --mount=type=cache,target=/root/.cache/go-build go build -o /app/im-manager -ldflags "-s -w" ./cmd/serve
+RUN go build -o /app/im-manager -ldflags "-s -w" ./cmd/serve
 
 FROM alpine:3.15
 RUN apk --no-cache -U upgrade
