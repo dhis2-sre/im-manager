@@ -7,7 +7,7 @@ STACK_ID=1
 NAME=$1
 GROUP_NAME=$2
 
-GROUP_ID=$($HTTP --check-status "$INSTANCE_HOST/groups-name-to-id/$GROUP_NAME" "Authorization: Bearer $ACCESS_TOKEN")
+GROUP_ID=$($HTTP get "$INSTANCE_HOST/groups-name-to-id/$GROUP_NAME" "Authorization: Bearer $ACCESS_TOKEN")
 
 echo "{
   \"name\": \"$NAME\",
