@@ -172,8 +172,10 @@ func (s service) Logs(instance *model.Instance, group *models.Group, selector st
 }
 
 func (s service) getPod(client *kubernetes.Clientset, instance *model.Instance, selector string) (v1.Pod, error) {
-	labelSelector := fmt.Sprintf("im-id=%d", instance.ID)
-	if selector != "" {
+	var labelSelector string
+	if selector == "" {
+		labelSelector = fmt.Sprintf("im-id=%d", instance.ID)
+	} else {
 		labelSelector = fmt.Sprintf("im-%s-id=%d", selector, instance.ID)
 	}
 
