@@ -7,34 +7,9 @@ if [ -n "$DATABASE_ID" ]; then
   ABSOLUTE_SEED_URL="im-database-manager-dev.instance-manager-dev.svc:8080/databases/$DATABASE_ID/download"
   echo "DATABASE_HOST: $ABSOLUTE_SEED_URL"
 
-  MY_UID=$(tr -dc A-Za-z0-9 </dev/urandom | head -c 32 ; echo '')
-  BASE_FOLDER="$POSTGRESQL_VOLUME_DIR/im"
-  mkdir -p $BASE_FOLDER
-  DOWNLOAD_FILE="$BASE_FOLDER/$MY_UID"
-  DATA_FILE="$DOWNLOAD_FILE-seed-data"
-
-  curl --fail -H "Authorization: $IM_ACCESS_TOKEN" -L "$ABSOLUTE_SEED_URL" -o "$DOWNLOAD_FILE" | cat
-  echo "Download completed!"
-
-  if gunzip -t "$DOWNLOAD_FILE"; then
-    echo "Unzipping..."
-    gunzip -v -c "$DOWNLOAD_FILE" > "$DATA_FILE"
-    echo "Unzipping completed!"
-  else
-    echo "No unzip!"
-    DATA_FILE="$DOWNLOAD_FILE"
-  fi
-
-  # file (the unix util) isn't available on bitnami's postgresql image therefore the following hack is used
-  # If the first line of the seed file is "--" it's assumed it's sql and not pgc
-  firstLine=$(head -n 1 "$DATA_FILE")
-  if [ "$firstLine" == "--" ]; then
-    psql -U postgres -d "$DATABASE_NAME" -f "$DATA_FILE"
-  else
-    pg_restore -j 8 -U postgres -d "$DATABASE_NAME" "$DATA_FILE"
-  fi
-
-  rm -f "$DOWNLOAD_FILE" "$DATA_FILE"
+# Try pg_restore... Or gzipped sql
+  (curl --fail -L "$ABSOLUTE_SEED_URL" -H "Authorization: $IM_ACCESS_TOKEN" | pg_restore -U postgres -d "$DATABASE_NAME") || \
+  (curl --fail -L "$ABSOLUTE_SEED_URL" -H "Authorization: $IM_ACCESS_TOKEN" | gunzip -v -c | psql -U postgres -d "$DATABASE_NAME")
 
   ## Change ownership to $DATABASE_USERNAME
   # Tables
