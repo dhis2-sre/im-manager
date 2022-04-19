@@ -4,7 +4,7 @@ set -euo pipefail
 
 if [ -n "$DATABASE_ID" ]; then
 #  ABSOLUTE_SEED_URL="$DATABASE_MANAGER_SERVICE_HOST/$DATABASE_MANAGER_SERVICE_BASE_PATH/databases/$DATABASE_ID/download"
-  ABSOLUTE_SEED_URL="im-database-manager-dev.instance-manager-dev.svc:8080/databases/$DATABASE_ID/download"
+  ABSOLUTE_SEED_URL="im-database-manager-prod.instance-manager-prod.svc:8080/databases/$DATABASE_ID/download"
   echo "DATABASE_HOST: $ABSOLUTE_SEED_URL"
 
 # Try pg_restore... Or gzipped sql
