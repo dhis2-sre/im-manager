@@ -413,7 +413,7 @@ func (h Handler) FindByIdWithDecryptedParameters(c *gin.Context) {
 // Security:
 //  oauth2:
 //
-// responses:
+// Responses:
 //   200: InstanceLogsResponse
 //   401: Error
 //   403: Error
@@ -427,6 +427,8 @@ func (h Handler) Logs(c *gin.Context) {
 		_ = c.Error(badRequest)
 		return
 	}
+
+	selector := c.Query("selector")
 
 	user, err := handler.GetUserFromContext(c)
 	if err != nil {
@@ -466,7 +468,7 @@ func (h Handler) Logs(c *gin.Context) {
 		_ = c.Error(err)
 	}
 
-	readCloser, err := h.instanceService.Logs(instance, group)
+	readCloser, err := h.instanceService.Logs(instance, group, selector)
 	if err != nil {
 		conflict := apperror.NewConflict(err.Error())
 		_ = c.Error(conflict)

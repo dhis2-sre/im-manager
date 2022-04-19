@@ -7,9 +7,9 @@ releases:
       - image:
           pullPolicy: Always
       - podLabels:
-          dhis2: "true"
-          dhis2-id: "{{ requiredEnv "INSTANCE_ID" }}"
-          dhis2-ttl: "{{ env "INSTANCE_TTL" | default "" }}"
+          im: "true"
+          im-id: "{{ requiredEnv "INSTANCE_ID" }}"
+          im-ttl: "{{ env "INSTANCE_TTL" | default "" }}"
       - command: "{{ requiredEnv "COMMAND" }}"
       - payload: "{{ env "PAYLOAD" | default "-" }}"
       - dhis2:

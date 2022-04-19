@@ -4,6 +4,15 @@ import (
 	"github.com/dhis2-sre/im-manager/pkg/instance"
 )
 
+// swagger:parameters instanceLogs
+type SelectorParameter struct {
+	// name: selector
+	// in: query
+	// required: false
+	// type: string
+	Selector uint `json:"selector"`
+}
+
 // swagger:parameters deleteInstance findInstanceById instanceLogs deployInstance saveInstance findInstanceByIdWithParameters
 type IdParameter struct {
 	// in: path
@@ -50,4 +59,10 @@ type _ struct {
 type RunJobResponse struct {
 	//in: body
 	RunJobResponse instance.RunJobResponse
+}
+
+// swagger:response
+type InstanceLogsResponse struct {
+	//in: body
+	InstanceLogsResponse string
 }
