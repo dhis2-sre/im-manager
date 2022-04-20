@@ -3,7 +3,7 @@ module github.com/dhis2-sre/im-manager
 go 1.18
 
 require (
-	github.com/dhis2-sre/im-database-manager v0.5.1
+	github.com/dhis2-sre/im-job v0.1.1-0.20220116121707-efdfb9c56501
 	github.com/dhis2-sre/im-user v0.6.0
 	github.com/dhis2-sre/instance-queue v0.2.0
 	github.com/gin-contrib/cors v1.3.1
@@ -44,7 +44,6 @@ require (
 	github.com/cenkalti/backoff/v3 v3.2.2 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.0.1 // indirect
-	github.com/dhis2-sre/im-job v0.1.1-0.20220116121707-efdfb9c56501 // indirect
 	github.com/dimchansky/utfbom v1.1.1 // indirect
 	github.com/fatih/color v1.13.0 // indirect
 	github.com/gin-contrib/sse v0.1.0 // indirect
