@@ -3,9 +3,10 @@ package apperror
 import (
 	"errors"
 	"fmt"
-	"github.com/gofrs/uuid"
 	"log"
 	"net/http"
+
+	"github.com/gofrs/uuid"
 )
 
 type Type string

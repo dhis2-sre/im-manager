@@ -1,9 +1,10 @@
 package handler
 
 import (
+	"sort"
+
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	"github.com/dhis2-sre/im-user/swagger/sdk/models"
-	"sort"
 )
 
 const AdministratorGroupName = "administrators"

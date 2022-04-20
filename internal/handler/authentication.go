@@ -4,15 +4,16 @@ import (
 	"context"
 	"crypto/rsa"
 	"errors"
+	"log"
+	"net/http"
+	"time"
+
 	"github.com/dhis2-sre/im-manager/internal/apperror"
 	"github.com/dhis2-sre/im-manager/pkg/config"
 	"github.com/gin-gonic/gin"
 	"github.com/lestrrat-go/jwx/jwa"
 	"github.com/lestrrat-go/jwx/jwk"
 	"github.com/lestrrat-go/jwx/jwt"
-	"log"
-	"net/http"
-	"time"
 )
 
 func ProvideAuthentication(c config.Config) AuthenticationMiddleware {

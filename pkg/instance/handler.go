@@ -3,6 +3,10 @@ package instance
 import (
 	"bufio"
 	"fmt"
+	"io"
+	"net/http"
+	"strconv"
+
 	jobClient "github.com/dhis2-sre/im-job/pkg/client"
 	jobModels "github.com/dhis2-sre/im-job/swagger/sdk/models"
 	"github.com/dhis2-sre/im-manager/internal/apperror"
@@ -11,9 +15,6 @@ import (
 	userClient "github.com/dhis2-sre/im-user/pkg/client"
 	"github.com/dhis2-sre/im-user/swagger/sdk/models"
 	"github.com/gin-gonic/gin"
-	"io"
-	"net/http"
-	"strconv"
 )
 
 func ProvideHandler(

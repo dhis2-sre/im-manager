@@ -2,9 +2,10 @@ package instance
 
 import (
 	"encoding/json"
+	"log"
+
 	"github.com/dhis2-sre/instance-queue/pgk/queue"
 	amqp "github.com/rabbitmq/amqp091-go"
-	"log"
 )
 
 func ProvideTtlDestroyConsumer(url string, instanceService Service) *ttlDestroyConsumer {
