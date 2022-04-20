@@ -1,4 +1,4 @@
-FROM golang:1.17-alpine AS build
+FROM golang:1.18-alpine AS build
 
 ARG KUBECTL_VERSION=v1.23.5
 ARG KUBECTL_CHECKSUM=715da05c56aa4f8df09cb1f9d96a2aa2c33a1232f6fd195e3ffce6e98a50a879
@@ -11,6 +11,8 @@ ARG HELMFILE_CHECKSUM=a30a5c9f64c8eba2123625497913f9ad210a047e997f2363cda3189cba
 
 ARG AWS_IAM_AUTHENTICATOR_VERSION=1.21.2/2021-07-05
 ARG AWS_IAM_AUTHENTICATOR_CHECKSUM=fe958eff955bea1499015b45dc53392a33f737630efd841cd574559cc0f41800
+
+ARG REFLEX_VERSION=v0.3.1
 
 RUN apk add gcc musl-dev git && \
 \
@@ -32,7 +34,7 @@ RUN apk add gcc musl-dev git && \
     install -o root -g root -m 0755 aws-iam-authenticator /usr/bin/aws-iam-authenticator
 
 WORKDIR /src
-RUN go get github.com/cespare/reflex
+RUN go install github.com/cespare/reflex@${REFLEX_VERSION}
 COPY go.mod go.sum ./
 RUN go mod download -x
 COPY . .
