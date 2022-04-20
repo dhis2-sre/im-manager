@@ -7,7 +7,7 @@ releases:
     values:
       - primary:
           podLabels:
-            dhis2-data-id: "{{ requiredEnv "INSTANCE_ID" }}"
+            im-data-id: "{{ requiredEnv "INSTANCE_ID" }}"
       - image:
           tag: {{ env "DATABASE_VERSION" | default 10 }}
       - postgresqlUsername: {{ env "DATABASE_USERNAME" | default "dhis" }}

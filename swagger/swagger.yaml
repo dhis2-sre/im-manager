@@ -382,6 +382,11 @@ paths:
       description: Stream instance logs in real time
       operationId: instanceLogs
       parameters:
+      - description: selector
+        in: query
+        name: selector
+        type: string
+        x-go-name: Selector
       - format: uint64
         in: path
         name: id

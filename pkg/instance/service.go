@@ -19,7 +19,7 @@ type Service interface {
 	Deploy(token string, instance *model.Instance, group *models.Group) error
 	FindById(id uint) (*model.Instance, error)
 	Delete(id uint) error
-	Logs(instance *model.Instance, group *models.Group) (io.ReadCloser, error)
+	Logs(instance *model.Instance, group *models.Group, selector string) (io.ReadCloser, error)
 	FindWithParametersById(id uint) (*model.Instance, error)
 	FindWithDecryptedParametersById(id uint) (*model.Instance, error)
 	FindByNameAndGroup(instanceName string, groupId uint) (*model.Instance, error)
@@ -146,11 +146,14 @@ func (s service) Delete(id uint) error {
 	return s.instanceRepository.Delete(id)
 }
 
-func (s service) Logs(instance *model.Instance, group *models.Group) (io.ReadCloser, error) {
+func (s service) Logs(instance *model.Instance, group *models.Group, selector string) (io.ReadCloser, error) {
 	var read io.ReadCloser
 
 	err := s.kubernetesService.Executor(group.ClusterConfiguration, func(client *kubernetes.Clientset) error {
-		pod := s.getPod(client, instance)
+		pod, err := s.getPod(client, instance, selector)
+		if err != nil {
+			return err
+		}
 
 		podLogOptions := v1.PodLogOptions{
 			Follow: true,
@@ -168,23 +171,28 @@ func (s service) Logs(instance *model.Instance, group *models.Group) (io.ReadClo
 	return read, err
 }
 
-func (s service) getPod(client *kubernetes.Clientset, instance *model.Instance) v1.Pod {
+func (s service) getPod(client *kubernetes.Clientset, instance *model.Instance, selector string) (v1.Pod, error) {
+	var labelSelector string
+	if selector == "" {
+		labelSelector = fmt.Sprintf("im-id=%d", instance.ID)
+	} else {
+		labelSelector = fmt.Sprintf("im-%s-id=%d", selector, instance.ID)
+	}
+
 	listOptions := metav1.ListOptions{
-		LabelSelector: fmt.Sprintf("dhis2-id=%d", instance.ID),
+		LabelSelector: labelSelector,
 	}
 
 	podList, err := client.CoreV1().Pods("").List(context.TODO(), listOptions)
 	if err != nil {
-		// TODO: Don't use fatal logging
-		log.Fatalln(err)
+		return v1.Pod{}, err
 	}
 
 	if len(podList.Items) > 1 {
-		// TODO: Don't use fatal logging
-		log.Fatalln("More than one pod found... TODO")
+		return v1.Pod{}, fmt.Errorf("multiple pods found using the selector: %s", labelSelector)
 	}
 
-	return podList.Items[0]
+	return podList.Items[0], nil
 }
 
 func (s service) FindWithParametersById(id uint) (*model.Instance, error) {

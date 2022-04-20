@@ -2,8 +2,6 @@ releases:
   - name: "{{ requiredEnv "INSTANCE_NAME" }}"
     namespace: "{{ requiredEnv "INSTANCE_NAMESPACE" }}"
     chart: tons/whoami-go
-# TODO: enable this!!!
-#    verify: true
     version: "{{ requiredEnv "CHART_VERSION" }}"
     values:
       - ingress:
@@ -12,9 +10,9 @@ releases:
           path: /{{ requiredEnv "INSTANCE_NAME" }}
           certIssuer: cert-issuer-prod
       - podLabels:
-          dhis2: "true"
-          dhis2-id: "{{ requiredEnv "INSTANCE_ID" }}"
-          dhis2-ttl: "{{ env "INSTANCE_TTL" | default "" }}"
+          im: "true"
+          im-id: "{{ requiredEnv "INSTANCE_ID" }}"
+          im-ttl: "{{ env "INSTANCE_TTL" | default "" }}"
 
 repositories:
   - name: tons

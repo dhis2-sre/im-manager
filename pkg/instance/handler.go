@@ -413,7 +413,7 @@ func (h Handler) FindByIdWithDecryptedParameters(c *gin.Context) {
 // Security:
 //  oauth2:
 //
-// responses:
+// Responses:
 //   200: InstanceLogsResponse
 //   401: Error
 //   403: Error
@@ -424,6 +424,14 @@ func (h Handler) Logs(c *gin.Context) {
 	id, err := strconv.ParseUint(idParam, 10, 64)
 	if err != nil {
 		badRequest := apperror.NewBadRequest("error parsing id")
+		_ = c.Error(badRequest)
+		return
+	}
+
+	selector := c.Query("selector")
+	// We currently only support streaming of logs from DHIS2 and the database. And we want to make sure logs from any other pods are off limit
+	if selector != "" && selector != "data" {
+		badRequest := apperror.NewBadRequest("selector can only be empty or \"data\"")
 		_ = c.Error(badRequest)
 		return
 	}
@@ -466,21 +474,21 @@ func (h Handler) Logs(c *gin.Context) {
 		_ = c.Error(err)
 	}
 
-	readCloser, err := h.instanceService.Logs(instance, group)
+	r, err := h.instanceService.Logs(instance, group, selector)
 	if err != nil {
 		conflict := apperror.NewConflict(err.Error())
 		_ = c.Error(conflict)
 		return
 	}
 
-	defer func(readCloser io.ReadCloser) {
-		err := readCloser.Close()
+	defer func(r io.ReadCloser) {
+		err := r.Close()
 		if err != nil {
 			_ = c.Error(err)
 		}
-	}(readCloser)
+	}(r)
 
-	bufferedReader := bufio.NewReader(readCloser)
+	bufferedReader := bufio.NewReader(r)
 
 	c.Stream(func(writer io.Writer) bool {
 		readBytes, err := bufferedReader.ReadBytes('\n')

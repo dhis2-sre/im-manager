@@ -20,9 +20,9 @@ releases:
           initialDelaySeconds: 180
           path: /{{ requiredEnv "INSTANCE_NAME" }}
       - podLabels:
-          dhis2: "true"
-          dhis2-id: "{{ requiredEnv "INSTANCE_ID" }}"
-          dhis2-ttl: "{{ env "INSTANCE_TTL" | default "" }}"
+          im: "true"
+          im-id: "{{ requiredEnv "INSTANCE_ID" }}"
+          im-ttl: "{{ env "INSTANCE_TTL" | default "" }}"
       - dhisConfig: |
           connection.dialect = org.hibernate.dialect.PostgreSQLDialect
           connection.driver_class = org.postgresql.Driver
