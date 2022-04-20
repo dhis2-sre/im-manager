@@ -1,9 +1,10 @@
 package instance
 
 import (
+	"strconv"
+
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	"gorm.io/gorm"
-	"strconv"
 )
 
 type Repository interface {

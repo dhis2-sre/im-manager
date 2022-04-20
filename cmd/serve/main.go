@@ -26,11 +26,12 @@
 package main
 
 import (
+	"log"
+
 	"github.com/dhis2-sre/im-manager/internal/di"
 	"github.com/dhis2-sre/im-manager/internal/server"
 	"github.com/dhis2-sre/im-manager/pkg/instance"
 	"github.com/dhis2-sre/im-manager/pkg/stack"
-	"log"
 )
 
 func main() {

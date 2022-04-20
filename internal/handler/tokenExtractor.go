@@ -2,8 +2,9 @@ package handler
 
 import (
 	"errors"
-	"github.com/gin-gonic/gin"
 	"strings"
+
+	"github.com/gin-gonic/gin"
 )
 
 func GetTokenFromHttpAuthHeader(c *gin.Context) (string, error) {

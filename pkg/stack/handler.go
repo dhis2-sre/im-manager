@@ -2,10 +2,11 @@ package stack
 
 import (
 	"fmt"
-	"github.com/dhis2-sre/im-manager/internal/apperror"
-	"github.com/gin-gonic/gin"
 	"net/http"
 	"strconv"
+
+	"github.com/dhis2-sre/im-manager/internal/apperror"
+	"github.com/gin-gonic/gin"
 )
 
 func ProvideHandler(service Service) Handler {

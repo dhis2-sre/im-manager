@@ -1,10 +1,11 @@
 package handler
 
 import (
+	"testing"
+
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	"github.com/dhis2-sre/im-user/swagger/sdk/models"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func TestCanWriteInstance_isOwnerAndMember(t *testing.T) {

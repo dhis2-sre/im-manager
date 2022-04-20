@@ -5,6 +5,9 @@ clean-cmd = docker compose down --remove-orphans --volumes
 binary:
 	go build -o im-manager -ldflags "-s -w" ./cmd/serve
 
+check:
+	pre-commit run --all-files
+
 smoke-test:
 	docker compose up -d database rabbitmq jwks
 	sleep 3
@@ -12,6 +15,10 @@ smoke-test:
 
 docker-image:
 	IMAGE_TAG=$(tag) docker compose build prod
+
+init:
+	direnv allow
+	pre-commit install
 
 push-docker-image:
 	IMAGE_TAG=$(tag) docker compose push prod
@@ -62,4 +69,4 @@ swagger: swagger-clean swagger-docs
 di:
 	wire gen ./internal/di
 
-.PHONY: binary docker-image push-docker-image dev test dev-test helm-chart publish-helm
+.PHONY: binary check docker-image push-docker-image dev test dev-test helm-chart publish-helm init

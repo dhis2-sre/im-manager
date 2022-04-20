@@ -3,15 +3,16 @@ package instance
 import (
 	"bytes"
 	"fmt"
+	"io/ioutil"
+	"os"
+	"os/exec"
+
 	"github.com/dhis2-sre/im-user/swagger/sdk/models"
 	"go.mozilla.org/sops/v3/cmd/sops/formats"
 	"go.mozilla.org/sops/v3/decrypt"
-	"io/ioutil"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
-	"os"
-	"os/exec"
 )
 
 type KubernetesService interface {
