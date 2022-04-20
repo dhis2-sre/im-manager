@@ -50,4 +50,4 @@ COPY --from=build /src/swagger/swagger.yaml ./swagger/
 # helmfile invokes helm in the folder which contains the helmfile.yaml and requires write access to .config/ and .cache/ in the same folder
 COPY --from=build --chown=guest:users /src/stacks ./stacks
 USER guest
-CMD ["/app/im-manager"]
+ENTRYPOINT ["/app/im-manager"]
