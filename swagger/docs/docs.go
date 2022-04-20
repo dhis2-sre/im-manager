@@ -6,11 +6,11 @@ import (
 
 // swagger:parameters instanceLogs
 type SelectorParameter struct {
-	// name: selector
+	// selector
 	// in: query
 	// required: false
 	// type: string
-	Selector uint `json:"selector"`
+	Selector string `json:"selector"`
 }
 
 // swagger:parameters deleteInstance findInstanceById instanceLogs deployInstance saveInstance findInstanceByIdWithParameters
