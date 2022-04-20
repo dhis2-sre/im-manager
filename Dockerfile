@@ -38,7 +38,7 @@ RUN go mod download -x
 COPY . .
 RUN --mount=type=cache,target=/root/.cache/go-build go build -o /app/im-manager -ldflags "-s -w" ./cmd/serve
 
-FROM alpine:3.14
+FROM alpine:3.15
 RUN apk --no-cache -U upgrade
 COPY --from=build /usr/bin/kubectl /usr/bin/kubectl
 COPY --from=build /usr/bin/helm /usr/bin/helm
