@@ -17,6 +17,7 @@ docker-image:
 	IMAGE_TAG=$(tag) docker compose build prod
 
 init:
+	direnv allow
 	pre-commit install
 
 push-docker-image:
