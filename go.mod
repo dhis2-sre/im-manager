@@ -3,6 +3,7 @@ module github.com/dhis2-sre/im-manager
 go 1.18
 
 require (
+	github.com/dhis2-sre/im-database-manager v0.5.1
 	github.com/dhis2-sre/im-job v0.1.1-0.20220116121707-efdfb9c56501
 	github.com/dhis2-sre/im-user v0.6.0
 	github.com/dhis2-sre/instance-queue v0.2.0
