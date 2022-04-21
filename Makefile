@@ -18,6 +18,7 @@ docker-image:
 
 init:
 	direnv allow
+	pip install pre-commit
 	pre-commit install --overwrite
 
 push-docker-image:
