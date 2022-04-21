@@ -6,7 +6,7 @@ binary:
 	go build -o im-manager -ldflags "-s -w" ./cmd/serve
 
 check:
-	pre-commit run --all-files
+	pre-commit run --all-files --show-diff-on-failure
 
 smoke-test:
 	docker compose up -d database rabbitmq jwks
