@@ -18,7 +18,7 @@ docker-image:
 
 init:
 	direnv allow
-	pre-commit install
+	pre-commit install --overwrite
 
 push-docker-image:
 	IMAGE_TAG=$(tag) docker compose push prod

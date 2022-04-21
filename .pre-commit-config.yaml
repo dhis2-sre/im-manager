@@ -6,3 +6,8 @@ repos:
       - id: go-imports
       - id: go-mod-tidy
       - id: golangci-lint
+  - repo: https://github.com/commitizen-tools/commitizen
+    rev: v2.24.0
+    hooks:
+      - id: commitizen
+        stages: [commit-msg]
