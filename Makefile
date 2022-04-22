@@ -51,9 +51,6 @@ publish-helm:
         -F "chart=@im-manager-$(version).tgz" \
         https://helm-charts.fitfit.dk/api/charts
 
-swagger-check: swagger
-	git diff --quiet -- swagger/swagger.yml
-
 swagger-check-install:
 	which swagger || go install github.com/go-swagger/go-swagger/cmd/swagger@latest
 
