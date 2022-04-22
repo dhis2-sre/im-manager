@@ -162,7 +162,7 @@ definitions:
         x-go-name: Status
     type: object
     x-go-package: github.com/dhis2-sre/im-manager/pkg/health
-  SaveInstanceResponse:
+  RunJobResponse:
     properties:
       runId:
         type: string
@@ -354,7 +354,7 @@ paths:
   /instances/{id}/deploy:
     post:
       description: Deploy instance
-      operationId: launchInstance
+      operationId: deployInstance
       parameters:
       - format: uint64
         in: path
@@ -406,6 +406,32 @@ paths:
           $ref: '#/responses/Error'
       security:
       - oauth2: []
+  /instances/{id}/parameters:
+    get:
+      description: Find instance by id with decrypted parameters
+      operationId: findInstanceByIdWithParameters
+      parameters:
+      - format: uint64
+        in: path
+        name: id
+        required: true
+        type: integer
+        x-go-name: ID
+      responses:
+        "200":
+          description: Instance
+          schema:
+            $ref: '#/definitions/Instance'
+        "401":
+          $ref: '#/responses/Error'
+        "403":
+          $ref: '#/responses/Error'
+        "404":
+          $ref: '#/responses/Error'
+        "415":
+          $ref: '#/responses/Error'
+      security:
+      - oauth2: []
   /instances/{id}/save:
     post:
       description: Save instance database
@@ -418,8 +444,8 @@ paths:
         type: integer
         x-go-name: ID
       responses:
-        "202":
-          $ref: '#/responses/SaveInstanceResponse'
+        "200":
+          $ref: '#/responses/RunJobResponse'
         "401":
           $ref: '#/responses/Error'
         "403":
@@ -445,10 +471,10 @@ responses:
     description: ""
     schema:
       $ref: '#/definitions/Response'
-  SaveInstanceResponse:
+  RunJobResponse:
     description: ""
     schema:
-      $ref: '#/definitions/SaveInstanceResponse'
+      $ref: '#/definitions/RunJobResponse'
 securityDefinitions:
   oauth2:
     flow: password
