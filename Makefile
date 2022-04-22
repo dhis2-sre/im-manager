@@ -55,7 +55,7 @@ swagger-check: swagger
 	git diff --quiet
 
 swagger-check-install:
-	which swagger || go install github.com/go-swagger/go-swagger/cmd/swagger
+	which swagger || go install github.com/go-swagger/go-swagger/cmd/swagger@latest
 
 swagger-clean:
 	rm -rf swagger/sdk/*
