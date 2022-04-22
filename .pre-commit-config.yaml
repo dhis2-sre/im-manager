@@ -14,7 +14,3 @@ repos:
     hooks:
       - id: commitizen
         stages: [commit-msg]
-  - repo: https://github.com/dhis2-sre/im-tooling
-    rev: v0.0.1
-    hooks:
-      - id: swagger-validation
