@@ -679,7 +679,7 @@ func (h Handler) Save(c *gin.Context) {
 		Payload: map[string]string{
 			"key": "val",
 		},
-		TargetID: uint64(id),
+		TargetID: id,
 	}
 
 	runId, err := h.jobClient.Run(token, uint(3), runJobRequest)
