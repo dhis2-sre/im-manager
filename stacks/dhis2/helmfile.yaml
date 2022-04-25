@@ -5,7 +5,7 @@ releases:
     version: "{{ env "CHART_VERSION" | default "0.6.0" }}"
     values:
       - image:
-          repository: dhis2/core
+          repository: dhis2/{{ env "IMAGE_REPOSITORY" | default "core" }}
           tag: "{{ env "IMAGE_TAG" | default "2.36.0-tomcat-8.5.34-jre8-alpine" }}"
       - ingress:
           enabled: true
