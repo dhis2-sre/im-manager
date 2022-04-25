@@ -36,7 +36,7 @@ type Handler struct {
 }
 
 type CreateInstanceRequest struct {
-	Name    string `json:"name" binding:"required"`
+	Name    string `json:"name" binding:"required,dns_rfc1035_label"`
 	GroupID uint   `json:"groupId" binding:"required"`
 	StackID uint   `json:"stackId" binding:"required"`
 }
