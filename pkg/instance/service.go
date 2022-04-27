@@ -263,7 +263,7 @@ func (s service) decryptParameters(instance *model.Instance) error {
 	for i, parameter := range instance.OptionalParameters {
 		value, err := decryptText(parameter.Value, s.config.InstanceParameterEncryptionKey)
 		if err != nil {
-			//			return err
+			return err
 		}
 		instance.OptionalParameters[i].Value = value
 	}
