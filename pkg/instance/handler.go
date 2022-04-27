@@ -177,6 +177,7 @@ func (h Handler) Deploy(c *gin.Context) {
 	group, err := h.userClient.FindGroupById(token, instance.GroupID)
 	if err != nil {
 		_ = c.Error(err)
+		return
 	}
 
 	instance.RequiredParameters = convertRequiredParameters(instance.ID, request.RequiredParameters)
