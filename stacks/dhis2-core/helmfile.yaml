@@ -2,10 +2,10 @@ releases:
   - name: "{{ requiredEnv "INSTANCE_NAME" }}"
     namespace: "{{ requiredEnv "INSTANCE_NAMESPACE" }}"
     chart: tons/dhis2-core
-    version: "{{ env "CHART_VERSION" | default "0.4.0" }}"
+    version: "{{ env "CHART_VERSION" | default "0.7.0" }}"
     values:
       - image:
-          repository: dhis2/core
+          repository: dhis2/{{ env "IMAGE_REPOSITORY" | default "core" }}
           tag: "{{ env "IMAGE_TAG" | default "2.36.0-tomcat-8.5.34-jre8-alpine" }}"
       - ingress:
           enabled: true
@@ -13,11 +13,12 @@ releases:
           path: /{{ requiredEnv "INSTANCE_NAME" }}
           certIssuer: cert-issuer-prod
       - catalinaOpts: "-Dcontext.path=/{{ requiredEnv "INSTANCE_NAME" }}"
+      - javaOpts: "{{ env "JAVA_OPTS" | default "" }}"
       - livenessProbe:
-          initialDelaySeconds: 180
+          initialDelaySeconds: {{ env "LIVENESS_PROBE_INITIAL_DELAY_SECONDS" | default 300 }}
           path: /{{ requiredEnv "INSTANCE_NAME" }}
       - readinessProbe:
-          initialDelaySeconds: 180
+          initialDelaySeconds: {{ env "READINESS_PROBE_INITIAL_DELAY_SECONDS" | default 300 }}
           path: /{{ requiredEnv "INSTANCE_NAME" }}
       - podLabels:
           im: "true"
@@ -26,13 +27,15 @@ releases:
       - dhisConfig: |
           connection.dialect = org.hibernate.dialect.PostgreSQLDialect
           connection.driver_class = org.postgresql.Driver
-          connection.url = jdbc:postgresql://{{ env "DATABASE_HOSTNAME" }}/{{ env "DATABASE_DATABASE" | default "dhis2" }}
+          connection.url = jdbc:postgresql://{{ requiredEnv "DATABASE_HOSTNAME" }}/{{ env "DATABASE_DATABASE" | default "dhis2" }}
           connection.username = {{ env "DATABASE_USERNAME" | default "dhis" }}
           connection.password = {{ env "DATABASE_PASSWORD" | default "dhis" }}
           # Database schema behavior, can be validate, update, create, create-drop
           connection.schema = update
           # Server base URL
           server.base.url = https://{{ requiredEnv "INSTANCE_HOSTNAME" }}/{{ requiredEnv "INSTANCE_NAME" }}
+          flyway.migrate_out_of_order = {{ env "FLYWAY_MIGRATE_OUT_OF_ORDER" | default false }}
+          flyway.repair_before_migration = {{ env "FLYWAY_REPAIR_BEFORE_MIGRATION" | default false }}
 
 repositories:
   - name: tons

@@ -2,7 +2,11 @@
 
 set -euo pipefail
 
+IMAGE_TAG_PARAMETER_ID=23
 IMAGE_TAG="2.36.0-tomcat-8.5.34-jre8-alpine"
+
+DATABASE_HOSTNAME_PARAMETER_ID=3
+DATABASE_HOSTNAME="sl-db-1-database-postgresql.whoami.svc"
 
 INSTANCE_NAME=$1
 GROUP_NAME=$2
@@ -16,8 +20,14 @@ echo "{
   \"stackId\": 1,
   \"optionalParameters\": [
     {
-      \"stackParameterId\": 1,
+      \"stackParameterId\": $IMAGE_TAG_PARAMETER_ID,
       \"value\": \"$IMAGE_TAG\"
+    }
+  ],
+  \"requiredParameters\": [
+    {
+      \"stackParameterId\": $DATABASE_HOSTNAME_PARAMETER_ID,
+      \"value\": \"$DATABASE_HOSTNAME\"
     }
   ]
 }" | $HTTP post "$INSTANCE_HOST/instances/$INSTANCE_ID/deploy" "Authorization: Bearer $ACCESS_TOKEN"
