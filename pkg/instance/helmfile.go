@@ -107,5 +107,7 @@ func (h helmfileService) injectEnv(env string, envs *[]string) {
 	if value, exists := os.LookupEnv(env); exists {
 		cmdEnv := fmt.Sprintf("%s=%s", env, value)
 		*envs = append(*envs, cmdEnv)
+	} else {
+		log.Println("WARNING!!! Env not found:", env)
 	}
 }
