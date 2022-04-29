@@ -20,7 +20,7 @@ releases:
             password: "{{ env "DHIS2_DATABASE_PASSWORD" | default "dhis" }}"
             database: "{{ env "DHIS2_DATABASE_DATABASE" | default "dhis2" }}"
           hostname: "{{ env "DHIS2_HOSTNAME" | default "-" }}"
-      - imToken: "{{ env "IM_TOKEN" | default "-" }}"
+      - imToken: "{{ env "IM_ACCESS_TOKEN" | default "-" }}"
 
 repositories:
   - name: tons

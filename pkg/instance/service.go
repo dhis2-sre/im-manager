@@ -65,7 +65,7 @@ func (s service) Create(instance *model.Instance) (*model.Instance, error) {
 	return instanceWithParameters, nil
 }
 
-func (s service) Deploy(token string, instance *model.Instance, group *models.Group) error {
+func (s service) Deploy(accessToken string, instance *model.Instance, group *models.Group) error {
 	encryptInstance, err := s.encryptParameters(instance)
 	if err != nil {
 		return err
@@ -81,7 +81,7 @@ func (s service) Deploy(token string, instance *model.Instance, group *models.Gr
 		return err
 	}
 
-	syncCmd, err := s.helmfileService.Sync(token, instanceWithParameters, group)
+	syncCmd, err := s.helmfileService.Sync(accessToken, instanceWithParameters, group)
 	if err != nil {
 		return err
 	}

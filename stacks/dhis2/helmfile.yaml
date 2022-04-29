@@ -51,7 +51,7 @@ releases:
             - name: DATABASE_ID
               value: "{{ requiredEnv "DATABASE_ID" }}"
             - name: IM_ACCESS_TOKEN
-              value: {{ requiredEnv "IM_TOKEN" }}
+              value: {{ requiredEnv "IM_ACCESS_TOKEN" }}
             - name: DATABASE_USERNAME
               value: {{ env "DATABASE_USERNAME" | default "dhis" }}
             - name: DATABASE_PASSWORD
