@@ -130,7 +130,7 @@ func isSystemParameter(parameter string) bool {
 }
 
 func getSystemParameters() []string {
-	parameters := []string{"INSTANCE_ID", "INSTANCE_NAME", "INSTANCE_HOSTNAME", "INSTANCE_NAMESPACE"}
+	parameters := []string{"INSTANCE_ID", "INSTANCE_NAME", "INSTANCE_HOSTNAME", "INSTANCE_NAMESPACE", "IM_ACCESS_TOKEN"}
 	sort.Strings(parameters)
 	return parameters
 }
