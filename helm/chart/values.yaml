@@ -15,6 +15,9 @@ basePath: ""
 #  key: value
 #  ...
 
+#groups:
+#  names: whoami
+
 livenessProbe: /health
 readinessProbe: /health
 
