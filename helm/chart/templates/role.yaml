@@ -60,5 +60,21 @@ rules:
       - patch
       - delete
 
+# PgAdmin
+  - apiGroups:
+      - networking.k8s.io
+    resources:
+      - networkpolicies
+    verbs:
+      - get
+      - create
+  - apiGroups:
+      - ""
+    resources:
+      - persistentvolumeclaims
+    verbs:
+      - get
+      - create
+
 ---
 {{- end }}
