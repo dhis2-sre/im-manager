@@ -14,8 +14,6 @@ const FOLDER = "./stacks"
 // Deleting the stack on each boot isn't ideal since instance parameters are linked to stack parameters
 // Perhaps upsert using... https://gorm.io/docs/advanced_query.html#FirstOrCreate
 
-// TODO: This isn't a service and therefore shouldn't be in the service package
-
 func LoadStacks(stackService Service) {
 	stacksFolder := FOLDER
 
