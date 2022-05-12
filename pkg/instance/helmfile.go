@@ -7,6 +7,10 @@ import (
 	"os/exec"
 	"path"
 
+	"go.mozilla.org/sops/v3/cmd/sops/formats"
+	"go.mozilla.org/sops/v3/decrypt"
+	"k8s.io/apimachinery/pkg/util/yaml"
+
 	"github.com/dhis2-sre/im-manager/pkg/config"
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	"github.com/dhis2-sre/im-manager/pkg/stack"
@@ -63,11 +67,40 @@ func (h helmfileService) executeHelmfileCommand(accessToken string, instance *mo
 	cmd := exec.Command("/usr/bin/helmfile", "--helm-binary", "/usr/bin/helm", "-f", stackPath, operation)
 	log.Printf("Command: %s\n", cmd.String())
 
-	h.configureInstanceEnvironment(accessToken, instance, group, cmd)
+	stackParameters, err := h.loadStackParameters(stacksFolder, stack.Name)
+	if err != nil {
+		return nil, err
+	}
+
+	h.configureInstanceEnvironment(accessToken, instance, group, stackParameters, cmd)
 	return cmd, nil
 }
 
-func (h helmfileService) configureInstanceEnvironment(accessToken string, instance *model.Instance, group *models.Group, cmd *exec.Cmd) {
+type StackParameters map[string]string
+
+func (h helmfileService) loadStackParameters(stacksFolder string, stackName string) (*StackParameters, error) {
+	environment := h.config.Environment
+	stackParametersPath := fmt.Sprintf("%s/%s/parameters/%s/parameters.yaml", stacksFolder, stackName, environment)
+	data, err := os.ReadFile(stackParametersPath)
+	// TODO: Maybe not just return an empty struct on any given error
+	if err != nil {
+		return &StackParameters{}, nil
+	}
+
+	bytes, err := h.decrypt(data, "yaml")
+	if err != nil {
+		return nil, err
+	}
+
+	stackParameters := &StackParameters{}
+	err = yaml.Unmarshal(bytes, stackParameters)
+	if err != nil {
+		return nil, err
+	}
+	return stackParameters, nil
+}
+
+func (h helmfileService) configureInstanceEnvironment(accessToken string, instance *model.Instance, group *models.Group, stackParameters *StackParameters, cmd *exec.Cmd) {
 	// TODO: We should only inject what the stack require, currently we just blindly inject IM_ACCESS_TOKEN and others which may not be required by the stack
 	// We could probably list the required system parameters in the stacks helmfile and parse those as well as other parameters
 	instanceNameEnv := fmt.Sprintf("%s=%s", "INSTANCE_NAME", instance.Name)
@@ -103,6 +136,11 @@ func (h helmfileService) configureInstanceEnvironment(accessToken string, instan
 		instanceEnv := fmt.Sprintf("%s=%s", parameter.StackOptionalParameter.Name, parameter.Value)
 		cmd.Env = append(cmd.Env, instanceEnv)
 	}
+
+	for parameter, value := range *stackParameters {
+		instanceEnv := fmt.Sprintf("%s=%s", parameter, value)
+		cmd.Env = append(cmd.Env, instanceEnv)
+	}
 }
 
 func (h helmfileService) injectEnv(env string, envs *[]string) {
@@ -112,4 +150,12 @@ func (h helmfileService) injectEnv(env string, envs *[]string) {
 	} else {
 		log.Println("WARNING!!! Env not found:", env)
 	}
+}
+
+func (h helmfileService) decrypt(data []byte, format string) ([]byte, error) {
+	cleartext, err := decrypt.DataWithFormat(data, formats.FormatFromString(format))
+	if err != nil {
+		return nil, err
+	}
+	return cleartext, nil
 }

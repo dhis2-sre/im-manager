@@ -7,6 +7,7 @@ serviceAccount:
     eks.amazonaws.com/role-arn: arn:aws:iam::767224633206:role/instance-cluster-test-im-manager-tons
 
 environment:
+  ENVIRONMENT: tons
   USER_SERVICE_HOST: im-user-tons.instance-manager-tons.svc:8080
   USER_SERVICE_BASE_PATH: /
 
