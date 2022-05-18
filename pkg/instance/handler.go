@@ -104,8 +104,8 @@ func (h Handler) Create(c *gin.Context) {
 }
 
 type ParameterRequest struct {
-	StackParameterID string `json:"stackParameterId" binding:"required"`
-	Value            string `json:"value" binding:"required"`
+	StackParameter string `json:"stackParameterId" binding:"required"`
+	Value          string `json:"value" binding:"required"`
 }
 
 type DeployInstanceRequest struct {
@@ -196,7 +196,7 @@ func convertRequiredParameters(instance *model.Instance, requestParameters []Par
 	if len(requestParameters) > 0 {
 		var parameters = make([]model.InstanceRequiredParameter, len(requestParameters))
 		for i, parameter := range requestParameters {
-			stackRequiredParameter := model.StackRequiredParameter{ID: parameter.StackParameterID}
+			stackRequiredParameter := model.StackRequiredParameter{ID: parameter.StackParameter}
 			parameters[i] = model.InstanceRequiredParameter{
 				InstanceID:             instance.ID,
 				StackRequiredParameter: stackRequiredParameter,
@@ -212,7 +212,7 @@ func convertOptionalParameters(instance *model.Instance, requestParameters []Par
 	if len(requestParameters) > 0 {
 		var parameters = make([]model.InstanceOptionalParameter, len(requestParameters))
 		for i, parameter := range requestParameters {
-			stackOptionalParameter := model.StackOptionalParameter{ID: parameter.StackParameterID}
+			stackOptionalParameter := model.StackOptionalParameter{ID: parameter.StackParameter}
 			parameters[i] = model.InstanceOptionalParameter{
 				InstanceID:             instance.ID,
 				StackOptionalParameter: stackOptionalParameter,
