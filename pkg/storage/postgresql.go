@@ -31,8 +31,13 @@ func ProvideDatabase(c config.Config) (*gorm.DB, error) {
 
 	err = db.AutoMigrate(
 		&model.Stack{},
+
 		&model.StackRequiredParameter{},
+		&model.RequiredStackParametersJoin{},
+
 		&model.StackOptionalParameter{},
+		&model.OptionalStackParametersJoin{},
+
 		&model.Instance{},
 		&model.InstanceRequiredParameter{},
 		&model.InstanceOptionalParameter{},

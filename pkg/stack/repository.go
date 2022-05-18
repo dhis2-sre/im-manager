@@ -11,8 +11,8 @@ type Repository interface {
 	FindById(id uint) (*model.Stack, error)
 	FindByName(name string) (*model.Stack, error)
 	FindAll() (*[]model.Stack, error)
-	CreateRequiredParameter(stackParameter *model.StackRequiredParameter) error
-	CreateOptionalParameter(stackParameter *model.StackOptionalParameter) error
+	CreateRequiredParameter(stackID uint, parameter *model.StackRequiredParameter) error
+	CreateOptionalParameter(stackID uint, parameter *model.StackOptionalParameter, defaultValue string) error
 }
 
 func ProvideRepository(DB *gorm.DB) Repository {
@@ -34,8 +34,8 @@ func (r repository) Delete(id uint) error {
 func (r repository) FindById(id uint) (*model.Stack, error) {
 	var stack *model.Stack
 	err := r.db.
-		Preload("RequiredParameters", "stack_id = ?", id).
-		Preload("OptionalParameters", "stack_id = ?", id).
+		Preload("RequiredParameters").
+		Preload("OptionalParameters").
 		First(&stack, id).Error
 	return stack, err
 }
@@ -52,10 +52,24 @@ func (r repository) FindAll() (*[]model.Stack, error) {
 	return &stacks, err
 }
 
-func (r repository) CreateOptionalParameter(stackParameter *model.StackOptionalParameter) error {
-	return r.db.Create(&stackParameter).Error
+func (r repository) CreateOptionalParameter(stackID uint, parameter *model.StackOptionalParameter, defaultValue string) error {
+	err := r.db.FirstOrCreate(&parameter).Error
+	if err != nil {
+		return err
+	}
+
+	joinModel := &model.OptionalStackParametersJoin{StackID: stackID, ParameterID: parameter.ID, DefaultValue: defaultValue}
+
+	return r.db.Create(&joinModel).Error
 }
 
-func (r repository) CreateRequiredParameter(stackParameter *model.StackRequiredParameter) error {
-	return r.db.Create(&stackParameter).Error
+func (r repository) CreateRequiredParameter(stackID uint, parameter *model.StackRequiredParameter) error {
+	err := r.db.FirstOrCreate(&parameter).Error
+	if err != nil {
+		return err
+	}
+
+	joinModel := &model.RequiredStackParametersJoin{StackID: stackID, ParameterID: parameter.ID}
+
+	return r.db.Create(&joinModel).Error
 }

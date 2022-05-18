@@ -87,8 +87,7 @@ definitions:
       StackOptionalParameter:
         $ref: '#/definitions/StackOptionalParameter'
       StackOptionalParameterID:
-        format: uint64
-        type: integer
+        type: string
       UpdatedAt:
         format: date-time
         type: string
@@ -112,8 +111,7 @@ definitions:
       StackRequiredParameter:
         $ref: '#/definitions/StackRequiredParameter'
       StackRequiredParameterID:
-        format: uint64
-        type: integer
+        type: string
       UpdatedAt:
         format: date-time
         type: string
@@ -171,43 +169,13 @@ definitions:
     x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
   StackOptionalParameter:
     properties:
-      CreatedAt:
-        format: date-time
-        type: string
-      DefaultValue:
-        type: string
-      DeletedAt:
-        $ref: '#/definitions/DeletedAt'
       ID:
-        format: uint64
-        type: integer
-      Name:
-        type: string
-      StackID:
-        format: uint64
-        type: integer
-      UpdatedAt:
-        format: date-time
         type: string
     type: object
     x-go-package: github.com/dhis2-sre/im-manager/pkg/model
   StackRequiredParameter:
     properties:
-      CreatedAt:
-        format: date-time
-        type: string
-      DeletedAt:
-        $ref: '#/definitions/DeletedAt'
       ID:
-        format: uint64
-        type: integer
-      Name:
-        type: string
-      StackID:
-        format: uint64
-        type: integer
-      UpdatedAt:
-        format: date-time
         type: string
     type: object
     x-go-package: github.com/dhis2-sre/im-manager/pkg/model

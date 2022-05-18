@@ -2,17 +2,10 @@
 
 set -euo pipefail
 
-IMAGE_TAG_PARAMETER_ID=15
-IMAGE_TAG="2.36.0-tomcat-8.5.34-jre8-alpine"
-
+IMAGE_TAG=2.36.0-tomcat-8.5.34-jre8-alpine
 READINESS_PROBE_INITIAL_DELAY_SECONDS=100
-READINESS_PROBE_INITIAL_DELAY_SECONDS_PARAMETER_ID=18
-
 LIVENESS_PROBE_INITIAL_DELAY_SECONDS=100
-LIVENESS_PROBE_INITIAL_DELAY_SECONDS_PARAMETER_ID=17
-
-DATABASE_HOSTNAME_PARAMETER_ID=2
-DATABASE_HOSTNAME="sl-db-23-database-postgresql.whoami.svc"
+DATABASE_HOSTNAME=sl-db-23-database-postgresql.whoami.svc
 
 INSTANCE_NAME=$1
 GROUP_NAME=$2
@@ -26,21 +19,21 @@ echo "{
   \"stackId\": 1,
   \"optionalParameters\": [
     {
-      \"stackParameterId\": $READINESS_PROBE_INITIAL_DELAY_SECONDS_PARAMETER_ID,
+      \"stackParameterId\": \"READINESS_PROBE_INITIAL_DELAY_SECONDS\",
       \"value\": \"$READINESS_PROBE_INITIAL_DELAY_SECONDS\"
     },
     {
-      \"stackParameterId\": $LIVENESS_PROBE_INITIAL_DELAY_SECONDS_PARAMETER_ID,
+      \"stackParameterId\": \"LIVENESS_PROBE_INITIAL_DELAY_SECONDS\",
       \"value\": \"$LIVENESS_PROBE_INITIAL_DELAY_SECONDS\"
     },
     {
-      \"stackParameterId\": $IMAGE_TAG_PARAMETER_ID,
+      \"stackParameterId\": \"IMAGE_TAG\",
       \"value\": \"$IMAGE_TAG\"
     }
   ],
   \"requiredParameters\": [
     {
-      \"stackParameterId\": $DATABASE_HOSTNAME_PARAMETER_ID,
+      \"stackParameterId\": \"DATABASE_HOSTNAME\",
       \"value\": \"$DATABASE_HOSTNAME\"
     }
   ]

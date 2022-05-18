@@ -2,23 +2,13 @@
 
 set -euo pipefail
 
-DATABASE_SIZE="30Gi"
-DATABASE_SIZE_PARAMETER_ID=10
-
 READINESS_PROBE_INITIAL_DELAY_SECONDS=100
-READINESS_PROBE_INITIAL_DELAY_SECONDS_PARAMETER_ID=12
-
 LIVENESS_PROBE_INITIAL_DELAY_SECONDS=100
-LIVENESS_PROBE_INITIAL_DELAY_SECONDS_PARAMETER_ID=5
-
 IMAGE_REPOSITORY=core
-IMAGE_REPOSITORY_PARAMETER_ID=11
-
-IMAGE_TAG="2.36.0-tomcat-8.5.34-jre8-alpine"
-IMAGE_TAG_PARAMETER_ID=1
-
-DATABASE_ID=1
-DATABASE_ID_PARAMETER_ID=1
+IMAGE_TAG=2.36.0-tomcat-8.5.34-jre8-alpine
+DATABASE_SIZE=30Gi
+PGADMIN_INSTALL=false
+DATABASE_ID=3
 
 INSTANCE_NAME=$1
 GROUP_NAME=$2
@@ -32,29 +22,33 @@ echo "{
   \"stackId\": 1,
   \"optionalParameters\": [
     {
-      \"stackParameterId\": $READINESS_PROBE_INITIAL_DELAY_SECONDS_PARAMETER_ID,
+      \"stackParameterId\": \"READINESS_PROBE_INITIAL_DELAY_SECONDS\",
       \"value\": \"$READINESS_PROBE_INITIAL_DELAY_SECONDS\"
     },
     {
-      \"stackParameterId\": $LIVENESS_PROBE_INITIAL_DELAY_SECONDS_PARAMETER_ID,
+      \"stackParameterId\": \"LIVENESS_PROBE_INITIAL_DELAY_SECONDS\",
       \"value\": \"$LIVENESS_PROBE_INITIAL_DELAY_SECONDS\"
     },
     {
-      \"stackParameterId\": $IMAGE_REPOSITORY_PARAMETER_ID,
+      \"stackParameterId\": \"IMAGE_REPOSITORY\",
       \"value\": \"$IMAGE_REPOSITORY\"
     },
     {
-      \"stackParameterId\": $IMAGE_TAG_PARAMETER_ID,
+      \"stackParameterId\": \"IMAGE_TAG\",
       \"value\": \"$IMAGE_TAG\"
     },
     {
-      \"stackParameterId\": $DATABASE_SIZE_PARAMETER_ID,
+      \"stackParameterId\": \"DATABASE_SIZE\",
       \"value\": \"$DATABASE_SIZE\"
+    },
+    {
+      \"stackParameterId\": \"PGADMIN_INSTALL\",
+      \"value\": \"$PGADMIN_INSTALL\"
     }
   ],
   \"requiredParameters\": [
     {
-      \"stackParameterId\": $DATABASE_ID_PARAMETER_ID,
+      \"stackParameterId\": \"DATABASE_ID\",
       \"value\": \"$DATABASE_ID\"
     }
   ]

@@ -41,26 +41,19 @@ func (s service) Delete(id uint) error {
 }
 
 func (s service) CreateRequiredParameter(stack *model.Stack, parameterName string) (*model.StackRequiredParameter, error) {
-	stackParameter := &model.StackRequiredParameter{
-		StackID: stack.ID,
-		Name:    parameterName,
-	}
+	parameter := &model.StackRequiredParameter{ID: parameterName}
 
-	err := s.repository.CreateRequiredParameter(stackParameter)
+	err := s.repository.CreateRequiredParameter(stack.ID, parameter)
 
-	return stackParameter, err
+	return parameter, err
 }
 
 func (s service) CreateOptionalParameter(stack *model.Stack, parameterName string, defaultValue string) (*model.StackOptionalParameter, error) {
-	stackParameter := &model.StackOptionalParameter{
-		StackID:      stack.ID,
-		Name:         parameterName,
-		DefaultValue: defaultValue,
-	}
+	parameter := &model.StackOptionalParameter{ID: parameterName}
 
-	err := s.repository.CreateOptionalParameter(stackParameter)
+	err := s.repository.CreateOptionalParameter(stack.ID, parameter, defaultValue)
 
-	return stackParameter, err
+	return parameter, err
 }
 
 func (s service) FindByName(name string) (*model.Stack, error) {
