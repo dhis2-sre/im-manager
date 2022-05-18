@@ -2,10 +2,11 @@
 
 set -euo pipefail
 
-GROUP_ID=2
-STACK_ID=5
-REQUIRED_PARAMETER_ID=4
-REQUIRED_PARAMETER_VALUE="0.5.0"
+STACK_ID=6 # Id of the whoami-go stack. Run ./stacks.sh for a list of all stacks
+CHART_VERSION=0.5.0
+GROUP_NAME=whoami
+
+GROUP_ID=$($HTTP --check-status "$INSTANCE_HOST/groups-name-to-id/$GROUP_NAME" "Authorization: Bearer $ACCESS_TOKEN")
 
 function int_handler {
   $HTTP delete "$INSTANCE_HOST/instances/$INSTANCE_ID" "Authorization: Bearer $ACCESS_TOKEN"
@@ -32,8 +33,8 @@ $HTTP "$INSTANCE_HOST/instances/$INSTANCE_ID" "Authorization: Bearer $ACCESS_TOK
 echo "{
   \"requiredParameters\": [
     {
-      \"stackParameter\": $REQUIRED_PARAMETER_ID,
-      \"value\": \"$REQUIRED_PARAMETER_VALUE\"
+      \"stackParameter\": \"CHART_VERSION\",
+      \"value\": \"$CHART_VERSION\"
     }
   ]
 }" | $HTTP post "$INSTANCE_HOST/instances/$INSTANCE_ID/deploy" "Authorization: Bearer $ACCESS_TOKEN"
