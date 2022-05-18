@@ -58,7 +58,7 @@ func (r repository) CreateOptionalParameter(stackID uint, parameter *model.Stack
 		return err
 	}
 
-	joinModel := &model.OptionalStackParametersJoin{StackID: stackID, ParameterID: parameter.ID, DefaultValue: defaultValue}
+	joinModel := &model.OptionalStackParametersJoin{StackID: stackID, ParameterID: parameter.Name, DefaultValue: defaultValue}
 
 	return r.db.Create(&joinModel).Error
 }
@@ -69,7 +69,7 @@ func (r repository) CreateRequiredParameter(stackID uint, parameter *model.Stack
 		return err
 	}
 
-	joinModel := &model.RequiredStackParametersJoin{StackID: stackID, ParameterID: parameter.ID}
+	joinModel := &model.RequiredStackParametersJoin{StackID: stackID, ParameterID: parameter.Name}
 
 	return r.db.Create(&joinModel).Error
 }
