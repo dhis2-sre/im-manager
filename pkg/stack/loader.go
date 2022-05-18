@@ -77,7 +77,7 @@ func LoadStacks(stackService Service) {
 }
 
 func extractRequiredParameters(file []byte) []string {
-	regexStr := "\\{\\{[ ]?requiredEnv[ ]?\"(.*?)\"[ ]?\\}\\}"
+	regexStr := "\\{\\{[ ]?requiredEnv[ ]?\"(.*?)\".*\\}\\}"
 	return extractParameters(file, regexStr)
 }
 
