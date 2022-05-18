@@ -8,7 +8,7 @@ IMAGE_REPOSITORY=core
 IMAGE_TAG=2.36.0-tomcat-8.5.34-jre8-alpine
 DATABASE_SIZE=30Gi
 PGADMIN_INSTALL=false
-DATABASE_ID=1
+DATABASE_ID=3
 
 INSTANCE_NAME=$1
 GROUP_NAME=$2
@@ -22,33 +22,33 @@ echo "{
   \"stackId\": 1,
   \"optionalParameters\": [
     {
-      \"stackParameterId\": \"READINESS_PROBE_INITIAL_DELAY_SECONDS\",
+      \"stackParameter\": \"READINESS_PROBE_INITIAL_DELAY_SECONDS\",
       \"value\": \"$READINESS_PROBE_INITIAL_DELAY_SECONDS\"
     },
     {
-      \"stackParameterId\": \"LIVENESS_PROBE_INITIAL_DELAY_SECONDS\",
+      \"stackParameter\": \"LIVENESS_PROBE_INITIAL_DELAY_SECONDS\",
       \"value\": \"$LIVENESS_PROBE_INITIAL_DELAY_SECONDS\"
     },
     {
-      \"stackParameterId\": \"IMAGE_REPOSITORY\",
+      \"stackParameter\": \"IMAGE_REPOSITORY\",
       \"value\": \"$IMAGE_REPOSITORY\"
     },
     {
-      \"stackParameterId\": \"IMAGE_TAG\",
+      \"stackParameter\": \"IMAGE_TAG\",
       \"value\": \"$IMAGE_TAG\"
     },
     {
-      \"stackParameterId\": \"DATABASE_SIZE\",
+      \"stackParameter\": \"DATABASE_SIZE\",
       \"value\": \"$DATABASE_SIZE\"
     },
     {
-      \"stackParameterId\": \"PGADMIN_INSTALL\",
+      \"stackParameter\": \"PGADMIN_INSTALL\",
       \"value\": \"$PGADMIN_INSTALL\"
     }
   ],
   \"requiredParameters\": [
     {
-      \"stackParameterId\": \"DATABASE_ID\",
+      \"stackParameter\": \"DATABASE_ID\",
       \"value\": \"$DATABASE_ID\"
     }
   ]

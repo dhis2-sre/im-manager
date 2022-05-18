@@ -13,7 +13,7 @@ INSTANCE_ID=$($HTTP --check-status "$INSTANCE_HOST/instances-name-to-id/$GROUP_I
 echo "{
   \"requiredParameters\": [
     {
-      \"stackParameterId\": \"CHART_VERSION\",
+      \"stackParameter\": \"CHART_VERSION\",
       \"value\": \"$CHART_VERSION\"
     }
   ]

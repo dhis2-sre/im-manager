@@ -104,7 +104,7 @@ func (h Handler) Create(c *gin.Context) {
 }
 
 type ParameterRequest struct {
-	StackParameter string `json:"stackParameterId" binding:"required"`
+	StackParameter string `json:"stackParameter" binding:"required"`
 	Value          string `json:"value" binding:"required"`
 }
 
