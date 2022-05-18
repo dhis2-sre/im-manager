@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-STACK_ID=6 # Id of the whoami-go stack. Run ./stacks.sh for a list of all stacks
+STACK_ID=5 # Id of the whoami-go stack. Run ./stacks.sh for a list of all stacks
 CHART_VERSION=0.5.0
 GROUP_NAME=whoami
 
