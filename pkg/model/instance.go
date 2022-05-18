@@ -17,7 +17,7 @@ type Instance struct {
 type InstanceRequiredParameter struct {
 	gorm.Model
 	InstanceID               uint                   `gorm:"index:idx_instance_required_parameter,unique"`
-	StackRequiredParameterID uint                   `gorm:"index:idx_instance_required_parameter,unique"`
+	StackRequiredParameterID string                 `gorm:"index:idx_instance_required_parameter,unique"`
 	StackRequiredParameter   StackRequiredParameter `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
 	Value                    string
 }
@@ -25,7 +25,7 @@ type InstanceRequiredParameter struct {
 type InstanceOptionalParameter struct {
 	gorm.Model
 	InstanceID               uint                   `gorm:"index:idx_instance_optional_parameter,unique"`
-	StackOptionalParameterID uint                   `gorm:"index:idx_instance_optional_parameter,unique"`
+	StackOptionalParameterID string                 `gorm:"index:idx_instance_optional_parameter,unique"`
 	StackOptionalParameter   StackOptionalParameter `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
 	Value                    string
 }

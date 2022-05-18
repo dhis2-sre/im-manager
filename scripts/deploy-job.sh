@@ -15,26 +15,7 @@ PAYLOAD='{\"databaseId\": \"11\"}'
 echo "{
   \"requiredParameters\": [
     {
-      \"stackParameterId\": 5,
-      \"value\": \"$JOB\"
-    }
-  ],
-  \"optionalParameters\": [
-    {
-      \"stackParameterId\": 10,
-      \"value\": \"300\"
-    },
-    {
-      \"stackParameterId\": 21,
-      \"value\": \"$PAYLOAD\"
-    }
-  ]
-}"
-
-echo "{
-  \"requiredParameters\": [
-    {
-      \"stackParameterId\": 5,
+      \"stackParameterId\": \"COMMAND\",
       \"value\": \"$JOB\"
     }
   ],

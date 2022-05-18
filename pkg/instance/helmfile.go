@@ -95,12 +95,12 @@ func (h helmfileService) configureInstanceEnvironment(accessToken string, instan
 	h.injectEnv("KUBERNETES_SERVICE_HOST", &cmd.Env)
 
 	for _, parameter := range instance.RequiredParameters {
-		instanceEnv := fmt.Sprintf("%s=%s", parameter.StackRequiredParameter.Name, parameter.Value)
+		instanceEnv := fmt.Sprintf("%s=%s", parameter.StackRequiredParameter.ID, parameter.Value)
 		cmd.Env = append(cmd.Env, instanceEnv)
 	}
 
 	for _, parameter := range instance.OptionalParameters {
-		instanceEnv := fmt.Sprintf("%s=%s", parameter.StackOptionalParameter.Name, parameter.Value)
+		instanceEnv := fmt.Sprintf("%s=%s", parameter.StackOptionalParameter.ID, parameter.Value)
 		cmd.Env = append(cmd.Env, instanceEnv)
 	}
 }

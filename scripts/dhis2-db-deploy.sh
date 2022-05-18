@@ -2,7 +2,6 @@
 
 set -euo pipefail
 
-DATABASE_PARAMETER_ID=4
 DATABASE_ID=1
 
 STACK_ID=3
@@ -19,7 +18,7 @@ echo "{
   \"stackId\": $STACK_ID,
   \"requiredParameters\": [
     {
-      \"stackParameterId\": $DATABASE_PARAMETER_ID,
+      \"stackParameterId\": \"DATABASE_ID\",
       \"value\": \"$DATABASE_ID\"
     }
   ]

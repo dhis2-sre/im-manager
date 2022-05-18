@@ -3,7 +3,6 @@
 set -euo pipefail
 
 CHART_VERSION="0.5.0"
-CHART_VERSION_PARAMETER_ID=5
 
 INSTANCE_NAME=$1
 GROUP_NAME=$2
@@ -14,7 +13,7 @@ INSTANCE_ID=$($HTTP --check-status "$INSTANCE_HOST/instances-name-to-id/$GROUP_I
 echo "{
   \"requiredParameters\": [
     {
-      \"stackParameterId\": $CHART_VERSION_PARAMETER_ID,
+      \"stackParameterId\": \"CHART_VERSION\",
       \"value\": \"$CHART_VERSION\"
     }
   ]
