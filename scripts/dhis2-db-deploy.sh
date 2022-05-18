@@ -18,7 +18,7 @@ echo "{
   \"stackId\": $STACK_ID,
   \"requiredParameters\": [
     {
-      \"stackParameterId\": \"DATABASE_ID\",
+      \"stackParameter\": \"DATABASE_ID\",
       \"value\": \"$DATABASE_ID\"
     }
   ]

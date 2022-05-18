@@ -19,21 +19,21 @@ echo "{
   \"stackId\": 1,
   \"optionalParameters\": [
     {
-      \"stackParameterId\": \"READINESS_PROBE_INITIAL_DELAY_SECONDS\",
+      \"stackParameter\": \"READINESS_PROBE_INITIAL_DELAY_SECONDS\",
       \"value\": \"$READINESS_PROBE_INITIAL_DELAY_SECONDS\"
     },
     {
-      \"stackParameterId\": \"LIVENESS_PROBE_INITIAL_DELAY_SECONDS\",
+      \"stackParameter\": \"LIVENESS_PROBE_INITIAL_DELAY_SECONDS\",
       \"value\": \"$LIVENESS_PROBE_INITIAL_DELAY_SECONDS\"
     },
     {
-      \"stackParameterId\": \"IMAGE_TAG\",
+      \"stackParameter\": \"IMAGE_TAG\",
       \"value\": \"$IMAGE_TAG\"
     }
   ],
   \"requiredParameters\": [
     {
-      \"stackParameterId\": \"DATABASE_HOSTNAME\",
+      \"stackParameter\": \"DATABASE_HOSTNAME\",
       \"value\": \"$DATABASE_HOSTNAME\"
     }
   ]

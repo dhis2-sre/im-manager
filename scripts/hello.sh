@@ -32,7 +32,7 @@ $HTTP "$INSTANCE_HOST/instances/$INSTANCE_ID" "Authorization: Bearer $ACCESS_TOK
 echo "{
   \"requiredParameters\": [
     {
-      \"stackParameterId\": $REQUIRED_PARAMETER_ID,
+      \"stackParameter\": $REQUIRED_PARAMETER_ID,
       \"value\": \"$REQUIRED_PARAMETER_VALUE\"
     }
   ]
