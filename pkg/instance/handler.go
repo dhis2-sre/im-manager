@@ -196,10 +196,9 @@ func convertRequiredParameters(instanceID uint, requestParameters []ParameterReq
 	if len(requestParameters) > 0 {
 		var parameters = make([]model.InstanceRequiredParameter, len(requestParameters))
 		for i, parameter := range requestParameters {
-			stackRequiredParameter := model.StackRequiredParameter{ID: parameter.StackParameter}
 			parameters[i] = model.InstanceRequiredParameter{
 				InstanceID:             instanceID,
-				StackRequiredParameter: stackRequiredParameter,
+				StackRequiredParameter: model.StackRequiredParameter{ID: parameter.StackParameter},
 				Value:                  parameter.Value,
 			}
 		}
@@ -212,10 +211,9 @@ func convertOptionalParameters(instanceID uint, requestParameters []ParameterReq
 	if len(requestParameters) > 0 {
 		var parameters = make([]model.InstanceOptionalParameter, len(requestParameters))
 		for i, parameter := range requestParameters {
-			stackOptionalParameter := model.StackOptionalParameter{ID: parameter.StackParameter}
 			parameters[i] = model.InstanceOptionalParameter{
 				InstanceID:             instanceID,
-				StackOptionalParameter: stackOptionalParameter,
+				StackOptionalParameter: model.StackOptionalParameter{ID: parameter.StackParameter},
 				Value:                  parameter.Value,
 			}
 		}
