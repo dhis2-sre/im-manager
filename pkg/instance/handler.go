@@ -180,8 +180,8 @@ func (h Handler) Deploy(c *gin.Context) {
 		return
 	}
 
-	instance.RequiredParameters = convertRequiredParameters(instance, request.RequiredParameters)
-	instance.OptionalParameters = convertOptionalParameters(instance, request.OptionalParameters)
+	instance.RequiredParameters = convertRequiredParameters(instance.ID, request.RequiredParameters)
+	instance.OptionalParameters = convertOptionalParameters(instance.ID, request.OptionalParameters)
 
 	err = h.instanceService.Deploy(accessToken, instance, group)
 	if err != nil {
@@ -192,13 +192,13 @@ func (h Handler) Deploy(c *gin.Context) {
 	c.JSON(http.StatusCreated, instance)
 }
 
-func convertRequiredParameters(instance *model.Instance, requestParameters []ParameterRequest) []model.InstanceRequiredParameter {
+func convertRequiredParameters(instanceID uint, requestParameters []ParameterRequest) []model.InstanceRequiredParameter {
 	if len(requestParameters) > 0 {
 		var parameters = make([]model.InstanceRequiredParameter, len(requestParameters))
 		for i, parameter := range requestParameters {
 			stackRequiredParameter := model.StackRequiredParameter{ID: parameter.StackParameter}
 			parameters[i] = model.InstanceRequiredParameter{
-				InstanceID:             instance.ID,
+				InstanceID:             instanceID,
 				StackRequiredParameter: stackRequiredParameter,
 				Value:                  parameter.Value,
 			}
@@ -208,13 +208,13 @@ func convertRequiredParameters(instance *model.Instance, requestParameters []Par
 	return []model.InstanceRequiredParameter{}
 }
 
-func convertOptionalParameters(instance *model.Instance, requestParameters []ParameterRequest) []model.InstanceOptionalParameter {
+func convertOptionalParameters(instanceID uint, requestParameters []ParameterRequest) []model.InstanceOptionalParameter {
 	if len(requestParameters) > 0 {
 		var parameters = make([]model.InstanceOptionalParameter, len(requestParameters))
 		for i, parameter := range requestParameters {
 			stackOptionalParameter := model.StackOptionalParameter{ID: parameter.StackParameter}
 			parameters[i] = model.InstanceOptionalParameter{
-				InstanceID:             instance.ID,
+				InstanceID:             instanceID,
 				StackOptionalParameter: stackOptionalParameter,
 				Value:                  parameter.Value,
 			}
