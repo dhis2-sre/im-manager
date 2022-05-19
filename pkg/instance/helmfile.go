@@ -45,7 +45,7 @@ func (h helmfileService) Destroy(accessToken string, instance *model.Instance, g
 // * stackPath is concatenated using path.Join which also cleans the path and furthermore it's existence is validated
 // * Binaries are executed using their full path and not from $PATH which would be very difficult to exploit anyway
 func (h helmfileService) executeHelmfileCommand(accessToken string, instance *model.Instance, group *models.Group, operation string) (*exec.Cmd, error) {
-	stack, err := h.stackService.FindById(instance.StackID)
+	stack, err := h.stackService.Find(instance.StackName)
 	if err != nil {
 		return nil, err
 	}

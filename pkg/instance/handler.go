@@ -36,9 +36,9 @@ type Handler struct {
 }
 
 type CreateInstanceRequest struct {
-	Name    string `json:"name" binding:"required,dns_rfc1035_label"`
-	GroupID uint   `json:"groupId" binding:"required"`
-	StackID uint   `json:"stackId" binding:"required"`
+	Name      string `json:"name" binding:"required,dns_rfc1035_label"`
+	GroupID   uint   `json:"groupId" binding:"required"`
+	StackName string `json:"stackName" binding:"required"`
 }
 
 // Create instance
@@ -81,10 +81,10 @@ func (h Handler) Create(c *gin.Context) {
 	}
 
 	instance := &model.Instance{
-		Name:    request.Name,
-		UserID:  user.ID,
-		GroupID: request.GroupID,
-		StackID: request.StackID,
+		Name:      request.Name,
+		UserID:    user.ID,
+		GroupID:   request.GroupID,
+		StackName: request.StackName,
 	}
 
 	canWrite := handler.CanWriteInstance(userWithGroups, instance)

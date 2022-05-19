@@ -1,22 +1,30 @@
 package model
 
-import "gorm.io/gorm"
+import (
+	"time"
+
+	"gorm.io/gorm"
+)
 
 type Stack struct {
-	gorm.Model
-	Name               string                   `gorm:"unique"`
-	RequiredParameters []StackRequiredParameter `gorm:"many2many:required_stack_parameters_joins; foreignKey:ID; joinForeignKey:StackID; References:Name; joinReferences:ParameterID; constraint:OnUpdate:CASCADE,OnDelete:CASCADE" json:"requiredParameters,omitempty"`
-	OptionalParameters []StackOptionalParameter `gorm:"many2many:optional_stack_parameters_joins; foreignKey:ID; joinForeignKey:StackID; References:Name; joinReferences:ParameterID; constraint:OnUpdate:CASCADE,OnDelete:CASCADE" json:"optionalParameters,omitempty"`
-	Instances          []Instance               `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
+	Name               string                   `gorm:"primaryKey" json:"name"`
+	RequiredParameters []StackRequiredParameter `gorm:"many2many:required_stack_parameters_joins; foreignKey:Name; References:Name; joinForeignKey:StackName; joinReferences:ParameterID; constraint:OnUpdate:CASCADE,OnDelete:CASCADE" json:"requiredParameters"`
+	OptionalParameters []StackOptionalParameter `gorm:"many2many:optional_stack_parameters_joins; foreignKey:Name; References:Name; joinForeignKey:StackName; joinReferences:ParameterID; constraint:OnUpdate:CASCADE,OnDelete:CASCADE" json:"optionalParameters"`
+	Instances          []Instance               `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;" json:"instances"`
+
+	//	gorm.Model
+	CreatedAt time.Time
+	UpdatedAt time.Time
+	DeletedAt gorm.DeletedAt `gorm:"index"`
 }
 
 type RequiredStackParametersJoin struct {
-	StackID     uint   `gorm:"primaryKey"`
+	StackName   string `gorm:"primaryKey"`
 	ParameterID string `gorm:"primaryKey"`
 }
 
 type OptionalStackParametersJoin struct {
-	StackID      uint   `gorm:"primaryKey"`
+	StackName    string `gorm:"primaryKey"`
 	ParameterID  string `gorm:"primaryKey"`
 	DefaultValue string
 }

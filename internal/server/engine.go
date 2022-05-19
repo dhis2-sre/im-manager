@@ -26,7 +26,7 @@ func GetEngine(environment di.Environment) *gin.Engine {
 	tokenAuthenticationRouter.Use(environment.AuthenticationMiddleware.TokenAuthentication)
 
 	tokenAuthenticationRouter.GET("/stacks", environment.StackHandler.FindAll)
-	tokenAuthenticationRouter.GET("/stacks/:id", environment.StackHandler.FindById)
+	tokenAuthenticationRouter.GET("/stacks/:name", environment.StackHandler.Find)
 
 	tokenAuthenticationRouter.POST("/instances", environment.InstanceHandler.Create)
 	tokenAuthenticationRouter.POST("/instances/:id/deploy", environment.InstanceHandler.Deploy)

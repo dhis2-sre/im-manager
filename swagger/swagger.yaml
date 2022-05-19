@@ -10,10 +10,9 @@ definitions:
       name:
         type: string
         x-go-name: Name
-      stackId:
-        format: uint64
-        type: integer
-        x-go-name: StackID
+      stackName:
+        type: string
+        x-go-name: StackName
     type: object
     x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
   DeletedAt:
@@ -50,9 +49,8 @@ definitions:
         type: integer
       Name:
         type: string
-      StackID:
-        format: uint64
-        type: integer
+      StackName:
+        type: string
       UpdatedAt:
         format: date-time
         type: string

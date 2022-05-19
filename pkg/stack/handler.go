@@ -3,7 +3,6 @@ package stack
 import (
 	"fmt"
 	"net/http"
-	"strconv"
 
 	"github.com/dhis2-sre/im-manager/internal/apperror"
 	"github.com/gin-gonic/gin"
@@ -19,29 +18,28 @@ type Handler struct {
 	service Service
 }
 
-// FindById godoc
-// @Summary Find stack by id
-// @Description Find stack by id...
+// Find godoc
+// @Summary Find stack by name
+// @Description Find stack by name...
 // @Tags Restricted
 // @Accept json
 // @Produce json
 // @Success 200 {object} map[string]interface{}
 // @Failure 401 {object} map[string]interface{}
-// @Router /stacks/{id} [get]
-// @Param id path string true "Stack id"
+// @Router /stacks/{name} [get]
+// @Param name path string true "Stack name"
 // @Security OAuth2Password
-func (h Handler) FindById(c *gin.Context) {
-	idParam := c.Param("id")
-	id, err := strconv.ParseUint(idParam, 10, 64)
-	if err != nil {
-		badRequest := apperror.NewBadRequest("Error parsing id")
+func (h Handler) Find(c *gin.Context) {
+	name := c.Param("name")
+	if name == "" {
+		badRequest := apperror.NewBadRequest("stack name missing")
 		_ = c.Error(badRequest)
 		return
 	}
 
-	stack, err := h.service.FindById(uint(id))
+	stack, err := h.service.Find(name)
 	if err != nil {
-		notFound := apperror.NewNotFound("stack", idParam)
+		notFound := apperror.NewNotFound("stack", name)
 		_ = c.Error(notFound)
 		return
 	}
