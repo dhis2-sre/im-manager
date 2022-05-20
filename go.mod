@@ -5,7 +5,7 @@ go 1.18
 require (
 	github.com/dhis2-sre/im-job v0.1.1-0.20220116121707-efdfb9c56501
 	github.com/dhis2-sre/im-user v0.6.1-0.20220521165423-8a97557f192c
-	github.com/dhis2-sre/rabbitmq v0.2.2
+	github.com/dhis2-sre/rabbitmq v0.3.0
 	github.com/gin-contrib/cors v1.3.1
 	github.com/gin-gonic/gin v1.8.0
 	github.com/go-openapi/runtime v0.24.1
@@ -71,6 +71,7 @@ require (
 	github.com/golang/snappy v0.0.4 // indirect
 	github.com/google/gnostic v0.6.8 // indirect
 	github.com/google/gofuzz v1.2.0 // indirect
+	github.com/google/uuid v1.3.0 // indirect
 	github.com/googleapis/gax-go/v2 v2.3.0 // indirect
 	github.com/goware/prefixer v0.0.0-20160118172347-395022866408 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
