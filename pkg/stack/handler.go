@@ -18,17 +18,20 @@ type Handler struct {
 	service Service
 }
 
-// Find godoc
-// @Summary Find stack by name
-// @Description Find stack by name...
-// @Tags Restricted
-// @Accept json
-// @Produce json
-// @Success 200 {object} map[string]interface{}
-// @Failure 401 {object} map[string]interface{}
-// @Router /stacks/{name} [get]
-// @Param name path string true "Stack name"
-// @Security OAuth2Password
+// Find stack
+// swagger:route GET /stacks/{name} stack
+//
+// Find stack by name
+//
+// Security:
+//  oauth2:
+//
+// Responses:
+//   200: StackResponse
+//   401: Error
+//   403: Error
+//   404: Error
+//   415: Error
 func (h Handler) Find(c *gin.Context) {
 	name := c.Param("name")
 	if name == "" {
@@ -47,16 +50,20 @@ func (h Handler) Find(c *gin.Context) {
 	c.JSON(http.StatusOK, stack)
 }
 
-// FindAll godoc
-// @Summary Find all stacks
-// @Description Find all stacks...
-// @Tags Restricted
-// @Accept json
-// @Produce json
-// @Success 200 {object} map[string]interface{}
-// @Failure 401 {object} map[string]interface{}
-// @Router /stacks [get]
-// @Security OAuth2Password
+// FindAll stack
+// swagger:route GET /stacks stacks
+//
+// Find all stacks
+//
+// Security:
+//  oauth2:
+//
+// Responses:
+//   200: StacksResponse
+//   401: Error
+//   403: Error
+//   404: Error
+//   415: Error
 func (h Handler) FindAll(c *gin.Context) {
 	stacks, err := h.service.FindAll()
 	if err != nil {

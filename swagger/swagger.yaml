@@ -140,6 +140,37 @@ definitions:
         x-go-name: Status
     type: object
     x-go-package: github.com/dhis2-sre/im-manager/pkg/health
+  Stack:
+    properties:
+      CreatedAt:
+        description: gorm.Model
+        format: date-time
+        type: string
+      DeletedAt:
+        $ref: '#/definitions/DeletedAt'
+      UpdatedAt:
+        format: date-time
+        type: string
+      instances:
+        items:
+          $ref: '#/definitions/Instance'
+        type: array
+        x-go-name: Instances
+      name:
+        type: string
+        x-go-name: Name
+      optionalParameters:
+        items:
+          $ref: '#/definitions/StackOptionalParameter'
+        type: array
+        x-go-name: OptionalParameters
+      requiredParameters:
+        items:
+          $ref: '#/definitions/StackRequiredParameter'
+        type: array
+        x-go-name: RequiredParameters
+    type: object
+    x-go-package: github.com/dhis2-sre/im-manager/pkg/model
   StackOptionalParameter:
     properties:
       Name:
@@ -392,6 +423,46 @@ paths:
           $ref: '#/responses/Error'
       security:
       - oauth2: []
+  /stacks:
+    get:
+      description: Find all stacks
+      operationId: stacks
+      responses:
+        "200":
+          $ref: '#/responses/StacksResponse'
+        "401":
+          $ref: '#/responses/Error'
+        "403":
+          $ref: '#/responses/Error'
+        "404":
+          $ref: '#/responses/Error'
+        "415":
+          $ref: '#/responses/Error'
+      security:
+      - oauth2: []
+  /stacks/{name}:
+    get:
+      description: Find stack by name
+      operationId: stack
+      parameters:
+      - in: path
+        name: name
+        required: true
+        type: string
+        x-go-name: Name
+      responses:
+        "200":
+          $ref: '#/responses/StackResponse'
+        "401":
+          $ref: '#/responses/Error'
+        "403":
+          $ref: '#/responses/Error'
+        "404":
+          $ref: '#/responses/Error'
+        "415":
+          $ref: '#/responses/Error'
+      security:
+      - oauth2: []
 produces:
 - application/json
 responses:
@@ -407,6 +478,16 @@ responses:
     description: ""
     schema:
       $ref: '#/definitions/Response'
+  StackResponse:
+    description: ""
+    schema:
+      $ref: '#/definitions/Stack'
+  StacksResponse:
+    description: ""
+    schema:
+      items:
+        $ref: '#/definitions/Stack'
+      type: array
 securityDefinitions:
   oauth2:
     flow: password
