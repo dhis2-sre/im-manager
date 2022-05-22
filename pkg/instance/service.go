@@ -115,7 +115,7 @@ func (s service) FindById(id uint) (*model.Instance, error) {
 
 // TODO: This should be done differently. If the method is called from an event it should be the service account user. Otherwise it should be the actual user invoking the http request
 func (s service) Delete(id uint) error {
-	instanceWithParameters, err := s.instanceRepository.FindWithParametersById(id)
+	instanceWithParameters, err := s.FindWithDecryptedParametersById(id)
 	if err != nil {
 		return err
 	}
