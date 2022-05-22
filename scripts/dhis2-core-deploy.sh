@@ -9,14 +9,14 @@ DATABASE_HOSTNAME=sl-db-23-database-postgresql.whoami.svc
 
 INSTANCE_NAME=$1
 GROUP_NAME=$2
+STACK_NAME=dhis2-core
 
-GROUP_ID=$($HTTP --check-status "$INSTANCE_HOST/groups-name-to-id/$GROUP_NAME" "Authorization: Bearer $ACCESS_TOKEN")
-INSTANCE_ID=$($HTTP --check-status "$INSTANCE_HOST/instances-name-to-id/$GROUP_ID/$INSTANCE_NAME" "Authorization: Bearer $ACCESS_TOKEN")
+INSTANCE_ID=$($HTTP --check-status "$INSTANCE_HOST/instances-name-to-id/$GROUP_NAME/$INSTANCE_NAME" "Authorization: Bearer $ACCESS_TOKEN")
 
 echo "{
   \"name\": \"$INSTANCE_NAME\",
-  \"groupId\": $GROUP_ID,
-  \"stackId\": 1,
+  \"groupName\": \"$GROUP_NAME\",
+  \"stackName\": \"$STACK_NAME\",
   \"optionalParameters\": [
     {
       \"stackParameter\": \"READINESS_PROBE_INITIAL_DELAY_SECONDS\",

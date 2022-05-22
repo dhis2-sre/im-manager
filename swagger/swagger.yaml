@@ -1,29 +1,12 @@
 consumes:
 - application/json
 definitions:
-  CreateInstanceRequest:
-    properties:
-      groupId:
-        format: uint64
-        type: integer
-        x-go-name: GroupID
-      name:
-        type: string
-        x-go-name: Name
-      stackName:
-        type: string
-        x-go-name: StackName
-    type: object
-    x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
   DeletedAt:
     $ref: '#/definitions/NullTime'
   GroupWithInstances:
     properties:
       Hostname:
         type: string
-      ID:
-        format: uint64
-        type: integer
       Instances:
         items:
           $ref: '#/definitions/Instance'
@@ -41,9 +24,8 @@ definitions:
         $ref: '#/definitions/DeletedAt'
       DeployLog:
         type: string
-      GroupID:
-        format: uint64
-        type: integer
+      GroupName:
+        type: string
       ID:
         format: uint64
         type: integer
@@ -158,13 +140,6 @@ definitions:
         x-go-name: Status
     type: object
     x-go-package: github.com/dhis2-sre/im-manager/pkg/health
-  RunJobResponse:
-    properties:
-      runId:
-        type: string
-        x-go-name: RunId
-    type: object
-    x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
   StackOptionalParameter:
     properties:
       Name:
@@ -202,7 +177,11 @@ paths:
       operationId: listInstances
       responses:
         "200":
-          $ref: '#/responses/GroupWithInstances'
+          description: GroupWithInstances
+          schema:
+            items:
+              $ref: '#/definitions/GroupWithInstances'
+            type: array
         "401":
           $ref: '#/responses/Error'
         "403":
@@ -214,13 +193,6 @@ paths:
     post:
       description: Create instance
       operationId: createInstance
-      parameters:
-      - description: Create instance request body parameter
-        in: body
-        name: Body
-        required: true
-        schema:
-          $ref: '#/definitions/CreateInstanceRequest'
       responses:
         "201":
           description: Instance
@@ -236,23 +208,21 @@ paths:
           $ref: '#/responses/Error'
       security:
       - oauth2: []
-  /instances-name-to-id{groupId}/{name}:
+  /instances-name-to-id{groupName}/{instanceName}:
     get:
-      description: Find instance id by name and group id
+      description: Find instance id by name and group name
       operationId: instanceNameToId
       parameters:
-      - format: uint64
-        in: path
-        name: groupId
+      - in: path
+        name: groupName
         required: true
-        type: integer
-        x-go-name: GroupID
-      - format: uint64
-        in: path
-        name: name
+        type: string
+        x-go-name: GroupName
+      - in: path
+        name: instanceName
         required: true
-        type: integer
-        x-go-name: Name
+        type: string
+        x-go-name: InstanceName
       responses:
         "200":
           description: Instance
@@ -348,17 +318,17 @@ paths:
       description: Stream instance logs in real time
       operationId: instanceLogs
       parameters:
-      - description: selector
-        in: query
-        name: selector
-        type: string
-        x-go-name: Selector
       - format: uint64
         in: path
         name: id
         required: true
         type: integer
         x-go-name: ID
+      - description: selector
+        in: query
+        name: selector
+        type: string
+        x-go-name: Selector
       responses:
         "200":
           $ref: '#/responses/InstanceLogsResponse'
@@ -411,7 +381,7 @@ paths:
         x-go-name: ID
       responses:
         "200":
-          $ref: '#/responses/RunJobResponse'
+          description: ""
         "401":
           $ref: '#/responses/Error'
         "403":
@@ -425,22 +395,18 @@ paths:
 produces:
 - application/json
 responses:
-  Error:
-    description: ""
-  GroupWithInstances:
+  _:
     description: ""
     schema:
       $ref: '#/definitions/GroupWithInstances'
+  Error:
+    description: ""
   InstanceLogsResponse:
     description: ""
   Response:
     description: ""
     schema:
       $ref: '#/definitions/Response'
-  RunJobResponse:
-    description: ""
-    schema:
-      $ref: '#/definitions/RunJobResponse'
 securityDefinitions:
   oauth2:
     flow: password

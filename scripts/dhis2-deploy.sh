@@ -8,18 +8,18 @@ IMAGE_REPOSITORY=core
 IMAGE_TAG=2.36.0-tomcat-8.5.34-jre8-alpine
 DATABASE_SIZE=30Gi
 PGADMIN_INSTALL=false
-DATABASE_ID=3
+DATABASE_ID=1
 
 INSTANCE_NAME=$1
 GROUP_NAME=$2
+STACK_NAME=dhis2
 
-GROUP_ID=$($HTTP --check-status "$INSTANCE_HOST/groups-name-to-id/$GROUP_NAME" "Authorization: Bearer $ACCESS_TOKEN")
-INSTANCE_ID=$($HTTP --check-status "$INSTANCE_HOST/instances-name-to-id/$GROUP_ID/$INSTANCE_NAME" "Authorization: Bearer $ACCESS_TOKEN")
+INSTANCE_ID=$($HTTP --check-status "$INSTANCE_HOST/instances-name-to-id/$GROUP_NAME/$INSTANCE_NAME" "Authorization: Bearer $ACCESS_TOKEN")
 
 echo "{
   \"name\": \"$INSTANCE_NAME\",
-  \"groupId\": $GROUP_ID,
-  \"stackId\": 1,
+  \"groupName\": \"$GROUP_NAME\",
+  \"stackName\": \"$STACK_NAME\",
   \"optionalParameters\": [
     {
       \"stackParameter\": \"READINESS_PROBE_INITIAL_DELAY_SECONDS\",

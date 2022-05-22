@@ -2,11 +2,9 @@
 
 set -euo pipefail
 
-STACK_ID=5 # Id of the whoami-go stack. Run ./stacks.sh for a list of all stacks
+STACK_NAME=whoami-go
 CHART_VERSION=0.5.0
 GROUP_NAME=whoami
-
-GROUP_ID=$($HTTP --check-status "$INSTANCE_HOST/groups-name-to-id/$GROUP_NAME" "Authorization: Bearer $ACCESS_TOKEN")
 
 function int_handler {
   $HTTP delete "$INSTANCE_HOST/instances/$INSTANCE_ID" "Authorization: Bearer $ACCESS_TOKEN"
@@ -20,8 +18,8 @@ trap int_handler EXIT
 # Create instance
 INSTANCE_OUTPUT=$(echo "{
   \"name\": \"$1\",
-  \"groupId\": $GROUP_ID,
-  \"stackId\": $STACK_ID
+  \"groupName\": \"$GROUP_NAME\",
+  \"stackName\": \"$STACK_NAME\"
 }" | $HTTP post "$INSTANCE_HOST/instances" "Authorization: Bearer $ACCESS_TOKEN")
 
 INSTANCE_ID=$(echo "$INSTANCE_OUTPUT" | jq -r '.ID')
