@@ -31,6 +31,11 @@ func (c *ttlDestroyConsumer) Consume() error {
 			log.Println(err)
 			return
 		}
+
+		err = d.Ack(false)
+		if err != nil {
+			log.Println(err)
+		}
 	})
 	return err
 }
