@@ -143,7 +143,6 @@ definitions:
   Stack:
     properties:
       CreatedAt:
-        description: gorm.Model
         format: date-time
         type: string
       DeletedAt:

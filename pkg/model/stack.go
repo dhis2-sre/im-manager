@@ -12,7 +12,6 @@ type Stack struct {
 	OptionalParameters []StackOptionalParameter `gorm:"many2many:optional_stack_parameters_joins; foreignKey:Name; References:Name; joinForeignKey:StackName; joinReferences:ParameterID; constraint:OnUpdate:CASCADE,OnDelete:CASCADE" json:"optionalParameters"`
 	Instances          []Instance               `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;" json:"instances"`
 
-	//	gorm.Model
 	CreatedAt time.Time
 	UpdatedAt time.Time
 	DeletedAt gorm.DeletedAt `gorm:"index"`
