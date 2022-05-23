@@ -239,7 +239,7 @@ paths:
           $ref: '#/responses/Error'
       security:
       - oauth2: []
-  /instances-name-to-id{groupName}/{instanceName}:
+  /instances-name-to-id/{groupName}/{instanceName}:
     get:
       description: Find instance id by name and group name
       operationId: instanceNameToId

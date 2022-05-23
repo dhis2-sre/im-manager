@@ -505,7 +505,7 @@ func (h Handler) Logs(c *gin.Context) {
 }
 
 // NameToId instance
-// swagger:route GET /instances-name-to-id{groupName}/{instanceName} instanceNameToId
+// swagger:route GET /instances-name-to-id/{groupName}/{instanceName} instanceNameToId
 //
 // Find instance id by name and group name
 //
