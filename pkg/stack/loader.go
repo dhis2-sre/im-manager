@@ -29,7 +29,7 @@ func LoadStacks(stackService Service) {
 
 		name := entry.Name()
 		log.Printf("Parsing stack: %s\n", name)
-		existingStack, err := stackService.FindByName(name)
+		existingStack, err := stackService.Find(name)
 		if err != nil {
 			if err.Error() != "record not found" {
 				log.Fatalf("Error search for existing stack: %s\n%+v", name, err)

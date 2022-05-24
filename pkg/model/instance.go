@@ -7,8 +7,8 @@ type Instance struct {
 	gorm.Model
 	Name               string `gorm:"index:idx_name_and_group,unique"`
 	UserID             uint
-	GroupID            uint `gorm:"index:idx_name_and_group,unique"`
-	StackID            uint
+	GroupName          string `gorm:"index:idx_name_and_group,unique"`
+	StackName          string
 	RequiredParameters []InstanceRequiredParameter `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;" json:"requiredParameters,omitempty"`
 	OptionalParameters []InstanceOptionalParameter `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;" json:"optionalParameters,omitempty"`
 	DeployLog          string                      `gorm:"type:text"`

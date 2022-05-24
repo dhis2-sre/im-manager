@@ -4,18 +4,17 @@ set -euo pipefail
 
 DATABASE_ID=1
 
-STACK_ID=3
+STACK_NAME=dhis2-db
 
 INSTANCE_NAME=$1
 GROUP_NAME=$2
 
-GROUP_ID=$($HTTP --check-status "$INSTANCE_HOST/groups-name-to-id/$GROUP_NAME" "Authorization: Bearer $ACCESS_TOKEN")
-INSTANCE_ID=$($HTTP --check-status "$INSTANCE_HOST/instances-name-to-id/$GROUP_ID/$INSTANCE_NAME" "Authorization: Bearer $ACCESS_TOKEN")
+INSTANCE_ID=$($HTTP --check-status "$INSTANCE_HOST/instances-name-to-id/$GROUP_NAME/$INSTANCE_NAME" "Authorization: Bearer $ACCESS_TOKEN")
 
 echo "{
   \"name\": \"$INSTANCE_NAME\",
-  \"groupId\": $GROUP_ID,
-  \"stackId\": $STACK_ID,
+  \"groupName\": \"$GROUP_NAME\",
+  \"stackName\": \"$STACK_NAME\",
   \"requiredParameters\": [
     {
       \"stackParameter\": \"DATABASE_ID\",

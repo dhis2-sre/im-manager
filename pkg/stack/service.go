@@ -7,12 +7,11 @@ import (
 
 type Service interface {
 	Create(name string) (*model.Stack, error)
-	Delete(id uint) error
+	Delete(name string) error
 	CreateRequiredParameter(stack *model.Stack, parameterName string) (*model.StackRequiredParameter, error)
 	CreateOptionalParameter(stack *model.Stack, parameterName string, defaultValue string) (*model.StackOptionalParameter, error)
-	FindByName(name string) (*model.Stack, error)
+	Find(name string) (*model.Stack, error)
 	FindAll() (*[]model.Stack, error)
-	FindById(id uint) (*model.Stack, error)
 }
 
 func ProvideService(repository Repository) Service {
@@ -36,14 +35,14 @@ func (s service) Create(name string) (*model.Stack, error) {
 	return stack, err
 }
 
-func (s service) Delete(id uint) error {
-	return s.repository.Delete(id)
+func (s service) Delete(name string) error {
+	return s.repository.Delete(name)
 }
 
 func (s service) CreateRequiredParameter(stack *model.Stack, parameterName string) (*model.StackRequiredParameter, error) {
 	parameter := &model.StackRequiredParameter{Name: parameterName}
 
-	err := s.repository.CreateRequiredParameter(stack.ID, parameter)
+	err := s.repository.CreateRequiredParameter(stack.Name, parameter)
 
 	return parameter, err
 }
@@ -51,19 +50,15 @@ func (s service) CreateRequiredParameter(stack *model.Stack, parameterName strin
 func (s service) CreateOptionalParameter(stack *model.Stack, parameterName string, defaultValue string) (*model.StackOptionalParameter, error) {
 	parameter := &model.StackOptionalParameter{Name: parameterName}
 
-	err := s.repository.CreateOptionalParameter(stack.ID, parameter, defaultValue)
+	err := s.repository.CreateOptionalParameter(stack.Name, parameter, defaultValue)
 
 	return parameter, err
 }
 
-func (s service) FindByName(name string) (*model.Stack, error) {
-	return s.repository.FindByName(name)
+func (s service) Find(name string) (*model.Stack, error) {
+	return s.repository.Find(name)
 }
 
 func (s service) FindAll() (*[]model.Stack, error) {
 	return s.repository.FindAll()
-}
-
-func (s service) FindById(id uint) (*model.Stack, error) {
-	return s.repository.FindById(id)
 }
