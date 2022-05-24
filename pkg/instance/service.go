@@ -23,7 +23,7 @@ type Service interface {
 	Logs(instance *model.Instance, group *models.Group, selector string) (io.ReadCloser, error)
 	FindWithParametersById(id uint) (*model.Instance, error)
 	FindWithDecryptedParametersById(id uint) (*model.Instance, error)
-	FindByNameAndGroup(instanceName string, groupName string) (*model.Instance, error)
+	FindByNameAndGroup(instance string, group string) (*model.Instance, error)
 	FindInstances(groups []*models.Group) ([]*model.Instance, error)
 }
 
@@ -214,8 +214,8 @@ func (s service) FindWithDecryptedParametersById(id uint) (*model.Instance, erro
 	return instance, nil
 }
 
-func (s service) FindByNameAndGroup(instanceName string, groupName string) (*model.Instance, error) {
-	return s.instanceRepository.FindByNameAndGroup(instanceName, groupName)
+func (s service) FindByNameAndGroup(instance string, group string) (*model.Instance, error) {
+	return s.instanceRepository.FindByNameAndGroup(instance, group)
 }
 
 func (s service) FindInstances(groups []*models.Group) ([]*model.Instance, error) {

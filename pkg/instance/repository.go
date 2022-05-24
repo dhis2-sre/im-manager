@@ -9,7 +9,7 @@ type Repository interface {
 	Create(instance *model.Instance) error
 	Save(instance *model.Instance) error
 	FindWithParametersById(id uint) (*model.Instance, error)
-	FindByNameAndGroup(instanceName string, groupName string) (*model.Instance, error)
+	FindByNameAndGroup(instance string, group string) (*model.Instance, error)
 	SaveDeployLog(instance *model.Instance, log string) error
 	FindById(id uint) (*model.Instance, error)
 	Delete(id uint) error
@@ -46,18 +46,18 @@ func (r repository) FindWithParametersById(id uint) (*model.Instance, error) {
 	return instance, err
 }
 
-func (r repository) FindByNameAndGroup(instanceName string, groupName string) (*model.Instance, error) {
-	var instance *model.Instance
+func (r repository) FindByNameAndGroup(instance string, group string) (*model.Instance, error) {
+	var i *model.Instance
 
 	err := r.db.
-		Where("name = ?", instanceName).
-		Where("group_name = ?", groupName).
-		First(&instance).Error
+		Where("name = ?", instance).
+		Where("group_name = ?", group).
+		First(&i).Error
 	if err != nil {
 		return nil, err
 	}
 
-	return instance, err
+	return i, err
 }
 
 func (r repository) SaveDeployLog(instance *model.Instance, log string) error {
