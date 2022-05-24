@@ -3,7 +3,6 @@ package handler
 import (
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	"github.com/dhis2-sre/im-user/swagger/sdk/models"
-	"golang.org/x/exp/slices"
 )
 
 const AdministratorGroupName = "administrators"
@@ -23,9 +22,12 @@ func isOwner(user *models.User, instance *model.Instance) bool {
 }
 
 func isMemberOf(groupName string, groups []*models.Group) bool {
-	f := func(g *models.Group) bool { return g.Name == groupName }
-	idx := slices.IndexFunc(groups, f)
-	return idx != -1
+	for _, group := range groups {
+		if groupName == group.Name {
+			return true
+		}
+	}
+	return false
 }
 
 func isAdministrator(user *models.User) bool {
