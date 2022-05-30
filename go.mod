@@ -7,7 +7,7 @@ require (
 	github.com/dhis2-sre/im-user v0.6.1-0.20220521165423-8a97557f192c
 	github.com/dhis2-sre/instance-queue v0.2.1
 	github.com/gin-contrib/cors v1.3.1
-	github.com/gin-gonic/gin v1.7.7
+	github.com/gin-gonic/gin v1.8.0
 	github.com/go-openapi/runtime v0.24.1
 	github.com/gofrs/uuid v4.2.0+incompatible
 	github.com/google/wire v0.5.0
@@ -129,6 +129,7 @@ require (
 	github.com/oklog/run v1.1.0 // indirect
 	github.com/oklog/ulid v1.3.1 // indirect
 	github.com/opentracing/opentracing-go v1.2.0 // indirect
+	github.com/pelletier/go-toml/v2 v2.0.1 // indirect
 	github.com/pierrec/lz4 v2.6.1+incompatible // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
