@@ -9,6 +9,7 @@ import (
 
 func ProvideConfig() Config {
 	return Config{
+		Environment:                    requireEnv("ENVIRONMENT"),
 		BasePath:                       requireEnv("BASE_PATH"),
 		InstanceParameterEncryptionKey: requireEnv("INSTANCE_PARAMETER_ENCRYPTION_KEY"),
 		UserService: service{
@@ -53,6 +54,7 @@ func ProvideConfig() Config {
 }
 
 type Config struct {
+	Environment                    string
 	InstanceParameterEncryptionKey string
 	BasePath                       string
 	JobService                     service

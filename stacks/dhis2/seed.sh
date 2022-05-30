@@ -3,13 +3,12 @@
 set -euo pipefail
 
 if [ -n "$DATABASE_ID" ]; then
-#  ABSOLUTE_SEED_URL="$DATABASE_MANAGER_SERVICE_HOST/$DATABASE_MANAGER_SERVICE_BASE_PATH/databases/$DATABASE_ID/download"
-  ABSOLUTE_SEED_URL="im-database-manager-dev.instance-manager-dev.svc:8080/databases/$DATABASE_ID/download"
-  echo "DATABASE_HOST: $ABSOLUTE_SEED_URL"
+  DATABASE_MANAGER_ABSOLUTE_URL="$DATABASE_MANAGER_URL:8080/databases/$DATABASE_ID/download"
+  echo "DATABASE_MANAGER_ABSOLUTE_URL: $DATABASE_MANAGER_ABSOLUTE_URL"
 
 # Try pg_restore... Or gzipped sql
-  (curl --fail -L "$ABSOLUTE_SEED_URL" -H "Authorization: $IM_ACCESS_TOKEN" | pg_restore -U postgres -d "$DATABASE_NAME") || \
-  (curl --fail -L "$ABSOLUTE_SEED_URL" -H "Authorization: $IM_ACCESS_TOKEN" | gunzip -v -c | psql -U postgres -d "$DATABASE_NAME")
+  (curl --fail -L "$DATABASE_MANAGER_ABSOLUTE_URL" -H "Authorization: $IM_ACCESS_TOKEN" | pg_restore -U postgres -d "$DATABASE_NAME") || \
+  (curl --fail -L "$DATABASE_MANAGER_ABSOLUTE_URL" -H "Authorization: $IM_ACCESS_TOKEN" | gunzip -v -c | psql -U postgres -d "$DATABASE_NAME")
 
   ## Change ownership to $DATABASE_USERNAME
   # Tables
