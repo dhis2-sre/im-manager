@@ -1,30 +1,12 @@
 consumes:
 - application/json
 definitions:
-  CreateInstanceRequest:
-    properties:
-      groupId:
-        format: uint64
-        type: integer
-        x-go-name: GroupID
-      name:
-        type: string
-        x-go-name: Name
-      stackId:
-        format: uint64
-        type: integer
-        x-go-name: StackID
-    type: object
-    x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
   DeletedAt:
     $ref: '#/definitions/NullTime'
   GroupWithInstances:
     properties:
       Hostname:
         type: string
-      ID:
-        format: uint64
-        type: integer
       Instances:
         items:
           $ref: '#/definitions/Instance'
@@ -42,17 +24,15 @@ definitions:
         $ref: '#/definitions/DeletedAt'
       DeployLog:
         type: string
-      GroupID:
-        format: uint64
-        type: integer
+      GroupName:
+        type: string
       ID:
         format: uint64
         type: integer
       Name:
         type: string
-      StackID:
-        format: uint64
-        type: integer
+      StackName:
+        type: string
       UpdatedAt:
         format: date-time
         type: string
@@ -87,8 +67,7 @@ definitions:
       StackOptionalParameter:
         $ref: '#/definitions/StackOptionalParameter'
       StackOptionalParameterID:
-        format: uint64
-        type: integer
+        type: string
       UpdatedAt:
         format: date-time
         type: string
@@ -112,8 +91,7 @@ definitions:
       StackRequiredParameter:
         $ref: '#/definitions/StackRequiredParameter'
       StackRequiredParameterID:
-        format: uint64
-        type: integer
+        type: string
       UpdatedAt:
         format: date-time
         type: string
@@ -162,52 +140,45 @@ definitions:
         x-go-name: Status
     type: object
     x-go-package: github.com/dhis2-sre/im-manager/pkg/health
-  RunJobResponse:
-    properties:
-      runId:
-        type: string
-        x-go-name: RunId
-    type: object
-    x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
-  StackOptionalParameter:
+  Stack:
     properties:
       CreatedAt:
         format: date-time
         type: string
-      DefaultValue:
-        type: string
       DeletedAt:
         $ref: '#/definitions/DeletedAt'
-      ID:
-        format: uint64
-        type: integer
-      Name:
-        type: string
-      StackID:
-        format: uint64
-        type: integer
       UpdatedAt:
         format: date-time
+        type: string
+      instances:
+        items:
+          $ref: '#/definitions/Instance'
+        type: array
+        x-go-name: Instances
+      name:
+        type: string
+        x-go-name: Name
+      optionalParameters:
+        items:
+          $ref: '#/definitions/StackOptionalParameter'
+        type: array
+        x-go-name: OptionalParameters
+      requiredParameters:
+        items:
+          $ref: '#/definitions/StackRequiredParameter'
+        type: array
+        x-go-name: RequiredParameters
+    type: object
+    x-go-package: github.com/dhis2-sre/im-manager/pkg/model
+  StackOptionalParameter:
+    properties:
+      Name:
         type: string
     type: object
     x-go-package: github.com/dhis2-sre/im-manager/pkg/model
   StackRequiredParameter:
     properties:
-      CreatedAt:
-        format: date-time
-        type: string
-      DeletedAt:
-        $ref: '#/definitions/DeletedAt'
-      ID:
-        format: uint64
-        type: integer
       Name:
-        type: string
-      StackID:
-        format: uint64
-        type: integer
-      UpdatedAt:
-        format: date-time
         type: string
     type: object
     x-go-package: github.com/dhis2-sre/im-manager/pkg/model
@@ -236,7 +207,11 @@ paths:
       operationId: listInstances
       responses:
         "200":
-          $ref: '#/responses/GroupWithInstances'
+          description: GroupWithInstances
+          schema:
+            items:
+              $ref: '#/definitions/GroupWithInstances'
+            type: array
         "401":
           $ref: '#/responses/Error'
         "403":
@@ -248,13 +223,6 @@ paths:
     post:
       description: Create instance
       operationId: createInstance
-      parameters:
-      - description: Create instance request body parameter
-        in: body
-        name: Body
-        required: true
-        schema:
-          $ref: '#/definitions/CreateInstanceRequest'
       responses:
         "201":
           description: Instance
@@ -270,23 +238,21 @@ paths:
           $ref: '#/responses/Error'
       security:
       - oauth2: []
-  /instances-name-to-id{groupId}/{name}:
+  /instances-name-to-id/{groupName}/{instanceName}:
     get:
-      description: Find instance id by name and group id
+      description: Find instance id by name and group name
       operationId: instanceNameToId
       parameters:
-      - format: uint64
-        in: path
-        name: groupId
+      - in: path
+        name: groupName
         required: true
-        type: integer
-        x-go-name: GroupID
-      - format: uint64
-        in: path
-        name: name
+        type: string
+        x-go-name: GroupName
+      - in: path
+        name: instanceName
         required: true
-        type: integer
-        x-go-name: Name
+        type: string
+        x-go-name: InstanceName
       responses:
         "200":
           description: Instance
@@ -382,17 +348,17 @@ paths:
       description: Stream instance logs in real time
       operationId: instanceLogs
       parameters:
-      - description: selector
-        in: query
-        name: selector
-        type: string
-        x-go-name: Selector
       - format: uint64
         in: path
         name: id
         required: true
         type: integer
         x-go-name: ID
+      - description: selector
+        in: query
+        name: selector
+        type: string
+        x-go-name: Selector
       responses:
         "200":
           $ref: '#/responses/InstanceLogsResponse'
@@ -445,7 +411,47 @@ paths:
         x-go-name: ID
       responses:
         "200":
-          $ref: '#/responses/RunJobResponse'
+          description: ""
+        "401":
+          $ref: '#/responses/Error'
+        "403":
+          $ref: '#/responses/Error'
+        "404":
+          $ref: '#/responses/Error'
+        "415":
+          $ref: '#/responses/Error'
+      security:
+      - oauth2: []
+  /stacks:
+    get:
+      description: Find all stacks
+      operationId: stacks
+      responses:
+        "200":
+          $ref: '#/responses/StacksResponse'
+        "401":
+          $ref: '#/responses/Error'
+        "403":
+          $ref: '#/responses/Error'
+        "404":
+          $ref: '#/responses/Error'
+        "415":
+          $ref: '#/responses/Error'
+      security:
+      - oauth2: []
+  /stacks/{name}:
+    get:
+      description: Find stack by name
+      operationId: stack
+      parameters:
+      - in: path
+        name: name
+        required: true
+        type: string
+        x-go-name: Name
+      responses:
+        "200":
+          $ref: '#/responses/StackResponse'
         "401":
           $ref: '#/responses/Error'
         "403":
@@ -459,22 +465,28 @@ paths:
 produces:
 - application/json
 responses:
-  Error:
-    description: ""
-  GroupWithInstances:
+  _:
     description: ""
     schema:
       $ref: '#/definitions/GroupWithInstances'
+  Error:
+    description: ""
   InstanceLogsResponse:
     description: ""
   Response:
     description: ""
     schema:
       $ref: '#/definitions/Response'
-  RunJobResponse:
+  StackResponse:
     description: ""
     schema:
-      $ref: '#/definitions/RunJobResponse'
+      $ref: '#/definitions/Stack'
+  StacksResponse:
+    description: ""
+    schema:
+      items:
+        $ref: '#/definitions/Stack'
+      type: array
 securityDefinitions:
   oauth2:
     flow: password

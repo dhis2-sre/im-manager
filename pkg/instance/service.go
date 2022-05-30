@@ -23,7 +23,7 @@ type Service interface {
 	Logs(instance *model.Instance, group *models.Group, selector string) (io.ReadCloser, error)
 	FindWithParametersById(id uint) (*model.Instance, error)
 	FindWithDecryptedParametersById(id uint) (*model.Instance, error)
-	FindByNameAndGroup(instanceName string, groupId uint) (*model.Instance, error)
+	FindByNameAndGroup(instance string, group string) (*model.Instance, error)
 	FindInstances(groups []*models.Group) ([]*model.Instance, error)
 }
 
@@ -115,7 +115,7 @@ func (s service) FindById(id uint) (*model.Instance, error) {
 
 // TODO: This should be done differently. If the method is called from an event it should be the service account user. Otherwise it should be the actual user invoking the http request
 func (s service) Delete(id uint) error {
-	instanceWithParameters, err := s.instanceRepository.FindWithParametersById(id)
+	instanceWithParameters, err := s.FindWithDecryptedParametersById(id)
 	if err != nil {
 		return err
 	}
@@ -126,7 +126,7 @@ func (s service) Delete(id uint) error {
 			return err
 		}
 
-		group, err := s.userClient.FindGroupById(tokens.AccessToken, instanceWithParameters.GroupID)
+		group, err := s.userClient.FindGroupByName(tokens.AccessToken, instanceWithParameters.GroupName)
 		if err != nil {
 			return err
 		}
@@ -214,17 +214,17 @@ func (s service) FindWithDecryptedParametersById(id uint) (*model.Instance, erro
 	return instance, nil
 }
 
-func (s service) FindByNameAndGroup(instanceName string, groupId uint) (*model.Instance, error) {
-	return s.instanceRepository.FindByNameAndGroup(instanceName, groupId)
+func (s service) FindByNameAndGroup(instance string, group string) (*model.Instance, error) {
+	return s.instanceRepository.FindByNameAndGroup(instance, group)
 }
 
 func (s service) FindInstances(groups []*models.Group) ([]*model.Instance, error) {
-	groupIds := make([]uint, len(groups))
+	groupNames := make([]string, len(groups))
 	for i, group := range groups {
-		groupIds[i] = uint(group.ID)
+		groupNames[i] = group.Name
 	}
 
-	instances, err := s.instanceRepository.FindByGroupIds(groupIds)
+	instances, err := s.instanceRepository.FindByGroupNames(groupNames)
 	if err != nil {
 		return nil, err
 	}

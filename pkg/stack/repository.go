@@ -7,12 +7,11 @@ import (
 
 type Repository interface {
 	Create(stack *model.Stack) error
-	Delete(id uint) error
-	FindById(id uint) (*model.Stack, error)
-	FindByName(name string) (*model.Stack, error)
+	Delete(name string) error
+	Find(name string) (*model.Stack, error)
 	FindAll() (*[]model.Stack, error)
-	CreateRequiredParameter(stackParameter *model.StackRequiredParameter) error
-	CreateOptionalParameter(stackParameter *model.StackOptionalParameter) error
+	CreateRequiredParameter(name string, parameter *model.StackRequiredParameter) error
+	CreateOptionalParameter(name string, parameter *model.StackOptionalParameter, defaultValue string) error
 }
 
 func ProvideRepository(DB *gorm.DB) Repository {
@@ -27,22 +26,16 @@ func (r repository) Create(stack *model.Stack) error {
 	return r.db.Create(&stack).Error
 }
 
-func (r repository) Delete(id uint) error {
-	return r.db.Unscoped().Delete(&model.Stack{}, id).Error
+func (r repository) Delete(name string) error {
+	return r.db.Unscoped().Delete(&model.Stack{}, name).Error
 }
 
-func (r repository) FindById(id uint) (*model.Stack, error) {
+func (r repository) Find(name string) (*model.Stack, error) {
 	var stack *model.Stack
 	err := r.db.
-		Preload("RequiredParameters", "stack_id = ?", id).
-		Preload("OptionalParameters", "stack_id = ?", id).
-		First(&stack, id).Error
-	return stack, err
-}
-
-func (r repository) FindByName(name string) (*model.Stack, error) {
-	var stack *model.Stack
-	err := r.db.Where("name = ?", name).First(&stack).Error
+		Preload("RequiredParameters").
+		Preload("OptionalParameters").
+		First(&stack, "name = ?", name).Error
 	return stack, err
 }
 
@@ -52,10 +45,24 @@ func (r repository) FindAll() (*[]model.Stack, error) {
 	return &stacks, err
 }
 
-func (r repository) CreateOptionalParameter(stackParameter *model.StackOptionalParameter) error {
-	return r.db.Create(&stackParameter).Error
+func (r repository) CreateOptionalParameter(name string, parameter *model.StackOptionalParameter, defaultValue string) error {
+	err := r.db.FirstOrCreate(&parameter).Error
+	if err != nil {
+		return err
+	}
+
+	joinModel := &model.OptionalStackParametersJoin{StackName: name, ParameterID: parameter.Name, DefaultValue: defaultValue}
+
+	return r.db.Create(&joinModel).Error
 }
 
-func (r repository) CreateRequiredParameter(stackParameter *model.StackRequiredParameter) error {
-	return r.db.Create(&stackParameter).Error
+func (r repository) CreateRequiredParameter(name string, parameter *model.StackRequiredParameter) error {
+	err := r.db.FirstOrCreate(&parameter).Error
+	if err != nil {
+		return err
+	}
+
+	joinModel := &model.RequiredStackParametersJoin{StackName: name, ParameterID: parameter.Name}
+
+	return r.db.Create(&joinModel).Error
 }

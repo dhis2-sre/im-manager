@@ -8,7 +8,6 @@ import (
 	"strconv"
 
 	jobClient "github.com/dhis2-sre/im-job/pkg/client"
-	jobModels "github.com/dhis2-sre/im-job/swagger/sdk/models"
 	"github.com/dhis2-sre/im-manager/internal/apperror"
 	"github.com/dhis2-sre/im-manager/internal/handler"
 	"github.com/dhis2-sre/im-manager/pkg/model"
@@ -36,9 +35,9 @@ type Handler struct {
 }
 
 type CreateInstanceRequest struct {
-	Name    string `json:"name" binding:"required,dns_rfc1035_label"`
-	GroupID uint   `json:"groupId" binding:"required"`
-	StackID uint   `json:"stackId" binding:"required"`
+	Name      string `json:"name" binding:"required,dns_rfc1035_label"`
+	GroupName string `json:"groupName" binding:"required"`
+	StackName string `json:"stackName" binding:"required"`
 }
 
 // Create instance
@@ -81,10 +80,10 @@ func (h Handler) Create(c *gin.Context) {
 	}
 
 	instance := &model.Instance{
-		Name:    request.Name,
-		UserID:  user.ID,
-		GroupID: request.GroupID,
-		StackID: request.StackID,
+		Name:      request.Name,
+		UserID:    user.ID,
+		GroupName: request.GroupName,
+		StackName: request.StackName,
 	}
 
 	canWrite := handler.CanWriteInstance(userWithGroups, instance)
@@ -104,8 +103,8 @@ func (h Handler) Create(c *gin.Context) {
 }
 
 type ParameterRequest struct {
-	StackParameterID uint   `json:"stackParameterId" binding:"required"`
-	Value            string `json:"value" binding:"required"`
+	StackParameter string `json:"stackParameter" binding:"required"`
+	Value          string `json:"value" binding:"required"`
 }
 
 type DeployInstanceRequest struct {
@@ -174,7 +173,7 @@ func (h Handler) Deploy(c *gin.Context) {
 		return
 	}
 
-	group, err := h.userClient.FindGroupById(accessToken, instance.GroupID)
+	group, err := h.userClient.FindGroupByName(accessToken, instance.GroupName)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -197,9 +196,9 @@ func convertRequiredParameters(instanceID uint, requestParameters []ParameterReq
 		var parameters = make([]model.InstanceRequiredParameter, len(requestParameters))
 		for i, parameter := range requestParameters {
 			parameters[i] = model.InstanceRequiredParameter{
-				InstanceID:               instanceID,
-				StackRequiredParameterID: parameter.StackParameterID,
-				Value:                    parameter.Value,
+				InstanceID:             instanceID,
+				StackRequiredParameter: model.StackRequiredParameter{Name: parameter.StackParameter},
+				Value:                  parameter.Value,
 			}
 		}
 		return parameters
@@ -212,9 +211,9 @@ func convertOptionalParameters(instanceID uint, requestParameters []ParameterReq
 		var parameters = make([]model.InstanceOptionalParameter, len(requestParameters))
 		for i, parameter := range requestParameters {
 			parameters[i] = model.InstanceOptionalParameter{
-				InstanceID:               instanceID,
-				StackOptionalParameterID: parameter.StackParameterID,
-				Value:                    parameter.Value,
+				InstanceID:             instanceID,
+				StackOptionalParameter: model.StackOptionalParameter{Name: parameter.StackParameter},
+				Value:                  parameter.Value,
 			}
 		}
 		return parameters
@@ -471,7 +470,7 @@ func (h Handler) Logs(c *gin.Context) {
 		return
 	}
 
-	group, err := h.userClient.FindGroupById(token, instance.GroupID)
+	group, err := h.userClient.FindGroupByName(token, instance.GroupName)
 	if err != nil {
 		_ = c.Error(err)
 	}
@@ -506,9 +505,9 @@ func (h Handler) Logs(c *gin.Context) {
 }
 
 // NameToId instance
-// swagger:route GET /instances-name-to-id{groupId}/{name} instanceNameToId
+// swagger:route GET /instances-name-to-id/{groupName}/{instanceName} instanceNameToId
 //
-// Find instance id by name and group id
+// Find instance id by name and group name
 //
 // Security:
 //  oauth2:
@@ -520,11 +519,10 @@ func (h Handler) Logs(c *gin.Context) {
 //   404: Error
 //   415: Error
 func (h Handler) NameToId(c *gin.Context) {
-	name := c.Param("name")
-	groupIdParam := c.Param("groupId")
-	groupId, err := strconv.Atoi(groupIdParam)
-	if err != nil {
-		badRequest := apperror.NewBadRequest("error parsing id")
+	instanceName := c.Param("instanceName")
+	groupName := c.Param("groupName")
+	if groupName == "" {
+		badRequest := apperror.NewBadRequest("missing group name")
 		_ = c.Error(badRequest)
 		return
 	}
@@ -548,9 +546,9 @@ func (h Handler) NameToId(c *gin.Context) {
 		return
 	}
 
-	instance, err := h.instanceService.FindByNameAndGroup(name, uint(groupId))
+	instance, err := h.instanceService.FindByNameAndGroup(instanceName, groupName)
 	if err != nil {
-		notFound := apperror.NewNotFound("instance", name)
+		notFound := apperror.NewNotFound("instance", instanceName)
 		_ = c.Error(notFound)
 		return
 	}
@@ -566,7 +564,6 @@ func (h Handler) NameToId(c *gin.Context) {
 }
 
 type GroupWithInstances struct {
-	ID        uint
 	Name      string
 	Hostname  string
 	Instances []*model.Instance
@@ -617,11 +614,10 @@ func (h Handler) List(c *gin.Context) {
 func (h Handler) groupsWithInstances(groups []*models.Group, instances []*model.Instance) []GroupWithInstances {
 	groupsWithInstances := make([]GroupWithInstances, len(groups))
 	for i, group := range groups {
-		groupsWithInstances[i].ID = uint(group.ID)
 		groupsWithInstances[i].Name = group.Name
 		groupsWithInstances[i].Hostname = group.Hostname
 		groupsWithInstances[i].Instances = h.filterByGroupId(instances, func(instance *model.Instance) bool {
-			return instance.GroupID == uint(group.ID)
+			return instance.GroupName == group.Name
 		})
 	}
 	return groupsWithInstances
@@ -636,6 +632,7 @@ func (h Handler) filterByGroupId(instances []*model.Instance, test func(instance
 	return
 }
 
+/*
 type RunJobResponse struct {
 	RunId string `json:"runId"`
 }
@@ -649,7 +646,7 @@ type RunJobResponse struct {
 //  oauth2:
 //
 // responses:
-//   200: RunJobResponse
+//   200:
 //   401: Error
 //   403: Error
 //   404: Error
@@ -691,3 +688,4 @@ func (h Handler) Save(c *gin.Context) {
 
 	c.JSON(http.StatusOK, RunJobResponse{runId})
 }
+*/

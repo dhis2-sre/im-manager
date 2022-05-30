@@ -10,20 +10,20 @@ import (
 
 func TestCanWriteInstance_isOwnerAndMember(t *testing.T) {
 	var userId uint64 = 123
-	var groupId uint64 = 321
+	var group = "321"
 
 	user := &models.User{
 		ID: userId,
 		Groups: []*models.Group{
 			{
-				ID: groupId,
+				Name: group,
 			},
 		},
 	}
 
 	instance := &model.Instance{
-		UserID:  uint(userId),
-		GroupID: uint(groupId),
+		UserID:    uint(userId),
+		GroupName: group,
 	}
 
 	isAdmin := CanWriteInstance(user, instance)
@@ -32,17 +32,17 @@ func TestCanWriteInstance_isOwnerAndMember(t *testing.T) {
 }
 
 func TestCanWriteInstance_isGroupAdministrator(t *testing.T) {
-	var groupId uint64 = 123
+	var group = "123"
 
 	user := &models.User{
 		AdminGroups: []*models.Group{
 			{
-				ID: groupId,
+				Name: group,
 			},
 		},
 	}
 
-	instance := &model.Instance{GroupID: uint(groupId)}
+	instance := &model.Instance{GroupName: group}
 
 	isAdmin := CanWriteInstance(user, instance)
 
@@ -69,17 +69,17 @@ func TestCanWriteInstance_isAdministrator(t *testing.T) {
 }
 
 func TestCanReadInstance_isMemberOf(t *testing.T) {
-	var groupId uint64 = 123
+	var group = "123"
 
 	user := &models.User{
 		Groups: []*models.Group{
 			{
-				ID: groupId,
+				Name: group,
 			},
 		},
 	}
 
-	instance := &model.Instance{GroupID: uint(groupId)}
+	instance := &model.Instance{GroupName: group}
 
 	isAdmin := CanReadInstance(user, instance)
 
@@ -109,7 +109,7 @@ func TestCanReadInstance_AccessDenied(t *testing.T) {
 	user := &models.User{
 		Groups: []*models.Group{
 			{
-				ID: 123,
+				Name: "123",
 			},
 		},
 	}

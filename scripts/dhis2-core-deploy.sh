@@ -2,45 +2,38 @@
 
 set -euo pipefail
 
-IMAGE_TAG_PARAMETER_ID=15
-IMAGE_TAG="2.36.0-tomcat-8.5.34-jre8-alpine"
-
+IMAGE_TAG=2.36.0-tomcat-8.5.34-jre8-alpine
 READINESS_PROBE_INITIAL_DELAY_SECONDS=100
-READINESS_PROBE_INITIAL_DELAY_SECONDS_PARAMETER_ID=18
-
 LIVENESS_PROBE_INITIAL_DELAY_SECONDS=100
-LIVENESS_PROBE_INITIAL_DELAY_SECONDS_PARAMETER_ID=17
-
-DATABASE_HOSTNAME_PARAMETER_ID=2
-DATABASE_HOSTNAME="sl-db-23-database-postgresql.whoami.svc"
+DATABASE_HOSTNAME=sl-db-23-database-postgresql.whoami.svc
 
 INSTANCE_NAME=$1
 GROUP_NAME=$2
+STACK_NAME=dhis2-core
 
-GROUP_ID=$($HTTP --check-status "$INSTANCE_HOST/groups-name-to-id/$GROUP_NAME" "Authorization: Bearer $ACCESS_TOKEN")
-INSTANCE_ID=$($HTTP --check-status "$INSTANCE_HOST/instances-name-to-id/$GROUP_ID/$INSTANCE_NAME" "Authorization: Bearer $ACCESS_TOKEN")
+INSTANCE_ID=$($HTTP --check-status "$INSTANCE_HOST/instances-name-to-id/$GROUP_NAME/$INSTANCE_NAME" "Authorization: Bearer $ACCESS_TOKEN")
 
 echo "{
   \"name\": \"$INSTANCE_NAME\",
-  \"groupId\": $GROUP_ID,
-  \"stackId\": 1,
+  \"groupName\": \"$GROUP_NAME\",
+  \"stackName\": \"$STACK_NAME\",
   \"optionalParameters\": [
     {
-      \"stackParameterId\": $READINESS_PROBE_INITIAL_DELAY_SECONDS_PARAMETER_ID,
+      \"stackParameter\": \"READINESS_PROBE_INITIAL_DELAY_SECONDS\",
       \"value\": \"$READINESS_PROBE_INITIAL_DELAY_SECONDS\"
     },
     {
-      \"stackParameterId\": $LIVENESS_PROBE_INITIAL_DELAY_SECONDS_PARAMETER_ID,
+      \"stackParameter\": \"LIVENESS_PROBE_INITIAL_DELAY_SECONDS\",
       \"value\": \"$LIVENESS_PROBE_INITIAL_DELAY_SECONDS\"
     },
     {
-      \"stackParameterId\": $IMAGE_TAG_PARAMETER_ID,
+      \"stackParameter\": \"IMAGE_TAG\",
       \"value\": \"$IMAGE_TAG\"
     }
   ],
   \"requiredParameters\": [
     {
-      \"stackParameterId\": $DATABASE_HOSTNAME_PARAMETER_ID,
+      \"stackParameter\": \"DATABASE_HOSTNAME\",
       \"value\": \"$DATABASE_HOSTNAME\"
     }
   ]

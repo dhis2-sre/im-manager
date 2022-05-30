@@ -1,8 +1,6 @@
 package instance
 
 import (
-	"strconv"
-
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	"gorm.io/gorm"
 )
@@ -11,11 +9,11 @@ type Repository interface {
 	Create(instance *model.Instance) error
 	Save(instance *model.Instance) error
 	FindWithParametersById(id uint) (*model.Instance, error)
-	FindByNameAndGroup(instanceName string, groupId uint) (*model.Instance, error)
+	FindByNameAndGroup(instance string, group string) (*model.Instance, error)
 	SaveDeployLog(instance *model.Instance, log string) error
 	FindById(id uint) (*model.Instance, error)
 	Delete(id uint) error
-	FindByGroupIds(ids []uint) ([]*model.Instance, error)
+	FindByGroupNames(names []string) ([]*model.Instance, error)
 }
 
 func ProvideRepository(DB *gorm.DB) Repository {
@@ -48,15 +46,18 @@ func (r repository) FindWithParametersById(id uint) (*model.Instance, error) {
 	return instance, err
 }
 
-func (r repository) FindByNameAndGroup(instanceName string, groupId uint) (*model.Instance, error) {
-	var instance *model.Instance
+func (r repository) FindByNameAndGroup(instance string, group string) (*model.Instance, error) {
+	var i *model.Instance
 
-	err := r.db.Where("name = ?", instanceName).Where("group_id = ?", groupId).First(&instance).Error
+	err := r.db.
+		Where("name = ?", instance).
+		Where("group_name = ?", group).
+		First(&i).Error
 	if err != nil {
 		return nil, err
 	}
 
-	return instance, err
+	return i, err
 }
 
 func (r repository) SaveDeployLog(instance *model.Instance, log string) error {
@@ -73,18 +74,13 @@ func (r repository) Delete(id uint) error {
 	return r.db.Unscoped().Delete(&model.Instance{}, id).Error
 }
 
-func (r repository) FindByGroupIds(ids []uint) ([]*model.Instance, error) {
+func (r repository) FindByGroupNames(names []string) ([]*model.Instance, error) {
 	var instances []*model.Instance
-
-	stringIds := make([]string, len(ids))
-	for i, id := range ids {
-		stringIds[i] = strconv.Itoa(int(id))
-	}
 
 	err := r.db.
 		Preload("RequiredParameters.StackRequiredParameter").
 		Preload("OptionalParameters.StackOptionalParameter").
-		Where("group_id IN ?", stringIds).
+		Where("group_name IN ?", names).
 		Find(&instances).Error
 
 	return instances, err
