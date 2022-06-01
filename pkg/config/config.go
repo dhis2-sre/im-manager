@@ -104,7 +104,7 @@ type Jwks struct {
 func requireEnv(key string) string {
 	value, exists := os.LookupEnv(key)
 	if !exists {
-		log.Fatalf("Can't find environment varialbe: %s\n", key)
+		log.Fatalf("Can't find environment variable: %s\n", key)
 	}
 	return value
 }
