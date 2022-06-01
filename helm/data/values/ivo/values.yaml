@@ -7,6 +7,8 @@ serviceAccount:
     eks.amazonaws.com/role-arn: arn:aws:iam::767224633206:role/instance-cluster-test-instance-manager-api-feature
 
 environment:
+  ENVIRONMENT: ivo
+
   USER_SERVICE_HOST: im-user-ivo.instance-manager-ivo.svc:8080
   USER_SERVICE_BASE_PATH: /
 
