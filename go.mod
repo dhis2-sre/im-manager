@@ -5,7 +5,7 @@ go 1.18
 require (
 	github.com/dhis2-sre/im-job v0.1.1-0.20220116121707-efdfb9c56501
 	github.com/dhis2-sre/im-user v0.6.1-0.20220521165423-8a97557f192c
-	github.com/dhis2-sre/rabbitmq v0.2.2
+	github.com/dhis2-sre/rabbitmq v0.3.0
 	github.com/gin-contrib/cors v1.3.1
 	github.com/gin-gonic/gin v1.8.1
 	github.com/go-openapi/runtime v0.24.1
@@ -25,7 +25,7 @@ require (
 require (
 	cloud.google.com/go/compute v1.6.1 // indirect
 	filippo.io/age v1.0.0 // indirect
-	github.com/Azure/azure-sdk-for-go v64.0.0+incompatible // indirect
+	github.com/Azure/azure-sdk-for-go v63.3.0+incompatible // indirect
 	github.com/Azure/go-autorest v14.2.0+incompatible // indirect
 	github.com/Azure/go-autorest/autorest v0.11.27 // indirect
 	github.com/Azure/go-autorest/autorest/adal v0.9.19 // indirect
@@ -71,6 +71,7 @@ require (
 	github.com/golang/snappy v0.0.4 // indirect
 	github.com/google/gnostic v0.6.8 // indirect
 	github.com/google/gofuzz v1.2.0 // indirect
+	github.com/google/uuid v1.3.0 // indirect
 	github.com/googleapis/gax-go/v2 v2.3.0 // indirect
 	github.com/goware/prefixer v0.0.0-20160118172347-395022866408 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
@@ -128,6 +129,7 @@ require (
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/oklog/run v1.1.0 // indirect
 	github.com/oklog/ulid v1.3.1 // indirect
+	github.com/onsi/gomega v1.10.3 // indirect
 	github.com/opentracing/opentracing-go v1.2.0 // indirect
 	github.com/pelletier/go-toml/v2 v2.0.1 // indirect
 	github.com/pierrec/lz4 v2.6.1+incompatible // indirect
@@ -136,6 +138,8 @@ require (
 	github.com/ryanuber/go-glob v1.0.0 // indirect
 	github.com/sirupsen/logrus v1.8.1 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
+	github.com/stretchr/objx v0.3.0 // indirect
+	github.com/testcontainers/testcontainers-go v0.13.0 // indirect
 	github.com/ugorji/go/codec v1.2.7 // indirect
 	go.mongodb.org/mongo-driver v1.9.1 // indirect
 	go.mozilla.org/gopgagent v0.0.0-20170926210634-4d7ea76ff71a // indirect
