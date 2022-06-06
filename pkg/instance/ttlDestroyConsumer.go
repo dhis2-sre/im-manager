@@ -4,38 +4,38 @@ import (
 	"encoding/json"
 	"log"
 
-	"github.com/dhis2-sre/rabbitmq"
+	"github.com/dhis2-sre/rabbitmq/pgk/queue"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
+func ProvideTtlDestroyConsumer(url string, instanceService Service) *ttlDestroyConsumer {
+	abstractConsumer := &queue.AbstractConsumer{}
+	consumer := &ttlDestroyConsumer{abstractConsumer, instanceService}
+	abstractConsumer.Consumer = consumer
+	abstractConsumer.Url = url
+	return consumer
+}
+
 type ttlDestroyConsumer struct {
-	consumer        *rabbitmq.Consumer
+	*queue.AbstractConsumer
 	instanceService Service
 }
 
-func ProvideTtlDestroyConsumer(consumer *rabbitmq.Consumer, instanceService Service) *ttlDestroyConsumer {
-	return &ttlDestroyConsumer{consumer, instanceService}
+func (c *ttlDestroyConsumer) Channel() string {
+	return "ttl-destroy"
 }
 
-func (c *ttlDestroyConsumer) Consume() error {
-	_, err := c.consumer.Consume("ttl-destroy", func(d amqp.Delivery) {
-		payload := struct{ ID uint }{}
+func (c *ttlDestroyConsumer) Consume(d amqp.Delivery) {
+	payload := struct{ ID uint }{}
 
-		if err := json.Unmarshal(d.Body, &payload); err != nil {
-			log.Println(err)
-			return
-		}
+	if err := json.Unmarshal(d.Body, &payload); err != nil {
+		log.Println(err)
+		return
+	}
 
-		err := c.instanceService.Delete(payload.ID)
-		if err != nil {
-			log.Println(err)
-			return
-		}
-
-		err = d.Ack(false)
-		if err != nil {
-			log.Println(err)
-		}
-	})
-	return err
+	err := c.instanceService.Delete(payload.ID)
+	if err != nil {
+		log.Println(err)
+		return
+	}
 }

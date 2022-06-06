@@ -32,35 +32,25 @@ import (
 	"github.com/dhis2-sre/im-manager/internal/server"
 	"github.com/dhis2-sre/im-manager/pkg/instance"
 	"github.com/dhis2-sre/im-manager/pkg/stack"
-	"github.com/dhis2-sre/rabbitmq"
 )
 
 func main() {
-	if err := run(); err != nil {
-		log.Fatal(err)
-	}
-}
-
-func run() error {
 	environment := di.GetEnvironment()
 
 	stack.LoadStacks(environment.StackService)
 
-	consumer, err := rabbitmq.NewConsumer(
-		environment.Config.RabbitMqURL.GetUrl(),
-		rabbitmq.WithConsumerPrefix("im-manager"),
-	)
-	if err != nil {
-		return err
-	}
-	defer consumer.Close()
-
-	ttlDestroyConsumer := instance.ProvideTtlDestroyConsumer(consumer, environment.InstanceService)
-	err = ttlDestroyConsumer.Consume()
-	if err != nil {
-		return err
-	}
+	launchConsumers(environment)
 
 	r := server.GetEngine(environment)
-	return r.Run()
+	if err := r.Run(); err != nil {
+		log.Fatal(err)
+	}
+}
+
+func launchConsumers(environment di.Environment) {
+	rabbitMqURL := environment.Config.RabbitMqURL.GetUrl()
+	instanceService := environment.InstanceService
+
+	ttlDestroyConsumer := instance.ProvideTtlDestroyConsumer(rabbitMqURL, instanceService)
+	go ttlDestroyConsumer.Launch()
 }
