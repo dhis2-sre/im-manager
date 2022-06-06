@@ -161,8 +161,8 @@ github.com/dhis2-sre/im-job v0.1.1-0.20220116121707-efdfb9c56501 h1:8mscN7/zx7A3
 github.com/dhis2-sre/im-job v0.1.1-0.20220116121707-efdfb9c56501/go.mod h1:WhOHtgn+OWwqXr0dgKDNEb/pk9vwZ8ZG7gJrLuKPgZ4=
 github.com/dhis2-sre/im-user v0.6.1-0.20220521165423-8a97557f192c h1:iPgSDHgZy5xYIhCHbEmVyy9i8dDjcIzoZQX5GTfNH1g=
 github.com/dhis2-sre/im-user v0.6.1-0.20220521165423-8a97557f192c/go.mod h1:3HypJbalMFmZPh/kSOv2UtltcAe3ZWAf3LXY/abqZEU=
-github.com/dhis2-sre/instance-queue v0.2.1 h1:lajXbAzm5uzUBH4k7yqL2z/B9ewFHpeG/b9w0A/YEKE=
-github.com/dhis2-sre/instance-queue v0.2.1/go.mod h1:anYOSIzHOuttEsaMrEk9Mp7qS5sCMuJIo3Ec0SV071A=
+github.com/dhis2-sre/rabbitmq v0.2.2 h1:g9fUqjdBrpxhrC97wEpFN/+iSkvoMGtCssu37VdAkuM=
+github.com/dhis2-sre/rabbitmq v0.2.2/go.mod h1:/0KaS7VjCTf8xCh6SbXjxoy+DRe/F8j3BeCEQNS/nKQ=
 github.com/dimchansky/utfbom v1.1.1 h1:vV6w1AhK4VMnhBno/TPVCoK9U/LP0PkLCS9tbxHdi/U=
 github.com/dimchansky/utfbom v1.1.1/go.mod h1:SxdoEBH5qIqFocHMyGOXVAybYJdr71b1Q/j0mACtrfE=
 github.com/docker/go-connections v0.4.0 h1:El9xVISelRB7BuFusrZozjnkIM5YnzCViNKohAFqRJQ=

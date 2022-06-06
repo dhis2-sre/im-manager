@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"log"
 
-	"github.com/dhis2-sre/instance-queue/pgk/queue"
+	"github.com/dhis2-sre/rabbitmq/pgk/queue"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
