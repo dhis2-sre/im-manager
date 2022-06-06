@@ -67,7 +67,7 @@ func run() error {
 func rabbitMQConnect(rabbitMqURL string) (*rabbitmq.Consumer, error) {
 	var err error
 	var consumer *rabbitmq.Consumer
-	for i, max := 0, 3; i < max; i++ {
+	for i, max := 0, 15; i < max; i++ {
 		consumer, err = rabbitmq.NewConsumer(
 			rabbitMqURL,
 			rabbitmq.WithConsumerPrefix("im-manager"),
@@ -76,7 +76,7 @@ func rabbitMQConnect(rabbitMqURL string) (*rabbitmq.Consumer, error) {
 			break
 		}
 		log.Printf("Failed to connect to RabbitMQ (attempt %d/%d): %s\n", i+1, max, err)
-		time.Sleep(time.Millisecond * 500)
+		time.Sleep(time.Second)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to RabbitMQ: %s", err)
