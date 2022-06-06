@@ -26,9 +26,7 @@
 package main
 
 import (
-	"fmt"
 	"log"
-	"time"
 
 	"github.com/dhis2-sre/im-manager/internal/di"
 	"github.com/dhis2-sre/im-manager/internal/server"
@@ -48,7 +46,10 @@ func run() error {
 
 	stack.LoadStacks(environment.StackService)
 
-	consumer, err := rabbitMQConnect(environment.Config.RabbitMqURL.GetUrl())
+	consumer, err := rabbitmq.NewConsumer(
+		environment.Config.RabbitMqURL.GetUrl(),
+		rabbitmq.WithConsumerPrefix("im-manager"),
+	)
 	if err != nil {
 		return err
 	}
@@ -62,25 +63,4 @@ func run() error {
 
 	r := server.GetEngine(environment)
 	return r.Run()
-}
-
-func rabbitMQConnect(rabbitMqURL string) (*rabbitmq.Consumer, error) {
-	var err error
-	var consumer *rabbitmq.Consumer
-	for i, max := 0, 3; i < max; i++ {
-		consumer, err = rabbitmq.NewConsumer(
-			rabbitMqURL,
-			rabbitmq.WithConsumerPrefix("im-manager"),
-		)
-		if err == nil {
-			break
-		}
-		log.Printf("Failed to connect to RabbitMQ (attempt %d/%d): %s\n", i+1, max, err)
-		time.Sleep(time.Millisecond * 500)
-	}
-	if err != nil {
-		return nil, fmt.Errorf("failed to connect to RabbitMQ: %s", err)
-	}
-
-	return consumer, nil
 }
