@@ -7,7 +7,7 @@ require (
 	github.com/dhis2-sre/im-user v0.6.1-0.20220521165423-8a97557f192c
 	github.com/dhis2-sre/rabbitmq v0.2.2
 	github.com/gin-contrib/cors v1.3.1
-	github.com/gin-gonic/gin v1.8.0
+	github.com/gin-gonic/gin v1.8.1
 	github.com/go-openapi/runtime v0.24.1
 	github.com/gofrs/uuid v4.2.0+incompatible
 	github.com/google/wire v0.5.0
