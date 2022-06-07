@@ -10,7 +10,7 @@ check:
 
 smoke-test:
 	docker compose up -d database rabbitmq jwks
-	sleep 3
+	sleep 10
 	IMAGE_TAG=$(tag) docker compose up -d prod
 
 docker-image:
