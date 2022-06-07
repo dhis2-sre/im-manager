@@ -4,7 +4,7 @@ image:
 
 serviceAccount:
   annotations:
-    eks.amazonaws.com/role-arn: arn:aws:iam::767224633206:role/instance-cluster-test-instance-manager-api-feature
+    eks.amazonaws.com/role-arn: arn:aws:iam::767224633206:role/instance-cluster-test-im-manager-dev
 
 environment:
   ENVIRONMENT: dev
