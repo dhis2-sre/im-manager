@@ -31,13 +31,12 @@ func (c *ttlDestroyConsumer) Consume() error {
 			log.Printf("Error deleting instance %d: %v\n", payload.ID, err)
 			return
 		}
+		log.Printf("Deleted instance %d since TTL expired\n", payload.ID)
 
 		err = d.Ack(false)
 		if err != nil {
 			log.Printf("Error acknowledging ttl-destroy message for instance %d: %v\n", payload.ID, err)
 		}
-
-		log.Printf("Deleted instance %d since TTL expired\n", payload.ID)
 	})
 	return err
 }
