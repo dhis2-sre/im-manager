@@ -1,17 +1,17 @@
 package server
 
 import (
-	"github.com/dhis2-sre/im-manager/internal/di"
+	"github.com/dhis2-sre/im-manager/internal/handler"
 	"github.com/dhis2-sre/im-manager/internal/middleware"
 	"github.com/dhis2-sre/im-manager/pkg/health"
+	"github.com/dhis2-sre/im-manager/pkg/instance"
+	"github.com/dhis2-sre/im-manager/pkg/stack"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	redocMiddleware "github.com/go-openapi/runtime/middleware"
 )
 
-func GetEngine(environment di.Environment) *gin.Engine {
-	basePath := environment.Config.BasePath
-
+func GetEngine(basePath string, stackHandler stack.Handler, instanceHandler instance.Handler, authMiddleware handler.AuthenticationMiddleware) *gin.Engine {
 	r := gin.Default()
 	r.Use(cors.Default())
 	r.Use(middleware.ErrorHandler())
@@ -23,22 +23,22 @@ func GetEngine(environment di.Environment) *gin.Engine {
 	router.GET("/health", health.Health)
 
 	tokenAuthenticationRouter := router.Group("")
-	tokenAuthenticationRouter.Use(environment.AuthenticationMiddleware.TokenAuthentication)
+	tokenAuthenticationRouter.Use(authMiddleware.TokenAuthentication)
 
-	tokenAuthenticationRouter.GET("/stacks", environment.StackHandler.FindAll)
-	tokenAuthenticationRouter.GET("/stacks/:name", environment.StackHandler.Find)
+	tokenAuthenticationRouter.GET("/stacks", stackHandler.FindAll)
+	tokenAuthenticationRouter.GET("/stacks/:name", stackHandler.Find)
 
-	tokenAuthenticationRouter.POST("/instances", environment.InstanceHandler.Create)
-	tokenAuthenticationRouter.POST("/instances/:id/deploy", environment.InstanceHandler.Deploy)
-	tokenAuthenticationRouter.GET("/instances/:id/parameters", environment.InstanceHandler.FindByIdWithDecryptedParameters)
-	tokenAuthenticationRouter.GET("/instances", environment.InstanceHandler.List)
-	tokenAuthenticationRouter.DELETE("/instances/:id", environment.InstanceHandler.Delete)
-	tokenAuthenticationRouter.GET("/instances/:id", environment.InstanceHandler.FindById)
-	tokenAuthenticationRouter.GET("/instances/:id/logs", environment.InstanceHandler.Logs)
-	tokenAuthenticationRouter.GET("/instances-name-to-id/:groupName/:instanceName", environment.InstanceHandler.NameToId)
+	tokenAuthenticationRouter.POST("/instances", instanceHandler.Create)
+	tokenAuthenticationRouter.POST("/instances/:id/deploy", instanceHandler.Deploy)
+	tokenAuthenticationRouter.GET("/instances/:id/parameters", instanceHandler.FindByIdWithDecryptedParameters)
+	tokenAuthenticationRouter.GET("/instances", instanceHandler.List)
+	tokenAuthenticationRouter.DELETE("/instances/:id", instanceHandler.Delete)
+	tokenAuthenticationRouter.GET("/instances/:id", instanceHandler.FindById)
+	tokenAuthenticationRouter.GET("/instances/:id/logs", instanceHandler.Logs)
+	tokenAuthenticationRouter.GET("/instances-name-to-id/:groupName/:instanceName", instanceHandler.NameToId)
 
-	//tokenAuthenticationRouter.POST("/instances/:id/save", environment.InstanceHandler.Save)
-	//tokenAuthenticationRouter.POST("/instances/:id/saveas", health.Health)
+	// tokenAuthenticationRouter.POST("/instances/:id/save", instanceHandler.Save)
+	// tokenAuthenticationRouter.POST("/instances/:id/saveas", health.Health)
 
 	return r
 }
