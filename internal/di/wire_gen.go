@@ -15,6 +15,7 @@ import (
 	"github.com/dhis2-sre/im-manager/pkg/instance"
 	"github.com/dhis2-sre/im-manager/pkg/stack"
 	"github.com/dhis2-sre/im-manager/pkg/storage"
+	client2 "github.com/dhis2-sre/im-user/pkg/client"
 	"gorm.io/gorm"
 )
 
@@ -34,7 +35,7 @@ func GetEnvironment() Environment {
 	client2 := client.ProvideJobService(configConfig)
 	instanceHandler := instance.ProvideHandler(clientClient, client2, instanceService)
 	authenticationMiddleware := handler.ProvideAuthentication(configConfig)
-	environment := ProvideEnvironment(configConfig, service, stackHandler, instanceService, instanceHandler, authenticationMiddleware)
+	environment := ProvideEnvironment(configConfig, service, stackHandler, instanceService, instanceHandler, authenticationMiddleware, clientClient)
 	return environment
 }
 
@@ -47,6 +48,7 @@ type Environment struct {
 	InstanceService          instance.Service
 	InstanceHandler          instance.Handler
 	AuthenticationMiddleware handler.AuthenticationMiddleware
+	UserClient               client2.Client
 }
 
 func ProvideEnvironment(config2 config.Config,
@@ -56,12 +58,14 @@ func ProvideEnvironment(config2 config.Config,
 	instanceService instance.Service,
 	instanceHandler instance.Handler,
 	authenticationMiddleware handler.AuthenticationMiddleware,
+	userClient client2.Client,
 ) Environment {
 	return Environment{config2, stackService,
 		stackHandler,
 		instanceService,
 		instanceHandler,
 		authenticationMiddleware,
+		userClient,
 	}
 }
 

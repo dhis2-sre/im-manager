@@ -277,7 +277,7 @@ func (h Handler) Delete(c *gin.Context) {
 		return
 	}
 
-	err = h.instanceService.Delete(instance.ID)
+	err = h.instanceService.Delete(token, instance.ID)
 	if err != nil {
 		message := fmt.Sprintf("Unable to delete instance: %s", err)
 		internal := apperror.NewInternal(message)

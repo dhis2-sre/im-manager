@@ -6,6 +6,8 @@ package di
 import (
 	"log"
 
+	userClient "github.com/dhis2-sre/im-user/pkg/client"
+
 	"github.com/dhis2-sre/im-manager/internal/client"
 	"github.com/dhis2-sre/im-manager/internal/handler"
 	"github.com/dhis2-sre/im-manager/pkg/config"
@@ -23,6 +25,7 @@ type Environment struct {
 	InstanceService          instance.Service
 	InstanceHandler          instance.Handler
 	AuthenticationMiddleware handler.AuthenticationMiddleware
+	UserClient               userClient.Client
 }
 
 func ProvideEnvironment(
@@ -32,6 +35,7 @@ func ProvideEnvironment(
 	instanceService instance.Service,
 	instanceHandler instance.Handler,
 	authenticationMiddleware handler.AuthenticationMiddleware,
+	userClient userClient.Client,
 ) Environment {
 	return Environment{
 		config,
@@ -40,6 +44,7 @@ func ProvideEnvironment(
 		instanceService,
 		instanceHandler,
 		authenticationMiddleware,
+		userClient,
 	}
 }
 

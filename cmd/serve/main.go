@@ -55,7 +55,7 @@ func run() error {
 	}
 	defer consumer.Close()
 
-	ttlDestroyConsumer := instance.ProvideTtlDestroyConsumer(consumer, environment.InstanceService)
+	ttlDestroyConsumer := instance.ProvideTtlDestroyConsumer(environment.Config, environment.UserClient, consumer, environment.InstanceService)
 	err = ttlDestroyConsumer.Consume()
 	if err != nil {
 		return err

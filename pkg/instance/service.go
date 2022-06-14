@@ -19,7 +19,7 @@ type Service interface {
 	Create(instance *model.Instance) (*model.Instance, error)
 	Deploy(token string, instance *model.Instance, group *models.Group) error
 	FindById(id uint) (*model.Instance, error)
-	Delete(id uint) error
+	Delete(token string, id uint) error
 	Logs(instance *model.Instance, group *models.Group, selector string) (io.ReadCloser, error)
 	FindWithParametersById(id uint) (*model.Instance, error)
 	FindWithDecryptedParametersById(id uint) (*model.Instance, error)
@@ -113,25 +113,19 @@ func (s service) FindById(id uint) (*model.Instance, error) {
 	return s.instanceRepository.FindById(id)
 }
 
-// TODO: This should be done differently. If the method is called from an event it should be the service account user. Otherwise it should be the actual user invoking the http request
-func (s service) Delete(id uint) error {
+func (s service) Delete(token string, id uint) error {
 	instanceWithParameters, err := s.FindWithDecryptedParametersById(id)
 	if err != nil {
 		return err
 	}
 
 	if instanceWithParameters.DeployLog != "" {
-		tokens, err := s.userClient.SignIn(s.config.UserService.Username, s.config.UserService.Password)
+		group, err := s.userClient.FindGroupByName(token, instanceWithParameters.GroupName)
 		if err != nil {
 			return err
 		}
 
-		group, err := s.userClient.FindGroupByName(tokens.AccessToken, instanceWithParameters.GroupName)
-		if err != nil {
-			return err
-		}
-
-		destroyCmd, err := s.helmfileService.Destroy(tokens.AccessToken, instanceWithParameters, group)
+		destroyCmd, err := s.helmfileService.Destroy(token, instanceWithParameters, group)
 		if err != nil {
 			return err
 		}
