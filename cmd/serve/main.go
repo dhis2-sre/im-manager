@@ -28,10 +28,13 @@ package main
 import (
 	"log"
 
-	"github.com/dhis2-sre/im-manager/internal/di"
+	"github.com/dhis2-sre/im-manager/internal/client"
+	"github.com/dhis2-sre/im-manager/internal/handler"
 	"github.com/dhis2-sre/im-manager/internal/server"
+	"github.com/dhis2-sre/im-manager/pkg/config"
 	"github.com/dhis2-sre/im-manager/pkg/instance"
 	"github.com/dhis2-sre/im-manager/pkg/stack"
+	"github.com/dhis2-sre/im-manager/pkg/storage"
 	"github.com/dhis2-sre/rabbitmq"
 )
 
@@ -42,12 +45,26 @@ func main() {
 }
 
 func run() error {
-	environment := di.GetEnvironment()
+	cfg := config.ProvideConfig()
 
-	stack.LoadStacks(environment.StackService)
+	db, err := storage.ProvideDatabase(cfg)
+	if err != nil {
+		return err
+	}
+
+	repository := stack.ProvideRepository(db)
+	stackSvc := stack.ProvideService(repository)
+
+	instanceRepository := instance.ProvideRepository(db)
+	usrSvc := client.ProvideUserService(cfg)
+	kubernetesSvc := instance.ProvideKubernetesService()
+	helmfileSvc := instance.ProvideHelmfileService(stackSvc, cfg)
+	instanceSvc := instance.ProvideService(cfg, instanceRepository, usrSvc, kubernetesSvc, helmfileSvc)
+
+	stack.LoadStacks(stackSvc)
 
 	consumer, err := rabbitmq.NewConsumer(
-		environment.Config.RabbitMqURL.GetUrl(),
+		cfg.RabbitMqURL.GetUrl(),
 		rabbitmq.WithConsumerPrefix("im-manager"),
 	)
 	if err != nil {
@@ -55,12 +72,17 @@ func run() error {
 	}
 	defer consumer.Close()
 
-	ttlDestroyConsumer := instance.ProvideTtlDestroyConsumer(consumer, environment.InstanceService)
+	ttlDestroyConsumer := instance.ProvideTtlDestroyConsumer(consumer, instanceSvc)
 	err = ttlDestroyConsumer.Consume()
 	if err != nil {
 		return err
 	}
 
-	r := server.GetEngine(environment)
+	stackHandler := stack.ProvideHandler(stackSvc)
+	jobSvc := client.ProvideJobService(cfg)
+	instanceHandler := instance.ProvideHandler(usrSvc, jobSvc, instanceSvc)
+	authMiddleware := handler.ProvideAuthentication(cfg)
+
+	r := server.GetEngine(cfg.BasePath, stackHandler, instanceHandler, authMiddleware)
 	return r.Run()
 }
