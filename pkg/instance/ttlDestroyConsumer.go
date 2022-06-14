@@ -27,7 +27,7 @@ func (c *ttlDestroyConsumer) Consume() error {
 		payload := struct{ ID uint }{}
 
 		if err := json.Unmarshal(d.Body, &payload); err != nil {
-			log.Println(err)
+			log.Printf("Error unmarshalling ttl-destroy message: %v\n", err)
 			return
 		}
 
@@ -39,13 +39,14 @@ func (c *ttlDestroyConsumer) Consume() error {
 
 		err = c.instanceService.Delete(tokens.AccessToken, payload.ID)
 		if err != nil {
-			log.Println(err)
+			log.Printf("Error deleting instance %d: %v\n", payload.ID, err)
 			return
 		}
+		log.Printf("Deleted instance %d since TTL expired\n", payload.ID)
 
 		err = d.Ack(false)
 		if err != nil {
-			log.Println(err)
+			log.Printf("Error acknowledging ttl-destroy message for instance %d: %v\n", payload.ID, err)
 		}
 	})
 	return err

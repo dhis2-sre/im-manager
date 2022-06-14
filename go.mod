@@ -4,19 +4,18 @@ go 1.18
 
 require (
 	github.com/dhis2-sre/im-job v0.1.1-0.20220116121707-efdfb9c56501
-	github.com/dhis2-sre/im-user v0.6.1-0.20220521165423-8a97557f192c
+	github.com/dhis2-sre/im-user v0.7.4
 	github.com/dhis2-sre/rabbitmq v0.3.0
 	github.com/gin-contrib/cors v1.3.1
 	github.com/gin-gonic/gin v1.8.1
 	github.com/go-openapi/runtime v0.24.1
 	github.com/gofrs/uuid v4.2.0+incompatible
-	github.com/google/wire v0.5.0
 	github.com/lestrrat-go/jwx v1.2.25
 	github.com/rabbitmq/amqp091-go v1.3.4
 	github.com/stretchr/testify v1.7.2
 	go.mozilla.org/sops/v3 v3.7.3
 	gorm.io/driver/postgres v1.3.7
-	gorm.io/gorm v1.23.5
+	gorm.io/gorm v1.23.6
 	k8s.io/api v0.25.0-alpha.0
 	k8s.io/apimachinery v0.25.0-alpha.0
 	k8s.io/client-go v0.25.0-alpha.0
@@ -58,7 +57,7 @@ require (
 	github.com/go-openapi/spec v0.20.6 // indirect
 	github.com/go-openapi/strfmt v0.21.2 // indirect
 	github.com/go-openapi/swag v0.21.1 // indirect
-	github.com/go-openapi/validate v0.21.0 // indirect
+	github.com/go-openapi/validate v0.22.0 // indirect
 	github.com/go-playground/locales v0.14.0 // indirect
 	github.com/go-playground/universal-translator v0.18.0 // indirect
 	github.com/go-playground/validator/v10 v10.10.1 // indirect
