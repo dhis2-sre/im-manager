@@ -5,6 +5,8 @@ metadata:
 build:
   artifacts:
     - image: dhis2/im-manager
+  tagPolicy:
+    inputDigest: { }
 deploy:
   statusCheckDeadlineSeconds: 240
   helm:
