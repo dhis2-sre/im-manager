@@ -11,27 +11,31 @@ import (
 	"github.com/dhis2-sre/im-manager/internal/apperror"
 	"github.com/dhis2-sre/im-manager/internal/handler"
 	"github.com/dhis2-sre/im-manager/pkg/model"
-	userClient "github.com/dhis2-sre/im-user/pkg/client"
 	"github.com/dhis2-sre/im-user/swagger/sdk/models"
 	"github.com/gin-gonic/gin"
 )
 
+type Handler struct {
+	userClient      userClientHandler
+	jobClient       jobClient.Client
+	instanceService Service
+}
+
 func ProvideHandler(
-	userClient userClient.Client,
+	usrClient userClientHandler,
 	jobClient jobClient.Client,
 	instanceService Service,
 ) Handler {
 	return Handler{
-		userClient,
+		usrClient,
 		jobClient,
 		instanceService,
 	}
 }
 
-type Handler struct {
-	userClient      userClient.Client
-	jobClient       jobClient.Client
-	instanceService Service
+type userClientHandler interface {
+	FindGroupByName(token string, name string) (*models.Group, error)
+	FindUserById(token string, id uint) (*models.User, error)
 }
 
 type CreateInstanceRequest struct {
@@ -193,7 +197,7 @@ func (h Handler) Deploy(c *gin.Context) {
 
 func convertRequiredParameters(instanceID uint, requestParameters []ParameterRequest) []model.InstanceRequiredParameter {
 	if len(requestParameters) > 0 {
-		var parameters = make([]model.InstanceRequiredParameter, len(requestParameters))
+		parameters := make([]model.InstanceRequiredParameter, len(requestParameters))
 		for i, parameter := range requestParameters {
 			parameters[i] = model.InstanceRequiredParameter{
 				InstanceID:             instanceID,
@@ -208,7 +212,7 @@ func convertRequiredParameters(instanceID uint, requestParameters []ParameterReq
 
 func convertOptionalParameters(instanceID uint, requestParameters []ParameterRequest) []model.InstanceOptionalParameter {
 	if len(requestParameters) > 0 {
-		var parameters = make([]model.InstanceOptionalParameter, len(requestParameters))
+		parameters := make([]model.InstanceOptionalParameter, len(requestParameters))
 		for i, parameter := range requestParameters {
 			parameters[i] = model.InstanceOptionalParameter{
 				InstanceID:             instanceID,
@@ -277,7 +281,7 @@ func (h Handler) Delete(c *gin.Context) {
 		return
 	}
 
-	err = h.instanceService.Delete(instance.ID)
+	err = h.instanceService.Delete(token, instance.ID)
 	if err != nil {
 		message := fmt.Sprintf("Unable to delete instance: %s", err)
 		internal := apperror.NewInternal(message)

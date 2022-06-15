@@ -17,6 +17,11 @@ import (
 func (s *ttlSuite) TestConsumeDeletesInstance() {
 	require := s.Require()
 
+	uc := &userClient{}
+	uc.On("SignIn", "username", "password").Return(&models.Tokens{
+		AccessToken: "token",
+	}, nil)
+
 	consumer, err := rabbitmq.NewConsumer(
 		s.rabbitURI,
 		rabbitmq.WithConsumerPrefix("im-manager"),
@@ -25,9 +30,9 @@ func (s *ttlSuite) TestConsumeDeletesInstance() {
 	defer func() { require.NoError(consumer.Close()) }()
 
 	is := &instanceService{}
-	is.On("Delete", uint(1)).Return(nil)
+	is.On("Delete", "token", uint(1)).Return(nil)
 
-	td := instance.ProvideTtlDestroyConsumer(consumer, is)
+	td := instance.ProvideTtlDestroyConsumer("username", "password", uc, consumer, is)
 	require.NoError(td.Consume())
 
 	require.NoError(s.amqpClient.ch.Publish("", "ttl-destroy", false, false, amqp.Publishing{
@@ -36,16 +41,27 @@ func (s *ttlSuite) TestConsumeDeletesInstance() {
 	}))
 
 	require.Eventually(func() bool {
-		return is.AssertExpectations(s.T())
+		return is.AssertExpectations(s.T()) && uc.AssertExpectations(s.T())
 	}, s.timeout, time.Second)
+}
+
+type userClient struct {
+	mock.Mock
+}
+
+func (u *userClient) SignIn(username, password string) (*models.Tokens, error) {
+	args := u.Called(username, password)
+	tokens := args.Get(0).(*models.Tokens)
+	err := args.Error(1)
+	return tokens, err
 }
 
 type instanceService struct {
 	mock.Mock
 }
 
-func (is *instanceService) Delete(id uint) error {
-	args := is.Called(id)
+func (is *instanceService) Delete(token string, id uint) error {
+	args := is.Called(token, id)
 	return args.Error(0)
 }
 

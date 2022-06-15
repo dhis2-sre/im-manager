@@ -35,6 +35,7 @@ import (
 	"github.com/dhis2-sre/im-manager/pkg/instance"
 	"github.com/dhis2-sre/im-manager/pkg/stack"
 	"github.com/dhis2-sre/im-manager/pkg/storage"
+	userClient "github.com/dhis2-sre/im-user/pkg/client"
 	"github.com/dhis2-sre/rabbitmq"
 )
 
@@ -56,10 +57,10 @@ func run() error {
 	stackSvc := stack.ProvideService(repository)
 
 	instanceRepository := instance.ProvideRepository(db)
-	usrSvc := client.ProvideUserService(cfg)
+	uc := userClient.New(cfg.UserService.Host, cfg.UserService.BasePath)
 	kubernetesSvc := instance.ProvideKubernetesService()
 	helmfileSvc := instance.ProvideHelmfileService(stackSvc, cfg)
-	instanceSvc := instance.ProvideService(cfg, instanceRepository, usrSvc, kubernetesSvc, helmfileSvc)
+	instanceSvc := instance.ProvideService(cfg, instanceRepository, uc, kubernetesSvc, helmfileSvc)
 
 	stack.LoadStacks(stackSvc)
 
@@ -72,7 +73,7 @@ func run() error {
 	}
 	defer consumer.Close()
 
-	ttlDestroyConsumer := instance.ProvideTtlDestroyConsumer(consumer, instanceSvc)
+	ttlDestroyConsumer := instance.ProvideTtlDestroyConsumer(cfg.UserService.Username, cfg.UserService.Password, uc, consumer, instanceSvc)
 	err = ttlDestroyConsumer.Consume()
 	if err != nil {
 		return err
@@ -80,7 +81,7 @@ func run() error {
 
 	stackHandler := stack.ProvideHandler(stackSvc)
 	jobSvc := client.ProvideJobService(cfg)
-	instanceHandler := instance.ProvideHandler(usrSvc, jobSvc, instanceSvc)
+	instanceHandler := instance.ProvideHandler(uc, jobSvc, instanceSvc)
 	authMiddleware := handler.ProvideAuthentication(cfg)
 
 	r := server.GetEngine(cfg.BasePath, stackHandler, instanceHandler, authMiddleware)

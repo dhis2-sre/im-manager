@@ -4,17 +4,32 @@ import (
 	"encoding/json"
 	"log"
 
+	"github.com/dhis2-sre/im-user/swagger/sdk/models"
+
 	"github.com/dhis2-sre/rabbitmq"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
 type ttlDestroyConsumer struct {
-	consumer        *rabbitmq.Consumer
-	instanceService Service
+	usrClientUsername string
+	usrClientPassword string
+	usrAuth           userAuth
+	consumer          *rabbitmq.Consumer
+	instanceService   Service
 }
 
-func ProvideTtlDestroyConsumer(consumer *rabbitmq.Consumer, instanceService Service) *ttlDestroyConsumer {
-	return &ttlDestroyConsumer{consumer, instanceService}
+type userAuth interface {
+	SignIn(username, password string) (*models.Tokens, error)
+}
+
+func ProvideTtlDestroyConsumer(userClientUsername, userClientPassword string, usrAuth userAuth, consumer *rabbitmq.Consumer, instanceService Service) *ttlDestroyConsumer {
+	return &ttlDestroyConsumer{
+		usrClientUsername: userClientUsername,
+		usrClientPassword: userClientPassword,
+		usrAuth:           usrAuth,
+		consumer:          consumer,
+		instanceService:   instanceService,
+	}
 }
 
 func (c *ttlDestroyConsumer) Consume() error {
@@ -26,7 +41,13 @@ func (c *ttlDestroyConsumer) Consume() error {
 			return
 		}
 
-		err := c.instanceService.Delete(payload.ID)
+		tokens, err := c.usrAuth.SignIn(c.usrClientUsername, c.usrClientPassword)
+		if err != nil {
+			log.Printf("Error signing in to im-user: %v\n", err)
+			return
+		}
+
+		err = c.instanceService.Delete(tokens.AccessToken, payload.ID)
 		if err != nil {
 			log.Printf("Error deleting instance %d: %v\n", payload.ID, err)
 			return
