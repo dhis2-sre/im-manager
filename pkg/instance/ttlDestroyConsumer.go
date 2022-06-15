@@ -4,22 +4,32 @@ import (
 	"encoding/json"
 	"log"
 
-	"github.com/dhis2-sre/im-manager/pkg/config"
-	userClient "github.com/dhis2-sre/im-user/pkg/client"
+	"github.com/dhis2-sre/im-user/swagger/sdk/models"
 
 	"github.com/dhis2-sre/rabbitmq"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
 type ttlDestroyConsumer struct {
-	config          config.Config
-	userClient      userClient.Client
-	consumer        *rabbitmq.Consumer
-	instanceService Service
+	usrClientUsername string
+	usrClientPassword string
+	usrAuth           userAuth
+	consumer          *rabbitmq.Consumer
+	instanceService   Service
 }
 
-func ProvideTtlDestroyConsumer(config config.Config, userClient userClient.Client, consumer *rabbitmq.Consumer, instanceService Service) *ttlDestroyConsumer {
-	return &ttlDestroyConsumer{config, userClient, consumer, instanceService}
+type userAuth interface {
+	SignIn(username, password string) (*models.Tokens, error)
+}
+
+func ProvideTtlDestroyConsumer(userClientUsername, userClientPassword string, usrAuth userAuth, consumer *rabbitmq.Consumer, instanceService Service) *ttlDestroyConsumer {
+	return &ttlDestroyConsumer{
+		usrClientUsername: userClientUsername,
+		usrClientPassword: userClientPassword,
+		usrAuth:           usrAuth,
+		consumer:          consumer,
+		instanceService:   instanceService,
+	}
 }
 
 func (c *ttlDestroyConsumer) Consume() error {
@@ -31,9 +41,9 @@ func (c *ttlDestroyConsumer) Consume() error {
 			return
 		}
 
-		tokens, err := c.userClient.SignIn(c.config.UserService.Username, c.config.UserService.Password)
+		tokens, err := c.usrAuth.SignIn(c.usrClientUsername, c.usrClientPassword)
 		if err != nil {
-			log.Println(err)
+			log.Printf("Error signing in to im-user: %v\n", err)
 			return
 		}
 

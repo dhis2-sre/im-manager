@@ -8,7 +8,6 @@ import (
 
 	"github.com/dhis2-sre/im-manager/pkg/config"
 	"github.com/dhis2-sre/im-manager/pkg/model"
-	userClient "github.com/dhis2-sre/im-user/pkg/client"
 	"github.com/dhis2-sre/im-user/swagger/sdk/models"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -30,7 +29,7 @@ type Service interface {
 func ProvideService(
 	config config.Config,
 	instanceRepository Repository,
-	userClient userClient.Client,
+	userClient userClientService,
 	kubernetesService KubernetesService,
 	helmfileService HelmfileService,
 ) Service {
@@ -43,10 +42,14 @@ func ProvideService(
 	}
 }
 
+type userClientService interface {
+	FindGroupByName(token string, name string) (*models.Group, error)
+}
+
 type service struct {
 	config             config.Config
 	instanceRepository Repository
-	userClient         userClient.Client
+	userClient         userClientService
 	helmfileService    HelmfileService
 	kubernetesService  KubernetesService
 }

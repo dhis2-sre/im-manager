@@ -5,8 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dhis2-sre/im-manager/pkg/config"
-
 	"github.com/dhis2-sre/im-manager/pkg/instance"
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	"github.com/dhis2-sre/im-user/swagger/sdk/models"
@@ -19,8 +17,10 @@ import (
 func (s *ttlSuite) TestConsumeDeletesInstance() {
 	require := s.Require()
 
-	c := config.Config{UserService: config.Service{Username: "username", Password: "password"}}
 	uc := &userClient{}
+	uc.On("SignIn", "username", "password").Return(&models.Tokens{
+		AccessToken: "token",
+	}, nil)
 
 	consumer, err := rabbitmq.NewConsumer(
 		s.rabbitURI,
@@ -29,10 +29,10 @@ func (s *ttlSuite) TestConsumeDeletesInstance() {
 	require.NoError(err)
 	defer func() { require.NoError(consumer.Close()) }()
 
-	is := &instanceService{userClient: uc}
+	is := &instanceService{}
 	is.On("Delete", "token", uint(1)).Return(nil)
 
-	td := instance.ProvideTtlDestroyConsumer(c, uc, consumer, is)
+	td := instance.ProvideTtlDestroyConsumer("username", "password", uc, consumer, is)
 	require.NoError(td.Consume())
 
 	require.NoError(s.amqpClient.ch.Publish("", "ttl-destroy", false, false, amqp.Publishing{
@@ -41,7 +41,7 @@ func (s *ttlSuite) TestConsumeDeletesInstance() {
 	}))
 
 	require.Eventually(func() bool {
-		return is.AssertExpectations(s.T())
+		return is.AssertExpectations(s.T()) && uc.AssertExpectations(s.T())
 	}, s.timeout, time.Second)
 }
 
@@ -49,30 +49,15 @@ type userClient struct {
 	mock.Mock
 }
 
-func (u *userClient) FindUserById(token string, id uint) (*models.User, error) {
-	return nil, nil
-}
-
-func (u *userClient) FindGroupByName(token string, name string) (*models.Group, error) {
-	return nil, nil
-}
-
 func (u *userClient) SignIn(username, password string) (*models.Tokens, error) {
-	return &models.Tokens{
-		AccessToken:  "token",
-		ExpiresIn:    0,
-		RefreshToken: "",
-		TokenType:    "",
-	}, nil
-}
-
-func (u *userClient) Me(token string) (*models.User, error) {
-	return nil, nil
+	args := u.Called(username, password)
+	tokens := args.Get(0).(*models.Tokens)
+	err := args.Error(1)
+	return tokens, err
 }
 
 type instanceService struct {
 	mock.Mock
-	userClient *userClient
 }
 
 func (is *instanceService) Delete(token string, id uint) error {
