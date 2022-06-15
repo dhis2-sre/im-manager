@@ -2,7 +2,10 @@ package instance
 
 import (
 	"encoding/json"
+	"errors"
 	"log"
+
+	"gorm.io/gorm"
 
 	"github.com/dhis2-sre/im-user/swagger/sdk/models"
 
@@ -49,6 +52,14 @@ func (c *ttlDestroyConsumer) Consume() error {
 
 		err = c.instanceService.Delete(tokens.AccessToken, payload.ID)
 		if err != nil {
+			// TODO: gorm shouldn't be used outside of the repository thus the error should be one we define... Instance.ErrInstanceNotFound
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				err := d.Ack(false)
+				if err != nil {
+					log.Printf("Error acknowledging ttl-destroy message for instance %d: %v\n", payload.ID, err)
+					return
+				}
+			}
 			log.Printf("Error deleting instance %d: %v\n", payload.ID, err)
 			return
 		}
