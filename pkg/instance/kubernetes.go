@@ -20,11 +20,11 @@ type KubernetesService interface {
 	CommandExecutor(cmd *exec.Cmd, configuration *models.ClusterConfiguration) ([]byte, []byte, error)
 }
 
-func ProvideKubernetesService() KubernetesService {
+type kubernetesService struct{}
+
+func NewKubernetesService() *kubernetesService {
 	return &kubernetesService{}
 }
-
-type kubernetesService struct{}
 
 func (k kubernetesService) CommandExecutor(cmd *exec.Cmd, configuration *models.ClusterConfiguration) ([]byte, []byte, error) {
 	if len(configuration.KubernetesConfiguration) > 0 {

@@ -32,7 +32,7 @@ func (s *ttlSuite) TestConsumeDeletesInstance() {
 	is := &instanceService{}
 	is.On("Delete", "token", uint(1)).Return(nil)
 
-	td := instance.ProvideTtlDestroyConsumer("username", "password", uc, consumer, is)
+	td := instance.NewTTLDestroyConsumer("username", "password", uc, consumer, is)
 	require.NoError(td.Consume())
 
 	require.NoError(s.amqpClient.ch.Publish("", "ttl-destroy", false, false, amqp.Publishing{

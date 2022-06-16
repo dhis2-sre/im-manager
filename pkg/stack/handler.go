@@ -8,14 +8,14 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func ProvideHandler(service Service) Handler {
+type Handler struct {
+	service Service
+}
+
+func NewHandler(service Service) Handler {
 	return Handler{
 		service,
 	}
-}
-
-type Handler struct {
-	service Service
 }
 
 // Find stack

@@ -22,16 +22,16 @@ type HelmfileService interface {
 	Destroy(token string, instance *model.Instance, group *models.Group) (*exec.Cmd, error)
 }
 
-func ProvideHelmfileService(stackService stack.Service, config config.Config) HelmfileService {
+type helmfileService struct {
+	stackService stack.Service
+	config       config.Config
+}
+
+func NewHelmfileService(stackService stack.Service, config config.Config) helmfileService {
 	return helmfileService{
 		stackService,
 		config,
 	}
-}
-
-type helmfileService struct {
-	stackService stack.Service
-	config       config.Config
 }
 
 func (h helmfileService) Sync(accessToken string, instance *model.Instance, group *models.Group) (*exec.Cmd, error) {
@@ -55,7 +55,7 @@ func (h helmfileService) executeHelmfileCommand(accessToken string, instance *mo
 	}
 
 	// TODO
-	//stacksFolder := h.config.StacksFolder
+	// stacksFolder := h.config.StacksFolder
 	stacksFolder := "./stacks"
 
 	stackPath := path.Join(stacksFolder, "/", stack.Name, "/helmfile.yaml")

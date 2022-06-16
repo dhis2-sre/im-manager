@@ -14,12 +14,12 @@ type Repository interface {
 	CreateOptionalParameter(name string, parameter *model.StackOptionalParameter, defaultValue string) error
 }
 
-func ProvideRepository(DB *gorm.DB) Repository {
-	return &repository{db: DB}
-}
-
 type repository struct {
 	db *gorm.DB
+}
+
+func NewRepository(DB *gorm.DB) *repository {
+	return &repository{db: DB}
 }
 
 func (r repository) Create(stack *model.Stack) error {

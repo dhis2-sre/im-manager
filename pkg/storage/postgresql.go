@@ -10,7 +10,7 @@ import (
 	"gorm.io/gorm/logger"
 )
 
-func ProvideDatabase(c config.Config) (*gorm.DB, error) {
+func NewDatabase(c config.Config) (*gorm.DB, error) {
 	host := c.Postgresql.Host
 	port := c.Postgresql.Port
 	username := c.Postgresql.Username
@@ -24,7 +24,6 @@ func ProvideDatabase(c config.Config) (*gorm.DB, error) {
 	}
 
 	db, err := gorm.Open(postgres.Open(dsn), &databaseConfig)
-
 	if err != nil {
 		return nil, err
 	}

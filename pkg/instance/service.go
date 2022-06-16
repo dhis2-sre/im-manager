@@ -26,13 +26,21 @@ type Service interface {
 	FindInstances(groups []*models.Group) ([]*model.Instance, error)
 }
 
-func ProvideService(
+type service struct {
+	config             config.Config
+	instanceRepository Repository
+	userClient         userClientService
+	helmfileService    HelmfileService
+	kubernetesService  KubernetesService
+}
+
+func NewService(
 	config config.Config,
 	instanceRepository Repository,
 	userClient userClientService,
 	kubernetesService KubernetesService,
 	helmfileService HelmfileService,
-) Service {
+) *service {
 	return &service{
 		config,
 		instanceRepository,
@@ -44,14 +52,6 @@ func ProvideService(
 
 type userClientService interface {
 	FindGroupByName(token string, name string) (*models.Group, error)
-}
-
-type service struct {
-	config             config.Config
-	instanceRepository Repository
-	userClient         userClientService
-	helmfileService    HelmfileService
-	kubernetesService  KubernetesService
 }
 
 func (s service) Create(instance *model.Instance) (*model.Instance, error) {

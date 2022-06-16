@@ -25,7 +25,7 @@ type userAuth interface {
 	SignIn(username, password string) (*models.Tokens, error)
 }
 
-func ProvideTtlDestroyConsumer(userClientUsername, userClientPassword string, usrAuth userAuth, consumer *rabbitmq.Consumer, instanceService Service) *ttlDestroyConsumer {
+func NewTTLDestroyConsumer(userClientUsername, userClientPassword string, usrAuth userAuth, consumer *rabbitmq.Consumer, instanceService Service) *ttlDestroyConsumer {
 	return &ttlDestroyConsumer{
 		usrClientUsername: userClientUsername,
 		usrClientPassword: userClientPassword,

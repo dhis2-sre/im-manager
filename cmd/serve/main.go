@@ -28,7 +28,7 @@ package main
 import (
 	"log"
 
-	"github.com/dhis2-sre/im-manager/internal/client"
+	jobClient "github.com/dhis2-sre/im-job/pkg/client"
 	"github.com/dhis2-sre/im-manager/internal/handler"
 	"github.com/dhis2-sre/im-manager/internal/server"
 	"github.com/dhis2-sre/im-manager/pkg/config"
@@ -46,21 +46,20 @@ func main() {
 }
 
 func run() error {
-	cfg := config.ProvideConfig()
+	cfg := config.New()
 
-	db, err := storage.ProvideDatabase(cfg)
+	db, err := storage.NewDatabase(cfg)
 	if err != nil {
 		return err
 	}
 
-	repository := stack.ProvideRepository(db)
-	stackSvc := stack.ProvideService(repository)
+	stackSvc := stack.NewService(stack.NewRepository(db))
 
-	instanceRepository := instance.ProvideRepository(db)
+	instanceRepo := instance.NewRepository(db)
 	uc := userClient.New(cfg.UserService.Host, cfg.UserService.BasePath)
-	kubernetesSvc := instance.ProvideKubernetesService()
-	helmfileSvc := instance.ProvideHelmfileService(stackSvc, cfg)
-	instanceSvc := instance.ProvideService(cfg, instanceRepository, uc, kubernetesSvc, helmfileSvc)
+	kubernetesSvc := instance.NewKubernetesService()
+	helmfileSvc := instance.NewHelmfileService(stackSvc, cfg)
+	instanceSvc := instance.NewService(cfg, instanceRepo, uc, kubernetesSvc, helmfileSvc)
 
 	stack.LoadStacks(stackSvc)
 
@@ -73,16 +72,16 @@ func run() error {
 	}
 	defer consumer.Close()
 
-	ttlDestroyConsumer := instance.ProvideTtlDestroyConsumer(cfg.UserService.Username, cfg.UserService.Password, uc, consumer, instanceSvc)
+	ttlDestroyConsumer := instance.NewTTLDestroyConsumer(cfg.UserService.Username, cfg.UserService.Password, uc, consumer, instanceSvc)
 	err = ttlDestroyConsumer.Consume()
 	if err != nil {
 		return err
 	}
 
-	stackHandler := stack.ProvideHandler(stackSvc)
-	jobSvc := client.ProvideJobService(cfg)
-	instanceHandler := instance.ProvideHandler(uc, jobSvc, instanceSvc)
-	authMiddleware := handler.ProvideAuthentication(cfg)
+	stackHandler := stack.NewHandler(stackSvc)
+	jobC := jobClient.ProvideClient(cfg.JobService.Host, cfg.JobService.BasePath)
+	instanceHandler := instance.NewHandler(uc, jobC, instanceSvc)
+	authMiddleware := handler.NewAuthentication(cfg)
 
 	r := server.GetEngine(cfg.BasePath, stackHandler, instanceHandler, authMiddleware)
 	return r.Run()

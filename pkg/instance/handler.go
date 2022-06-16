@@ -21,7 +21,7 @@ type Handler struct {
 	instanceService Service
 }
 
-func ProvideHandler(
+func NewHandler(
 	usrClient userClientHandler,
 	jobClient jobClient.Client,
 	instanceService Service,

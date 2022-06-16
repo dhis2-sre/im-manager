@@ -16,7 +16,12 @@ import (
 	"github.com/lestrrat-go/jwx/jwt"
 )
 
-func ProvideAuthentication(c config.Config) AuthenticationMiddleware {
+type AuthenticationMiddleware struct {
+	c              config.Config
+	jwkAutoRefresh *jwk.AutoRefresh
+}
+
+func NewAuthentication(c config.Config) AuthenticationMiddleware {
 	jwksHost := c.Authentication.Jwks.Host
 	minimumRefreshInterval := time.Duration(c.Authentication.Jwks.MinimumRefreshInterval) * time.Second
 	autoRefresh, err := provideJwkAutoRefresh(jwksHost, minimumRefreshInterval)
@@ -28,11 +33,6 @@ func ProvideAuthentication(c config.Config) AuthenticationMiddleware {
 		c,
 		autoRefresh,
 	}
-}
-
-type AuthenticationMiddleware struct {
-	c              config.Config
-	jwkAutoRefresh *jwk.AutoRefresh
 }
 
 func provideJwkAutoRefresh(host string, minRefreshInterval time.Duration) (*jwk.AutoRefresh, error) {

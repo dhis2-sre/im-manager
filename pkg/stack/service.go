@@ -14,12 +14,12 @@ type Service interface {
 	FindAll() (*[]model.Stack, error)
 }
 
-func ProvideService(repository Repository) Service {
-	return &service{repository}
-}
-
 type service struct {
 	repository Repository
+}
+
+func NewService(repository Repository) *service {
+	return &service{repository}
 }
 
 func (s service) Create(name string) (*model.Stack, error) {
