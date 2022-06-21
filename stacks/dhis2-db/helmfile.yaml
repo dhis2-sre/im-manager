@@ -1,3 +1,4 @@
+# stackParameters: DATABASE_MANAGER_URL
 releases:
   - name: {{ requiredEnv "INSTANCE_NAME" }}-database
     namespace: "{{ requiredEnv "INSTANCE_NAMESPACE" }}"
