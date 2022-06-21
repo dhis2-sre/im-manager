@@ -11,6 +11,8 @@ releases:
             im-data-id: "{{ requiredEnv "INSTANCE_ID" }}"
 
           extraEnvVars:
+            - name: DATABASE_MANAGER_URL
+              value: { { requiredEnv "DATABASE_MANAGER_URL" } }
             - name: DATABASE_ID
               value: "{{ requiredEnv "DATABASE_ID" }}"
             - name: IM_ACCESS_TOKEN
