@@ -37,6 +37,12 @@ releases:
           server.base.url = https://{{ requiredEnv "INSTANCE_HOSTNAME" }}/{{ requiredEnv "INSTANCE_NAME" }}
           flyway.migrate_out_of_order = {{ env "FLYWAY_MIGRATE_OUT_OF_ORDER" | default false }}
           flyway.repair_before_migration = {{ env "FLYWAY_REPAIR_BEFORE_MIGRATION" | default false }}
+      - googleAuth:
+          projectId: "{{ env "GOOGLE_AUTH_PROJECT_ID" | default "" }}"
+          privateKeyId: "{{ env "GOOGLE_AUTH_PRIVATE_KEY_ID" | default "" }}"
+          privateKey: {{ env "GOOGLE_AUTH_PRIVATE_KEY" | default "" }}
+          clientEmail: "{{ env "GOOGLE_AUTH_CLIENT_EMAIL" | default "" }}"
+          clientId: "{{ env "GOOGLE_AUTH_CLIENT_ID" | default "" }}"
 
   - name: {{ requiredEnv "INSTANCE_NAME" }}-database
     namespace: "{{ requiredEnv "INSTANCE_NAMESPACE" }}"
