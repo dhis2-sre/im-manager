@@ -1,8 +1,8 @@
 releases:
   - name: "{{ requiredEnv "INSTANCE_NAME" }}"
     namespace: "{{ requiredEnv "INSTANCE_NAMESPACE" }}"
-    chart: tons/dhis2-core
-    version: "{{ env "CHART_VERSION" | default "0.7.0" }}"
+    chart: dhis2/core
+    version: "{{ env "CHART_VERSION" | default "0.10.0" }}"
     values:
       - image:
           repository: dhis2/{{ env "IMAGE_REPOSITORY" | default "core" }}
@@ -44,5 +44,5 @@ releases:
           clientId: "{{ env "GOOGLE_AUTH_CLIENT_ID" | default "" }}"
 
 repositories:
-  - name: tons
-    url: https://helm-charts.fitfit.dk
+  - name: dhis2
+    url: https://dhis2-sre.github.io/dhis2-core-helm
