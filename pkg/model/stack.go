@@ -1,6 +1,7 @@
 package model
 
 import (
+	"fmt"
 	"time"
 
 	"gorm.io/gorm"
@@ -8,30 +9,40 @@ import (
 
 type Stack struct {
 	Name               string                   `gorm:"primaryKey" json:"name"`
-	RequiredParameters []StackRequiredParameter `gorm:"many2many:required_stack_parameters_joins; foreignKey:Name; References:Name; joinForeignKey:StackName; joinReferences:ParameterID; constraint:OnUpdate:CASCADE,OnDelete:CASCADE" json:"requiredParameters"`
-	OptionalParameters []StackOptionalParameter `gorm:"many2many:optional_stack_parameters_joins; foreignKey:Name; References:Name; joinForeignKey:StackName; joinReferences:ParameterID; constraint:OnUpdate:CASCADE,OnDelete:CASCADE" json:"optionalParameters"`
+	RequiredParameters []StackRequiredParameter `gorm:"foreignKey:StackName; references: Name; constraint:OnUpdate:CASCADE,OnDelete:CASCADE" json:"requiredParameters"`
+	OptionalParameters []StackOptionalParameter `gorm:"foreignKey:StackName; references: Name; constraint:OnUpdate:CASCADE,OnDelete:CASCADE" json:"optionalParameters"`
 	Instances          []Instance               `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;" json:"instances"`
+
+	HostnamePattern  string
+	HostnameVariable string
 
 	CreatedAt time.Time
 	UpdatedAt time.Time
 	DeletedAt gorm.DeletedAt `gorm:"index"`
 }
 
-type RequiredStackParametersJoin struct {
-	StackName   string `gorm:"primaryKey"`
-	ParameterID string `gorm:"primaryKey"`
+func (s Stack) GetHostname(name, namespace string) string {
+	return fmt.Sprintf(s.HostnamePattern, name, namespace)
 }
 
-type OptionalStackParametersJoin struct {
-	StackName    string `gorm:"primaryKey"`
-	ParameterID  string `gorm:"primaryKey"`
-	DefaultValue string
+func (s Stack) FindOptionalParameter(name string) (StackOptionalParameter, error) {
+	for _, parameter := range s.OptionalParameters {
+		if parameter.Name == name {
+			return parameter, nil
+		}
+	}
+	return StackOptionalParameter{}, fmt.Errorf("optional parameter not found: %s", name)
 }
 
 type StackRequiredParameter struct {
-	Name string `gorm:"primaryKey"`
+	Name      string `gorm:"primaryKey"`
+	StackName string `gorm:"primaryKey"`
+	Consumed  bool
 }
 
 type StackOptionalParameter struct {
-	Name string `gorm:"primaryKey"`
+	Name         string `gorm:"primaryKey"`
+	StackName    string `gorm:"primaryKey"`
+	DefaultValue string
+	Consumed     bool
 }

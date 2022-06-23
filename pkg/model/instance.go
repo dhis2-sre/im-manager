@@ -1,6 +1,10 @@
 package model
 
-import "gorm.io/gorm"
+import (
+	"fmt"
+
+	"gorm.io/gorm"
+)
 
 // swagger:model Instance
 type Instance struct {
@@ -14,18 +18,38 @@ type Instance struct {
 	DeployLog          string                      `gorm:"type:text"`
 }
 
+func (i Instance) FindRequiredParameter(name string) (InstanceRequiredParameter, error) {
+	for _, parameter := range i.RequiredParameters {
+		if parameter.StackRequiredParameterID == name {
+			return parameter, nil
+		}
+	}
+	return InstanceRequiredParameter{}, fmt.Errorf("required parameter not found: %s", name)
+}
+
+func (i Instance) FindOptionalParameter(name string) (InstanceOptionalParameter, error) {
+	for _, parameter := range i.OptionalParameters {
+		if parameter.StackOptionalParameterID == name {
+			return parameter, nil
+		}
+	}
+	return InstanceOptionalParameter{}, fmt.Errorf("optional parameter not found: %s", name)
+}
+
 type InstanceRequiredParameter struct {
 	gorm.Model
-	InstanceID               uint                   `gorm:"index:idx_instance_required_parameter,unique"`
-	StackRequiredParameterID string                 `gorm:"index:idx_instance_required_parameter,unique"`
-	StackRequiredParameter   StackRequiredParameter `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
+	InstanceID               uint   `gorm:"index:idx_instance_required_parameter,unique"`
+	StackRequiredParameterID string `gorm:"index:idx_instance_required_parameter,unique"`
+	StackName                string
+	StackRequiredParameter   StackRequiredParameter `gorm:"foreignKey:StackName,StackRequiredParameterID; references:StackName,Name; constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
 	Value                    string
 }
 
 type InstanceOptionalParameter struct {
 	gorm.Model
-	InstanceID               uint                   `gorm:"index:idx_instance_optional_parameter,unique"`
-	StackOptionalParameterID string                 `gorm:"index:idx_instance_optional_parameter,unique"`
-	StackOptionalParameter   StackOptionalParameter `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
+	InstanceID               uint   `gorm:"index:idx_instance_optional_parameter,unique"`
+	StackOptionalParameterID string `gorm:"index:idx_instance_optional_parameter,unique"`
+	StackName                string
+	StackOptionalParameter   StackOptionalParameter `gorm:"foreignKey:StackName,StackOptionalParameterID; references:StackName,Name; constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
 	Value                    string
 }

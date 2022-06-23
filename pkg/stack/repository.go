@@ -10,8 +10,9 @@ type Repository interface {
 	Delete(name string) error
 	Find(name string) (*model.Stack, error)
 	FindAll() (*[]model.Stack, error)
-	CreateRequiredParameter(name string, parameter *model.StackRequiredParameter) error
-	CreateOptionalParameter(name string, parameter *model.StackOptionalParameter, defaultValue string) error
+	CreateRequiredParameter(name string, parameter *model.StackRequiredParameter, consumed bool) error
+	CreateOptionalParameter(name string, parameter *model.StackOptionalParameter, consumed bool, defaultValue string) error
+	Save(stack *model.Stack) error
 }
 
 type repository struct {
@@ -35,6 +36,9 @@ func (r repository) Find(name string) (*model.Stack, error) {
 	err := r.db.
 		Preload("RequiredParameters").
 		Preload("OptionalParameters").
+		// https://stackoverflow.com/a/57288696/672009
+		//		Not("RequiredParameters.consumed <> ?", true).
+		//		Not("OptionalParameters.consumed <> ?", true).
 		First(&stack, "name = ?", name).Error
 	return stack, err
 }
@@ -45,24 +49,30 @@ func (r repository) FindAll() (*[]model.Stack, error) {
 	return &stacks, err
 }
 
-func (r repository) CreateOptionalParameter(name string, parameter *model.StackOptionalParameter, defaultValue string) error {
+func (r repository) CreateOptionalParameter(name string, parameter *model.StackOptionalParameter, consumed bool, defaultValue string) error {
 	err := r.db.FirstOrCreate(&parameter).Error
 	if err != nil {
 		return err
 	}
+	return err
 
-	joinModel := &model.OptionalStackParametersJoin{StackName: name, ParameterID: parameter.Name, DefaultValue: defaultValue}
+	//	joinModel := &model.OptionalStackParametersJoin{StackName: name, ParameterID: parameter.Name, Consumed: consumed, DefaultValue: defaultValue}
 
-	return r.db.Create(&joinModel).Error
+	//	return r.db.Create(&joinModel).Error
 }
 
-func (r repository) CreateRequiredParameter(name string, parameter *model.StackRequiredParameter) error {
+func (r repository) CreateRequiredParameter(name string, parameter *model.StackRequiredParameter, consumed bool) error {
 	err := r.db.FirstOrCreate(&parameter).Error
 	if err != nil {
 		return err
 	}
+	return err
 
-	joinModel := &model.RequiredStackParametersJoin{StackName: name, ParameterID: parameter.Name}
+	//	joinModel := &model.RequiredStackParametersJoin{StackName: name, ParameterID: parameter.Name, Consumed: consumed}
 
-	return r.db.Create(&joinModel).Error
+	//	return r.db.Create(&joinModel).Error
+}
+
+func (r repository) Save(stack *model.Stack) error {
+	return r.db.Save(stack).Error
 }
