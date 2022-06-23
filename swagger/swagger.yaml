@@ -64,6 +64,8 @@ definitions:
       InstanceID:
         format: uint64
         type: integer
+      StackName:
+        type: string
       StackOptionalParameter:
         $ref: '#/definitions/StackOptionalParameter'
       StackOptionalParameterID:
@@ -88,6 +90,8 @@ definitions:
       InstanceID:
         format: uint64
         type: integer
+      StackName:
+        type: string
       StackRequiredParameter:
         $ref: '#/definitions/StackRequiredParameter'
       StackRequiredParameterID:
@@ -147,6 +151,10 @@ definitions:
         type: string
       DeletedAt:
         $ref: '#/definitions/DeletedAt'
+      HostnamePattern:
+        type: string
+      HostnameVariable:
+        type: string
       UpdatedAt:
         format: date-time
         type: string
@@ -172,13 +180,23 @@ definitions:
     x-go-package: github.com/dhis2-sre/im-manager/pkg/model
   StackOptionalParameter:
     properties:
+      Consumed:
+        type: boolean
+      DefaultValue:
+        type: string
       Name:
+        type: string
+      StackName:
         type: string
     type: object
     x-go-package: github.com/dhis2-sre/im-manager/pkg/model
   StackRequiredParameter:
     properties:
+      Consumed:
+        type: boolean
       Name:
+        type: string
+      StackName:
         type: string
     type: object
     x-go-package: github.com/dhis2-sre/im-manager/pkg/model
@@ -328,6 +346,38 @@ paths:
         required: true
         type: integer
         x-go-name: ID
+      responses:
+        "201":
+          description: Instance
+          schema:
+            $ref: '#/definitions/Instance'
+        "401":
+          $ref: '#/responses/Error'
+        "403":
+          $ref: '#/responses/Error'
+        "404":
+          $ref: '#/responses/Error'
+        "415":
+          $ref: '#/responses/Error'
+      security:
+      - oauth2: []
+  /instances/{id}/link/{newInstanceId}:
+    post:
+      description: Deploy and link with an existing instance
+      operationId: linkDeployInstance
+      parameters:
+      - format: uint64
+        in: path
+        name: id
+        required: true
+        type: integer
+        x-go-name: ID
+      - format: uint64
+        in: path
+        name: newInstanceId
+        required: true
+        type: integer
+        x-go-name: NewInstanceId
       responses:
         "201":
           description: Instance

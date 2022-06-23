@@ -29,6 +29,7 @@ func GetEngine(basePath string, stackHandler stack.Handler, instanceHandler inst
 	tokenAuthenticationRouter.GET("/stacks/:name", stackHandler.Find)
 
 	tokenAuthenticationRouter.POST("/instances", instanceHandler.Create)
+	tokenAuthenticationRouter.POST("/instances/:id/link/:newInstanceId", instanceHandler.LinkDeploy)
 	tokenAuthenticationRouter.POST("/instances/:id/deploy", instanceHandler.Deploy)
 	tokenAuthenticationRouter.GET("/instances/:id/parameters", instanceHandler.FindByIdWithDecryptedParameters)
 	tokenAuthenticationRouter.GET("/instances", instanceHandler.List)

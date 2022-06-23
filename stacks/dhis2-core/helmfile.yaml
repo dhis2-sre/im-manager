@@ -1,4 +1,6 @@
 # stackParameters: GOOGLE_AUTH_PROJECT_ID,GOOGLE_AUTH_PRIVATE_KEY_ID,GOOGLE_AUTH_PRIVATE_KEY,GOOGLE_AUTH_CLIENT_EMAIL,GOOGLE_AUTH_CLIENT_ID
+# consumedParameters: DATABASE_USERNAME, DATABASE_PASSWORD, DATABASE_NAME, DATABASE_HOSTNAME
+# hostnameVariable: DATABASE_HOSTNAME
 releases:
   - name: "{{ requiredEnv "INSTANCE_NAME" }}"
     namespace: "{{ requiredEnv "INSTANCE_NAMESPACE" }}"
@@ -28,7 +30,7 @@ releases:
       - dhisConfig: |
           connection.dialect = org.hibernate.dialect.PostgreSQLDialect
           connection.driver_class = org.postgresql.Driver
-          connection.url = jdbc:postgresql://{{ requiredEnv "INSTANCE_NAME" }}-database-postgresql/{{ env "DATABASE_DATABASE" | default "dhis2" }}
+          connection.url = jdbc:postgresql://{{ requiredEnv "DATABASE_HOSTNAME" }}/{{ env "DATABASE_NAME" | default "dhis2" }}
           connection.username = {{ env "DATABASE_USERNAME" | default "dhis" }}
           connection.password = {{ env "DATABASE_PASSWORD" | default "dhis" }}
           # Database schema behavior, can be validate, update, create, create-drop

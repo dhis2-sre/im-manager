@@ -80,7 +80,7 @@ func run() error {
 
 	stackHandler := stack.NewHandler(stackSvc)
 	jobC := jobClient.ProvideClient(cfg.JobService.Host, cfg.JobService.BasePath)
-	instanceHandler := instance.NewHandler(uc, jobC, instanceSvc)
+	instanceHandler := instance.NewHandler(uc, jobC, instanceSvc, stackSvc)
 	authMiddleware := handler.NewAuthentication(cfg)
 
 	r := server.GetEngine(cfg.BasePath, stackHandler, instanceHandler, authMiddleware)

@@ -8,10 +8,11 @@ import (
 type Service interface {
 	Create(name string) (*model.Stack, error)
 	Delete(name string) error
-	CreateRequiredParameter(stack *model.Stack, parameterName string) (*model.StackRequiredParameter, error)
-	CreateOptionalParameter(stack *model.Stack, parameterName string, defaultValue string) (*model.StackOptionalParameter, error)
+	CreateRequiredParameter(stack *model.Stack, parameterName string, consumed bool) (*model.StackRequiredParameter, error)
+	CreateOptionalParameter(stack *model.Stack, parameterName string, defaultValue string, consumed bool) (*model.StackOptionalParameter, error)
 	Find(name string) (*model.Stack, error)
 	FindAll() (*[]model.Stack, error)
+	Save(stack *model.Stack) error
 }
 
 type service struct {
@@ -39,18 +40,18 @@ func (s service) Delete(name string) error {
 	return s.repository.Delete(name)
 }
 
-func (s service) CreateRequiredParameter(stack *model.Stack, parameterName string) (*model.StackRequiredParameter, error) {
-	parameter := &model.StackRequiredParameter{Name: parameterName}
+func (s service) CreateRequiredParameter(stack *model.Stack, parameterName string, consumed bool) (*model.StackRequiredParameter, error) {
+	parameter := &model.StackRequiredParameter{Name: parameterName, StackName: stack.Name, Consumed: consumed}
 
-	err := s.repository.CreateRequiredParameter(stack.Name, parameter)
+	err := s.repository.CreateRequiredParameter(stack.Name, parameter, consumed)
 
 	return parameter, err
 }
 
-func (s service) CreateOptionalParameter(stack *model.Stack, parameterName string, defaultValue string) (*model.StackOptionalParameter, error) {
-	parameter := &model.StackOptionalParameter{Name: parameterName}
+func (s service) CreateOptionalParameter(stack *model.Stack, parameterName string, defaultValue string, consumed bool) (*model.StackOptionalParameter, error) {
+	parameter := &model.StackOptionalParameter{Name: parameterName, StackName: stack.Name, Consumed: consumed, DefaultValue: defaultValue}
 
-	err := s.repository.CreateOptionalParameter(stack.Name, parameter, defaultValue)
+	err := s.repository.CreateOptionalParameter(stack.Name, parameter, consumed, defaultValue)
 
 	return parameter, err
 }
@@ -61,4 +62,8 @@ func (s service) Find(name string) (*model.Stack, error) {
 
 func (s service) FindAll() (*[]model.Stack, error) {
 	return s.repository.FindAll()
+}
+
+func (s service) Save(stack *model.Stack) error {
+	return s.repository.Save(stack)
 }

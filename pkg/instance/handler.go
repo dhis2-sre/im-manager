@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/dhis2-sre/im-manager/pkg/stack"
+
 	jobClient "github.com/dhis2-sre/im-job/pkg/client"
 	"github.com/dhis2-sre/im-manager/internal/apperror"
 	"github.com/dhis2-sre/im-manager/internal/handler"
@@ -19,17 +21,20 @@ type Handler struct {
 	userClient      userClientHandler
 	jobClient       jobClient.Client
 	instanceService Service
+	stackService    stack.Service
 }
 
 func NewHandler(
 	usrClient userClientHandler,
 	jobClient jobClient.Client,
 	instanceService Service,
+	stackService stack.Service,
 ) Handler {
 	return Handler{
 		usrClient,
 		jobClient,
 		instanceService,
+		stackService,
 	}
 }
 
@@ -183,8 +188,8 @@ func (h Handler) Deploy(c *gin.Context) {
 		return
 	}
 
-	instance.RequiredParameters = convertRequiredParameters(instance.ID, request.RequiredParameters)
-	instance.OptionalParameters = convertOptionalParameters(instance.ID, request.OptionalParameters)
+	instance.RequiredParameters = convertRequiredParameters(instance, request.RequiredParameters)
+	instance.OptionalParameters = convertOptionalParameters(instance, request.OptionalParameters)
 
 	err = h.instanceService.Deploy(accessToken, instance, group)
 	if err != nil {
@@ -195,13 +200,168 @@ func (h Handler) Deploy(c *gin.Context) {
 	c.JSON(http.StatusCreated, instance)
 }
 
-func convertRequiredParameters(instanceID uint, requestParameters []ParameterRequest) []model.InstanceRequiredParameter {
+// LinkDeploy instance
+// swagger:route POST /instances/{id}/link/{newInstanceId} linkDeployInstance
+//
+// Deploy and link with an existing instance
+//
+// Security:
+//  oauth2:
+//
+// responses:
+//   201: Instance
+//   401: Error
+//   403: Error
+//   404: Error
+//   415: Error
+func (h Handler) LinkDeploy(c *gin.Context) {
+	idParam := c.Param("id")
+	id, err := strconv.ParseUint(idParam, 10, 64)
+	if err != nil {
+		badRequest := apperror.NewBadRequest("error parsing id")
+		_ = c.Error(badRequest)
+		return
+	}
+
+	newIdParam := c.Param("newInstanceId")
+	newId, err := strconv.ParseUint(newIdParam, 10, 64)
+	if err != nil {
+		badRequest := apperror.NewBadRequest("error parsing new id")
+		_ = c.Error(badRequest)
+		return
+	}
+
+	var request DeployInstanceRequest
+	if err := handler.DataBinder(c, &request); err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	user, err := handler.GetUserFromContext(c)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	accessToken, err := handler.GetTokenFromHttpAuthHeader(c)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	userWithGroups, err := h.userClient.FindUserById(accessToken, user.ID)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	instance, err := h.instanceService.FindWithDecryptedParametersById(uint(id))
+	if err != nil {
+		notFound := apperror.NewNotFound("instance", idParam)
+		_ = c.Error(notFound)
+		return
+	}
+
+	canWrite := handler.CanWriteInstance(userWithGroups, instance)
+	if !canWrite {
+		unauthorized := apperror.NewUnauthorized("write access denied")
+		_ = c.Error(unauthorized)
+		return
+	}
+
+	newInstance, err := h.instanceService.FindById(uint(newId))
+	if err != nil {
+		notFound := apperror.NewNotFound("instance", idParam)
+		_ = c.Error(notFound)
+		return
+	}
+
+	stack, err := h.stackService.Find(instance.StackName)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	newStack, err := h.stackService.Find(newInstance.StackName)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	// Consumed required parameters
+	for _, v := range newStack.RequiredParameters {
+		if v.Consumed && v.Name != newStack.HostnameVariable {
+			parameter, err := instance.FindRequiredParameter(v.Name)
+			if err != nil {
+				_ = c.Error(err)
+				return
+			}
+			parameterRequest := ParameterRequest{
+				StackParameter: v.Name,
+				Value:          parameter.Value,
+			}
+			request.RequiredParameters = append(request.RequiredParameters, parameterRequest)
+		}
+	}
+
+	// Consumed optional parameters
+	for _, v := range newStack.OptionalParameters {
+		if v.Consumed && v.Name != newStack.HostnameVariable {
+			parameter, err := instance.FindOptionalParameter(v.Name)
+			if err != nil {
+				// TODO: Better error handling
+				stackParameter, serr := stack.FindOptionalParameter(v.Name)
+				if serr != nil {
+					notFound := apperror.NewNotFound("optional stack parameter", v.Name)
+					_ = c.Error(notFound)
+					return
+				}
+				parameter.Value = stackParameter.DefaultValue
+			}
+			parameterRequest := ParameterRequest{
+				StackParameter: v.Name,
+				Value:          parameter.Value,
+			}
+			request.OptionalParameters = append(request.OptionalParameters, parameterRequest)
+		}
+	}
+
+	// Hostname parameter
+	// TODO: Is hostname always a required parameter?
+	if newStack.HostnameVariable != "" {
+		hostnameParameter := ParameterRequest{
+			StackParameter: newStack.HostnameVariable,
+			Value:          fmt.Sprintf(stack.HostnamePattern, instance.Name, instance.GroupName),
+		}
+		request.RequiredParameters = append(request.RequiredParameters, hostnameParameter)
+	}
+
+	newInstance.RequiredParameters = convertRequiredParameters(newInstance, request.RequiredParameters)
+	newInstance.OptionalParameters = convertOptionalParameters(newInstance, request.OptionalParameters)
+
+	group, err := h.userClient.FindGroupByName(accessToken, instance.GroupName)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	err = h.instanceService.Deploy(accessToken, newInstance, group)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	c.JSON(http.StatusCreated, newInstance)
+}
+
+func convertRequiredParameters(instance *model.Instance, requestParameters []ParameterRequest) []model.InstanceRequiredParameter {
 	if len(requestParameters) > 0 {
 		parameters := make([]model.InstanceRequiredParameter, len(requestParameters))
 		for i, parameter := range requestParameters {
 			parameters[i] = model.InstanceRequiredParameter{
-				InstanceID:             instanceID,
-				StackRequiredParameter: model.StackRequiredParameter{Name: parameter.StackParameter},
+				InstanceID:             instance.ID,
+				StackName:              instance.StackName,
+				StackRequiredParameter: model.StackRequiredParameter{Name: parameter.StackParameter, StackName: instance.StackName},
 				Value:                  parameter.Value,
 			}
 		}
@@ -210,13 +370,14 @@ func convertRequiredParameters(instanceID uint, requestParameters []ParameterReq
 	return []model.InstanceRequiredParameter{}
 }
 
-func convertOptionalParameters(instanceID uint, requestParameters []ParameterRequest) []model.InstanceOptionalParameter {
+func convertOptionalParameters(instance *model.Instance, requestParameters []ParameterRequest) []model.InstanceOptionalParameter {
 	if len(requestParameters) > 0 {
 		parameters := make([]model.InstanceOptionalParameter, len(requestParameters))
 		for i, parameter := range requestParameters {
 			parameters[i] = model.InstanceOptionalParameter{
-				InstanceID:             instanceID,
-				StackOptionalParameter: model.StackOptionalParameter{Name: parameter.StackParameter},
+				InstanceID:             instance.ID,
+				StackName:              instance.StackName,
+				StackOptionalParameter: model.StackOptionalParameter{Name: parameter.StackParameter, StackName: instance.StackName},
 				Value:                  parameter.Value,
 			}
 		}
