@@ -2,12 +2,16 @@
 
 set -euo pipefail
 
-psql -U postgres -qAt -d "$DATABASE_NAME" -c "create extension if not exists postgis"
+function exec_psql() {
+  psql -U postgres -qAt -d "$DATABASE_NAME" -c "$1"
+}
+
+exec_psql "create extension if not exists postgis"
 
 if [ -n "$DATABASE_ID" ]; then
-  table_exists=$(psql -U postgres -qAt -c -d "DATABASE_NAME" "select exists (select from information_schema.tables where table_schema = 'schema_name' and table_name = 'table_name')")
+  table_exists=$(exec_psql "DATABASE_NAME" "select exists (select from information_schema.tables where table_schema = 'schema_name' and table_name = 'table_name')")
   if [ "$table_exists" = "true" ]; then
-    row_count=$(psql -U postgres -qAt -c -d "DATABASE_NAME" "select count(*) from organisationunit")
+    row_count=$(exec_psql "DATABASE_NAME" "select count(*) from organisationunit")
     if [ $row_count -ne 0 ]; then
       echo "Seeding aborted!"
       exit 0
@@ -23,21 +27,21 @@ if [ -n "$DATABASE_ID" ]; then
 
   ## Change ownership to $DATABASE_USERNAME
   # Tables
-  entities=$(psql -U postgres -qAt -c -d "DATABASE_NAME" "select tablename from pg_tables where schemaname = 'public'")
+  entities=$(exec_psql "DATABASE_NAME" "select tablename from pg_tables where schemaname = 'public'")
   for entity in $entities; do
     echo "Changing owner of $entity to $DATABASE_USERNAME"
     psql -U postgres -c "alter table \"$entity\" owner to $DATABASE_USERNAME" "$DATABASE_NAME"
   done
 
   # Sequences
-  entities=$(psql -U postgres -qAt -c -d "DATABASE_NAME" "select sequence_name from information_schema.sequences where sequence_schema = 'public'")
+  entities=$(exec_psql "DATABASE_NAME" "select sequence_name from information_schema.sequences where sequence_schema = 'public'")
   for entity in $entities; do
     echo "Changing owner of $entity to $DATABASE_USERNAME"
     psql -U postgres -c "alter sequence \"$entity\" owner to $DATABASE_USERNAME" "$DATABASE_NAME"
   done
 
   # Views
-  entities=$(psql -U postgres -qAt -c -d "DATABASE_NAME" "select table_name from information_schema.views where table_schema = 'public'")
+  entities=$(exec_psql "DATABASE_NAME" "select table_name from information_schema.views where table_schema = 'public'")
   for entity in $entities; do
     echo "Changing owner of $entity to $DATABASE_USERNAME"
     psql -U postgres -c "alter view \"$entity\" owner to $DATABASE_USERNAME" "$DATABASE_NAME"
