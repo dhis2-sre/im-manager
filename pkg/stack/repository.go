@@ -34,11 +34,8 @@ func (r repository) Delete(name string) error {
 func (r repository) Find(name string) (*model.Stack, error) {
 	var stack *model.Stack
 	err := r.db.
-		Preload("RequiredParameters").
-		Preload("OptionalParameters").
-		// https://stackoverflow.com/a/57288696/672009
-		//		Not("RequiredParameters.consumed <> ?", true).
-		//		Not("OptionalParameters.consumed <> ?", true).
+		Preload("RequiredParameters", "consumed <> ?", true).
+		Preload("OptionalParameters", "consumed <> ?", true).
 		First(&stack, "name = ?", name).Error
 	return stack, err
 }
