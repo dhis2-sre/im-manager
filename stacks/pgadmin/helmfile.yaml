@@ -11,7 +11,7 @@ releases:
           hosts:
             - host: {{ requiredEnv "INSTANCE_HOSTNAME" }}
               paths:
-                - path: /{{ requiredEnv "INSTANCE_NAME" }}/pgadmin
+                - path: /{{ requiredEnv "INSTANCE_NAME" }}
                   pathType: Prefix
           annotations:
             cert-manager.io/cluster-issuer: cert-issuer-prod
@@ -24,7 +24,7 @@ releases:
           # TODO: https://jira.dhis2.org/browse/DEVOPS-136
           email: {{ requiredEnv "PGADMIN_USERNAME" }}
           password: {{ requiredEnv "PGADMIN_PASSWORD" | quote }}
-          contextPath: /{{ requiredEnv "INSTANCE_NAME" }}/pgadmin
+          contextPath: /{{ requiredEnv "INSTANCE_NAME" }}
       - serverDefinitions:
           enabled: true
           servers:
