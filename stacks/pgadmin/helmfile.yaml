@@ -1,0 +1,42 @@
+# consumedParameters: DATABASE_USERNAME, DATABASE_PASSWORD, DATABASE_NAME, DATABASE_HOSTNAME
+# hostnameVariable: DATABASE_HOSTNAME
+releases:
+  - name: {{ requiredEnv "INSTANCE_NAME" }}-pgadmin
+    namespace: "{{ requiredEnv "INSTANCE_NAMESPACE" }}"
+    chart: runix/pgadmin4
+    version: "{{ env "PGADMIN_CHART_VERSION" | default "1.11.0" }}"
+    values:
+      - ingress:
+          enabled: true
+          hosts:
+            - host: {{ requiredEnv "INSTANCE_HOSTNAME" }}
+              paths:
+                - path: /{{ requiredEnv "INSTANCE_NAME" }}/pgadmin
+                  pathType: Prefix
+          annotations:
+            cert-manager.io/cluster-issuer: cert-issuer-prod
+            ingress.kubernetes.io/ssl-redirect: "true"
+          tls:
+            - secretName: "{{ requiredEnv "INSTANCE_HOSTNAME" | replace "." "-" }}-tls"
+              hosts:
+                - {{ requiredEnv "INSTANCE_HOSTNAME" | quote }}
+      - env:
+          # TODO: https://jira.dhis2.org/browse/DEVOPS-136
+          email: {{ requiredEnv "PGADMIN_USERNAME" }}
+          password: {{ requiredEnv "PGADMIN_PASSWORD" | quote }}
+          contextPath: /{{ requiredEnv "INSTANCE_NAME" }}/pgadmin
+      - serverDefinitions:
+          enabled: true
+          servers:
+            server:
+              Name: {{ requiredEnv "INSTANCE_NAME" }}
+              Group: Servers
+              Port: 5432
+              Username: {{ env "DATABASE_USERNAME" | default "dhis" }}
+              Host: {{ requiredEnv "DATABASE_HOSTNAME" }}
+              SSLMode: prefer
+              MaintenanceDB: {{ env "DATABASE_NAME" | default "dhis2" }}
+
+repositories:
+  - name: runix
+    url: https://helm.runix.net
