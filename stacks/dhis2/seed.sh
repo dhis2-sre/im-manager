@@ -2,6 +2,8 @@
 
 set -euo pipefail
 
+psql -U postgres -qAt -d "$DATABASE_NAME" -c "create extension if not exists postgis"
+
 if [ -n "$DATABASE_ID" ]; then
   DATABASE_MANAGER_ABSOLUTE_URL="$DATABASE_MANAGER_URL:8080/databases/$DATABASE_ID/download"
   echo "DATABASE_MANAGER_ABSOLUTE_URL: $DATABASE_MANAGER_ABSOLUTE_URL"
@@ -32,6 +34,4 @@ if [ -n "$DATABASE_ID" ]; then
     psql -U postgres -c "alter view \"$entity\" owner to $DATABASE_USERNAME" "$DATABASE_NAME"
   done
 
-else
-  psql -U postgres -d "$DATABASE_USERNAME" -p 5432 -c "create extension if not exists postgis"
 fi
