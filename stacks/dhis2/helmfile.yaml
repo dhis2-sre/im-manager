@@ -1,9 +1,9 @@
-# stackParameters: DATABASE_MANAGER_URL
+# stackParameters: DATABASE_MANAGER_URL,GOOGLE_AUTH_PROJECT_ID,GOOGLE_AUTH_PRIVATE_KEY_ID,GOOGLE_AUTH_PRIVATE_KEY,GOOGLE_AUTH_CLIENT_EMAIL,GOOGLE_AUTH_CLIENT_ID
 releases:
   - name: "{{ requiredEnv "INSTANCE_NAME" }}"
     namespace: "{{ requiredEnv "INSTANCE_NAMESPACE" }}"
-    chart: tons/dhis2-core
-    version: "{{ env "CHART_VERSION" | default "0.7.0" }}"
+    chart: dhis2/core
+    version: "{{ env "CHART_VERSION" | default "0.10.0" }}"
     values:
       - image:
           repository: dhis2/{{ env "IMAGE_REPOSITORY" | default "core" }}
@@ -37,6 +37,12 @@ releases:
           server.base.url = https://{{ requiredEnv "INSTANCE_HOSTNAME" }}/{{ requiredEnv "INSTANCE_NAME" }}
           flyway.migrate_out_of_order = {{ env "FLYWAY_MIGRATE_OUT_OF_ORDER" | default false }}
           flyway.repair_before_migration = {{ env "FLYWAY_REPAIR_BEFORE_MIGRATION" | default false }}
+      - googleAuth:
+          projectId: "{{ env "GOOGLE_AUTH_PROJECT_ID" | default "" }}"
+          privateKeyId: "{{ env "GOOGLE_AUTH_PRIVATE_KEY_ID" | default "" }}"
+          privateKey: {{ env "GOOGLE_AUTH_PRIVATE_KEY" | default "" }}
+          clientEmail: "{{ env "GOOGLE_AUTH_CLIENT_EMAIL" | default "" }}"
+          clientId: "{{ env "GOOGLE_AUTH_CLIENT_ID" | default "" }}"
 
   - name: {{ requiredEnv "INSTANCE_NAME" }}-database
     namespace: "{{ requiredEnv "INSTANCE_NAMESPACE" }}"
@@ -118,7 +124,7 @@ releases:
 repositories:
   - name: bitnami
     url: https://charts.bitnami.com/bitnami
-  - name: tons
-    url: https://helm-charts.fitfit.dk
+  - name: dhis2
+    url: https://dhis2-sre.github.io/dhis2-core-helm
   - name: runix
     url: https://helm.runix.net
