@@ -68,6 +68,8 @@ rules:
     verbs:
       - get
       - create
+      - delete
+
   - apiGroups:
       - ""
     resources:
@@ -75,6 +77,7 @@ rules:
     verbs:
       - get
       - create
+      - delete
 
 ---
 {{- end }}
