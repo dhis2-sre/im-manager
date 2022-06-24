@@ -6,6 +6,11 @@ releases:
     chart: runix/pgadmin4
     version: "{{ env "PGADMIN_CHART_VERSION" | default "1.11.0" }}"
     values:
+      - podLabels:
+          im: "true"
+          im-id: "{{ requiredEnv "INSTANCE_ID" }}"
+          im-ttl: "{{ env "INSTANCE_TTL" | default "" }}"
+
       - ingress:
           enabled: true
           hosts:
