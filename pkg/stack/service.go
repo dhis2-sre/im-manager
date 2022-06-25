@@ -43,7 +43,7 @@ func (s service) Delete(name string) error {
 func (s service) CreateRequiredParameter(stack *model.Stack, parameterName string, consumed bool) (*model.StackRequiredParameter, error) {
 	parameter := &model.StackRequiredParameter{Name: parameterName, StackName: stack.Name, Consumed: consumed}
 
-	err := s.repository.CreateRequiredParameter(stack.Name, parameter, consumed)
+	err := s.repository.CreateRequiredParameter(parameter)
 
 	return parameter, err
 }
@@ -51,7 +51,7 @@ func (s service) CreateRequiredParameter(stack *model.Stack, parameterName strin
 func (s service) CreateOptionalParameter(stack *model.Stack, parameterName string, defaultValue string, consumed bool) (*model.StackOptionalParameter, error) {
 	parameter := &model.StackOptionalParameter{Name: parameterName, StackName: stack.Name, Consumed: consumed, DefaultValue: defaultValue}
 
-	err := s.repository.CreateOptionalParameter(stack.Name, parameter, consumed, defaultValue)
+	err := s.repository.CreateOptionalParameter(parameter)
 
 	return parameter, err
 }
