@@ -50,27 +50,23 @@ func (r repository) Link(firstInstance *model.Instance, secondInstance *model.In
 func (r repository) Unlink(instance *model.Instance) error {
 	link := &model.Linked{}
 
-	// Does another instance depends on the instance we're trying to unlink
+	// Does another instance depend on the instance we're trying to unlink
 	err := r.db.First(link, "first_instance_id = ?", instance.ID).Error
 	if err == nil {
 		return fmt.Errorf("instance %d depends on %d", link.SecondInstanceID, instance.ID)
 	}
 
+	// Any error beside ErrRecordNotFound?
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 		return err
 	}
 
-	// Find instance to delete, return nil if not found
-	err = r.db.Find(link, "second_instance_id = ?", instance.ID).Error
+	// Attempt to unlink
+	err = r.db.Unscoped().Delete(link, "second_instance_id = ?", instance.ID).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil
 		}
-		return err
-	}
-
-	err = r.db.Unscoped().Delete(link, "first_instance_id = ? and second_instance_id = ?", link.FirstInstanceID, link.SecondInstanceID).Error
-	if err != nil {
 		return err
 	}
 	return nil
