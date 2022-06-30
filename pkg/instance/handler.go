@@ -276,6 +276,13 @@ func (h Handler) LinkDeploy(c *gin.Context) {
 		return
 	}
 
+	err = h.instanceService.Link(uint(id), uint(newId), newInstance.StackName)
+	if err != nil {
+		conflict := apperror.NewConflict(err.Error())
+		_ = c.Error(conflict)
+		return
+	}
+
 	stack, err := h.stackService.Find(instance.StackName)
 	if err != nil {
 		_ = c.Error(err)
@@ -406,6 +413,12 @@ func (h Handler) Delete(c *gin.Context) {
 	if err != nil {
 		badRequest := apperror.NewBadRequest("error parsing id")
 		_ = c.Error(badRequest)
+		return
+	}
+
+	err = h.instanceService.Unlink(uint(id))
+	if err != nil {
+		_ = c.Error(err)
 		return
 	}
 

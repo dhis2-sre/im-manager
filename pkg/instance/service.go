@@ -6,6 +6,8 @@ import (
 	"io"
 	"log"
 
+	"gorm.io/gorm"
+
 	"github.com/dhis2-sre/im-manager/pkg/config"
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	"github.com/dhis2-sre/im-user/swagger/sdk/models"
@@ -15,6 +17,8 @@ import (
 )
 
 type Service interface {
+	Link(firstID, secondID uint, stackName string) error
+	Unlink(id uint) error
 	Create(instance *model.Instance) (*model.Instance, error)
 	Deploy(token string, instance *model.Instance, group *models.Group) error
 	FindById(id uint) (*model.Instance, error)
@@ -52,6 +56,24 @@ func NewService(
 
 type userClientService interface {
 	FindGroupByName(token string, name string) (*models.Group, error)
+}
+
+func (s service) Link(firstID, secondID uint, stackName string) error {
+	instance := &model.Instance{
+		Model: gorm.Model{ID: firstID},
+	}
+	secondInstance := &model.Instance{
+		Model:     gorm.Model{ID: secondID},
+		StackName: stackName,
+	}
+	return s.instanceRepository.Link(instance, secondInstance)
+}
+
+func (s service) Unlink(id uint) error {
+	instance := &model.Instance{
+		Model: gorm.Model{ID: id},
+	}
+	return s.instanceRepository.Unlink(instance)
 }
 
 func (s service) Create(instance *model.Instance) (*model.Instance, error) {
