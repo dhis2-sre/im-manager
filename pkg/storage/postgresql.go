@@ -36,6 +36,7 @@ func NewDatabase(c config.Config) (*gorm.DB, error) {
 		&model.StackOptionalParameter{},
 
 		&model.Instance{},
+		&model.Linked{},
 		&model.InstanceRequiredParameter{},
 		&model.InstanceOptionalParameter{},
 	)

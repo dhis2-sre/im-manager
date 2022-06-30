@@ -18,6 +18,13 @@ type Instance struct {
 	DeployLog          string                      `gorm:"type:text"`
 }
 
+// TODO: https://gorm.io/docs/has_one.html#Override-Foreign-Key
+type Linked struct {
+	FirstInstanceID  uint   `gorm:"primaryKey"`
+	StackName        string `gorm:"primaryKey"`
+	SecondInstanceID uint   `gorm:"index:idx_linked_second_instance,unique"`
+}
+
 func (i Instance) FindRequiredParameter(name string) (InstanceRequiredParameter, error) {
 	for _, parameter := range i.RequiredParameters {
 		if parameter.StackRequiredParameterID == name {

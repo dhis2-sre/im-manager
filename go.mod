@@ -10,6 +10,7 @@ require (
 	github.com/gin-gonic/gin v1.8.1
 	github.com/go-openapi/runtime v0.24.1
 	github.com/gofrs/uuid v4.2.0+incompatible
+	github.com/jackc/pgconn v1.12.1
 	github.com/lestrrat-go/jwx v1.2.25
 	github.com/rabbitmq/amqp091-go v1.3.4
 	github.com/stretchr/testify v1.7.4
@@ -96,7 +97,6 @@ require (
 	github.com/howeyc/gopass v0.0.0-20210920133722-c8aef6fb66ef // indirect
 	github.com/imdario/mergo v0.3.13 // indirect
 	github.com/jackc/chunkreader/v2 v2.0.1 // indirect
-	github.com/jackc/pgconn v1.12.1 // indirect
 	github.com/jackc/pgio v1.0.0 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgproto3/v2 v2.3.0 // indirect
