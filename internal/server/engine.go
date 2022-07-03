@@ -30,6 +30,7 @@ func GetEngine(basePath string, stackHandler stack.Handler, instanceHandler inst
 
 	tokenAuthenticationRouter.POST("/instances", instanceHandler.Create)
 	tokenAuthenticationRouter.POST("/instances/:id/deploy", instanceHandler.Deploy)
+	tokenAuthenticationRouter.POST("/instances/:id/restart", instanceHandler.Restart)
 	tokenAuthenticationRouter.GET("/instances/:id/parameters", instanceHandler.FindByIdWithDecryptedParameters)
 	tokenAuthenticationRouter.GET("/instances", instanceHandler.List)
 	tokenAuthenticationRouter.DELETE("/instances/:id", instanceHandler.Delete)
