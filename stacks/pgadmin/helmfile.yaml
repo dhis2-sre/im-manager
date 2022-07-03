@@ -1,7 +1,7 @@
 # consumedParameters: DATABASE_USERNAME, DATABASE_PASSWORD, DATABASE_NAME, DATABASE_HOSTNAME
 # hostnameVariable: DATABASE_HOSTNAME
 releases:
-  - name: {{ requiredEnv "INSTANCE_NAME" }}-pgadmin
+  - name: {{ requiredEnv "INSTANCE_NAME" }}
     namespace: "{{ requiredEnv "INSTANCE_NAMESPACE" }}"
     chart: runix/pgadmin4
     version: "{{ env "PGADMIN_CHART_VERSION" | default "1.11.0" }}"
