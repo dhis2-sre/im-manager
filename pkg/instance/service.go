@@ -66,7 +66,6 @@ type userClientService interface {
 }
 
 func (s service) LinkDeploy(token string, oldInstance, newInstance *model.Instance) error {
-	// TODO: Unexport Link and don't pass newInstance properties twice
 	err := s.Link(oldInstance.ID, newInstance.ID, newInstance.StackName)
 	if err != nil {
 		return err
