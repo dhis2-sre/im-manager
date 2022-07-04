@@ -1,7 +1,6 @@
 package model
 
 import (
-	"encoding/json"
 	"fmt"
 
 	"gorm.io/gorm"
@@ -53,11 +52,6 @@ type InstanceRequiredParameter struct {
 	StackRequiredParameter   StackRequiredParameter `gorm:"foreignKey:StackRequiredParameterID,StackName; references:Name,StackName; constraint:OnUpdate:CASCADE,OnDelete:CASCADE" json:"-"`
 	StackName                string                 `json:"-"`
 	Value                    string                 `json:"value"`
-}
-
-func (irp InstanceRequiredParameter) GoString() string {
-	bytes, _ := json.MarshalIndent(irp, "", "  ")
-	return string(bytes)
 }
 
 type InstanceOptionalParameter struct {
