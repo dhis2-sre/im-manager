@@ -43,6 +43,28 @@ type service struct {
 	kubernetesService  KubernetesService
 }
 
+func NewService(
+	config config.Config,
+	instanceRepository Repository,
+	userClient userClientService,
+	stackService stack.Service,
+	kubernetesService KubernetesService,
+	helmfileService HelmfileService,
+) *service {
+	return &service{
+		config,
+		instanceRepository,
+		userClient,
+		stackService,
+		helmfileService,
+		kubernetesService,
+	}
+}
+
+type userClientService interface {
+	FindGroupByName(token string, name string) (*models.Group, error)
+}
+
 func (s service) LinkDeploy(token string, oldInstance, newInstance *model.Instance) error {
 	// TODO: Unexport Link and don't pass newInstance properties twice
 	err := s.Link(oldInstance.ID, newInstance.ID, newInstance.StackName)
@@ -113,28 +135,6 @@ func (s service) LinkDeploy(token string, oldInstance, newInstance *model.Instan
 	}
 
 	return nil
-}
-
-func NewService(
-	config config.Config,
-	instanceRepository Repository,
-	userClient userClientService,
-	stackService stack.Service,
-	kubernetesService KubernetesService,
-	helmfileService HelmfileService,
-) *service {
-	return &service{
-		config,
-		instanceRepository,
-		userClient,
-		stackService,
-		helmfileService,
-		kubernetesService,
-	}
-}
-
-type userClientService interface {
-	FindGroupByName(token string, name string) (*models.Group, error)
 }
 
 func (s service) Link(firstID, secondID uint, stackName string) error {
