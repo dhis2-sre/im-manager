@@ -53,54 +53,24 @@ definitions:
     x-go-package: github.com/dhis2-sre/im-manager/pkg/model
   InstanceOptionalParameter:
     properties:
-      CreatedAt:
-        format: date-time
+      name:
+        description: 'TODO: Rename StackOptionalParameterID to Name'
         type: string
-      DeletedAt:
-        $ref: '#/definitions/DeletedAt'
-      ID:
-        format: uint64
-        type: integer
-      InstanceID:
-        format: uint64
-        type: integer
-      StackName:
+        x-go-name: StackOptionalParameterID
+      value:
         type: string
-      StackOptionalParameter:
-        $ref: '#/definitions/StackOptionalParameter'
-      StackOptionalParameterID:
-        type: string
-      UpdatedAt:
-        format: date-time
-        type: string
-      Value:
-        type: string
+        x-go-name: Value
     type: object
     x-go-package: github.com/dhis2-sre/im-manager/pkg/model
   InstanceRequiredParameter:
     properties:
-      CreatedAt:
-        format: date-time
+      name:
+        description: 'TODO: Rename StackRequiredParameterID to Name'
         type: string
-      DeletedAt:
-        $ref: '#/definitions/DeletedAt'
-      ID:
-        format: uint64
-        type: integer
-      InstanceID:
-        format: uint64
-        type: integer
-      StackName:
+        x-go-name: StackRequiredParameterID
+      value:
         type: string
-      StackRequiredParameter:
-        $ref: '#/definitions/StackRequiredParameter'
-      StackRequiredParameterID:
-        type: string
-      UpdatedAt:
-        format: date-time
-        type: string
-      Value:
-        type: string
+        x-go-name: Value
     type: object
     x-go-package: github.com/dhis2-sre/im-manager/pkg/model
   Model:

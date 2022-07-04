@@ -19,11 +19,11 @@ echo "{
   \"stackName\": \"$STACK_NAME\",
   \"requiredParameters\": [
     {
-      \"stackParameter\": \"PGADMIN_USERNAME\",
+      \"name\": \"PGADMIN_USERNAME\",
       \"value\": \"$PGADMIN_USERNAME\"
     },
     {
-      \"stackParameter\": \"PGADMIN_PASSWORD\",
+      \"name\": \"PGADMIN_PASSWORD\",
       \"value\": \"$PGADMIN_PASSWORD\"
     }
   ]

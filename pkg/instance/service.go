@@ -6,6 +6,9 @@ import (
 	"io"
 	"log"
 
+	"github.com/dhis2-sre/im-manager/internal/apperror"
+	"github.com/dhis2-sre/im-manager/pkg/stack"
+
 	"gorm.io/gorm"
 
 	"github.com/dhis2-sre/im-manager/pkg/config"
@@ -17,10 +20,11 @@ import (
 )
 
 type Service interface {
+	LinkDeploy(token string, oldInstance, newInstance *model.Instance) error
 	Link(firstID, secondID uint, stackName string) error
 	Unlink(id uint) error
 	Create(instance *model.Instance) (*model.Instance, error)
-	Deploy(token string, instance *model.Instance, group *models.Group) error
+	Deploy(token string, instance *model.Instance) error
 	FindById(id uint) (*model.Instance, error)
 	Delete(token string, id uint) error
 	Logs(instance *model.Instance, group *models.Group, selector string) (io.ReadCloser, error)
@@ -34,14 +38,88 @@ type service struct {
 	config             config.Config
 	instanceRepository Repository
 	userClient         userClientService
+	stackService       stack.Service
 	helmfileService    HelmfileService
 	kubernetesService  KubernetesService
+}
+
+func (s service) LinkDeploy(token string, oldInstance, newInstance *model.Instance) error {
+	// TODO: Unexport Link and don't pass newInstance properties twice
+	err := s.Link(oldInstance.ID, newInstance.ID, newInstance.StackName)
+	if err != nil {
+		return err
+	}
+
+	oldStack, err := s.stackService.Find(oldInstance.StackName)
+	if err != nil {
+		return err
+	}
+
+	newStack, err := s.stackService.Find(newInstance.StackName)
+	if err != nil {
+		return err
+	}
+
+	// Consumed required parameters
+	for _, v := range newStack.RequiredParameters {
+		if v.Consumed && v.Name != newStack.HostnameVariable {
+			parameter, err := oldInstance.FindRequiredParameter(v.Name)
+			if err != nil {
+				return err
+			}
+			parameterRequest := model.InstanceRequiredParameter{
+				StackRequiredParameterID: v.Name,
+				Value:                    parameter.Value,
+			}
+			newInstance.RequiredParameters = append(newInstance.RequiredParameters, parameterRequest)
+		}
+	}
+
+	// Consumed optional parameters
+	for _, v := range newStack.OptionalParameters {
+		if v.Consumed && v.Name != newStack.HostnameVariable {
+			parameter, err := oldInstance.FindOptionalParameter(v.Name)
+			if err != nil {
+				// TODO: Better error handling
+				stackParameter, serr := oldStack.FindOptionalParameter(v.Name)
+				if serr != nil {
+					// TODO: don't use apperror here
+					notFound := apperror.NewNotFound("optional stack parameter", v.Name)
+					return notFound
+				}
+				parameter.Value = stackParameter.DefaultValue
+			}
+			parameterRequest := model.InstanceOptionalParameter{
+				StackOptionalParameterID: v.Name,
+				Value:                    parameter.Value,
+			}
+			newInstance.OptionalParameters = append(newInstance.OptionalParameters, parameterRequest)
+		}
+	}
+
+	// Hostname parameter
+	// TODO: Is hostname always a required parameter?
+	if newStack.HostnameVariable != "" {
+		hostnameParameter := model.InstanceRequiredParameter{
+			StackRequiredParameterID: newStack.HostnameVariable,
+			Value:                    fmt.Sprintf(oldStack.HostnamePattern, oldInstance.Name, oldInstance.GroupName),
+		}
+		newInstance.RequiredParameters = append(newInstance.RequiredParameters, hostnameParameter)
+	}
+
+	err = s.Deploy(token, newInstance)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func NewService(
 	config config.Config,
 	instanceRepository Repository,
 	userClient userClientService,
+	stackService stack.Service,
 	kubernetesService KubernetesService,
 	helmfileService HelmfileService,
 ) *service {
@@ -49,6 +127,7 @@ func NewService(
 		config,
 		instanceRepository,
 		userClient,
+		stackService,
 		helmfileService,
 		kubernetesService,
 	}
@@ -90,7 +169,10 @@ func (s service) Create(instance *model.Instance) (*model.Instance, error) {
 	return instanceWithParameters, nil
 }
 
-func (s service) Deploy(accessToken string, instance *model.Instance, group *models.Group) error {
+func (s service) Deploy(accessToken string, instance *model.Instance) error {
+	instance.RequiredParameters = enrichRequiredParameters(instance)
+	instance.OptionalParameters = enrichOptionalParameters(instance)
+
 	encryptInstance, err := s.encryptParameters(instance)
 	if err != nil {
 		return err
@@ -102,6 +184,11 @@ func (s service) Deploy(accessToken string, instance *model.Instance, group *mod
 	}
 
 	instanceWithParameters, err := s.FindWithDecryptedParametersById(encryptInstance.ID)
+	if err != nil {
+		return err
+	}
+
+	group, err := s.userClient.FindGroupByName(accessToken, instance.GroupName)
 	if err != nil {
 		return err
 	}
@@ -132,6 +219,30 @@ func (s service) Deploy(accessToken string, instance *model.Instance, group *mod
 	}
 
 	return nil
+}
+
+func enrichRequiredParameters(instance *model.Instance) []model.InstanceRequiredParameter {
+	requestParameters := instance.RequiredParameters
+	if len(requestParameters) > 0 {
+		for i := range requestParameters {
+			requestParameters[i].InstanceID = instance.ID
+			requestParameters[i].StackName = instance.StackName
+		}
+		return requestParameters
+	}
+	return []model.InstanceRequiredParameter{}
+}
+
+func enrichOptionalParameters(instance *model.Instance) []model.InstanceOptionalParameter {
+	requestParameters := instance.OptionalParameters
+	if len(requestParameters) > 0 {
+		for i := range requestParameters {
+			requestParameters[i].InstanceID = instance.ID
+			requestParameters[i].StackName = instance.StackName
+		}
+		return requestParameters
+	}
+	return []model.InstanceOptionalParameter{}
 }
 
 func (s service) FindById(id uint) (*model.Instance, error) {

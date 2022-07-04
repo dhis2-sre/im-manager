@@ -1,6 +1,7 @@
 package model
 
 import (
+	"encoding/json"
 	"fmt"
 
 	"gorm.io/gorm"
@@ -9,20 +10,22 @@ import (
 // swagger:model Instance
 type Instance struct {
 	gorm.Model
-	Name               string `gorm:"index:idx_name_and_group,unique"`
 	UserID             uint
+	Name               string `gorm:"index:idx_name_and_group,unique"`
 	GroupName          string `gorm:"index:idx_name_and_group,unique"`
 	StackName          string
-	RequiredParameters []InstanceRequiredParameter `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;" json:"requiredParameters,omitempty"`
-	OptionalParameters []InstanceOptionalParameter `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;" json:"optionalParameters,omitempty"`
+	RequiredParameters []InstanceRequiredParameter `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;" json:"requiredParameters"`
+	OptionalParameters []InstanceOptionalParameter `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;" json:"optionalParameters"`
 	DeployLog          string                      `gorm:"type:text"`
 }
 
 // TODO: https://gorm.io/docs/has_one.html#Override-Foreign-Key
 type Linked struct {
-	FirstInstanceID  uint   `gorm:"primaryKey"`
+	FirstInstanceID  uint `gorm:"primaryKey"`
+	FirstInstance    Instance
 	StackName        string `gorm:"primaryKey"`
 	SecondInstanceID uint   `gorm:"index:idx_linked_second_instance,unique"`
+	SecondInstance   Instance
 }
 
 func (i Instance) FindRequiredParameter(name string) (InstanceRequiredParameter, error) {
@@ -44,19 +47,24 @@ func (i Instance) FindOptionalParameter(name string) (InstanceOptionalParameter,
 }
 
 type InstanceRequiredParameter struct {
-	gorm.Model
-	InstanceID               uint   `gorm:"index:idx_instance_required_parameter,unique"`
-	StackRequiredParameterID string `gorm:"index:idx_instance_required_parameter,unique"`
-	StackName                string
-	StackRequiredParameter   StackRequiredParameter `gorm:"foreignKey:StackName,StackRequiredParameterID; references:StackName,Name; constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
-	Value                    string
+	InstanceID uint `gorm:"primaryKey" json:"-"`
+	// TODO: Rename StackRequiredParameterID to Name
+	StackRequiredParameterID string                 `gorm:"primaryKey" json:"name"`
+	StackRequiredParameter   StackRequiredParameter `gorm:"foreignKey:StackRequiredParameterID,StackName; references:Name,StackName; constraint:OnUpdate:CASCADE,OnDelete:CASCADE" json:"-"`
+	StackName                string                 `json:"-"`
+	Value                    string                 `json:"value"`
+}
+
+func (irp InstanceRequiredParameter) GoString() string {
+	bytes, _ := json.MarshalIndent(irp, "", "  ")
+	return string(bytes)
 }
 
 type InstanceOptionalParameter struct {
-	gorm.Model
-	InstanceID               uint   `gorm:"index:idx_instance_optional_parameter,unique"`
-	StackOptionalParameterID string `gorm:"index:idx_instance_optional_parameter,unique"`
-	StackName                string
-	StackOptionalParameter   StackOptionalParameter `gorm:"foreignKey:StackName,StackOptionalParameterID; references:StackName,Name; constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
-	Value                    string
+	InstanceID uint `gorm:"primaryKey" json:"-"`
+	// TODO: Rename StackOptionalParameterID to Name
+	StackOptionalParameterID string                 `gorm:"primaryKey" json:"name"`
+	StackOptionalParameter   StackOptionalParameter `gorm:"foreignKey:StackOptionalParameterID,StackName; references:Name,StackName; constraint:OnUpdate:CASCADE,OnDelete:CASCADE" json:"-"`
+	StackName                string                 `json:"-"`
+	Value                    string                 `json:"value"`
 }

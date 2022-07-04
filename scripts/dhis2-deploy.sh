@@ -22,33 +22,33 @@ echo "{
   \"stackName\": \"$STACK_NAME\",
   \"optionalParameters\": [
     {
-      \"stackParameter\": \"READINESS_PROBE_INITIAL_DELAY_SECONDS\",
+      \"name\": \"READINESS_PROBE_INITIAL_DELAY_SECONDS\",
       \"value\": \"$READINESS_PROBE_INITIAL_DELAY_SECONDS\"
     },
     {
-      \"stackParameter\": \"LIVENESS_PROBE_INITIAL_DELAY_SECONDS\",
+      \"name\": \"LIVENESS_PROBE_INITIAL_DELAY_SECONDS\",
       \"value\": \"$LIVENESS_PROBE_INITIAL_DELAY_SECONDS\"
     },
     {
-      \"stackParameter\": \"IMAGE_REPOSITORY\",
+      \"name\": \"IMAGE_REPOSITORY\",
       \"value\": \"$IMAGE_REPOSITORY\"
     },
     {
-      \"stackParameter\": \"IMAGE_TAG\",
+      \"name\": \"IMAGE_TAG\",
       \"value\": \"$IMAGE_TAG\"
     },
     {
-      \"stackParameter\": \"DATABASE_SIZE\",
+      \"name\": \"DATABASE_SIZE\",
       \"value\": \"$DATABASE_SIZE\"
     },
     {
-      \"stackParameter\": \"PGADMIN_INSTALL\",
+      \"name\": \"PGADMIN_INSTALL\",
       \"value\": \"$PGADMIN_INSTALL\"
     }
   ],
   \"requiredParameters\": [
     {
-      \"stackParameter\": \"DATABASE_ID\",
+      \"name\": \"DATABASE_ID\",
       \"value\": \"$DATABASE_ID\"
     }
   ]

@@ -14,17 +14,17 @@ PAYLOAD='{\"databaseId\": \"11\"}'
 echo "{
   \"requiredParameters\": [
     {
-      \"stackParameter\": \"COMMAND\",
+      \"name\": \"COMMAND\",
       \"value\": \"$JOB\"
     }
   ],
   \"optionalParameters\": [
     {
-      \"stackParameter\": 10,
+      \"name\": 10,
       \"value\": \"300\"
     },
     {
-      \"stackParameter\": 21,
+      \"name\": 21,
       \"value\": \"$PAYLOAD\"
     }
   ]
