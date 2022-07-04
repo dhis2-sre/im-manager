@@ -59,7 +59,7 @@ func run() error {
 	uc := userClient.New(cfg.UserService.Host, cfg.UserService.BasePath)
 	kubernetesSvc := instance.NewKubernetesService()
 	helmfileSvc := instance.NewHelmfileService(stackSvc, cfg)
-	instanceSvc := instance.NewService(cfg, instanceRepo, uc, kubernetesSvc, helmfileSvc)
+	instanceSvc := instance.NewService(cfg, instanceRepo, uc, stackSvc, kubernetesSvc, helmfileSvc)
 
 	stack.LoadStacks(stackSvc)
 
