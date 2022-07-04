@@ -169,8 +169,7 @@ func (s service) Create(instance *model.Instance) (*model.Instance, error) {
 }
 
 func (s service) Deploy(accessToken string, instance *model.Instance) error {
-	instance.RequiredParameters = enrichRequiredParameters(instance)
-	instance.OptionalParameters = enrichOptionalParameters(instance)
+	enrichParameters(instance)
 
 	encryptInstance, err := s.encryptParameters(instance)
 	if err != nil {
@@ -220,28 +219,22 @@ func (s service) Deploy(accessToken string, instance *model.Instance) error {
 	return nil
 }
 
-func enrichRequiredParameters(instance *model.Instance) []model.InstanceRequiredParameter {
-	requestParameters := instance.RequiredParameters
-	if len(requestParameters) > 0 {
-		for i := range requestParameters {
-			requestParameters[i].InstanceID = instance.ID
-			requestParameters[i].StackName = instance.StackName
+func enrichParameters(instance *model.Instance) {
+	requiredParameters := instance.RequiredParameters
+	if len(requiredParameters) > 0 {
+		for i := range requiredParameters {
+			requiredParameters[i].InstanceID = instance.ID
+			requiredParameters[i].StackName = instance.StackName
 		}
-		return requestParameters
 	}
-	return []model.InstanceRequiredParameter{}
-}
 
-func enrichOptionalParameters(instance *model.Instance) []model.InstanceOptionalParameter {
-	requestParameters := instance.OptionalParameters
-	if len(requestParameters) > 0 {
-		for i := range requestParameters {
-			requestParameters[i].InstanceID = instance.ID
-			requestParameters[i].StackName = instance.StackName
+	optionalParameters := instance.OptionalParameters
+	if len(optionalParameters) > 0 {
+		for i := range optionalParameters {
+			optionalParameters[i].InstanceID = instance.ID
+			optionalParameters[i].StackName = instance.StackName
 		}
-		return requestParameters
 	}
-	return []model.InstanceOptionalParameter{}
 }
 
 func (s service) FindById(id uint) (*model.Instance, error) {
