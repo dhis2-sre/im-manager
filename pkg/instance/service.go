@@ -119,7 +119,6 @@ func (s service) LinkDeploy(token string, oldInstance, newInstance *model.Instan
 	}
 
 	// Hostname parameter
-	// TODO: Is hostname always a required parameter?
 	if newStack.HostnameVariable != "" {
 		hostnameParameter := model.InstanceRequiredParameter{
 			StackRequiredParameterID: newStack.HostnameVariable,
