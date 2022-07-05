@@ -1,6 +1,7 @@
 package model
 
 import (
+	"encoding/json"
 	"fmt"
 
 	"gorm.io/gorm"
@@ -16,6 +17,11 @@ type Instance struct {
 	RequiredParameters []InstanceRequiredParameter `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;" json:"requiredParameters"`
 	OptionalParameters []InstanceOptionalParameter `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;" json:"optionalParameters"`
 	DeployLog          string                      `gorm:"type:text"`
+}
+
+func (i Instance) GoString() string {
+	indent, _ := json.MarshalIndent(i, "", "  ")
+	return string(indent)
 }
 
 // TODO: https://gorm.io/docs/has_one.html#Override-Foreign-Key

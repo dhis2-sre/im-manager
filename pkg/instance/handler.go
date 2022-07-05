@@ -131,6 +131,28 @@ type DeployInstanceRequest struct {
 //   404: Error
 //   415: Error
 func (h Handler) Deploy(c *gin.Context) {
+	h.deployOrUpdate(c, http.StatusCreated)
+}
+
+// Update instance
+// swagger:route PUT /instances/{id}/deploy updateInstance
+//
+// Update instance
+//
+// Security:
+//  oauth2:
+//
+// responses:
+//   201: Instance
+//   401: Error
+//   403: Error
+//   404: Error
+//   415: Error
+func (h Handler) Update(c *gin.Context) {
+	h.deployOrUpdate(c, http.StatusNoContent)
+}
+
+func (h Handler) deployOrUpdate(c *gin.Context, httpStatusCode int) {
 	idParam := c.Param("id")
 	id, err := strconv.ParseUint(idParam, 10, 64)
 	if err != nil {
@@ -186,7 +208,7 @@ func (h Handler) Deploy(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusCreated, instance)
+	c.JSON(httpStatusCode, instance)
 }
 
 // LinkDeploy instance
