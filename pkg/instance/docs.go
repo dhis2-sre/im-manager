@@ -20,6 +20,18 @@ type _ struct {
 	_ DeployInstanceRequest
 }
 
+// swagger:parameters updateInstance
+type _ struct {
+	// in: path
+	// required: true
+	ID uint `json:"id"`
+
+	// Update instance request body parameter
+	// in: body
+	// required: true
+	_ DeployInstanceRequest
+}
+
 // swagger:parameters restartInstance
 type _ struct {
 	// in: path

@@ -77,12 +77,7 @@ func (r repository) Create(instance *model.Instance) error {
 }
 
 func (r repository) Save(instance *model.Instance) error {
-	err := r.db.Save(instance).Error
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return r.db.Session(&gorm.Session{FullSaveAssociations: true}).Save(instance).Error
 }
 
 func (r repository) FindWithParametersById(id uint) (*model.Instance, error) {
