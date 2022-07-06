@@ -95,7 +95,7 @@ func extractStackParameters(file []byte) []string {
 }
 
 func extractRequiredParameters(file []byte, stackParameters []string) []string {
-	regexStr := "\\{\\{[ ]?requiredEnv[ ]?\"(.*?)\".*\\}\\}"
+	regexStr := `{{[ ]requiredEnv[ ]"(.*?)".*?}}`
 	return extractParameters(file, regexStr, stackParameters)
 }
 
