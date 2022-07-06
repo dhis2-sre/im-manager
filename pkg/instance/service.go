@@ -6,7 +6,6 @@ import (
 	"io"
 	"log"
 
-	"github.com/dhis2-sre/im-manager/internal/apperror"
 	"github.com/dhis2-sre/im-manager/pkg/stack"
 
 	"gorm.io/gorm"
@@ -82,37 +81,30 @@ func (s service) LinkDeploy(token string, oldInstance, newInstance *model.Instan
 	}
 
 	// Consumed required parameters
-	for _, v := range newStack.RequiredParameters {
-		if v.Consumed && v.Name != newStack.HostnameVariable {
-			parameter, err := oldInstance.FindRequiredParameter(v.Name)
+	for _, parameter := range newStack.RequiredParameters {
+		if parameter.Consumed && parameter.Name != newStack.HostnameVariable {
+			value, err := s.findParameterValue(parameter.Name, oldInstance, oldStack)
 			if err != nil {
 				return err
 			}
 			parameterRequest := model.InstanceRequiredParameter{
-				StackRequiredParameterID: v.Name,
-				Value:                    parameter.Value,
+				StackRequiredParameterID: parameter.Name,
+				Value:                    value,
 			}
 			newInstance.RequiredParameters = append(newInstance.RequiredParameters, parameterRequest)
 		}
 	}
 
 	// Consumed optional parameters
-	for _, v := range newStack.OptionalParameters {
-		if v.Consumed && v.Name != newStack.HostnameVariable {
-			parameter, err := oldInstance.FindOptionalParameter(v.Name)
+	for _, parameter := range newStack.OptionalParameters {
+		if parameter.Consumed && parameter.Name != newStack.HostnameVariable {
+			value, err := s.findParameterValue(parameter.Name, oldInstance, oldStack)
 			if err != nil {
-				// TODO: Better error handling
-				stackParameter, serr := oldStack.FindOptionalParameter(v.Name)
-				if serr != nil {
-					// TODO: don't use apperror here
-					notFound := apperror.NewNotFound("optional stack parameter", v.Name)
-					return notFound
-				}
-				parameter.Value = stackParameter.DefaultValue
+				return err
 			}
 			parameterRequest := model.InstanceOptionalParameter{
-				StackOptionalParameterID: v.Name,
-				Value:                    parameter.Value,
+				StackOptionalParameterID: parameter.Name,
+				Value:                    value,
 			}
 			newInstance.OptionalParameters = append(newInstance.OptionalParameters, parameterRequest)
 		}
@@ -133,6 +125,25 @@ func (s service) LinkDeploy(token string, oldInstance, newInstance *model.Instan
 	}
 
 	return nil
+}
+
+func (s service) findParameterValue(parameter string, oldInstance *model.Instance, oldStack *model.Stack) (string, error) {
+	requiredParameter, err := oldInstance.FindRequiredParameter(parameter)
+	if err == nil {
+		return requiredParameter.Value, nil
+	}
+
+	optionalParameter, err := oldInstance.FindOptionalParameter(parameter)
+	if err == nil {
+		return optionalParameter.Value, nil
+	}
+
+	stackOptionalParameter, err := oldStack.FindOptionalParameter(parameter)
+	if err == nil {
+		return stackOptionalParameter.DefaultValue, nil
+	}
+
+	return "", fmt.Errorf("unable to find value for parameter: %s", parameter)
 }
 
 func (s service) Link(firstID, secondID uint, stackName string) error {
