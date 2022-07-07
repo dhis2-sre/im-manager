@@ -78,11 +78,10 @@ func (s service) Restart(token string, id uint) error {
 
 		items := deploymentList.Items
 		if len(items) > 1 {
-			return fmt.Errorf("multiple deployments found using the selector: %s", labelSelector)
+			return fmt.Errorf("multiple deployments found using the selector: %q", labelSelector)
 		}
-
 		if len(items) < 1 {
-			return fmt.Errorf("no deployment found using the selector: %s", labelSelector)
+			return fmt.Errorf("no deployment found using the selector: %q", labelSelector)
 		}
 
 		name := items[0].Name
