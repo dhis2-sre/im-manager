@@ -188,13 +188,13 @@ func (h Handler) Deploy(c *gin.Context) {
 		return
 	}
 
-	accessToken, err := handler.GetTokenFromHttpAuthHeader(c)
+	token, err := handler.GetTokenFromHttpAuthHeader(c)
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
 
-	userWithGroups, err := h.userClient.FindUserById(accessToken, user.ID)
+	userWithGroups, err := h.userClient.FindUserById(token, user.ID)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -214,7 +214,7 @@ func (h Handler) Deploy(c *gin.Context) {
 		return
 	}
 
-	group, err := h.userClient.FindGroupByName(accessToken, instance.GroupName)
+	group, err := h.userClient.FindGroupByName(token, instance.GroupName)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -223,7 +223,7 @@ func (h Handler) Deploy(c *gin.Context) {
 	instance.RequiredParameters = convertRequiredParameters(instance.ID, request.RequiredParameters)
 	instance.OptionalParameters = convertOptionalParameters(instance.ID, request.OptionalParameters)
 
-	err = h.instanceService.Deploy(accessToken, instance, group)
+	err = h.instanceService.Deploy(token, instance, group)
 	if err != nil {
 		_ = c.Error(err)
 		return
