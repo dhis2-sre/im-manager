@@ -93,7 +93,6 @@ func LoadStacks(stackService Service) {
 		fmt.Printf("Optional parameters: %+v\n", optionalParameterMap)
 		for name, v := range optionalParameterMap {
 			isConsumed := isConsumedParameter(name, consumedParameters)
-			log.Println("name: ", name, "v: ", v, "isConsumed: ", isConsumed)
 			_, err := stackService.CreateOptionalParameter(stack, name, v, isConsumed)
 			if err != nil {
 				log.Fatalf("Failed to create parameter: %s", err)
