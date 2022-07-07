@@ -84,7 +84,6 @@ func (s service) LinkDeploy(token string, oldInstance, newInstance *model.Instan
 	for _, parameter := range newStack.RequiredParameters {
 		if parameter.Consumed && parameter.Name != newStack.HostnameVariable {
 			value, err := s.findParameterValue(parameter.Name, oldInstance, oldStack)
-			log.Println(parameter.Name, value)
 			if err != nil {
 				return err
 			}
