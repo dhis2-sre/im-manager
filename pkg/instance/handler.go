@@ -134,7 +134,32 @@ func (h Handler) Restart(c *gin.Context) {
 		return
 	}
 
-	err = h.instanceService.Restart(token, uint(id))
+	user, err := handler.GetUserFromContext(c)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	userWithGroups, err := h.userClient.FindUserById(token, user.ID)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	instance, err := h.instanceService.FindById(uint(id))
+	if err != nil {
+		notFound := apperror.NewNotFound("instance", idParam)
+		_ = c.Error(notFound)
+		return
+	}
+
+	canWrite := handler.CanWriteInstance(userWithGroups, instance)
+	if !canWrite {
+		_ = c.AbortWithError(http.StatusUnauthorized, fmt.Errorf("write access denied"))
+		return
+	}
+
+	err = h.instanceService.Restart(token, instance.ID)
 	if err != nil {
 		_ = c.Error(err)
 		return
