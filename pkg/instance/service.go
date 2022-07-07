@@ -67,12 +67,10 @@ func (s service) Restart(token string, id uint) error {
 	}
 
 	err = s.kubernetesService.Executor(group.ClusterConfiguration, func(client *kubernetes.Clientset) error {
-		labelSelector := fmt.Sprintf("app.kubernetes.io/instance=%s", instance.Name)
-		listOptions := metav1.ListOptions{
-			LabelSelector: labelSelector,
-		}
-
 		deployments := client.AppsV1().Deployments(instance.GroupName)
+
+		labelSelector := fmt.Sprintf("app.kubernetes.io/instance=%s", instance.Name)
+		listOptions := metav1.ListOptions{LabelSelector: labelSelector}
 		deploymentList, err := deployments.List(context.TODO(), listOptions)
 		if err != nil {
 			return err
