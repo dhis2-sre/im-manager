@@ -15,6 +15,7 @@ import (
 )
 
 type Service interface {
+	Restart(token string, id uint) error
 	Create(instance *model.Instance) (*model.Instance, error)
 	Deploy(token string, instance *model.Instance, group *models.Group) error
 	FindById(id uint) (*model.Instance, error)
@@ -52,6 +53,69 @@ func NewService(
 
 type userClientService interface {
 	FindGroupByName(token string, name string) (*models.Group, error)
+}
+
+func (s service) Restart(token string, id uint) error {
+	instance, err := s.FindById(id)
+	if err != nil {
+		return err
+	}
+
+	group, err := s.userClient.FindGroupByName(token, instance.GroupName)
+	if err != nil {
+		return err
+	}
+
+	err = s.kubernetesService.Executor(group.ClusterConfiguration, func(client *kubernetes.Clientset) error {
+		deployments := client.AppsV1().Deployments(instance.GroupName)
+
+		labelSelector := fmt.Sprintf("app.kubernetes.io/instance=%s", instance.Name)
+		listOptions := metav1.ListOptions{LabelSelector: labelSelector}
+		deploymentList, err := deployments.List(context.TODO(), listOptions)
+		if err != nil {
+			return err
+		}
+
+		items := deploymentList.Items
+		if len(items) > 1 {
+			return fmt.Errorf("multiple deployments found using the selector: %q", labelSelector)
+		}
+		if len(items) < 1 {
+			return fmt.Errorf("no deployment found using the selector: %q", labelSelector)
+		}
+
+		name := items[0].Name
+
+		// Scale down
+		deployment, err := deployments.GetScale(context.TODO(), name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+
+		replicas := deployment.Spec.Replicas
+		deployment.Spec.Replicas = 0
+
+		_, err = deployments.UpdateScale(context.TODO(), name, deployment, metav1.UpdateOptions{})
+		if err != nil {
+			return err
+		}
+
+		// Scale up
+		updatedDeployment, err := deployments.GetScale(context.TODO(), name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+
+		updatedDeployment.Spec.Replicas = replicas
+		_, err = deployments.UpdateScale(context.TODO(), name, updatedDeployment, metav1.UpdateOptions{})
+		if err != nil {
+			return err
+		}
+
+		return nil
+	})
+
+	return err
 }
 
 func (s service) Create(instance *model.Instance) (*model.Instance, error) {

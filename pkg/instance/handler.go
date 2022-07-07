@@ -106,6 +106,43 @@ func (h Handler) Create(c *gin.Context) {
 	c.JSON(http.StatusCreated, savedInstance)
 }
 
+// Restart instance
+// swagger:route POST /instances/{id}/restart restartInstance
+//
+// Restart instance
+//
+// Security:
+//  oauth2:
+//
+// responses:
+//   202:
+//   401: Error
+//   403: Error
+//   404: Error
+//   415: Error
+func (h Handler) Restart(c *gin.Context) {
+	idParam := c.Param("id")
+	id, err := strconv.ParseUint(idParam, 10, 64)
+	if err != nil {
+		_ = c.AbortWithError(http.StatusBadRequest, fmt.Errorf("failed to parse id: %s", err))
+		return
+	}
+
+	token, err := handler.GetTokenFromHttpAuthHeader(c)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	err = h.instanceService.Restart(token, uint(id))
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	c.Status(http.StatusAccepted)
+}
+
 type ParameterRequest struct {
 	StackParameter string `json:"stackParameter" binding:"required"`
 	Value          string `json:"value" binding:"required"`

@@ -43,6 +43,7 @@ func (k kubernetesService) CommandExecutor(cmd *exec.Cmd, configuration *models.
 		defer func(name string) {
 			err := os.Remove(name)
 			if err != nil {
+				// TODO ... What to do?
 			}
 		}(file.Name())
 

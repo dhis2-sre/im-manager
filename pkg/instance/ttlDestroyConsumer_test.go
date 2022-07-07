@@ -60,6 +60,10 @@ type instanceService struct {
 	mock.Mock
 }
 
+func (is *instanceService) Restart(token string, id uint) error {
+	return nil
+}
+
 func (is *instanceService) Delete(token string, id uint) error {
 	args := is.Called(token, id)
 	return args.Error(0)
