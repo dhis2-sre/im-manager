@@ -61,12 +61,12 @@ func LoadStacks(stackService Service) {
 		}
 
 		hostnamePattern := extractMetadataParameters(file, hostnamePatternIdentifier)
-		if 0 < len(hostnamePattern) && len(hostnamePattern) < 2 {
+		if len(hostnamePattern) == 1 {
 			stack.HostnamePattern = hostnamePattern[0]
 		}
 
 		hostnameVariable := extractMetadataParameters(file, hostnameVariableIdentifier)
-		if 0 < len(hostnameVariable) && len(hostnameVariable) < 2 {
+		if len(hostnameVariable) == 1 {
 			stack.HostnameVariable = hostnameVariable[0]
 		}
 
