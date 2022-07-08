@@ -274,16 +274,14 @@ func (h Handler) LinkDeploy(c *gin.Context) {
 	idParam := c.Param("id")
 	id, err := strconv.ParseUint(idParam, 10, 64)
 	if err != nil {
-		badRequest := apperror.NewBadRequest("error parsing id")
-		_ = c.Error(badRequest)
+		_ = c.AbortWithError(http.StatusBadRequest, fmt.Errorf("failed to parse id: %s", err))
 		return
 	}
 
 	newIdParam := c.Param("newInstanceId")
 	newId, err := strconv.ParseUint(newIdParam, 10, 64)
 	if err != nil {
-		badRequest := apperror.NewBadRequest("error parsing new id")
-		_ = c.Error(badRequest)
+		_ = c.AbortWithError(http.StatusBadRequest, fmt.Errorf("failed to parse id: %s", err))
 		return
 	}
 
