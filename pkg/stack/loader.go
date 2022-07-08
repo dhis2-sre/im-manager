@@ -61,11 +61,17 @@ func LoadStacks(stackService Service) {
 		}
 
 		hostnamePattern := extractMetadataParameters(file, hostnamePatternIdentifier)
+		if len(hostnamePattern) > 1 {
+			log.Fatalf("%q defined more than once", hostnamePatternIdentifier)
+		}
 		if len(hostnamePattern) == 1 {
 			stack.HostnamePattern = hostnamePattern[0]
 		}
 
 		hostnameVariable := extractMetadataParameters(file, hostnameVariableIdentifier)
+		if len(hostnameVariable) > 1 {
+			log.Fatalf("%q defined more than once", hostnameVariableIdentifier)
+		}
 		if len(hostnameVariable) == 1 {
 			stack.HostnameVariable = hostnameVariable[0]
 		}
@@ -117,7 +123,7 @@ func extractMetadataParameters(file []byte, identifier string) []string {
 }
 
 func extractRequiredParameters(file []byte, stackParameters []string) []string {
-	regexStr := "\\{\\{[ ]?requiredEnv[ ]?\"(.*?)\".*\\}\\}"
+	regexStr := `{{[ ]requiredEnv[ ]"(.*?)".*?}}`
 	return extractParameters(file, regexStr, stackParameters)
 }
 
