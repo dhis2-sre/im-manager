@@ -257,7 +257,7 @@ func (h Handler) Deploy(c *gin.Context) {
 }
 
 // LinkDeploy instance
-// swagger:route POST /instances/{id}/link/{newInstanceId} linkDeployInstance
+// swagger:route POST /instances/{id}/link/{destinationId} linkDeployInstance
 //
 // Deploy and link with an existing instance
 //
@@ -271,17 +271,17 @@ func (h Handler) Deploy(c *gin.Context) {
 //   404: Error
 //   415: Error
 func (h Handler) LinkDeploy(c *gin.Context) {
-	idParam := c.Param("id")
-	id, err := strconv.ParseUint(idParam, 10, 64)
+	sourceIdParam := c.Param("id")
+	sourceId, err := strconv.ParseUint(sourceIdParam, 10, 64)
 	if err != nil {
 		_ = c.AbortWithError(http.StatusBadRequest, fmt.Errorf("failed to parse id: %s", err))
 		return
 	}
 
-	newIdParam := c.Param("newInstanceId")
-	newId, err := strconv.ParseUint(newIdParam, 10, 64)
+	destinationIdParam := c.Param("destinationId")
+	destinationId, err := strconv.ParseUint(destinationIdParam, 10, 64)
 	if err != nil {
-		_ = c.AbortWithError(http.StatusBadRequest, fmt.Errorf("failed to parse id: %s", err))
+		_ = c.AbortWithError(http.StatusBadRequest, fmt.Errorf("failed to parse destinationIsourceId: %s", err))
 		return
 	}
 
@@ -297,48 +297,53 @@ func (h Handler) LinkDeploy(c *gin.Context) {
 		return
 	}
 
-	accessToken, err := handler.GetTokenFromHttpAuthHeader(c)
+	token, err := handler.GetTokenFromHttpAuthHeader(c)
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
 
-	userWithGroups, err := h.userClient.FindUserById(accessToken, user.ID)
+	userWithGroups, err := h.userClient.FindUserById(token, user.ID)
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
 
-	oldInstance, err := h.instanceService.FindWithDecryptedParametersById(uint(id))
+	sourceInstance, err := h.instanceService.FindWithDecryptedParametersById(uint(sourceId))
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
 
-	canWrite := handler.CanWriteInstance(userWithGroups, oldInstance)
-	if !canWrite {
-		unauthorized := apperror.NewUnauthorized("write access denied")
+	if sourceInstance.DeployLog == "" {
+		_ = c.AbortWithError(http.StatusBadRequest, fmt.Errorf("source instance (%s) not deployed", sourceInstance.Name))
+		return
+	}
+
+	canWriteSource := handler.CanWriteInstance(userWithGroups, sourceInstance)
+	if !canWriteSource {
+		unauthorized := apperror.NewUnauthorized("write access to source instance denied")
 		_ = c.Error(unauthorized)
 		return
 	}
 
-	newInstance, err := h.instanceService.FindById(uint(newId))
+	destinationInstance, err := h.instanceService.FindById(uint(destinationId))
 	if err != nil {
-		notFound := apperror.NewNotFound("instance", idParam)
+		notFound := apperror.NewNotFound("instance", sourceIdParam)
 		_ = c.Error(notFound)
 		return
 	}
 
-	newInstance.RequiredParameters = request.RequiredParameters
-	newInstance.OptionalParameters = request.OptionalParameters
+	destinationInstance.RequiredParameters = request.RequiredParameters
+	destinationInstance.OptionalParameters = request.OptionalParameters
 
-	err = h.instanceService.LinkDeploy(accessToken, oldInstance, newInstance)
+	err = h.instanceService.LinkDeploy(token, sourceInstance, destinationInstance)
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
 
-	c.JSON(http.StatusCreated, newInstance)
+	c.JSON(http.StatusCreated, destinationInstance)
 }
 
 // Delete instance by id

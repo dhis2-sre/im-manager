@@ -331,7 +331,7 @@ paths:
           $ref: '#/responses/Error'
       security:
       - oauth2: []
-  /instances/{id}/link/{newInstanceId}:
+  /instances/{id}/link/{destinationId}:
     post:
       description: Deploy and link with an existing instance
       operationId: linkDeployInstance
@@ -344,10 +344,10 @@ paths:
         x-go-name: ID
       - format: uint64
         in: path
-        name: newInstanceId
+        name: destinationId
         required: true
         type: integer
-        x-go-name: NewInstanceId
+        x-go-name: DestinationId
       responses:
         "201":
           description: Instance

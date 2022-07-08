@@ -30,17 +30,17 @@ func NewRepository(DB *gorm.DB) *repository {
 	return &repository{db: DB}
 }
 
-func (r repository) Link(firstInstance *model.Instance, secondInstance *model.Instance) error {
+func (r repository) Link(source *model.Instance, destination *model.Instance) error {
 	link := &model.Linked{
-		FirstInstanceID:  firstInstance.ID,
-		StackName:        secondInstance.StackName,
-		SecondInstanceID: secondInstance.ID,
+		SourceInstanceID:      source.ID,
+		DestinationStackName:  destination.StackName,
+		DestinationInstanceID: destination.ID,
 	}
 	err := r.db.Create(&link).Error
 	if err != nil {
 		var perr *pgconn.PgError
 		if errors.As(err, &perr) && perr.Code == "23505" {
-			return fmt.Errorf("instance (%d) already linked with a stack of type \"%s\"", firstInstance.ID, secondInstance.StackName)
+			return fmt.Errorf("instance (%d) already linked with a stack of type \"%s\"", source.ID, destination.StackName)
 		}
 		return err
 	}
@@ -51,9 +51,9 @@ func (r repository) Unlink(instance *model.Instance) error {
 	link := &model.Linked{}
 
 	// Does another instance depend on the instance we're trying to unlink
-	err := r.db.First(link, "first_instance_id = ?", instance.ID).Error
+	err := r.db.First(link, "source_instance_id = ?", instance.ID).Error
 	if err == nil {
-		return fmt.Errorf("instance %d depends on %d", link.SecondInstanceID, instance.ID)
+		return fmt.Errorf("instance %d depends on %d", link.DestinationInstanceID, instance.ID)
 	}
 
 	// Any error beside ErrRecordNotFound?
@@ -62,7 +62,7 @@ func (r repository) Unlink(instance *model.Instance) error {
 	}
 
 	// Attempt to unlink
-	err = r.db.Unscoped().Delete(link, "second_instance_id = ?", instance.ID).Error
+	err = r.db.Unscoped().Delete(link, "destination_instance_id = ?", instance.ID).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil

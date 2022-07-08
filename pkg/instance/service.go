@@ -19,7 +19,7 @@ import (
 )
 
 type Service interface {
-	LinkDeploy(token string, oldInstance, newInstance *model.Instance) error
+	LinkDeploy(token string, sourceInstance, destinationInstance *model.Instance) error
 	Restart(token string, id uint) error
 	Create(instance *model.Instance) (*model.Instance, error)
 	Deploy(token string, instance *model.Instance) error
@@ -63,26 +63,26 @@ type userClientService interface {
 	FindGroupByName(token string, name string) (*models.Group, error)
 }
 
-func (s service) LinkDeploy(token string, oldInstance, newInstance *model.Instance) error {
-	err := s.link(oldInstance.ID, newInstance.ID, newInstance.StackName)
+func (s service) LinkDeploy(token string, sourceInstance, destinationInstance *model.Instance) error {
+	err := s.link(sourceInstance, destinationInstance)
 	if err != nil {
 		return err
 	}
 
-	oldStack, err := s.stackService.Find(oldInstance.StackName)
+	sourceStack, err := s.stackService.Find(sourceInstance.StackName)
 	if err != nil {
 		return err
 	}
 
-	newStack, err := s.stackService.Find(newInstance.StackName)
+	destinationStack, err := s.stackService.Find(destinationInstance.StackName)
 	if err != nil {
 		return err
 	}
 
 	// Consumed required parameters
-	for _, parameter := range newStack.RequiredParameters {
-		if parameter.Consumed && parameter.Name != newStack.HostnameVariable {
-			value, err := s.findParameterValue(parameter.Name, oldInstance, oldStack)
+	for _, parameter := range destinationStack.RequiredParameters {
+		if parameter.Consumed && parameter.Name != destinationStack.HostnameVariable {
+			value, err := s.findParameterValue(parameter.Name, sourceInstance, sourceStack)
 			if err != nil {
 				return err
 			}
@@ -90,14 +90,14 @@ func (s service) LinkDeploy(token string, oldInstance, newInstance *model.Instan
 				StackRequiredParameterID: parameter.Name,
 				Value:                    value,
 			}
-			newInstance.RequiredParameters = append(newInstance.RequiredParameters, parameterRequest)
+			destinationInstance.RequiredParameters = append(destinationInstance.RequiredParameters, parameterRequest)
 		}
 	}
 
 	// Consumed optional parameters
-	for _, parameter := range newStack.OptionalParameters {
-		if parameter.Consumed && parameter.Name != newStack.HostnameVariable {
-			value, err := s.findParameterValue(parameter.Name, oldInstance, oldStack)
+	for _, parameter := range destinationStack.OptionalParameters {
+		if parameter.Consumed && parameter.Name != destinationStack.HostnameVariable {
+			value, err := s.findParameterValue(parameter.Name, sourceInstance, sourceStack)
 			if err != nil {
 				return err
 			}
@@ -105,20 +105,20 @@ func (s service) LinkDeploy(token string, oldInstance, newInstance *model.Instan
 				StackOptionalParameterID: parameter.Name,
 				Value:                    value,
 			}
-			newInstance.OptionalParameters = append(newInstance.OptionalParameters, parameterRequest)
+			destinationInstance.OptionalParameters = append(destinationInstance.OptionalParameters, parameterRequest)
 		}
 	}
 
 	// Hostname parameter
-	if newStack.HostnameVariable != "" {
+	if destinationStack.HostnameVariable != "" {
 		hostnameParameter := model.InstanceRequiredParameter{
-			StackRequiredParameterID: newStack.HostnameVariable,
-			Value:                    fmt.Sprintf(oldStack.HostnamePattern, oldInstance.Name, oldInstance.GroupName),
+			StackRequiredParameterID: destinationStack.HostnameVariable,
+			Value:                    fmt.Sprintf(sourceStack.HostnamePattern, sourceInstance.Name, sourceInstance.GroupName),
 		}
-		newInstance.RequiredParameters = append(newInstance.RequiredParameters, hostnameParameter)
+		destinationInstance.RequiredParameters = append(destinationInstance.RequiredParameters, hostnameParameter)
 	}
 
-	err = s.Deploy(token, newInstance)
+	err = s.Deploy(token, destinationInstance)
 	if err != nil {
 		return err
 	}
@@ -126,18 +126,18 @@ func (s service) LinkDeploy(token string, oldInstance, newInstance *model.Instan
 	return nil
 }
 
-func (s service) findParameterValue(parameter string, oldInstance *model.Instance, oldStack *model.Stack) (string, error) {
-	requiredParameter, err := oldInstance.FindRequiredParameter(parameter)
+func (s service) findParameterValue(parameter string, sourceInstance *model.Instance, sourceStack *model.Stack) (string, error) {
+	requiredParameter, err := sourceInstance.FindRequiredParameter(parameter)
 	if err == nil {
 		return requiredParameter.Value, nil
 	}
 
-	optionalParameter, err := oldInstance.FindOptionalParameter(parameter)
+	optionalParameter, err := sourceInstance.FindOptionalParameter(parameter)
 	if err == nil {
 		return optionalParameter.Value, nil
 	}
 
-	stackOptionalParameter, err := oldStack.FindOptionalParameter(parameter)
+	stackOptionalParameter, err := sourceStack.FindOptionalParameter(parameter)
 	if err == nil {
 		return stackOptionalParameter.DefaultValue, nil
 	}
@@ -208,15 +208,8 @@ func (s service) Restart(token string, id uint) error {
 	return err
 }
 
-func (s service) link(firstID, secondID uint, stackName string) error {
-	instance := &model.Instance{
-		Model: gorm.Model{ID: firstID},
-	}
-	secondInstance := &model.Instance{
-		Model:     gorm.Model{ID: secondID},
-		StackName: stackName,
-	}
-	return s.instanceRepository.Link(instance, secondInstance)
+func (s service) link(source, destination *model.Instance) error {
+	return s.instanceRepository.Link(source, destination)
 }
 
 func (s service) unlink(id uint) error {

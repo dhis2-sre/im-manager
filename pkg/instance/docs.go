@@ -35,7 +35,7 @@ type _ struct {
 
 	// in: path
 	// required: true
-	NewInstanceId uint `json:"newInstanceId"`
+	DestinationId uint `json:"destinationId"`
 
 	// Deploy instance request body parameter
 	// in: body
