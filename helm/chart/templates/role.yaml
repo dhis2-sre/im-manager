@@ -60,6 +60,15 @@ rules:
       - patch
       - delete
 
+# Restart an instance
+  - apiGroups:
+      - apps
+    resources:
+      - deployments/scale
+    verbs:
+      - get
+      - update
+
 # PgAdmin
   - apiGroups:
       - networking.k8s.io

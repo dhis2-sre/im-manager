@@ -64,11 +64,7 @@ func (is *instanceService) LinkDeploy(token string, oldInstance, newInstance *mo
 	return nil
 }
 
-func (is *instanceService) Link(firstID, secondID uint, stackName string) error {
-	return nil
-}
-
-func (is *instanceService) Unlink(id uint) error {
+func (is *instanceService) Restart(token string, id uint) error {
 	return nil
 }
 

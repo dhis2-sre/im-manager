@@ -111,6 +111,73 @@ func (h Handler) Create(c *gin.Context) {
 	c.JSON(http.StatusCreated, savedInstance)
 }
 
+// Restart instance
+// swagger:route POST /instances/{id}/restart restartInstance
+//
+// Restart instance
+//
+// Security:
+//  oauth2:
+//
+// responses:
+//   202:
+//   401: Error
+//   403: Error
+//   404: Error
+//   415: Error
+func (h Handler) Restart(c *gin.Context) {
+	idParam := c.Param("id")
+	id, err := strconv.ParseUint(idParam, 10, 64)
+	if err != nil {
+		_ = c.AbortWithError(http.StatusBadRequest, fmt.Errorf("failed to parse id: %s", err))
+		return
+	}
+
+	token, err := handler.GetTokenFromHttpAuthHeader(c)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	user, err := handler.GetUserFromContext(c)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	userWithGroups, err := h.userClient.FindUserById(token, user.ID)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	instance, err := h.instanceService.FindById(uint(id))
+	if err != nil {
+		notFound := apperror.NewNotFound("instance", idParam)
+		_ = c.Error(notFound)
+		return
+	}
+
+	canWrite := handler.CanWriteInstance(userWithGroups, instance)
+	if !canWrite {
+		_ = c.AbortWithError(http.StatusUnauthorized, fmt.Errorf("write access denied"))
+		return
+	}
+
+	err = h.instanceService.Restart(token, instance.ID)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	c.Status(http.StatusAccepted)
+}
+
+type ParameterRequest struct {
+	StackParameter string `json:"stackParameter" binding:"required"`
+	Value          string `json:"value" binding:"required"`
+}
+
 type DeployInstanceRequest struct {
 	RequiredParameters []model.InstanceRequiredParameter `json:"requiredParameters"`
 	OptionalParameters []model.InstanceOptionalParameter `json:"optionalParameters"`
@@ -151,13 +218,13 @@ func (h Handler) Deploy(c *gin.Context) {
 		return
 	}
 
-	accessToken, err := handler.GetTokenFromHttpAuthHeader(c)
+	token, err := handler.GetTokenFromHttpAuthHeader(c)
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
 
-	userWithGroups, err := h.userClient.FindUserById(accessToken, user.ID)
+	userWithGroups, err := h.userClient.FindUserById(token, user.ID)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -180,7 +247,7 @@ func (h Handler) Deploy(c *gin.Context) {
 	instance.RequiredParameters = request.RequiredParameters
 	instance.OptionalParameters = request.OptionalParameters
 
-	err = h.instanceService.Deploy(accessToken, instance)
+	err = h.instanceService.Deploy(token, instance)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -297,12 +364,6 @@ func (h Handler) Delete(c *gin.Context) {
 	if err != nil {
 		badRequest := apperror.NewBadRequest("error parsing id")
 		_ = c.Error(badRequest)
-		return
-	}
-
-	err = h.instanceService.Unlink(uint(id))
-	if err != nil {
-		_ = c.Error(err)
 		return
 	}
 
