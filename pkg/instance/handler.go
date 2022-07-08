@@ -311,8 +311,7 @@ func (h Handler) LinkDeploy(c *gin.Context) {
 
 	oldInstance, err := h.instanceService.FindWithDecryptedParametersById(uint(id))
 	if err != nil {
-		notFound := apperror.NewNotFound("instance", idParam)
-		_ = c.Error(notFound)
+		_ = c.Error(err)
 		return
 	}
 
