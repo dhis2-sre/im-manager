@@ -13,7 +13,7 @@ require (
 	github.com/jackc/pgconn v1.12.1
 	github.com/lestrrat-go/jwx v1.2.25
 	github.com/rabbitmq/amqp091-go v1.3.4
-	github.com/stretchr/testify v1.7.5
+	github.com/stretchr/testify v1.8.0
 	go.mozilla.org/sops/v3 v3.7.3
 	gorm.io/driver/postgres v1.3.8
 	gorm.io/gorm v1.23.8
