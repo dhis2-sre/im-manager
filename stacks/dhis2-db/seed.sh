@@ -3,7 +3,7 @@
 set -euo pipefail
 
 function exec_psql() {
-  psql -U postgres -qAt -d "$DATABASE_NAME" -c "$1"
+  PGPASSWORD=$POSTGRES_POSTGRES_PASSWORD psql -U postgres -qAt -d "$DATABASE_NAME" -c "$1"
 }
 
 exec_psql "create extension if not exists postgis"
