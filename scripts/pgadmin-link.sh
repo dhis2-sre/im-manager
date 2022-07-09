@@ -3,7 +3,10 @@
 set -euo pipefail
 
 PGADMIN_USERNAME=someone@something.com
-PGADMIN_PASSWORD=QYfzfZTeF8pVMwECvt7jgBdk
+PGADMIN_PASSWORD=$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c32)
+
+echo "pgAdmin username: $PGADMIN_USERNAME"
+echo "pgAdmin password: $PGADMIN_PASSWORD"
 
 FIRST_INSTANCE_NAME=$1
 SECOND_INSTANCE_NAME=$2
