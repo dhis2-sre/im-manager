@@ -18,7 +18,6 @@ type Instance struct {
 	DeployLog          string                      `gorm:"type:text"`
 }
 
-// TODO: https://gorm.io/docs/has_one.html#Override-Foreign-Key
 type Linked struct {
 	SourceInstanceID      uint `gorm:"primaryKey"`
 	SourceInstance        Instance
