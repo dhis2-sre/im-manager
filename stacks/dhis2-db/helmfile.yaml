@@ -1,6 +1,7 @@
+# hostnamePattern: %s-postgresql.%s.svc
 # stackParameters: DATABASE_MANAGER_URL
 releases:
-  - name: {{ requiredEnv "INSTANCE_NAME" }}-database
+  - name: "{{ requiredEnv "INSTANCE_NAME" }}"
     namespace: "{{ requiredEnv "INSTANCE_NAMESPACE" }}"
     chart: bitnami/postgresql
     version: "{{ env "CHART_VERSION" | default "11.0.4" }}"
@@ -8,7 +9,9 @@ releases:
     values:
       - primary:
           podLabels:
-            im-data-id: "{{ requiredEnv "INSTANCE_ID" }}"
+            im: "true"
+            im-id: "{{ requiredEnv "INSTANCE_ID" }}"
+            im-ttl: "{{ env "INSTANCE_TTL" | default "" }}"
 
           extraEnvVars:
             - name: DATABASE_MANAGER_URL

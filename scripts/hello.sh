@@ -31,7 +31,7 @@ $HTTP "$INSTANCE_HOST/instances/$INSTANCE_ID" "Authorization: Bearer $ACCESS_TOK
 echo "{
   \"requiredParameters\": [
     {
-      \"stackParameter\": \"CHART_VERSION\",
+      \"name\": \"CHART_VERSION\",
       \"value\": \"$CHART_VERSION\"
     }
   ]

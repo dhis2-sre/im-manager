@@ -1,11 +1,17 @@
 package instance
 
 import (
+	"errors"
+	"fmt"
+
 	"github.com/dhis2-sre/im-manager/pkg/model"
+	"github.com/jackc/pgconn"
 	"gorm.io/gorm"
 )
 
 type Repository interface {
+	Link(firstInstance, secondInstance *model.Instance) error
+	Unlink(instance *model.Instance) error
 	Create(instance *model.Instance) error
 	Save(instance *model.Instance) error
 	FindWithParametersById(id uint) (*model.Instance, error)
@@ -22,6 +28,48 @@ type repository struct {
 
 func NewRepository(DB *gorm.DB) *repository {
 	return &repository{db: DB}
+}
+
+func (r repository) Link(source *model.Instance, destination *model.Instance) error {
+	link := &model.Linked{
+		SourceInstanceID:      source.ID,
+		DestinationStackName:  destination.StackName,
+		DestinationInstanceID: destination.ID,
+	}
+	err := r.db.Create(&link).Error
+	if err != nil {
+		var perr *pgconn.PgError
+		if errors.As(err, &perr) && perr.Code == "23505" {
+			return fmt.Errorf("instance (%d) already linked with a stack of type \"%s\"", source.ID, destination.StackName)
+		}
+		return err
+	}
+	return nil
+}
+
+func (r repository) Unlink(instance *model.Instance) error {
+	link := &model.Linked{}
+
+	// Does another instance depend on the instance we're trying to unlink
+	err := r.db.First(link, "source_instance_id = ?", instance.ID).Error
+	if err == nil {
+		return fmt.Errorf("instance %d depends on %d", link.DestinationInstanceID, instance.ID)
+	}
+
+	// Any error beside ErrRecordNotFound?
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return err
+	}
+
+	// Attempt to unlink
+	err = r.db.Unscoped().Delete(link, "destination_instance_id = ?", instance.ID).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil
+		}
+		return err
+	}
+	return nil
 }
 
 func (r repository) Create(instance *model.Instance) error {

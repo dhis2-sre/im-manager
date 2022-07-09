@@ -60,6 +60,10 @@ type instanceService struct {
 	mock.Mock
 }
 
+func (is *instanceService) LinkDeploy(token string, oldInstance, newInstance *model.Instance) error {
+	return nil
+}
+
 func (is *instanceService) Restart(token string, id uint) error {
 	return nil
 }
@@ -71,7 +75,7 @@ func (is *instanceService) Delete(token string, id uint) error {
 
 func (is *instanceService) Create(instance *model.Instance) (*model.Instance, error) { return nil, nil }
 
-func (is *instanceService) Deploy(token string, instance *model.Instance, group *models.Group) error {
+func (is *instanceService) Deploy(token string, instance *model.Instance) error {
 	return nil
 }
 

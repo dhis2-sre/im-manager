@@ -6,6 +6,10 @@ import (
 	"io"
 	"log"
 
+	"github.com/dhis2-sre/im-manager/pkg/stack"
+
+	"gorm.io/gorm"
+
 	"github.com/dhis2-sre/im-manager/pkg/config"
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	"github.com/dhis2-sre/im-user/swagger/sdk/models"
@@ -15,9 +19,10 @@ import (
 )
 
 type Service interface {
+	LinkDeploy(token string, sourceInstance, destinationInstance *model.Instance) error
 	Restart(token string, id uint) error
 	Create(instance *model.Instance) (*model.Instance, error)
-	Deploy(token string, instance *model.Instance, group *models.Group) error
+	Deploy(token string, instance *model.Instance) error
 	FindById(id uint) (*model.Instance, error)
 	Delete(token string, id uint) error
 	Logs(instance *model.Instance, group *models.Group, selector string) (io.ReadCloser, error)
@@ -31,6 +36,7 @@ type service struct {
 	config             config.Config
 	instanceRepository Repository
 	userClient         userClientService
+	stackService       stack.Service
 	helmfileService    HelmfileService
 	kubernetesService  KubernetesService
 }
@@ -39,6 +45,7 @@ func NewService(
 	config config.Config,
 	instanceRepository Repository,
 	userClient userClientService,
+	stackService stack.Service,
 	kubernetesService KubernetesService,
 	helmfileService HelmfileService,
 ) *service {
@@ -46,6 +53,7 @@ func NewService(
 		config,
 		instanceRepository,
 		userClient,
+		stackService,
 		helmfileService,
 		kubernetesService,
 	}
@@ -53,6 +61,88 @@ func NewService(
 
 type userClientService interface {
 	FindGroupByName(token string, name string) (*models.Group, error)
+}
+
+func (s service) LinkDeploy(token string, sourceInstance, destinationInstance *model.Instance) error {
+	err := s.link(sourceInstance, destinationInstance)
+	if err != nil {
+		return err
+	}
+
+	sourceStack, err := s.stackService.Find(sourceInstance.StackName)
+	if err != nil {
+		return err
+	}
+
+	destinationStack, err := s.stackService.Find(destinationInstance.StackName)
+	if err != nil {
+		return err
+	}
+
+	// Consumed required parameters
+	for _, parameter := range destinationStack.RequiredParameters {
+		if parameter.Consumed && parameter.Name != destinationStack.HostnameVariable {
+			value, err := s.findParameterValue(parameter.Name, sourceInstance, sourceStack)
+			if err != nil {
+				return err
+			}
+			parameterRequest := model.InstanceRequiredParameter{
+				StackRequiredParameterID: parameter.Name,
+				Value:                    value,
+			}
+			destinationInstance.RequiredParameters = append(destinationInstance.RequiredParameters, parameterRequest)
+		}
+	}
+
+	// Consumed optional parameters
+	for _, parameter := range destinationStack.OptionalParameters {
+		if parameter.Consumed && parameter.Name != destinationStack.HostnameVariable {
+			value, err := s.findParameterValue(parameter.Name, sourceInstance, sourceStack)
+			if err != nil {
+				return err
+			}
+			parameterRequest := model.InstanceOptionalParameter{
+				StackOptionalParameterID: parameter.Name,
+				Value:                    value,
+			}
+			destinationInstance.OptionalParameters = append(destinationInstance.OptionalParameters, parameterRequest)
+		}
+	}
+
+	// Hostname parameter
+	if destinationStack.HostnameVariable != "" {
+		hostnameParameter := model.InstanceRequiredParameter{
+			StackRequiredParameterID: destinationStack.HostnameVariable,
+			Value:                    fmt.Sprintf(sourceStack.HostnamePattern, sourceInstance.Name, sourceInstance.GroupName),
+		}
+		destinationInstance.RequiredParameters = append(destinationInstance.RequiredParameters, hostnameParameter)
+	}
+
+	err = s.Deploy(token, destinationInstance)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (s service) findParameterValue(parameter string, sourceInstance *model.Instance, sourceStack *model.Stack) (string, error) {
+	requiredParameter, err := sourceInstance.FindRequiredParameter(parameter)
+	if err == nil {
+		return requiredParameter.Value, nil
+	}
+
+	optionalParameter, err := sourceInstance.FindOptionalParameter(parameter)
+	if err == nil {
+		return optionalParameter.Value, nil
+	}
+
+	stackOptionalParameter, err := sourceStack.FindOptionalParameter(parameter)
+	if err == nil {
+		return stackOptionalParameter.DefaultValue, nil
+	}
+
+	return "", fmt.Errorf("unable to find value for parameter: %s", parameter)
 }
 
 func (s service) Restart(token string, id uint) error {
@@ -118,6 +208,17 @@ func (s service) Restart(token string, id uint) error {
 	return err
 }
 
+func (s service) link(source, destination *model.Instance) error {
+	return s.instanceRepository.Link(source, destination)
+}
+
+func (s service) unlink(id uint) error {
+	instance := &model.Instance{
+		Model: gorm.Model{ID: id},
+	}
+	return s.instanceRepository.Unlink(instance)
+}
+
 func (s service) Create(instance *model.Instance) (*model.Instance, error) {
 	err := s.instanceRepository.Create(instance)
 	if err != nil {
@@ -132,7 +233,9 @@ func (s service) Create(instance *model.Instance) (*model.Instance, error) {
 	return instanceWithParameters, nil
 }
 
-func (s service) Deploy(accessToken string, instance *model.Instance, group *models.Group) error {
+func (s service) Deploy(accessToken string, instance *model.Instance) error {
+	enrichParameters(instance)
+
 	encryptInstance, err := s.encryptParameters(instance)
 	if err != nil {
 		return err
@@ -144,6 +247,11 @@ func (s service) Deploy(accessToken string, instance *model.Instance, group *mod
 	}
 
 	instanceWithParameters, err := s.FindWithDecryptedParametersById(encryptInstance.ID)
+	if err != nil {
+		return err
+	}
+
+	group, err := s.userClient.FindGroupByName(accessToken, instance.GroupName)
 	if err != nil {
 		return err
 	}
@@ -176,11 +284,34 @@ func (s service) Deploy(accessToken string, instance *model.Instance, group *mod
 	return nil
 }
 
+func enrichParameters(instance *model.Instance) {
+	requiredParameters := instance.RequiredParameters
+	if len(requiredParameters) > 0 {
+		for i := range requiredParameters {
+			requiredParameters[i].InstanceID = instance.ID
+			requiredParameters[i].StackName = instance.StackName
+		}
+	}
+
+	optionalParameters := instance.OptionalParameters
+	if len(optionalParameters) > 0 {
+		for i := range optionalParameters {
+			optionalParameters[i].InstanceID = instance.ID
+			optionalParameters[i].StackName = instance.StackName
+		}
+	}
+}
+
 func (s service) FindById(id uint) (*model.Instance, error) {
 	return s.instanceRepository.FindById(id)
 }
 
 func (s service) Delete(token string, id uint) error {
+	err := s.unlink(id)
+	if err != nil {
+		return err
+	}
+
 	instanceWithParameters, err := s.FindWithDecryptedParametersById(id)
 	if err != nil {
 		return err

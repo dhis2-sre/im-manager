@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/dhis2-sre/im-manager/pkg/stack"
+
 	jobClient "github.com/dhis2-sre/im-job/pkg/client"
 	"github.com/dhis2-sre/im-manager/internal/apperror"
 	"github.com/dhis2-sre/im-manager/internal/handler"
@@ -19,17 +21,20 @@ type Handler struct {
 	userClient      userClientHandler
 	jobClient       jobClient.Client
 	instanceService Service
+	stackService    stack.Service
 }
 
 func NewHandler(
 	usrClient userClientHandler,
 	jobClient jobClient.Client,
 	instanceService Service,
+	stackService stack.Service,
 ) Handler {
 	return Handler{
 		usrClient,
 		jobClient,
 		instanceService,
+		stackService,
 	}
 }
 
@@ -174,8 +179,8 @@ type ParameterRequest struct {
 }
 
 type DeployInstanceRequest struct {
-	RequiredParameters []ParameterRequest `json:"requiredParameters"`
-	OptionalParameters []ParameterRequest `json:"optionalParameters"`
+	RequiredParameters []model.InstanceRequiredParameter `json:"requiredParameters"`
+	OptionalParameters []model.InstanceOptionalParameter `json:"optionalParameters"`
 }
 
 // Deploy instance
@@ -239,16 +244,10 @@ func (h Handler) Deploy(c *gin.Context) {
 		return
 	}
 
-	group, err := h.userClient.FindGroupByName(token, instance.GroupName)
-	if err != nil {
-		_ = c.Error(err)
-		return
-	}
+	instance.RequiredParameters = request.RequiredParameters
+	instance.OptionalParameters = request.OptionalParameters
 
-	instance.RequiredParameters = convertRequiredParameters(instance.ID, request.RequiredParameters)
-	instance.OptionalParameters = convertOptionalParameters(instance.ID, request.OptionalParameters)
-
-	err = h.instanceService.Deploy(token, instance, group)
+	err = h.instanceService.Deploy(token, instance)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -257,34 +256,101 @@ func (h Handler) Deploy(c *gin.Context) {
 	c.JSON(http.StatusCreated, instance)
 }
 
-func convertRequiredParameters(instanceID uint, requestParameters []ParameterRequest) []model.InstanceRequiredParameter {
-	if len(requestParameters) > 0 {
-		parameters := make([]model.InstanceRequiredParameter, len(requestParameters))
-		for i, parameter := range requestParameters {
-			parameters[i] = model.InstanceRequiredParameter{
-				InstanceID:             instanceID,
-				StackRequiredParameter: model.StackRequiredParameter{Name: parameter.StackParameter},
-				Value:                  parameter.Value,
-			}
-		}
-		return parameters
+// LinkDeploy instance
+// swagger:route POST /instances/{id}/link/{destinationId} linkDeployInstance
+//
+// Deploy and link with an existing instance
+//
+// Security:
+//  oauth2:
+//
+// responses:
+//   201: Instance
+//   401: Error
+//   403: Error
+//   404: Error
+//   415: Error
+func (h Handler) LinkDeploy(c *gin.Context) {
+	sourceIdParam := c.Param("id")
+	sourceId, err := strconv.ParseUint(sourceIdParam, 10, 64)
+	if err != nil {
+		_ = c.AbortWithError(http.StatusBadRequest, fmt.Errorf("failed to parse id: %s", err))
+		return
 	}
-	return []model.InstanceRequiredParameter{}
-}
 
-func convertOptionalParameters(instanceID uint, requestParameters []ParameterRequest) []model.InstanceOptionalParameter {
-	if len(requestParameters) > 0 {
-		parameters := make([]model.InstanceOptionalParameter, len(requestParameters))
-		for i, parameter := range requestParameters {
-			parameters[i] = model.InstanceOptionalParameter{
-				InstanceID:             instanceID,
-				StackOptionalParameter: model.StackOptionalParameter{Name: parameter.StackParameter},
-				Value:                  parameter.Value,
-			}
-		}
-		return parameters
+	destinationIdParam := c.Param("destinationId")
+	destinationId, err := strconv.ParseUint(destinationIdParam, 10, 64)
+	if err != nil {
+		_ = c.AbortWithError(http.StatusBadRequest, fmt.Errorf("failed to parse destinationIsourceId: %s", err))
+		return
 	}
-	return []model.InstanceOptionalParameter{}
+
+	var request DeployInstanceRequest
+	if err := handler.DataBinder(c, &request); err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	user, err := handler.GetUserFromContext(c)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	token, err := handler.GetTokenFromHttpAuthHeader(c)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	userWithGroups, err := h.userClient.FindUserById(token, user.ID)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	sourceInstance, err := h.instanceService.FindWithDecryptedParametersById(uint(sourceId))
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	if sourceInstance.DeployLog == "" {
+		_ = c.AbortWithError(http.StatusBadRequest, fmt.Errorf("source instance (%s) not deployed", sourceInstance.Name))
+		return
+	}
+
+	canWriteSource := handler.CanWriteInstance(userWithGroups, sourceInstance)
+	if !canWriteSource {
+		unauthorized := apperror.NewUnauthorized(fmt.Sprintf("write access to source instance (id: %d) denied", sourceInstance.ID))
+		_ = c.Error(unauthorized)
+		return
+	}
+
+	destinationInstance, err := h.instanceService.FindById(uint(destinationId))
+	if err != nil {
+		notFound := apperror.NewNotFound("instance", sourceIdParam)
+		_ = c.Error(notFound)
+		return
+	}
+
+	canWriteDestination := handler.CanWriteInstance(userWithGroups, destinationInstance)
+	if !canWriteDestination {
+		unauthorized := apperror.NewUnauthorized(fmt.Sprintf("write access to destination instance (id: %d) denied", destinationInstance.ID))
+		_ = c.Error(unauthorized)
+		return
+	}
+
+	destinationInstance.RequiredParameters = request.RequiredParameters
+	destinationInstance.OptionalParameters = request.OptionalParameters
+
+	err = h.instanceService.LinkDeploy(token, sourceInstance, destinationInstance)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	c.JSON(http.StatusCreated, destinationInstance)
 }
 
 // Delete instance by id

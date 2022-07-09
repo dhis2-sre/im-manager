@@ -32,12 +32,11 @@ func NewDatabase(c config.Config) (*gorm.DB, error) {
 		&model.Stack{},
 
 		&model.StackRequiredParameter{},
-		&model.RequiredStackParametersJoin{},
 
 		&model.StackOptionalParameter{},
-		&model.OptionalStackParametersJoin{},
 
 		&model.Instance{},
+		&model.Linked{},
 		&model.InstanceRequiredParameter{},
 		&model.InstanceOptionalParameter{},
 	)

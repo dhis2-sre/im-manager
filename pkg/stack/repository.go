@@ -10,8 +10,9 @@ type Repository interface {
 	Delete(name string) error
 	Find(name string) (*model.Stack, error)
 	FindAll() (*[]model.Stack, error)
-	CreateRequiredParameter(name string, parameter *model.StackRequiredParameter) error
-	CreateOptionalParameter(name string, parameter *model.StackOptionalParameter, defaultValue string) error
+	CreateRequiredParameter(parameter *model.StackRequiredParameter) error
+	CreateOptionalParameter(parameter *model.StackOptionalParameter) error
+	Save(stack *model.Stack) error
 }
 
 type repository struct {
@@ -33,6 +34,8 @@ func (r repository) Delete(name string) error {
 func (r repository) Find(name string) (*model.Stack, error) {
 	var stack *model.Stack
 	err := r.db.
+		//		Preload("RequiredParameters", "consumed <> ?", true).
+		//		Preload("OptionalParameters", "consumed <> ?", true).
 		Preload("RequiredParameters").
 		Preload("OptionalParameters").
 		First(&stack, "name = ?", name).Error
@@ -45,24 +48,14 @@ func (r repository) FindAll() (*[]model.Stack, error) {
 	return &stacks, err
 }
 
-func (r repository) CreateOptionalParameter(name string, parameter *model.StackOptionalParameter, defaultValue string) error {
-	err := r.db.FirstOrCreate(&parameter).Error
-	if err != nil {
-		return err
-	}
-
-	joinModel := &model.OptionalStackParametersJoin{StackName: name, ParameterID: parameter.Name, DefaultValue: defaultValue}
-
-	return r.db.Create(&joinModel).Error
+func (r repository) CreateOptionalParameter(parameter *model.StackOptionalParameter) error {
+	return r.db.FirstOrCreate(&parameter).Error
 }
 
-func (r repository) CreateRequiredParameter(name string, parameter *model.StackRequiredParameter) error {
-	err := r.db.FirstOrCreate(&parameter).Error
-	if err != nil {
-		return err
-	}
+func (r repository) CreateRequiredParameter(parameter *model.StackRequiredParameter) error {
+	return r.db.FirstOrCreate(&parameter).Error
+}
 
-	joinModel := &model.RequiredStackParametersJoin{StackName: name, ParameterID: parameter.Name}
-
-	return r.db.Create(&joinModel).Error
+func (r repository) Save(stack *model.Stack) error {
+	return r.db.Save(stack).Error
 }

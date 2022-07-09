@@ -59,7 +59,7 @@ func run() error {
 	uc := userClient.New(cfg.UserService.Host, cfg.UserService.BasePath)
 	kubernetesSvc := instance.NewKubernetesService()
 	helmfileSvc := instance.NewHelmfileService(stackSvc, cfg)
-	instanceSvc := instance.NewService(cfg, instanceRepo, uc, kubernetesSvc, helmfileSvc)
+	instanceSvc := instance.NewService(cfg, instanceRepo, uc, stackSvc, kubernetesSvc, helmfileSvc)
 
 	stack.LoadStacks(stackSvc)
 
@@ -80,7 +80,7 @@ func run() error {
 
 	stackHandler := stack.NewHandler(stackSvc)
 	jobC := jobClient.ProvideClient(cfg.JobService.Host, cfg.JobService.BasePath)
-	instanceHandler := instance.NewHandler(uc, jobC, instanceSvc)
+	instanceHandler := instance.NewHandler(uc, jobC, instanceSvc, stackSvc)
 	authMiddleware := handler.NewAuthentication(cfg)
 
 	r := server.GetEngine(cfg.BasePath, stackHandler, instanceHandler, authMiddleware)
