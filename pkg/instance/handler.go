@@ -334,6 +334,13 @@ func (h Handler) LinkDeploy(c *gin.Context) {
 		return
 	}
 
+	canWriteDestination := handler.CanWriteInstance(userWithGroups, destinationInstance)
+	if !canWriteDestination {
+		unauthorized := apperror.NewUnauthorized(fmt.Sprintf("write access to destination instance (id: %d) denied", destinationInstance.ID))
+		_ = c.Error(unauthorized)
+		return
+	}
+
 	destinationInstance.RequiredParameters = request.RequiredParameters
 	destinationInstance.OptionalParameters = request.OptionalParameters
 
