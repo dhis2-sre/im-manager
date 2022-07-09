@@ -322,7 +322,7 @@ func (h Handler) LinkDeploy(c *gin.Context) {
 
 	canWriteSource := handler.CanWriteInstance(userWithGroups, sourceInstance)
 	if !canWriteSource {
-		unauthorized := apperror.NewUnauthorized("write access to source instance denied")
+		unauthorized := apperror.NewUnauthorized(fmt.Sprintf("write access to source instance (id: %d) denied", sourceInstance.ID))
 		_ = c.Error(unauthorized)
 		return
 	}
