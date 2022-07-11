@@ -41,6 +41,11 @@ func (c *ttlDestroyConsumer) Consume() error {
 
 		if err := json.Unmarshal(d.Body, &payload); err != nil {
 			log.Printf("Error unmarshalling ttl-destroy message: %v\n", err)
+			err := d.Nack(false, false)
+			if err != nil {
+				log.Printf("Error negatively acknowledging ttl-destroy message: %v\n", err)
+				return
+			}
 			return
 		}
 
