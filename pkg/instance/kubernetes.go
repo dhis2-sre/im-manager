@@ -28,13 +28,11 @@ func NewKubernetesService() *kubernetesService {
 
 func (k kubernetesService) CommandExecutor(cmd *exec.Cmd, configuration *models.ClusterConfiguration) ([]byte, []byte, error) {
 	if len(configuration.KubernetesConfiguration) > 0 {
-		// Decrypt
 		kubernetesConfigurationInCleartext, err := k.decrypt(configuration.KubernetesConfiguration, "yaml")
 		if err != nil {
 			return nil, nil, err
 		}
 
-		// Create tmp file
 		file, err := ioutil.TempFile("", "kubectl")
 		if err != nil {
 			return nil, nil, err
@@ -47,7 +45,6 @@ func (k kubernetesService) CommandExecutor(cmd *exec.Cmd, configuration *models.
 			}
 		}(file.Name())
 
-		// Write configuration to file
 		_, err = file.Write(kubernetesConfigurationInCleartext)
 		if err != nil {
 			return nil, nil, err
