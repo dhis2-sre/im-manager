@@ -62,15 +62,15 @@ func (h helmfileService) executeHelmfileCommand(accessToken string, instance *mo
 		return nil, err
 	}
 
-	cmd := exec.Command("/usr/bin/helmfile", "--helm-binary", "/usr/bin/helm", "-f", stackPath, operation)
-	log.Printf("Command: %s\n", cmd.String())
-
 	stackParameters, err := h.loadStackParameters(stacksFolder, stack.Name)
 	if err != nil {
 		return nil, err
 	}
 
+	cmd := exec.Command("/usr/bin/helmfile", "--helm-binary", "/usr/bin/helm", "-f", stackPath, operation)
+	log.Printf("Command: %s\n", cmd.String())
 	h.configureInstanceEnvironment(accessToken, instance, group, stackParameters, cmd)
+
 	return cmd, nil
 }
 
