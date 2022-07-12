@@ -24,37 +24,40 @@ func NewKubernetesService() *kubernetesService {
 	return &kubernetesService{}
 }
 
-func (k kubernetesService) CommandExecutor(cmd *exec.Cmd, configuration *models.ClusterConfiguration) ([]byte, []byte, error) {
-	if len(configuration.KubernetesConfiguration) > 0 {
-		kubernetesConfigurationInCleartext, err := decryptYaml(configuration.KubernetesConfiguration)
-		if err != nil {
-			return nil, nil, err
-		}
-
-		file, err := ioutil.TempFile("", "kubectl")
-		if err != nil {
-			return nil, nil, err
-		}
-
-		defer func(name string) {
-			err := os.Remove(name)
-			if err != nil {
-				// TODO ... What to do?
-			}
-		}(file.Name())
-
-		_, err = file.Write(kubernetesConfigurationInCleartext)
-		if err != nil {
-			return nil, nil, err
-		}
-
-		err = file.Close()
-		if err != nil {
-			return nil, nil, err
-		}
-
-		cmd.Env = append(cmd.Env, fmt.Sprintf("KUBECONFIG=%s", file.Name()))
+func (k kubernetesService) CommandExecutor(cmd *exec.Cmd, configuration *models.ClusterConfiguration) (stdout []byte, stderr []byte, err error) {
+	if len(configuration.KubernetesConfiguration) == 0 {
+		return runCommand(cmd)
 	}
+
+	kubeCfg, err := decryptYaml(configuration.KubernetesConfiguration)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	file, err := ioutil.TempFile("", "kubectl")
+	if err != nil {
+		return nil, nil, err
+	}
+	defer func() {
+		// remove the file even if closing it fails. os.Remove is actually making syscall unlink
+		// unlink deletes a name and the file if the name was the last link to the file.
+		// If we fail to close the file it will remain in existence until the last file descriptor
+		// referring to it is closed. As we don't return the file, this should be done once a GC
+		// occurs.
+
+		errC := file.Close()
+		errR := os.Remove(file.Name())
+		if errC != nil || errR != nil {
+			err = fmt.Errorf("error removing kube config %q: %v, %v", file.Name(), errC, errR)
+		}
+	}()
+
+	_, err = file.Write(kubeCfg)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	cmd.Env = append(cmd.Env, fmt.Sprintf("KUBECONFIG=%s", file.Name()))
 	return runCommand(cmd)
 }
 
@@ -71,12 +74,12 @@ func runCommand(cmd *exec.Cmd) ([]byte, []byte, error) {
 func newClient(configuration *models.ClusterConfiguration) (*kubernetes.Clientset, error) {
 	var restClientConfig *rest.Config
 	if len(configuration.KubernetesConfiguration) > 0 {
-		configurationInCleartext, err := decryptYaml(configuration.KubernetesConfiguration)
+		kubeCfg, err := decryptYaml(configuration.KubernetesConfiguration)
 		if err != nil {
 			return nil, err
 		}
 
-		config, err := clientcmd.NewClientConfigFromBytes(configurationInCleartext)
+		config, err := clientcmd.NewClientConfigFromBytes(kubeCfg)
 		if err != nil {
 			return nil, err
 		}
