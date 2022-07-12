@@ -80,9 +80,8 @@ func (h helmfileService) loadStackParameters(stacksFolder string, stackName stri
 	environment := h.config.Environment
 	stackParametersPath := fmt.Sprintf("%s/%s/parameters/%s/parameters.yaml", stacksFolder, stackName, environment)
 	data, err := os.ReadFile(stackParametersPath)
-	// TODO: Maybe not just return an empty struct on any given error
 	if err != nil {
-		return &StackParameters{}, nil
+		return nil, err
 	}
 
 	bytes, err := decryptYaml(data)
