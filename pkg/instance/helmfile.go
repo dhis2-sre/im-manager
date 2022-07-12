@@ -7,8 +7,6 @@ import (
 	"os/exec"
 	"path"
 
-	"go.mozilla.org/sops/v3/cmd/sops/formats"
-	"go.mozilla.org/sops/v3/decrypt"
 	"k8s.io/apimachinery/pkg/util/yaml"
 
 	"github.com/dhis2-sre/im-manager/pkg/config"
@@ -87,7 +85,7 @@ func (h helmfileService) loadStackParameters(stacksFolder string, stackName stri
 		return &StackParameters{}, nil
 	}
 
-	bytes, err := h.decrypt(data, "yaml")
+	bytes, err := decryptYaml(data)
 	if err != nil {
 		return nil, err
 	}
@@ -150,12 +148,4 @@ func (h helmfileService) injectEnv(env string, envs *[]string) {
 	} else {
 		log.Println("WARNING!!! Env not found:", env)
 	}
-}
-
-func (h helmfileService) decrypt(data []byte, format string) ([]byte, error) {
-	cleartext, err := decrypt.DataWithFormat(data, formats.FormatFromString(format))
-	if err != nil {
-		return nil, err
-	}
-	return cleartext, nil
 }
