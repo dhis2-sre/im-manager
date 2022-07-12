@@ -8,8 +8,6 @@ import (
 	"os/exec"
 
 	"github.com/dhis2-sre/im-user/swagger/sdk/models"
-	"go.mozilla.org/sops/v3/cmd/sops/formats"
-	"go.mozilla.org/sops/v3/decrypt"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -28,7 +26,7 @@ func NewKubernetesService() *kubernetesService {
 
 func (k kubernetesService) CommandExecutor(cmd *exec.Cmd, configuration *models.ClusterConfiguration) ([]byte, []byte, error) {
 	if len(configuration.KubernetesConfiguration) > 0 {
-		kubernetesConfigurationInCleartext, err := k.decrypt(configuration.KubernetesConfiguration, "yaml")
+		kubernetesConfigurationInCleartext, err := decryptYaml(configuration.KubernetesConfiguration)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -70,10 +68,10 @@ func runCommand(cmd *exec.Cmd) ([]byte, []byte, error) {
 	return stdout.Bytes(), stderr.Bytes(), err
 }
 
-func (k kubernetesService) getClient(configuration *models.ClusterConfiguration) (*kubernetes.Clientset, error) {
+func newClient(configuration *models.ClusterConfiguration) (*kubernetes.Clientset, error) {
 	var restClientConfig *rest.Config
 	if len(configuration.KubernetesConfiguration) > 0 {
-		configurationInCleartext, err := k.decrypt(configuration.KubernetesConfiguration, "yaml")
+		configurationInCleartext, err := decryptYaml(configuration.KubernetesConfiguration)
 		if err != nil {
 			return nil, err
 		}
@@ -105,17 +103,9 @@ func (k kubernetesService) getClient(configuration *models.ClusterConfiguration)
 
 func (k kubernetesService) Executor(configuration *models.ClusterConfiguration, fn func(client *kubernetes.Clientset) error) error {
 	// TODO: This isn't good code. The error returned could be from either getClient or from fn
-	client, err := k.getClient(configuration)
+	client, err := newClient(configuration)
 	if err != nil {
 		return err
 	}
 	return fn(client)
-}
-
-func (k kubernetesService) decrypt(data []byte, format string) ([]byte, error) {
-	kubernetesConfigurationCleartext, err := decrypt.DataWithFormat(data, formats.FormatFromString(format))
-	if err != nil {
-		return nil, err
-	}
-	return kubernetesConfigurationCleartext, nil
 }

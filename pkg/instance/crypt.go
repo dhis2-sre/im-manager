@@ -4,6 +4,9 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"encoding/base64"
+
+	"go.mozilla.org/sops/v3/cmd/sops/formats"
+	"go.mozilla.org/sops/v3/decrypt"
 )
 
 var iv = []byte{83, 108, 97, 118, 97, 32, 85, 107, 114, 97, 105, 110, 105, 33, 33, 33}
@@ -40,4 +43,8 @@ func decryptText(text string, key string) (string, error) {
 	cfb.XORKeyStream(plainText, cipherText)
 
 	return string(plainText), nil
+}
+
+func decryptYaml(data []byte) ([]byte, error) {
+	return decrypt.DataWithFormat(data, formats.FormatFromString("yaml"))
 }
