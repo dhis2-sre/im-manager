@@ -26,37 +26,38 @@ func NewKubernetesService() *kubernetesService {
 	return &kubernetesService{}
 }
 
-func (k kubernetesService) CommandExecutor(cmd *exec.Cmd, configuration *models.ClusterConfiguration) ([]byte, []byte, error) {
-	if len(configuration.KubernetesConfiguration) > 0 {
-		kubernetesConfigurationInCleartext, err := k.decrypt(configuration.KubernetesConfiguration, "yaml")
-		if err != nil {
-			return nil, nil, err
-		}
-
-		file, err := ioutil.TempFile("", "kubectl")
-		if err != nil {
-			return nil, nil, err
-		}
-
-		defer func(name string) {
-			err := os.Remove(name)
-			if err != nil {
-				// TODO ... What to do?
-			}
-		}(file.Name())
-
-		_, err = file.Write(kubernetesConfigurationInCleartext)
-		if err != nil {
-			return nil, nil, err
-		}
-
-		err = file.Close()
-		if err != nil {
-			return nil, nil, err
-		}
-
-		cmd.Env = append(cmd.Env, fmt.Sprintf("KUBECONFIG=%s", file.Name()))
+func (k kubernetesService) CommandExecutor(cmd *exec.Cmd, configuration *models.ClusterConfiguration) (stdout []byte, stderr []byte, err error) {
+	if len(configuration.KubernetesConfiguration) == 0 {
+		return runCommand(cmd)
 	}
+
+	kubeCfg, err := decryptYaml(configuration.KubernetesConfiguration)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	file, err := ioutil.TempFile("", "kubectl")
+	if err != nil {
+		return nil, nil, err
+	}
+	defer func() {
+		// TODO this comment can be remove later on, its just to explain an interesting detail about
+		// os.Remove and not using defer on file.Close()
+		// os.Remove will successfully "remove" the file even if its still open
+		// previously, if file.Write() failed for example when there is no space on tmp
+		// the actual file would still be referenced (at least for a little longer)
+		// https://stackoverflow.com/questions/19441823/a-file-opened-for-read-and-write-can-be-unlinked
+		err = file.Close()
+		// TODO here in case err is != nil due to a failed close we would discard it; ok with me :)
+		err = os.Remove(file.Name())
+	}()
+
+	_, err = file.Write(kubeCfg)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	cmd.Env = append(cmd.Env, fmt.Sprintf("KUBECONFIG=%s", file.Name()))
 	return runCommand(cmd)
 }
 
@@ -70,15 +71,15 @@ func runCommand(cmd *exec.Cmd) ([]byte, []byte, error) {
 	return stdout.Bytes(), stderr.Bytes(), err
 }
 
-func (k kubernetesService) getClient(configuration *models.ClusterConfiguration) (*kubernetes.Clientset, error) {
+func newClient(configuration *models.ClusterConfiguration) (*kubernetes.Clientset, error) {
 	var restClientConfig *rest.Config
 	if len(configuration.KubernetesConfiguration) > 0 {
-		configurationInCleartext, err := k.decrypt(configuration.KubernetesConfiguration, "yaml")
+		kubeCfg, err := decryptYaml(configuration.KubernetesConfiguration)
 		if err != nil {
 			return nil, err
 		}
 
-		config, err := clientcmd.NewClientConfigFromBytes(configurationInCleartext)
+		config, err := clientcmd.NewClientConfigFromBytes(kubeCfg)
 		if err != nil {
 			return nil, err
 		}
@@ -104,18 +105,14 @@ func (k kubernetesService) getClient(configuration *models.ClusterConfiguration)
 }
 
 func (k kubernetesService) Executor(configuration *models.ClusterConfiguration, fn func(client *kubernetes.Clientset) error) error {
-	// TODO: This isn't good code. The error returned could be from either getClient or from fn
-	client, err := k.getClient(configuration)
+	// TODO: This isn't good code. The error returned could be from either newClient or from fn
+	client, err := newClient(configuration)
 	if err != nil {
 		return err
 	}
 	return fn(client)
 }
 
-func (k kubernetesService) decrypt(data []byte, format string) ([]byte, error) {
-	kubernetesConfigurationCleartext, err := decrypt.DataWithFormat(data, formats.FormatFromString(format))
-	if err != nil {
-		return nil, err
-	}
-	return kubernetesConfigurationCleartext, nil
+func decryptYaml(data []byte) ([]byte, error) {
+	return decrypt.DataWithFormat(data, formats.FormatFromString("yaml"))
 }
