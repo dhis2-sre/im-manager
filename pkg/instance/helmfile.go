@@ -94,6 +94,7 @@ func (h helmfileService) loadStackParameters(stacksFolder string, stackName stri
 	if err != nil {
 		return nil, err
 	}
+
 	return stackParameters, nil
 }
 
