@@ -76,26 +76,26 @@ func (h helmfileService) executeHelmfileCommand(accessToken string, instance *mo
 
 type StackParameters map[string]string
 
-func (h helmfileService) loadStackParameters(stacksFolder string, stackName string) (*StackParameters, error) {
+func (h helmfileService) loadStackParameters(folder string, name string) (*StackParameters, error) {
 	environment := h.config.Environment
-	stackParametersPath := fmt.Sprintf("%s/%s/parameters/%s/parameters.yaml", stacksFolder, stackName, environment)
-	data, err := os.ReadFile(stackParametersPath)
+	path := fmt.Sprintf("%s/%s/parameters/%s/parameters.yaml", folder, name, environment)
+	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
 
-	bytes, err := decryptYaml(data)
+	b, err := decryptYaml(data)
 	if err != nil {
 		return nil, err
 	}
 
-	stackParameters := &StackParameters{}
-	err = yaml.Unmarshal(bytes, stackParameters)
+	params := &StackParameters{}
+	err = yaml.Unmarshal(b, params)
 	if err != nil {
 		return nil, err
 	}
 
-	return stackParameters, nil
+	return params, nil
 }
 
 func (h helmfileService) configureInstanceEnvironment(accessToken string, instance *model.Instance, group *models.Group, stackParameters *StackParameters, cmd *exec.Cmd) {
