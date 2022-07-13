@@ -62,43 +62,43 @@ func (h helmfileService) executeHelmfileCommand(accessToken string, instance *mo
 		return nil, err
 	}
 
-	cmd := exec.Command("/usr/bin/helmfile", "--helm-binary", "/usr/bin/helm", "-f", stackPath, operation)
-	log.Printf("Command: %s\n", cmd.String())
-
 	stackParameters, err := h.loadStackParameters(stacksFolder, stack.Name)
 	if err != nil {
 		return nil, err
 	}
 
-	h.configureInstanceEnvironment(accessToken, instance, group, stackParameters, cmd)
+	cmd := exec.Command("/usr/bin/helmfile", "--helm-binary", "/usr/bin/helm", "-f", stackPath, operation)
+	log.Printf("Command: %s\n", cmd.String())
+	configureInstanceEnvironment(accessToken, instance, group, stackParameters, cmd)
+
 	return cmd, nil
 }
 
 type StackParameters map[string]string
 
-func (h helmfileService) loadStackParameters(stacksFolder string, stackName string) (*StackParameters, error) {
+func (h helmfileService) loadStackParameters(folder string, name string) (StackParameters, error) {
 	environment := h.config.Environment
-	stackParametersPath := fmt.Sprintf("%s/%s/parameters/%s/parameters.yaml", stacksFolder, stackName, environment)
-	data, err := os.ReadFile(stackParametersPath)
-	// TODO: Maybe not just return an empty struct on any given error
-	if err != nil {
-		return &StackParameters{}, nil
-	}
-
-	bytes, err := decryptYaml(data)
+	path := fmt.Sprintf("%s/%s/parameters/%s/parameters.yaml", folder, name, environment)
+	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
 
-	stackParameters := &StackParameters{}
-	err = yaml.Unmarshal(bytes, stackParameters)
+	b, err := decryptYaml(data)
 	if err != nil {
 		return nil, err
 	}
-	return stackParameters, nil
+
+	var params StackParameters
+	err = yaml.Unmarshal(b, &params)
+	if err != nil {
+		return nil, err
+	}
+
+	return params, nil
 }
 
-func (h helmfileService) configureInstanceEnvironment(accessToken string, instance *model.Instance, group *models.Group, stackParameters *StackParameters, cmd *exec.Cmd) {
+func configureInstanceEnvironment(accessToken string, instance *model.Instance, group *models.Group, stackParameters StackParameters, cmd *exec.Cmd) {
 	// TODO: We should only inject what the stack require, currently we just blindly inject IM_ACCESS_TOKEN and others which may not be required by the stack
 	// We could probably list the required system parameters in the stacks helmfile and parse those as well as other parameters
 	instanceNameEnv := fmt.Sprintf("%s=%s", "INSTANCE_NAME", instance.Name)
@@ -109,21 +109,21 @@ func (h helmfileService) configureInstanceEnvironment(accessToken string, instan
 	homeEnv := fmt.Sprintf("%s=%s", "HOME", "/tmp")
 	cmd.Env = append(cmd.Env, instanceNameEnv, instanceNamespaceEnv, instanceIdEnv, instanceHostnameEnv, homeEnv, imTokenEnv)
 
-	h.injectEnv("AWS_ACCESS_KEY_ID", &cmd.Env)
-	h.injectEnv("AWS_SECRET_ACCESS_KEY", &cmd.Env)
-	h.injectEnv("AWS_DEFAULT_REGION", &cmd.Env)
-	h.injectEnv("AWS_REGION", &cmd.Env)
-	h.injectEnv("AWS_ROLE_ARN", &cmd.Env)
-	h.injectEnv("AWS_WEB_IDENTITY_TOKEN_FILE", &cmd.Env)
+	cmd.Env = injectEnv(cmd.Env, "AWS_ACCESS_KEY_ID")
+	cmd.Env = injectEnv(cmd.Env, "AWS_SECRET_ACCESS_KEY")
+	cmd.Env = injectEnv(cmd.Env, "AWS_DEFAULT_REGION")
+	cmd.Env = injectEnv(cmd.Env, "AWS_REGION")
+	cmd.Env = injectEnv(cmd.Env, "AWS_ROLE_ARN")
+	cmd.Env = injectEnv(cmd.Env, "AWS_WEB_IDENTITY_TOKEN_FILE")
 
-	h.injectEnv("KUBERNETES_SERVICE_PORT", &cmd.Env)
-	h.injectEnv("KUBERNETES_PORT", &cmd.Env)
-	h.injectEnv("KUBERNETES_PORT_443_TCP_ADDR", &cmd.Env)
-	h.injectEnv("KUBERNETES_PORT_443_TCP_PORT", &cmd.Env)
-	h.injectEnv("KUBERNETES_PORT_443_TCP_PROTO", &cmd.Env)
-	h.injectEnv("KUBERNETES_PORT_443_TCP", &cmd.Env)
-	h.injectEnv("KUBERNETES_SERVICE_PORT_HTTPS", &cmd.Env)
-	h.injectEnv("KUBERNETES_SERVICE_HOST", &cmd.Env)
+	cmd.Env = injectEnv(cmd.Env, "KUBERNETES_SERVICE_PORT")
+	cmd.Env = injectEnv(cmd.Env, "KUBERNETES_PORT")
+	cmd.Env = injectEnv(cmd.Env, "KUBERNETES_PORT_443_TCP_ADDR")
+	cmd.Env = injectEnv(cmd.Env, "KUBERNETES_PORT_443_TCP_PORT")
+	cmd.Env = injectEnv(cmd.Env, "KUBERNETES_PORT_443_TCP_PROTO")
+	cmd.Env = injectEnv(cmd.Env, "KUBERNETES_PORT_443_TCP")
+	cmd.Env = injectEnv(cmd.Env, "KUBERNETES_SERVICE_PORT_HTTPS")
+	cmd.Env = injectEnv(cmd.Env, "KUBERNETES_SERVICE_HOST")
 
 	for _, parameter := range instance.RequiredParameters {
 		instanceEnv := fmt.Sprintf("%s=%s", parameter.StackRequiredParameter.Name, parameter.Value)
@@ -135,17 +135,19 @@ func (h helmfileService) configureInstanceEnvironment(accessToken string, instan
 		cmd.Env = append(cmd.Env, instanceEnv)
 	}
 
-	for parameter, value := range *stackParameters {
+	for parameter, value := range stackParameters {
 		instanceEnv := fmt.Sprintf("%s=%s", parameter, value)
 		cmd.Env = append(cmd.Env, instanceEnv)
 	}
 }
 
-func (h helmfileService) injectEnv(env string, envs *[]string) {
+func injectEnv(envs []string, env string) []string {
 	if value, exists := os.LookupEnv(env); exists {
 		cmdEnv := fmt.Sprintf("%s=%s", env, value)
-		*envs = append(*envs, cmdEnv)
+		envs = append(envs, cmdEnv)
 	} else {
 		log.Println("WARNING!!! Env not found:", env)
 	}
+
+	return envs
 }
