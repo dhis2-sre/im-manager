@@ -15,11 +15,6 @@ import (
 	"github.com/dhis2-sre/im-user/swagger/sdk/models"
 )
 
-type HelmfileService interface {
-	Sync(token string, instance *model.Instance, group *models.Group) (*exec.Cmd, error)
-	Destroy(token string, instance *model.Instance, group *models.Group) (*exec.Cmd, error)
-}
-
 type helmfileService struct {
 	stackService stack.Service
 	config       config.Config
@@ -32,11 +27,11 @@ func NewHelmfileService(stackService stack.Service, config config.Config) helmfi
 	}
 }
 
-func (h helmfileService) Sync(accessToken string, instance *model.Instance, group *models.Group) (*exec.Cmd, error) {
+func (h helmfileService) sync(accessToken string, instance *model.Instance, group *models.Group) (*exec.Cmd, error) {
 	return h.executeHelmfileCommand(accessToken, instance, group, "sync")
 }
 
-func (h helmfileService) Destroy(accessToken string, instance *model.Instance, group *models.Group) (*exec.Cmd, error) {
+func (h helmfileService) destroy(accessToken string, instance *model.Instance, group *models.Group) (*exec.Cmd, error) {
 	return h.executeHelmfileCommand(accessToken, instance, group, "destroy")
 }
 
