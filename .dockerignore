@@ -1,1 +1,12 @@
-helm/
+.env
+.env.example
+.envrc
+.git
+.github
+.gitignore
+.golangci.yml
+helm
+Makefile
+*.md
+.pre-commit-config.yaml
+scripts
