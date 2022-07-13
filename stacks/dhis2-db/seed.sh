@@ -2,10 +2,8 @@
 
 set -euo pipefail
 
-sleep 1 # Prevent: "psql: fe_sendauth: no password supplied"
-
 function exec_psql() {
-  psql -U postgres -qAt -d "$DATABASE_NAME" -c "$1"
+  PGPASSWORD=$POSTGRES_POSTGRES_PASSWORD psql -U postgres -qAt -d "$DATABASE_NAME" -c "$1"
 }
 
 exec_psql "create extension if not exists postgis"
