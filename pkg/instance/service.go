@@ -40,7 +40,7 @@ type helmfile interface {
 
 type kubernetesExecutor interface {
 	executor(configuration *models.ClusterConfiguration, fn func(client *kubernetes.Clientset) error) error
-	commandExecutor(cmd *exec.Cmd, configuration *models.ClusterConfiguration) ([]byte, []byte, error)
+	commandExecutor(cmd *exec.Cmd, configuration *models.ClusterConfiguration) (stdout []byte, stderr []byte, err error)
 }
 
 type service struct {
