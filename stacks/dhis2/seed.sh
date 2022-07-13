@@ -1,1 +1,1 @@
-dhis2-db/seed.sh
+../dhis2-db/seed.sh
