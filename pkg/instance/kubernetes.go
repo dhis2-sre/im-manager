@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"os"
 	"os/exec"
+	"strings"
 
 	"github.com/dhis2-sre/im-user/swagger/sdk/models"
 	"k8s.io/client-go/kubernetes"
@@ -47,8 +48,9 @@ func (k kubernetesService) CommandExecutor(cmd *exec.Cmd, configuration *models.
 
 		errC := file.Close()
 		errR := os.Remove(file.Name())
-		if errC != nil || errR != nil {
-			err = fmt.Errorf("error removing kube config %q: %v, %v", file.Name(), errC, errR)
+		errMsg := joinErrors(err, errC, errR)
+		if errMsg != "" {
+			err = fmt.Errorf("error handling kube config %q: %s", file.Name(), errMsg)
 		}
 	}()
 
@@ -59,6 +61,16 @@ func (k kubernetesService) CommandExecutor(cmd *exec.Cmd, configuration *models.
 
 	cmd.Env = append(cmd.Env, fmt.Sprintf("KUBECONFIG=%s", file.Name()))
 	return runCommand(cmd)
+}
+
+func joinErrors(errs ...error) string {
+	var errMsgs []string
+	for _, err := range errs {
+		if err != nil {
+			errMsgs = append(errMsgs, err.Error())
+		}
+	}
+	return strings.Join(errMsgs, ", ")
 }
 
 func runCommand(cmd *exec.Cmd) ([]byte, []byte, error) {
