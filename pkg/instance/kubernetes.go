@@ -105,10 +105,9 @@ func newClient(configuration *models.ClusterConfiguration) (*kubernetes.Clientse
 }
 
 func (k kubernetesService) Executor(configuration *models.ClusterConfiguration, fn func(client *kubernetes.Clientset) error) error {
-	// TODO: This isn't good code. The error returned could be from either getClient or from fn
 	client, err := newClient(configuration)
 	if err != nil {
-		return err
+		return fmt.Errorf("error creating kube client: %v", err)
 	}
 	return fn(client)
 }
