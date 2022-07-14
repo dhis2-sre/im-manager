@@ -2,8 +2,10 @@
 
 set -euo pipefail
 
-READINESS_PROBE_INITIAL_DELAY_SECONDS=0
-LIVENESS_PROBE_INITIAL_DELAY_SECONDS=0
+# container(s) in dhis2 pod will be restarted after that due to restartPolicy
+# 5*26=130s
+STARTUP_PROBE_FAILURE_THRESHOLD=26
+STARTUP_PROBE_PERIOD_SECONDS=5
 IMAGE_REPOSITORY=core
 IMAGE_TAG=2.36.0-tomcat-8.5.34-jre8-alpine
 DATABASE_SIZE=30Gi
@@ -22,12 +24,12 @@ echo "{
   \"stackName\": \"$STACK_NAME\",
   \"optionalParameters\": [
     {
-      \"name\": \"READINESS_PROBE_INITIAL_DELAY_SECONDS\",
-      \"value\": \"$READINESS_PROBE_INITIAL_DELAY_SECONDS\"
+      \"name\": \"STARTUP_PROBE_FAILURE_THRESHOLD\",
+      \"value\": \"$STARTUP_PROBE_FAILURE_THRESHOLD\"
     },
     {
-      \"name\": \"LIVENESS_PROBE_INITIAL_DELAY_SECONDS\",
-      \"value\": \"$LIVENESS_PROBE_INITIAL_DELAY_SECONDS\"
+      \"name\": \"STARTUP_PROBE_PERIOD_SECONDS\",
+      \"value\": \"$STARTUP_PROBE_PERIOD_SECONDS\"
     },
     {
       \"name\": \"IMAGE_REPOSITORY\",
