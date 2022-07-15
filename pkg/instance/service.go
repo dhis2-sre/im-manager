@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"os/exec"
 
 	"github.com/dhis2-sre/im-manager/pkg/stack"
 
@@ -32,22 +33,13 @@ type Service interface {
 	FindInstances(groups []*models.Group) ([]*model.Instance, error)
 }
 
-type service struct {
-	config             config.Config
-	instanceRepository Repository
-	userClient         userClientService
-	stackService       stack.Service
-	helmfileService    HelmfileService
-	kubernetesService  KubernetesService
-}
-
 func NewService(
 	config config.Config,
 	instanceRepository Repository,
 	userClient userClientService,
 	stackService stack.Service,
-	kubernetesService KubernetesService,
-	helmfileService HelmfileService,
+	kubernetesService kubernetesExecutor,
+	helmfileService helmfile,
 ) *service {
 	return &service{
 		config,
@@ -61,6 +53,25 @@ func NewService(
 
 type userClientService interface {
 	FindGroupByName(token string, name string) (*models.Group, error)
+}
+
+type kubernetesExecutor interface {
+	executor(configuration *models.ClusterConfiguration, fn func(client *kubernetes.Clientset) error) error
+	commandExecutor(cmd *exec.Cmd, configuration *models.ClusterConfiguration) (stdout []byte, stderr []byte, err error)
+}
+
+type helmfile interface {
+	sync(token string, instance *model.Instance, group *models.Group) (*exec.Cmd, error)
+	destroy(token string, instance *model.Instance, group *models.Group) (*exec.Cmd, error)
+}
+
+type service struct {
+	config             config.Config
+	instanceRepository Repository
+	userClient         userClientService
+	stackService       stack.Service
+	helmfileService    helmfile
+	kubernetesService  kubernetesExecutor
 }
 
 func (s service) LinkDeploy(token string, sourceInstance, destinationInstance *model.Instance) error {
@@ -156,7 +167,7 @@ func (s service) Restart(token string, id uint) error {
 		return err
 	}
 
-	err = s.kubernetesService.Executor(group.ClusterConfiguration, func(client *kubernetes.Clientset) error {
+	err = s.kubernetesService.executor(group.ClusterConfiguration, func(client *kubernetes.Clientset) error {
 		deployments := client.AppsV1().Deployments(instance.GroupName)
 
 		labelSelector := fmt.Sprintf("app.kubernetes.io/instance=%s", instance.Name)
@@ -256,12 +267,12 @@ func (s service) Deploy(accessToken string, instance *model.Instance) error {
 		return err
 	}
 
-	syncCmd, err := s.helmfileService.Sync(accessToken, instanceWithParameters, group)
+	syncCmd, err := s.helmfileService.sync(accessToken, instanceWithParameters, group)
 	if err != nil {
 		return err
 	}
 
-	deployLog, deployErrorLog, err := s.kubernetesService.CommandExecutor(syncCmd, group.ClusterConfiguration)
+	deployLog, deployErrorLog, err := s.kubernetesService.commandExecutor(syncCmd, group.ClusterConfiguration)
 	log.Printf("Deploy log: %s\n", deployLog)
 	log.Printf("Deploy error log: %s\n", deployErrorLog)
 	/* TODO: return error log if relevant
@@ -323,12 +334,12 @@ func (s service) Delete(token string, id uint) error {
 			return err
 		}
 
-		destroyCmd, err := s.helmfileService.Destroy(token, instanceWithParameters, group)
+		destroyCmd, err := s.helmfileService.destroy(token, instanceWithParameters, group)
 		if err != nil {
 			return err
 		}
 
-		destroyLog, destroyErrorLog, err := s.kubernetesService.CommandExecutor(destroyCmd, group.ClusterConfiguration)
+		destroyLog, destroyErrorLog, err := s.kubernetesService.commandExecutor(destroyCmd, group.ClusterConfiguration)
 		log.Printf("Destroy log: %s\n", destroyLog)
 		log.Printf("Destroy error log: %s\n", destroyErrorLog)
 		if err != nil {
@@ -342,7 +353,7 @@ func (s service) Delete(token string, id uint) error {
 func (s service) Logs(instance *model.Instance, group *models.Group, selector string) (io.ReadCloser, error) {
 	var read io.ReadCloser
 
-	err := s.kubernetesService.Executor(group.ClusterConfiguration, func(client *kubernetes.Clientset) error {
+	err := s.kubernetesService.executor(group.ClusterConfiguration, func(client *kubernetes.Clientset) error {
 		pod, err := s.getPod(client, instance, selector)
 		if err != nil {
 			return err

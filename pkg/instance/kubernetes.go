@@ -14,18 +14,13 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 )
 
-type KubernetesService interface {
-	Executor(configuration *models.ClusterConfiguration, fn func(client *kubernetes.Clientset) error) error
-	CommandExecutor(cmd *exec.Cmd, configuration *models.ClusterConfiguration) ([]byte, []byte, error)
-}
-
 type kubernetesService struct{}
 
 func NewKubernetesService() *kubernetesService {
 	return &kubernetesService{}
 }
 
-func (k kubernetesService) CommandExecutor(cmd *exec.Cmd, configuration *models.ClusterConfiguration) (stdout []byte, stderr []byte, err error) {
+func (k kubernetesService) commandExecutor(cmd *exec.Cmd, configuration *models.ClusterConfiguration) (stdout []byte, stderr []byte, err error) {
 	if len(configuration.KubernetesConfiguration) == 0 {
 		return runCommand(cmd)
 	}
@@ -116,7 +111,7 @@ func newClient(configuration *models.ClusterConfiguration) (*kubernetes.Clientse
 	return client, nil
 }
 
-func (k kubernetesService) Executor(configuration *models.ClusterConfiguration, fn func(client *kubernetes.Clientset) error) error {
+func (k kubernetesService) executor(configuration *models.ClusterConfiguration, fn func(client *kubernetes.Clientset) error) error {
 	client, err := newClient(configuration)
 	if err != nil {
 		return fmt.Errorf("error creating kube client: %v", err)
