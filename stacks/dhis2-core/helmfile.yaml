@@ -5,7 +5,7 @@ releases:
   - name: "{{ requiredEnv "INSTANCE_NAME" }}"
     namespace: "{{ requiredEnv "INSTANCE_NAMESPACE" }}"
     chart: dhis2/core
-    version: "{{ env "CHART_VERSION" | default "0.10.0" }}"
+    version: "{{ env "CHART_VERSION" | default "0.10.1" }}"
     values:
       - image:
           repository: dhis2/{{ env "IMAGE_REPOSITORY" | default "core" }}
@@ -17,11 +17,13 @@ releases:
           certIssuer: cert-issuer-prod
       - catalinaOpts: "-Dcontext.path=/{{ requiredEnv "INSTANCE_NAME" }}"
       - javaOpts: "{{ env "JAVA_OPTS" | default "" }}"
+      - startupProbe:
+          failureThreshold: {{ env "STARTUP_PROBE_FAILURE_THRESHOLD" | default 26 }}
+          periodSeconds: {{ env "STARTUP_PROBE_PERIOD_SECONDS" | default 5 }}
+          path: /{{ requiredEnv "INSTANCE_NAME" }}
       - livenessProbe:
-          initialDelaySeconds: {{ env "LIVENESS_PROBE_INITIAL_DELAY_SECONDS" | default 300 }}
           path: /{{ requiredEnv "INSTANCE_NAME" }}
       - readinessProbe:
-          initialDelaySeconds: {{ env "READINESS_PROBE_INITIAL_DELAY_SECONDS" | default 300 }}
           path: /{{ requiredEnv "INSTANCE_NAME" }}
       - podLabels:
           im: "true"
