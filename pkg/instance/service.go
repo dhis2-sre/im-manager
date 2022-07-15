@@ -33,25 +33,6 @@ type Service interface {
 	FindInstances(groups []*models.Group) ([]*model.Instance, error)
 }
 
-type helmfile interface {
-	sync(token string, instance *model.Instance, group *models.Group) (*exec.Cmd, error)
-	destroy(token string, instance *model.Instance, group *models.Group) (*exec.Cmd, error)
-}
-
-type kubernetesExecutor interface {
-	executor(configuration *models.ClusterConfiguration, fn func(client *kubernetes.Clientset) error) error
-	commandExecutor(cmd *exec.Cmd, configuration *models.ClusterConfiguration) (stdout []byte, stderr []byte, err error)
-}
-
-type service struct {
-	config             config.Config
-	instanceRepository Repository
-	userClient         userClientService
-	stackService       stack.Service
-	helmfileService    helmfile
-	kubernetesService  kubernetesExecutor
-}
-
 func NewService(
 	config config.Config,
 	instanceRepository Repository,
@@ -72,6 +53,25 @@ func NewService(
 
 type userClientService interface {
 	FindGroupByName(token string, name string) (*models.Group, error)
+}
+
+type kubernetesExecutor interface {
+	executor(configuration *models.ClusterConfiguration, fn func(client *kubernetes.Clientset) error) error
+	commandExecutor(cmd *exec.Cmd, configuration *models.ClusterConfiguration) (stdout []byte, stderr []byte, err error)
+}
+
+type helmfile interface {
+	sync(token string, instance *model.Instance, group *models.Group) (*exec.Cmd, error)
+	destroy(token string, instance *model.Instance, group *models.Group) (*exec.Cmd, error)
+}
+
+type service struct {
+	config             config.Config
+	instanceRepository Repository
+	userClient         userClientService
+	stackService       stack.Service
+	helmfileService    helmfile
+	kubernetesService  kubernetesExecutor
 }
 
 func (s service) LinkDeploy(token string, sourceInstance, destinationInstance *model.Instance) error {
