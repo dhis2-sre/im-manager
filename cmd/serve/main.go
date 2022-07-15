@@ -61,7 +61,10 @@ func run() error {
 	helmfileSvc := instance.NewHelmfileService(stackSvc, cfg)
 	instanceSvc := instance.NewService(cfg, instanceRepo, uc, stackSvc, kubernetesSvc, helmfileSvc)
 
-	stack.LoadStacks(stackSvc)
+	err = stack.LoadStacks(stackSvc)
+	if err != nil {
+		return err
+	}
 
 	consumer, err := rabbitmq.NewConsumer(
 		cfg.RabbitMqURL.GetUrl(),
