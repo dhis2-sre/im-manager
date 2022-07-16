@@ -69,9 +69,9 @@ func (h helmfileService) executeHelmfileCommand(accessToken string, instance *mo
 	return cmd, nil
 }
 
-type StackParameters map[string]string
+type stackParameters map[string]string
 
-func (h helmfileService) loadStackParameters(folder string, name string) (StackParameters, error) {
+func (h helmfileService) loadStackParameters(folder string, name string) (stackParameters, error) {
 	environment := h.config.Environment
 	path := fmt.Sprintf("%s/%s/parameters/%s/parameters.yaml", folder, name, environment)
 	data, err := os.ReadFile(path)
@@ -84,7 +84,7 @@ func (h helmfileService) loadStackParameters(folder string, name string) (StackP
 		return nil, err
 	}
 
-	var params StackParameters
+	var params stackParameters
 	err = yaml.Unmarshal(b, &params)
 	if err != nil {
 		return nil, err
@@ -93,7 +93,7 @@ func (h helmfileService) loadStackParameters(folder string, name string) (StackP
 	return params, nil
 }
 
-func configureInstanceEnvironment(accessToken string, instance *model.Instance, group *models.Group, stackParameters StackParameters, cmd *exec.Cmd) {
+func configureInstanceEnvironment(accessToken string, instance *model.Instance, group *models.Group, stackParameters stackParameters, cmd *exec.Cmd) {
 	// TODO: We should only inject what the stack require, currently we just blindly inject IM_ACCESS_TOKEN and others which may not be required by the stack
 	// We could probably list the required system parameters in the stacks helmfile and parse those as well as other parameters
 	instanceNameEnv := fmt.Sprintf("%s=%s", "INSTANCE_NAME", instance.Name)
