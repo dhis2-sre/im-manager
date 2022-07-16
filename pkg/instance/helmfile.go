@@ -1,7 +1,9 @@
 package instance
 
 import (
+	"errors"
 	"fmt"
+	"io/fs"
 	"log"
 	"os"
 	"os/exec"
@@ -76,6 +78,10 @@ func (h helmfileService) loadStackParameters(folder string, name string) (stackP
 	path := fmt.Sprintf("%s/%s/parameters/%s/parameters.yaml", folder, name, environment)
 	data, err := os.ReadFile(path)
 	if err != nil {
+		var e *fs.PathError
+		if errors.As(err, &e) {
+			return stackParameters{}, err
+		}
 		return nil, err
 	}
 
