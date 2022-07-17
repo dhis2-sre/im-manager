@@ -78,7 +78,7 @@ func (h helmfileService) loadStackParameters(folder string, name string) (stackP
 	data, err := os.ReadFile(path)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			return stackParameters{}, nil
+			return nil, nil
 		}
 		return nil, err
 	}
