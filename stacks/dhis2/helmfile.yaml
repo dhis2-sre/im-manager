@@ -78,6 +78,19 @@ releases:
               seed.sh: |
                 {{- readFile "./seed.sh" | indent 16 }}
 
+          readinessProbe:
+            enabled: false
+
+          customReadinessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - -e
+                - |
+                  exec pg_isready -U {{ env "DATABASE_USERNAME" | default "dhis" }} -d "dbname={{ env "DATABASE_NAME" | default "dhis" }}" -h 127.0.0.1 -p 5432
+                  && [ -f /opt/bitnami/postgresql/tmp/.initialized ] || [ -f /bitnami/postgresql/.initialized ]
+
       - image:
           tag: {{ env "DATABASE_VERSION" | default 10 }}
 
