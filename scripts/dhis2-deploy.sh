@@ -19,9 +19,6 @@ STACK_NAME=dhis2
 INSTANCE_ID=$($HTTP --check-status "$INSTANCE_HOST/instances-name-to-id/$GROUP_NAME/$INSTANCE_NAME" "Authorization: Bearer $ACCESS_TOKEN")
 
 echo "{
-  \"name\": \"$INSTANCE_NAME\",
-  \"groupName\": \"$GROUP_NAME\",
-  \"stackName\": \"$STACK_NAME\",
   \"optionalParameters\": [
     {
       \"name\": \"STARTUP_PROBE_FAILURE_THRESHOLD\",
