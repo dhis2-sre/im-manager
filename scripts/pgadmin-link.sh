@@ -13,8 +13,8 @@ SECOND_INSTANCE_NAME=$2
 GROUP_NAME=$3
 STACK_NAME=pgadmin
 
-FIRST_INSTANCE_ID=$($HTTP --check-status "$INSTANCE_HOST/instances-name-to-id/$GROUP_NAME/$FIRST_INSTANCE_NAME" "Authorization: Bearer $ACCESS_TOKEN")
-SECOND_INSTANCE_ID=$($HTTP --check-status "$INSTANCE_HOST/instances-name-to-id/$GROUP_NAME/$SECOND_INSTANCE_NAME" "Authorization: Bearer $ACCESS_TOKEN")
+FIRST_INSTANCE_ID=$($HTTP get "$INSTANCE_HOST/instances-name-to-id/$GROUP_NAME/$FIRST_INSTANCE_NAME" "Authorization: Bearer $ACCESS_TOKEN")
+SECOND_INSTANCE_ID=$($HTTP get "$INSTANCE_HOST/instances-name-to-id/$GROUP_NAME/$SECOND_INSTANCE_NAME" "Authorization: Bearer $ACCESS_TOKEN")
 
 echo "{
   \"name\": \"$SECOND_INSTANCE_NAME\",
