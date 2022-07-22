@@ -17,8 +17,8 @@ require (
 	go.mozilla.org/sops/v3 v3.7.3
 	gorm.io/driver/postgres v1.3.8
 	gorm.io/gorm v1.23.8
-	k8s.io/api v0.25.0-alpha.2
-	k8s.io/apimachinery v0.25.0-alpha.2
+	k8s.io/api v0.25.0-alpha.3
+	k8s.io/apimachinery v0.25.0-alpha.3
 	k8s.io/client-go v0.25.0-alpha.2
 )
 
@@ -129,7 +129,6 @@ require (
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/oklog/run v1.1.0 // indirect
 	github.com/oklog/ulid v1.3.1 // indirect
-	github.com/onsi/gomega v1.10.3 // indirect
 	github.com/opentracing/opentracing-go v1.2.0 // indirect
 	github.com/pelletier/go-toml/v2 v2.0.2 // indirect
 	github.com/pierrec/lz4 v2.6.1+incompatible // indirect
@@ -163,10 +162,10 @@ require (
 	gopkg.in/urfave/cli.v1 v1.20.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	k8s.io/klog/v2 v2.70.0 // indirect
-	k8s.io/kube-openapi v0.0.0-20220614142933-1062c7ade5f8 // indirect
+	k8s.io/klog/v2 v2.70.1 // indirect
+	k8s.io/kube-openapi v0.0.0-20220627174259-011e075b9cb8 // indirect
 	k8s.io/utils v0.0.0-20220210201930-3a6ce19ff2f9 // indirect
-	sigs.k8s.io/json v0.0.0-20220525155127-227cbc7cc124 // indirect
+	sigs.k8s.io/json v0.0.0-20220713155537-f223a00ba0e2 // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.2.1 // indirect
 	sigs.k8s.io/yaml v1.3.0 // indirect
 )
