@@ -15,9 +15,6 @@ STACK_NAME=dhis2-core
 INSTANCE_ID=$($HTTP get "$INSTANCE_HOST/instances-name-to-id/$GROUP_NAME/$INSTANCE_NAME" "Authorization: Bearer $ACCESS_TOKEN")
 
 echo "{
-  \"name\": \"$INSTANCE_NAME\",
-  \"groupName\": \"$GROUP_NAME\",
-  \"stackName\": \"$STACK_NAME\",
   \"optionalParameters\": [
     {
       \"name\": \"STARTUP_PROBE_FAILURE_THRESHOLD\",
@@ -32,4 +29,4 @@ echo "{
       \"value\": \"$IMAGE_TAG\"
     }
   ]
-}" | $HTTP post "$INSTANCE_HOST/instances/$INSTANCE_ID/deploy" "Authorization: Bearer $ACCESS_TOKEN"
+}" | $HTTP post "$INSTANCE_HOST/instances/$INSTANCE_ID" "Authorization: Bearer $ACCESS_TOKEN"

@@ -28,10 +28,9 @@ func GetEngine(basePath string, stackHandler stack.Handler, instanceHandler inst
 	tokenAuthenticationRouter.GET("/stacks", stackHandler.FindAll)
 	tokenAuthenticationRouter.GET("/stacks/:name", stackHandler.Find)
 
-	tokenAuthenticationRouter.POST("/instances", instanceHandler.Create)
-	tokenAuthenticationRouter.POST("/instances/:id/link/:destinationId", instanceHandler.LinkDeploy)
-	tokenAuthenticationRouter.POST("/instances/:id/deploy", instanceHandler.Deploy)
-	tokenAuthenticationRouter.PUT("/instances/:id/deploy", instanceHandler.Update)
+	tokenAuthenticationRouter.POST("/instances", instanceHandler.Launch)
+	tokenAuthenticationRouter.POST("/instances/:id", instanceHandler.Deploy)
+	tokenAuthenticationRouter.PUT("/instances/:id", instanceHandler.Update)
 	tokenAuthenticationRouter.POST("/instances/:id/restart", instanceHandler.Restart)
 	tokenAuthenticationRouter.GET("/instances/:id/parameters", instanceHandler.FindByIdWithDecryptedParameters)
 	tokenAuthenticationRouter.GET("/instances", instanceHandler.List)
@@ -39,9 +38,6 @@ func GetEngine(basePath string, stackHandler stack.Handler, instanceHandler inst
 	tokenAuthenticationRouter.GET("/instances/:id", instanceHandler.FindById)
 	tokenAuthenticationRouter.GET("/instances/:id/logs", instanceHandler.Logs)
 	tokenAuthenticationRouter.GET("/instances-name-to-id/:groupName/:instanceName", instanceHandler.NameToId)
-
-	// tokenAuthenticationRouter.POST("/instances/:id/save", instanceHandler.Save)
-	// tokenAuthenticationRouter.POST("/instances/:id/saveas", health.Health)
 
 	return r
 }

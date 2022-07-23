@@ -60,7 +60,15 @@ type instanceService struct {
 	mock.Mock
 }
 
-func (is *instanceService) LinkDeploy(token string, oldInstance, newInstance *model.Instance) error {
+func (is *instanceService) ConsumeParameters(sourceInstance, destinationInstance *model.Instance) error {
+	return nil
+}
+
+func (is *instanceService) Save(instance *model.Instance) (*model.Instance, error) {
+	return nil, nil
+}
+
+func (is *instanceService) Link(source, destination *model.Instance) error {
 	return nil
 }
 
@@ -72,8 +80,6 @@ func (is *instanceService) Delete(token string, id uint) error {
 	args := is.Called(token, id)
 	return args.Error(0)
 }
-
-func (is *instanceService) Create(instance *model.Instance) (*model.Instance, error) { return nil, nil }
 
 func (is *instanceService) Deploy(token string, instance *model.Instance) error {
 	return nil

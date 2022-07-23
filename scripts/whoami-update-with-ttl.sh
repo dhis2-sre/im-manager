@@ -23,4 +23,4 @@ echo "{
        \"value\": \"$INSTANCE_TTL\"
     }
   ]
-}" | $HTTP put "$INSTANCE_HOST/instances/$INSTANCE_ID/deploy" "Authorization: Bearer $ACCESS_TOKEN"
+}" | $HTTP put "$INSTANCE_HOST/instances/$INSTANCE_ID" "Authorization: Bearer $ACCESS_TOKEN"
