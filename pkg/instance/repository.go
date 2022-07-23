@@ -51,14 +51,11 @@ func (r repository) Link(source *model.Instance, destination *model.Instance) er
 		DestinationInstanceID: destination.ID,
 	}
 	err := r.db.Create(&link).Error
-	if err != nil {
-		var perr *pgconn.PgError
-		if errors.As(err, &perr) && perr.Code == "23505" {
-			return fmt.Errorf("instance (%d) already linked with a stack of type \"%s\"", source.ID, destination.StackName)
-		}
-		return err
+	var perr *pgconn.PgError
+	if errors.As(err, &perr) && perr.Code == "23505" {
+		return fmt.Errorf("instance (%d) already linked with a stack of type \"%s\"", source.ID, destination.StackName)
 	}
-	return nil
+	return err
 }
 
 func (r repository) Unlink(instance *model.Instance) error {
@@ -77,13 +74,10 @@ func (r repository) Unlink(instance *model.Instance) error {
 
 	// Attempt to unlink
 	err = r.db.Unscoped().Delete(link, "destination_instance_id = ?", instance.ID).Error
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil
-		}
-		return err
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil
 	}
-	return nil
+	return err
 }
 
 func (r repository) Save(instance *model.Instance) error {
