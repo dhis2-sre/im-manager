@@ -1,11 +1,11 @@
 package instance
 
-// swagger:parameters createInstance
+// swagger:parameters launchInstance
 type _ struct {
-	// Create instance request body parameter
+	// Launch instance request body parameter
 	// in: body
 	// required: true
-	_ CreateInstanceRequest
+	_ LaunchInstanceRequest
 }
 
 // swagger:parameters deployInstance

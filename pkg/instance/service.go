@@ -20,9 +20,9 @@ import (
 )
 
 type Service interface {
-	LinkDeploy(token string, sourceInstance, destinationInstance *model.Instance) error
+	ConsumeParameters(sourceInstance, destinationInstance *model.Instance) error
 	Restart(token string, id uint) error
-	Create(instance *model.Instance) (*model.Instance, error)
+	Save(instance *model.Instance) (*model.Instance, error)
 	Deploy(token string, instance *model.Instance) error
 	FindById(id uint) (*model.Instance, error)
 	Delete(token string, id uint) error
@@ -31,6 +31,7 @@ type Service interface {
 	FindWithDecryptedParametersById(id uint) (*model.Instance, error)
 	FindByNameAndGroup(instance string, group string) (*model.Instance, error)
 	FindInstances(groups []*models.Group) ([]*model.Instance, error)
+	Link(source, destination *model.Instance) error
 }
 
 func NewService(
@@ -74,18 +75,13 @@ type service struct {
 	kubernetesService  kubernetesExecutor
 }
 
-func (s service) LinkDeploy(token string, sourceInstance, destinationInstance *model.Instance) error {
-	err := s.link(sourceInstance, destinationInstance)
+func (s service) ConsumeParameters(source, destination *model.Instance) error {
+	sourceStack, err := s.stackService.Find(source.StackName)
 	if err != nil {
 		return err
 	}
 
-	sourceStack, err := s.stackService.Find(sourceInstance.StackName)
-	if err != nil {
-		return err
-	}
-
-	destinationStack, err := s.stackService.Find(destinationInstance.StackName)
+	destinationStack, err := s.stackService.Find(destination.StackName)
 	if err != nil {
 		return err
 	}
@@ -93,7 +89,7 @@ func (s service) LinkDeploy(token string, sourceInstance, destinationInstance *m
 	// Consumed required parameters
 	for _, parameter := range destinationStack.RequiredParameters {
 		if parameter.Consumed && parameter.Name != destinationStack.HostnameVariable {
-			value, err := s.findParameterValue(parameter.Name, sourceInstance, sourceStack)
+			value, err := s.findParameterValue(parameter.Name, source, sourceStack)
 			if err != nil {
 				return err
 			}
@@ -101,14 +97,14 @@ func (s service) LinkDeploy(token string, sourceInstance, destinationInstance *m
 				StackRequiredParameterID: parameter.Name,
 				Value:                    value,
 			}
-			destinationInstance.RequiredParameters = append(destinationInstance.RequiredParameters, parameterRequest)
+			destination.RequiredParameters = append(destination.RequiredParameters, parameterRequest)
 		}
 	}
 
 	// Consumed optional parameters
 	for _, parameter := range destinationStack.OptionalParameters {
 		if parameter.Consumed && parameter.Name != destinationStack.HostnameVariable {
-			value, err := s.findParameterValue(parameter.Name, sourceInstance, sourceStack)
+			value, err := s.findParameterValue(parameter.Name, source, sourceStack)
 			if err != nil {
 				return err
 			}
@@ -116,7 +112,7 @@ func (s service) LinkDeploy(token string, sourceInstance, destinationInstance *m
 				StackOptionalParameterID: parameter.Name,
 				Value:                    value,
 			}
-			destinationInstance.OptionalParameters = append(destinationInstance.OptionalParameters, parameterRequest)
+			destination.OptionalParameters = append(destination.OptionalParameters, parameterRequest)
 		}
 	}
 
@@ -124,14 +120,9 @@ func (s service) LinkDeploy(token string, sourceInstance, destinationInstance *m
 	if destinationStack.HostnameVariable != "" {
 		hostnameParameter := model.InstanceRequiredParameter{
 			StackRequiredParameterID: destinationStack.HostnameVariable,
-			Value:                    fmt.Sprintf(sourceStack.HostnamePattern, sourceInstance.Name, sourceInstance.GroupName),
+			Value:                    fmt.Sprintf(sourceStack.HostnamePattern, source.Name, source.GroupName),
 		}
-		destinationInstance.RequiredParameters = append(destinationInstance.RequiredParameters, hostnameParameter)
-	}
-
-	err = s.Deploy(token, destinationInstance)
-	if err != nil {
-		return err
+		destination.RequiredParameters = append(destination.RequiredParameters, hostnameParameter)
 	}
 
 	return nil
@@ -219,7 +210,7 @@ func (s service) Restart(token string, id uint) error {
 	return err
 }
 
-func (s service) link(source, destination *model.Instance) error {
+func (s service) Link(source, destination *model.Instance) error {
 	return s.instanceRepository.Link(source, destination)
 }
 
@@ -230,34 +221,23 @@ func (s service) unlink(id uint) error {
 	return s.instanceRepository.Unlink(instance)
 }
 
-func (s service) Create(instance *model.Instance) (*model.Instance, error) {
-	err := s.instanceRepository.Create(instance)
+func (s service) Save(instance *model.Instance) (*model.Instance, error) {
+	enrichParameters(instance)
+	err := s.instanceRepository.Save(instance)
 	if err != nil {
 		return nil, err
 	}
 
-	instanceWithParameters, err := s.instanceRepository.FindWithParametersById(instance.ID)
-	if err != nil {
-		return nil, err
-	}
-
-	return instanceWithParameters, nil
+	return s.instanceRepository.FindWithParametersById(instance.ID)
 }
 
 func (s service) Deploy(accessToken string, instance *model.Instance) error {
-	enrichParameters(instance)
-
-	encryptInstance, err := s.encryptParameters(instance)
+	err := s.instanceRepository.Save(instance)
 	if err != nil {
 		return err
 	}
 
-	err = s.instanceRepository.Save(encryptInstance)
-	if err != nil {
-		return err
-	}
-
-	instanceWithParameters, err := s.FindWithDecryptedParametersById(encryptInstance.ID)
+	instanceWithParameters, err := s.FindWithDecryptedParametersById(instance.ID)
 	if err != nil {
 		return err
 	}
@@ -293,24 +273,6 @@ func (s service) Deploy(accessToken string, instance *model.Instance) error {
 	}
 
 	return nil
-}
-
-func enrichParameters(instance *model.Instance) {
-	requiredParameters := instance.RequiredParameters
-	if len(requiredParameters) > 0 {
-		for i := range requiredParameters {
-			requiredParameters[i].InstanceID = instance.ID
-			requiredParameters[i].StackName = instance.StackName
-		}
-	}
-
-	optionalParameters := instance.OptionalParameters
-	if len(optionalParameters) > 0 {
-		for i := range optionalParameters {
-			optionalParameters[i].InstanceID = instance.ID
-			optionalParameters[i].StackName = instance.StackName
-		}
-	}
 }
 
 func (s service) FindById(id uint) (*model.Instance, error) {
@@ -404,17 +366,7 @@ func (s service) FindWithParametersById(id uint) (*model.Instance, error) {
 }
 
 func (s service) FindWithDecryptedParametersById(id uint) (*model.Instance, error) {
-	instance, err := s.instanceRepository.FindWithParametersById(id)
-	if err != nil {
-		return nil, err
-	}
-
-	err = s.decryptParameters(instance)
-	if err != nil {
-		return nil, err
-	}
-
-	return instance, nil
+	return s.instanceRepository.FindWithDecryptedParametersById(id)
 }
 
 func (s service) FindByNameAndGroup(instance string, group string) (*model.Instance, error) {
@@ -427,49 +379,5 @@ func (s service) FindInstances(groups []*models.Group) ([]*model.Instance, error
 		groupNames[i] = group.Name
 	}
 
-	instances, err := s.instanceRepository.FindByGroupNames(groupNames)
-	if err != nil {
-		return nil, err
-	}
-	return instances, nil
-}
-
-func (s service) encryptParameters(instance *model.Instance) (*model.Instance, error) {
-	for i, parameter := range instance.RequiredParameters {
-		value, err := encryptText(parameter.Value, s.config.InstanceParameterEncryptionKey)
-		if err != nil {
-			return nil, err
-		}
-		instance.RequiredParameters[i].Value = value
-	}
-
-	for i, parameter := range instance.OptionalParameters {
-		value, err := encryptText(parameter.Value, s.config.InstanceParameterEncryptionKey)
-		if err != nil {
-			return nil, err
-		}
-		instance.OptionalParameters[i].Value = value
-	}
-
-	return instance, nil
-}
-
-func (s service) decryptParameters(instance *model.Instance) error {
-	for i, parameter := range instance.RequiredParameters {
-		value, err := decryptText(parameter.Value, s.config.InstanceParameterEncryptionKey)
-		if err != nil {
-			return err
-		}
-		instance.RequiredParameters[i].Value = value
-	}
-
-	for i, parameter := range instance.OptionalParameters {
-		value, err := decryptText(parameter.Value, s.config.InstanceParameterEncryptionKey)
-		if err != nil {
-			return err
-		}
-		instance.OptionalParameters[i].Value = value
-	}
-
-	return nil
+	return s.instanceRepository.FindByGroupNames(groupNames)
 }
