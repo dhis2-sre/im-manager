@@ -8,7 +8,7 @@ import (
 )
 
 // TODO use a new func with all functions being methods?
-// func newTemplate() (*tmpl, error) {
+// func newTemplate(name string) (*tmpl, error) {
 // 	template := &tmpl{}
 //
 // 	return template, nil
