@@ -39,9 +39,6 @@ func GetEngine(basePath string, stackHandler stack.Handler, instanceHandler inst
 	tokenAuthenticationRouter.GET("/instances/:id/logs", instanceHandler.Logs)
 	tokenAuthenticationRouter.GET("/instances-name-to-id/:groupName/:instanceName", instanceHandler.NameToId)
 
-	// tokenAuthenticationRouter.POST("/instances/:id/save", instanceHandler.Save)
-	// tokenAuthenticationRouter.POST("/instances/:id/saveas", health.Health)
-
 	return r
 }
 
