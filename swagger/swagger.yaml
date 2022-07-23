@@ -305,7 +305,6 @@ paths:
           $ref: '#/responses/Error'
       security:
       - oauth2: []
-  /instances/{id}/deploy:
     post:
       description: Deploy instance
       operationId: deployInstance

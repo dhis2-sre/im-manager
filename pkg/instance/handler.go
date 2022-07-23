@@ -179,7 +179,7 @@ type DeployInstanceRequest struct {
 }
 
 // Deploy instance
-// swagger:route POST /instances/{id}/deploy deployInstance
+// swagger:route POST /instances/{id} deployInstance
 //
 // Deploy instance
 //
@@ -197,7 +197,7 @@ func (h Handler) Deploy(c *gin.Context) {
 }
 
 // Update instance
-// swagger:route PUT /instances/{id}/deploy updateInstance
+// swagger:route PUT /instances/{id} updateInstance
 //
 // Update instance
 //
