@@ -20,7 +20,7 @@ import (
 )
 
 type Service interface {
-	ConsumeParameters(sourceInstance, destinationInstance *model.Instance) error
+	ConsumeParameters(source, destination *model.Instance) error
 	Restart(token string, id uint) error
 	Save(instance *model.Instance) (*model.Instance, error)
 	Deploy(token string, instance *model.Instance) error
