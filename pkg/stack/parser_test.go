@@ -1,18 +1,13 @@
 package stack
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func TestParser(t *testing.T) {
-	assert := assert.New(t)
-	require := require.New(t)
-
-	// TODO other success case? or another failure test if the arg is not a string?
+func TestParserRequiredEnv(t *testing.T) {
 	tt := map[string]struct {
 		in   string
 		want []string
@@ -24,7 +19,10 @@ func TestParser(t *testing.T) {
 	}
 
 	for n, tt := range tt {
-		t.Run(n, func(_ *testing.T) {
+		t.Run(n, func(t *testing.T) {
+			assert := assert.New(t)
+			require := require.New(t)
+
 			tmpl, err := parse(tt.in)
 
 			require.NoError(err)
@@ -33,25 +31,31 @@ func TestParser(t *testing.T) {
 	}
 
 	te := map[string]struct {
-		in string
+		in      string
+		wantErr string
 	}{
 		"MissingEnv": {
 			in: `{{requiredEnv}}`,
 		},
 		"BlankEnv": {
-			in: `{{requiredEnv "   "}}`,
+			in:      `{{requiredEnv "   "}}`,
+			wantErr: "must provide name",
 		},
 	}
 
 	for n, te := range te {
-		t.Run(n, func(_ *testing.T) {
-			// TODO assert tmpl is nil
-			_, err := parse(te.in)
-			fmt.Println(err)
+		t.Run(n, func(t *testing.T) {
+			assert := assert.New(t)
+			require := require.New(t)
 
-			// TODO better way?
-			// TODO assert "must provide name" is in error
-			require.Error(err)
+			tmpl, err := parse(te.in)
+
+			assert.Nil(tmpl)
+			if te.wantErr != "" {
+				require.ErrorContains(err, te.wantErr)
+			} else {
+				require.Error(err)
+			}
 		})
 	}
 }
