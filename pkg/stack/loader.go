@@ -7,6 +7,8 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+
+	"github.com/dhis2-sre/im-manager/pkg/model"
 )
 
 const (
@@ -51,18 +53,15 @@ func LoadStacks(dir string, stackService Service) error {
 			continue
 		}
 
-		stack, err := stackService.Create(name)
+		stack := &model.Stack{
+			Name:             name,
+			HostnamePattern:  stackTemplate.hostnamePattern,
+			HostnameVariable: stackTemplate.hostnameVariable,
+		}
+		stack, err = stackService.Create(stack)
 		log.Printf("Stack created: %+v\n", stack)
 		if err != nil {
 			return fmt.Errorf("error creating stack %q: %v", name, err)
-		}
-
-		stack.HostnamePattern = stackTemplate.hostnamePattern
-		stack.HostnameVariable = stackTemplate.hostnameVariable
-
-		err = stackService.Save(stack)
-		if err != nil {
-			return fmt.Errorf("error updating stack %q: %v", name, err)
 		}
 
 		fmt.Printf("Required parameters: %+v\n", stackTemplate.requiredParameters)
