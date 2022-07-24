@@ -61,7 +61,7 @@ func run() error {
 	helmfileSvc := instance.NewHelmfileService(stackSvc, cfg)
 	instanceSvc := instance.NewService(cfg, instanceRepo, uc, stackSvc, kubernetesSvc, helmfileSvc)
 
-	err = stack.LoadStacks(stackSvc)
+	err = stack.LoadStacks("./stacks", stackSvc)
 	if err != nil {
 		return err
 	}
