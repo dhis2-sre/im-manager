@@ -78,12 +78,12 @@ type service struct {
 func (s service) ConsumeParameters(source, destination *model.Instance) error {
 	sourceStack, err := s.stackService.Find(source.StackName)
 	if err != nil {
-		return err
+		return fmt.Errorf("error finding stack %q of source instance: %w", source.StackName, err)
 	}
 
 	destinationStack, err := s.stackService.Find(destination.StackName)
 	if err != nil {
-		return err
+		return fmt.Errorf("error finding stack %q of destination instance: %w", destination.StackName, err)
 	}
 
 	// Consumed required parameters
