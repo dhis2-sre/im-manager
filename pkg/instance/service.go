@@ -222,7 +222,6 @@ func (s service) unlink(id uint) error {
 }
 
 func (s service) Save(instance *model.Instance) (*model.Instance, error) {
-	enrichParameters(instance)
 	err := s.instanceRepository.Save(instance)
 	if err != nil {
 		return nil, err
