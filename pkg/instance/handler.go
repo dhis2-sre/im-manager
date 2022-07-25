@@ -131,7 +131,7 @@ func (h Handler) Launch(c *gin.Context) {
 		}
 
 		if sourceInstance.DeployLog == "" {
-			err := fmt.Errorf("source instance (%s) not deployed", sourceInstance.Name)
+			err := fmt.Errorf("source instance %q not deployed", sourceInstance.Name)
 			_ = c.Error(err)
 			return
 		}
