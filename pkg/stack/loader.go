@@ -10,7 +10,6 @@ import (
 )
 
 const (
-	FOLDER                       = "./stacks"
 	stackParametersIdentifier    = "# stackParameters: "
 	consumedParametersIdentifier = "# consumedParameters: "
 	hostnamePatternIdentifier    = "# hostnamePattern: "
@@ -21,10 +20,8 @@ const (
 // Deleting the stack on each boot isn't ideal since instance parameters are linked to stack parameters
 // Perhaps upsert using... https://gorm.io/docs/advanced_query.html#FirstOrCreate
 
-func LoadStacks(stackService Service) error {
-	stacksFolder := FOLDER
-
-	entries, err := os.ReadDir(stacksFolder)
+func LoadStacks(dir string, stackService Service) error {
+	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return fmt.Errorf("failed to read stack folder: %s", err)
 	}
@@ -36,6 +33,11 @@ func LoadStacks(stackService Service) error {
 
 		name := entry.Name()
 		log.Printf("Parsing stack: %s\n", name)
+		stackTemplate, err := parseStack(dir, name)
+		if err != nil {
+			return fmt.Errorf("error parsing stack %q: %v", name, err)
+		}
+
 		existingStack, err := stackService.Find(name)
 		if err != nil {
 			if err.Error() != "record not found" {
@@ -55,52 +57,25 @@ func LoadStacks(stackService Service) error {
 			return fmt.Errorf("error creating stack %q: %v", name, err)
 		}
 
-		path := fmt.Sprintf("%s/%s/helmfile.yaml", stacksFolder, name)
-		log.Printf("Reading: %s", path)
-		file, err := os.ReadFile(path)
-		if err != nil {
-			return fmt.Errorf("error reading stack %q: %v", name, err)
-		}
-
-		hostnamePattern := extractMetadataParameters(file, hostnamePatternIdentifier)
-		if len(hostnamePattern) > 1 {
-			return fmt.Errorf("error parsing stack %q: %q defined more than once", name, hostnamePatternIdentifier)
-		}
-		if len(hostnamePattern) == 1 {
-			stack.HostnamePattern = hostnamePattern[0]
-		}
-
-		hostnameVariable := extractMetadataParameters(file, hostnameVariableIdentifier)
-		if len(hostnameVariable) > 1 {
-			return fmt.Errorf("error parsing stack %q: %q defined more than once", name, hostnameVariableIdentifier)
-		}
-		if len(hostnameVariable) == 1 {
-			stack.HostnameVariable = hostnameVariable[0]
-		}
+		stack.HostnamePattern = stackTemplate.hostnamePattern
+		stack.HostnameVariable = stackTemplate.hostnameVariable
 
 		err = stackService.Save(stack)
 		if err != nil {
 			return fmt.Errorf("error updating stack %q: %v", name, err)
 		}
 
-		consumedParameters := extractMetadataParameters(file, consumedParametersIdentifier)
-
-		stackParameters := extractMetadataParameters(file, stackParametersIdentifier)
-
-		requiredParameterSet := extractRequiredParameters(file, stackParameters)
-		fmt.Printf("Required parameters: %+v\n", requiredParameterSet)
-		for _, name := range requiredParameterSet {
-			isConsumed := isConsumedParameter(name, consumedParameters)
+		fmt.Printf("Required parameters: %+v\n", stackTemplate.requiredParameters)
+		for _, name := range stackTemplate.requiredParameters {
+			isConsumed := isConsumedParameter(name, stackTemplate.consumedParameters)
 			_, err := stackService.CreateRequiredParameter(stack, name, isConsumed)
 			if err != nil {
 				return fmt.Errorf("error creating required parameter %q for stack %q: %v", name, stack.Name, err)
 			}
 		}
-
-		optionalParameterMap := extractOptionalParameters(file, stackParameters)
-		fmt.Printf("Optional parameters: %+v\n", optionalParameterMap)
-		for name, v := range optionalParameterMap {
-			isConsumed := isConsumedParameter(name, consumedParameters)
+		fmt.Printf("Optional parameters: %+v\n", stackTemplate.optionalParameters)
+		for name, v := range stackTemplate.optionalParameters {
+			isConsumed := isConsumedParameter(name, stackTemplate.consumedParameters)
 			_, err := stackService.CreateOptionalParameter(stack, name, v, isConsumed)
 			if err != nil {
 				return fmt.Errorf("error creating optional parameter %q for stack %q: %v", name, stack.Name, err)
@@ -109,6 +84,55 @@ func LoadStacks(stackService Service) error {
 	}
 
 	return nil
+}
+
+type stack struct {
+	hostnamePattern    string
+	hostnameVariable   string
+	consumedParameters []string
+	stackParameters    []string
+	requiredParameters []string
+	optionalParameters map[string]string
+}
+
+func parseStack(dir, name string) (*stack, error) {
+	path := fmt.Sprintf("%s/%s/helmfile.yaml", dir, name)
+	file, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("error reading stack %q: %v", name, err)
+	}
+
+	hostnamePatterns := extractMetadataParameters(file, hostnamePatternIdentifier)
+	if len(hostnamePatterns) > 1 {
+		return nil, fmt.Errorf("error parsing stack %q: %q defined more than once", name, hostnamePatternIdentifier)
+	}
+	var hostnamePattern string
+	if len(hostnamePatterns) == 1 {
+		hostnamePattern = hostnamePatterns[0]
+	}
+
+	hostnameVariables := extractMetadataParameters(file, hostnameVariableIdentifier)
+	if len(hostnameVariables) > 1 {
+		return nil, fmt.Errorf("error parsing stack %q: %q defined more than once", name, hostnameVariableIdentifier)
+	}
+	var hostnameVariable string
+	if len(hostnameVariables) == 1 {
+		hostnameVariable = hostnameVariables[0]
+	}
+
+	consumedParameters := extractMetadataParameters(file, consumedParametersIdentifier)
+	stackParameters := extractMetadataParameters(file, stackParametersIdentifier)
+	requiredParams := extractRequiredParameters(file, stackParameters)
+	optionalParams := extractOptionalParameters(file, stackParameters)
+
+	return &stack{
+		hostnamePattern:    hostnamePattern,
+		hostnameVariable:   hostnameVariable,
+		consumedParameters: consumedParameters,
+		stackParameters:    stackParameters,
+		requiredParameters: requiredParams,
+		optionalParameters: optionalParams,
+	}, nil
 }
 
 func extractMetadataParameters(file []byte, identifier string) []string {
