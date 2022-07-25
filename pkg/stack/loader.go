@@ -7,6 +7,8 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+
+	"github.com/dhis2-sre/im-manager/pkg/model"
 )
 
 const (
@@ -32,7 +34,7 @@ func LoadStacks(dir string, stackService Service) error {
 		}
 
 		name := entry.Name()
-		log.Printf("Parsing stack: %s\n", name)
+		log.Printf("Parsing stack: %q\n", name)
 		stackTemplate, err := parseStack(dir, name)
 		if err != nil {
 			return fmt.Errorf("error parsing stack %q: %v", name, err)
@@ -51,35 +53,26 @@ func LoadStacks(dir string, stackService Service) error {
 			continue
 		}
 
-		stack, err := stackService.Create(name)
+		stack := &model.Stack{
+			Name:             name,
+			HostnamePattern:  stackTemplate.hostnamePattern,
+			HostnameVariable: stackTemplate.hostnameVariable,
+		}
+		for _, name := range stackTemplate.requiredParameters {
+			isConsumed := isConsumedParameter(name, stackTemplate.consumedParameters)
+			parameter := &model.StackRequiredParameter{Name: name, StackName: stack.Name, Consumed: isConsumed}
+			stack.RequiredParameters = append(stack.RequiredParameters, *parameter)
+		}
+		for name, v := range stackTemplate.optionalParameters {
+			isConsumed := isConsumedParameter(name, stackTemplate.consumedParameters)
+			parameter := &model.StackOptionalParameter{Name: name, StackName: stack.Name, Consumed: isConsumed, DefaultValue: v}
+			stack.OptionalParameters = append(stack.OptionalParameters, *parameter)
+		}
+
+		stack, err = stackService.Create(stack)
 		log.Printf("Stack created: %+v\n", stack)
 		if err != nil {
 			return fmt.Errorf("error creating stack %q: %v", name, err)
-		}
-
-		stack.HostnamePattern = stackTemplate.hostnamePattern
-		stack.HostnameVariable = stackTemplate.hostnameVariable
-
-		err = stackService.Save(stack)
-		if err != nil {
-			return fmt.Errorf("error updating stack %q: %v", name, err)
-		}
-
-		fmt.Printf("Required parameters: %+v\n", stackTemplate.requiredParameters)
-		for _, name := range stackTemplate.requiredParameters {
-			isConsumed := isConsumedParameter(name, stackTemplate.consumedParameters)
-			_, err := stackService.CreateRequiredParameter(stack, name, isConsumed)
-			if err != nil {
-				return fmt.Errorf("error creating required parameter %q for stack %q: %v", name, stack.Name, err)
-			}
-		}
-		fmt.Printf("Optional parameters: %+v\n", stackTemplate.optionalParameters)
-		for name, v := range stackTemplate.optionalParameters {
-			isConsumed := isConsumedParameter(name, stackTemplate.consumedParameters)
-			_, err := stackService.CreateOptionalParameter(stack, name, v, isConsumed)
-			if err != nil {
-				return fmt.Errorf("error creating optional parameter %q for stack %q: %v", name, stack.Name, err)
-			}
 		}
 	}
 
