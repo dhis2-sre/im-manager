@@ -1,0 +1,7 @@
+* create an error that contains the executed go template, so the yaml helmfile
+  print it in case yaml parsing failed. this helps in figuring out what is wrong.
+* optional/required parameters are not system parameters like
+
+	[]string{"INSTANCE_ID", "INSTANCE_NAME", "INSTANCE_HOSTNAME", "INSTANCE_NAMESPACE", "IM_ACCESS_TOKEN"}
+
+  or stack parameters

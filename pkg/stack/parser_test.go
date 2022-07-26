@@ -1,8 +1,6 @@
 package stack
 
 import (
-	"fmt"
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -10,36 +8,6 @@ import (
 )
 
 // TODO check if I can declare the assert/require before subtests and reuse them in there
-
-func TestParserStacks(t *testing.T) {
-	// The instance manager will fail at startup if parsing fails. Having this test is to
-	// ensures that we fail even earlier when introducing a syntax error into our stack helmfiles.
-
-	assert := assert.New(t)
-	require := require.New(t)
-
-	dir := "../../stacks/"
-	entries, err := os.ReadDir(dir)
-	require.NoError(err, "error reading stack folder")
-
-	for _, entry := range entries {
-		if !entry.IsDir() {
-			continue
-		}
-
-		name := entry.Name()
-		t.Run(name, func(_ *testing.T) {
-			path := fmt.Sprintf("%s/%s/helmfile.yaml", dir, name)
-			file, err := os.ReadFile(path)
-			require.NoError(err, "error reading stack %q helmfile", name)
-
-			tmpl := &tmpl{}
-			err = tmpl.parse(string(file))
-
-			assert.NoError(err, "error parsing stack %q helmfile", name)
-		})
-	}
-}
 
 func TestParserYamlMetadata(t *testing.T) {
 	t.Run("SuccessWithAllMetadata", func(t *testing.T) {
@@ -121,12 +89,17 @@ func TestParserRequiredEnv(t *testing.T) {
 		assert := assert.New(t)
 		require := require.New(t)
 
-		in := `{{requiredEnv "INSTANCE_NAME"}}`
-		want := []string{"INSTANCE_NAME"}
+		in := `releases:
+- name: {{requiredEnv "DATABASE_NAME"}}
+- name: {{requiredEnv "DATABASE_NAME"}}
+- name: {{requiredEnv "DATABASE_PORT"}}`
+		want := map[string]struct{}{
+			"DATABASE_NAME": {},
+			"DATABASE_PORT": {},
+		}
 
 		tmpl := &tmpl{}
-		err := tmpl.parse(`releases:
-  - name: ` + in)
+		err := tmpl.parse(in)
 
 		require.NoError(err)
 		assert.Equal(want, tmpl.requiredEnvs)

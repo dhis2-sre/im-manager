@@ -12,17 +12,17 @@ import (
 // TODO convert helmfiles to new format
 
 // TODO pass in dir?
-// func newTmpl(name string) *tmpl {
-// 	return &tmpl{
-// 		name: name,
-// 	}
-// }
+func newTmpl(name string) *tmpl {
+	return &tmpl{
+		name: name,
+	}
+}
 
 // tmpl represents a stack template used to create the environment for running a stacks helmfile
 // commands.
 type tmpl struct {
 	name               string
-	requiredEnvs       []string
+	requiredEnvs       map[string]struct{}
 	envs               map[string]any
 	hostnameVariable   string
 	hostnamePattern    string
@@ -88,7 +88,10 @@ func (t *tmpl) requiredEnv(name string) (string, error) {
 	if strings.TrimSpace(name) == "" {
 		return "", errors.New("must provide name")
 	}
-	t.requiredEnvs = append(t.requiredEnvs, name)
+	if t.requiredEnvs == nil {
+		t.requiredEnvs = make(map[string]struct{})
+	}
+	t.requiredEnvs[name] = struct{}{}
 
 	return name, nil
 }
@@ -116,13 +119,13 @@ func (t *tmpl) env(name string) (string, error) {
 // calling it provide the correct amount/type of args. String args must be non-blank as this is most
 // likely an unintentional mistake.
 // https://github.com/Masterminds/sprig/blob/3ac42c7bc5e4be6aa534e036fb19dde4a996da2e/defaults.go#L26
-func (t *tmpl) dfault(d any, name string) (string, error) {
+func (t *tmpl) dfault(d any, name string) (any, error) {
 	if strings.TrimSpace(name) == "" {
 		return "", errors.New("must provide name")
 	}
 	t.envs[name] = d
 
-	return name, nil
+	return d, nil
 }
 
 // requiredEnv replaces the helmfile readFile template function. This implementation ensures stack templates
