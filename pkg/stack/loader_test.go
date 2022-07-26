@@ -12,7 +12,8 @@ func TestParseStacks(t *testing.T) {
 	// ensures that we fail even earlier when introducing a syntax error into our stack helmfiles.
 	require := require.New(t)
 
-	dir := "../../stacks/"
+	// TODO use a proper file handling func to get the absolute path
+	dir := "../../stacks"
 
 	_, err := parseStacks(dir)
 

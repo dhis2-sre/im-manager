@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/dhis2-sre/im-manager/pkg/model"
+	"gopkg.in/yaml.v2"
 )
 
 const (
@@ -18,6 +19,8 @@ const (
 	hostnameVariableIdentifier   = "# hostnameVariable: "
 )
 
+// TODO can the yaml parser turn a list into a map[string]struct{}?
+// if not should I do it and only expose the version using sets? its nicer to work with
 type metadata struct {
 	HostnameVariable   string   `yaml:"hostnameVariable,omitempty"`
 	HostnamePattern    string   `yaml:"hostnamePattern,omitempty"`
@@ -74,48 +77,69 @@ func parseStacks(dir string) ([]*model.Stack, error) {
 		name := entry.Name()
 		log.Printf("Parsing stack: %q\n", name)
 
-		// TODO write and call parseMetadata(name)
-		// and adapt subsequent code
-
-		// TODO move that potentially into parseStack(dir, name)
-		// so we have
-		// meta,err:= parseMetadata(name)
-		// parseStack(name, meta.stackParams)
-		path := fmt.Sprintf("%s/%s/helmfile.yaml", dir, name)
-		file, err := os.ReadFile(path)
+		meta, err := parseMetadata(dir, name)
 		if err != nil {
-			return nil, fmt.Errorf("error reading stack %q: %v", name, err)
+			return nil, err
 		}
 
-		// TODO pass the stackParams in
-		stackTemplate := newTmpl(name, []string{})
-		err = stackTemplate.parse(string(file))
+		tmpl, err := parseTemplate(dir, name, meta.StackParameters)
 		if err != nil {
-			return nil, fmt.Errorf("error parsing stack %q: %v", name, err)
+			return nil, err
 		}
 
-		// TODO convert to *model.Stack
-		// TODO move that conversion into parseStacks so it returns []*model.Stack
 		stack := &model.Stack{
-			Name: name,
-			// HostnamePattern:  template.hostnamePattern,
-			// HostnameVariable: template.hostnameVariable,
+			Name:             name,
+			HostnamePattern:  meta.HostnamePattern,
+			HostnameVariable: meta.HostnameVariable,
 		}
 		// TODO can I simplify isConsumed by using a set?
-		// for name := range template.requiredEnvs {
-		// 	isConsumed := isConsumedParameter(name, template.consumedParameters)
-		// 	parameter := &model.StackRequiredParameter{Name: name, StackName: stack.Name, Consumed: isConsumed}
-		// 	stack.RequiredParameters = append(stack.RequiredParameters, *parameter)
-		// }
-		// for name, v := range template.envs {
-		// 	isConsumed := isConsumedParameter(name, template.consumedParameters)
-		// 	parameter := &model.StackOptionalParameter{Name: name, StackName: stack.Name, Consumed: isConsumed, DefaultValue: fmt.Sprintf("%s", v)}
-		// 	stack.OptionalParameters = append(stack.OptionalParameters, *parameter)
-		// }
+		for name := range tmpl.requiredEnvs {
+			isConsumed := isConsumedParameter(name, meta.ConsumedParameters)
+			parameter := &model.StackRequiredParameter{Name: name, StackName: stack.Name, Consumed: isConsumed}
+			stack.RequiredParameters = append(stack.RequiredParameters, *parameter)
+		}
+		for name, v := range tmpl.envs {
+			isConsumed := isConsumedParameter(name, meta.ConsumedParameters)
+			parameter := &model.StackOptionalParameter{Name: name, StackName: stack.Name, Consumed: isConsumed, DefaultValue: fmt.Sprintf("%s", v)}
+			stack.OptionalParameters = append(stack.OptionalParameters, *parameter)
+		}
 		stacks = append(stacks, stack)
 	}
 
 	return stacks, nil
+}
+
+func parseMetadata(dir, name string) (metadata, error) {
+	// TODO handle the file not being there
+	var meta metadata
+
+	// TODO use some proper file handling funcs
+	path := fmt.Sprintf("%s/%s/im-metadata.yaml", dir, name)
+	file, err := os.ReadFile(path)
+	if err != nil {
+		return meta, fmt.Errorf("error reading stack metadata %q: %v", name, err)
+	}
+
+	err = yaml.Unmarshal(file, &meta)
+
+	return meta, err
+}
+
+func parseTemplate(dir, name string, stackParams []string) (*tmpl, error) {
+	// TODO use some proper file handling funcs
+	path := fmt.Sprintf("%s/%s/helmfile.yaml", dir, name)
+	file, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("error reading stack template %q: %v", name, err)
+	}
+
+	stackTemplate := newTmpl(name, stackParams)
+	err = stackTemplate.parse(string(file))
+	if err != nil {
+		return nil, fmt.Errorf("error parsing stack template %q: %v", name, err)
+	}
+
+	return stackTemplate, nil
 }
 
 func parseStacksOld(dir string) ([]*model.Stack, error) {
