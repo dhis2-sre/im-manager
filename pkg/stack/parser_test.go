@@ -85,7 +85,6 @@ func TestParserYamlMetadata(t *testing.T) {
 }
 
 func TestParserRequiredEnv(t *testing.T) {
-	// TODO one test for all cases or separate ones?
 	tt := map[string]struct {
 		in   string
 		want map[string]struct{}
@@ -164,20 +163,40 @@ func TestParserEnv(t *testing.T) {
 		in   string
 		want map[string]any
 	}{
-		"Success": {
-			in: `{{env "INSTANCE_NAME"}}`,
+		"Ok": {
+			in: `releases:
+- name: {{env "IMAGE_REPOSITORY"}}
+- name: {{env "IMAGE_REPOSITORY"}}`,
 			want: map[string]any{
-				"INSTANCE_NAME": "",
+				"IMAGE_REPOSITORY": "",
 			},
 		},
-		"SuccessWithDefaultString": {
-			in: `{{env "INSTANCE_NAME" | default "DHIS2"}}`,
+		"OkWithoutSystemParameters": {
+			in: `releases:
+- name: {{env "IMAGE_REPOSITORY"}}
+- name: {{env "INSTANCE_ID"}}`,
 			want: map[string]any{
-				"INSTANCE_NAME": "DHIS2",
+				"IMAGE_REPOSITORY": "",
 			},
 		},
-		"SuccessWithDefaultNumber": {
-			in: `{{env "CHART_VERSION" | default 2}}`,
+		"OkWithDefaultString": {
+			in: `releases:
+- name: {{env "IMAGE_REPOSITORY" | default "dockerhub"}}`,
+			want: map[string]any{
+				"IMAGE_REPOSITORY": "dockerhub",
+			},
+		},
+		"OkMultipleDefaultsOverride": {
+			in: `releases:
+- name: {{env "IMAGE_REPOSITORY" | default "dockerhub"}}
+- name: {{env "IMAGE_REPOSITORY" | default "azurehub"}}`,
+			want: map[string]any{
+				"IMAGE_REPOSITORY": "azurehub",
+			},
+		},
+		"OkWithDefaultNumber": {
+			in: `releases:
+- name: {{env "CHART_VERSION" | default 2}}`,
 			want: map[string]any{
 				"CHART_VERSION": 2,
 			},
@@ -189,9 +208,8 @@ func TestParserEnv(t *testing.T) {
 			assert := assert.New(t)
 			require := require.New(t)
 
-			tmpl := &tmpl{}
-			err := tmpl.parse(`releases:
-  - name: ` + tt.in)
+			tmpl := newTmpl("test")
+			err := tmpl.parse(tt.in)
 
 			require.NoError(err)
 			assert.Equal(tt.want, tmpl.envs)

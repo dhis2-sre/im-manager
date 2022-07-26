@@ -1,0 +1,3 @@
+hostnamePattern: "%s-postgresql.%s.svc"
+stackParameters:
+  - DATABASE_MANAGER_URL

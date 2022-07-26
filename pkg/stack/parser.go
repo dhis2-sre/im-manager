@@ -115,6 +115,11 @@ func (t *tmpl) env(name string) (string, error) {
 	if strings.TrimSpace(name) == "" {
 		return "", errors.New("must provide name")
 	}
+
+	if _, ok := t.systemParameters[name]; ok {
+		return name, nil
+	}
+
 	if t.envs == nil {
 		t.envs = make(map[string]any)
 	}
