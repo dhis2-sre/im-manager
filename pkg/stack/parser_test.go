@@ -85,25 +85,49 @@ func TestParserYamlMetadata(t *testing.T) {
 }
 
 func TestParserRequiredEnv(t *testing.T) {
-	t.Run("Success", func(t *testing.T) {
-		assert := assert.New(t)
-		require := require.New(t)
-
-		in := `releases:
+	// TODO one test for all cases or separate ones?
+	tt := map[string]struct {
+		in   string
+		want map[string]struct{}
+	}{
+		"Ok": {
+			in: `releases:
 - name: {{requiredEnv "DATABASE_NAME"}}
 - name: {{requiredEnv "DATABASE_NAME"}}
-- name: {{requiredEnv "DATABASE_PORT"}}`
-		want := map[string]struct{}{
-			"DATABASE_NAME": {},
-			"DATABASE_PORT": {},
-		}
+- name: {{requiredEnv "DATABASE_PORT"}}`,
+			want: map[string]struct{}{
+				"DATABASE_NAME": {},
+				"DATABASE_PORT": {},
+			},
+		},
+		"OkWithoutSystemParameters": {
+			in: `releases:
+- name: {{requiredEnv "DATABASE_NAME"}}
+- name: {{requiredEnv "INSTANCE_ID"}}
+- name: {{requiredEnv "INSTANCE_NAME"}}
+- name: {{requiredEnv "INSTANCE_HOSTNAME"}}
+- name: {{requiredEnv "IM_ACCESS_TOKEN"}}
+- name: {{requiredEnv "DATABASE_NAME"}}
+- name: {{requiredEnv "DATABASE_PORT"}}`,
+			want: map[string]struct{}{
+				"DATABASE_NAME": {},
+				"DATABASE_PORT": {},
+			},
+		},
+	}
 
-		tmpl := &tmpl{}
-		err := tmpl.parse(in)
+	for n, tt := range tt {
+		t.Run(n, func(t *testing.T) {
+			assert := assert.New(t)
+			require := require.New(t)
 
-		require.NoError(err)
-		assert.Equal(want, tmpl.requiredEnvs)
-	})
+			tmpl := newTmpl("test")
+			err := tmpl.parse(tt.in)
+
+			require.NoError(err)
+			assert.Equal(tt.want, tmpl.requiredEnvs)
+		})
+	}
 
 	te := map[string]struct {
 		in      string

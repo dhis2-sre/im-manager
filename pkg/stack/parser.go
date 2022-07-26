@@ -9,12 +9,17 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-// TODO convert helmfiles to new format
-
 // TODO pass in dir?
 func newTmpl(name string) *tmpl {
 	return &tmpl{
 		name: name,
+		systemParameters: map[string]struct{}{
+			"INSTANCE_ID":        {},
+			"INSTANCE_NAME":      {},
+			"INSTANCE_HOSTNAME":  {},
+			"INSTANCE_NAMESPACE": {},
+			"IM_ACCESS_TOKEN":    {},
+		},
 	}
 }
 
@@ -28,6 +33,7 @@ type tmpl struct {
 	hostnamePattern    string
 	consumedParameters []string
 	stackParameters    []string
+	systemParameters   map[string]struct{}
 }
 
 // helmfile represents a helmfile with added instance manager metadata.
@@ -88,6 +94,11 @@ func (t *tmpl) requiredEnv(name string) (string, error) {
 	if strings.TrimSpace(name) == "" {
 		return "", errors.New("must provide name")
 	}
+
+	if _, ok := t.systemParameters[name]; ok {
+		return name, nil
+	}
+
 	if t.requiredEnvs == nil {
 		t.requiredEnvs = make(map[string]struct{})
 	}
