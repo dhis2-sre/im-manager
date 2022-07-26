@@ -18,38 +18,28 @@ const (
 	hostnameVariableIdentifier   = "# hostnameVariable: "
 )
 
+type metadata struct {
+	HostnameVariable   string   `yaml:"hostnameVariable,omitempty"`
+	HostnamePattern    string   `yaml:"hostnamePattern,omitempty"`
+	ConsumedParameters []string `yaml:"consumedParameters,omitempty"`
+	StackParameters    []string `yaml:"stackParameters,omitempty"`
+}
+
 // TODO: This is not thread safe
 // Deleting the stack on each boot isn't ideal since instance parameters are linked to stack parameters
 // Perhaps upsert using... https://gorm.io/docs/advanced_query.html#FirstOrCreate
 
 func LoadStacks(dir string, stackService Service) error {
-	templates, err := parseStacks(dir)
+	stacks, err := parseStacks(dir)
 	if err != nil {
 		return err
 	}
 
-	for _, template := range templates {
-		stack := &model.Stack{
-			Name:             template.name,
-			HostnamePattern:  template.hostnamePattern,
-			HostnameVariable: template.hostnameVariable,
-		}
-		// TODO can I simplify isConsumed by using a set?
-		for name := range template.requiredEnvs {
-			isConsumed := isConsumedParameter(name, template.consumedParameters)
-			parameter := &model.StackRequiredParameter{Name: name, StackName: stack.Name, Consumed: isConsumed}
-			stack.RequiredParameters = append(stack.RequiredParameters, *parameter)
-		}
-		for name, v := range template.envs {
-			isConsumed := isConsumedParameter(name, template.consumedParameters)
-			parameter := &model.StackOptionalParameter{Name: name, StackName: stack.Name, Consumed: isConsumed, DefaultValue: fmt.Sprintf("%s", v)}
-			stack.OptionalParameters = append(stack.OptionalParameters, *parameter)
-		}
-
-		existingStack, err := stackService.Find(template.name)
+	for _, stack := range stacks {
+		existingStack, err := stackService.Find(stack.Name)
 		if err != nil {
 			if err.Error() != "record not found" {
-				return fmt.Errorf("error searching existing stack %q: %v", template.name, err)
+				return fmt.Errorf("error searching existing stack %q: %v", stack.Name, err)
 			}
 		}
 		if err == nil {
@@ -59,23 +49,23 @@ func LoadStacks(dir string, stackService Service) error {
 			continue
 		}
 
-		stack, err = stackService.Create(stack)
-		log.Printf("Stack created: %+v\n", stack)
+		createdStack, err := stackService.Create(stack)
 		if err != nil {
-			return fmt.Errorf("error creating stack %q: %v", template.name, err)
+			return fmt.Errorf("error creating stack %q: %v", stack.Name, err)
 		}
+		log.Printf("Stack created: %+v\n", createdStack)
 	}
 
 	return nil
 }
 
-func parseStacks(dir string) ([]*tmpl, error) {
+func parseStacks(dir string) ([]*model.Stack, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return nil, fmt.Errorf("error reading stack directory %q: %s", dir, err)
 	}
 
-	var templates []*tmpl
+	var stacks []*model.Stack
 	for _, entry := range entries {
 		if !entry.IsDir() {
 			continue
@@ -84,31 +74,57 @@ func parseStacks(dir string) ([]*tmpl, error) {
 		name := entry.Name()
 		log.Printf("Parsing stack: %q\n", name)
 
+		// TODO write and call parseMetadata(name)
+		// and adapt subsequent code
+
+		// TODO move that potentially into parseStack(dir, name)
+		// so we have
+		// meta,err:= parseMetadata(name)
+		// parseStack(name, meta.stackParams)
 		path := fmt.Sprintf("%s/%s/helmfile.yaml", dir, name)
 		file, err := os.ReadFile(path)
 		if err != nil {
 			return nil, fmt.Errorf("error reading stack %q: %v", name, err)
 		}
 
-		stackTemplate := newTmpl(name)
+		// TODO pass the stackParams in
+		stackTemplate := newTmpl(name, []string{})
 		err = stackTemplate.parse(string(file))
 		if err != nil {
 			return nil, fmt.Errorf("error parsing stack %q: %v", name, err)
 		}
 
-		templates = append(templates, stackTemplate)
+		// TODO convert to *model.Stack
+		// TODO move that conversion into parseStacks so it returns []*model.Stack
+		stack := &model.Stack{
+			Name: name,
+			// HostnamePattern:  template.hostnamePattern,
+			// HostnameVariable: template.hostnameVariable,
+		}
+		// TODO can I simplify isConsumed by using a set?
+		// for name := range template.requiredEnvs {
+		// 	isConsumed := isConsumedParameter(name, template.consumedParameters)
+		// 	parameter := &model.StackRequiredParameter{Name: name, StackName: stack.Name, Consumed: isConsumed}
+		// 	stack.RequiredParameters = append(stack.RequiredParameters, *parameter)
+		// }
+		// for name, v := range template.envs {
+		// 	isConsumed := isConsumedParameter(name, template.consumedParameters)
+		// 	parameter := &model.StackOptionalParameter{Name: name, StackName: stack.Name, Consumed: isConsumed, DefaultValue: fmt.Sprintf("%s", v)}
+		// 	stack.OptionalParameters = append(stack.OptionalParameters, *parameter)
+		// }
+		stacks = append(stacks, stack)
 	}
 
-	return templates, nil
+	return stacks, nil
 }
 
-func parseStacksOld(dir string) ([]*tmpl, error) {
+func parseStacksOld(dir string) ([]*model.Stack, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return nil, fmt.Errorf("error reading stack directory %q: %s", dir, err)
 	}
 
-	var templates []*tmpl
+	var stacks []*model.Stack
 	for _, entry := range entries {
 		if !entry.IsDir() {
 			continue
@@ -122,13 +138,13 @@ func parseStacksOld(dir string) ([]*tmpl, error) {
 			return nil, fmt.Errorf("error parsing stack %q: %v", name, err)
 		}
 
-		templates = append(templates, stackTemplate)
+		stacks = append(stacks, stackTemplate)
 	}
 
-	return templates, nil
+	return stacks, nil
 }
 
-func parseStackOld(dir, name string) (*tmpl, error) {
+func parseStackOld(dir, name string) (*model.Stack, error) {
 	path := fmt.Sprintf("%s/%s/helmfile.yaml", dir, name)
 	file, err := os.ReadFile(path)
 	if err != nil {
@@ -165,15 +181,23 @@ func parseStackOld(dir, name string) (*tmpl, error) {
 
 	optionalParams := extractOptionalParameters(file, stackParameters)
 
-	return &tmpl{
-		name:               name,
-		hostnamePattern:    hostnamePattern,
-		hostnameVariable:   hostnameVariable,
-		consumedParameters: consumedParameters,
-		stackParameters:    stackParameters,
-		requiredEnvs:       requiredEnvs,
-		envs:               optionalParams,
-	}, nil
+	stack := &model.Stack{
+		Name:             name,
+		HostnamePattern:  hostnamePattern,
+		HostnameVariable: hostnameVariable,
+	}
+	for _, param := range requiredParams {
+		isConsumed := isConsumedParameter(param, consumedParameters)
+		parameter := &model.StackRequiredParameter{Name: param, StackName: stack.Name, Consumed: isConsumed}
+		stack.RequiredParameters = append(stack.RequiredParameters, *parameter)
+	}
+	for param, value := range optionalParams {
+		isConsumed := isConsumedParameter(param, consumedParameters)
+		parameter := &model.StackOptionalParameter{Name: name, StackName: stack.Name, Consumed: isConsumed, DefaultValue: value}
+		stack.OptionalParameters = append(stack.OptionalParameters, *parameter)
+	}
+
+	return stack, nil
 }
 
 func extractMetadataParameters(file []byte, identifier string) []string {
@@ -195,10 +219,10 @@ func extractRequiredParameters(file []byte, stackParameters []string) []string {
 	return extractParameters(file, regexStr, stackParameters)
 }
 
-func extractOptionalParameters(file []byte, stackParameters []string) map[string]any {
+func extractOptionalParameters(file []byte, stackParameters []string) map[string]string {
 	regexStr := `{{[ ]env[ ]"(\w+)"[ ]?(\|[ ]?default[ ]["]?(.*)\s+}})?`
 	fileData := string(file)
-	parameterMap := make(map[string]any)
+	parameterMap := make(map[string]string)
 	re := regexp.MustCompile(regexStr)
 	matches := re.FindAllStringSubmatch(fileData, -1)
 	for _, match := range matches {

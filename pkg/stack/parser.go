@@ -9,10 +9,11 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-// TODO pass in dir?
-func newTmpl(name string) *tmpl {
+func newTmpl(name string, stackParameters []string) *tmpl {
+	// TODO turn stackParams into set
 	return &tmpl{
-		name: name,
+		name:            name,
+		stackParameters: stackParameters,
 		systemParameters: map[string]struct{}{
 			"INSTANCE_ID":        {},
 			"INSTANCE_NAME":      {},
@@ -26,24 +27,15 @@ func newTmpl(name string) *tmpl {
 // tmpl represents a stack template used to create the environment for running a stacks helmfile
 // commands.
 type tmpl struct {
-	name               string
-	requiredEnvs       map[string]struct{}
-	envs               map[string]any
-	hostnameVariable   string
-	hostnamePattern    string
-	consumedParameters []string
-	stackParameters    []string
-	systemParameters   map[string]struct{}
+	name             string
+	requiredEnvs     map[string]struct{}
+	envs             map[string]any
+	stackParameters  []string
+	systemParameters map[string]struct{}
 }
 
 // helmfile represents a helmfile with added instance manager metadata.
 type helmfile struct {
-	Metadata struct {
-		HostnameVariable   string   `yaml:"hostnameVariable,omitempty"`
-		HostnamePattern    string   `yaml:"hostnamePattern,omitempty"`
-		ConsumedParameters []string `yaml:"consumedParameters,omitempty"`
-		StackParameters    []string `yaml:"stackParameters,omitempty"`
-	} `yaml:"instanceManager,omitempty"`
 	Releases     []map[any]any `yaml:"releases,omitempty"`
 	Repositories []map[any]any `yaml:"repositories,omitempty"`
 }
@@ -71,17 +63,7 @@ func (t *tmpl) parse(in string) error {
 	// fmt.Println(yl.String())
 
 	var helm helmfile
-	err = yaml.Unmarshal(yl.Bytes(), &helm)
-	if err != nil {
-		return err
-	}
-
-	t.hostnameVariable = helm.Metadata.HostnameVariable
-	t.hostnamePattern = helm.Metadata.HostnamePattern
-	t.consumedParameters = helm.Metadata.ConsumedParameters
-	t.stackParameters = helm.Metadata.StackParameters
-
-	return err
+	return yaml.Unmarshal(yl.Bytes(), &helm)
 }
 
 // TODO should we check the default value in any way? It will be provided otherwise the

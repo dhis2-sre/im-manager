@@ -7,83 +7,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TODO check if I can declare the assert/require before subtests and reuse them in there
-
-func TestParserYamlMetadata(t *testing.T) {
-	t.Run("SuccessWithAllMetadata", func(t *testing.T) {
-		assert := assert.New(t)
-		require := require.New(t)
-
-		in := `instanceManager:
- consumedParameters:
-    - DATABASE_USERNAME
-    - DATABASE_PASSWORD
-    - DATABASE_NAME
- hostnameVariable: DATABASE_HOSTNAME
- hostnamePattern: "%s-postgresql.%s.svc"
- stackParameters:
-    - GOOGLE_AUTH_PROJECT_ID
-    - GOOGLE_AUTH_CLIENT_ID`
-		want := &tmpl{
-			hostnameVariable: "DATABASE_HOSTNAME",
-			hostnamePattern:  "%s-postgresql.%s.svc",
-			consumedParameters: []string{
-				"DATABASE_USERNAME",
-				"DATABASE_PASSWORD",
-				"DATABASE_NAME",
-			},
-			stackParameters: []string{
-				"GOOGLE_AUTH_PROJECT_ID",
-				"GOOGLE_AUTH_CLIENT_ID",
-			},
-		}
-
-		tmpl := &tmpl{}
-		err := tmpl.parse(in)
-
-		require.NoError(err)
-		assert.Equal(want, tmpl)
-	})
-
-	t.Run("SuccessWithPartialMetadata", func(t *testing.T) {
-		assert := assert.New(t)
-		require := require.New(t)
-
-		in := `instanceManager:
- hostnameVariable: DATABASE_HOSTNAME
- stackParameters:
-    - GOOGLE_AUTH_PROJECT_ID
-    - GOOGLE_AUTH_CLIENT_ID`
-		want := &tmpl{
-			hostnameVariable: "DATABASE_HOSTNAME",
-			stackParameters: []string{
-				"GOOGLE_AUTH_PROJECT_ID",
-				"GOOGLE_AUTH_CLIENT_ID",
-			},
-		}
-
-		tmpl := &tmpl{}
-		err := tmpl.parse(in)
-
-		require.NoError(err)
-		assert.Equal(want, tmpl)
-	})
-
-	t.Run("FailsWithInvalidStructure", func(t *testing.T) {
-		require := require.New(t)
-
-		in := `instanceManager:
- hostnameVariable:
-	- DATABASE_HOSTNAME
-	- DATABASE_PORT`
-
-		tmpl := &tmpl{}
-		err := tmpl.parse(in)
-
-		require.Error(err)
-	})
-}
-
 func TestParserRequiredEnv(t *testing.T) {
 	tt := map[string]struct {
 		in   string
@@ -120,7 +43,7 @@ func TestParserRequiredEnv(t *testing.T) {
 			assert := assert.New(t)
 			require := require.New(t)
 
-			tmpl := newTmpl("test")
+			tmpl := newTmpl("test", []string{})
 			err := tmpl.parse(tt.in)
 
 			require.NoError(err)
@@ -208,7 +131,7 @@ func TestParserEnv(t *testing.T) {
 			assert := assert.New(t)
 			require := require.New(t)
 
-			tmpl := newTmpl("test")
+			tmpl := newTmpl("test", []string{})
 			err := tmpl.parse(tt.in)
 
 			require.NoError(err)
@@ -233,7 +156,7 @@ func TestParserEnv(t *testing.T) {
 		t.Run(n, func(t *testing.T) {
 			assert := assert.New(t)
 
-			tmpl := &tmpl{}
+			tmpl := newTmpl("test", []string{})
 			err := tmpl.parse(`releases:
   - name: ` + te.in)
 

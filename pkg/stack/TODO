@@ -1,4 +1,4 @@
-* extract helmfile instance manager metadata to im-metadata.yaml
+* parse im-metadata in loader and pass to parser tmpl
 * create an error that contains the executed go template, so the yaml helmfile
   print it in case yaml parsing failed. this helps in figuring out what is wrong.
 * optional/required parameters are not system parameters like
@@ -9,3 +9,4 @@
 
 * should I call the fields envs/requiredEnvs in the parser? since they come from these functions
   or should I call them optionalParams/requiredParams
+* check if I can declare the assert/require before subtests and reuse them in there
