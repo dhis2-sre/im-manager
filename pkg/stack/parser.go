@@ -84,27 +84,20 @@ func (t *tmpl) parse(in string) error {
 	return err
 }
 
-// TODO sort functions in call order
+// TODO should we check the default value in any way? It will be provided otherwise the
+// text/template Execute will fail
 
-// requiredEnv replaces the helmfile requiredEnv template function. This implementation ensures stack templates
+// dfault replaces the Sprig default template function. This implementation ensures stack templates
 // calling it provide the correct amount/type of args. String args must be non-blank as this is most
 // likely an unintentional mistake.
-// https://github.com/helmfile/helmfile/blob/70d2dd653b5fd7a64d834aa99e07d727d3f4d10d/pkg/tmpl/context_funcs.go#L313
-func (t *tmpl) requiredEnv(name string) (string, error) {
+// https://github.com/Masterminds/sprig/blob/3ac42c7bc5e4be6aa534e036fb19dde4a996da2e/defaults.go#L26
+func (t *tmpl) dfault(d any, name string) (any, error) {
 	if strings.TrimSpace(name) == "" {
 		return "", errors.New("must provide name")
 	}
+	t.envs[name] = d
 
-	if _, ok := t.systemParameters[name]; ok {
-		return name, nil
-	}
-
-	if t.requiredEnvs == nil {
-		t.requiredEnvs = make(map[string]struct{})
-	}
-	t.requiredEnvs[name] = struct{}{}
-
-	return name, nil
+	return d, nil
 }
 
 // env replaces the Sprig env template function which is actually os.Getenv. This implementation ensures stack templates
@@ -128,55 +121,25 @@ func (t *tmpl) env(name string) (string, error) {
 	return name, nil
 }
 
-// TODO should we check the default value in any way? It will be provided otherwise the
-// text/template Execute will fail
-
-// dfault replaces the Sprig default template function. This implementation ensures stack templates
+// requiredEnv replaces the helmfile requiredEnv template function. This implementation ensures stack templates
 // calling it provide the correct amount/type of args. String args must be non-blank as this is most
 // likely an unintentional mistake.
-// https://github.com/Masterminds/sprig/blob/3ac42c7bc5e4be6aa534e036fb19dde4a996da2e/defaults.go#L26
-func (t *tmpl) dfault(d any, name string) (any, error) {
+// https://github.com/helmfile/helmfile/blob/70d2dd653b5fd7a64d834aa99e07d727d3f4d10d/pkg/tmpl/context_funcs.go#L313
+func (t *tmpl) requiredEnv(name string) (string, error) {
 	if strings.TrimSpace(name) == "" {
 		return "", errors.New("must provide name")
 	}
-	t.envs[name] = d
 
-	return d, nil
-}
-
-// requiredEnv replaces the helmfile readFile template function. This implementation ensures stack templates
-// calling it provide the correct amount/type of args. String args must be non-blank as this is most
-// likely an unintentional mistake.
-// https://github.com/helmfile/helmfile/blob/70d2dd653b5fd7a64d834aa99e07d727d3f4d10d/pkg/tmpl/context_funcs.go#L200
-func readFile(filename string) (string, error) {
-	if strings.TrimSpace(filename) == "" {
-		return "", errors.New("must provide filename")
+	if _, ok := t.systemParameters[name]; ok {
+		return name, nil
 	}
 
-	// f, err := os.ReadFile(filename)
-	// if err != nil {
-	// 	return "", fmt.Errorf("error reading %q: %v", filename, err)
-	// }
-
-	return string(""), nil
-}
-
-// replace replaces the Sprig replace template function. This implementation ensures stack templates
-// calling it provide the correct amount/type of args. String args must be non-blank as this is most
-// likely an unintentional mistake.
-// https://github.com/Masterminds/sprig/blob/3ac42c7bc5e4be6aa534e036fb19dde4a996da2e/strings.go#L118
-func replace(old, new, src string) (string, error) {
-	if strings.TrimSpace(old) == "" {
-		return "", errors.New("must provide old")
+	if t.requiredEnvs == nil {
+		t.requiredEnvs = make(map[string]struct{})
 	}
-	if strings.TrimSpace(new) == "" {
-		return "", errors.New("must provide new")
-	}
-	if strings.TrimSpace(src) == "" {
-		return "", errors.New("must provide src")
-	}
+	t.requiredEnvs[name] = struct{}{}
 
-	return old, nil
+	return name, nil
 }
 
 // replace replaces the Sprig indent template function. This implementation ensures stack templates
@@ -200,4 +163,34 @@ func indent(_ int, v string) (string, error) {
 // https://github.com/Masterminds/sprig/blob/3ac42c7bc5e4be6aa534e036fb19dde4a996da2e/strings.go#L83
 func quote(str ...interface{}) (string, error) {
 	return "", nil
+}
+
+// readFile replaces the helmfile readFile template function. This implementation ensures stack templates
+// calling it provide the correct amount/type of args. String args must be non-blank as this is most
+// likely an unintentional mistake.
+// https://github.com/helmfile/helmfile/blob/70d2dd653b5fd7a64d834aa99e07d727d3f4d10d/pkg/tmpl/context_funcs.go#L200
+func readFile(filename string) (string, error) {
+	if strings.TrimSpace(filename) == "" {
+		return "", errors.New("must provide filename")
+	}
+
+	return string(""), nil
+}
+
+// replace replaces the Sprig replace template function. This implementation ensures stack templates
+// calling it provide the correct amount/type of args. String args must be non-blank as this is most
+// likely an unintentional mistake.
+// https://github.com/Masterminds/sprig/blob/3ac42c7bc5e4be6aa534e036fb19dde4a996da2e/strings.go#L118
+func replace(old, new, src string) (string, error) {
+	if strings.TrimSpace(old) == "" {
+		return "", errors.New("must provide old")
+	}
+	if strings.TrimSpace(new) == "" {
+		return "", errors.New("must provide new")
+	}
+	if strings.TrimSpace(src) == "" {
+		return "", errors.New("must provide src")
+	}
+
+	return old, nil
 }
