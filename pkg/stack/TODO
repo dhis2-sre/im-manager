@@ -8,3 +8,4 @@
 * remove tests that only helped in migrating parsers
 * remove metadata comments in helmfile.yaml
 * remove old parser code
+* remove measure.sh script
