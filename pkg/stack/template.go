@@ -9,6 +9,8 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
+// newTmpl creates a stack template of given name and with given stackParameters. stackParameters
+// will be excluded from optional and required parameters when executing parse.
 func newTmpl(name string, stackParameters map[string]struct{}) *tmpl {
 	return &tmpl{
 		name:            name,
