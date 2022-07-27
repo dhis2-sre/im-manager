@@ -151,6 +151,25 @@ func TestParserEnv(t *testing.T) {
 				"CHART_VERSION": 2,
 			},
 		},
+		"OkWithoutSystemParametersAndDefault": {
+			template: `releases:
+- name: {{env "IMAGE_REPOSITORY"}}
+- name: "{{env "IM_ACCESS_TOKEN" | default "-"}}"`,
+			want: map[string]any{
+				"IMAGE_REPOSITORY": "",
+			},
+		},
+		"OkWithoutStackParametersAndDefault": {
+			template: `releases:
+- name: {{env "IMAGE_REPOSITORY"}}
+- name: "{{env "DATABASE_MANAGER_URL" | default "-"}}"`,
+			stackParams: map[string]struct{}{
+				"DATABASE_MANAGER_URL": {},
+			},
+			want: map[string]any{
+				"IMAGE_REPOSITORY": "",
+			},
+		},
 	}
 
 	for n, tt := range tt {

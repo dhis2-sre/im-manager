@@ -76,7 +76,10 @@ func (t *tmpl) dfault(d any, name string) (any, error) {
 	if strings.TrimSpace(name) == "" {
 		return "", errors.New("must provide name")
 	}
-	t.envs[name] = d
+
+	if _, ok := t.envs[name]; ok {
+		t.envs[name] = d
+	}
 
 	return d, nil
 }

@@ -163,6 +163,7 @@ func parseTemplate(dir, name string, stackParams map[string]struct{}) (*tmpl, er
 	if err != nil {
 		return nil, fmt.Errorf("error parsing stack template %q: %v", name, err)
 	}
+	fmt.Printf("stack: %q template: %+v\n", name, template)
 
 	return template, nil
 }
