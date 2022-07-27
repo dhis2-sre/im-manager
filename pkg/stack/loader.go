@@ -11,7 +11,7 @@ import (
 	"strings"
 
 	"github.com/dhis2-sre/im-manager/pkg/model"
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 )
 
 const (
