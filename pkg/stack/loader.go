@@ -87,7 +87,6 @@ func parseStacks(dir string) ([]*model.Stack, error) {
 		if err != nil {
 			return nil, err
 		}
-		fmt.Printf("%q: %+v\n", name, meta)
 
 		tmpl, err := parseTemplate(dir, name, meta.stackParameters)
 		if err != nil {
@@ -163,7 +162,6 @@ func parseTemplate(dir, name string, stackParams map[string]struct{}) (*tmpl, er
 	if err != nil {
 		return nil, fmt.Errorf("error parsing stack template %q: %v", name, err)
 	}
-	fmt.Printf("stack: %q template: %+v\n", name, template)
 
 	return template, nil
 }

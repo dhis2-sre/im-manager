@@ -59,8 +59,6 @@ func (t *tmpl) parse(in string) error {
 		return err
 	}
 
-	// fmt.Println(yl.String())
-
 	var helm helmfile
 	return yaml.Unmarshal(yl.Bytes(), &helm)
 }
