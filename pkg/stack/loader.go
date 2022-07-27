@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path"
 	"regexp"
 	"sort"
 	"strings"
@@ -117,7 +118,7 @@ func parseStacks(dir string) ([]*model.Stack, error) {
 func parseMetadata(dir, name string) (metadata, error) {
 	var meta metadata
 
-	path := fmt.Sprintf("%s/%s/im-metadata.yaml", dir, name)
+	path := path.Join(dir, name, "im-metadata.yaml")
 	file, err := os.ReadFile(path)
 	if errors.Is(err, os.ErrNotExist) {
 		return meta, nil
@@ -151,7 +152,7 @@ func parseMetadata(dir, name string) (metadata, error) {
 }
 
 func parseTemplate(dir, name string, stackParams map[string]struct{}) (*tmpl, error) {
-	path := fmt.Sprintf("%s/%s/helmfile.yaml", dir, name)
+	path := path.Join(dir, name, "helmfile.yaml")
 	file, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("error reading stack template %q: %v", name, err)
