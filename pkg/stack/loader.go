@@ -20,9 +20,14 @@ const (
 	hostnameVariableIdentifier   = "# hostnameVariable: "
 )
 
-// TODO can the yaml parser turn a list into a map[string]struct{}?
-// if not should I do it and only expose the version using sets? its nicer to work with
 type metadata struct {
+	hostnameVariable   string
+	hostnamePattern    string
+	consumedParameters map[string]struct{}
+	stackParameters    map[string]struct{}
+}
+
+type metadataYaml struct {
 	HostnameVariable   string   `yaml:"hostnameVariable,omitempty"`
 	HostnamePattern    string   `yaml:"hostnamePattern,omitempty"`
 	ConsumedParameters []string `yaml:"consumedParameters,omitempty"`
@@ -82,25 +87,25 @@ func parseStacks(dir string) ([]*model.Stack, error) {
 		if err != nil {
 			return nil, err
 		}
+		fmt.Printf("%q: %+v\n", name, meta)
 
-		tmpl, err := parseTemplate(dir, name, meta.StackParameters)
+		tmpl, err := parseTemplate(dir, name, meta.stackParameters)
 		if err != nil {
 			return nil, err
 		}
 
 		stack := &model.Stack{
 			Name:             name,
-			HostnamePattern:  meta.HostnamePattern,
-			HostnameVariable: meta.HostnameVariable,
+			HostnamePattern:  meta.hostnamePattern,
+			HostnameVariable: meta.hostnameVariable,
 		}
-		// TODO can I simplify isConsumed by using a set?
 		for requiredEnv := range tmpl.requiredEnvs {
-			isConsumed := isConsumedParameter(requiredEnv, meta.ConsumedParameters)
+			_, isConsumed := meta.consumedParameters[requiredEnv]
 			parameter := &model.StackRequiredParameter{Name: requiredEnv, StackName: stack.Name, Consumed: isConsumed}
 			stack.RequiredParameters = append(stack.RequiredParameters, *parameter)
 		}
 		for env, value := range tmpl.envs {
-			isConsumed := isConsumedParameter(env, meta.ConsumedParameters)
+			_, isConsumed := meta.consumedParameters[env]
 			parameter := &model.StackOptionalParameter{Name: env, StackName: stack.Name, Consumed: isConsumed, DefaultValue: fmt.Sprintf("%v", value)}
 			stack.OptionalParameters = append(stack.OptionalParameters, *parameter)
 		}
@@ -122,29 +127,44 @@ func parseMetadata(dir, name string) (metadata, error) {
 		return meta, fmt.Errorf("error reading stack metadata %q: %v", name, err)
 	}
 
-	err = yaml.Unmarshal(file, &meta)
+	var metaYaml metadataYaml
+	err = yaml.Unmarshal(file, &metaYaml)
 	if err != nil {
 		return meta, fmt.Errorf("error parsing stack metadata %q: %v", name, err)
+	}
+
+	cps := make(map[string]struct{})
+	for _, cp := range metaYaml.ConsumedParameters {
+		cps[strings.TrimSpace(cp)] = struct{}{}
+	}
+	sps := make(map[string]struct{})
+	for _, sp := range metaYaml.StackParameters {
+		sps[strings.TrimSpace(sp)] = struct{}{}
+	}
+	meta = metadata{
+		hostnameVariable:   metaYaml.HostnameVariable,
+		hostnamePattern:    metaYaml.HostnamePattern,
+		consumedParameters: cps,
+		stackParameters:    sps,
 	}
 
 	return meta, err
 }
 
-func parseTemplate(dir, name string, stackParams []string) (*tmpl, error) {
-	// TODO use some proper file path handling funcs?
+func parseTemplate(dir, name string, stackParams map[string]struct{}) (*tmpl, error) {
 	path := fmt.Sprintf("%s/%s/helmfile.yaml", dir, name)
 	file, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("error reading stack template %q: %v", name, err)
 	}
 
-	stackTemplate := newTmpl(name, stackParams)
-	err = stackTemplate.parse(string(file))
+	template := newTmpl(name, stackParams)
+	err = template.parse(string(file))
 	if err != nil {
 		return nil, fmt.Errorf("error parsing stack template %q: %v", name, err)
 	}
 
-	return stackTemplate, nil
+	return template, nil
 }
 
 func parseStacksOld(dir string) ([]*model.Stack, error) {

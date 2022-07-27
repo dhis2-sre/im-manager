@@ -9,15 +9,10 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-func newTmpl(name string, stackParameters []string) *tmpl {
-	ps := make(map[string]struct{})
-	for _, p := range stackParameters {
-		ps[p] = struct{}{}
-	}
-
+func newTmpl(name string, stackParameters map[string]struct{}) *tmpl {
 	return &tmpl{
 		name:            name,
-		stackParameters: ps,
+		stackParameters: stackParameters,
 		systemParameters: map[string]struct{}{
 			"INSTANCE_ID":        {},
 			"INSTANCE_NAME":      {},

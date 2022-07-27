@@ -10,7 +10,7 @@ import (
 func TestParserRequiredEnv(t *testing.T) {
 	tt := map[string]struct {
 		template    string
-		stackParams []string
+		stackParams map[string]struct{}
 		want        map[string]struct{}
 	}{
 		"Ok": {
@@ -41,8 +41,8 @@ func TestParserRequiredEnv(t *testing.T) {
 			template: `releases:
 - name: {{requiredEnv "DATABASE_NAME"}}
 - name: {{requiredEnv "DATABASE_MANAGER_URL"}}`,
-			stackParams: []string{
-				"DATABASE_MANAGER_URL",
+			stackParams: map[string]struct{}{
+				"DATABASE_MANAGER_URL": {},
 			},
 			want: map[string]struct{}{
 				"DATABASE_NAME": {},
@@ -96,7 +96,7 @@ func TestParserRequiredEnv(t *testing.T) {
 func TestParserEnv(t *testing.T) {
 	tt := map[string]struct {
 		template    string
-		stackParams []string
+		stackParams map[string]struct{}
 		want        map[string]any
 	}{
 		"Ok": {
@@ -110,7 +110,10 @@ func TestParserEnv(t *testing.T) {
 		"OkWithoutSystemParameters": {
 			template: `releases:
 - name: {{env "IMAGE_REPOSITORY"}}
-- name: {{env "INSTANCE_ID"}}`,
+- name: {{env "INSTANCE_ID"}}
+- name: {{env "INSTANCE_NAME"}}
+- name: {{env "INSTANCE_HOSTNAME"}}
+- name: {{env "IM_ACCESS_TOKEN"}}`,
 			want: map[string]any{
 				"IMAGE_REPOSITORY": "",
 			},
@@ -119,8 +122,8 @@ func TestParserEnv(t *testing.T) {
 			template: `releases:
 - name: {{env "IMAGE_REPOSITORY"}}
 - name: {{env "DATABASE_MANAGER_URL"}}`,
-			stackParams: []string{
-				"DATABASE_MANAGER_URL",
+			stackParams: map[string]struct{}{
+				"DATABASE_MANAGER_URL": {},
 			},
 			want: map[string]any{
 				"IMAGE_REPOSITORY": "",
@@ -180,7 +183,7 @@ func TestParserEnv(t *testing.T) {
 		t.Run(n, func(t *testing.T) {
 			assert := assert.New(t)
 
-			tmpl := newTmpl("test", []string{})
+			tmpl := newTmpl("test", map[string]struct{}{})
 			err := tmpl.parse(`releases:
   - name: ` + te.template)
 
