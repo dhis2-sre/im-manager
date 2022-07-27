@@ -9,11 +9,12 @@ import (
 
 func TestParserRequiredEnv(t *testing.T) {
 	tt := map[string]struct {
-		in   string
-		want map[string]struct{}
+		template    string
+		stackParams []string
+		want        map[string]struct{}
 	}{
 		"Ok": {
-			in: `releases:
+			template: `releases:
 - name: {{requiredEnv "DATABASE_NAME"}}
 - name: {{requiredEnv "DATABASE_NAME"}}
 - name: {{requiredEnv "DATABASE_PORT"}}`,
@@ -23,7 +24,7 @@ func TestParserRequiredEnv(t *testing.T) {
 			},
 		},
 		"OkWithoutSystemParameters": {
-			in: `releases:
+			template: `releases:
 - name: {{requiredEnv "DATABASE_NAME"}}
 - name: {{requiredEnv "INSTANCE_ID"}}
 - name: {{requiredEnv "INSTANCE_NAME"}}
@@ -36,6 +37,17 @@ func TestParserRequiredEnv(t *testing.T) {
 				"DATABASE_PORT": {},
 			},
 		},
+		"OkWithoutStackParameters": {
+			template: `releases:
+- name: {{requiredEnv "DATABASE_NAME"}}
+- name: {{requiredEnv "DATABASE_MANAGER_URL"}}`,
+			stackParams: []string{
+				"DATABASE_MANAGER_URL",
+			},
+			want: map[string]struct{}{
+				"DATABASE_NAME": {},
+			},
+		},
 	}
 
 	for n, tt := range tt {
@@ -43,8 +55,8 @@ func TestParserRequiredEnv(t *testing.T) {
 			assert := assert.New(t)
 			require := require.New(t)
 
-			tmpl := newTmpl("test", []string{})
-			err := tmpl.parse(tt.in)
+			tmpl := newTmpl("test", tt.stackParams)
+			err := tmpl.parse(tt.template)
 
 			require.NoError(err)
 			assert.Equal(tt.want, tmpl.requiredEnvs)
@@ -52,15 +64,15 @@ func TestParserRequiredEnv(t *testing.T) {
 	}
 
 	te := map[string]struct {
-		in      string
-		wantErr string
+		template string
+		wantErr  string
 	}{
 		"MissingEnv": {
-			in: `{{requiredEnv}}`,
+			template: `{{requiredEnv}}`,
 		},
 		"BlankEnv": {
-			in:      `{{requiredEnv "   "}}`,
-			wantErr: "must provide name",
+			template: `{{requiredEnv "   "}}`,
+			wantErr:  "must provide name",
 		},
 	}
 
@@ -70,7 +82,7 @@ func TestParserRequiredEnv(t *testing.T) {
 
 			tmpl := &tmpl{}
 			err := tmpl.parse(`releases:
-  - name: ` + te.in)
+  - name: ` + te.template)
 
 			if te.wantErr != "" {
 				assert.ErrorContains(err, te.wantErr)
@@ -83,11 +95,12 @@ func TestParserRequiredEnv(t *testing.T) {
 
 func TestParserEnv(t *testing.T) {
 	tt := map[string]struct {
-		in   string
-		want map[string]any
+		template    string
+		stackParams []string
+		want        map[string]any
 	}{
 		"Ok": {
-			in: `releases:
+			template: `releases:
 - name: {{env "IMAGE_REPOSITORY"}}
 - name: {{env "IMAGE_REPOSITORY"}}`,
 			want: map[string]any{
@@ -95,22 +108,33 @@ func TestParserEnv(t *testing.T) {
 			},
 		},
 		"OkWithoutSystemParameters": {
-			in: `releases:
+			template: `releases:
 - name: {{env "IMAGE_REPOSITORY"}}
 - name: {{env "INSTANCE_ID"}}`,
 			want: map[string]any{
 				"IMAGE_REPOSITORY": "",
 			},
 		},
+		"OkWithoutStackParameters": {
+			template: `releases:
+- name: {{env "IMAGE_REPOSITORY"}}
+- name: {{env "DATABASE_MANAGER_URL"}}`,
+			stackParams: []string{
+				"DATABASE_MANAGER_URL",
+			},
+			want: map[string]any{
+				"IMAGE_REPOSITORY": "",
+			},
+		},
 		"OkWithDefaultString": {
-			in: `releases:
+			template: `releases:
 - name: {{env "IMAGE_REPOSITORY" | default "dockerhub"}}`,
 			want: map[string]any{
 				"IMAGE_REPOSITORY": "dockerhub",
 			},
 		},
 		"OkMultipleDefaultsOverride": {
-			in: `releases:
+			template: `releases:
 - name: {{env "IMAGE_REPOSITORY" | default "dockerhub"}}
 - name: {{env "IMAGE_REPOSITORY" | default "azurehub"}}`,
 			want: map[string]any{
@@ -118,7 +142,7 @@ func TestParserEnv(t *testing.T) {
 			},
 		},
 		"OkWithDefaultNumber": {
-			in: `releases:
+			template: `releases:
 - name: {{env "CHART_VERSION" | default 2}}`,
 			want: map[string]any{
 				"CHART_VERSION": 2,
@@ -131,8 +155,8 @@ func TestParserEnv(t *testing.T) {
 			assert := assert.New(t)
 			require := require.New(t)
 
-			tmpl := newTmpl("test", []string{})
-			err := tmpl.parse(tt.in)
+			tmpl := newTmpl("test", tt.stackParams)
+			err := tmpl.parse(tt.template)
 
 			require.NoError(err)
 			assert.Equal(tt.want, tmpl.envs)
@@ -140,15 +164,15 @@ func TestParserEnv(t *testing.T) {
 	}
 
 	te := map[string]struct {
-		in      string
-		wantErr string
+		template string
+		wantErr  string
 	}{
 		"MissingEnv": {
-			in: `{{requiredEnv}}`,
+			template: `{{requiredEnv}}`,
 		},
 		"BlankEnv": {
-			in:      `{{requiredEnv "   "}}`,
-			wantErr: "must provide name",
+			template: `{{requiredEnv "   "}}`,
+			wantErr:  "must provide name",
 		},
 	}
 
@@ -158,7 +182,7 @@ func TestParserEnv(t *testing.T) {
 
 			tmpl := newTmpl("test", []string{})
 			err := tmpl.parse(`releases:
-  - name: ` + te.in)
+  - name: ` + te.template)
 
 			if te.wantErr != "" {
 				assert.ErrorContains(err, te.wantErr)

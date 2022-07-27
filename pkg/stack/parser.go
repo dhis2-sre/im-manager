@@ -10,10 +10,14 @@ import (
 )
 
 func newTmpl(name string, stackParameters []string) *tmpl {
-	// TODO turn stackParams into set
+	ps := make(map[string]struct{})
+	for _, p := range stackParameters {
+		ps[p] = struct{}{}
+	}
+
 	return &tmpl{
 		name:            name,
-		stackParameters: stackParameters,
+		stackParameters: ps,
 		systemParameters: map[string]struct{}{
 			"INSTANCE_ID":        {},
 			"INSTANCE_NAME":      {},
@@ -30,7 +34,7 @@ type tmpl struct {
 	name             string
 	requiredEnvs     map[string]struct{}
 	envs             map[string]any
-	stackParameters  []string
+	stackParameters  map[string]struct{}
 	systemParameters map[string]struct{}
 }
 
@@ -94,6 +98,9 @@ func (t *tmpl) env(name string) (string, error) {
 	if _, ok := t.systemParameters[name]; ok {
 		return name, nil
 	}
+	if _, ok := t.stackParameters[name]; ok {
+		return name, nil
+	}
 
 	if t.envs == nil {
 		t.envs = make(map[string]any)
@@ -113,6 +120,9 @@ func (t *tmpl) requiredEnv(name string) (string, error) {
 	}
 
 	if _, ok := t.systemParameters[name]; ok {
+		return name, nil
+	}
+	if _, ok := t.stackParameters[name]; ok {
 		return name, nil
 	}
 

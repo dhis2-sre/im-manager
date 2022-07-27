@@ -43,6 +43,9 @@ func TestNewOldParser(t *testing.T) {
 	for _, o := range oldS {
 		n, ok := newS[o.Name]
 		require.True(ok, "stack %q does not exist in NEW parseStacks", o.Name)
-		assert.Equal(o, n, "stack %q was parsed differently in NEW than in OLD", o.Name)
+		assert.Equal(o.HostnamePattern, n.HostnamePattern, "stack %q HostnamePattern was parsed differently in OLD and NEW")
+		assert.Equal(o.HostnameVariable, n.HostnameVariable, "stack %q HostnameVariable was parsed differently in OLD and NEW")
+		assert.ElementsMatchf(o.RequiredParameters, n.RequiredParameters, "stack %q was parsed differently in OLD (list A) and NEW (list B)", o.Name)
+		assert.ElementsMatchf(o.OptionalParameters, n.OptionalParameters, "stack %q was parsed differently in OLD (list A) and NEW (list B)", o.Name)
 	}
 }

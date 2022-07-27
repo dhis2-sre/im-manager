@@ -101,7 +101,7 @@ func parseStacks(dir string) ([]*model.Stack, error) {
 		}
 		for env, value := range tmpl.envs {
 			isConsumed := isConsumedParameter(env, meta.ConsumedParameters)
-			parameter := &model.StackOptionalParameter{Name: env, StackName: stack.Name, Consumed: isConsumed, DefaultValue: fmt.Sprintf("%s", value)}
+			parameter := &model.StackOptionalParameter{Name: env, StackName: stack.Name, Consumed: isConsumed, DefaultValue: fmt.Sprintf("%v", value)}
 			stack.OptionalParameters = append(stack.OptionalParameters, *parameter)
 		}
 		stacks = append(stacks, stack)
@@ -150,7 +150,7 @@ func parseTemplate(dir, name string, stackParams []string) (*tmpl, error) {
 func parseStacksOld(dir string) ([]*model.Stack, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
-		return nil, fmt.Errorf("error reading stack directory %q: %s", dir, err)
+		return nil, fmt.Errorf("failed to read stack folder: %s", err)
 	}
 
 	var stacks []*model.Stack
@@ -161,13 +161,12 @@ func parseStacksOld(dir string) ([]*model.Stack, error) {
 
 		name := entry.Name()
 		log.Printf("Parsing stack: %q\n", name)
-
-		stackTemplate, err := parseStackOld(dir, name)
+		stack, err := parseStackOld(dir, name)
 		if err != nil {
 			return nil, fmt.Errorf("error parsing stack %q: %v", name, err)
 		}
 
-		stacks = append(stacks, stackTemplate)
+		stacks = append(stacks, stack)
 	}
 
 	return stacks, nil
@@ -201,13 +200,6 @@ func parseStackOld(dir, name string) (*model.Stack, error) {
 	consumedParameters := extractMetadataParameters(file, consumedParametersIdentifier)
 	stackParameters := extractMetadataParameters(file, stackParametersIdentifier)
 	requiredParams := extractRequiredParameters(file, stackParameters)
-	// NOTE: this is only to adapt to the new data structure; the rest of the old parsing is the
-	// same
-	requiredEnvs := make(map[string]struct{})
-	for _, name := range requiredParams {
-		requiredEnvs[name] = struct{}{}
-	}
-
 	optionalParams := extractOptionalParameters(file, stackParameters)
 
 	stack := &model.Stack{
@@ -215,14 +207,14 @@ func parseStackOld(dir, name string) (*model.Stack, error) {
 		HostnamePattern:  hostnamePattern,
 		HostnameVariable: hostnameVariable,
 	}
-	for _, param := range requiredParams {
-		isConsumed := isConsumedParameter(param, consumedParameters)
-		parameter := &model.StackRequiredParameter{Name: param, StackName: stack.Name, Consumed: isConsumed}
+	for _, name := range requiredParams {
+		isConsumed := isConsumedParameter(name, consumedParameters)
+		parameter := &model.StackRequiredParameter{Name: name, StackName: stack.Name, Consumed: isConsumed}
 		stack.RequiredParameters = append(stack.RequiredParameters, *parameter)
 	}
-	for param, value := range optionalParams {
-		isConsumed := isConsumedParameter(param, consumedParameters)
-		parameter := &model.StackOptionalParameter{Name: name, StackName: stack.Name, Consumed: isConsumed, DefaultValue: value}
+	for name, v := range optionalParams {
+		isConsumed := isConsumedParameter(name, consumedParameters)
+		parameter := &model.StackOptionalParameter{Name: name, StackName: stack.Name, Consumed: isConsumed, DefaultValue: v}
 		stack.OptionalParameters = append(stack.OptionalParameters, *parameter)
 	}
 
