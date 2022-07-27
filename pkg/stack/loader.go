@@ -1,6 +1,7 @@
 package stack
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -65,7 +66,7 @@ func LoadStacks(dir string, stackService Service) error {
 func parseStacks(dir string) ([]*model.Stack, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
-		return nil, fmt.Errorf("error reading stack directory %q: %s", dir, err)
+		return nil, fmt.Errorf("error reading stack directory %q: %v", dir, err)
 	}
 
 	var stacks []*model.Stack
@@ -93,14 +94,14 @@ func parseStacks(dir string) ([]*model.Stack, error) {
 			HostnameVariable: meta.HostnameVariable,
 		}
 		// TODO can I simplify isConsumed by using a set?
-		for name := range tmpl.requiredEnvs {
-			isConsumed := isConsumedParameter(name, meta.ConsumedParameters)
-			parameter := &model.StackRequiredParameter{Name: name, StackName: stack.Name, Consumed: isConsumed}
+		for requiredEnv := range tmpl.requiredEnvs {
+			isConsumed := isConsumedParameter(requiredEnv, meta.ConsumedParameters)
+			parameter := &model.StackRequiredParameter{Name: requiredEnv, StackName: stack.Name, Consumed: isConsumed}
 			stack.RequiredParameters = append(stack.RequiredParameters, *parameter)
 		}
-		for name, v := range tmpl.envs {
-			isConsumed := isConsumedParameter(name, meta.ConsumedParameters)
-			parameter := &model.StackOptionalParameter{Name: name, StackName: stack.Name, Consumed: isConsumed, DefaultValue: fmt.Sprintf("%s", v)}
+		for env, value := range tmpl.envs {
+			isConsumed := isConsumedParameter(env, meta.ConsumedParameters)
+			parameter := &model.StackOptionalParameter{Name: env, StackName: stack.Name, Consumed: isConsumed, DefaultValue: fmt.Sprintf("%s", value)}
 			stack.OptionalParameters = append(stack.OptionalParameters, *parameter)
 		}
 		stacks = append(stacks, stack)
@@ -110,23 +111,27 @@ func parseStacks(dir string) ([]*model.Stack, error) {
 }
 
 func parseMetadata(dir, name string) (metadata, error) {
-	// TODO handle the file not being there
 	var meta metadata
 
-	// TODO use some proper file handling funcs
 	path := fmt.Sprintf("%s/%s/im-metadata.yaml", dir, name)
 	file, err := os.ReadFile(path)
+	if errors.Is(err, os.ErrNotExist) {
+		return meta, nil
+	}
 	if err != nil {
 		return meta, fmt.Errorf("error reading stack metadata %q: %v", name, err)
 	}
 
 	err = yaml.Unmarshal(file, &meta)
+	if err != nil {
+		return meta, fmt.Errorf("error parsing stack metadata %q: %v", name, err)
+	}
 
 	return meta, err
 }
 
 func parseTemplate(dir, name string, stackParams []string) (*tmpl, error) {
-	// TODO use some proper file handling funcs
+	// TODO use some proper file path handling funcs?
 	path := fmt.Sprintf("%s/%s/helmfile.yaml", dir, name)
 	file, err := os.ReadFile(path)
 	if err != nil {

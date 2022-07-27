@@ -9,19 +9,15 @@ import (
 
 func TestParseStacks(t *testing.T) {
 	// The instance manager will fail at startup if parsing fails. Having this test is to
-	// ensures that we fail even earlier when introducing a syntax error into our stack helmfiles.
+	// ensure that we fail even earlier when introducing a syntax error into our stack helmfiles.
 	require := require.New(t)
 
-	// TODO use a proper file handling func to get the absolute path
-	dir := "../../stacks"
-
-	_, err := parseStacks(dir)
+	_, err := parseStacks("../../stacks")
 
 	require.NoError(err, "error parsing stack dir")
 }
 
-// TODO move work to loader
-// func TestParseYamlMetadata(t *testing.T) {
+// func TestParseMetadata(t *testing.T) {
 // 	t.Run("SuccessWithAllMetadata", func(t *testing.T) {
 // 		assert := assert.New(t)
 // 		require := require.New(t)
@@ -36,22 +32,21 @@ func TestParseStacks(t *testing.T) {
 //  stackParameters:
 //     - GOOGLE_AUTH_PROJECT_ID
 //     - GOOGLE_AUTH_CLIENT_ID`
-// 		want := &tmpl{
-// 			hostnameVariable: "DATABASE_HOSTNAME",
-// 			hostnamePattern:  "%s-postgresql.%s.svc",
-// 			consumedParameters: []string{
+// 		want := &metadata{
+// 			HostnameVariable: "DATABASE_HOSTNAME",
+// 			HostnamePattern:  "%s-postgresql.%s.svc",
+// 			ConsumedParameters: []string{
 // 				"DATABASE_USERNAME",
 // 				"DATABASE_PASSWORD",
 // 				"DATABASE_NAME",
 // 			},
-// 			stackParameters: []string{
+// 			StackParameters: []string{
 // 				"GOOGLE_AUTH_PROJECT_ID",
 // 				"GOOGLE_AUTH_CLIENT_ID",
 // 			},
 // 		}
 //
-// 		tmpl := &tmpl{}
-// 		err := tmpl.parse(in)
+// 		err := parseMetadata(in)
 //
 // 		require.NoError(err)
 // 		assert.Equal(want, tmpl)
