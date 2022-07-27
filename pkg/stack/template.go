@@ -35,7 +35,7 @@ type tmpl struct {
 	systemParameters map[string]struct{}
 }
 
-// helmfile represents a helmfile with added instance manager metadata.
+// helmfile represents a helmfile.
 type helmfile struct {
 	Releases     []map[any]any `yaml:"releases,omitempty"`
 	Repositories []map[any]any `yaml:"repositories,omitempty"`

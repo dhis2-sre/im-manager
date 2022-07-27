@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestParserRequiredEnv(t *testing.T) {
+func TestTemplateRequiredEnv(t *testing.T) {
 	tt := map[string]struct {
 		template    string
 		stackParams map[string]struct{}
@@ -93,7 +93,7 @@ func TestParserRequiredEnv(t *testing.T) {
 	}
 }
 
-func TestParserEnv(t *testing.T) {
+func TestTemplateEnv(t *testing.T) {
 	tt := map[string]struct {
 		template    string
 		stackParams map[string]struct{}

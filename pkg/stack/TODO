@@ -4,3 +4,7 @@
   or should I call them optionalParams/requiredParams
 * check if I can declare the assert/require before subtests and reuse them in there
 * add docs. explain why the parsing of the helmfile template is needed in the way we do it
+
+* remove tests that only helped in migrating parsers
+* remove metadata comments in helmfile.yaml
+* remove old parser code
