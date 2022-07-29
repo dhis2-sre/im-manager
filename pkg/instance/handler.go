@@ -178,10 +178,10 @@ type DeployInstanceRequest struct {
 	OptionalParameters []model.InstanceOptionalParameter `json:"optionalParameters"`
 }
 
-// Deploy instance
-// swagger:route POST /instances/{id} deployInstance
+// DeployExisting instance
+// swagger:route POST /instances/{id} deployExistingInstance
 //
-// Deploy instance
+// Deploy an existing instance
 //
 // Security:
 //  oauth2:
@@ -192,7 +192,7 @@ type DeployInstanceRequest struct {
 //   403: Error
 //   404: Error
 //   415: Error
-func (h Handler) Deploy(c *gin.Context) {
+func (h Handler) DeployExisting(c *gin.Context) {
 	h.deployOrUpdate(c, http.StatusCreated)
 }
 

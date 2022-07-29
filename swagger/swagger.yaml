@@ -306,8 +306,8 @@ paths:
       security:
       - oauth2: []
     post:
-      description: Deploy instance
-      operationId: deployInstance
+      description: Deploy an existing instance
+      operationId: deployExistingInstance
       parameters:
       - format: uint64
         in: path

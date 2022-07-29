@@ -8,7 +8,7 @@ type _ struct {
 	_ LaunchInstanceRequest
 }
 
-// swagger:parameters deployInstance
+// swagger:parameters deployExistingInstance
 type _ struct {
 	// in: path
 	// required: true
