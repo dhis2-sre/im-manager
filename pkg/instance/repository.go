@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/dhis2-sre/im-manager/pkg/config"
-
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	"github.com/jackc/pgconn"
 	"gorm.io/gorm"
@@ -39,7 +38,7 @@ func (r repository) FindByIdWithDecryptedParameters(id uint) (*model.Instance, e
 		return nil, err
 	}
 
-	err = r.decryptParameters(instance)
+	err = decryptParameters(r.config.InstanceParameterEncryptionKey, instance)
 
 	return instance, err
 }
@@ -81,12 +80,14 @@ func (r repository) Unlink(instance *model.Instance) error {
 }
 
 func (r repository) Save(instance *model.Instance) error {
+	key := r.config.InstanceParameterEncryptionKey
+
 	enrichParameters(instance)
 
 	// TODO: Handle error?
-	_ = r.decryptParameters(instance)
+	_ = decryptParameters(key, instance)
 
-	err := r.encryptParameters(instance)
+	err := encryptParameters(key, instance)
 	if err != nil {
 		return err
 	}
@@ -143,46 +144,6 @@ func (r repository) FindByGroupNames(names []string) ([]*model.Instance, error) 
 	return instances, err
 }
 
-func (r repository) encryptParameters(instance *model.Instance) error {
-	for i, parameter := range instance.RequiredParameters {
-		value, err := encryptText(r.config.InstanceParameterEncryptionKey, parameter.Value)
-		if err != nil {
-			return err
-		}
-		instance.RequiredParameters[i].Value = value
-	}
-
-	for i, parameter := range instance.OptionalParameters {
-		value, err := encryptText(r.config.InstanceParameterEncryptionKey, parameter.Value)
-		if err != nil {
-			return err
-		}
-		instance.OptionalParameters[i].Value = value
-	}
-
-	return nil
-}
-
-func (r repository) decryptParameters(instance *model.Instance) error {
-	for i, parameter := range instance.RequiredParameters {
-		value, err := decryptText(r.config.InstanceParameterEncryptionKey, parameter.Value)
-		if err != nil {
-			return err
-		}
-		instance.RequiredParameters[i].Value = value
-	}
-
-	for i, parameter := range instance.OptionalParameters {
-		value, err := decryptText(r.config.InstanceParameterEncryptionKey, parameter.Value)
-		if err != nil {
-			return err
-		}
-		instance.OptionalParameters[i].Value = value
-	}
-
-	return nil
-}
-
 // TODO: Rename PopulateRelations? Or something else?
 func enrichParameters(instance *model.Instance) {
 	requiredParameters := instance.RequiredParameters
@@ -200,4 +161,44 @@ func enrichParameters(instance *model.Instance) {
 			optionalParameters[i].StackName = instance.StackName
 		}
 	}
+}
+
+func encryptParameters(key string, instance *model.Instance) error {
+	for i, parameter := range instance.RequiredParameters {
+		value, err := encryptText(key, parameter.Value)
+		if err != nil {
+			return err
+		}
+		instance.RequiredParameters[i].Value = value
+	}
+
+	for i, parameter := range instance.OptionalParameters {
+		value, err := encryptText(key, parameter.Value)
+		if err != nil {
+			return err
+		}
+		instance.OptionalParameters[i].Value = value
+	}
+
+	return nil
+}
+
+func decryptParameters(key string, instance *model.Instance) error {
+	for i, parameter := range instance.RequiredParameters {
+		value, err := decryptText(key, parameter.Value)
+		if err != nil {
+			return err
+		}
+		instance.RequiredParameters[i].Value = value
+	}
+
+	for i, parameter := range instance.OptionalParameters {
+		value, err := decryptText(key, parameter.Value)
+		if err != nil {
+			return err
+		}
+		instance.OptionalParameters[i].Value = value
+	}
+
+	return nil
 }
