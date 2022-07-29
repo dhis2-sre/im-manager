@@ -11,7 +11,7 @@ import (
 
 var iv = []byte{83, 108, 97, 118, 97, 32, 85, 107, 114, 97, 105, 110, 105, 33, 33, 33}
 
-func encryptText(text string, key string) (string, error) {
+func encryptText(key string, text string) (string, error) {
 	block, err := aes.NewCipher([]byte(key))
 	if err != nil {
 		return "", err
@@ -27,7 +27,7 @@ func encryptText(text string, key string) (string, error) {
 	return base64Encoded, nil
 }
 
-func decryptText(text string, key string) (string, error) {
+func decryptText(key string, text string) (string, error) {
 	cipherText, err := base64.StdEncoding.DecodeString(text)
 	if err != nil {
 		return "", err

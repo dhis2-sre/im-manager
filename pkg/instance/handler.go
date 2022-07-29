@@ -43,16 +43,19 @@ type userClientHandler interface {
 	FindUserById(token string, id uint) (*models.User, error)
 }
 
-type CreateInstanceRequest struct {
-	Name      string `json:"name" binding:"required,dns_rfc1035_label"`
-	GroupName string `json:"groupName" binding:"required"`
-	StackName string `json:"stackName" binding:"required"`
+type DeployInstanceRequest struct {
+	Name               string                            `json:"name" binding:"required,dns_rfc1035_label"`
+	Group              string                            `json:"groupName" binding:"required"`
+	Stack              string                            `json:"stackName" binding:"required"`
+	RequiredParameters []model.InstanceRequiredParameter `json:"requiredParameters"`
+	OptionalParameters []model.InstanceOptionalParameter `json:"optionalParameters"`
+	SourceInstance     uint                              `json:"sourceInstance"`
 }
 
-// Create instance
-// swagger:route POST /instances createInstance
+// Deploy instance
+// swagger:route POST /instances deployInstance
 //
-// Create instance
+// Deploy instance
 //
 // Security:
 //  oauth2:
@@ -63,8 +66,17 @@ type CreateInstanceRequest struct {
 //   403: Error
 //   404: Error
 //   415: Error
-func (h Handler) Create(c *gin.Context) {
-	var request CreateInstanceRequest
+func (h Handler) Deploy(c *gin.Context) {
+	deploy := true
+	if deployParam, ok := c.GetQuery("deploy"); ok {
+		var err error
+		if deploy, err = strconv.ParseBool(deployParam); err != nil {
+			_ = c.Error(err)
+			return
+		}
+	}
+
+	var request DeployInstanceRequest
 	if err := handler.DataBinder(c, &request); err != nil {
 		_ = c.Error(err)
 		return
@@ -89,10 +101,12 @@ func (h Handler) Create(c *gin.Context) {
 	}
 
 	instance := &model.Instance{
-		Name:      request.Name,
-		UserID:    user.ID,
-		GroupName: request.GroupName,
-		StackName: request.StackName,
+		Name:               request.Name,
+		UserID:             user.ID,
+		GroupName:          request.Group,
+		StackName:          request.Stack,
+		RequiredParameters: request.RequiredParameters,
+		OptionalParameters: request.OptionalParameters,
 	}
 
 	canWrite := handler.CanWriteInstance(userWithGroups, instance)
@@ -102,13 +116,161 @@ func (h Handler) Create(c *gin.Context) {
 		return
 	}
 
-	savedInstance, err := h.instanceService.Create(instance)
+	if request.SourceInstance != 0 {
+		sourceInstance, err := h.instanceService.FindByIdWithDecryptedParameters(request.SourceInstance)
+		if err != nil {
+			_ = c.Error(err)
+			return
+		}
+
+		canWriteSource := handler.CanWriteInstance(userWithGroups, sourceInstance)
+		if !canWriteSource {
+			err := apperror.NewUnauthorized(fmt.Sprintf("write access to source instance (id: %d) denied", sourceInstance.ID))
+			_ = c.Error(err)
+			return
+		}
+
+		if sourceInstance.DeployLog == "" {
+			err := fmt.Errorf("source instance %q not deployed", sourceInstance.Name)
+			_ = c.Error(err)
+			return
+		}
+
+		err = h.instanceService.ConsumeParameters(sourceInstance, instance)
+		if err != nil {
+			_ = c.Error(err)
+			return
+		}
+
+		savedInstance, err := h.instanceService.Save(instance)
+		if err != nil {
+			_ = c.Error(err)
+			return
+		}
+
+		err = h.instanceService.Link(sourceInstance, savedInstance)
+		if err != nil {
+			_ = c.Error(err)
+			return
+		}
+	}
+
+	savedInstance, err := h.instanceService.Save(instance)
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
 
-	c.JSON(http.StatusCreated, savedInstance)
+	if deploy {
+		err = h.instanceService.Deploy(token, savedInstance)
+		if err != nil {
+			_ = c.Error(err)
+			return
+		}
+		c.JSON(http.StatusCreated, savedInstance)
+		return
+	}
+	c.JSON(http.StatusAccepted, savedInstance)
+}
+
+type DeployExistingInstanceRequest struct {
+	RequiredParameters []model.InstanceRequiredParameter `json:"requiredParameters"`
+	OptionalParameters []model.InstanceOptionalParameter `json:"optionalParameters"`
+}
+
+// DeployExisting instance
+// swagger:route POST /instances/{id} deployExistingInstance
+//
+// Deploy an existing instance
+//
+// Security:
+//  oauth2:
+//
+// responses:
+//   201: Instance
+//   401: Error
+//   403: Error
+//   404: Error
+//   415: Error
+func (h Handler) DeployExisting(c *gin.Context) {
+	h.deployOrUpdate(c, http.StatusCreated)
+}
+
+// Update instance
+// swagger:route PUT /instances/{id} updateInstance
+//
+// Update an instance
+//
+// Security:
+//  oauth2:
+//
+// responses:
+//   204: Instance
+//   401: Error
+//   403: Error
+//   404: Error
+//   415: Error
+func (h Handler) Update(c *gin.Context) {
+	h.deployOrUpdate(c, http.StatusNoContent)
+}
+
+func (h Handler) deployOrUpdate(c *gin.Context, httpStatusCode int) {
+	idParam := c.Param("id")
+	id, err := strconv.ParseUint(idParam, 10, 64)
+	if err != nil {
+		badRequest := apperror.NewBadRequest("error parsing id")
+		_ = c.Error(badRequest)
+		return
+	}
+
+	var request DeployExistingInstanceRequest
+	if err := handler.DataBinder(c, &request); err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	user, err := handler.GetUserFromContext(c)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	token, err := handler.GetTokenFromHttpAuthHeader(c)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	userWithGroups, err := h.userClient.FindUserById(token, user.ID)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	instance, err := h.instanceService.FindById(uint(id))
+	if err != nil {
+		notFound := apperror.NewNotFound("instance", idParam)
+		_ = c.Error(notFound)
+		return
+	}
+
+	canWrite := handler.CanWriteInstance(userWithGroups, instance)
+	if !canWrite {
+		unauthorized := apperror.NewUnauthorized("write access denied")
+		_ = c.Error(unauthorized)
+		return
+	}
+
+	instance.RequiredParameters = request.RequiredParameters
+	instance.OptionalParameters = request.OptionalParameters
+
+	err = h.instanceService.Deploy(token, instance)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	c.JSON(httpStatusCode, instance)
 }
 
 // Restart instance
@@ -171,208 +333,6 @@ func (h Handler) Restart(c *gin.Context) {
 	}
 
 	c.Status(http.StatusAccepted)
-}
-
-type ParameterRequest struct {
-	StackParameter string `json:"stackParameter" binding:"required"`
-	Value          string `json:"value" binding:"required"`
-}
-
-type DeployInstanceRequest struct {
-	RequiredParameters []model.InstanceRequiredParameter `json:"requiredParameters"`
-	OptionalParameters []model.InstanceOptionalParameter `json:"optionalParameters"`
-}
-
-// Deploy instance
-// swagger:route POST /instances/{id}/deploy deployInstance
-//
-// Deploy instance
-//
-// Security:
-//  oauth2:
-//
-// responses:
-//   201: Instance
-//   401: Error
-//   403: Error
-//   404: Error
-//   415: Error
-func (h Handler) Deploy(c *gin.Context) {
-	h.deployOrUpdate(c, http.StatusCreated)
-}
-
-// Update instance
-// swagger:route PUT /instances/{id}/deploy updateInstance
-//
-// Update instance
-//
-// Security:
-//  oauth2:
-//
-// responses:
-//   204: Instance
-//   401: Error
-//   403: Error
-//   404: Error
-//   415: Error
-func (h Handler) Update(c *gin.Context) {
-	h.deployOrUpdate(c, http.StatusNoContent)
-}
-
-func (h Handler) deployOrUpdate(c *gin.Context, httpStatusCode int) {
-	idParam := c.Param("id")
-	id, err := strconv.ParseUint(idParam, 10, 64)
-	if err != nil {
-		badRequest := apperror.NewBadRequest("error parsing id")
-		_ = c.Error(badRequest)
-		return
-	}
-
-	var request DeployInstanceRequest
-	if err := handler.DataBinder(c, &request); err != nil {
-		_ = c.Error(err)
-		return
-	}
-
-	user, err := handler.GetUserFromContext(c)
-	if err != nil {
-		_ = c.Error(err)
-		return
-	}
-
-	token, err := handler.GetTokenFromHttpAuthHeader(c)
-	if err != nil {
-		_ = c.Error(err)
-		return
-	}
-
-	userWithGroups, err := h.userClient.FindUserById(token, user.ID)
-	if err != nil {
-		_ = c.Error(err)
-		return
-	}
-
-	instance, err := h.instanceService.FindById(uint(id))
-	if err != nil {
-		notFound := apperror.NewNotFound("instance", idParam)
-		_ = c.Error(notFound)
-		return
-	}
-
-	canWrite := handler.CanWriteInstance(userWithGroups, instance)
-	if !canWrite {
-		unauthorized := apperror.NewUnauthorized("write access denied")
-		_ = c.Error(unauthorized)
-		return
-	}
-
-	instance.RequiredParameters = request.RequiredParameters
-	instance.OptionalParameters = request.OptionalParameters
-
-	err = h.instanceService.Deploy(token, instance)
-	if err != nil {
-		_ = c.Error(err)
-		return
-	}
-
-	c.JSON(httpStatusCode, instance)
-}
-
-// LinkDeploy instance
-// swagger:route POST /instances/{id}/link/{destinationId} linkDeployInstance
-//
-// Deploy and link with an existing instance
-//
-// Security:
-//  oauth2:
-//
-// responses:
-//   201: Instance
-//   401: Error
-//   403: Error
-//   404: Error
-//   415: Error
-func (h Handler) LinkDeploy(c *gin.Context) {
-	sourceIdParam := c.Param("id")
-	sourceId, err := strconv.ParseUint(sourceIdParam, 10, 64)
-	if err != nil {
-		_ = c.AbortWithError(http.StatusBadRequest, fmt.Errorf("failed to parse id: %s", err))
-		return
-	}
-
-	destinationIdParam := c.Param("destinationId")
-	destinationId, err := strconv.ParseUint(destinationIdParam, 10, 64)
-	if err != nil {
-		_ = c.AbortWithError(http.StatusBadRequest, fmt.Errorf("failed to parse destinationIsourceId: %s", err))
-		return
-	}
-
-	var request DeployInstanceRequest
-	if err := handler.DataBinder(c, &request); err != nil {
-		_ = c.Error(err)
-		return
-	}
-
-	user, err := handler.GetUserFromContext(c)
-	if err != nil {
-		_ = c.Error(err)
-		return
-	}
-
-	token, err := handler.GetTokenFromHttpAuthHeader(c)
-	if err != nil {
-		_ = c.Error(err)
-		return
-	}
-
-	userWithGroups, err := h.userClient.FindUserById(token, user.ID)
-	if err != nil {
-		_ = c.Error(err)
-		return
-	}
-
-	sourceInstance, err := h.instanceService.FindWithDecryptedParametersById(uint(sourceId))
-	if err != nil {
-		_ = c.Error(err)
-		return
-	}
-
-	if sourceInstance.DeployLog == "" {
-		_ = c.AbortWithError(http.StatusBadRequest, fmt.Errorf("source instance (%s) not deployed", sourceInstance.Name))
-		return
-	}
-
-	canWriteSource := handler.CanWriteInstance(userWithGroups, sourceInstance)
-	if !canWriteSource {
-		unauthorized := apperror.NewUnauthorized(fmt.Sprintf("write access to source instance (id: %d) denied", sourceInstance.ID))
-		_ = c.Error(unauthorized)
-		return
-	}
-
-	destinationInstance, err := h.instanceService.FindById(uint(destinationId))
-	if err != nil {
-		notFound := apperror.NewNotFound("instance", sourceIdParam)
-		_ = c.Error(notFound)
-		return
-	}
-
-	canWriteDestination := handler.CanWriteInstance(userWithGroups, destinationInstance)
-	if !canWriteDestination {
-		unauthorized := apperror.NewUnauthorized(fmt.Sprintf("write access to destination instance (id: %d) denied", destinationInstance.ID))
-		_ = c.Error(unauthorized)
-		return
-	}
-
-	destinationInstance.RequiredParameters = request.RequiredParameters
-	destinationInstance.OptionalParameters = request.OptionalParameters
-
-	err = h.instanceService.LinkDeploy(token, sourceInstance, destinationInstance)
-	if err != nil {
-		_ = c.Error(err)
-		return
-	}
-
-	c.JSON(http.StatusCreated, destinationInstance)
 }
 
 // Delete instance by id
@@ -484,7 +444,7 @@ func (h Handler) FindById(c *gin.Context) {
 		return
 	}
 
-	instance, err := h.instanceService.FindWithParametersById(uint(id))
+	instance, err := h.instanceService.FindByIdWithParameters(uint(id))
 	if err != nil {
 		notFound := apperror.NewNotFound("instance", idParam)
 		_ = c.Error(notFound)
@@ -543,7 +503,7 @@ func (h Handler) FindByIdWithDecryptedParameters(c *gin.Context) {
 		return
 	}
 
-	instance, err := h.instanceService.FindWithDecryptedParametersById(uint(id))
+	instance, err := h.instanceService.FindByIdWithDecryptedParameters(uint(id))
 	if err != nil {
 		notFound := apperror.NewNotFound("instance", idParam)
 		_ = c.Error(notFound)
@@ -785,61 +745,3 @@ func (h Handler) filterByGroupId(instances []*model.Instance, test func(instance
 	}
 	return
 }
-
-/*
-type RunJobResponse struct {
-	RunId string `json:"runId"`
-}
-
-// Save instance
-// swagger:route POST /instances/{id}/save saveInstance
-//
-// Save instance database
-//
-// Security:
-//  oauth2:
-//
-// responses:
-//   200:
-//   401: Error
-//   403: Error
-//   404: Error
-//   415: Error
-func (h Handler) Save(c *gin.Context) {
-	idParam := c.Param("id")
-	id, err := strconv.ParseUint(idParam, 10, 64)
-	if err != nil {
-		badRequest := apperror.NewBadRequest("error parsing id")
-		_ = c.Error(badRequest)
-		return
-	}
-
-	token, err := handler.GetTokenFromHttpAuthHeader(c)
-	if err != nil {
-		_ = c.Error(err)
-		return
-	}
-
-	instance, err := h.instanceService.FindById(uint(id))
-	if err != nil {
-		_ = c.Error(err)
-		return
-	}
-
-	runJobRequest := &jobModels.RunJobRequest{
-		GroupID: uint64(instance.GroupID),
-		Payload: map[string]string{
-			"key": "val",
-		},
-		TargetID: id,
-	}
-
-	runId, err := h.jobClient.Run(token, uint(3), runJobRequest)
-	if err != nil {
-		_ = c.Error(err)
-		return
-	}
-
-	c.JSON(http.StatusOK, RunJobResponse{runId})
-}
-*/

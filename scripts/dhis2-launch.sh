@@ -12,13 +12,14 @@ DATABASE_SIZE=30Gi
 PGADMIN_INSTALL=false
 DATABASE_ID=1
 
-INSTANCE_NAME=$1
-GROUP_NAME=$2
-STACK_NAME=dhis2
-
-INSTANCE_ID=$($HTTP get "$INSTANCE_HOST/instances-name-to-id/$GROUP_NAME/$INSTANCE_NAME" "Authorization: Bearer $ACCESS_TOKEN")
+GROUP=$1
+NAME=$2
+STACK=dhis2
 
 echo "{
+  \"name\": \"$NAME\",
+  \"groupName\": \"$GROUP\",
+  \"stackName\": \"$STACK\",
   \"optionalParameters\": [
     {
       \"name\": \"STARTUP_PROBE_FAILURE_THRESHOLD\",
@@ -51,4 +52,4 @@ echo "{
       \"value\": \"$DATABASE_ID\"
     }
   ]
-}" | $HTTP post "$INSTANCE_HOST/instances/$INSTANCE_ID" "Authorization: Bearer $ACCESS_TOKEN"
+}" | $HTTP post "$INSTANCE_HOST/instances" "Authorization: Bearer $ACCESS_TOKEN"

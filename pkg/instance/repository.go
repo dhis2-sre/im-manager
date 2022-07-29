@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/dhis2-sre/im-manager/pkg/config"
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	"github.com/jackc/pgconn"
 	"gorm.io/gorm"
@@ -12,22 +13,34 @@ import (
 type Repository interface {
 	Link(firstInstance, secondInstance *model.Instance) error
 	Unlink(instance *model.Instance) error
-	Create(instance *model.Instance) error
 	Save(instance *model.Instance) error
-	FindWithParametersById(id uint) (*model.Instance, error)
-	FindByNameAndGroup(instance string, group string) (*model.Instance, error)
-	SaveDeployLog(instance *model.Instance, log string) error
 	FindById(id uint) (*model.Instance, error)
-	Delete(id uint) error
+	FindByIdWithParameters(id uint) (*model.Instance, error)
+	FindByIdWithDecryptedParameters(id uint) (*model.Instance, error)
+	FindByNameAndGroup(instance string, group string) (*model.Instance, error)
 	FindByGroupNames(names []string) ([]*model.Instance, error)
+	SaveDeployLog(instance *model.Instance, log string) error
+	Delete(id uint) error
 }
 
 type repository struct {
-	db *gorm.DB
+	db     *gorm.DB
+	config config.Config
 }
 
-func NewRepository(DB *gorm.DB) *repository {
-	return &repository{db: DB}
+func NewRepository(DB *gorm.DB, config config.Config) Repository {
+	return &repository{db: DB, config: config}
+}
+
+func (r repository) FindByIdWithDecryptedParameters(id uint) (*model.Instance, error) {
+	instance, err := r.FindByIdWithParameters(id)
+	if err != nil {
+		return nil, err
+	}
+
+	err = decryptParameters(r.config.InstanceParameterEncryptionKey, instance)
+
+	return instance, err
 }
 
 func (r repository) Link(source *model.Instance, destination *model.Instance) error {
@@ -37,14 +50,11 @@ func (r repository) Link(source *model.Instance, destination *model.Instance) er
 		DestinationInstanceID: destination.ID,
 	}
 	err := r.db.Create(&link).Error
-	if err != nil {
-		var perr *pgconn.PgError
-		if errors.As(err, &perr) && perr.Code == "23505" {
-			return fmt.Errorf("instance (%d) already linked with a stack of type \"%s\"", source.ID, destination.StackName)
-		}
-		return err
+	var perr *pgconn.PgError
+	if errors.As(err, &perr) && perr.Code == "23505" {
+		return fmt.Errorf("instance (%d) already linked with a stack of type \"%s\"", source.ID, destination.StackName)
 	}
-	return nil
+	return err
 }
 
 func (r repository) Unlink(instance *model.Instance) error {
@@ -63,24 +73,29 @@ func (r repository) Unlink(instance *model.Instance) error {
 
 	// Attempt to unlink
 	err = r.db.Unscoped().Delete(link, "destination_instance_id = ?", instance.ID).Error
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil
-		}
-		return err
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil
 	}
-	return nil
-}
-
-func (r repository) Create(instance *model.Instance) error {
-	return r.db.Create(&instance).Error
+	return err
 }
 
 func (r repository) Save(instance *model.Instance) error {
+	key := r.config.InstanceParameterEncryptionKey
+
+	enrichParameters(instance)
+
+	// TODO: Handle error?
+	_ = decryptParameters(key, instance)
+
+	err := encryptParameters(key, instance)
+	if err != nil {
+		return err
+	}
+
 	return r.db.Session(&gorm.Session{FullSaveAssociations: true}).Save(instance).Error
 }
 
-func (r repository) FindWithParametersById(id uint) (*model.Instance, error) {
+func (r repository) FindByIdWithParameters(id uint) (*model.Instance, error) {
 	var instance *model.Instance
 	err := r.db.
 		Preload("RequiredParameters.StackRequiredParameter").
@@ -127,4 +142,63 @@ func (r repository) FindByGroupNames(names []string) ([]*model.Instance, error) 
 		Find(&instances).Error
 
 	return instances, err
+}
+
+// TODO: Rename PopulateRelations? Or something else?
+func enrichParameters(instance *model.Instance) {
+	requiredParameters := instance.RequiredParameters
+	if len(requiredParameters) > 0 {
+		for i := range requiredParameters {
+			requiredParameters[i].InstanceID = instance.ID
+			requiredParameters[i].StackName = instance.StackName
+		}
+	}
+
+	optionalParameters := instance.OptionalParameters
+	if len(optionalParameters) > 0 {
+		for i := range optionalParameters {
+			optionalParameters[i].InstanceID = instance.ID
+			optionalParameters[i].StackName = instance.StackName
+		}
+	}
+}
+
+func encryptParameters(key string, instance *model.Instance) error {
+	for i, parameter := range instance.RequiredParameters {
+		value, err := encryptText(key, parameter.Value)
+		if err != nil {
+			return err
+		}
+		instance.RequiredParameters[i].Value = value
+	}
+
+	for i, parameter := range instance.OptionalParameters {
+		value, err := encryptText(key, parameter.Value)
+		if err != nil {
+			return err
+		}
+		instance.OptionalParameters[i].Value = value
+	}
+
+	return nil
+}
+
+func decryptParameters(key string, instance *model.Instance) error {
+	for i, parameter := range instance.RequiredParameters {
+		value, err := decryptText(key, parameter.Value)
+		if err != nil {
+			return err
+		}
+		instance.RequiredParameters[i].Value = value
+	}
+
+	for i, parameter := range instance.OptionalParameters {
+		value, err := decryptText(key, parameter.Value)
+		if err != nil {
+			return err
+		}
+		instance.OptionalParameters[i].Value = value
+	}
+
+	return nil
 }
