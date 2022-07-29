@@ -252,7 +252,7 @@ func (h Handler) Update(c *gin.Context) {
 }
 
 // Restart instance
-// swagger:route POST /instances/{id}/restart restartInstance
+// swagger:route PUT /instances/{id}/restart restartInstance
 //
 // Restart instance
 //

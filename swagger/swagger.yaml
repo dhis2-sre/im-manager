@@ -386,7 +386,7 @@ paths:
       security:
       - oauth2: []
   /instances/{id}/restart:
-    post:
+    put:
       description: Restart instance
       operationId: restartInstance
       parameters:
