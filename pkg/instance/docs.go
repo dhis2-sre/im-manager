@@ -5,7 +5,7 @@ type _ struct {
 	// Deploy instance request body parameter
 	// in: body
 	// required: true
-	_ DeployInstanceRequest
+	Payload DeployInstanceRequest
 }
 
 // swagger:parameters updateInstance
@@ -17,7 +17,7 @@ type _ struct {
 	// Update instance request body parameter
 	// in: body
 	// required: true
-	_ UpdateInstanceRequest
+	Payload UpdateInstanceRequest
 }
 
 // swagger:parameters restartInstance
