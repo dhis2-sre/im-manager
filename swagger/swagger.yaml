@@ -434,30 +434,6 @@ paths:
           $ref: '#/responses/Error'
       security:
       - oauth2: []
-  /instances/{id}/save:
-    post:
-      description: Save instance database
-      operationId: saveInstance
-      parameters:
-      - format: uint64
-        in: path
-        name: id
-        required: true
-        type: integer
-        x-go-name: ID
-      responses:
-        "200":
-          description: ""
-        "401":
-          $ref: '#/responses/Error'
-        "403":
-          $ref: '#/responses/Error'
-        "404":
-          $ref: '#/responses/Error'
-        "415":
-          $ref: '#/responses/Error'
-      security:
-      - oauth2: []
   /stacks:
     get:
       description: Find all stacks
