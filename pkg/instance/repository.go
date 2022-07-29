@@ -15,13 +15,13 @@ type Repository interface {
 	Link(firstInstance, secondInstance *model.Instance) error
 	Unlink(instance *model.Instance) error
 	Save(instance *model.Instance) error
-	FindWithParametersById(id uint) (*model.Instance, error)
-	FindByNameAndGroup(instance string, group string) (*model.Instance, error)
-	SaveDeployLog(instance *model.Instance, log string) error
 	FindById(id uint) (*model.Instance, error)
-	Delete(id uint) error
+	FindByIdWithParameters(id uint) (*model.Instance, error)
+	FindByIdWithDecryptedParameters(id uint) (*model.Instance, error)
+	FindByNameAndGroup(instance string, group string) (*model.Instance, error)
 	FindByGroupNames(names []string) ([]*model.Instance, error)
-	FindWithDecryptedParametersById(id uint) (*model.Instance, error)
+	SaveDeployLog(instance *model.Instance, log string) error
+	Delete(id uint) error
 }
 
 type repository struct {
@@ -33,8 +33,8 @@ func NewRepository(DB *gorm.DB, config config.Config) Repository {
 	return &repository{db: DB, config: config}
 }
 
-func (r repository) FindWithDecryptedParametersById(id uint) (*model.Instance, error) {
-	instance, err := r.FindWithParametersById(id)
+func (r repository) FindByIdWithDecryptedParameters(id uint) (*model.Instance, error) {
+	instance, err := r.FindByIdWithParameters(id)
 	if err != nil {
 		return nil, err
 	}
@@ -94,7 +94,7 @@ func (r repository) Save(instance *model.Instance) error {
 	return r.db.Session(&gorm.Session{FullSaveAssociations: true}).Save(instance).Error
 }
 
-func (r repository) FindWithParametersById(id uint) (*model.Instance, error) {
+func (r repository) FindByIdWithParameters(id uint) (*model.Instance, error) {
 	var instance *model.Instance
 	err := r.db.
 		Preload("RequiredParameters.StackRequiredParameter").

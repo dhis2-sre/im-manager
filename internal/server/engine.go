@@ -29,13 +29,13 @@ func GetEngine(basePath string, stackHandler stack.Handler, instanceHandler inst
 	tokenAuthenticationRouter.GET("/stacks/:name", stackHandler.Find)
 
 	tokenAuthenticationRouter.POST("/instances", instanceHandler.Launch)
+	tokenAuthenticationRouter.GET("/instances", instanceHandler.List)
+	tokenAuthenticationRouter.GET("/instances/:id", instanceHandler.FindById)
+	tokenAuthenticationRouter.DELETE("/instances/:id", instanceHandler.Delete)
 	tokenAuthenticationRouter.POST("/instances/:id", instanceHandler.Deploy)
 	tokenAuthenticationRouter.PUT("/instances/:id", instanceHandler.Update)
 	tokenAuthenticationRouter.POST("/instances/:id/restart", instanceHandler.Restart)
 	tokenAuthenticationRouter.GET("/instances/:id/parameters", instanceHandler.FindByIdWithDecryptedParameters)
-	tokenAuthenticationRouter.GET("/instances", instanceHandler.List)
-	tokenAuthenticationRouter.DELETE("/instances/:id", instanceHandler.Delete)
-	tokenAuthenticationRouter.GET("/instances/:id", instanceHandler.FindById)
 	tokenAuthenticationRouter.GET("/instances/:id/logs", instanceHandler.Logs)
 	tokenAuthenticationRouter.GET("/instances-name-to-id/:groupName/:instanceName", instanceHandler.NameToId)
 
