@@ -173,27 +173,9 @@ func (h Handler) Deploy(c *gin.Context) {
 	c.JSON(http.StatusAccepted, savedInstance)
 }
 
-type DeployExistingInstanceRequest struct {
+type UpdateInstanceRequest struct {
 	RequiredParameters []model.InstanceRequiredParameter `json:"requiredParameters"`
 	OptionalParameters []model.InstanceOptionalParameter `json:"optionalParameters"`
-}
-
-// DeployExisting instance
-// swagger:route POST /instances/{id} deployExistingInstance
-//
-// Deploy an existing instance
-//
-// Security:
-//  oauth2:
-//
-// responses:
-//   201: Instance
-//   401: Error
-//   403: Error
-//   404: Error
-//   415: Error
-func (h Handler) DeployExisting(c *gin.Context) {
-	h.deployOrUpdate(c, http.StatusCreated)
 }
 
 // Update instance
@@ -211,10 +193,6 @@ func (h Handler) DeployExisting(c *gin.Context) {
 //   404: Error
 //   415: Error
 func (h Handler) Update(c *gin.Context) {
-	h.deployOrUpdate(c, http.StatusNoContent)
-}
-
-func (h Handler) deployOrUpdate(c *gin.Context, httpStatusCode int) {
 	idParam := c.Param("id")
 	id, err := strconv.ParseUint(idParam, 10, 64)
 	if err != nil {
@@ -223,7 +201,7 @@ func (h Handler) deployOrUpdate(c *gin.Context, httpStatusCode int) {
 		return
 	}
 
-	var request DeployExistingInstanceRequest
+	var request UpdateInstanceRequest
 	if err := handler.DataBinder(c, &request); err != nil {
 		_ = c.Error(err)
 		return
@@ -270,7 +248,7 @@ func (h Handler) deployOrUpdate(c *gin.Context, httpStatusCode int) {
 		return
 	}
 
-	c.JSON(httpStatusCode, instance)
+	c.JSON(http.StatusAccepted, instance)
 }
 
 // Restart instance

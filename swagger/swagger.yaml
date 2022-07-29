@@ -305,31 +305,6 @@ paths:
           $ref: '#/responses/Error'
       security:
       - oauth2: []
-    post:
-      description: Deploy an existing instance
-      operationId: deployExistingInstance
-      parameters:
-      - format: uint64
-        in: path
-        name: id
-        required: true
-        type: integer
-        x-go-name: ID
-      responses:
-        "201":
-          description: Instance
-          schema:
-            $ref: '#/definitions/Instance'
-        "401":
-          $ref: '#/responses/Error'
-        "403":
-          $ref: '#/responses/Error'
-        "404":
-          $ref: '#/responses/Error'
-        "415":
-          $ref: '#/responses/Error'
-      security:
-      - oauth2: []
     put:
       description: Update an instance
       operationId: updateInstance
