@@ -25,8 +25,7 @@ type Service interface {
 	Save(instance *model.Instance) (*model.Instance, error)
 	Deploy(token string, instance *model.Instance) error
 	FindById(id uint) (*model.Instance, error)
-	FindByIdWithParameters(id uint) (*model.Instance, error)
-	FindByIdWithDecryptedParameters(id uint) (*model.Instance, error)
+	FindByIdDecrypted(id uint) (*model.Instance, error)
 	FindByNameAndGroup(instance string, group string) (*model.Instance, error)
 	Delete(token string, id uint) error
 	Logs(instance *model.Instance, group *models.Group, selector string) (io.ReadCloser, error)
@@ -223,11 +222,7 @@ func (s service) unlink(id uint) error {
 
 func (s service) Save(instance *model.Instance) (*model.Instance, error) {
 	err := s.instanceRepository.Save(instance)
-	if err != nil {
-		return nil, err
-	}
-
-	return s.instanceRepository.FindByIdWithParameters(instance.ID)
+	return instance, err
 }
 
 func (s service) Deploy(accessToken string, instance *model.Instance) error {
@@ -236,7 +231,7 @@ func (s service) Deploy(accessToken string, instance *model.Instance) error {
 		return err
 	}
 
-	instanceWithParameters, err := s.FindByIdWithDecryptedParameters(instance.ID)
+	instanceWithParameters, err := s.FindByIdDecrypted(instance.ID)
 	if err != nil {
 		return err
 	}
@@ -274,17 +269,13 @@ func (s service) Deploy(accessToken string, instance *model.Instance) error {
 	return nil
 }
 
-func (s service) FindById(id uint) (*model.Instance, error) {
-	return s.instanceRepository.FindById(id)
-}
-
 func (s service) Delete(token string, id uint) error {
 	err := s.unlink(id)
 	if err != nil {
 		return err
 	}
 
-	instanceWithParameters, err := s.FindByIdWithDecryptedParameters(id)
+	instanceWithParameters, err := s.FindByIdDecrypted(id)
 	if err != nil {
 		return err
 	}
@@ -360,12 +351,12 @@ func (s service) getPod(client *kubernetes.Clientset, instance *model.Instance, 
 	return podList.Items[0], nil
 }
 
-func (s service) FindByIdWithParameters(id uint) (*model.Instance, error) {
-	return s.instanceRepository.FindByIdWithParameters(id)
+func (s service) FindById(id uint) (*model.Instance, error) {
+	return s.instanceRepository.FindById(id)
 }
 
-func (s service) FindByIdWithDecryptedParameters(id uint) (*model.Instance, error) {
-	return s.instanceRepository.FindByIdWithDecryptedParameters(id)
+func (s service) FindByIdDecrypted(id uint) (*model.Instance, error) {
+	return s.instanceRepository.FindByIdDecrypted(id)
 }
 
 func (s service) FindByNameAndGroup(instance string, group string) (*model.Instance, error) {

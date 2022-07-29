@@ -117,7 +117,7 @@ func (h Handler) Deploy(c *gin.Context) {
 	}
 
 	if request.SourceInstance != 0 {
-		sourceInstance, err := h.instanceService.FindByIdWithDecryptedParameters(request.SourceInstance)
+		sourceInstance, err := h.instanceService.FindByIdDecrypted(request.SourceInstance)
 		if err != nil {
 			_ = c.Error(err)
 			return
@@ -422,7 +422,7 @@ func (h Handler) FindById(c *gin.Context) {
 		return
 	}
 
-	instance, err := h.instanceService.FindByIdWithParameters(uint(id))
+	instance, err := h.instanceService.FindById(uint(id))
 	if err != nil {
 		notFound := apperror.NewNotFound("instance", idParam)
 		_ = c.Error(notFound)
@@ -481,7 +481,7 @@ func (h Handler) FindByIdWithDecryptedParameters(c *gin.Context) {
 		return
 	}
 
-	instance, err := h.instanceService.FindByIdWithDecryptedParameters(uint(id))
+	instance, err := h.instanceService.FindByIdDecrypted(uint(id))
 	if err != nil {
 		notFound := apperror.NewNotFound("instance", idParam)
 		_ = c.Error(notFound)

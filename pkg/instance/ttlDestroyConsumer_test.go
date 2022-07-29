@@ -90,9 +90,8 @@ func (is *instanceService) FindById(id uint) (*model.Instance, error) { return n
 func (is *instanceService) Logs(instance *model.Instance, group *models.Group, selector string) (io.ReadCloser, error) {
 	return nil, nil
 }
-func (is *instanceService) FindByIdWithParameters(id uint) (*model.Instance, error) { return nil, nil }
 
-func (is *instanceService) FindByIdWithDecryptedParameters(id uint) (*model.Instance, error) {
+func (is *instanceService) FindByIdDecrypted(id uint) (*model.Instance, error) {
 	return nil, nil
 }
 
