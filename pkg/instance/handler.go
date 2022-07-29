@@ -43,7 +43,7 @@ type userClientHandler interface {
 	FindUserById(token string, id uint) (*models.User, error)
 }
 
-type LaunchInstanceRequest struct {
+type DeployInstanceRequest struct {
 	Name               string                            `json:"name" binding:"required,dns_rfc1035_label"`
 	Group              string                            `json:"groupName" binding:"required"`
 	Stack              string                            `json:"stackName" binding:"required"`
@@ -52,10 +52,10 @@ type LaunchInstanceRequest struct {
 	SourceInstance     uint                              `json:"sourceInstance"`
 }
 
-// Launch instance
-// swagger:route POST /instances launchInstance
+// Deploy instance
+// swagger:route POST /instances deployInstance
 //
-// Launch instance
+// Deploy instance
 //
 // Security:
 //  oauth2:
@@ -66,7 +66,7 @@ type LaunchInstanceRequest struct {
 //   403: Error
 //   404: Error
 //   415: Error
-func (h Handler) Launch(c *gin.Context) {
+func (h Handler) Deploy(c *gin.Context) {
 	deploy := true
 	if deployParam, ok := c.GetQuery("deploy"); ok {
 		var err error
@@ -76,7 +76,7 @@ func (h Handler) Launch(c *gin.Context) {
 		}
 	}
 
-	var request LaunchInstanceRequest
+	var request DeployInstanceRequest
 	if err := handler.DataBinder(c, &request); err != nil {
 		_ = c.Error(err)
 		return
@@ -173,7 +173,7 @@ func (h Handler) Launch(c *gin.Context) {
 	c.JSON(http.StatusAccepted, savedInstance)
 }
 
-type DeployInstanceRequest struct {
+type DeployExistingInstanceRequest struct {
 	RequiredParameters []model.InstanceRequiredParameter `json:"requiredParameters"`
 	OptionalParameters []model.InstanceOptionalParameter `json:"optionalParameters"`
 }
@@ -199,7 +199,7 @@ func (h Handler) DeployExisting(c *gin.Context) {
 // Update instance
 // swagger:route PUT /instances/{id} updateInstance
 //
-// Update instance
+// Update an instance
 //
 // Security:
 //  oauth2:
@@ -223,7 +223,7 @@ func (h Handler) deployOrUpdate(c *gin.Context, httpStatusCode int) {
 		return
 	}
 
-	var request DeployInstanceRequest
+	var request DeployExistingInstanceRequest
 	if err := handler.DataBinder(c, &request); err != nil {
 		_ = c.Error(err)
 		return

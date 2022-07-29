@@ -209,8 +209,8 @@ paths:
       security:
       - oauth2: []
     post:
-      description: Launch instance
-      operationId: launchInstance
+      description: Deploy instance
+      operationId: deployInstance
       responses:
         "201":
           description: Instance
@@ -331,7 +331,7 @@ paths:
       security:
       - oauth2: []
     put:
-      description: Update instance
+      description: Update an instance
       operationId: updateInstance
       parameters:
       - format: uint64

@@ -28,7 +28,7 @@ func GetEngine(basePath string, stackHandler stack.Handler, instanceHandler inst
 	tokenAuthenticationRouter.GET("/stacks", stackHandler.FindAll)
 	tokenAuthenticationRouter.GET("/stacks/:name", stackHandler.Find)
 
-	tokenAuthenticationRouter.POST("/instances", instanceHandler.Launch)
+	tokenAuthenticationRouter.POST("/instances", instanceHandler.Deploy)
 	tokenAuthenticationRouter.GET("/instances", instanceHandler.List)
 	tokenAuthenticationRouter.GET("/instances/:id", instanceHandler.FindById)
 	tokenAuthenticationRouter.DELETE("/instances/:id", instanceHandler.Delete)

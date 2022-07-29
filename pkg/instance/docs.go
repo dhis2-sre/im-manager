@@ -1,11 +1,11 @@
 package instance
 
-// swagger:parameters launchInstance
+// swagger:parameters deployInstance
 type _ struct {
-	// Launch instance request body parameter
+	// Deploy instance request body parameter
 	// in: body
 	// required: true
-	_ LaunchInstanceRequest
+	_ DeployInstanceRequest
 }
 
 // swagger:parameters deployExistingInstance
@@ -17,7 +17,7 @@ type _ struct {
 	// Deploy instance request body parameter
 	// in: body
 	// required: true
-	_ DeployInstanceRequest
+	_ DeployExistingInstanceRequest
 }
 
 // swagger:parameters updateInstance
@@ -29,7 +29,7 @@ type _ struct {
 	// Update instance request body parameter
 	// in: body
 	// required: true
-	_ DeployInstanceRequest
+	_ DeployExistingInstanceRequest
 }
 
 // swagger:parameters restartInstance
