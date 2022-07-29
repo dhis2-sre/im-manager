@@ -53,6 +53,7 @@ securityContext:
     - ALL
   readOnlyRootFilesystem: true
   runAsNonRoot: true
+# Alpine guest user
   runAsUser: 405
   runAsGroup: 100
 
