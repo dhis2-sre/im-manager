@@ -27,22 +27,6 @@ type _ struct {
 	ID uint `json:"id"`
 }
 
-// swagger:parameters linkDeployInstance
-type _ struct {
-	// in: path
-	// required: true
-	ID uint `json:"id"`
-
-	// in: path
-	// required: true
-	DestinationId uint `json:"destinationId"`
-
-	// Deploy instance request body parameter
-	// in: body
-	// required: true
-	_ DeployInstanceRequest
-}
-
 // swagger:parameters instanceLogs
 type _ struct {
 	// in: path
