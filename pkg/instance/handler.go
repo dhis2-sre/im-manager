@@ -381,7 +381,7 @@ func (h Handler) Delete(c *gin.Context) {
 }
 
 // FindById instance
-// swagger:route GET /instances/{id} findInstanceById
+// swagger:route GET /instances/{id} findById
 //
 // Find instance by id
 //
@@ -439,8 +439,8 @@ func (h Handler) FindById(c *gin.Context) {
 	c.JSON(http.StatusOK, instance)
 }
 
-// FindByIdWithDecryptedParameters instance
-// swagger:route GET /instances/{id}/parameters findInstanceByIdWithParameters
+// FindByIdDecrypted instance
+// swagger:route GET /instances/{id}/parameters findByIdDecrypted
 //
 // Find instance by id with decrypted parameters
 //
@@ -453,7 +453,7 @@ func (h Handler) FindById(c *gin.Context) {
 //   403: Error
 //   404: Error
 //   415: Error
-func (h Handler) FindByIdWithDecryptedParameters(c *gin.Context) {
+func (h Handler) FindByIdDecrypted(c *gin.Context) {
 	idParam := c.Param("id")
 	id, err := strconv.ParseUint(idParam, 10, 64)
 	if err != nil {

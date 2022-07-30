@@ -40,7 +40,7 @@ type _ struct {
 	Selector string `json:"selector"`
 }
 
-// swagger:parameters deleteInstance findInstanceById findInstanceByIdWithParameters saveInstance
+// swagger:parameters deleteInstance findById findByIdDecrypted saveInstance
 type _ struct {
 	// in: path
 	// required: true

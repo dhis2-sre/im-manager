@@ -330,7 +330,7 @@ paths:
       - oauth2: []
     get:
       description: Find instance by id
-      operationId: findInstanceById
+      operationId: findById
       parameters:
       - format: uint64
         in: path
@@ -416,7 +416,7 @@ paths:
   /instances/{id}/parameters:
     get:
       description: Find instance by id with decrypted parameters
-      operationId: findInstanceByIdWithParameters
+      operationId: findByIdDecrypted
       parameters:
       - format: uint64
         in: path
