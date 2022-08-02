@@ -4,10 +4,9 @@ set -euo pipefail
 
 STACK=whoami-go
 
-CHART_VERSION="0.5.0"
-
 GROUP=$1
 NAME=$2
+CHART_VERSION=${3:-"0.5.0"}
 
 echo "{
   \"name\": \"$NAME\",

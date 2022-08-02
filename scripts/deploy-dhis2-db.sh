@@ -2,12 +2,12 @@
 
 set -euo pipefail
 
-DATABASE_ID=1
-
 STACK=dhis2-db
 
 GROUP=$1
 NAME=$2
+
+DATABASE_ID=1
 
 echo "{
   \"name\": \"$NAME\",

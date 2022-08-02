@@ -14,7 +14,7 @@ GROUP=$1
 SOURCE_INSTANCE=$2
 DESTINATION_INSTANCE=$3
 
-SOURCE_INSTANCE_ID=$($HTTP --check-status "$INSTANCE_HOST/instances-name-to-id/$GROUP/$SOURCE_INSTANCE" "Authorization: Bearer $ACCESS_TOKEN")
+SOURCE_INSTANCE_ID=$($HTTP get "$INSTANCE_HOST/instances-name-to-id/$GROUP/$SOURCE_INSTANCE" "Authorization: Bearer $ACCESS_TOKEN")
 
 echo "{
   \"name\": \"$DESTINATION_INSTANCE\",

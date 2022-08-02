@@ -2,6 +2,6 @@
 
 set -euo pipefail
 
-STACK_NAME=$1
+STACK=$1
 
-$HTTP "$INSTANCE_HOST/stacks/$STACK_NAME" "Authorization: Bearer $ACCESS_TOKEN"
+$HTTP "$INSTANCE_HOST/stacks/$STACK" "Authorization: Bearer $ACCESS_TOKEN"
