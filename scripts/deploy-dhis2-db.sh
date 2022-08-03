@@ -7,7 +7,7 @@ STACK=dhis2-db
 GROUP=$1
 NAME=$2
 
-DATABASE_ID=1
+DATABASE_ID=${DATABASE_ID:-1}
 
 echo "{
   \"name\": \"$NAME\",

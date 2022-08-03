@@ -2,8 +2,9 @@
 
 set -euo pipefail
 
-PGADMIN_USERNAME=someone@something.com
-PGADMIN_PASSWORD=$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c32)
+PGADMIN_USERNAME=${PGADMIN_USERNAME:-someone@something.com}
+RANDOM_PASSWORD=$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c32)
+PGADMIN_PASSWORD=${PGADMIN_PASSWORD:-$RANDOM_PASSWORD}
 
 echo "pgAdmin username: $PGADMIN_USERNAME"
 echo "pgAdmin password: $PGADMIN_PASSWORD"
