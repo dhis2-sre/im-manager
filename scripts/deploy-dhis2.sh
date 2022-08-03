@@ -49,7 +49,7 @@ echo "{
     },
     {
        \"name\": \"INSTANCE_TTL\",
-       \"value\": \"$TTL\"
+       \"value\": \"$INSTANCE_TTL\"
     }
   ],
   \"requiredParameters\": [
