@@ -41,5 +41,5 @@ export MYID=who-1 && ./whoami-create.sh whoami $MYID; read && ./whoami-deploy-ex
 
 ## Destroy all "your-instances"
 ```sh
-./destroy.sh whoami $(./list.sh | jq -r '.[] | .Name, .Instances[].Name' | tail -n +2 | grep your-instances)
+./destroy.sh whoami $(./list.sh | jq -r '.[].Instances[].Name' | grep your-instances)
 ```
