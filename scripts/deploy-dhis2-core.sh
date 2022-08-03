@@ -13,6 +13,7 @@ DESTINATION_INSTANCE=$3
 STARTUP_PROBE_FAILURE_THRESHOLD=${STARTUP_PROBE_FAILURE_THRESHOLD:-26}
 STARTUP_PROBE_PERIOD_SECONDS=${STARTUP_PROBE_PERIOD_SECONDS:-5}
 IMAGE_TAG=${IMAGE_TAG:-2.36.0-tomcat-8.5.34-jre8-alpine}
+INSTANCE_TTL=${INSTANCE_TTL:-""}
 
 SOURCE_INSTANCE_ID=$($HTTP get "$INSTANCE_HOST/instances-name-to-id/$GROUP/$SOURCE_INSTANCE" "Authorization: Bearer $ACCESS_TOKEN")
 
@@ -33,6 +34,10 @@ echo "{
     {
       \"name\": \"IMAGE_TAG\",
       \"value\": \"$IMAGE_TAG\"
+    },
+    {
+      \"name\": \"INSTANCE_TTL\",
+      \"value\": \"$INSTANCE_TTL\"
     }
   ]
 }" | $HTTP post "$INSTANCE_HOST/instances" "Authorization: Bearer $ACCESS_TOKEN"

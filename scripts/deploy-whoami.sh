@@ -7,6 +7,7 @@ STACK=whoami-go
 GROUP=$1
 NAME=$2
 CHART_VERSION=${CHART_VERSION:-"0.5.0"}
+INSTANCE_TTL=${INSTANCE_TTL:-""}
 
 echo "{
   \"name\": \"$NAME\",
@@ -16,6 +17,12 @@ echo "{
     {
       \"name\": \"CHART_VERSION\",
       \"value\": \"$CHART_VERSION\"
+    }
+  ],
+  \"optionalParameters\": [
+    {
+      \"name\": \"INSTANCE_TTL\",
+      \"value\": \"$INSTANCE_TTL\"
     }
   ]
 }" | $HTTP post "$INSTANCE_HOST/instances" "Authorization: Bearer $ACCESS_TOKEN"

@@ -16,6 +16,7 @@ IMAGE_TAG=${IMAGE_TAG:-2.36.0-tomcat-8.5.34-jre8-alpine}
 DATABASE_SIZE=${DATABASE_SIZE:-30Gi}
 PGADMIN_INSTALL=${PGADMIN_INSTALL:-false}
 DATABASE_ID=${DATABASE_ID:-1}
+INSTANCE_TTL=${INSTANCE_TTL:-""}
 
 echo "{
   \"name\": \"$NAME\",
@@ -45,6 +46,10 @@ echo "{
     {
       \"name\": \"PGADMIN_INSTALL\",
       \"value\": \"$PGADMIN_INSTALL\"
+    },
+    {
+       \"name\": \"INSTANCE_TTL\",
+       \"value\": \"$TTL\"
     }
   ],
   \"requiredParameters\": [
