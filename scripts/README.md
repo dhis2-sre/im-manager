@@ -36,7 +36,7 @@ export MYID=who-1 && ./whoami-create.sh whoami $MYID; read && ./whoami-deploy-ex
 
 ## Spawn 5 "your-instances"
 ```sh
-./spawn.sh whoami 5 your-instances
+./stress.sh whoami 5 your-instances
 ```
 
 ## Destroy all "your-instances"
