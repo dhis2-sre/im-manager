@@ -2,13 +2,13 @@
 
 set -euo pipefail
 
-STACK_NAME=whoami-go
+STACK=whoami-go
 
-NAME=$1
-GROUP_NAME=$2
+GROUP=$1
+NAME=$2
 
 echo "{
   \"name\": \"$NAME\",
-  \"groupName\": \"$GROUP_NAME\",
-  \"stackName\": \"$STACK_NAME\"
+  \"groupName\": \"$GROUP\",
+  \"stackName\": \"$STACK\"
 }" | $HTTP post "$INSTANCE_HOST/instances?deploy=false" "Authorization: Bearer $ACCESS_TOKEN"

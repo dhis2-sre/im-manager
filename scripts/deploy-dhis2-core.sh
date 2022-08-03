@@ -2,24 +2,26 @@
 
 set -euo pipefail
 
-# container(s) in dhis2 pod will be restarted after that due to restartPolicy
-# 5*26=130s
-STARTUP_PROBE_FAILURE_THRESHOLD=26
-STARTUP_PROBE_PERIOD_SECONDS=5
-IMAGE_REPOSITORY=core
-IMAGE_TAG=2.36.0-tomcat-8.5.34-jre8-alpine
-DATABASE_SIZE=30Gi
-PGADMIN_INSTALL=false
-DATABASE_ID=1
+STACK=dhis2-core
 
 GROUP=$1
-NAME=$2
-STACK=dhis2
+SOURCE_INSTANCE=$2
+DESTINATION_INSTANCE=$3
+
+# container(s) in dhis2 pod will be restarted after that due to restartPolicy
+# 5*26=130s
+STARTUP_PROBE_FAILURE_THRESHOLD=${STARTUP_PROBE_FAILURE_THRESHOLD:-26}
+STARTUP_PROBE_PERIOD_SECONDS=${STARTUP_PROBE_PERIOD_SECONDS:-5}
+IMAGE_TAG=${IMAGE_TAG:-2.36.0-tomcat-8.5.34-jre8-alpine}
+INSTANCE_TTL=${INSTANCE_TTL:-""}
+
+SOURCE_INSTANCE_ID=$($HTTP get "$INSTANCE_HOST/instances-name-to-id/$GROUP/$SOURCE_INSTANCE" "Authorization: Bearer $ACCESS_TOKEN")
 
 echo "{
-  \"name\": \"$NAME\",
+  \"name\": \"$DESTINATION_INSTANCE\",
   \"groupName\": \"$GROUP\",
   \"stackName\": \"$STACK\",
+  \"sourceInstance\": $SOURCE_INSTANCE_ID,
   \"optionalParameters\": [
     {
       \"name\": \"STARTUP_PROBE_FAILURE_THRESHOLD\",
@@ -30,26 +32,12 @@ echo "{
       \"value\": \"$STARTUP_PROBE_PERIOD_SECONDS\"
     },
     {
-      \"name\": \"IMAGE_REPOSITORY\",
-      \"value\": \"$IMAGE_REPOSITORY\"
-    },
-    {
       \"name\": \"IMAGE_TAG\",
       \"value\": \"$IMAGE_TAG\"
     },
     {
-      \"name\": \"DATABASE_SIZE\",
-      \"value\": \"$DATABASE_SIZE\"
-    },
-    {
-      \"name\": \"PGADMIN_INSTALL\",
-      \"value\": \"$PGADMIN_INSTALL\"
-    }
-  ],
-  \"requiredParameters\": [
-    {
-      \"name\": \"DATABASE_ID\",
-      \"value\": \"$DATABASE_ID\"
+      \"name\": \"INSTANCE_TTL\",
+      \"value\": \"$INSTANCE_TTL\"
     }
   ]
 }" | $HTTP post "$INSTANCE_HOST/instances" "Authorization: Bearer $ACCESS_TOKEN"

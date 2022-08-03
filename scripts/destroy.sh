@@ -2,9 +2,20 @@
 
 set -euo pipefail
 
-INSTANCE_NAME=$1
-GROUP_NAME=$2
+GROUP=$1
+shift
+INSTANCES=$*
 
-INSTANCE_ID=$($HTTP get "$INSTANCE_HOST/instances-name-to-id/$GROUP_NAME/$INSTANCE_NAME" "Authorization: Bearer $ACCESS_TOKEN")
+echo "Group: $GROUP"
+echo "Instance(s): $INSTANCES"
 
-$HTTP delete "$INSTANCE_HOST/instances/$INSTANCE_ID" "Authorization: Bearer $ACCESS_TOKEN"
+delete(){
+  INSTANCE_ID=$($HTTP get "$INSTANCE_HOST/instances-name-to-id/$GROUP/$1" "Authorization: Bearer $ACCESS_TOKEN")
+  $HTTP delete "$INSTANCE_HOST/instances/$INSTANCE_ID" "Authorization: Bearer $ACCESS_TOKEN"
+}
+
+for INSTANCE in $INSTANCES; do
+  delete $INSTANCE &
+done
+
+wait $(jobs -p)
