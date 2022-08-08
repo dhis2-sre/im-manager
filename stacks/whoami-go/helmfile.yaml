@@ -4,6 +4,7 @@ releases:
     chart: tons/whoami-go
     version: "{{ requiredEnv "CHART_VERSION" }}"
     values:
+      - replicaCount: {{ env "REPLICA_COUNT" | default "1" }}
       - ingress:
           enabled: true
           hostname: {{ requiredEnv "INSTANCE_HOSTNAME" }}
