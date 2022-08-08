@@ -10,7 +10,7 @@ require (
 	github.com/gin-gonic/gin v1.8.1
 	github.com/go-openapi/runtime v0.24.1
 	github.com/gofrs/uuid v4.2.0+incompatible
-	github.com/jackc/pgconn v1.12.1
+	github.com/jackc/pgconn v1.13.0
 	github.com/lestrrat-go/jwx v1.2.25
 	github.com/rabbitmq/amqp091-go v1.3.4
 	github.com/stretchr/testify v1.8.0
@@ -99,7 +99,7 @@ require (
 	github.com/jackc/chunkreader/v2 v2.0.1 // indirect
 	github.com/jackc/pgio v1.0.0 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
-	github.com/jackc/pgproto3/v2 v2.3.0 // indirect
+	github.com/jackc/pgproto3/v2 v2.3.1 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20200714003250-2b9c44734f2b // indirect
 	github.com/jackc/pgtype v1.11.0 // indirect
 	github.com/jackc/pgx/v4 v4.16.1 // indirect
@@ -144,7 +144,7 @@ require (
 	go.mozilla.org/gopgagent v0.0.0-20170926210634-4d7ea76ff71a // indirect
 	go.opencensus.io v0.23.0 // indirect
 	go.uber.org/atomic v1.9.0 // indirect
-	golang.org/x/crypto v0.0.0-20220525230936-793ad666bf5e // indirect
+	golang.org/x/crypto v0.0.0-20220722155217-630584e8d5aa // indirect
 	golang.org/x/net v0.0.0-20220722155237-a158d28d115b // indirect
 	golang.org/x/oauth2 v0.0.0-20220608161450-d0670ef3b1eb // indirect
 	golang.org/x/sys v0.0.0-20220722155257-8c9f86f7a55f // indirect
