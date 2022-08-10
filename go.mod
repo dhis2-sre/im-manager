@@ -18,7 +18,7 @@ require (
 	gorm.io/driver/postgres v1.3.8
 	gorm.io/gorm v1.23.8
 	k8s.io/api v0.25.0-alpha.3
-	k8s.io/apimachinery v0.25.0-beta.0
+	k8s.io/apimachinery v0.26.0-alpha.0
 	k8s.io/client-go v0.25.0-alpha.3
 )
 
