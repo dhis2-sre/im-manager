@@ -8,6 +8,7 @@ releases:
       - image:
           repository: dhis2/{{ env "IMAGE_REPOSITORY" | default "core" }}
           tag: "{{ env "IMAGE_TAG" | default "2.36.0-tomcat-8.5.34-jre8-alpine" }}"
+          pullPolicy: {{ env "IMAGE_PULL_POLICY" | default "IfNotPresent" }}
       - ingress:
           enabled: true
           hostname: {{ requiredEnv "INSTANCE_HOSTNAME" }}
