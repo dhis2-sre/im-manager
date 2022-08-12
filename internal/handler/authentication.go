@@ -129,17 +129,17 @@ func extractUser(userData interface{}) (*models.User, error) {
 }
 
 func extractGroups(key string, userMap map[string]interface{}) []*models.Group {
-	groups, ok := userMap[key].([]interface{})
+	groupsData, ok := userMap[key].([]interface{})
 	if ok {
-		gs := make([]*models.Group, len(groups))
-		for i := 0; i < len(groups); i++ {
-			group := groups[i].(map[string]interface{})
-			gs[i] = &models.Group{
+		groups := make([]*models.Group, len(groupsData))
+		for i := 0; i < len(groupsData); i++ {
+			group := groupsData[i].(map[string]interface{})
+			groups[i] = &models.Group{
 				Name:     group["Name"].(string),
 				Hostname: group["Hostname"].(string),
 			}
 		}
-		return gs
+		return groups
 	}
 	return nil
 }
