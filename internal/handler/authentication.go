@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/dhis2-sre/im-user/swagger/sdk/models"
+
 	"github.com/dhis2-sre/im-manager/internal/apperror"
 	"github.com/dhis2-sre/im-manager/pkg/config"
 	"github.com/gin-gonic/gin"
@@ -73,6 +75,7 @@ func (m AuthenticationMiddleware) TokenAuthentication(c *gin.Context) {
 
 	u, err := parseRequest(c.Request, publicKey)
 	if err != nil {
+		// TODO: token could be not valid for lots of reasons, return err or at least log it
 		unauthorized := apperror.NewUnauthorized("token not valid")
 		_ = c.Error(unauthorized)
 		c.Abort()
@@ -89,36 +92,54 @@ func (m AuthenticationMiddleware) TokenAuthentication(c *gin.Context) {
 	}
 }
 
-type User struct {
-	ID    uint
-	Email string
-}
-
-func parseRequest(request *http.Request, key *rsa.PublicKey) (User, error) {
+func parseRequest(request *http.Request, key *rsa.PublicKey) (*models.User, error) {
 	token, err := jwt.ParseRequest(
 		request,
 		jwt.WithValidate(true),
 		jwt.WithVerify(jwa.RS256, key),
 	)
 	if err != nil {
-		return User{}, err
+		return nil, err
 	}
 
 	userData, ok := token.Get("user")
 	if !ok {
-		return User{}, errors.New("user not found in claims")
+		return nil, errors.New("user not found in claims")
 	}
 
+	return extractUser(userData)
+}
+
+func extractUser(userData interface{}) (*models.User, error) {
 	userMap, ok := userData.(map[string]interface{})
 	if !ok {
-		return User{}, errors.New("failed to parse user data")
+		return nil, errors.New("failed to parse user data")
 	}
 
 	id := userMap["ID"].(float64)
 	email := userMap["Email"].(string)
 
-	return User{
-		ID:    uint(id),
-		Email: email,
-	}, nil
+	user := &models.User{
+		ID:          uint64(id),
+		Email:       email,
+		Groups:      extractGroups("Groups", userMap),
+		AdminGroups: extractGroups("AdminGroups", userMap),
+	}
+	return user, nil
+}
+
+func extractGroups(key string, userMap map[string]interface{}) []*models.Group {
+	groups, ok := userMap[key].([]interface{})
+	if ok {
+		gs := make([]*models.Group, len(groups))
+		for i := 0; i < len(groups); i++ {
+			group := groups[i].(map[string]interface{})
+			gs[i] = &models.Group{
+				Name:     group["Name"].(string),
+				Hostname: group["Hostname"].(string),
+			}
+		}
+		return gs
+	}
+	return nil
 }
