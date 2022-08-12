@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/rsa"
 	"errors"
-	"log"
 	"net/http"
 	"time"
 
@@ -23,18 +22,18 @@ type AuthenticationMiddleware struct {
 	jwkAutoRefresh *jwk.AutoRefresh
 }
 
-func NewAuthentication(c config.Config) AuthenticationMiddleware {
+func NewAuthentication(c config.Config) (AuthenticationMiddleware, error) {
 	jwksHost := c.Authentication.Jwks.Host
 	minimumRefreshInterval := time.Duration(c.Authentication.Jwks.MinimumRefreshInterval) * time.Second
 	autoRefresh, err := provideJwkAutoRefresh(jwksHost, minimumRefreshInterval)
 	if err != nil {
-		log.Fatal(err)
+		return AuthenticationMiddleware{}, err
 	}
 
 	return AuthenticationMiddleware{
 		c,
 		autoRefresh,
-	}
+	}, nil
 }
 
 func provideJwkAutoRefresh(host string, minRefreshInterval time.Duration) (*jwk.AutoRefresh, error) {
