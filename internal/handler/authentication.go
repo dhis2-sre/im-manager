@@ -22,15 +22,15 @@ type AuthenticationMiddleware struct {
 	jwkAutoRefresh *jwk.AutoRefresh
 }
 
-func NewAuthentication(c config.Config) (AuthenticationMiddleware, error) {
+func NewAuthentication(c config.Config) (*AuthenticationMiddleware, error) {
 	jwksHost := c.Authentication.Jwks.Host
 	minimumRefreshInterval := time.Duration(c.Authentication.Jwks.MinimumRefreshInterval) * time.Second
 	autoRefresh, err := provideJwkAutoRefresh(jwksHost, minimumRefreshInterval)
 	if err != nil {
-		return AuthenticationMiddleware{}, err
+		return nil, err
 	}
 
-	return AuthenticationMiddleware{
+	return &AuthenticationMiddleware{
 		c,
 		autoRefresh,
 	}, nil

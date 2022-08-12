@@ -11,7 +11,7 @@ import (
 	redocMiddleware "github.com/go-openapi/runtime/middleware"
 )
 
-func GetEngine(basePath string, stackHandler stack.Handler, instanceHandler instance.Handler, authMiddleware handler.AuthenticationMiddleware) *gin.Engine {
+func GetEngine(basePath string, stackHandler stack.Handler, instanceHandler instance.Handler, authMiddleware *handler.AuthenticationMiddleware) *gin.Engine {
 	r := gin.Default()
 	r.Use(cors.Default())
 	r.Use(middleware.ErrorHandler())
