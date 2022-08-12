@@ -258,6 +258,7 @@ func (s service) Deploy(accessToken string, instance *model.Instance) error {
 		return err
 	}
 
+	// TODO: Encrypt before saving? Yes...
 	err = s.instanceRepository.SaveDeployLog(instanceWithParameters, string(deployLog))
 	instance.DeployLog = string(deployLog)
 	if err != nil {
