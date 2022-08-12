@@ -94,22 +94,16 @@ func (h Handler) Deploy(c *gin.Context) {
 		return
 	}
 
-	userWithGroups, err := h.userClient.FindUserById(token, user.ID)
-	if err != nil {
-		_ = c.Error(err)
-		return
-	}
-
 	instance := &model.Instance{
 		Name:               request.Name,
-		UserID:             user.ID,
+		UserID:             uint(user.ID),
 		GroupName:          request.Group,
 		StackName:          request.Stack,
 		RequiredParameters: request.RequiredParameters,
 		OptionalParameters: request.OptionalParameters,
 	}
 
-	canWrite := handler.CanWriteInstance(userWithGroups, instance)
+	canWrite := handler.CanWriteInstance(user, instance)
 	if !canWrite {
 		unauthorized := apperror.NewUnauthorized("write access denied")
 		_ = c.Error(unauthorized)
@@ -123,7 +117,7 @@ func (h Handler) Deploy(c *gin.Context) {
 			return
 		}
 
-		canWriteSource := handler.CanWriteInstance(userWithGroups, sourceInstance)
+		canWriteSource := handler.CanWriteInstance(user, sourceInstance)
 		if !canWriteSource {
 			err := apperror.NewUnauthorized(fmt.Sprintf("write access to source instance (id: %d) denied", sourceInstance.ID))
 			_ = c.Error(err)
@@ -219,12 +213,6 @@ func (h Handler) Update(c *gin.Context) {
 		return
 	}
 
-	userWithGroups, err := h.userClient.FindUserById(token, user.ID)
-	if err != nil {
-		_ = c.Error(err)
-		return
-	}
-
 	instance, err := h.instanceService.FindById(uint(id))
 	if err != nil {
 		notFound := apperror.NewNotFound("instance", idParam)
@@ -232,7 +220,7 @@ func (h Handler) Update(c *gin.Context) {
 		return
 	}
 
-	canWrite := handler.CanWriteInstance(userWithGroups, instance)
+	canWrite := handler.CanWriteInstance(user, instance)
 	if !canWrite {
 		unauthorized := apperror.NewUnauthorized("write access denied")
 		_ = c.Error(unauthorized)
@@ -285,12 +273,6 @@ func (h Handler) Restart(c *gin.Context) {
 		return
 	}
 
-	userWithGroups, err := h.userClient.FindUserById(token, user.ID)
-	if err != nil {
-		_ = c.Error(err)
-		return
-	}
-
 	instance, err := h.instanceService.FindById(uint(id))
 	if err != nil {
 		notFound := apperror.NewNotFound("instance", idParam)
@@ -298,7 +280,7 @@ func (h Handler) Restart(c *gin.Context) {
 		return
 	}
 
-	canWrite := handler.CanWriteInstance(userWithGroups, instance)
+	canWrite := handler.CanWriteInstance(user, instance)
 	if !canWrite {
 		_ = c.AbortWithError(http.StatusUnauthorized, fmt.Errorf("write access denied"))
 		return
@@ -348,13 +330,6 @@ func (h Handler) Delete(c *gin.Context) {
 		return
 	}
 
-	userWithGroups, err := h.userClient.FindUserById(token, user.ID)
-	if err != nil {
-		notFound := apperror.NewNotFound("user", strconv.Itoa(int(user.ID)))
-		_ = c.Error(notFound)
-		return
-	}
-
 	instance, err := h.instanceService.FindById(uint(id))
 	if err != nil {
 		notFound := apperror.NewNotFound("instance", idParam)
@@ -362,7 +337,7 @@ func (h Handler) Delete(c *gin.Context) {
 		return
 	}
 
-	canWrite := handler.CanWriteInstance(userWithGroups, instance)
+	canWrite := handler.CanWriteInstance(user, instance)
 	if !canWrite {
 		unauthorized := apperror.NewUnauthorized("write access denied")
 		_ = c.Error(unauthorized)
@@ -409,19 +384,6 @@ func (h Handler) FindById(c *gin.Context) {
 		return
 	}
 
-	token, err := handler.GetTokenFromHttpAuthHeader(c)
-	if err != nil {
-		_ = c.Error(err)
-		return
-	}
-
-	userWithGroups, err := h.userClient.FindUserById(token, user.ID)
-	if err != nil {
-		notFound := apperror.NewNotFound("user", strconv.Itoa(int(user.ID)))
-		_ = c.Error(notFound)
-		return
-	}
-
 	instance, err := h.instanceService.FindById(uint(id))
 	if err != nil {
 		notFound := apperror.NewNotFound("instance", idParam)
@@ -429,7 +391,7 @@ func (h Handler) FindById(c *gin.Context) {
 		return
 	}
 
-	canRead := handler.CanReadInstance(userWithGroups, instance)
+	canRead := handler.CanReadInstance(user, instance)
 	if !canRead {
 		unauthorized := apperror.NewUnauthorized("read access denied")
 		_ = c.Error(unauthorized)
@@ -468,19 +430,6 @@ func (h Handler) FindByIdDecrypted(c *gin.Context) {
 		return
 	}
 
-	token, err := handler.GetTokenFromHttpAuthHeader(c)
-	if err != nil {
-		_ = c.Error(err)
-		return
-	}
-
-	userWithGroups, err := h.userClient.FindUserById(token, user.ID)
-	if err != nil {
-		notFound := apperror.NewNotFound("user", strconv.Itoa(int(user.ID)))
-		_ = c.Error(notFound)
-		return
-	}
-
 	instance, err := h.instanceService.FindByIdDecrypted(uint(id))
 	if err != nil {
 		notFound := apperror.NewNotFound("instance", idParam)
@@ -488,7 +437,7 @@ func (h Handler) FindByIdDecrypted(c *gin.Context) {
 		return
 	}
 
-	canRead := handler.CanWriteInstance(userWithGroups, instance)
+	canRead := handler.CanWriteInstance(user, instance)
 	if !canRead {
 		unauthorized := apperror.NewUnauthorized("read access denied")
 		_ = c.Error(unauthorized)
@@ -541,13 +490,6 @@ func (h Handler) Logs(c *gin.Context) {
 		return
 	}
 
-	userWithGroups, err := h.userClient.FindUserById(token, user.ID)
-	if err != nil {
-		notFound := apperror.NewNotFound("user", strconv.Itoa(int(user.ID)))
-		_ = c.Error(notFound)
-		return
-	}
-
 	instance, err := h.instanceService.FindById(uint(id))
 	if err != nil {
 		notFound := apperror.NewNotFound("instance", idParam)
@@ -555,7 +497,7 @@ func (h Handler) Logs(c *gin.Context) {
 		return
 	}
 
-	canRead := handler.CanReadInstance(userWithGroups, instance)
+	canRead := handler.CanReadInstance(user, instance)
 	if !canRead {
 		unauthorized := apperror.NewUnauthorized("read access denied")
 		_ = c.Error(unauthorized)
@@ -625,19 +567,6 @@ func (h Handler) NameToId(c *gin.Context) {
 		return
 	}
 
-	token, err := handler.GetTokenFromHttpAuthHeader(c)
-	if err != nil {
-		_ = c.Error(err)
-		return
-	}
-
-	userWithGroups, err := h.userClient.FindUserById(token, user.ID)
-	if err != nil {
-		notFound := apperror.NewNotFound("user", strconv.Itoa(int(user.ID)))
-		_ = c.Error(notFound)
-		return
-	}
-
 	instance, err := h.instanceService.FindByNameAndGroup(instanceName, groupName)
 	if err != nil {
 		notFound := apperror.NewNotFound("instance", instanceName)
@@ -645,7 +574,7 @@ func (h Handler) NameToId(c *gin.Context) {
 		return
 	}
 
-	canRead := handler.CanReadInstance(userWithGroups, instance)
+	canRead := handler.CanReadInstance(user, instance)
 	if !canRead {
 		unauthorized := apperror.NewUnauthorized("read access denied")
 		_ = c.Error(unauthorized)
@@ -681,26 +610,13 @@ func (h Handler) List(c *gin.Context) {
 		return
 	}
 
-	token, err := handler.GetTokenFromHttpAuthHeader(c)
+	instances, err := h.instanceService.FindInstances(user.Groups)
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
 
-	userWithGroups, err := h.userClient.FindUserById(token, user.ID)
-	if err != nil {
-		_ = c.Error(err)
-		return
-	}
-
-	groups := userWithGroups.Groups
-	instances, err := h.instanceService.FindInstances(groups)
-	if err != nil {
-		_ = c.Error(err)
-		return
-	}
-
-	c.JSON(http.StatusOK, h.groupsWithInstances(groups, instances))
+	c.JSON(http.StatusOK, h.groupsWithInstances(user.Groups, instances))
 }
 
 func (h Handler) groupsWithInstances(groups []*models.Group, instances []*model.Instance) []GroupWithInstances {
