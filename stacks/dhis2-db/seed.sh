@@ -7,6 +7,8 @@ function exec_psql() {
 }
 
 exec_psql "create extension if not exists postgis"
+exec_psql "create extension if not exists pg_trgm"
+exec_psql "create extension if not exists btree_gin"
 
 if [ -n "$DATABASE_ID" ]; then
   table_exists=$(exec_psql "select exists (select from information_schema.tables where table_schema = 'schema_name' and table_name = 'table_name')")
