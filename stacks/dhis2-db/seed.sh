@@ -23,11 +23,12 @@ if [[ -n $DATABASE_ID ]]; then
   DATABASE_MANAGER_ABSOLUTE_URL="$DATABASE_MANAGER_URL/databases/$DATABASE_ID/download"
   echo "DATABASE_MANAGER_ABSOLUTE_URL: $DATABASE_MANAGER_ABSOLUTE_URL"
 
-  cd /tmp
+  tmp_file=$(mktemp)
+  curl --fail -L "$DATABASE_MANAGER_ABSOLUTE_URL" -H "Authorization: $IM_ACCESS_TOKEN" > "$tmp_file"
 # Try pg_restore... Or gzipped sql
-  (curl --fail -L "$DATABASE_MANAGER_ABSOLUTE_URL" -H "Authorization: $IM_ACCESS_TOKEN" | pg_restore -U postgres -d "$DATABASE_NAME") || \
-  (curl --fail -L "$DATABASE_MANAGER_ABSOLUTE_URL" -H "Authorization: $IM_ACCESS_TOKEN" | gunzip -v -c | psql -U postgres -d "$DATABASE_NAME")
-  cd -
+  (pg_restore -U postgres -d "$DATABASE_NAME" -j 8 "$tmp_file") || \
+  (gunzip -v -c "$tmp_file" | psql -U postgres -d "$DATABASE_NAME")
+  rm "$tmp_file"
 
   ## Change ownership to $DATABASE_USERNAME
   # Tables
