@@ -18,4 +18,5 @@ for INSTANCE in $INSTANCES; do
   delete $INSTANCE &
 done
 
+# shellcheck disable=SC2046
 wait $(jobs -p)
