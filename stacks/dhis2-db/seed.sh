@@ -26,7 +26,7 @@ if [[ -n $DATABASE_ID ]]; then
   tmp_file=$(mktemp)
   curl --fail -L "$DATABASE_MANAGER_ABSOLUTE_URL" -H "Authorization: $IM_ACCESS_TOKEN" > "$tmp_file"
 # Try pg_restore... Or gzipped sql
-  (pg_restore -U postgres -d "$DATABASE_NAME" -j 8 "$tmp_file") || \
+  (pg_restore -U postgres -d "$DATABASE_NAME" -j 4 "$tmp_file") || \
   (gunzip -v -c "$tmp_file" | psql -U postgres -d "$DATABASE_NAME")
   rm "$tmp_file"
 
