@@ -10,11 +10,11 @@ exec_psql "create extension if not exists postgis"
 exec_psql "create extension if not exists pg_trgm"
 exec_psql "create extension if not exists btree_gin"
 
-if [ -n "$DATABASE_ID" ]; then
+if [[ -n $DATABASE_ID ]]; then
   table_exists=$(exec_psql "select exists (select from information_schema.tables where table_schema = 'schema_name' and table_name = 'table_name')")
-  if [ "$table_exists" = "true" ]; then
+  if [[ $table_exists = true ]]; then
     row_count=$(exec_psql "select count(*) from organisationunit")
-    if [ $row_count -ne 0 ]; then
+    if [[ $row_count -ne 0 ]]; then
       echo "Seeding aborted!"
       exit 0
     fi
