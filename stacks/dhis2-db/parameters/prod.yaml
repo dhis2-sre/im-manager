@@ -1,4 +1,4 @@
-DATABASE_MANAGER_URL: ENC[AES256_GCM,data:bBy2a7fbTol+o3YU9nQrw2jwktz5B83kRx8QELFbTOLN6ywy3xODQOGGpVzUx8uxpNM=,iv:pya66R+oDjTXw75XFj+ZBPiX76ybh4GwewMICIFHNWI=,tag:4hYUQpBvpW0GD+SA/LpebQ==,type:str]
+DATABASE_MANAGER_URL: ENC[AES256_GCM,data:/vPSq2zMfSGD/ory0jZRQb3Qyi8N+A/CDBGI6NC4xnkmlsTi,iv:C7bE//z+C/i0mQ5tptlgF2KSzybzBbNBGLO6u3F/X04=,tag:JDSaiL/JP4AqRL0Kikd6gg==,type:str]
 sops:
     kms:
         - arn: arn:aws:kms:eu-central-1:767224633206:key/mrk-f5d88b4c53ec4100acd9c8ae3bde0a65
@@ -9,8 +9,8 @@ sops:
     azure_kv: []
     hc_vault: []
     age: []
-    lastmodified: "2022-06-21T13:50:40Z"
-    mac: ENC[AES256_GCM,data:X/CviawYgIKYW7eI0UpbzOr9PpVGw+Mjysc4t7Xovo/LPc0zj6K3iLDyQ3UlScFb10PYQ2OnASK8Nrk1Q9iqWZGxn3uTgsoCk9hBq8dJTUJc8sk/uVuE1Em++HdpO+8lmMCY5+qBxI7ZCgVNVtWuRGEm4dAqu5cTit7iWqvkmGY=,iv:v82dIHKKeeXsFc/zoFclm5UXDC5cpJ1BKy14ZVJVHnY=,tag:BABc+s6dMqg68KCuEnU/iQ==,type:str]
+    lastmodified: "2022-08-24T08:27:24Z"
+    mac: ENC[AES256_GCM,data:n90BZdrnvAAXxmXdTf9LGOee/A3Xgu4yLDJS5zetSfdBxgvcfopg3ijGuQO8gDcO3W89Lx0Q0Vu/i7NI+eGLCuyIS2F4CcwDB8a1NFAtjrD3n755jydjkTKYUWcXO/NwB1bjYR2pdhaftos+6/3NJp2mZ1a9Xj2f/NKQ3qh7+LY=,iv:CTL1JnDkAtYcLFKiUltb0XiXTs/KZ5a/K/ih2vyNdeM=,tag:364QBa0lrcJJLKMzN8rf5A==,type:str]
     pgp: []
     unencrypted_suffix: _unencrypted
-    version: 3.7.1
+    version: 3.7.3
