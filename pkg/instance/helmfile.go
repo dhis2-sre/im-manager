@@ -74,7 +74,7 @@ type stackParameters map[string]string
 
 func (h helmfileService) loadStackParameters(folder string, name string) (stackParameters, error) {
 	environment := h.config.Environment
-	path := fmt.Sprintf("%s/%s/parameters/%s/parameters.yaml", folder, name, environment)
+	path := fmt.Sprintf("%s/%s/parameters/%s.yaml", folder, name, environment)
 	data, err := os.ReadFile(path)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
