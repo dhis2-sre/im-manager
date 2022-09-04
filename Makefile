@@ -65,6 +65,6 @@ swagger-docs: swagger-check-install
 swagger-client: swagger-check-install
 	swagger generate client -f swagger/swagger.yaml -t swagger/sdk
 
-swagger: swagger-clean swagger-docs
+swagger: swagger-clean swagger-docs swagger-client
 
 .PHONY: binary check docker-image push-docker-image dev test dev-test helm-chart publish-helm init
