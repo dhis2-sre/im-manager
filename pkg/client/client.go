@@ -29,3 +29,13 @@ func (c instanceClient) FindByIdDecrypted(token string, id uint) (*models.Instan
 	}
 	return instance.GetPayload(), nil
 }
+
+func (c instanceClient) FindStack(token string, name string) (*models.Stack, error) {
+	params := &operations.StackParams{Name: name, Context: context.Background()}
+	clientAuthInfoWriter := httptransport.BearerToken(token)
+	stack, err := c.client.Stack(params, clientAuthInfoWriter)
+	if err != nil {
+		return nil, err
+	}
+	return stack.GetPayload(), nil
+}
