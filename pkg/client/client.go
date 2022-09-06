@@ -10,20 +10,20 @@ import (
 )
 
 type instanceClient struct {
-	Client operations.ClientService
+	client operations.ClientService
 }
 
 func New(host string, basePath string) *instanceClient {
 	transport := httptransport.New(host, basePath, nil)
 	return &instanceClient{
-		Client: operations.New(transport, strfmt.Default),
+		client: operations.New(transport, strfmt.Default),
 	}
 }
 
 func (c instanceClient) FindByIdDecrypted(token string, id uint) (*models.Instance, error) {
 	params := &operations.FindByIDDecryptedParams{ID: uint64(id), Context: context.Background()}
 	clientAuthInfoWriter := httptransport.BearerToken(token)
-	instance, err := c.Client.FindByIDDecrypted(params, clientAuthInfoWriter)
+	instance, err := c.client.FindByIDDecrypted(params, clientAuthInfoWriter)
 	if err != nil {
 		return nil, err
 	}
