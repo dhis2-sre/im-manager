@@ -20,7 +20,7 @@ require (
 	github.com/stretchr/testify v1.8.0
 	go.mozilla.org/sops/v3 v3.7.3
 	gorm.io/driver/postgres v1.3.9
-	gorm.io/gorm v1.23.8
+	gorm.io/gorm v1.23.9
 	k8s.io/api v0.26.0-alpha.0
 	k8s.io/apimachinery v0.26.0-alpha.0
 	k8s.io/client-go v0.26.0-alpha.0
