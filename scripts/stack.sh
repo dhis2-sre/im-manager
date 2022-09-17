@@ -2,6 +2,8 @@
 
 set -euo pipefail
 
+source ./auth.sh
+
 STACK=$1
 
 $HTTP "$INSTANCE_HOST/stacks/$STACK" "Authorization: Bearer $ACCESS_TOKEN"

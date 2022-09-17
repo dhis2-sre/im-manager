@@ -2,6 +2,8 @@
 
 set -euo pipefail
 
+source ./auth.sh
+
 CHART_VERSION="0.5.0"
 
 GROUP=$1
