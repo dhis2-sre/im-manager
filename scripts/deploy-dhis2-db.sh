@@ -2,6 +2,8 @@
 
 set -euo pipefail
 
+source ./auth.sh
+
 STACK=dhis2-db
 
 GROUP=$1

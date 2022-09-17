@@ -2,8 +2,8 @@
 
 set -euo pipefail
 
-STACK=whoami-go
-CHART_VERSION=0.5.0
+source ./auth.sh
+
 GROUP=$1
 NAME=$2
 

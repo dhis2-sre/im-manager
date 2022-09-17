@@ -2,6 +2,8 @@
 
 set -euo pipefail
 
+source ./auth.sh
+
 GROUP=$1
 INSTANCES=$2
 NAME=$3

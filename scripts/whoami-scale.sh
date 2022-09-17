@@ -2,6 +2,8 @@
 
 set -euo pipefail
 
+source ./auth.sh
+
 GROUP=$1
 NAME=$2
 REPLICA_COUNT=$3
