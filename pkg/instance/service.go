@@ -159,7 +159,6 @@ func (s service) Restart(token string, id uint) error {
 
 	err = s.kubernetesService.executor(group.ClusterConfiguration, func(client *kubernetes.Clientset) error {
 		deployments := client.AppsV1().Deployments(instance.GroupName)
-
 		labelSelector := fmt.Sprintf("app.kubernetes.io/instance=%s", instance.Name)
 		listOptions := metav1.ListOptions{LabelSelector: labelSelector}
 		deploymentList, err := deployments.List(context.TODO(), listOptions)
@@ -199,6 +198,50 @@ func (s service) Restart(token string, id uint) error {
 
 		updatedDeployment.Spec.Replicas = replicas
 		_, err = deployments.UpdateScale(context.TODO(), name, updatedDeployment, metav1.UpdateOptions{})
+		if err != nil {
+			return err
+		}
+
+		// *********** SATEFULSET
+		labelSelector = fmt.Sprintf("app.kubernetes.io/instance=%s-database", instance.Name)
+		st := client.AppsV1().StatefulSets(instance.GroupName)
+		stList, err := st.List(context.TODO(), metav1.ListOptions{LabelSelector: labelSelector})
+		if err != nil {
+			return err
+		}
+
+		if len(stList.Items) > 1 {
+			return fmt.Errorf("multiple StatefulSets found using the selector: %q", labelSelector)
+		}
+		if len(stList.Items) < 1 {
+			return fmt.Errorf("no StatefulSet found using the selector: %q", labelSelector)
+		}
+
+		name = stList.Items[0].Name
+
+		// Scale down
+		scale, err := st.GetScale(context.TODO(), name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+
+		replicas = scale.Spec.Replicas
+		scale.Spec.Replicas = 0
+
+		// TODO why do we not use this scale object and call GetScale again?
+		_, err = st.UpdateScale(context.TODO(), name, scale, metav1.UpdateOptions{})
+		if err != nil {
+			return err
+		}
+
+		// Scale up
+		scale, err = st.GetScale(context.TODO(), name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+
+		scale.Spec.Replicas = replicas
+		_, err = st.UpdateScale(context.TODO(), name, scale, metav1.UpdateOptions{})
 		if err != nil {
 			return err
 		}
