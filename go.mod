@@ -23,7 +23,7 @@ require (
 	gorm.io/gorm v1.23.9
 	k8s.io/api v0.26.0-alpha.1
 	k8s.io/apimachinery v0.26.0-alpha.1
-	k8s.io/client-go v0.26.0-alpha.0
+	k8s.io/client-go v0.26.0-alpha.1
 )
 
 require (
@@ -50,7 +50,7 @@ require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.0.1 // indirect
 	github.com/dimchansky/utfbom v1.1.1 // indirect
-	github.com/emicklei/go-restful/v3 v3.8.0 // indirect
+	github.com/emicklei/go-restful/v3 v3.9.0 // indirect
 	github.com/fatih/color v1.13.0 // indirect
 	github.com/gin-contrib/sse v0.1.0 // indirect
 	github.com/go-logr/logr v1.2.3 // indirect
