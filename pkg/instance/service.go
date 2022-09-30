@@ -21,7 +21,7 @@ import (
 
 type Service interface {
 	ConsumeParameters(source, destination *model.Instance) error
-	Restart(token string, id uint) error
+	Restart(token string, instance *model.Instance) error
 	Save(instance *model.Instance) (*model.Instance, error)
 	Deploy(token string, instance *model.Instance) error
 	FindById(id uint) (*model.Instance, error)
@@ -146,12 +146,7 @@ func (s service) findParameterValue(parameter string, sourceInstance *model.Inst
 	return "", fmt.Errorf("unable to find value for parameter: %s", parameter)
 }
 
-func (s service) Restart(token string, id uint) error {
-	instance, err := s.FindById(id)
-	if err != nil {
-		return err
-	}
-
+func (s service) Restart(token string, instance *model.Instance) error {
 	group, err := s.userClient.FindGroupByName(token, instance.GroupName)
 	if err != nil {
 		return err

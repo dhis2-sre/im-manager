@@ -286,7 +286,7 @@ func (h Handler) Restart(c *gin.Context) {
 		return
 	}
 
-	err = h.instanceService.Restart(token, instance.ID)
+	err = h.instanceService.Restart(token, instance)
 	if err != nil {
 		_ = c.Error(err)
 		return
