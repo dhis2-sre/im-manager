@@ -1,7 +1,6 @@
 package instance
 
 import (
-	"context"
 	"fmt"
 	"io"
 	"log"
@@ -14,9 +13,6 @@ import (
 	"github.com/dhis2-sre/im-manager/pkg/config"
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	"github.com/dhis2-sre/im-user/swagger/sdk/models"
-	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
 )
 
 type Service interface {
@@ -38,7 +34,6 @@ func NewService(
 	instanceRepository Repository,
 	userClient userClientService,
 	stackService stack.Service,
-	kubernetesService kubernetesExecutor,
 	helmfileService helmfile,
 ) *service {
 	return &service{
@@ -47,17 +42,11 @@ func NewService(
 		userClient,
 		stackService,
 		helmfileService,
-		kubernetesService,
 	}
 }
 
 type userClientService interface {
 	FindGroupByName(token string, name string) (*models.Group, error)
-}
-
-type kubernetesExecutor interface {
-	executor(configuration *models.ClusterConfiguration, fn func(client *kubernetes.Clientset) error) error
-	commandExecutor(cmd *exec.Cmd, configuration *models.ClusterConfiguration) (stdout []byte, stderr []byte, err error)
 }
 
 type helmfile interface {
@@ -71,7 +60,6 @@ type service struct {
 	userClient         userClientService
 	stackService       stack.Service
 	helmfileService    helmfile
-	kubernetesService  kubernetesExecutor
 }
 
 func (s service) ConsumeParameters(source, destination *model.Instance) error {
@@ -152,51 +140,12 @@ func (s service) Restart(token string, instance *model.Instance) error {
 		return err
 	}
 
-	err = s.kubernetesService.executor(group.ClusterConfiguration, func(client *kubernetes.Clientset) error {
-		deployments := client.AppsV1().Deployments(instance.GroupName)
+	ks, err := NewKubernetesService(group.ClusterConfiguration)
+	if err != nil {
+		return err
+	}
 
-		labelSelector := fmt.Sprintf("app.kubernetes.io/instance=%s", instance.Name)
-		listOptions := metav1.ListOptions{LabelSelector: labelSelector}
-		deploymentList, err := deployments.List(context.TODO(), listOptions)
-		if err != nil {
-			return err
-		}
-
-		items := deploymentList.Items
-		if len(items) > 1 {
-			return fmt.Errorf("multiple deployments found using the selector: %q", labelSelector)
-		}
-		if len(items) < 1 {
-			return fmt.Errorf("no deployment found using the selector: %q", labelSelector)
-		}
-
-		name := items[0].Name
-
-		// Scale down
-		scale, err := deployments.GetScale(context.TODO(), name, metav1.GetOptions{})
-		if err != nil {
-			return err
-		}
-
-		replicas := scale.Spec.Replicas
-		scale.Spec.Replicas = 0
-
-		updatedScale, err := deployments.UpdateScale(context.TODO(), name, scale, metav1.UpdateOptions{})
-		if err != nil {
-			return err
-		}
-
-		// Scale up
-		updatedScale.Spec.Replicas = replicas
-		_, err = deployments.UpdateScale(context.TODO(), name, updatedScale, metav1.UpdateOptions{})
-		if err != nil {
-			return err
-		}
-
-		return nil
-	})
-
-	return err
+	return ks.restart(instance)
 }
 
 func (s service) Link(source, destination *model.Instance) error {
@@ -236,7 +185,7 @@ func (s service) Deploy(accessToken string, instance *model.Instance) error {
 		return err
 	}
 
-	deployLog, deployErrorLog, err := s.kubernetesService.commandExecutor(syncCmd, group.ClusterConfiguration)
+	deployLog, deployErrorLog, err := commandExecutor(syncCmd, group.ClusterConfiguration)
 	log.Printf("Deploy log: %s\n", deployLog)
 	log.Printf("Deploy error log: %s\n", deployErrorLog)
 	/* TODO: return error log if relevant
@@ -282,7 +231,7 @@ func (s service) Delete(token string, id uint) error {
 			return err
 		}
 
-		destroyLog, destroyErrorLog, err := s.kubernetesService.commandExecutor(destroyCmd, group.ClusterConfiguration)
+		destroyLog, destroyErrorLog, err := commandExecutor(destroyCmd, group.ClusterConfiguration)
 		log.Printf("Destroy log: %s\n", destroyLog)
 		log.Printf("Destroy error log: %s\n", destroyErrorLog)
 		if err != nil {
@@ -294,52 +243,12 @@ func (s service) Delete(token string, id uint) error {
 }
 
 func (s service) Logs(instance *model.Instance, group *models.Group, selector string) (io.ReadCloser, error) {
-	var read io.ReadCloser
-
-	err := s.kubernetesService.executor(group.ClusterConfiguration, func(client *kubernetes.Clientset) error {
-		pod, err := s.getPod(client, instance, selector)
-		if err != nil {
-			return err
-		}
-
-		podLogOptions := v1.PodLogOptions{
-			Follow: true,
-		}
-
-		readCloser, err := client.
-			CoreV1().
-			Pods(pod.Namespace).
-			GetLogs(pod.Name, &podLogOptions).
-			Stream(context.TODO())
-		read = readCloser
-		return err
-	})
-
-	return read, err
-}
-
-func (s service) getPod(client *kubernetes.Clientset, instance *model.Instance, selector string) (v1.Pod, error) {
-	var labelSelector string
-	if selector == "" {
-		labelSelector = fmt.Sprintf("im-id=%d", instance.ID)
-	} else {
-		labelSelector = fmt.Sprintf("im-%s-id=%d", selector, instance.ID)
-	}
-
-	listOptions := metav1.ListOptions{
-		LabelSelector: labelSelector,
-	}
-
-	podList, err := client.CoreV1().Pods("").List(context.TODO(), listOptions)
+	ks, err := NewKubernetesService(group.ClusterConfiguration)
 	if err != nil {
-		return v1.Pod{}, err
+		return nil, err
 	}
 
-	if len(podList.Items) > 1 {
-		return v1.Pod{}, fmt.Errorf("multiple pods found using the selector: %s", labelSelector)
-	}
-
-	return podList.Items[0], nil
+	return ks.getLogs(instance, selector)
 }
 
 func (s service) FindById(id uint) (*model.Instance, error) {
