@@ -72,7 +72,7 @@ func (is *instanceService) Link(source, destination *model.Instance) error {
 	return nil
 }
 
-func (is *instanceService) Restart(token string, id uint) error {
+func (is *instanceService) Restart(token string, instance *model.Instance) error {
 	return nil
 }
 

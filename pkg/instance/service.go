@@ -21,7 +21,7 @@ import (
 
 type Service interface {
 	ConsumeParameters(source, destination *model.Instance) error
-	Restart(token string, id uint) error
+	Restart(token string, instance *model.Instance) error
 	Save(instance *model.Instance) (*model.Instance, error)
 	Deploy(token string, instance *model.Instance) error
 	FindById(id uint) (*model.Instance, error)
@@ -146,12 +146,7 @@ func (s service) findParameterValue(parameter string, sourceInstance *model.Inst
 	return "", fmt.Errorf("unable to find value for parameter: %s", parameter)
 }
 
-func (s service) Restart(token string, id uint) error {
-	instance, err := s.FindById(id)
-	if err != nil {
-		return err
-	}
-
+func (s service) Restart(token string, instance *model.Instance) error {
 	group, err := s.userClient.FindGroupByName(token, instance.GroupName)
 	if err != nil {
 		return err
@@ -178,27 +173,22 @@ func (s service) Restart(token string, id uint) error {
 		name := items[0].Name
 
 		// Scale down
-		deployment, err := deployments.GetScale(context.TODO(), name, metav1.GetOptions{})
+		scale, err := deployments.GetScale(context.TODO(), name, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
 
-		replicas := deployment.Spec.Replicas
-		deployment.Spec.Replicas = 0
+		replicas := scale.Spec.Replicas
+		scale.Spec.Replicas = 0
 
-		_, err = deployments.UpdateScale(context.TODO(), name, deployment, metav1.UpdateOptions{})
+		updatedScale, err := deployments.UpdateScale(context.TODO(), name, scale, metav1.UpdateOptions{})
 		if err != nil {
 			return err
 		}
 
 		// Scale up
-		updatedDeployment, err := deployments.GetScale(context.TODO(), name, metav1.GetOptions{})
-		if err != nil {
-			return err
-		}
-
-		updatedDeployment.Spec.Replicas = replicas
-		_, err = deployments.UpdateScale(context.TODO(), name, updatedDeployment, metav1.UpdateOptions{})
+		updatedScale.Spec.Replicas = replicas
+		_, err = deployments.UpdateScale(context.TODO(), name, updatedScale, metav1.UpdateOptions{})
 		if err != nil {
 			return err
 		}
