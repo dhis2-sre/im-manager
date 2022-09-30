@@ -11,7 +11,7 @@ require (
 	github.com/go-openapi/errors v0.20.3
 	github.com/go-openapi/runtime v0.24.1
 	github.com/go-openapi/strfmt v0.21.3
-	github.com/go-openapi/swag v0.21.1
+	github.com/go-openapi/swag v0.22.3
 	github.com/go-openapi/validate v0.22.0
 	github.com/gofrs/uuid v4.2.0+incompatible
 	github.com/jackc/pgconn v1.13.0
@@ -21,7 +21,7 @@ require (
 	go.mozilla.org/sops/v3 v3.7.3
 	gorm.io/driver/postgres v1.3.10
 	gorm.io/gorm v1.23.9
-	k8s.io/api v0.26.0-alpha.0
+	k8s.io/api v0.26.0-alpha.1
 	k8s.io/apimachinery v0.26.0-alpha.1
 	k8s.io/client-go v0.26.0-alpha.0
 )
