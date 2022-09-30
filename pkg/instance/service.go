@@ -173,27 +173,22 @@ func (s service) Restart(token string, instance *model.Instance) error {
 		name := items[0].Name
 
 		// Scale down
-		deployment, err := deployments.GetScale(context.TODO(), name, metav1.GetOptions{})
+		scale, err := deployments.GetScale(context.TODO(), name, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
 
-		replicas := deployment.Spec.Replicas
-		deployment.Spec.Replicas = 0
+		replicas := scale.Spec.Replicas
+		scale.Spec.Replicas = 0
 
-		_, err = deployments.UpdateScale(context.TODO(), name, deployment, metav1.UpdateOptions{})
+		updatedScale, err := deployments.UpdateScale(context.TODO(), name, scale, metav1.UpdateOptions{})
 		if err != nil {
 			return err
 		}
 
 		// Scale up
-		updatedDeployment, err := deployments.GetScale(context.TODO(), name, metav1.GetOptions{})
-		if err != nil {
-			return err
-		}
-
-		updatedDeployment.Spec.Replicas = replicas
-		_, err = deployments.UpdateScale(context.TODO(), name, updatedDeployment, metav1.UpdateOptions{})
+		updatedScale.Spec.Replicas = replicas
+		_, err = deployments.UpdateScale(context.TODO(), name, updatedScale, metav1.UpdateOptions{})
 		if err != nil {
 			return err
 		}
