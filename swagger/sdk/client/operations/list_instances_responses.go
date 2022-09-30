@@ -65,9 +65,39 @@ type ListInstancesOK struct {
 	Payload []*models.GroupWithInstances
 }
 
+// IsSuccess returns true when this list instances o k response has a 2xx status code
+func (o *ListInstancesOK) IsSuccess() bool {
+	return true
+}
+
+// IsRedirect returns true when this list instances o k response has a 3xx status code
+func (o *ListInstancesOK) IsRedirect() bool {
+	return false
+}
+
+// IsClientError returns true when this list instances o k response has a 4xx status code
+func (o *ListInstancesOK) IsClientError() bool {
+	return false
+}
+
+// IsServerError returns true when this list instances o k response has a 5xx status code
+func (o *ListInstancesOK) IsServerError() bool {
+	return false
+}
+
+// IsCode returns true when this list instances o k response a status code equal to that given
+func (o *ListInstancesOK) IsCode(code int) bool {
+	return code == 200
+}
+
 func (o *ListInstancesOK) Error() string {
 	return fmt.Sprintf("[GET /instances][%d] listInstancesOK  %+v", 200, o.Payload)
 }
+
+func (o *ListInstancesOK) String() string {
+	return fmt.Sprintf("[GET /instances][%d] listInstancesOK  %+v", 200, o.Payload)
+}
+
 func (o *ListInstancesOK) GetPayload() []*models.GroupWithInstances {
 	return o.Payload
 }
@@ -94,7 +124,36 @@ ListInstancesUnauthorized list instances unauthorized
 type ListInstancesUnauthorized struct {
 }
 
+// IsSuccess returns true when this list instances unauthorized response has a 2xx status code
+func (o *ListInstancesUnauthorized) IsSuccess() bool {
+	return false
+}
+
+// IsRedirect returns true when this list instances unauthorized response has a 3xx status code
+func (o *ListInstancesUnauthorized) IsRedirect() bool {
+	return false
+}
+
+// IsClientError returns true when this list instances unauthorized response has a 4xx status code
+func (o *ListInstancesUnauthorized) IsClientError() bool {
+	return true
+}
+
+// IsServerError returns true when this list instances unauthorized response has a 5xx status code
+func (o *ListInstancesUnauthorized) IsServerError() bool {
+	return false
+}
+
+// IsCode returns true when this list instances unauthorized response a status code equal to that given
+func (o *ListInstancesUnauthorized) IsCode(code int) bool {
+	return code == 401
+}
+
 func (o *ListInstancesUnauthorized) Error() string {
+	return fmt.Sprintf("[GET /instances][%d] listInstancesUnauthorized ", 401)
+}
+
+func (o *ListInstancesUnauthorized) String() string {
 	return fmt.Sprintf("[GET /instances][%d] listInstancesUnauthorized ", 401)
 }
 
@@ -115,7 +174,36 @@ ListInstancesForbidden list instances forbidden
 type ListInstancesForbidden struct {
 }
 
+// IsSuccess returns true when this list instances forbidden response has a 2xx status code
+func (o *ListInstancesForbidden) IsSuccess() bool {
+	return false
+}
+
+// IsRedirect returns true when this list instances forbidden response has a 3xx status code
+func (o *ListInstancesForbidden) IsRedirect() bool {
+	return false
+}
+
+// IsClientError returns true when this list instances forbidden response has a 4xx status code
+func (o *ListInstancesForbidden) IsClientError() bool {
+	return true
+}
+
+// IsServerError returns true when this list instances forbidden response has a 5xx status code
+func (o *ListInstancesForbidden) IsServerError() bool {
+	return false
+}
+
+// IsCode returns true when this list instances forbidden response a status code equal to that given
+func (o *ListInstancesForbidden) IsCode(code int) bool {
+	return code == 403
+}
+
 func (o *ListInstancesForbidden) Error() string {
+	return fmt.Sprintf("[GET /instances][%d] listInstancesForbidden ", 403)
+}
+
+func (o *ListInstancesForbidden) String() string {
 	return fmt.Sprintf("[GET /instances][%d] listInstancesForbidden ", 403)
 }
 
@@ -136,7 +224,36 @@ ListInstancesUnsupportedMediaType list instances unsupported media type
 type ListInstancesUnsupportedMediaType struct {
 }
 
+// IsSuccess returns true when this list instances unsupported media type response has a 2xx status code
+func (o *ListInstancesUnsupportedMediaType) IsSuccess() bool {
+	return false
+}
+
+// IsRedirect returns true when this list instances unsupported media type response has a 3xx status code
+func (o *ListInstancesUnsupportedMediaType) IsRedirect() bool {
+	return false
+}
+
+// IsClientError returns true when this list instances unsupported media type response has a 4xx status code
+func (o *ListInstancesUnsupportedMediaType) IsClientError() bool {
+	return true
+}
+
+// IsServerError returns true when this list instances unsupported media type response has a 5xx status code
+func (o *ListInstancesUnsupportedMediaType) IsServerError() bool {
+	return false
+}
+
+// IsCode returns true when this list instances unsupported media type response a status code equal to that given
+func (o *ListInstancesUnsupportedMediaType) IsCode(code int) bool {
+	return code == 415
+}
+
 func (o *ListInstancesUnsupportedMediaType) Error() string {
+	return fmt.Sprintf("[GET /instances][%d] listInstancesUnsupportedMediaType ", 415)
+}
+
+func (o *ListInstancesUnsupportedMediaType) String() string {
 	return fmt.Sprintf("[GET /instances][%d] listInstancesUnsupportedMediaType ", 415)
 }
 

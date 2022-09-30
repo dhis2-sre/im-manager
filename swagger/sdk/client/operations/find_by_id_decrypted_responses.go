@@ -71,9 +71,39 @@ type FindByIDDecryptedOK struct {
 	Payload *models.Instance
 }
 
+// IsSuccess returns true when this find by Id decrypted o k response has a 2xx status code
+func (o *FindByIDDecryptedOK) IsSuccess() bool {
+	return true
+}
+
+// IsRedirect returns true when this find by Id decrypted o k response has a 3xx status code
+func (o *FindByIDDecryptedOK) IsRedirect() bool {
+	return false
+}
+
+// IsClientError returns true when this find by Id decrypted o k response has a 4xx status code
+func (o *FindByIDDecryptedOK) IsClientError() bool {
+	return false
+}
+
+// IsServerError returns true when this find by Id decrypted o k response has a 5xx status code
+func (o *FindByIDDecryptedOK) IsServerError() bool {
+	return false
+}
+
+// IsCode returns true when this find by Id decrypted o k response a status code equal to that given
+func (o *FindByIDDecryptedOK) IsCode(code int) bool {
+	return code == 200
+}
+
 func (o *FindByIDDecryptedOK) Error() string {
 	return fmt.Sprintf("[GET /instances/{id}/parameters][%d] findByIdDecryptedOK  %+v", 200, o.Payload)
 }
+
+func (o *FindByIDDecryptedOK) String() string {
+	return fmt.Sprintf("[GET /instances/{id}/parameters][%d] findByIdDecryptedOK  %+v", 200, o.Payload)
+}
+
 func (o *FindByIDDecryptedOK) GetPayload() *models.Instance {
 	return o.Payload
 }
@@ -102,7 +132,36 @@ FindByIDDecryptedUnauthorized find by Id decrypted unauthorized
 type FindByIDDecryptedUnauthorized struct {
 }
 
+// IsSuccess returns true when this find by Id decrypted unauthorized response has a 2xx status code
+func (o *FindByIDDecryptedUnauthorized) IsSuccess() bool {
+	return false
+}
+
+// IsRedirect returns true when this find by Id decrypted unauthorized response has a 3xx status code
+func (o *FindByIDDecryptedUnauthorized) IsRedirect() bool {
+	return false
+}
+
+// IsClientError returns true when this find by Id decrypted unauthorized response has a 4xx status code
+func (o *FindByIDDecryptedUnauthorized) IsClientError() bool {
+	return true
+}
+
+// IsServerError returns true when this find by Id decrypted unauthorized response has a 5xx status code
+func (o *FindByIDDecryptedUnauthorized) IsServerError() bool {
+	return false
+}
+
+// IsCode returns true when this find by Id decrypted unauthorized response a status code equal to that given
+func (o *FindByIDDecryptedUnauthorized) IsCode(code int) bool {
+	return code == 401
+}
+
 func (o *FindByIDDecryptedUnauthorized) Error() string {
+	return fmt.Sprintf("[GET /instances/{id}/parameters][%d] findByIdDecryptedUnauthorized ", 401)
+}
+
+func (o *FindByIDDecryptedUnauthorized) String() string {
 	return fmt.Sprintf("[GET /instances/{id}/parameters][%d] findByIdDecryptedUnauthorized ", 401)
 }
 
@@ -123,7 +182,36 @@ FindByIDDecryptedForbidden find by Id decrypted forbidden
 type FindByIDDecryptedForbidden struct {
 }
 
+// IsSuccess returns true when this find by Id decrypted forbidden response has a 2xx status code
+func (o *FindByIDDecryptedForbidden) IsSuccess() bool {
+	return false
+}
+
+// IsRedirect returns true when this find by Id decrypted forbidden response has a 3xx status code
+func (o *FindByIDDecryptedForbidden) IsRedirect() bool {
+	return false
+}
+
+// IsClientError returns true when this find by Id decrypted forbidden response has a 4xx status code
+func (o *FindByIDDecryptedForbidden) IsClientError() bool {
+	return true
+}
+
+// IsServerError returns true when this find by Id decrypted forbidden response has a 5xx status code
+func (o *FindByIDDecryptedForbidden) IsServerError() bool {
+	return false
+}
+
+// IsCode returns true when this find by Id decrypted forbidden response a status code equal to that given
+func (o *FindByIDDecryptedForbidden) IsCode(code int) bool {
+	return code == 403
+}
+
 func (o *FindByIDDecryptedForbidden) Error() string {
+	return fmt.Sprintf("[GET /instances/{id}/parameters][%d] findByIdDecryptedForbidden ", 403)
+}
+
+func (o *FindByIDDecryptedForbidden) String() string {
 	return fmt.Sprintf("[GET /instances/{id}/parameters][%d] findByIdDecryptedForbidden ", 403)
 }
 
@@ -144,7 +232,36 @@ FindByIDDecryptedNotFound find by Id decrypted not found
 type FindByIDDecryptedNotFound struct {
 }
 
+// IsSuccess returns true when this find by Id decrypted not found response has a 2xx status code
+func (o *FindByIDDecryptedNotFound) IsSuccess() bool {
+	return false
+}
+
+// IsRedirect returns true when this find by Id decrypted not found response has a 3xx status code
+func (o *FindByIDDecryptedNotFound) IsRedirect() bool {
+	return false
+}
+
+// IsClientError returns true when this find by Id decrypted not found response has a 4xx status code
+func (o *FindByIDDecryptedNotFound) IsClientError() bool {
+	return true
+}
+
+// IsServerError returns true when this find by Id decrypted not found response has a 5xx status code
+func (o *FindByIDDecryptedNotFound) IsServerError() bool {
+	return false
+}
+
+// IsCode returns true when this find by Id decrypted not found response a status code equal to that given
+func (o *FindByIDDecryptedNotFound) IsCode(code int) bool {
+	return code == 404
+}
+
 func (o *FindByIDDecryptedNotFound) Error() string {
+	return fmt.Sprintf("[GET /instances/{id}/parameters][%d] findByIdDecryptedNotFound ", 404)
+}
+
+func (o *FindByIDDecryptedNotFound) String() string {
 	return fmt.Sprintf("[GET /instances/{id}/parameters][%d] findByIdDecryptedNotFound ", 404)
 }
 
@@ -165,7 +282,36 @@ FindByIDDecryptedUnsupportedMediaType find by Id decrypted unsupported media typ
 type FindByIDDecryptedUnsupportedMediaType struct {
 }
 
+// IsSuccess returns true when this find by Id decrypted unsupported media type response has a 2xx status code
+func (o *FindByIDDecryptedUnsupportedMediaType) IsSuccess() bool {
+	return false
+}
+
+// IsRedirect returns true when this find by Id decrypted unsupported media type response has a 3xx status code
+func (o *FindByIDDecryptedUnsupportedMediaType) IsRedirect() bool {
+	return false
+}
+
+// IsClientError returns true when this find by Id decrypted unsupported media type response has a 4xx status code
+func (o *FindByIDDecryptedUnsupportedMediaType) IsClientError() bool {
+	return true
+}
+
+// IsServerError returns true when this find by Id decrypted unsupported media type response has a 5xx status code
+func (o *FindByIDDecryptedUnsupportedMediaType) IsServerError() bool {
+	return false
+}
+
+// IsCode returns true when this find by Id decrypted unsupported media type response a status code equal to that given
+func (o *FindByIDDecryptedUnsupportedMediaType) IsCode(code int) bool {
+	return code == 415
+}
+
 func (o *FindByIDDecryptedUnsupportedMediaType) Error() string {
+	return fmt.Sprintf("[GET /instances/{id}/parameters][%d] findByIdDecryptedUnsupportedMediaType ", 415)
+}
+
+func (o *FindByIDDecryptedUnsupportedMediaType) String() string {
 	return fmt.Sprintf("[GET /instances/{id}/parameters][%d] findByIdDecryptedUnsupportedMediaType ", 415)
 }
 

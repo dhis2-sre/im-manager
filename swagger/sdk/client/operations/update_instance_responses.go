@@ -71,9 +71,39 @@ type UpdateInstanceNoContent struct {
 	Payload *models.Instance
 }
 
+// IsSuccess returns true when this update instance no content response has a 2xx status code
+func (o *UpdateInstanceNoContent) IsSuccess() bool {
+	return true
+}
+
+// IsRedirect returns true when this update instance no content response has a 3xx status code
+func (o *UpdateInstanceNoContent) IsRedirect() bool {
+	return false
+}
+
+// IsClientError returns true when this update instance no content response has a 4xx status code
+func (o *UpdateInstanceNoContent) IsClientError() bool {
+	return false
+}
+
+// IsServerError returns true when this update instance no content response has a 5xx status code
+func (o *UpdateInstanceNoContent) IsServerError() bool {
+	return false
+}
+
+// IsCode returns true when this update instance no content response a status code equal to that given
+func (o *UpdateInstanceNoContent) IsCode(code int) bool {
+	return code == 204
+}
+
 func (o *UpdateInstanceNoContent) Error() string {
 	return fmt.Sprintf("[PUT /instances/{id}][%d] updateInstanceNoContent  %+v", 204, o.Payload)
 }
+
+func (o *UpdateInstanceNoContent) String() string {
+	return fmt.Sprintf("[PUT /instances/{id}][%d] updateInstanceNoContent  %+v", 204, o.Payload)
+}
+
 func (o *UpdateInstanceNoContent) GetPayload() *models.Instance {
 	return o.Payload
 }
@@ -102,7 +132,36 @@ UpdateInstanceUnauthorized update instance unauthorized
 type UpdateInstanceUnauthorized struct {
 }
 
+// IsSuccess returns true when this update instance unauthorized response has a 2xx status code
+func (o *UpdateInstanceUnauthorized) IsSuccess() bool {
+	return false
+}
+
+// IsRedirect returns true when this update instance unauthorized response has a 3xx status code
+func (o *UpdateInstanceUnauthorized) IsRedirect() bool {
+	return false
+}
+
+// IsClientError returns true when this update instance unauthorized response has a 4xx status code
+func (o *UpdateInstanceUnauthorized) IsClientError() bool {
+	return true
+}
+
+// IsServerError returns true when this update instance unauthorized response has a 5xx status code
+func (o *UpdateInstanceUnauthorized) IsServerError() bool {
+	return false
+}
+
+// IsCode returns true when this update instance unauthorized response a status code equal to that given
+func (o *UpdateInstanceUnauthorized) IsCode(code int) bool {
+	return code == 401
+}
+
 func (o *UpdateInstanceUnauthorized) Error() string {
+	return fmt.Sprintf("[PUT /instances/{id}][%d] updateInstanceUnauthorized ", 401)
+}
+
+func (o *UpdateInstanceUnauthorized) String() string {
 	return fmt.Sprintf("[PUT /instances/{id}][%d] updateInstanceUnauthorized ", 401)
 }
 
@@ -123,7 +182,36 @@ UpdateInstanceForbidden update instance forbidden
 type UpdateInstanceForbidden struct {
 }
 
+// IsSuccess returns true when this update instance forbidden response has a 2xx status code
+func (o *UpdateInstanceForbidden) IsSuccess() bool {
+	return false
+}
+
+// IsRedirect returns true when this update instance forbidden response has a 3xx status code
+func (o *UpdateInstanceForbidden) IsRedirect() bool {
+	return false
+}
+
+// IsClientError returns true when this update instance forbidden response has a 4xx status code
+func (o *UpdateInstanceForbidden) IsClientError() bool {
+	return true
+}
+
+// IsServerError returns true when this update instance forbidden response has a 5xx status code
+func (o *UpdateInstanceForbidden) IsServerError() bool {
+	return false
+}
+
+// IsCode returns true when this update instance forbidden response a status code equal to that given
+func (o *UpdateInstanceForbidden) IsCode(code int) bool {
+	return code == 403
+}
+
 func (o *UpdateInstanceForbidden) Error() string {
+	return fmt.Sprintf("[PUT /instances/{id}][%d] updateInstanceForbidden ", 403)
+}
+
+func (o *UpdateInstanceForbidden) String() string {
 	return fmt.Sprintf("[PUT /instances/{id}][%d] updateInstanceForbidden ", 403)
 }
 
@@ -144,7 +232,36 @@ UpdateInstanceNotFound update instance not found
 type UpdateInstanceNotFound struct {
 }
 
+// IsSuccess returns true when this update instance not found response has a 2xx status code
+func (o *UpdateInstanceNotFound) IsSuccess() bool {
+	return false
+}
+
+// IsRedirect returns true when this update instance not found response has a 3xx status code
+func (o *UpdateInstanceNotFound) IsRedirect() bool {
+	return false
+}
+
+// IsClientError returns true when this update instance not found response has a 4xx status code
+func (o *UpdateInstanceNotFound) IsClientError() bool {
+	return true
+}
+
+// IsServerError returns true when this update instance not found response has a 5xx status code
+func (o *UpdateInstanceNotFound) IsServerError() bool {
+	return false
+}
+
+// IsCode returns true when this update instance not found response a status code equal to that given
+func (o *UpdateInstanceNotFound) IsCode(code int) bool {
+	return code == 404
+}
+
 func (o *UpdateInstanceNotFound) Error() string {
+	return fmt.Sprintf("[PUT /instances/{id}][%d] updateInstanceNotFound ", 404)
+}
+
+func (o *UpdateInstanceNotFound) String() string {
 	return fmt.Sprintf("[PUT /instances/{id}][%d] updateInstanceNotFound ", 404)
 }
 
@@ -165,7 +282,36 @@ UpdateInstanceUnsupportedMediaType update instance unsupported media type
 type UpdateInstanceUnsupportedMediaType struct {
 }
 
+// IsSuccess returns true when this update instance unsupported media type response has a 2xx status code
+func (o *UpdateInstanceUnsupportedMediaType) IsSuccess() bool {
+	return false
+}
+
+// IsRedirect returns true when this update instance unsupported media type response has a 3xx status code
+func (o *UpdateInstanceUnsupportedMediaType) IsRedirect() bool {
+	return false
+}
+
+// IsClientError returns true when this update instance unsupported media type response has a 4xx status code
+func (o *UpdateInstanceUnsupportedMediaType) IsClientError() bool {
+	return true
+}
+
+// IsServerError returns true when this update instance unsupported media type response has a 5xx status code
+func (o *UpdateInstanceUnsupportedMediaType) IsServerError() bool {
+	return false
+}
+
+// IsCode returns true when this update instance unsupported media type response a status code equal to that given
+func (o *UpdateInstanceUnsupportedMediaType) IsCode(code int) bool {
+	return code == 415
+}
+
 func (o *UpdateInstanceUnsupportedMediaType) Error() string {
+	return fmt.Sprintf("[PUT /instances/{id}][%d] updateInstanceUnsupportedMediaType ", 415)
+}
+
+func (o *UpdateInstanceUnsupportedMediaType) String() string {
 	return fmt.Sprintf("[PUT /instances/{id}][%d] updateInstanceUnsupportedMediaType ", 415)
 }
 

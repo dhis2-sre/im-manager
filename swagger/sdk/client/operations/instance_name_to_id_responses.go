@@ -71,9 +71,39 @@ type InstanceNameToIDOK struct {
 	Payload *models.Instance
 }
 
+// IsSuccess returns true when this instance name to Id o k response has a 2xx status code
+func (o *InstanceNameToIDOK) IsSuccess() bool {
+	return true
+}
+
+// IsRedirect returns true when this instance name to Id o k response has a 3xx status code
+func (o *InstanceNameToIDOK) IsRedirect() bool {
+	return false
+}
+
+// IsClientError returns true when this instance name to Id o k response has a 4xx status code
+func (o *InstanceNameToIDOK) IsClientError() bool {
+	return false
+}
+
+// IsServerError returns true when this instance name to Id o k response has a 5xx status code
+func (o *InstanceNameToIDOK) IsServerError() bool {
+	return false
+}
+
+// IsCode returns true when this instance name to Id o k response a status code equal to that given
+func (o *InstanceNameToIDOK) IsCode(code int) bool {
+	return code == 200
+}
+
 func (o *InstanceNameToIDOK) Error() string {
 	return fmt.Sprintf("[GET /instances-name-to-id/{groupName}/{instanceName}][%d] instanceNameToIdOK  %+v", 200, o.Payload)
 }
+
+func (o *InstanceNameToIDOK) String() string {
+	return fmt.Sprintf("[GET /instances-name-to-id/{groupName}/{instanceName}][%d] instanceNameToIdOK  %+v", 200, o.Payload)
+}
+
 func (o *InstanceNameToIDOK) GetPayload() *models.Instance {
 	return o.Payload
 }
@@ -102,7 +132,36 @@ InstanceNameToIDUnauthorized instance name to Id unauthorized
 type InstanceNameToIDUnauthorized struct {
 }
 
+// IsSuccess returns true when this instance name to Id unauthorized response has a 2xx status code
+func (o *InstanceNameToIDUnauthorized) IsSuccess() bool {
+	return false
+}
+
+// IsRedirect returns true when this instance name to Id unauthorized response has a 3xx status code
+func (o *InstanceNameToIDUnauthorized) IsRedirect() bool {
+	return false
+}
+
+// IsClientError returns true when this instance name to Id unauthorized response has a 4xx status code
+func (o *InstanceNameToIDUnauthorized) IsClientError() bool {
+	return true
+}
+
+// IsServerError returns true when this instance name to Id unauthorized response has a 5xx status code
+func (o *InstanceNameToIDUnauthorized) IsServerError() bool {
+	return false
+}
+
+// IsCode returns true when this instance name to Id unauthorized response a status code equal to that given
+func (o *InstanceNameToIDUnauthorized) IsCode(code int) bool {
+	return code == 401
+}
+
 func (o *InstanceNameToIDUnauthorized) Error() string {
+	return fmt.Sprintf("[GET /instances-name-to-id/{groupName}/{instanceName}][%d] instanceNameToIdUnauthorized ", 401)
+}
+
+func (o *InstanceNameToIDUnauthorized) String() string {
 	return fmt.Sprintf("[GET /instances-name-to-id/{groupName}/{instanceName}][%d] instanceNameToIdUnauthorized ", 401)
 }
 
@@ -123,7 +182,36 @@ InstanceNameToIDForbidden instance name to Id forbidden
 type InstanceNameToIDForbidden struct {
 }
 
+// IsSuccess returns true when this instance name to Id forbidden response has a 2xx status code
+func (o *InstanceNameToIDForbidden) IsSuccess() bool {
+	return false
+}
+
+// IsRedirect returns true when this instance name to Id forbidden response has a 3xx status code
+func (o *InstanceNameToIDForbidden) IsRedirect() bool {
+	return false
+}
+
+// IsClientError returns true when this instance name to Id forbidden response has a 4xx status code
+func (o *InstanceNameToIDForbidden) IsClientError() bool {
+	return true
+}
+
+// IsServerError returns true when this instance name to Id forbidden response has a 5xx status code
+func (o *InstanceNameToIDForbidden) IsServerError() bool {
+	return false
+}
+
+// IsCode returns true when this instance name to Id forbidden response a status code equal to that given
+func (o *InstanceNameToIDForbidden) IsCode(code int) bool {
+	return code == 403
+}
+
 func (o *InstanceNameToIDForbidden) Error() string {
+	return fmt.Sprintf("[GET /instances-name-to-id/{groupName}/{instanceName}][%d] instanceNameToIdForbidden ", 403)
+}
+
+func (o *InstanceNameToIDForbidden) String() string {
 	return fmt.Sprintf("[GET /instances-name-to-id/{groupName}/{instanceName}][%d] instanceNameToIdForbidden ", 403)
 }
 
@@ -144,7 +232,36 @@ InstanceNameToIDNotFound instance name to Id not found
 type InstanceNameToIDNotFound struct {
 }
 
+// IsSuccess returns true when this instance name to Id not found response has a 2xx status code
+func (o *InstanceNameToIDNotFound) IsSuccess() bool {
+	return false
+}
+
+// IsRedirect returns true when this instance name to Id not found response has a 3xx status code
+func (o *InstanceNameToIDNotFound) IsRedirect() bool {
+	return false
+}
+
+// IsClientError returns true when this instance name to Id not found response has a 4xx status code
+func (o *InstanceNameToIDNotFound) IsClientError() bool {
+	return true
+}
+
+// IsServerError returns true when this instance name to Id not found response has a 5xx status code
+func (o *InstanceNameToIDNotFound) IsServerError() bool {
+	return false
+}
+
+// IsCode returns true when this instance name to Id not found response a status code equal to that given
+func (o *InstanceNameToIDNotFound) IsCode(code int) bool {
+	return code == 404
+}
+
 func (o *InstanceNameToIDNotFound) Error() string {
+	return fmt.Sprintf("[GET /instances-name-to-id/{groupName}/{instanceName}][%d] instanceNameToIdNotFound ", 404)
+}
+
+func (o *InstanceNameToIDNotFound) String() string {
 	return fmt.Sprintf("[GET /instances-name-to-id/{groupName}/{instanceName}][%d] instanceNameToIdNotFound ", 404)
 }
 
@@ -165,7 +282,36 @@ InstanceNameToIDUnsupportedMediaType instance name to Id unsupported media type
 type InstanceNameToIDUnsupportedMediaType struct {
 }
 
+// IsSuccess returns true when this instance name to Id unsupported media type response has a 2xx status code
+func (o *InstanceNameToIDUnsupportedMediaType) IsSuccess() bool {
+	return false
+}
+
+// IsRedirect returns true when this instance name to Id unsupported media type response has a 3xx status code
+func (o *InstanceNameToIDUnsupportedMediaType) IsRedirect() bool {
+	return false
+}
+
+// IsClientError returns true when this instance name to Id unsupported media type response has a 4xx status code
+func (o *InstanceNameToIDUnsupportedMediaType) IsClientError() bool {
+	return true
+}
+
+// IsServerError returns true when this instance name to Id unsupported media type response has a 5xx status code
+func (o *InstanceNameToIDUnsupportedMediaType) IsServerError() bool {
+	return false
+}
+
+// IsCode returns true when this instance name to Id unsupported media type response a status code equal to that given
+func (o *InstanceNameToIDUnsupportedMediaType) IsCode(code int) bool {
+	return code == 415
+}
+
 func (o *InstanceNameToIDUnsupportedMediaType) Error() string {
+	return fmt.Sprintf("[GET /instances-name-to-id/{groupName}/{instanceName}][%d] instanceNameToIdUnsupportedMediaType ", 415)
+}
+
+func (o *InstanceNameToIDUnsupportedMediaType) String() string {
 	return fmt.Sprintf("[GET /instances-name-to-id/{groupName}/{instanceName}][%d] instanceNameToIdUnsupportedMediaType ", 415)
 }
 

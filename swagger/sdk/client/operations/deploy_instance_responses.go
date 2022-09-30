@@ -71,9 +71,39 @@ type DeployInstanceCreated struct {
 	Payload *models.Instance
 }
 
+// IsSuccess returns true when this deploy instance created response has a 2xx status code
+func (o *DeployInstanceCreated) IsSuccess() bool {
+	return true
+}
+
+// IsRedirect returns true when this deploy instance created response has a 3xx status code
+func (o *DeployInstanceCreated) IsRedirect() bool {
+	return false
+}
+
+// IsClientError returns true when this deploy instance created response has a 4xx status code
+func (o *DeployInstanceCreated) IsClientError() bool {
+	return false
+}
+
+// IsServerError returns true when this deploy instance created response has a 5xx status code
+func (o *DeployInstanceCreated) IsServerError() bool {
+	return false
+}
+
+// IsCode returns true when this deploy instance created response a status code equal to that given
+func (o *DeployInstanceCreated) IsCode(code int) bool {
+	return code == 201
+}
+
 func (o *DeployInstanceCreated) Error() string {
 	return fmt.Sprintf("[POST /instances][%d] deployInstanceCreated  %+v", 201, o.Payload)
 }
+
+func (o *DeployInstanceCreated) String() string {
+	return fmt.Sprintf("[POST /instances][%d] deployInstanceCreated  %+v", 201, o.Payload)
+}
+
 func (o *DeployInstanceCreated) GetPayload() *models.Instance {
 	return o.Payload
 }
@@ -102,7 +132,36 @@ DeployInstanceUnauthorized deploy instance unauthorized
 type DeployInstanceUnauthorized struct {
 }
 
+// IsSuccess returns true when this deploy instance unauthorized response has a 2xx status code
+func (o *DeployInstanceUnauthorized) IsSuccess() bool {
+	return false
+}
+
+// IsRedirect returns true when this deploy instance unauthorized response has a 3xx status code
+func (o *DeployInstanceUnauthorized) IsRedirect() bool {
+	return false
+}
+
+// IsClientError returns true when this deploy instance unauthorized response has a 4xx status code
+func (o *DeployInstanceUnauthorized) IsClientError() bool {
+	return true
+}
+
+// IsServerError returns true when this deploy instance unauthorized response has a 5xx status code
+func (o *DeployInstanceUnauthorized) IsServerError() bool {
+	return false
+}
+
+// IsCode returns true when this deploy instance unauthorized response a status code equal to that given
+func (o *DeployInstanceUnauthorized) IsCode(code int) bool {
+	return code == 401
+}
+
 func (o *DeployInstanceUnauthorized) Error() string {
+	return fmt.Sprintf("[POST /instances][%d] deployInstanceUnauthorized ", 401)
+}
+
+func (o *DeployInstanceUnauthorized) String() string {
 	return fmt.Sprintf("[POST /instances][%d] deployInstanceUnauthorized ", 401)
 }
 
@@ -123,7 +182,36 @@ DeployInstanceForbidden deploy instance forbidden
 type DeployInstanceForbidden struct {
 }
 
+// IsSuccess returns true when this deploy instance forbidden response has a 2xx status code
+func (o *DeployInstanceForbidden) IsSuccess() bool {
+	return false
+}
+
+// IsRedirect returns true when this deploy instance forbidden response has a 3xx status code
+func (o *DeployInstanceForbidden) IsRedirect() bool {
+	return false
+}
+
+// IsClientError returns true when this deploy instance forbidden response has a 4xx status code
+func (o *DeployInstanceForbidden) IsClientError() bool {
+	return true
+}
+
+// IsServerError returns true when this deploy instance forbidden response has a 5xx status code
+func (o *DeployInstanceForbidden) IsServerError() bool {
+	return false
+}
+
+// IsCode returns true when this deploy instance forbidden response a status code equal to that given
+func (o *DeployInstanceForbidden) IsCode(code int) bool {
+	return code == 403
+}
+
 func (o *DeployInstanceForbidden) Error() string {
+	return fmt.Sprintf("[POST /instances][%d] deployInstanceForbidden ", 403)
+}
+
+func (o *DeployInstanceForbidden) String() string {
 	return fmt.Sprintf("[POST /instances][%d] deployInstanceForbidden ", 403)
 }
 
@@ -144,7 +232,36 @@ DeployInstanceNotFound deploy instance not found
 type DeployInstanceNotFound struct {
 }
 
+// IsSuccess returns true when this deploy instance not found response has a 2xx status code
+func (o *DeployInstanceNotFound) IsSuccess() bool {
+	return false
+}
+
+// IsRedirect returns true when this deploy instance not found response has a 3xx status code
+func (o *DeployInstanceNotFound) IsRedirect() bool {
+	return false
+}
+
+// IsClientError returns true when this deploy instance not found response has a 4xx status code
+func (o *DeployInstanceNotFound) IsClientError() bool {
+	return true
+}
+
+// IsServerError returns true when this deploy instance not found response has a 5xx status code
+func (o *DeployInstanceNotFound) IsServerError() bool {
+	return false
+}
+
+// IsCode returns true when this deploy instance not found response a status code equal to that given
+func (o *DeployInstanceNotFound) IsCode(code int) bool {
+	return code == 404
+}
+
 func (o *DeployInstanceNotFound) Error() string {
+	return fmt.Sprintf("[POST /instances][%d] deployInstanceNotFound ", 404)
+}
+
+func (o *DeployInstanceNotFound) String() string {
 	return fmt.Sprintf("[POST /instances][%d] deployInstanceNotFound ", 404)
 }
 
@@ -165,7 +282,36 @@ DeployInstanceUnsupportedMediaType deploy instance unsupported media type
 type DeployInstanceUnsupportedMediaType struct {
 }
 
+// IsSuccess returns true when this deploy instance unsupported media type response has a 2xx status code
+func (o *DeployInstanceUnsupportedMediaType) IsSuccess() bool {
+	return false
+}
+
+// IsRedirect returns true when this deploy instance unsupported media type response has a 3xx status code
+func (o *DeployInstanceUnsupportedMediaType) IsRedirect() bool {
+	return false
+}
+
+// IsClientError returns true when this deploy instance unsupported media type response has a 4xx status code
+func (o *DeployInstanceUnsupportedMediaType) IsClientError() bool {
+	return true
+}
+
+// IsServerError returns true when this deploy instance unsupported media type response has a 5xx status code
+func (o *DeployInstanceUnsupportedMediaType) IsServerError() bool {
+	return false
+}
+
+// IsCode returns true when this deploy instance unsupported media type response a status code equal to that given
+func (o *DeployInstanceUnsupportedMediaType) IsCode(code int) bool {
+	return code == 415
+}
+
 func (o *DeployInstanceUnsupportedMediaType) Error() string {
+	return fmt.Sprintf("[POST /instances][%d] deployInstanceUnsupportedMediaType ", 415)
+}
+
+func (o *DeployInstanceUnsupportedMediaType) String() string {
 	return fmt.Sprintf("[POST /instances][%d] deployInstanceUnsupportedMediaType ", 415)
 }
 

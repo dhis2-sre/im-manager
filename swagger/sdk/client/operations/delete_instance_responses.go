@@ -67,7 +67,36 @@ DeleteInstanceAccepted delete instance accepted
 type DeleteInstanceAccepted struct {
 }
 
+// IsSuccess returns true when this delete instance accepted response has a 2xx status code
+func (o *DeleteInstanceAccepted) IsSuccess() bool {
+	return true
+}
+
+// IsRedirect returns true when this delete instance accepted response has a 3xx status code
+func (o *DeleteInstanceAccepted) IsRedirect() bool {
+	return false
+}
+
+// IsClientError returns true when this delete instance accepted response has a 4xx status code
+func (o *DeleteInstanceAccepted) IsClientError() bool {
+	return false
+}
+
+// IsServerError returns true when this delete instance accepted response has a 5xx status code
+func (o *DeleteInstanceAccepted) IsServerError() bool {
+	return false
+}
+
+// IsCode returns true when this delete instance accepted response a status code equal to that given
+func (o *DeleteInstanceAccepted) IsCode(code int) bool {
+	return code == 202
+}
+
 func (o *DeleteInstanceAccepted) Error() string {
+	return fmt.Sprintf("[DELETE /instances/{id}][%d] deleteInstanceAccepted ", 202)
+}
+
+func (o *DeleteInstanceAccepted) String() string {
 	return fmt.Sprintf("[DELETE /instances/{id}][%d] deleteInstanceAccepted ", 202)
 }
 
@@ -88,7 +117,36 @@ DeleteInstanceUnauthorized delete instance unauthorized
 type DeleteInstanceUnauthorized struct {
 }
 
+// IsSuccess returns true when this delete instance unauthorized response has a 2xx status code
+func (o *DeleteInstanceUnauthorized) IsSuccess() bool {
+	return false
+}
+
+// IsRedirect returns true when this delete instance unauthorized response has a 3xx status code
+func (o *DeleteInstanceUnauthorized) IsRedirect() bool {
+	return false
+}
+
+// IsClientError returns true when this delete instance unauthorized response has a 4xx status code
+func (o *DeleteInstanceUnauthorized) IsClientError() bool {
+	return true
+}
+
+// IsServerError returns true when this delete instance unauthorized response has a 5xx status code
+func (o *DeleteInstanceUnauthorized) IsServerError() bool {
+	return false
+}
+
+// IsCode returns true when this delete instance unauthorized response a status code equal to that given
+func (o *DeleteInstanceUnauthorized) IsCode(code int) bool {
+	return code == 401
+}
+
 func (o *DeleteInstanceUnauthorized) Error() string {
+	return fmt.Sprintf("[DELETE /instances/{id}][%d] deleteInstanceUnauthorized ", 401)
+}
+
+func (o *DeleteInstanceUnauthorized) String() string {
 	return fmt.Sprintf("[DELETE /instances/{id}][%d] deleteInstanceUnauthorized ", 401)
 }
 
@@ -109,7 +167,36 @@ DeleteInstanceForbidden delete instance forbidden
 type DeleteInstanceForbidden struct {
 }
 
+// IsSuccess returns true when this delete instance forbidden response has a 2xx status code
+func (o *DeleteInstanceForbidden) IsSuccess() bool {
+	return false
+}
+
+// IsRedirect returns true when this delete instance forbidden response has a 3xx status code
+func (o *DeleteInstanceForbidden) IsRedirect() bool {
+	return false
+}
+
+// IsClientError returns true when this delete instance forbidden response has a 4xx status code
+func (o *DeleteInstanceForbidden) IsClientError() bool {
+	return true
+}
+
+// IsServerError returns true when this delete instance forbidden response has a 5xx status code
+func (o *DeleteInstanceForbidden) IsServerError() bool {
+	return false
+}
+
+// IsCode returns true when this delete instance forbidden response a status code equal to that given
+func (o *DeleteInstanceForbidden) IsCode(code int) bool {
+	return code == 403
+}
+
 func (o *DeleteInstanceForbidden) Error() string {
+	return fmt.Sprintf("[DELETE /instances/{id}][%d] deleteInstanceForbidden ", 403)
+}
+
+func (o *DeleteInstanceForbidden) String() string {
 	return fmt.Sprintf("[DELETE /instances/{id}][%d] deleteInstanceForbidden ", 403)
 }
 
@@ -130,7 +217,36 @@ DeleteInstanceNotFound delete instance not found
 type DeleteInstanceNotFound struct {
 }
 
+// IsSuccess returns true when this delete instance not found response has a 2xx status code
+func (o *DeleteInstanceNotFound) IsSuccess() bool {
+	return false
+}
+
+// IsRedirect returns true when this delete instance not found response has a 3xx status code
+func (o *DeleteInstanceNotFound) IsRedirect() bool {
+	return false
+}
+
+// IsClientError returns true when this delete instance not found response has a 4xx status code
+func (o *DeleteInstanceNotFound) IsClientError() bool {
+	return true
+}
+
+// IsServerError returns true when this delete instance not found response has a 5xx status code
+func (o *DeleteInstanceNotFound) IsServerError() bool {
+	return false
+}
+
+// IsCode returns true when this delete instance not found response a status code equal to that given
+func (o *DeleteInstanceNotFound) IsCode(code int) bool {
+	return code == 404
+}
+
 func (o *DeleteInstanceNotFound) Error() string {
+	return fmt.Sprintf("[DELETE /instances/{id}][%d] deleteInstanceNotFound ", 404)
+}
+
+func (o *DeleteInstanceNotFound) String() string {
 	return fmt.Sprintf("[DELETE /instances/{id}][%d] deleteInstanceNotFound ", 404)
 }
 
@@ -151,7 +267,36 @@ DeleteInstanceUnsupportedMediaType delete instance unsupported media type
 type DeleteInstanceUnsupportedMediaType struct {
 }
 
+// IsSuccess returns true when this delete instance unsupported media type response has a 2xx status code
+func (o *DeleteInstanceUnsupportedMediaType) IsSuccess() bool {
+	return false
+}
+
+// IsRedirect returns true when this delete instance unsupported media type response has a 3xx status code
+func (o *DeleteInstanceUnsupportedMediaType) IsRedirect() bool {
+	return false
+}
+
+// IsClientError returns true when this delete instance unsupported media type response has a 4xx status code
+func (o *DeleteInstanceUnsupportedMediaType) IsClientError() bool {
+	return true
+}
+
+// IsServerError returns true when this delete instance unsupported media type response has a 5xx status code
+func (o *DeleteInstanceUnsupportedMediaType) IsServerError() bool {
+	return false
+}
+
+// IsCode returns true when this delete instance unsupported media type response a status code equal to that given
+func (o *DeleteInstanceUnsupportedMediaType) IsCode(code int) bool {
+	return code == 415
+}
+
 func (o *DeleteInstanceUnsupportedMediaType) Error() string {
+	return fmt.Sprintf("[DELETE /instances/{id}][%d] deleteInstanceUnsupportedMediaType ", 415)
+}
+
+func (o *DeleteInstanceUnsupportedMediaType) String() string {
 	return fmt.Sprintf("[DELETE /instances/{id}][%d] deleteInstanceUnsupportedMediaType ", 415)
 }
 

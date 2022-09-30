@@ -71,9 +71,39 @@ type FindByIDOK struct {
 	Payload *models.Instance
 }
 
+// IsSuccess returns true when this find by Id o k response has a 2xx status code
+func (o *FindByIDOK) IsSuccess() bool {
+	return true
+}
+
+// IsRedirect returns true when this find by Id o k response has a 3xx status code
+func (o *FindByIDOK) IsRedirect() bool {
+	return false
+}
+
+// IsClientError returns true when this find by Id o k response has a 4xx status code
+func (o *FindByIDOK) IsClientError() bool {
+	return false
+}
+
+// IsServerError returns true when this find by Id o k response has a 5xx status code
+func (o *FindByIDOK) IsServerError() bool {
+	return false
+}
+
+// IsCode returns true when this find by Id o k response a status code equal to that given
+func (o *FindByIDOK) IsCode(code int) bool {
+	return code == 200
+}
+
 func (o *FindByIDOK) Error() string {
 	return fmt.Sprintf("[GET /instances/{id}][%d] findByIdOK  %+v", 200, o.Payload)
 }
+
+func (o *FindByIDOK) String() string {
+	return fmt.Sprintf("[GET /instances/{id}][%d] findByIdOK  %+v", 200, o.Payload)
+}
+
 func (o *FindByIDOK) GetPayload() *models.Instance {
 	return o.Payload
 }
@@ -102,7 +132,36 @@ FindByIDUnauthorized find by Id unauthorized
 type FindByIDUnauthorized struct {
 }
 
+// IsSuccess returns true when this find by Id unauthorized response has a 2xx status code
+func (o *FindByIDUnauthorized) IsSuccess() bool {
+	return false
+}
+
+// IsRedirect returns true when this find by Id unauthorized response has a 3xx status code
+func (o *FindByIDUnauthorized) IsRedirect() bool {
+	return false
+}
+
+// IsClientError returns true when this find by Id unauthorized response has a 4xx status code
+func (o *FindByIDUnauthorized) IsClientError() bool {
+	return true
+}
+
+// IsServerError returns true when this find by Id unauthorized response has a 5xx status code
+func (o *FindByIDUnauthorized) IsServerError() bool {
+	return false
+}
+
+// IsCode returns true when this find by Id unauthorized response a status code equal to that given
+func (o *FindByIDUnauthorized) IsCode(code int) bool {
+	return code == 401
+}
+
 func (o *FindByIDUnauthorized) Error() string {
+	return fmt.Sprintf("[GET /instances/{id}][%d] findByIdUnauthorized ", 401)
+}
+
+func (o *FindByIDUnauthorized) String() string {
 	return fmt.Sprintf("[GET /instances/{id}][%d] findByIdUnauthorized ", 401)
 }
 
@@ -123,7 +182,36 @@ FindByIDForbidden find by Id forbidden
 type FindByIDForbidden struct {
 }
 
+// IsSuccess returns true when this find by Id forbidden response has a 2xx status code
+func (o *FindByIDForbidden) IsSuccess() bool {
+	return false
+}
+
+// IsRedirect returns true when this find by Id forbidden response has a 3xx status code
+func (o *FindByIDForbidden) IsRedirect() bool {
+	return false
+}
+
+// IsClientError returns true when this find by Id forbidden response has a 4xx status code
+func (o *FindByIDForbidden) IsClientError() bool {
+	return true
+}
+
+// IsServerError returns true when this find by Id forbidden response has a 5xx status code
+func (o *FindByIDForbidden) IsServerError() bool {
+	return false
+}
+
+// IsCode returns true when this find by Id forbidden response a status code equal to that given
+func (o *FindByIDForbidden) IsCode(code int) bool {
+	return code == 403
+}
+
 func (o *FindByIDForbidden) Error() string {
+	return fmt.Sprintf("[GET /instances/{id}][%d] findByIdForbidden ", 403)
+}
+
+func (o *FindByIDForbidden) String() string {
 	return fmt.Sprintf("[GET /instances/{id}][%d] findByIdForbidden ", 403)
 }
 
@@ -144,7 +232,36 @@ FindByIDNotFound find by Id not found
 type FindByIDNotFound struct {
 }
 
+// IsSuccess returns true when this find by Id not found response has a 2xx status code
+func (o *FindByIDNotFound) IsSuccess() bool {
+	return false
+}
+
+// IsRedirect returns true when this find by Id not found response has a 3xx status code
+func (o *FindByIDNotFound) IsRedirect() bool {
+	return false
+}
+
+// IsClientError returns true when this find by Id not found response has a 4xx status code
+func (o *FindByIDNotFound) IsClientError() bool {
+	return true
+}
+
+// IsServerError returns true when this find by Id not found response has a 5xx status code
+func (o *FindByIDNotFound) IsServerError() bool {
+	return false
+}
+
+// IsCode returns true when this find by Id not found response a status code equal to that given
+func (o *FindByIDNotFound) IsCode(code int) bool {
+	return code == 404
+}
+
 func (o *FindByIDNotFound) Error() string {
+	return fmt.Sprintf("[GET /instances/{id}][%d] findByIdNotFound ", 404)
+}
+
+func (o *FindByIDNotFound) String() string {
 	return fmt.Sprintf("[GET /instances/{id}][%d] findByIdNotFound ", 404)
 }
 
@@ -165,7 +282,36 @@ FindByIDUnsupportedMediaType find by Id unsupported media type
 type FindByIDUnsupportedMediaType struct {
 }
 
+// IsSuccess returns true when this find by Id unsupported media type response has a 2xx status code
+func (o *FindByIDUnsupportedMediaType) IsSuccess() bool {
+	return false
+}
+
+// IsRedirect returns true when this find by Id unsupported media type response has a 3xx status code
+func (o *FindByIDUnsupportedMediaType) IsRedirect() bool {
+	return false
+}
+
+// IsClientError returns true when this find by Id unsupported media type response has a 4xx status code
+func (o *FindByIDUnsupportedMediaType) IsClientError() bool {
+	return true
+}
+
+// IsServerError returns true when this find by Id unsupported media type response has a 5xx status code
+func (o *FindByIDUnsupportedMediaType) IsServerError() bool {
+	return false
+}
+
+// IsCode returns true when this find by Id unsupported media type response a status code equal to that given
+func (o *FindByIDUnsupportedMediaType) IsCode(code int) bool {
+	return code == 415
+}
+
 func (o *FindByIDUnsupportedMediaType) Error() string {
+	return fmt.Sprintf("[GET /instances/{id}][%d] findByIdUnsupportedMediaType ", 415)
+}
+
+func (o *FindByIDUnsupportedMediaType) String() string {
 	return fmt.Sprintf("[GET /instances/{id}][%d] findByIdUnsupportedMediaType ", 415)
 }
 

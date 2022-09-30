@@ -67,7 +67,36 @@ InstanceLogsOK instance logs o k
 type InstanceLogsOK struct {
 }
 
+// IsSuccess returns true when this instance logs o k response has a 2xx status code
+func (o *InstanceLogsOK) IsSuccess() bool {
+	return true
+}
+
+// IsRedirect returns true when this instance logs o k response has a 3xx status code
+func (o *InstanceLogsOK) IsRedirect() bool {
+	return false
+}
+
+// IsClientError returns true when this instance logs o k response has a 4xx status code
+func (o *InstanceLogsOK) IsClientError() bool {
+	return false
+}
+
+// IsServerError returns true when this instance logs o k response has a 5xx status code
+func (o *InstanceLogsOK) IsServerError() bool {
+	return false
+}
+
+// IsCode returns true when this instance logs o k response a status code equal to that given
+func (o *InstanceLogsOK) IsCode(code int) bool {
+	return code == 200
+}
+
 func (o *InstanceLogsOK) Error() string {
+	return fmt.Sprintf("[GET /instances/{id}/logs][%d] instanceLogsOK ", 200)
+}
+
+func (o *InstanceLogsOK) String() string {
 	return fmt.Sprintf("[GET /instances/{id}/logs][%d] instanceLogsOK ", 200)
 }
 
@@ -88,7 +117,36 @@ InstanceLogsUnauthorized instance logs unauthorized
 type InstanceLogsUnauthorized struct {
 }
 
+// IsSuccess returns true when this instance logs unauthorized response has a 2xx status code
+func (o *InstanceLogsUnauthorized) IsSuccess() bool {
+	return false
+}
+
+// IsRedirect returns true when this instance logs unauthorized response has a 3xx status code
+func (o *InstanceLogsUnauthorized) IsRedirect() bool {
+	return false
+}
+
+// IsClientError returns true when this instance logs unauthorized response has a 4xx status code
+func (o *InstanceLogsUnauthorized) IsClientError() bool {
+	return true
+}
+
+// IsServerError returns true when this instance logs unauthorized response has a 5xx status code
+func (o *InstanceLogsUnauthorized) IsServerError() bool {
+	return false
+}
+
+// IsCode returns true when this instance logs unauthorized response a status code equal to that given
+func (o *InstanceLogsUnauthorized) IsCode(code int) bool {
+	return code == 401
+}
+
 func (o *InstanceLogsUnauthorized) Error() string {
+	return fmt.Sprintf("[GET /instances/{id}/logs][%d] instanceLogsUnauthorized ", 401)
+}
+
+func (o *InstanceLogsUnauthorized) String() string {
 	return fmt.Sprintf("[GET /instances/{id}/logs][%d] instanceLogsUnauthorized ", 401)
 }
 
@@ -109,7 +167,36 @@ InstanceLogsForbidden instance logs forbidden
 type InstanceLogsForbidden struct {
 }
 
+// IsSuccess returns true when this instance logs forbidden response has a 2xx status code
+func (o *InstanceLogsForbidden) IsSuccess() bool {
+	return false
+}
+
+// IsRedirect returns true when this instance logs forbidden response has a 3xx status code
+func (o *InstanceLogsForbidden) IsRedirect() bool {
+	return false
+}
+
+// IsClientError returns true when this instance logs forbidden response has a 4xx status code
+func (o *InstanceLogsForbidden) IsClientError() bool {
+	return true
+}
+
+// IsServerError returns true when this instance logs forbidden response has a 5xx status code
+func (o *InstanceLogsForbidden) IsServerError() bool {
+	return false
+}
+
+// IsCode returns true when this instance logs forbidden response a status code equal to that given
+func (o *InstanceLogsForbidden) IsCode(code int) bool {
+	return code == 403
+}
+
 func (o *InstanceLogsForbidden) Error() string {
+	return fmt.Sprintf("[GET /instances/{id}/logs][%d] instanceLogsForbidden ", 403)
+}
+
+func (o *InstanceLogsForbidden) String() string {
 	return fmt.Sprintf("[GET /instances/{id}/logs][%d] instanceLogsForbidden ", 403)
 }
 
@@ -130,7 +217,36 @@ InstanceLogsNotFound instance logs not found
 type InstanceLogsNotFound struct {
 }
 
+// IsSuccess returns true when this instance logs not found response has a 2xx status code
+func (o *InstanceLogsNotFound) IsSuccess() bool {
+	return false
+}
+
+// IsRedirect returns true when this instance logs not found response has a 3xx status code
+func (o *InstanceLogsNotFound) IsRedirect() bool {
+	return false
+}
+
+// IsClientError returns true when this instance logs not found response has a 4xx status code
+func (o *InstanceLogsNotFound) IsClientError() bool {
+	return true
+}
+
+// IsServerError returns true when this instance logs not found response has a 5xx status code
+func (o *InstanceLogsNotFound) IsServerError() bool {
+	return false
+}
+
+// IsCode returns true when this instance logs not found response a status code equal to that given
+func (o *InstanceLogsNotFound) IsCode(code int) bool {
+	return code == 404
+}
+
 func (o *InstanceLogsNotFound) Error() string {
+	return fmt.Sprintf("[GET /instances/{id}/logs][%d] instanceLogsNotFound ", 404)
+}
+
+func (o *InstanceLogsNotFound) String() string {
 	return fmt.Sprintf("[GET /instances/{id}/logs][%d] instanceLogsNotFound ", 404)
 }
 
@@ -151,7 +267,36 @@ InstanceLogsUnsupportedMediaType instance logs unsupported media type
 type InstanceLogsUnsupportedMediaType struct {
 }
 
+// IsSuccess returns true when this instance logs unsupported media type response has a 2xx status code
+func (o *InstanceLogsUnsupportedMediaType) IsSuccess() bool {
+	return false
+}
+
+// IsRedirect returns true when this instance logs unsupported media type response has a 3xx status code
+func (o *InstanceLogsUnsupportedMediaType) IsRedirect() bool {
+	return false
+}
+
+// IsClientError returns true when this instance logs unsupported media type response has a 4xx status code
+func (o *InstanceLogsUnsupportedMediaType) IsClientError() bool {
+	return true
+}
+
+// IsServerError returns true when this instance logs unsupported media type response has a 5xx status code
+func (o *InstanceLogsUnsupportedMediaType) IsServerError() bool {
+	return false
+}
+
+// IsCode returns true when this instance logs unsupported media type response a status code equal to that given
+func (o *InstanceLogsUnsupportedMediaType) IsCode(code int) bool {
+	return code == 415
+}
+
 func (o *InstanceLogsUnsupportedMediaType) Error() string {
+	return fmt.Sprintf("[GET /instances/{id}/logs][%d] instanceLogsUnsupportedMediaType ", 415)
+}
+
+func (o *InstanceLogsUnsupportedMediaType) String() string {
 	return fmt.Sprintf("[GET /instances/{id}/logs][%d] instanceLogsUnsupportedMediaType ", 415)
 }
 

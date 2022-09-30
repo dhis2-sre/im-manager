@@ -67,7 +67,36 @@ RestartInstanceAccepted restart instance accepted
 type RestartInstanceAccepted struct {
 }
 
+// IsSuccess returns true when this restart instance accepted response has a 2xx status code
+func (o *RestartInstanceAccepted) IsSuccess() bool {
+	return true
+}
+
+// IsRedirect returns true when this restart instance accepted response has a 3xx status code
+func (o *RestartInstanceAccepted) IsRedirect() bool {
+	return false
+}
+
+// IsClientError returns true when this restart instance accepted response has a 4xx status code
+func (o *RestartInstanceAccepted) IsClientError() bool {
+	return false
+}
+
+// IsServerError returns true when this restart instance accepted response has a 5xx status code
+func (o *RestartInstanceAccepted) IsServerError() bool {
+	return false
+}
+
+// IsCode returns true when this restart instance accepted response a status code equal to that given
+func (o *RestartInstanceAccepted) IsCode(code int) bool {
+	return code == 202
+}
+
 func (o *RestartInstanceAccepted) Error() string {
+	return fmt.Sprintf("[PUT /instances/{id}/restart][%d] restartInstanceAccepted ", 202)
+}
+
+func (o *RestartInstanceAccepted) String() string {
 	return fmt.Sprintf("[PUT /instances/{id}/restart][%d] restartInstanceAccepted ", 202)
 }
 
@@ -88,7 +117,36 @@ RestartInstanceUnauthorized restart instance unauthorized
 type RestartInstanceUnauthorized struct {
 }
 
+// IsSuccess returns true when this restart instance unauthorized response has a 2xx status code
+func (o *RestartInstanceUnauthorized) IsSuccess() bool {
+	return false
+}
+
+// IsRedirect returns true when this restart instance unauthorized response has a 3xx status code
+func (o *RestartInstanceUnauthorized) IsRedirect() bool {
+	return false
+}
+
+// IsClientError returns true when this restart instance unauthorized response has a 4xx status code
+func (o *RestartInstanceUnauthorized) IsClientError() bool {
+	return true
+}
+
+// IsServerError returns true when this restart instance unauthorized response has a 5xx status code
+func (o *RestartInstanceUnauthorized) IsServerError() bool {
+	return false
+}
+
+// IsCode returns true when this restart instance unauthorized response a status code equal to that given
+func (o *RestartInstanceUnauthorized) IsCode(code int) bool {
+	return code == 401
+}
+
 func (o *RestartInstanceUnauthorized) Error() string {
+	return fmt.Sprintf("[PUT /instances/{id}/restart][%d] restartInstanceUnauthorized ", 401)
+}
+
+func (o *RestartInstanceUnauthorized) String() string {
 	return fmt.Sprintf("[PUT /instances/{id}/restart][%d] restartInstanceUnauthorized ", 401)
 }
 
@@ -109,7 +167,36 @@ RestartInstanceForbidden restart instance forbidden
 type RestartInstanceForbidden struct {
 }
 
+// IsSuccess returns true when this restart instance forbidden response has a 2xx status code
+func (o *RestartInstanceForbidden) IsSuccess() bool {
+	return false
+}
+
+// IsRedirect returns true when this restart instance forbidden response has a 3xx status code
+func (o *RestartInstanceForbidden) IsRedirect() bool {
+	return false
+}
+
+// IsClientError returns true when this restart instance forbidden response has a 4xx status code
+func (o *RestartInstanceForbidden) IsClientError() bool {
+	return true
+}
+
+// IsServerError returns true when this restart instance forbidden response has a 5xx status code
+func (o *RestartInstanceForbidden) IsServerError() bool {
+	return false
+}
+
+// IsCode returns true when this restart instance forbidden response a status code equal to that given
+func (o *RestartInstanceForbidden) IsCode(code int) bool {
+	return code == 403
+}
+
 func (o *RestartInstanceForbidden) Error() string {
+	return fmt.Sprintf("[PUT /instances/{id}/restart][%d] restartInstanceForbidden ", 403)
+}
+
+func (o *RestartInstanceForbidden) String() string {
 	return fmt.Sprintf("[PUT /instances/{id}/restart][%d] restartInstanceForbidden ", 403)
 }
 
@@ -130,7 +217,36 @@ RestartInstanceNotFound restart instance not found
 type RestartInstanceNotFound struct {
 }
 
+// IsSuccess returns true when this restart instance not found response has a 2xx status code
+func (o *RestartInstanceNotFound) IsSuccess() bool {
+	return false
+}
+
+// IsRedirect returns true when this restart instance not found response has a 3xx status code
+func (o *RestartInstanceNotFound) IsRedirect() bool {
+	return false
+}
+
+// IsClientError returns true when this restart instance not found response has a 4xx status code
+func (o *RestartInstanceNotFound) IsClientError() bool {
+	return true
+}
+
+// IsServerError returns true when this restart instance not found response has a 5xx status code
+func (o *RestartInstanceNotFound) IsServerError() bool {
+	return false
+}
+
+// IsCode returns true when this restart instance not found response a status code equal to that given
+func (o *RestartInstanceNotFound) IsCode(code int) bool {
+	return code == 404
+}
+
 func (o *RestartInstanceNotFound) Error() string {
+	return fmt.Sprintf("[PUT /instances/{id}/restart][%d] restartInstanceNotFound ", 404)
+}
+
+func (o *RestartInstanceNotFound) String() string {
 	return fmt.Sprintf("[PUT /instances/{id}/restart][%d] restartInstanceNotFound ", 404)
 }
 
@@ -151,7 +267,36 @@ RestartInstanceUnsupportedMediaType restart instance unsupported media type
 type RestartInstanceUnsupportedMediaType struct {
 }
 
+// IsSuccess returns true when this restart instance unsupported media type response has a 2xx status code
+func (o *RestartInstanceUnsupportedMediaType) IsSuccess() bool {
+	return false
+}
+
+// IsRedirect returns true when this restart instance unsupported media type response has a 3xx status code
+func (o *RestartInstanceUnsupportedMediaType) IsRedirect() bool {
+	return false
+}
+
+// IsClientError returns true when this restart instance unsupported media type response has a 4xx status code
+func (o *RestartInstanceUnsupportedMediaType) IsClientError() bool {
+	return true
+}
+
+// IsServerError returns true when this restart instance unsupported media type response has a 5xx status code
+func (o *RestartInstanceUnsupportedMediaType) IsServerError() bool {
+	return false
+}
+
+// IsCode returns true when this restart instance unsupported media type response a status code equal to that given
+func (o *RestartInstanceUnsupportedMediaType) IsCode(code int) bool {
+	return code == 415
+}
+
 func (o *RestartInstanceUnsupportedMediaType) Error() string {
+	return fmt.Sprintf("[PUT /instances/{id}/restart][%d] restartInstanceUnsupportedMediaType ", 415)
+}
+
+func (o *RestartInstanceUnsupportedMediaType) String() string {
 	return fmt.Sprintf("[PUT /instances/{id}/restart][%d] restartInstanceUnsupportedMediaType ", 415)
 }
 

@@ -47,9 +47,39 @@ type HealthOK struct {
 	Payload *models.Response
 }
 
+// IsSuccess returns true when this health o k response has a 2xx status code
+func (o *HealthOK) IsSuccess() bool {
+	return true
+}
+
+// IsRedirect returns true when this health o k response has a 3xx status code
+func (o *HealthOK) IsRedirect() bool {
+	return false
+}
+
+// IsClientError returns true when this health o k response has a 4xx status code
+func (o *HealthOK) IsClientError() bool {
+	return false
+}
+
+// IsServerError returns true when this health o k response has a 5xx status code
+func (o *HealthOK) IsServerError() bool {
+	return false
+}
+
+// IsCode returns true when this health o k response a status code equal to that given
+func (o *HealthOK) IsCode(code int) bool {
+	return code == 200
+}
+
 func (o *HealthOK) Error() string {
 	return fmt.Sprintf("[GET /health][%d] healthOK  %+v", 200, o.Payload)
 }
+
+func (o *HealthOK) String() string {
+	return fmt.Sprintf("[GET /health][%d] healthOK  %+v", 200, o.Payload)
+}
+
 func (o *HealthOK) GetPayload() *models.Response {
 	return o.Payload
 }

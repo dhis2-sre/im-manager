@@ -1,536 +1,535 @@
 consumes:
-- application/json
+    - application/json
 definitions:
-  DeletedAt:
-    $ref: '#/definitions/NullTime'
-  DeployInstanceRequest:
-    properties:
-      groupName:
-        type: string
-        x-go-name: Group
-      name:
-        type: string
-        x-go-name: Name
-      optionalParameters:
-        items:
-          $ref: '#/definitions/InstanceOptionalParameter'
-        type: array
-        x-go-name: OptionalParameters
-      requiredParameters:
-        items:
-          $ref: '#/definitions/InstanceRequiredParameter'
-        type: array
-        x-go-name: RequiredParameters
-      sourceInstance:
-        format: uint64
-        type: integer
-        x-go-name: SourceInstance
-      stackName:
-        type: string
-        x-go-name: Stack
-    type: object
-    x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
-  GroupWithInstances:
-    properties:
-      Hostname:
-        type: string
-      Instances:
-        items:
-          $ref: '#/definitions/Instance'
-        type: array
-      Name:
-        type: string
-    type: object
-    x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
-  Instance:
-    properties:
-      CreatedAt:
-        format: date-time
-        type: string
-      DeletedAt:
-        $ref: '#/definitions/DeletedAt'
-      DeployLog:
-        type: string
-      GroupName:
-        type: string
-      ID:
-        format: uint64
-        type: integer
-      Name:
-        type: string
-      StackName:
-        type: string
-      UpdatedAt:
-        format: date-time
-        type: string
-      UserID:
-        format: uint64
-        type: integer
-      optionalParameters:
-        items:
-          $ref: '#/definitions/InstanceOptionalParameter'
-        type: array
-        x-go-name: OptionalParameters
-      requiredParameters:
-        items:
-          $ref: '#/definitions/InstanceRequiredParameter'
-        type: array
-        x-go-name: RequiredParameters
-    type: object
-    x-go-package: github.com/dhis2-sre/im-manager/pkg/model
-  InstanceOptionalParameter:
-    properties:
-      name:
-        description: 'TODO: Rename StackOptionalParameterID to Name'
-        type: string
-        x-go-name: StackOptionalParameterID
-      value:
-        type: string
-        x-go-name: Value
-    type: object
-    x-go-package: github.com/dhis2-sre/im-manager/pkg/model
-  InstanceRequiredParameter:
-    properties:
-      name:
-        description: 'TODO: Rename StackRequiredParameterID to Name'
-        type: string
-        x-go-name: StackRequiredParameterID
-      value:
-        type: string
-        x-go-name: Value
-    type: object
-    x-go-package: github.com/dhis2-sre/im-manager/pkg/model
-  Model:
-    description: |-
-      Model a basic GoLang struct which includes the following fields: ID, CreatedAt, UpdatedAt, DeletedAt
-      It may be embedded into your model or you may build your own model without it
-      type User struct {
-      gorm.Model
-      }
-    properties:
-      CreatedAt:
-        format: date-time
-        type: string
-      DeletedAt:
-        $ref: '#/definitions/DeletedAt'
-      ID:
-        format: uint64
-        type: integer
-      UpdatedAt:
-        format: date-time
-        type: string
-    type: object
-    x-go-package: gorm.io/gorm
-  NullTime:
-    description: |-
-      NullTime implements the Scanner interface so
-      it can be used as a scan destination, similar to NullString.
-    properties:
-      Time:
-        format: date-time
-        type: string
-      Valid:
-        type: boolean
-    title: NullTime represents a time.Time that may be null.
-    type: object
-    x-go-package: database/sql
-  Response:
-    properties:
-      status:
-        type: string
-        x-go-name: Status
-    type: object
-    x-go-package: github.com/dhis2-sre/im-manager/pkg/health
-  Stack:
-    properties:
-      CreatedAt:
-        format: date-time
-        type: string
-      DeletedAt:
-        $ref: '#/definitions/DeletedAt'
-      HostnamePattern:
-        type: string
-      HostnameVariable:
-        type: string
-      UpdatedAt:
-        format: date-time
-        type: string
-      instances:
-        items:
-          $ref: '#/definitions/Instance'
-        type: array
-        x-go-name: Instances
-      name:
-        type: string
-        x-go-name: Name
-      optionalParameters:
-        items:
-          $ref: '#/definitions/StackOptionalParameter'
-        type: array
-        x-go-name: OptionalParameters
-      requiredParameters:
-        items:
-          $ref: '#/definitions/StackRequiredParameter'
-        type: array
-        x-go-name: RequiredParameters
-    type: object
-    x-go-package: github.com/dhis2-sre/im-manager/pkg/model
-  StackOptionalParameter:
-    properties:
-      Consumed:
-        type: boolean
-      DefaultValue:
-        type: string
-      Name:
-        type: string
-      StackName:
-        type: string
-    type: object
-    x-go-package: github.com/dhis2-sre/im-manager/pkg/model
-  StackRequiredParameter:
-    properties:
-      Consumed:
-        type: boolean
-      Name:
-        type: string
-      StackName:
-        type: string
-    type: object
-    x-go-package: github.com/dhis2-sre/im-manager/pkg/model
-  UpdateInstanceRequest:
-    properties:
-      optionalParameters:
-        items:
-          $ref: '#/definitions/InstanceOptionalParameter'
-        type: array
-        x-go-name: OptionalParameters
-      requiredParameters:
-        items:
-          $ref: '#/definitions/InstanceRequiredParameter'
-        type: array
-        x-go-name: RequiredParameters
-    type: object
-    x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
+    DeletedAt:
+        $ref: '#/definitions/NullTime'
+    DeployInstanceRequest:
+        properties:
+            groupName:
+                type: string
+                x-go-name: Group
+            name:
+                type: string
+                x-go-name: Name
+            optionalParameters:
+                items:
+                    $ref: '#/definitions/InstanceOptionalParameter'
+                type: array
+                x-go-name: OptionalParameters
+            requiredParameters:
+                items:
+                    $ref: '#/definitions/InstanceRequiredParameter'
+                type: array
+                x-go-name: RequiredParameters
+            sourceInstance:
+                format: uint64
+                type: integer
+                x-go-name: SourceInstance
+            stackName:
+                type: string
+                x-go-name: Stack
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
+    GroupWithInstances:
+        properties:
+            Hostname:
+                type: string
+            Instances:
+                items:
+                    $ref: '#/definitions/Instance'
+                type: array
+            Name:
+                type: string
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
+    Instance:
+        properties:
+            CreatedAt:
+                format: date-time
+                type: string
+            DeletedAt:
+                $ref: '#/definitions/DeletedAt'
+            DeployLog:
+                type: string
+            GroupName:
+                type: string
+            ID:
+                format: uint64
+                type: integer
+            Name:
+                type: string
+            StackName:
+                type: string
+            UpdatedAt:
+                format: date-time
+                type: string
+            UserID:
+                format: uint64
+                type: integer
+            optionalParameters:
+                items:
+                    $ref: '#/definitions/InstanceOptionalParameter'
+                type: array
+                x-go-name: OptionalParameters
+            requiredParameters:
+                items:
+                    $ref: '#/definitions/InstanceRequiredParameter'
+                type: array
+                x-go-name: RequiredParameters
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/model
+    InstanceOptionalParameter:
+        properties:
+            name:
+                description: 'TODO: Rename StackOptionalParameterID to Name'
+                type: string
+                x-go-name: StackOptionalParameterID
+            value:
+                type: string
+                x-go-name: Value
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/model
+    InstanceRequiredParameter:
+        properties:
+            name:
+                description: 'TODO: Rename StackRequiredParameterID to Name'
+                type: string
+                x-go-name: StackRequiredParameterID
+            value:
+                type: string
+                x-go-name: Value
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/model
+    Model:
+        description: |-
+            Model a basic GoLang struct which includes the following fields: ID, CreatedAt, UpdatedAt, DeletedAt
+            It may be embedded into your model or you may build your own model without it
+            type User struct {
+            gorm.Model
+            }
+        properties:
+            CreatedAt:
+                format: date-time
+                type: string
+            DeletedAt:
+                $ref: '#/definitions/DeletedAt'
+            ID:
+                format: uint64
+                type: integer
+            UpdatedAt:
+                format: date-time
+                type: string
+        type: object
+        x-go-package: gorm.io/gorm
+    NullTime:
+        description: |-
+            NullTime implements the Scanner interface so
+            it can be used as a scan destination, similar to NullString.
+        properties:
+            Time:
+                format: date-time
+                type: string
+            Valid:
+                type: boolean
+        title: NullTime represents a time.Time that may be null.
+        type: object
+        x-go-package: database/sql
+    Response:
+        properties:
+            status:
+                type: string
+                x-go-name: Status
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/health
+    Stack:
+        properties:
+            CreatedAt:
+                format: date-time
+                type: string
+            DeletedAt:
+                $ref: '#/definitions/DeletedAt'
+            HostnamePattern:
+                type: string
+            HostnameVariable:
+                type: string
+            UpdatedAt:
+                format: date-time
+                type: string
+            instances:
+                items:
+                    $ref: '#/definitions/Instance'
+                type: array
+                x-go-name: Instances
+            name:
+                type: string
+                x-go-name: Name
+            optionalParameters:
+                items:
+                    $ref: '#/definitions/StackOptionalParameter'
+                type: array
+                x-go-name: OptionalParameters
+            requiredParameters:
+                items:
+                    $ref: '#/definitions/StackRequiredParameter'
+                type: array
+                x-go-name: RequiredParameters
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/model
+    StackOptionalParameter:
+        properties:
+            Consumed:
+                type: boolean
+            DefaultValue:
+                type: string
+            Name:
+                type: string
+            StackName:
+                type: string
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/model
+    StackRequiredParameter:
+        properties:
+            Consumed:
+                type: boolean
+            Name:
+                type: string
+            StackName:
+                type: string
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/model
+    UpdateInstanceRequest:
+        properties:
+            optionalParameters:
+                items:
+                    $ref: '#/definitions/InstanceOptionalParameter'
+                type: array
+                x-go-name: OptionalParameters
+            requiredParameters:
+                items:
+                    $ref: '#/definitions/InstanceRequiredParameter'
+                type: array
+                x-go-name: RequiredParameters
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
 info:
-  contact:
-    email: info@dhis2.org
-    url: https://github.com/dhis2-sre/im-manager
-  description: Manager Service as part of the Instance Manager environment
-  license:
-    name: TODO
-  termsOfService: there are no TOS at this moment, use at your own risk we take no
-    responsibility
-  title: Instance Manager Manager Service.
-  version: 0.1.0
+    contact:
+        email: info@dhis2.org
+        url: https://github.com/dhis2-sre/im-manager
+    description: Manager Service as part of the Instance Manager environment
+    license:
+        name: TODO
+    termsOfService: there are no TOS at this moment, use at your own risk we take no responsibility
+    title: Instance Manager Manager Service.
+    version: 0.1.0
 paths:
-  /health:
-    get:
-      description: Service health status
-      operationId: health
-      responses:
-        "200":
-          $ref: '#/responses/Response'
-  /instances:
-    get:
-      description: List instances
-      operationId: listInstances
-      responses:
-        "200":
-          description: GroupWithInstances
-          schema:
-            items:
-              $ref: '#/definitions/GroupWithInstances'
-            type: array
-        "401":
-          $ref: '#/responses/Error'
-        "403":
-          $ref: '#/responses/Error'
-        "415":
-          $ref: '#/responses/Error'
-      security:
-      - oauth2: []
-    post:
-      description: Deploy instance
-      operationId: deployInstance
-      parameters:
-      - description: Deploy instance request body parameter
-        in: body
-        name: Payload
-        required: true
-        schema:
-          $ref: '#/definitions/DeployInstanceRequest'
-      responses:
-        "201":
-          description: Instance
-          schema:
-            $ref: '#/definitions/Instance'
-        "401":
-          $ref: '#/responses/Error'
-        "403":
-          $ref: '#/responses/Error'
-        "404":
-          $ref: '#/responses/Error'
-        "415":
-          $ref: '#/responses/Error'
-      security:
-      - oauth2: []
-  /instances-name-to-id/{groupName}/{instanceName}:
-    get:
-      description: Find instance id by name and group name
-      operationId: instanceNameToId
-      parameters:
-      - in: path
-        name: groupName
-        required: true
-        type: string
-        x-go-name: GroupName
-      - in: path
-        name: instanceName
-        required: true
-        type: string
-        x-go-name: InstanceName
-      responses:
-        "200":
-          description: Instance
-          schema:
-            $ref: '#/definitions/Instance'
-        "401":
-          $ref: '#/responses/Error'
-        "403":
-          $ref: '#/responses/Error'
-        "404":
-          $ref: '#/responses/Error'
-        "415":
-          $ref: '#/responses/Error'
-      security:
-      - oauth2: []
-  /instances/{id}:
-    delete:
-      description: Delete an instance by id
-      operationId: deleteInstance
-      parameters:
-      - format: uint64
-        in: path
-        name: id
-        required: true
-        type: integer
-        x-go-name: ID
-      responses:
-        "202":
-          description: ""
-        "401":
-          $ref: '#/responses/Error'
-        "403":
-          $ref: '#/responses/Error'
-        "404":
-          $ref: '#/responses/Error'
-        "415":
-          $ref: '#/responses/Error'
-      security:
-      - oauth2: []
-    get:
-      description: Find instance by id
-      operationId: findById
-      parameters:
-      - format: uint64
-        in: path
-        name: id
-        required: true
-        type: integer
-        x-go-name: ID
-      responses:
-        "200":
-          description: Instance
-          schema:
-            $ref: '#/definitions/Instance'
-        "401":
-          $ref: '#/responses/Error'
-        "403":
-          $ref: '#/responses/Error'
-        "404":
-          $ref: '#/responses/Error'
-        "415":
-          $ref: '#/responses/Error'
-      security:
-      - oauth2: []
-    put:
-      description: Update an instance
-      operationId: updateInstance
-      parameters:
-      - format: uint64
-        in: path
-        name: id
-        required: true
-        type: integer
-        x-go-name: ID
-      - description: Update instance request body parameter
-        in: body
-        name: Payload
-        required: true
-        schema:
-          $ref: '#/definitions/UpdateInstanceRequest'
-      responses:
-        "204":
-          description: Instance
-          schema:
-            $ref: '#/definitions/Instance'
-        "401":
-          $ref: '#/responses/Error'
-        "403":
-          $ref: '#/responses/Error'
-        "404":
-          $ref: '#/responses/Error'
-        "415":
-          $ref: '#/responses/Error'
-      security:
-      - oauth2: []
-  /instances/{id}/logs:
-    get:
-      description: Stream instance logs in real time
-      operationId: instanceLogs
-      parameters:
-      - format: uint64
-        in: path
-        name: id
-        required: true
-        type: integer
-        x-go-name: ID
-      - description: selector
-        in: query
-        name: selector
-        type: string
-        x-go-name: Selector
-      responses:
-        "200":
-          $ref: '#/responses/InstanceLogsResponse'
-        "401":
-          $ref: '#/responses/Error'
-        "403":
-          $ref: '#/responses/Error'
-        "404":
-          $ref: '#/responses/Error'
-        "415":
-          $ref: '#/responses/Error'
-      security:
-      - oauth2: []
-  /instances/{id}/parameters:
-    get:
-      description: Find instance by id with decrypted parameters
-      operationId: findByIdDecrypted
-      parameters:
-      - format: uint64
-        in: path
-        name: id
-        required: true
-        type: integer
-        x-go-name: ID
-      responses:
-        "200":
-          description: Instance
-          schema:
-            $ref: '#/definitions/Instance'
-        "401":
-          $ref: '#/responses/Error'
-        "403":
-          $ref: '#/responses/Error'
-        "404":
-          $ref: '#/responses/Error'
-        "415":
-          $ref: '#/responses/Error'
-      security:
-      - oauth2: []
-  /instances/{id}/restart:
-    put:
-      description: Restart instance
-      operationId: restartInstance
-      parameters:
-      - format: uint64
-        in: path
-        name: id
-        required: true
-        type: integer
-        x-go-name: ID
-      responses:
-        "202":
-          description: ""
-        "401":
-          $ref: '#/responses/Error'
-        "403":
-          $ref: '#/responses/Error'
-        "404":
-          $ref: '#/responses/Error'
-        "415":
-          $ref: '#/responses/Error'
-      security:
-      - oauth2: []
-  /stacks:
-    get:
-      description: Find all stacks
-      operationId: stacks
-      responses:
-        "200":
-          $ref: '#/responses/StacksResponse'
-        "401":
-          $ref: '#/responses/Error'
-        "403":
-          $ref: '#/responses/Error'
-        "404":
-          $ref: '#/responses/Error'
-        "415":
-          $ref: '#/responses/Error'
-      security:
-      - oauth2: []
-  /stacks/{name}:
-    get:
-      description: Find stack by name
-      operationId: stack
-      parameters:
-      - in: path
-        name: name
-        required: true
-        type: string
-        x-go-name: Name
-      responses:
-        "200":
-          $ref: '#/responses/StackResponse'
-        "401":
-          $ref: '#/responses/Error'
-        "403":
-          $ref: '#/responses/Error'
-        "404":
-          $ref: '#/responses/Error'
-        "415":
-          $ref: '#/responses/Error'
-      security:
-      - oauth2: []
+    /health:
+        get:
+            description: Service health status
+            operationId: health
+            responses:
+                "200":
+                    $ref: '#/responses/Response'
+    /instances:
+        get:
+            description: List instances
+            operationId: listInstances
+            responses:
+                "200":
+                    description: GroupWithInstances
+                    schema:
+                        items:
+                            $ref: '#/definitions/GroupWithInstances'
+                        type: array
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+        post:
+            description: Deploy instance
+            operationId: deployInstance
+            parameters:
+                - description: Deploy instance request body parameter
+                  in: body
+                  name: Payload
+                  required: true
+                  schema:
+                    $ref: '#/definitions/DeployInstanceRequest'
+            responses:
+                "201":
+                    description: Instance
+                    schema:
+                        $ref: '#/definitions/Instance'
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+    /instances-name-to-id/{groupName}/{instanceName}:
+        get:
+            description: Find instance id by name and group name
+            operationId: instanceNameToId
+            parameters:
+                - in: path
+                  name: groupName
+                  required: true
+                  type: string
+                  x-go-name: GroupName
+                - in: path
+                  name: instanceName
+                  required: true
+                  type: string
+                  x-go-name: InstanceName
+            responses:
+                "200":
+                    description: Instance
+                    schema:
+                        $ref: '#/definitions/Instance'
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+    /instances/{id}:
+        delete:
+            description: Delete an instance by id
+            operationId: deleteInstance
+            parameters:
+                - format: uint64
+                  in: path
+                  name: id
+                  required: true
+                  type: integer
+                  x-go-name: ID
+            responses:
+                "202":
+                    description: ""
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+        get:
+            description: Find instance by id
+            operationId: findById
+            parameters:
+                - format: uint64
+                  in: path
+                  name: id
+                  required: true
+                  type: integer
+                  x-go-name: ID
+            responses:
+                "200":
+                    description: Instance
+                    schema:
+                        $ref: '#/definitions/Instance'
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+        put:
+            description: Update an instance
+            operationId: updateInstance
+            parameters:
+                - format: uint64
+                  in: path
+                  name: id
+                  required: true
+                  type: integer
+                  x-go-name: ID
+                - description: Update instance request body parameter
+                  in: body
+                  name: Payload
+                  required: true
+                  schema:
+                    $ref: '#/definitions/UpdateInstanceRequest'
+            responses:
+                "204":
+                    description: Instance
+                    schema:
+                        $ref: '#/definitions/Instance'
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+    /instances/{id}/logs:
+        get:
+            description: Stream instance logs in real time
+            operationId: instanceLogs
+            parameters:
+                - format: uint64
+                  in: path
+                  name: id
+                  required: true
+                  type: integer
+                  x-go-name: ID
+                - description: selector
+                  in: query
+                  name: selector
+                  type: string
+                  x-go-name: Selector
+            responses:
+                "200":
+                    $ref: '#/responses/InstanceLogsResponse'
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+    /instances/{id}/parameters:
+        get:
+            description: Find instance by id with decrypted parameters
+            operationId: findByIdDecrypted
+            parameters:
+                - format: uint64
+                  in: path
+                  name: id
+                  required: true
+                  type: integer
+                  x-go-name: ID
+            responses:
+                "200":
+                    description: Instance
+                    schema:
+                        $ref: '#/definitions/Instance'
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+    /instances/{id}/restart:
+        put:
+            description: Restart instance
+            operationId: restartInstance
+            parameters:
+                - format: uint64
+                  in: path
+                  name: id
+                  required: true
+                  type: integer
+                  x-go-name: ID
+            responses:
+                "202":
+                    description: ""
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+    /stacks:
+        get:
+            description: Find all stacks
+            operationId: stacks
+            responses:
+                "200":
+                    $ref: '#/responses/StacksResponse'
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+    /stacks/{name}:
+        get:
+            description: Find stack by name
+            operationId: stack
+            parameters:
+                - in: path
+                  name: name
+                  required: true
+                  type: string
+                  x-go-name: Name
+            responses:
+                "200":
+                    $ref: '#/responses/StackResponse'
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
 produces:
-- application/json
+    - application/json
 responses:
-  _:
-    description: ""
-    schema:
-      $ref: '#/definitions/GroupWithInstances'
-  Error:
-    description: ""
-  InstanceLogsResponse:
-    description: ""
-  Response:
-    description: ""
-    schema:
-      $ref: '#/definitions/Response'
-  StackResponse:
-    description: ""
-    schema:
-      $ref: '#/definitions/Stack'
-  StacksResponse:
-    description: ""
-    schema:
-      items:
-        $ref: '#/definitions/Stack'
-      type: array
+    _:
+        description: ""
+        schema:
+            $ref: '#/definitions/GroupWithInstances'
+    Error:
+        description: ""
+    InstanceLogsResponse:
+        description: ""
+    Response:
+        description: ""
+        schema:
+            $ref: '#/definitions/Response'
+    StackResponse:
+        description: ""
+        schema:
+            $ref: '#/definitions/Stack'
+    StacksResponse:
+        description: ""
+        schema:
+            items:
+                $ref: '#/definitions/Stack'
+            type: array
 securityDefinitions:
-  oauth2:
-    flow: password
-    tokenUrl: /not-valid--endpoint-is-served-from-the-im-user-service
-    type: oauth2
+    oauth2:
+        flow: password
+        tokenUrl: /not-valid--endpoint-is-served-from-the-im-user-service
+        type: oauth2
 swagger: "2.0"

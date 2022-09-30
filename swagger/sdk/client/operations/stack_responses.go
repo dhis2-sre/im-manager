@@ -71,9 +71,39 @@ type StackOK struct {
 	Payload *models.Stack
 }
 
+// IsSuccess returns true when this stack o k response has a 2xx status code
+func (o *StackOK) IsSuccess() bool {
+	return true
+}
+
+// IsRedirect returns true when this stack o k response has a 3xx status code
+func (o *StackOK) IsRedirect() bool {
+	return false
+}
+
+// IsClientError returns true when this stack o k response has a 4xx status code
+func (o *StackOK) IsClientError() bool {
+	return false
+}
+
+// IsServerError returns true when this stack o k response has a 5xx status code
+func (o *StackOK) IsServerError() bool {
+	return false
+}
+
+// IsCode returns true when this stack o k response a status code equal to that given
+func (o *StackOK) IsCode(code int) bool {
+	return code == 200
+}
+
 func (o *StackOK) Error() string {
 	return fmt.Sprintf("[GET /stacks/{name}][%d] stackOK  %+v", 200, o.Payload)
 }
+
+func (o *StackOK) String() string {
+	return fmt.Sprintf("[GET /stacks/{name}][%d] stackOK  %+v", 200, o.Payload)
+}
+
 func (o *StackOK) GetPayload() *models.Stack {
 	return o.Payload
 }
@@ -102,7 +132,36 @@ StackUnauthorized stack unauthorized
 type StackUnauthorized struct {
 }
 
+// IsSuccess returns true when this stack unauthorized response has a 2xx status code
+func (o *StackUnauthorized) IsSuccess() bool {
+	return false
+}
+
+// IsRedirect returns true when this stack unauthorized response has a 3xx status code
+func (o *StackUnauthorized) IsRedirect() bool {
+	return false
+}
+
+// IsClientError returns true when this stack unauthorized response has a 4xx status code
+func (o *StackUnauthorized) IsClientError() bool {
+	return true
+}
+
+// IsServerError returns true when this stack unauthorized response has a 5xx status code
+func (o *StackUnauthorized) IsServerError() bool {
+	return false
+}
+
+// IsCode returns true when this stack unauthorized response a status code equal to that given
+func (o *StackUnauthorized) IsCode(code int) bool {
+	return code == 401
+}
+
 func (o *StackUnauthorized) Error() string {
+	return fmt.Sprintf("[GET /stacks/{name}][%d] stackUnauthorized ", 401)
+}
+
+func (o *StackUnauthorized) String() string {
 	return fmt.Sprintf("[GET /stacks/{name}][%d] stackUnauthorized ", 401)
 }
 
@@ -123,7 +182,36 @@ StackForbidden stack forbidden
 type StackForbidden struct {
 }
 
+// IsSuccess returns true when this stack forbidden response has a 2xx status code
+func (o *StackForbidden) IsSuccess() bool {
+	return false
+}
+
+// IsRedirect returns true when this stack forbidden response has a 3xx status code
+func (o *StackForbidden) IsRedirect() bool {
+	return false
+}
+
+// IsClientError returns true when this stack forbidden response has a 4xx status code
+func (o *StackForbidden) IsClientError() bool {
+	return true
+}
+
+// IsServerError returns true when this stack forbidden response has a 5xx status code
+func (o *StackForbidden) IsServerError() bool {
+	return false
+}
+
+// IsCode returns true when this stack forbidden response a status code equal to that given
+func (o *StackForbidden) IsCode(code int) bool {
+	return code == 403
+}
+
 func (o *StackForbidden) Error() string {
+	return fmt.Sprintf("[GET /stacks/{name}][%d] stackForbidden ", 403)
+}
+
+func (o *StackForbidden) String() string {
 	return fmt.Sprintf("[GET /stacks/{name}][%d] stackForbidden ", 403)
 }
 
@@ -144,7 +232,36 @@ StackNotFound stack not found
 type StackNotFound struct {
 }
 
+// IsSuccess returns true when this stack not found response has a 2xx status code
+func (o *StackNotFound) IsSuccess() bool {
+	return false
+}
+
+// IsRedirect returns true when this stack not found response has a 3xx status code
+func (o *StackNotFound) IsRedirect() bool {
+	return false
+}
+
+// IsClientError returns true when this stack not found response has a 4xx status code
+func (o *StackNotFound) IsClientError() bool {
+	return true
+}
+
+// IsServerError returns true when this stack not found response has a 5xx status code
+func (o *StackNotFound) IsServerError() bool {
+	return false
+}
+
+// IsCode returns true when this stack not found response a status code equal to that given
+func (o *StackNotFound) IsCode(code int) bool {
+	return code == 404
+}
+
 func (o *StackNotFound) Error() string {
+	return fmt.Sprintf("[GET /stacks/{name}][%d] stackNotFound ", 404)
+}
+
+func (o *StackNotFound) String() string {
 	return fmt.Sprintf("[GET /stacks/{name}][%d] stackNotFound ", 404)
 }
 
@@ -165,7 +282,36 @@ StackUnsupportedMediaType stack unsupported media type
 type StackUnsupportedMediaType struct {
 }
 
+// IsSuccess returns true when this stack unsupported media type response has a 2xx status code
+func (o *StackUnsupportedMediaType) IsSuccess() bool {
+	return false
+}
+
+// IsRedirect returns true when this stack unsupported media type response has a 3xx status code
+func (o *StackUnsupportedMediaType) IsRedirect() bool {
+	return false
+}
+
+// IsClientError returns true when this stack unsupported media type response has a 4xx status code
+func (o *StackUnsupportedMediaType) IsClientError() bool {
+	return true
+}
+
+// IsServerError returns true when this stack unsupported media type response has a 5xx status code
+func (o *StackUnsupportedMediaType) IsServerError() bool {
+	return false
+}
+
+// IsCode returns true when this stack unsupported media type response a status code equal to that given
+func (o *StackUnsupportedMediaType) IsCode(code int) bool {
+	return code == 415
+}
+
 func (o *StackUnsupportedMediaType) Error() string {
+	return fmt.Sprintf("[GET /stacks/{name}][%d] stackUnsupportedMediaType ", 415)
+}
+
+func (o *StackUnsupportedMediaType) String() string {
 	return fmt.Sprintf("[GET /stacks/{name}][%d] stackUnsupportedMediaType ", 415)
 }
 
