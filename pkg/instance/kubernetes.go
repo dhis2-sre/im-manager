@@ -207,11 +207,10 @@ func (ks kubernetesService) pause(instance *model.Instance) error {
 		return fmt.Errorf("error finding deployments using selector %q: %v", labelSelector, err)
 	}
 
-	var errs []error
 	for _, d := range deploymentList.Items {
 		_, err = scale(deployments, d.Name, 0)
 		if err != nil {
-			errs = append(errs, err)
+			return err
 		}
 	}
 
@@ -227,13 +226,8 @@ func (ks kubernetesService) pause(instance *model.Instance) error {
 	for _, s := range setsList.Items {
 		_, err = scale(sets, s.Name, 0)
 		if err != nil {
-			errs = append(errs, err)
+			return err
 		}
-	}
-
-	if len(errs) > 0 {
-		errMsg := joinErrors(errs...)
-		return fmt.Errorf("error pausing resources: %s", errMsg)
 	}
 
 	return nil
