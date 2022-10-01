@@ -25,7 +25,7 @@ type Service interface {
 	FindByIdDecrypted(id uint) (*model.Instance, error)
 	FindByNameAndGroup(instance string, group string) (*model.Instance, error)
 	Delete(token string, id uint) error
-	Logs(instance *model.Instance, group *models.Group, selector string) (io.ReadCloser, error)
+	Logs(instance *model.Instance, group *models.Group, typeSelector string) (io.ReadCloser, error)
 	FindInstances(groups []*models.Group) ([]*model.Instance, error)
 	Link(source, destination *model.Instance) error
 }
@@ -257,13 +257,13 @@ func (s service) Delete(token string, id uint) error {
 	return s.instanceRepository.Delete(id)
 }
 
-func (s service) Logs(instance *model.Instance, group *models.Group, selector string) (io.ReadCloser, error) {
+func (s service) Logs(instance *model.Instance, group *models.Group, typeSelector string) (io.ReadCloser, error) {
 	ks, err := NewKubernetesService(group.ClusterConfiguration)
 	if err != nil {
 		return nil, err
 	}
 
-	return ks.getLogs(instance, selector)
+	return ks.getLogs(instance, typeSelector)
 }
 
 func (s service) FindById(id uint) (*model.Instance, error) {

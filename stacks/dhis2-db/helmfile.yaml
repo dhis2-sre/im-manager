@@ -7,12 +7,14 @@ releases:
     version: "{{ env "CHART_VERSION" | default "11.0.4" }}"
     verify: false
     values:
-      - primary:
-          podLabels:
-            im: "true"
-            im-id: "{{ requiredEnv "INSTANCE_ID" }}"
-            im-ttl: "{{ env "INSTANCE_TTL" | default "" }}"
+      - commonLabels:
+          im: "true"
+          im-default: "true"
+          im-id: "{{ requiredEnv "INSTANCE_ID" }}"
+          im-type: "db"
+          im-ttl: "{{ env "INSTANCE_TTL" | default "" }}"
 
+      - primary:
           extraEnvVars:
             - name: DATABASE_MANAGER_URL
               value: {{ requiredEnv "DATABASE_MANAGER_URL" }}

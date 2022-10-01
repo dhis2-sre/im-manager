@@ -44,6 +44,7 @@ type _ struct {
 	// in: query
 	// required: false
 	// type: string
+	// description: stream logs of a specific pod labeled with im-type=<selector>
 	Selector string `json:"selector"`
 }
 

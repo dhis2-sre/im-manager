@@ -124,8 +124,8 @@ func newClient(configuration *models.ClusterConfiguration) (*kubernetes.Clientse
 	return client, nil
 }
 
-func (ks kubernetesService) getLogs(instance *model.Instance, selector string) (io.ReadCloser, error) {
-	pod, err := ks.getPod(instance, selector)
+func (ks kubernetesService) getLogs(instance *model.Instance, typeSelector string) (io.ReadCloser, error) {
+	pod, err := ks.getPod(instance, typeSelector)
 	if err != nil {
 		return nil, err
 	}
@@ -141,32 +141,43 @@ func (ks kubernetesService) getLogs(instance *model.Instance, selector string) (
 		Stream(context.TODO())
 }
 
-func (ks kubernetesService) getPod(instance *model.Instance, selector string) (v1.Pod, error) {
-	var labelSelector string
-	if selector == "" {
-		labelSelector = fmt.Sprintf("im-id=%d", instance.ID)
+func (ks kubernetesService) getPod(instance *model.Instance, typeSelector string) (v1.Pod, error) {
+	labels := &metav1.LabelSelector{
+		MatchLabels: map[string]string{
+			"im-id": fmt.Sprint(instance.ID),
+		},
+	}
+	if typeSelector == "" {
+		labels.MatchLabels["im-default"] = "true"
 	} else {
-		labelSelector = fmt.Sprintf("im-%s-id=%d", selector, instance.ID)
+		labels.MatchLabels["im-type"] = typeSelector
 	}
 
-	listOptions := metav1.ListOptions{
-		LabelSelector: labelSelector,
-	}
-
-	podList, err := ks.client.CoreV1().Pods("").List(context.TODO(), listOptions)
+	labelSelector, err := metav1.LabelSelectorAsSelector(labels)
 	if err != nil {
-		return v1.Pod{}, fmt.Errorf("error getting pod for instance %d and selector %q: %v", instance.ID, selector, err)
+		return v1.Pod{}, err
+	}
+	listOptions := metav1.ListOptions{
+		LabelSelector: labelSelector.String(),
 	}
 
-	if len(podList.Items) > 1 {
-		return v1.Pod{}, fmt.Errorf("multiple pods found using the selector: %q", labelSelector)
+	pods, err := ks.client.CoreV1().Pods("").List(context.TODO(), listOptions)
+	if err != nil {
+		return v1.Pod{}, fmt.Errorf("error getting pod for instance %d and selector %q: %v", instance.ID, labelSelector.String(), err)
 	}
 
-	return podList.Items[0], nil
+	if len(pods.Items) == 0 {
+		return v1.Pod{}, fmt.Errorf("no pod found using the selector: %q", labelSelector.String())
+	}
+	if len(pods.Items) > 1 {
+		return v1.Pod{}, fmt.Errorf("multiple pods found using the selector: %q", labelSelector.String())
+	}
+
+	return pods.Items[0], nil
 }
 
 func (ks kubernetesService) restart(instance *model.Instance) error {
-	labelSelector := fmt.Sprintf("app.kubernetes.io/instance=%s", instance.Name)
+	labelSelector := fmt.Sprintf("im-id=%d", instance.ID)
 	listOptions := metav1.ListOptions{LabelSelector: labelSelector}
 
 	deployments := ks.client.AppsV1().Deployments(instance.GroupName)
@@ -198,7 +209,7 @@ func (ks kubernetesService) restart(instance *model.Instance) error {
 }
 
 func (ks kubernetesService) pause(instance *model.Instance) error {
-	labelSelector := fmt.Sprintf("app.kubernetes.io/instance=%s", instance.Name)
+	labelSelector := fmt.Sprintf("im-id=%d", instance.ID)
 	listOptions := metav1.ListOptions{LabelSelector: labelSelector}
 
 	deployments := ks.client.AppsV1().Deployments(instance.GroupName)
@@ -213,9 +224,6 @@ func (ks kubernetesService) pause(instance *model.Instance) error {
 			return err
 		}
 	}
-
-	labelSelector = fmt.Sprintf("app.kubernetes.io/instance=%s-database", instance.Name)
-	listOptions = metav1.ListOptions{LabelSelector: labelSelector}
 
 	sets := ks.client.AppsV1().StatefulSets(instance.GroupName)
 	setsList, err := sets.List(context.TODO(), listOptions)

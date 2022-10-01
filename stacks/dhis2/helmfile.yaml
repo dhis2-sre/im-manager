@@ -3,7 +3,7 @@ releases:
   - name: "{{ requiredEnv "INSTANCE_NAME" }}"
     namespace: "{{ requiredEnv "INSTANCE_NAMESPACE" }}"
     chart: dhis2/core
-    version: "{{ env "CHART_VERSION" | default "0.10.1" }}"
+    version: "{{ env "CHART_VERSION" | default "0.11.3" }}"
     values:
       - image:
           repository: dhis2/{{ env "IMAGE_REPOSITORY" | default "core" }}
@@ -24,9 +24,11 @@ releases:
           path: /{{ requiredEnv "INSTANCE_NAME" }}
       - readinessProbe:
           path: /{{ requiredEnv "INSTANCE_NAME" }}
-      - podLabels:
+      - commonLabels:
           im: "true"
+          im-default: "true"
           im-id: "{{ requiredEnv "INSTANCE_ID" }}"
+          im-type: "dhis2"
           im-ttl: "{{ env "INSTANCE_TTL" | default "" }}"
       - dhisConfig: |
           connection.dialect = org.hibernate.dialect.PostgreSQLDialect
@@ -53,10 +55,11 @@ releases:
     version: 11.0.4
     verify: false
     values:
-      - primary:
-          podLabels:
-            im-data-id: "{{ requiredEnv "INSTANCE_ID" }}"
+      - commonLabels:
+          im-id: "{{ requiredEnv "INSTANCE_ID" }}"
+          im-type: "db"
 
+      - primary:
           extraEnvVars:
             - name: DATABASE_MANAGER_URL
               value: {{ requiredEnv "DATABASE_MANAGER_URL" }}
@@ -93,6 +96,9 @@ releases:
     version: "{{ env "PGADMIN_CHART_VERSION" | default "1.9.10" }}"
     installed: {{ env "PGADMIN_INSTALL" | default "false" }}
     values:
+      - podLabels:
+          im-id: "{{ requiredEnv "INSTANCE_ID" }}"
+          im-type: "pgadmin"
       - ingress:
           enabled: true
           hosts:
