@@ -12,6 +12,7 @@ import (
 
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	"github.com/dhis2-sre/im-user/swagger/sdk/models"
+	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -165,9 +166,10 @@ func (ks kubernetesService) getPod(instance *model.Instance, selector string) (v
 }
 
 func (ks kubernetesService) restart(instance *model.Instance) error {
-	deployments := ks.client.AppsV1().Deployments(instance.GroupName)
 	labelSelector := fmt.Sprintf("app.kubernetes.io/instance=%s", instance.Name)
 	listOptions := metav1.ListOptions{LabelSelector: labelSelector}
+
+	deployments := ks.client.AppsV1().Deployments(instance.GroupName)
 	deploymentList, err := deployments.List(context.TODO(), listOptions)
 	if err != nil {
 		return err
@@ -184,22 +186,72 @@ func (ks kubernetesService) restart(instance *model.Instance) error {
 	name := items[0].Name
 
 	// Scale down
-	scale, err := deployments.GetScale(context.TODO(), name, metav1.GetOptions{})
-	if err != nil {
-		return err
-	}
-
-	replicas := scale.Spec.Replicas
-	scale.Spec.Replicas = 0
-
-	updatedScale, err := deployments.UpdateScale(context.TODO(), name, scale, metav1.UpdateOptions{})
+	prevReplicas, err := scale(deployments, name, 0)
 	if err != nil {
 		return err
 	}
 
 	// Scale up
-	updatedScale.Spec.Replicas = replicas
-	_, err = deployments.UpdateScale(context.TODO(), name, updatedScale, metav1.UpdateOptions{})
+	_, err = scale(deployments, name, prevReplicas)
 
 	return err
+}
+
+func (ks kubernetesService) pause(instance *model.Instance) error {
+	labelSelector := fmt.Sprintf("app.kubernetes.io/instance=%s", instance.Name)
+	listOptions := metav1.ListOptions{LabelSelector: labelSelector}
+
+	deployments := ks.client.AppsV1().Deployments(instance.GroupName)
+	deploymentList, err := deployments.List(context.TODO(), listOptions)
+	if err != nil {
+		return fmt.Errorf("error finding deployments using selector %q: %v", labelSelector, err)
+	}
+
+	for _, d := range deploymentList.Items {
+		_, err = scale(deployments, d.Name, 0)
+		if err != nil {
+			return err
+		}
+	}
+
+	labelSelector = fmt.Sprintf("app.kubernetes.io/instance=%s-database", instance.Name)
+	listOptions = metav1.ListOptions{LabelSelector: labelSelector}
+
+	sets := ks.client.AppsV1().StatefulSets(instance.GroupName)
+	setsList, err := sets.List(context.TODO(), listOptions)
+	if err != nil {
+		return fmt.Errorf("error finding StatefulSets using selector %q: %v", labelSelector, err)
+	}
+
+	for _, s := range setsList.Items {
+		_, err = scale(sets, s.Name, 0)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// scaler allows updating the desired scale of a resource as well as getting the current desired and
+// actual scale.
+type scaler interface {
+	GetScale(ctx context.Context, name string, options metav1.GetOptions) (*autoscalingv1.Scale, error)
+	UpdateScale(ctx context.Context, name string, scale *autoscalingv1.Scale, opts metav1.UpdateOptions) (*autoscalingv1.Scale, error)
+}
+
+// scale updates the number of replicas on a scaler. The desired number of replicas before scaling
+// was updated is returned.
+func scale(sc scaler, name string, replicas int32) (int32, error) {
+	scale, err := sc.GetScale(context.TODO(), name, metav1.GetOptions{})
+	if err != nil {
+		return 0, err
+	}
+
+	prevReplicas := scale.Spec.Replicas
+	scale.Spec.Replicas = replicas
+
+	_, err = sc.UpdateScale(context.TODO(), name, scale, metav1.UpdateOptions{})
+
+	return prevReplicas, err
 }

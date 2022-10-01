@@ -20,6 +20,13 @@ type _ struct {
 	Payload UpdateInstanceRequest
 }
 
+// swagger:parameters pauseInstance
+type _ struct {
+	// in: path
+	// required: true
+	ID uint `json:"id"`
+}
+
 // swagger:parameters restartInstance
 type _ struct {
 	// in: path
@@ -49,7 +56,7 @@ type _ struct {
 
 // swagger:response InstanceLogsResponse
 type _ struct {
-	//in: body
+	// in: body
 	_ string
 }
 
@@ -67,12 +74,12 @@ type _ struct {
 // swagger:response
 type Error struct {
 	// The error message
-	//in: body
+	// in: body
 	Message string
 }
 
 // swagger:response
 type _ struct {
-	//in: body
+	// in: body
 	_ GroupWithInstances
 }

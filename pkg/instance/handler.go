@@ -239,6 +239,62 @@ func (h Handler) Update(c *gin.Context) {
 	c.JSON(http.StatusAccepted, instance)
 }
 
+// Pause instance
+// swagger:route PUT /instances/{id}/pause pauseInstance
+//
+// Pause instance
+//
+// Security:
+//  oauth2:
+//
+// responses:
+//   202:
+//   401: Error
+//   403: Error
+//   404: Error
+//   415: Error
+func (h Handler) Pause(c *gin.Context) {
+	idParam := c.Param("id")
+	id, err := strconv.ParseUint(idParam, 10, 64)
+	if err != nil {
+		_ = c.AbortWithError(http.StatusBadRequest, fmt.Errorf("failed to parse id: %s", err))
+		return
+	}
+
+	token, err := handler.GetTokenFromHttpAuthHeader(c)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	user, err := handler.GetUserFromContext(c)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	instance, err := h.instanceService.FindById(uint(id))
+	if err != nil {
+		notFound := apperror.NewNotFound("instance", idParam)
+		_ = c.Error(notFound)
+		return
+	}
+
+	canWrite := handler.CanWriteInstance(user, instance)
+	if !canWrite {
+		_ = c.AbortWithError(http.StatusUnauthorized, fmt.Errorf("write access denied"))
+		return
+	}
+
+	err = h.instanceService.Pause(token, instance)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	c.Status(http.StatusAccepted)
+}
+
 // Restart instance
 // swagger:route PUT /instances/{id}/restart restartInstance
 //

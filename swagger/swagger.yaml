@@ -438,6 +438,30 @@ paths:
                     $ref: '#/responses/Error'
             security:
                 - oauth2: []
+    /instances/{id}/pause:
+        put:
+            description: Pause instance
+            operationId: pauseInstance
+            parameters:
+                - format: uint64
+                  in: path
+                  name: id
+                  required: true
+                  type: integer
+                  x-go-name: ID
+            responses:
+                "202":
+                    description: ""
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
     /instances/{id}/restart:
         put:
             description: Restart instance
