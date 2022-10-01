@@ -1,7 +1,7 @@
 # hostnamePattern: %s-postgresql.%s.svc
 # stackParameters: DATABASE_MANAGER_URL
 releases:
-  - name: "{{ requiredEnv "INSTANCE_NAME" }}"
+  - name: {{ requiredEnv "INSTANCE_NAME" }}-database
     namespace: "{{ requiredEnv "INSTANCE_NAMESPACE" }}"
     chart: bitnami/postgresql
     version: "{{ env "CHART_VERSION" | default "11.0.4" }}"
