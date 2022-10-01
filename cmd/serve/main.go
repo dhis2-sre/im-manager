@@ -57,9 +57,8 @@ func run() error {
 
 	instanceRepo := instance.NewRepository(db, cfg)
 	uc := userClient.New(cfg.UserService.Host, cfg.UserService.BasePath)
-	kubernetesSvc := instance.NewKubernetesService()
 	helmfileSvc := instance.NewHelmfileService(stackSvc, cfg)
-	instanceSvc := instance.NewService(cfg, instanceRepo, uc, stackSvc, kubernetesSvc, helmfileSvc)
+	instanceSvc := instance.NewService(cfg, instanceRepo, uc, stackSvc, helmfileSvc)
 
 	err = stack.LoadStacks("./stacks", stackSvc)
 	if err != nil {
