@@ -204,20 +204,15 @@ func (ks kubernetesService) pause(instance *model.Instance) error {
 	deployments := ks.client.AppsV1().Deployments(instance.GroupName)
 	deploymentList, err := deployments.List(context.TODO(), listOptions)
 	if err != nil {
-		return err
+		return fmt.Errorf("error finding deployments using selector %q: %v", labelSelector, err)
 	}
 
-	items := deploymentList.Items
-	if len(items) > 1 {
-		return fmt.Errorf("multiple deployments found using the selector: %q", labelSelector)
-	}
-	if len(items) < 1 {
-		return fmt.Errorf("no deployment found using the selector: %q", labelSelector)
-	}
-
-	_, err = scale(deployments, items[0].Name, 0)
-	if err != nil {
-		return err
+	var errs []error
+	for _, d := range deploymentList.Items {
+		_, err = scale(deployments, d.Name, 0)
+		if err != nil {
+			errs = append(errs, err)
+		}
 	}
 
 	labelSelector = fmt.Sprintf("app.kubernetes.io/instance=%s-database", instance.Name)
@@ -226,20 +221,22 @@ func (ks kubernetesService) pause(instance *model.Instance) error {
 	sets := ks.client.AppsV1().StatefulSets(instance.GroupName)
 	setsList, err := sets.List(context.TODO(), listOptions)
 	if err != nil {
-		return err
+		return fmt.Errorf("error finding StatefulSets using selector %q: %v", labelSelector, err)
 	}
 
-	setsItems := setsList.Items
-	if len(setsItems) > 1 {
-		return fmt.Errorf("multiple StatefulSets found using the selector: %q", labelSelector)
-	}
-	if len(setsItems) < 1 {
-		return fmt.Errorf("no StatefulSet found using the selector: %q", labelSelector)
+	for _, s := range setsList.Items {
+		_, err = scale(sets, s.Name, 0)
+		if err != nil {
+			errs = append(errs, err)
+		}
 	}
 
-	_, err = scale(sets, setsItems[0].Name, 0)
+	if len(errs) > 0 {
+		errMsg := joinErrors(errs...)
+		return fmt.Errorf("error pausing resources: %s", errMsg)
+	}
 
-	return err
+	return nil
 }
 
 // scaler allows updating the desired scale of a resource as well as getting the current desired and
