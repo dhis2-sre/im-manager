@@ -342,7 +342,8 @@ func (h Handler) Restart(c *gin.Context) {
 		return
 	}
 
-	err = h.instanceService.Restart(token, instance)
+	selector := c.Query("selector")
+	err = h.instanceService.Restart(token, instance, selector)
 	if err != nil {
 		_ = c.Error(err)
 		return

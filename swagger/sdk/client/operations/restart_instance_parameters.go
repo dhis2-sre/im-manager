@@ -65,6 +65,12 @@ type RestartInstanceParams struct {
 	// Format: uint64
 	ID uint64
 
+	/* Selector.
+
+	   selector
+	*/
+	Selector *string
+
 	timeout    time.Duration
 	Context    context.Context
 	HTTPClient *http.Client
@@ -129,6 +135,17 @@ func (o *RestartInstanceParams) SetID(id uint64) {
 	o.ID = id
 }
 
+// WithSelector adds the selector to the restart instance params
+func (o *RestartInstanceParams) WithSelector(selector *string) *RestartInstanceParams {
+	o.SetSelector(selector)
+	return o
+}
+
+// SetSelector adds the selector to the restart instance params
+func (o *RestartInstanceParams) SetSelector(selector *string) {
+	o.Selector = selector
+}
+
 // WriteToRequest writes these params to a swagger request
 func (o *RestartInstanceParams) WriteToRequest(r runtime.ClientRequest, reg strfmt.Registry) error {
 
@@ -140,6 +157,23 @@ func (o *RestartInstanceParams) WriteToRequest(r runtime.ClientRequest, reg strf
 	// path param id
 	if err := r.SetPathParam("id", swag.FormatUint64(o.ID)); err != nil {
 		return err
+	}
+
+	if o.Selector != nil {
+
+		// query param selector
+		var qrSelector string
+
+		if o.Selector != nil {
+			qrSelector = *o.Selector
+		}
+		qSelector := qrSelector
+		if qSelector != "" {
+
+			if err := r.SetQueryParam("selector", qSelector); err != nil {
+				return err
+			}
+		}
 	}
 
 	if len(res) > 0 {

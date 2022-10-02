@@ -32,6 +32,13 @@ type _ struct {
 	// in: path
 	// required: true
 	ID uint `json:"id"`
+
+	// selector
+	// in: query
+	// required: false
+	// type: string
+	// description: restart a specific deployment labeled with im-type=<selector>
+	Selector string `json:"selector"`
 }
 
 // swagger:parameters instanceLogs

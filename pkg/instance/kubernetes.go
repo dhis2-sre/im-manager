@@ -176,9 +176,25 @@ func (ks kubernetesService) getPod(instance *model.Instance, typeSelector string
 	return pods.Items[0], nil
 }
 
-func (ks kubernetesService) restart(instance *model.Instance) error {
-	labelSelector := fmt.Sprintf("im-id=%d", instance.ID)
-	listOptions := metav1.ListOptions{LabelSelector: labelSelector}
+func (ks kubernetesService) restart(instance *model.Instance, typeSelector string) error {
+	labels := &metav1.LabelSelector{
+		MatchLabels: map[string]string{
+			"im-id": fmt.Sprint(instance.ID),
+		},
+	}
+	if typeSelector == "" {
+		labels.MatchLabels["im-default"] = "true"
+	} else {
+		labels.MatchLabels["im-type"] = typeSelector
+	}
+
+	labelSelector, err := metav1.LabelSelectorAsSelector(labels)
+	if err != nil {
+		return err
+	}
+	listOptions := metav1.ListOptions{
+		LabelSelector: labelSelector.String(),
+	}
 
 	deployments := ks.client.AppsV1().Deployments(instance.GroupName)
 	deploymentList, err := deployments.List(context.TODO(), listOptions)
@@ -187,11 +203,11 @@ func (ks kubernetesService) restart(instance *model.Instance) error {
 	}
 
 	items := deploymentList.Items
-	if len(items) > 1 {
-		return fmt.Errorf("multiple deployments found using the selector: %q", labelSelector)
-	}
 	if len(items) < 1 {
-		return fmt.Errorf("no deployment found using the selector: %q", labelSelector)
+		return fmt.Errorf("no deployment found using the selector: %q", labelSelector.String())
+	}
+	if len(items) > 1 {
+		return fmt.Errorf("multiple deployments found using the selector: %q", labelSelector.String())
 	}
 
 	name := items[0].Name

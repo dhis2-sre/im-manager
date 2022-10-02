@@ -18,7 +18,7 @@ import (
 type Service interface {
 	ConsumeParameters(source, destination *model.Instance) error
 	Pause(token string, instance *model.Instance) error
-	Restart(token string, instance *model.Instance) error
+	Restart(token string, instance *model.Instance, typeSelector string) error
 	Save(instance *model.Instance) (*model.Instance, error)
 	Deploy(token string, instance *model.Instance) error
 	FindById(id uint) (*model.Instance, error)
@@ -149,7 +149,7 @@ func (s service) Pause(token string, instance *model.Instance) error {
 	return ks.pause(instance)
 }
 
-func (s service) Restart(token string, instance *model.Instance) error {
+func (s service) Restart(token string, instance *model.Instance, typeSelector string) error {
 	group, err := s.userClient.FindGroupByName(token, instance.GroupName)
 	if err != nil {
 		return err
@@ -160,7 +160,7 @@ func (s service) Restart(token string, instance *model.Instance) error {
 		return err
 	}
 
-	return ks.restart(instance)
+	return ks.restart(instance, typeSelector)
 }
 
 func (s service) Link(source, destination *model.Instance) error {
