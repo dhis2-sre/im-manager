@@ -342,7 +342,8 @@ func (h Handler) Restart(c *gin.Context) {
 		return
 	}
 
-	err = h.instanceService.Restart(token, instance)
+	selector := c.Query("selector")
+	err = h.instanceService.Restart(token, instance, selector)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -526,14 +527,6 @@ func (h Handler) Logs(c *gin.Context) {
 		return
 	}
 
-	selector := c.Query("selector")
-	// We currently only support streaming of logs from DHIS2 and the database. And we want to make sure logs from any other pods are off limit
-	if selector != "" && selector != "data" {
-		badRequest := apperror.NewBadRequest("selector can only be empty or \"data\"")
-		_ = c.Error(badRequest)
-		return
-	}
-
 	user, err := handler.GetUserFromContext(c)
 	if err != nil {
 		_ = c.Error(err)
@@ -565,6 +558,7 @@ func (h Handler) Logs(c *gin.Context) {
 		_ = c.Error(err)
 	}
 
+	selector := c.Query("selector")
 	r, err := h.instanceService.Logs(instance, group, selector)
 	if err != nil {
 		conflict := apperror.NewConflict(err.Error())

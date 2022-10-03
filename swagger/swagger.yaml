@@ -473,6 +473,11 @@ paths:
                   required: true
                   type: integer
                   x-go-name: ID
+                - description: selector
+                  in: query
+                  name: selector
+                  type: string
+                  x-go-name: Selector
             responses:
                 "202":
                     description: ""

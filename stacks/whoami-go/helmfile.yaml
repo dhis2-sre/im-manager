@@ -12,7 +12,9 @@ releases:
           certIssuer: cert-issuer-prod
       - podLabels:
           im: "true"
+          im-default: "true"
           im-id: "{{ requiredEnv "INSTANCE_ID" }}"
+          im-type: "whoami"
           im-ttl: "{{ env "INSTANCE_TTL" | default "" }}"
 
 repositories:

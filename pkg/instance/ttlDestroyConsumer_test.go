@@ -76,7 +76,7 @@ func (is *instanceService) Pause(token string, instance *model.Instance) error {
 	return nil
 }
 
-func (is *instanceService) Restart(token string, instance *model.Instance) error {
+func (is *instanceService) Restart(token string, instance *model.Instance, typeSelector string) error {
 	return nil
 }
 

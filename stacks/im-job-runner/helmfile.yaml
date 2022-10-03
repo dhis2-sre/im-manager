@@ -8,7 +8,9 @@ releases:
           pullPolicy: Always
       - podLabels:
           im: "true"
+          im-default: "true"
           im-id: "{{ requiredEnv "INSTANCE_ID" }}"
+          im-type: "job"
           im-ttl: "{{ env "INSTANCE_TTL" | default "" }}"
       - command: "{{ requiredEnv "COMMAND" }}"
       - payload: "{{ env "PAYLOAD" | default "-" }}"
