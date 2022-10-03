@@ -1,4 +1,4 @@
-# hostnamePattern: %s-postgresql.%s.svc
+# hostnamePattern: %s-database-postgresql.%s.svc
 # stackParameters: DATABASE_MANAGER_URL
 releases:
   - name: {{ requiredEnv "INSTANCE_NAME" }}-database
