@@ -142,41 +142,32 @@ func (ks kubernetesService) getLogs(instance *model.Instance, typeSelector strin
 }
 
 func (ks kubernetesService) getPod(instance *model.Instance, typeSelector string) (v1.Pod, error) {
-	labels := &metav1.LabelSelector{
-		MatchLabels: map[string]string{
-			"im-id": fmt.Sprint(instance.ID),
-		},
-	}
-	if typeSelector == "" {
-		labels.MatchLabels["im-default"] = "true"
-	} else {
-		labels.MatchLabels["im-type"] = typeSelector
-	}
-
-	labelSelector, err := metav1.LabelSelectorAsSelector(labels)
+	selector, err := labelSelector(instance, typeSelector)
 	if err != nil {
 		return v1.Pod{}, err
 	}
 	listOptions := metav1.ListOptions{
-		LabelSelector: labelSelector.String(),
+		LabelSelector: selector,
 	}
 
 	pods, err := ks.client.CoreV1().Pods("").List(context.TODO(), listOptions)
 	if err != nil {
-		return v1.Pod{}, fmt.Errorf("error getting pod for instance %d and selector %q: %v", instance.ID, labelSelector.String(), err)
+		return v1.Pod{}, fmt.Errorf("error getting pod for instance %d and selector %q: %v", instance.ID, selector, err)
 	}
 
 	if len(pods.Items) == 0 {
-		return v1.Pod{}, fmt.Errorf("no pod found using the selector: %q", labelSelector.String())
+		return v1.Pod{}, fmt.Errorf("no pod found using the selector: %q", selector)
 	}
 	if len(pods.Items) > 1 {
-		return v1.Pod{}, fmt.Errorf("multiple pods found using the selector: %q", labelSelector.String())
+		return v1.Pod{}, fmt.Errorf("multiple pods found using the selector: %q", selector)
 	}
 
 	return pods.Items[0], nil
 }
 
-func (ks kubernetesService) restart(instance *model.Instance, typeSelector string) error {
+// labelSelector returns a selector with requirements for im-id=instanceId and either the im-default
+// or im-type=typeSelector.
+func labelSelector(instance *model.Instance, typeSelector string) (string, error) {
 	labels := &metav1.LabelSelector{
 		MatchLabels: map[string]string{
 			"im-id": fmt.Sprint(instance.ID),
@@ -188,12 +179,21 @@ func (ks kubernetesService) restart(instance *model.Instance, typeSelector strin
 		labels.MatchLabels["im-type"] = typeSelector
 	}
 
-	labelSelector, err := metav1.LabelSelectorAsSelector(labels)
+	sl, err := metav1.LabelSelectorAsSelector(labels)
+	if err != nil {
+		return "", fmt.Errorf("error creating label selector: %v", err)
+	}
+
+	return sl.String(), nil
+}
+
+func (ks kubernetesService) restart(instance *model.Instance, typeSelector string) error {
+	selector, err := labelSelector(instance, typeSelector)
 	if err != nil {
 		return err
 	}
 	listOptions := metav1.ListOptions{
-		LabelSelector: labelSelector.String(),
+		LabelSelector: selector,
 	}
 
 	deployments := ks.client.AppsV1().Deployments(instance.GroupName)
@@ -203,11 +203,11 @@ func (ks kubernetesService) restart(instance *model.Instance, typeSelector strin
 	}
 
 	items := deploymentList.Items
-	if len(items) < 1 {
-		return fmt.Errorf("no deployment found using the selector: %q", labelSelector.String())
+	if len(items) == 0 {
+		return fmt.Errorf("no deployment found using the selector: %q", selector)
 	}
 	if len(items) > 1 {
-		return fmt.Errorf("multiple deployments found using the selector: %q", labelSelector.String())
+		return fmt.Errorf("multiple deployments found using the selector: %q", selector)
 	}
 
 	name := items[0].Name
