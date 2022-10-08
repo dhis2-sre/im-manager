@@ -52,7 +52,7 @@ releases:
   - name: {{ requiredEnv "INSTANCE_NAME" }}-database
     namespace: "{{ requiredEnv "INSTANCE_NAMESPACE" }}"
     chart: bitnami/postgresql
-    version: 11.0.4
+    version: 11.9.8
     verify: false
     values:
       - commonLabels:
@@ -83,7 +83,7 @@ releases:
                 {{- readFile "./seed.sh" | indent 16 }}
 
       - image:
-          tag: {{ env "DATABASE_VERSION" | default 13 }}
+          tag: {{ env "DATABASE_VERSION" | default 13.7.0 }}
 
       - auth:
           username: {{ env "DATABASE_USERNAME" | default "dhis" }}
