@@ -17,6 +17,8 @@ STARTUP_PROBE_PERIOD_SECONDS=${STARTUP_PROBE_PERIOD_SECONDS:-5}
 IMAGE_REPOSITORY=${IMAGE_REPOSITORY:-core}
 IMAGE_TAG=${IMAGE_TAG:-2.38.1.1-tomcat-9.0-jdk11-openjdk-slim}
 INSTANCE_TTL=${INSTANCE_TTL:-""}
+FLYWAY_MIGRATE_OUT_OF_ORDER=${FLYWAY_MIGRATE_OUT_OF_ORDER:-false}
+FLYWAY_REPAIR_BEFORE_MIGRATION=${FLYWAY_REPAIR_BEFORE_MIGRATION:-false}
 
 SOURCE_INSTANCE_ID=$($HTTP get "$INSTANCE_HOST/instances-name-to-id/$GROUP/$SOURCE_INSTANCE" "Authorization: Bearer $ACCESS_TOKEN")
 
@@ -45,6 +47,14 @@ echo "{
     {
       \"name\": \"INSTANCE_TTL\",
       \"value\": \"$INSTANCE_TTL\"
+    },
+    {
+      \"name\": \"FLYWAY_MIGRATE_OUT_OF_ORDER\",
+      \"value\": \"$FLYWAY_MIGRATE_OUT_OF_ORDER\"
+    },
+    {
+      \"name\": \"FLYWAY_REPAIR_BEFORE_MIGRATION\",
+      \"value\": \"$FLYWAY_REPAIR_BEFORE_MIGRATION\"
     }
   ]
 }" | $HTTP post "$INSTANCE_HOST/instances" "Authorization: Bearer $ACCESS_TOKEN"
