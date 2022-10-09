@@ -10,7 +10,7 @@ releases:
           hostname: {{ requiredEnv "INSTANCE_HOSTNAME" }}
           path: /{{ requiredEnv "INSTANCE_NAME" }}
           certIssuer: cert-issuer-prod
-      - podLabels:
+      - commonLabels:
           im: "true"
           im-default: "true"
           im-id: "{{ requiredEnv "INSTANCE_ID" }}"
