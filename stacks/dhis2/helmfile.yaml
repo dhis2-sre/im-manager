@@ -3,7 +3,7 @@ releases:
   - name: "{{ requiredEnv "INSTANCE_NAME" }}"
     namespace: "{{ requiredEnv "INSTANCE_NAMESPACE" }}"
     chart: dhis2/core
-    version: "{{ env "CHART_VERSION" | default "0.11.3" }}"
+    version: "{{ env "CHART_VERSION" | default "0.12.0" }}"
     values:
       - image:
           repository: dhis2/{{ env "IMAGE_REPOSITORY" | default "core" }}
