@@ -28,6 +28,9 @@ type DeployInstanceRequest struct {
 	// optional parameters
 	OptionalParameters []*InstanceOptionalParameter `json:"optionalParameters"`
 
+	// preset instance
+	PresetInstance uint64 `json:"presetInstance,omitempty"`
+
 	// required parameters
 	RequiredParameters []*InstanceRequiredParameter `json:"requiredParameters"`
 

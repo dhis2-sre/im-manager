@@ -76,7 +76,7 @@ func (s service) ConsumeParameters(source, destination *model.Instance) error {
 
 	// Consumed required parameters
 	for _, parameter := range destinationStack.RequiredParameters {
-		if parameter.Consumed && parameter.Name != destinationStack.HostnameVariable {
+		if (parameter.Consumed || source.Preset) && parameter.Name != destinationStack.HostnameVariable {
 			value, err := s.findParameterValue(parameter.Name, source, sourceStack)
 			if err != nil {
 				return err
@@ -91,7 +91,7 @@ func (s service) ConsumeParameters(source, destination *model.Instance) error {
 
 	// Consumed optional parameters
 	for _, parameter := range destinationStack.OptionalParameters {
-		if parameter.Consumed && parameter.Name != destinationStack.HostnameVariable {
+		if (parameter.Consumed || source.Preset) && parameter.Name != destinationStack.HostnameVariable {
 			value, err := s.findParameterValue(parameter.Name, source, sourceStack)
 			if err != nil {
 				return err
@@ -105,7 +105,7 @@ func (s service) ConsumeParameters(source, destination *model.Instance) error {
 	}
 
 	// Hostname parameter
-	if destinationStack.HostnameVariable != "" {
+	if !source.Preset && destinationStack.HostnameVariable != "" {
 		hostnameParameter := model.InstanceRequiredParameter{
 			StackRequiredParameterID: destinationStack.HostnameVariable,
 			Value:                    fmt.Sprintf(sourceStack.HostnamePattern, source.Name, source.GroupName),

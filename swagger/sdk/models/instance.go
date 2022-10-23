@@ -42,6 +42,9 @@ type Instance struct {
 	// optional parameters
 	OptionalParameters []*InstanceOptionalParameter `json:"optionalParameters"`
 
+	// preset
+	Preset bool `json:"Preset,omitempty"`
+
 	// required parameters
 	RequiredParameters []*InstanceRequiredParameter `json:"requiredParameters"`
 
