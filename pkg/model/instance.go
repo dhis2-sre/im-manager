@@ -16,6 +16,7 @@ type Instance struct {
 	RequiredParameters []InstanceRequiredParameter `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;" json:"requiredParameters"`
 	OptionalParameters []InstanceOptionalParameter `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;" json:"optionalParameters"`
 	DeployLog          string                      `gorm:"type:text"`
+	Preset             bool
 }
 
 type Linked struct {

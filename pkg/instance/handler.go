@@ -50,6 +50,7 @@ type DeployInstanceRequest struct {
 	RequiredParameters []model.InstanceRequiredParameter `json:"requiredParameters"`
 	OptionalParameters []model.InstanceOptionalParameter `json:"optionalParameters"`
 	SourceInstance     uint                              `json:"sourceInstance"`
+	PresetInstance     uint                              `json:"presetInstance"`
 }
 
 // Deploy instance
@@ -71,6 +72,15 @@ func (h Handler) Deploy(c *gin.Context) {
 	if deployParam, ok := c.GetQuery("deploy"); ok {
 		var err error
 		if deploy, err = strconv.ParseBool(deployParam); err != nil {
+			_ = c.Error(err)
+			return
+		}
+	}
+
+	preset := false
+	if presetParam, ok := c.GetQuery("preset"); ok {
+		var err error
+		if preset, err = strconv.ParseBool(presetParam); err != nil {
 			_ = c.Error(err)
 			return
 		}
@@ -101,6 +111,9 @@ func (h Handler) Deploy(c *gin.Context) {
 		StackName:          request.Stack,
 		RequiredParameters: request.RequiredParameters,
 		OptionalParameters: request.OptionalParameters,
+		Preset:             preset,
+		// TODO: Store reference to preset instance? For the sake of traceability
+		//PresetInstance:		request.PresetInstance,
 	}
 
 	canWrite := handler.CanWriteInstance(user, instance)
@@ -110,39 +123,16 @@ func (h Handler) Deploy(c *gin.Context) {
 		return
 	}
 
+	if request.PresetInstance != 0 {
+		err = h.consumeParameters(user, request.PresetInstance, instance, true)
+		if err != nil {
+			_ = c.Error(err)
+			return
+		}
+	}
+
 	if request.SourceInstance != 0 {
-		sourceInstance, err := h.instanceService.FindByIdDecrypted(request.SourceInstance)
-		if err != nil {
-			_ = c.Error(err)
-			return
-		}
-
-		canWriteSource := handler.CanWriteInstance(user, sourceInstance)
-		if !canWriteSource {
-			err := apperror.NewUnauthorized(fmt.Sprintf("write access to source instance (id: %d) denied", sourceInstance.ID))
-			_ = c.Error(err)
-			return
-		}
-
-		if sourceInstance.DeployLog == "" {
-			err := fmt.Errorf("source instance %q not deployed", sourceInstance.Name)
-			_ = c.Error(err)
-			return
-		}
-
-		err = h.instanceService.ConsumeParameters(sourceInstance, instance)
-		if err != nil {
-			_ = c.Error(err)
-			return
-		}
-
-		savedInstance, err := h.instanceService.Save(instance)
-		if err != nil {
-			_ = c.Error(err)
-			return
-		}
-
-		err = h.instanceService.Link(sourceInstance, savedInstance)
+		err = h.consumeParameters(user, request.SourceInstance, instance, false)
 		if err != nil {
 			_ = c.Error(err)
 			return
@@ -155,7 +145,7 @@ func (h Handler) Deploy(c *gin.Context) {
 		return
 	}
 
-	if deploy {
+	if deploy && !preset {
 		err = h.instanceService.Deploy(token, savedInstance)
 		if err != nil {
 			_ = c.Error(err)
@@ -165,6 +155,44 @@ func (h Handler) Deploy(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusAccepted, savedInstance)
+}
+
+func (h Handler) consumeParameters(user *models.User, sourceInstanceId uint, instance *model.Instance, preset bool) error {
+	sourceInstance, err := h.instanceService.FindByIdDecrypted(sourceInstanceId)
+	if err != nil {
+		return err
+	}
+
+	if sourceInstance.Preset != preset {
+		return apperror.NewUnauthorized(fmt.Sprintf("instance (id: %d) isn't a preset", sourceInstance.ID))
+	}
+
+	if sourceInstance.StackName != instance.StackName {
+		return apperror.NewUnauthorized(fmt.Sprintf("preset stack (%s) doesn't match instance stack (%s)", sourceInstance.StackName, instance.StackName))
+	}
+
+	canReadSource := handler.CanReadInstance(user, sourceInstance)
+	if !canReadSource {
+		return apperror.NewUnauthorized(fmt.Sprintf("read access to source instance (id: %d) denied", sourceInstance.ID))
+	}
+
+	err = h.instanceService.ConsumeParameters(sourceInstance, instance)
+	if err != nil {
+		return err
+	}
+
+	savedInstance, err := h.instanceService.Save(instance)
+	if err != nil {
+		return err
+	}
+
+	if !preset {
+		err = h.instanceService.Link(sourceInstance, savedInstance)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 type UpdateInstanceRequest struct {
