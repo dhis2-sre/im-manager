@@ -8,20 +8,18 @@ STACK=whoami-go
 
 GROUP=$1
 NAME=$2
-CHART_VERSION=${CHART_VERSION:-"0.7.0"}
+CHART_VERSION=${CHART_VERSION:-0.9.0}
 INSTANCE_TTL=${INSTANCE_TTL:-""}
 
 echo "{
   \"name\": \"$NAME\",
   \"groupName\": \"$GROUP\",
   \"stackName\": \"$STACK\",
-  \"requiredParameters\": [
+  \"optionalParameters\": [
     {
       \"name\": \"CHART_VERSION\",
       \"value\": \"$CHART_VERSION\"
-    }
-  ],
-  \"optionalParameters\": [
+    },
     {
       \"name\": \"INSTANCE_TTL\",
       \"value\": \"$INSTANCE_TTL\"
