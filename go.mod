@@ -17,7 +17,7 @@ require (
 	github.com/jackc/pgconn v1.13.0
 	github.com/lestrrat-go/jwx v1.2.25
 	github.com/rabbitmq/amqp091-go v1.3.4
-	github.com/stretchr/testify v1.8.0
+	github.com/stretchr/testify v1.8.1
 	go.mozilla.org/sops/v3 v3.7.3
 	gorm.io/driver/postgres v1.4.5
 	gorm.io/gorm v1.24.1-0.20221019064659-5dd2bb482755
@@ -136,7 +136,7 @@ require (
 	github.com/ryanuber/go-glob v1.0.0 // indirect
 	github.com/sirupsen/logrus v1.8.1 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
-	github.com/stretchr/objx v0.4.0 // indirect
+	github.com/stretchr/objx v0.5.0 // indirect
 	github.com/testcontainers/testcontainers-go v0.13.0 // indirect
 	github.com/ugorji/go/codec v1.2.7 // indirect
 	go.mongodb.org/mongo-driver v1.10.0 // indirect
