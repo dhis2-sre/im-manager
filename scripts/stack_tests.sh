@@ -2,7 +2,7 @@
 
 set -xeuo pipefail
 
-INSTANCE_HOST_DEPLOY=https://whoami.im.tons.test.c.dhis2.org
+INSTANCE_HOST_DEPLOY=https://whoami.im.dev.test.c.dhis2.org
 GROUP=whoami
 
 # Whoami
