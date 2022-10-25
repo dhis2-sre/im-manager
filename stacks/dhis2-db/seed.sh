@@ -24,7 +24,7 @@ if [[ -n $DATABASE_ID ]]; then
   exec_psql "create extension if not exists btree_gin"
 
   tmp_file=$(mktemp)
-  curl --fail -L "$DATABASE_MANAGER_ABSOLUTE_URL" -H "Authorization: $IM_ACCESS_TOKEN" > "$tmp_file"
+  curl --connect-timeout 10 --retry 5 --retry-delay 1 --fail -L "$DATABASE_MANAGER_ABSOLUTE_URL" -H "Authorization: $IM_ACCESS_TOKEN" > "$tmp_file"
 # Try pg_restore... Or gzipped sql
   (pg_restore -U postgres -d "$DATABASE_NAME" -j 4 "$tmp_file") || \
   (gunzip -v -c "$tmp_file" | psql -U postgres -d "$DATABASE_NAME")
