@@ -1,0 +1,28 @@
+name: e2e tests
+
+on:
+  schedule:
+    - cron: "0 */12 * * *"
+jobs:
+  cron:
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install prerequisites
+        run: apt install httpie
+
+      - name: Pin kubectl to version v1.23.6 (https://github.com/aws/aws-cli/issues/6920)
+        run: |
+          curl -LO https://storage.googleapis.com/kubernetes-release/release/v1.23.6/bin/linux/amd64/kubectl
+          chmod +x ./kubectl
+          sudo mv ./kubectl /usr/local/bin/kubectl
+
+      - name: Configure kubectl
+        run: |
+          mkdir $PWD/.kube
+          echo "${{ secrets.KUBECONFIG }}" > $PWD/.kube/config
+          echo "KUBECONFIG=$PWD/.kube/config" >> $GITHUB_ENV
+
+      - name: Run e2e
+        run: ./scripts/stack_tests.sh

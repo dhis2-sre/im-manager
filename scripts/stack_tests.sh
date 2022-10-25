@@ -2,7 +2,6 @@
 
 set -xeuo pipefail
 
-KUBECONFIG=$HOME/.kube/kubeconfig-test.yaml
 INSTANCE_HOST_DEPLOY=https://whoami.im.tons.test.c.dhis2.org
 GROUP=whoami
 
