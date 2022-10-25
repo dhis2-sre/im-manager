@@ -25,4 +25,4 @@ jobs:
           echo "KUBECONFIG=$PWD/.kube/config" >> $GITHUB_ENV
 
       - name: Run e2e
-        run: ./scripts/stack_tests.sh
+        run: cd scripts/ && ./stack_tests.sh
