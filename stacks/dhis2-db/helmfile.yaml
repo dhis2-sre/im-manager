@@ -19,7 +19,7 @@ releases:
             - name: DATABASE_MANAGER_URL
               value: {{ requiredEnv "DATABASE_MANAGER_URL" }}
             - name: DATABASE_ID
-              value: "{{ requiredEnv "DATABASE_ID" }}"
+              value: "{{ env "DATABASE_ID" | default "" }}"
             - name: IM_ACCESS_TOKEN
               value: {{ requiredEnv "IM_ACCESS_TOKEN" }}
             - name: DATABASE_USERNAME

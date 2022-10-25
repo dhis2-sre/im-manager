@@ -17,16 +17,14 @@ echo "{
   \"name\": \"$NAME\",
   \"groupName\": \"$GROUP\",
   \"stackName\": \"$STACK\",
-  \"requiredParameters\": [
-    {
-      \"name\": \"DATABASE_ID\",
-      \"value\": \"$DATABASE_ID\"
-    }
-  ],
   \"optionalParameters\": [
     {
       \"name\": \"INSTANCE_TTL\",
       \"value\": \"$INSTANCE_TTL\"
+    },
+    {
+      \"name\": \"DATABASE_ID\",
+      \"value\": \"$DATABASE_ID\"
     },
     {
       \"name\": \"DATABASE_SIZE\",
