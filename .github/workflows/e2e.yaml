@@ -1,8 +1,7 @@
 name: e2e tests
 
-on:
-  schedule:
-    - cron: "0 */12 * * *"
+on: [push, pull_request]
+
 jobs:
   cron:
     runs-on: ubuntu-20.04
