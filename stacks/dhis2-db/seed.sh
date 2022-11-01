@@ -6,10 +6,6 @@ function exec_psql() {
   PGPASSWORD=$POSTGRES_POSTGRES_PASSWORD psql -U postgres -qAt -d "$DATABASE_NAME" -c "$1"
 }
 
-exec_psql "create extension if not exists postgis"
-exec_psql "create extension if not exists pg_trgm"
-exec_psql "create extension if not exists btree_gin"
-
 if [[ -n $DATABASE_ID ]]; then
   table_exists=$(exec_psql "select exists (select from information_schema.tables where table_schema = 'schema_name' and table_name = 'table_name')")
   if [[ $table_exists = true ]]; then
@@ -23,11 +19,17 @@ if [[ -n $DATABASE_ID ]]; then
   DATABASE_MANAGER_ABSOLUTE_URL="$DATABASE_MANAGER_URL/databases/$DATABASE_ID/download"
   echo "DATABASE_MANAGER_ABSOLUTE_URL: $DATABASE_MANAGER_ABSOLUTE_URL"
 
+  exec_psql "create extension if not exists postgis"
+  exec_psql "create extension if not exists pg_trgm"
+  exec_psql "create extension if not exists btree_gin"
+
   tmp_file=$(mktemp)
-  curl --fail -L "$DATABASE_MANAGER_ABSOLUTE_URL" -H "Authorization: $IM_ACCESS_TOKEN" > "$tmp_file"
+  curl --connect-timeout 10 --retry 5 --retry-delay 1 --fail -L "$DATABASE_MANAGER_ABSOLUTE_URL" -H "Authorization: $IM_ACCESS_TOKEN" > "$tmp_file"
 # Try pg_restore... Or gzipped sql
-  (pg_restore -U postgres -d "$DATABASE_NAME" -j 4 "$tmp_file") || \
-  (gunzip -v -c "$tmp_file" | psql -U postgres -d "$DATABASE_NAME")
+# pg_restore often returns a non zero return code due to benign errors resulting in executing of gunzip despite the restore being successful
+# gunzip will fail because the input isn't gzipped causing the whole seed script to fail... Which is why there's a "|| true" at the end
+  (pg_restore --verbose --create -U postgres -d "$DATABASE_NAME" -j 4 "$tmp_file") || \
+  (gunzip -v -c "$tmp_file" | psql -U postgres -d "$DATABASE_NAME") || true
   rm "$tmp_file"
 
   ## Change ownership to $DATABASE_USERNAME
