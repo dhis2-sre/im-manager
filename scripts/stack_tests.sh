@@ -18,6 +18,7 @@ INSTANCE_NAME=monolith-test
 ./deploy-dhis2.sh $GROUP $INSTANCE_NAME
 sleep 3
 kubectl wait --for=condition=available --timeout=180s --namespace $GROUP deployment/$INSTANCE_NAME-core
+sleep 3
 http --check-status --follow "$INSTANCE_HOST_DEPLOY/$INSTANCE_NAME"
 ./destroy.sh $GROUP $INSTANCE_NAME
 kubectl delete pvc --namespace $GROUP data-$INSTANCE_NAME-database-postgresql-0
