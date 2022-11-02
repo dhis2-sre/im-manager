@@ -21,7 +21,7 @@ require (
 	go.mozilla.org/sops/v3 v3.7.3
 	gorm.io/driver/postgres v1.4.5
 	gorm.io/gorm v1.24.1-0.20221019064659-5dd2bb482755
-	k8s.io/api v0.26.0-alpha.2
+	k8s.io/api v0.26.0-alpha.3
 	k8s.io/apimachinery v0.26.0-alpha.3
 	k8s.io/client-go v0.26.0-alpha.2
 )
