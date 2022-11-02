@@ -10,6 +10,7 @@ INSTANCE_NAME=whoami-test
 ./deploy-whoami.sh $GROUP $INSTANCE_NAME
 sleep 3
 kubectl wait --for=condition=available --timeout=30s --namespace $GROUP deployment/$INSTANCE_NAME-whoami-go
+sleep 3
 http --check-status "$INSTANCE_HOST_DEPLOY/$INSTANCE_NAME"
 ./destroy.sh $GROUP $INSTANCE_NAME
 
