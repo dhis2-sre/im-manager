@@ -497,6 +497,25 @@ paths:
                     $ref: '#/responses/Error'
             security:
                 - oauth2: []
+    /presets:
+        get:
+            description: List presets
+            operationId: listPresets
+            responses:
+                "200":
+                    description: GroupWithInstances
+                    schema:
+                        items:
+                            $ref: '#/definitions/GroupWithInstances'
+                        type: array
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
     /stacks:
         get:
             description: Find all stacks

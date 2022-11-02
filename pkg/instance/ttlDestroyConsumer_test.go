@@ -103,7 +103,7 @@ func (is *instanceService) FindByNameAndGroup(instance string, groupId string) (
 	return nil, nil
 }
 
-func (is *instanceService) FindInstances(groups []*models.Group) ([]*model.Instance, error) {
+func (is *instanceService) FindInstances(groups []*models.Group, presets bool) ([]*model.Instance, error) {
 	return nil, nil
 }
 

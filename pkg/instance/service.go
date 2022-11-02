@@ -26,7 +26,7 @@ type Service interface {
 	FindByNameAndGroup(instance string, group string) (*model.Instance, error)
 	Delete(token string, id uint) error
 	Logs(instance *model.Instance, group *models.Group, typeSelector string) (io.ReadCloser, error)
-	FindInstances(groups []*models.Group) ([]*model.Instance, error)
+	FindInstances(groups []*models.Group, presets bool) ([]*model.Instance, error)
 	Link(source, destination *model.Instance) error
 }
 
@@ -278,11 +278,11 @@ func (s service) FindByNameAndGroup(instance string, group string) (*model.Insta
 	return s.instanceRepository.FindByNameAndGroup(instance, group)
 }
 
-func (s service) FindInstances(groups []*models.Group) ([]*model.Instance, error) {
+func (s service) FindInstances(groups []*models.Group, presets bool) ([]*model.Instance, error) {
 	groupNames := make([]string, len(groups))
 	for i, group := range groups {
 		groupNames[i] = group.Name
 	}
 
-	return s.instanceRepository.FindByGroupNames(groupNames)
+	return s.instanceRepository.FindByGroupNames(groupNames, presets)
 }
