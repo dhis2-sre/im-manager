@@ -17,7 +17,7 @@ type Repository interface {
 	FindById(id uint) (*model.Instance, error)
 	FindByIdDecrypted(id uint) (*model.Instance, error)
 	FindByNameAndGroup(instance string, group string) (*model.Instance, error)
-	FindByGroupNames(names []string) ([]*model.Instance, error)
+	FindByGroupNames(names []string, presets bool) ([]*model.Instance, error)
 	SaveDeployLog(instance *model.Instance, log string) error
 	Delete(id uint) error
 }
@@ -125,13 +125,14 @@ func (r repository) Delete(id uint) error {
 	return r.db.Unscoped().Delete(&model.Instance{}, id).Error
 }
 
-func (r repository) FindByGroupNames(names []string) ([]*model.Instance, error) {
+func (r repository) FindByGroupNames(names []string, presets bool) ([]*model.Instance, error) {
 	var instances []*model.Instance
 
 	err := r.db.
 		Preload("RequiredParameters.StackRequiredParameter").
 		Preload("OptionalParameters.StackOptionalParameter").
 		Where("group_name IN ?", names).
+		Where("preset = ?", presets).
 		Find(&instances).Error
 
 	return instances, err

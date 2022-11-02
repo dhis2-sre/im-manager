@@ -688,13 +688,42 @@ func (h Handler) List(c *gin.Context) {
 		return
 	}
 
-	instances, err := h.instanceService.FindInstances(user.Groups)
+	instances, err := h.instanceService.FindInstances(user.Groups, false)
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
 
 	c.JSON(http.StatusOK, h.groupsWithInstances(user.Groups, instances))
+}
+
+// ListPresets presets
+// swagger:route GET /presets listPresets
+//
+// List presets
+//
+// Security:
+//  oauth2:
+//
+// responses:
+//   200: []GroupWithInstances
+//   401: Error
+//   403: Error
+//   415: Error
+func (h Handler) ListPresets(c *gin.Context) {
+	user, err := handler.GetUserFromContext(c)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	presets, err := h.instanceService.FindInstances(user.Groups, true)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	c.JSON(http.StatusOK, h.groupsWithInstances(user.Groups, presets))
 }
 
 func (h Handler) groupsWithInstances(groups []*models.Group, instances []*model.Instance) []GroupWithInstances {
