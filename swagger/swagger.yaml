@@ -264,6 +264,11 @@ paths:
                   required: true
                   schema:
                     $ref: '#/definitions/DeployInstanceRequest'
+                - description: preset
+                  in: query
+                  name: preset
+                  type: string
+                  x-go-name: Preset
             responses:
                 "201":
                     description: Instance

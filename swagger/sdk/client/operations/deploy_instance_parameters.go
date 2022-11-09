@@ -67,6 +67,12 @@ type DeployInstanceParams struct {
 	*/
 	Payload *models.DeployInstanceRequest
 
+	/* Preset.
+
+	   preset
+	*/
+	Preset *string
+
 	timeout    time.Duration
 	Context    context.Context
 	HTTPClient *http.Client
@@ -131,6 +137,17 @@ func (o *DeployInstanceParams) SetPayload(payload *models.DeployInstanceRequest)
 	o.Payload = payload
 }
 
+// WithPreset adds the preset to the deploy instance params
+func (o *DeployInstanceParams) WithPreset(preset *string) *DeployInstanceParams {
+	o.SetPreset(preset)
+	return o
+}
+
+// SetPreset adds the preset to the deploy instance params
+func (o *DeployInstanceParams) SetPreset(preset *string) {
+	o.Preset = preset
+}
+
 // WriteToRequest writes these params to a swagger request
 func (o *DeployInstanceParams) WriteToRequest(r runtime.ClientRequest, reg strfmt.Registry) error {
 
@@ -141,6 +158,23 @@ func (o *DeployInstanceParams) WriteToRequest(r runtime.ClientRequest, reg strfm
 	if o.Payload != nil {
 		if err := r.SetBodyParam(o.Payload); err != nil {
 			return err
+		}
+	}
+
+	if o.Preset != nil {
+
+		// query param preset
+		var qrPreset string
+
+		if o.Preset != nil {
+			qrPreset = *o.Preset
+		}
+		qPreset := qrPreset
+		if qPreset != "" {
+
+			if err := r.SetQueryParam("preset", qPreset); err != nil {
+				return err
+			}
 		}
 	}
 
