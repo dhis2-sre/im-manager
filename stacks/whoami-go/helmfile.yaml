@@ -2,9 +2,13 @@ releases:
   - name: "{{ requiredEnv "INSTANCE_NAME" }}"
     namespace: "{{ requiredEnv "INSTANCE_NAMESPACE" }}"
     chart: tons/whoami-go
-    version: "{{ requiredEnv "CHART_VERSION" }}"
+    version: "{{ env "CHART_VERSION" | default "0.9.0" }}"
     values:
       - replicaCount: {{ env "REPLICA_COUNT" | default "1" }}
+      - image:
+          #repository: tons/{{ env "IMAGE_REPOSITORY" | default "core" }}
+          tag: "{{ env "IMAGE_TAG" | default "0.6.0" }}"
+          pullPolicy: {{ env "IMAGE_PULL_POLICY" | default "IfNotPresent" }}
       - ingress:
           enabled: true
           hostname: {{ requiredEnv "INSTANCE_HOSTNAME" }}

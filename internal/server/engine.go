@@ -13,7 +13,13 @@ import (
 
 func GetEngine(basePath string, stackHandler stack.Handler, instanceHandler instance.Handler, authMiddleware *handler.AuthenticationMiddleware) *gin.Engine {
 	r := gin.Default()
-	r.Use(cors.Default())
+
+	corsConfig := cors.DefaultConfig()
+	corsConfig.AllowAllOrigins = true
+	corsConfig.AllowCredentials = true
+	corsConfig.AddAllowHeaders("authorization")
+	r.Use(cors.New(corsConfig))
+
 	r.Use(middleware.ErrorHandler())
 
 	router := r.Group(basePath)

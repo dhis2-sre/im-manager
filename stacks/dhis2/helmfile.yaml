@@ -3,17 +3,20 @@ releases:
   - name: "{{ requiredEnv "INSTANCE_NAME" }}"
     namespace: "{{ requiredEnv "INSTANCE_NAMESPACE" }}"
     chart: dhis2/core
-    version: "{{ env "CHART_VERSION" | default "0.12.0" }}"
+    version: "{{ env "CHART_VERSION" | default "0.12.1" }}"
     values:
       - image:
           repository: dhis2/{{ env "IMAGE_REPOSITORY" | default "core" }}
-          tag: "{{ env "IMAGE_TAG" | default "2.36.0-tomcat-8.5.34-jre8-alpine" }}"
+          tag: "{{ env "IMAGE_TAG" | default "2.39.0" }}"
           pullPolicy: {{ env "IMAGE_PULL_POLICY" | default "IfNotPresent" }}
       - ingress:
           enabled: true
           hostname: {{ requiredEnv "INSTANCE_HOSTNAME" }}
           path: /{{ requiredEnv "INSTANCE_NAME" }}
           certIssuer: cert-issuer-prod
+          annotations:
+            nginx.ingress.kubernetes.io/proxy-body-size: 8m
+      - dhis2Home: "{{ env "DHIS2_HOME" | default "/opt/dhis2" }}"
       - catalinaOpts: "-Dcontext.path=/{{ requiredEnv "INSTANCE_NAME" }}"
       - javaOpts: "{{ env "JAVA_OPTS" | default "" }}"
       - startupProbe:
@@ -83,7 +86,7 @@ releases:
                 {{- readFile "./seed.sh" | indent 16 }}
 
       - image:
-          tag: {{ env "DATABASE_VERSION" | default 13.7.0 }}
+          tag: {{ env "DATABASE_VERSION" | default "13.7.0" }}
 
       - auth:
           username: {{ env "DATABASE_USERNAME" | default "dhis" }}

@@ -4,18 +4,15 @@ set -euo pipefail
 
 source ./auth.sh
 
-STACK=whoami-go
-
 GROUP=$1
 NAME=$2
 CHART_VERSION=${CHART_VERSION:-0.9.0}
 IMAGE_TAG=${IMAGE_TAG:-0.6.0}
 INSTANCE_TTL=${INSTANCE_TTL:-""}
 
+INSTANCE_ID=$($HTTP --check-status "$INSTANCE_HOST/instances-name-to-id/$GROUP/$NAME" "Authorization: Bearer $ACCESS_TOKEN")
+
 echo "{
-  \"name\": \"$NAME\",
-  \"groupName\": \"$GROUP\",
-  \"stackName\": \"$STACK\",
   \"optionalParameters\": [
     {
       \"name\": \"CHART_VERSION\",
@@ -30,4 +27,4 @@ echo "{
       \"value\": \"$INSTANCE_TTL\"
     }
   ]
-}" | $HTTP post "$INSTANCE_HOST/instances" "Authorization: Bearer $ACCESS_TOKEN"
+}" | $HTTP put "$INSTANCE_HOST/instances/$INSTANCE_ID" "Authorization: Bearer $ACCESS_TOKEN"

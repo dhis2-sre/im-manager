@@ -21,10 +21,9 @@ PGADMIN_INSTALL=${PGADMIN_INSTALL:-false}
 DATABASE_ID=${DATABASE_ID:-1}
 INSTANCE_TTL=${INSTANCE_TTL:-""}
 
+INSTANCE_ID=$($HTTP --check-status "$INSTANCE_HOST/instances-name-to-id/$GROUP/$NAME" "Authorization: Bearer $ACCESS_TOKEN")
+
 echo "{
-  \"name\": \"$NAME\",
-  \"groupName\": \"$GROUP\",
-  \"stackName\": \"$STACK\",
   \"optionalParameters\": [
     {
       \"name\": \"STARTUP_PROBE_FAILURE_THRESHOLD\",
@@ -65,4 +64,4 @@ echo "{
       \"value\": \"$DATABASE_ID\"
     }
   ]
-}" | $HTTP post "$INSTANCE_HOST/instances" "Authorization: Bearer $ACCESS_TOKEN"
+}" | $HTTP put "$INSTANCE_HOST/instances/$INSTANCE_ID" "Authorization: Bearer $ACCESS_TOKEN"
