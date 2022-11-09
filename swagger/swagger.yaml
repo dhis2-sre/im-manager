@@ -64,6 +64,9 @@ definitions:
                 type: string
             Preset:
                 type: boolean
+            PresetID:
+                format: uint64
+                type: integer
             StackName:
                 type: string
             UpdatedAt:

@@ -45,6 +45,9 @@ type Instance struct {
 	// preset
 	Preset bool `json:"Preset,omitempty"`
 
+	// preset ID
+	PresetID uint64 `json:"PresetID,omitempty"`
+
 	// required parameters
 	RequiredParameters []*InstanceRequiredParameter `json:"requiredParameters"`
 

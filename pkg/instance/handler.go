@@ -112,8 +112,7 @@ func (h Handler) Deploy(c *gin.Context) {
 		RequiredParameters: request.RequiredParameters,
 		OptionalParameters: request.OptionalParameters,
 		Preset:             preset,
-		// TODO: Store reference to preset instance? For the sake of traceability
-		//PresetInstance:		request.PresetInstance,
+		PresetID:           request.PresetInstance,
 	}
 
 	canWrite := handler.CanWriteInstance(user, instance)
