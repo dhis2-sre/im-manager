@@ -6,6 +6,13 @@ type _ struct {
 	// in: body
 	// required: true
 	Payload DeployInstanceRequest
+
+	// preset
+	// in: query
+	// required: false
+	// type: string
+	// description: define deployment as a preset
+	Preset string `json:"preset"`
 }
 
 // swagger:parameters updateInstance
