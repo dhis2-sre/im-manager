@@ -4,7 +4,7 @@ go 1.18
 
 require (
 	github.com/dhis2-sre/im-job v0.1.1-0.20220116121707-efdfb9c56501
-	github.com/dhis2-sre/im-user v0.9.0
+	github.com/dhis2-sre/im-user v0.10.0
 	github.com/dhis2-sre/rabbitmq v0.3.0
 	github.com/gin-contrib/cors v1.4.0
 	github.com/gin-gonic/gin v1.8.1

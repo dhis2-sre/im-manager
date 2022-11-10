@@ -320,8 +320,8 @@ github.com/dgrijalva/jwt-go v3.2.0+incompatible/go.mod h1:E3ru+11k8xSBh+hMPgOLZm
 github.com/dgryski/go-sip13 v0.0.0-20181026042036-e10d5fee7954/go.mod h1:vAd38F8PWV+bWy6jNmig1y/TA+kYO4g3RSRF0IAv0no=
 github.com/dhis2-sre/im-job v0.1.1-0.20220116121707-efdfb9c56501 h1:8mscN7/zx7A3BnXppCzMoi1Zc0y9SnUHdJF19S1ofWc=
 github.com/dhis2-sre/im-job v0.1.1-0.20220116121707-efdfb9c56501/go.mod h1:WhOHtgn+OWwqXr0dgKDNEb/pk9vwZ8ZG7gJrLuKPgZ4=
-github.com/dhis2-sre/im-user v0.9.0 h1:8k7p970dJkiSWZGBGOvweuzy32+MOoW0lx6EhpmcagY=
-github.com/dhis2-sre/im-user v0.9.0/go.mod h1:XHBG5Y7Wq/C45TE+DnGGxIkauxuckkYJe6zxin/DyXQ=
+github.com/dhis2-sre/im-user v0.10.0 h1:p2VmfVv+1Jm37AZK48vi9x13Fu8dVhJoDqw38VdTbE0=
+github.com/dhis2-sre/im-user v0.10.0/go.mod h1:ECvHnm41xyF/n0gLJ2FvgpaJFpyHm59rlXSVLTAtrrE=
 github.com/dhis2-sre/rabbitmq v0.3.0 h1:r7/5uJTTQGqYU9d19UO6SyfNHPsgqOtbmkoQM3xmEKI=
 github.com/dhis2-sre/rabbitmq v0.3.0/go.mod h1:CvQf39ow51XDHJVh0XZudgdtaZ8QATFjDLtmLcWBRY0=
 github.com/dimchansky/utfbom v1.1.1 h1:vV6w1AhK4VMnhBno/TPVCoK9U/LP0PkLCS9tbxHdi/U=
