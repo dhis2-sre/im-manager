@@ -149,7 +149,7 @@ func (h Handler) Deploy(c *gin.Context) {
 		return
 	}
 
-	if deploy && !preset {
+	if deploy {
 		err = h.instanceService.Deploy(token, savedInstance)
 		if err != nil {
 			_ = c.Error(err)
