@@ -167,7 +167,7 @@ func (h Handler) consumeParameters(user *models.User, sourceInstanceId uint, ins
 		return err
 	}
 
-	if sourceInstance.Preset != preset {
+	if preset && sourceInstance.Preset != false {
 		return apperror.NewUnauthorized(fmt.Sprintf("instance (id: %d) isn't a preset", sourceInstance.ID))
 	}
 
