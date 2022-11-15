@@ -171,7 +171,7 @@ func (h Handler) consumeParameters(user *models.User, sourceInstanceId uint, ins
 		return apperror.NewUnauthorized(fmt.Sprintf("instance (id: %d) isn't a preset", sourceInstance.ID))
 	}
 
-	if sourceInstance.StackName != instance.StackName {
+	if preset && sourceInstance.StackName != instance.StackName {
 		return apperror.NewUnauthorized(fmt.Sprintf("preset stack (%s) doesn't match instance stack (%s)", sourceInstance.StackName, instance.StackName))
 	}
 
