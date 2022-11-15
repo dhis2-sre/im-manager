@@ -86,6 +86,11 @@ func (h Handler) Deploy(c *gin.Context) {
 		}
 	}
 
+	if deploy && preset {
+		_ = c.Error(fmt.Errorf("you can't deploy a preset, thus both deploy and preset can't both be true"))
+		return
+	}
+
 	var request DeployInstanceRequest
 	if err := handler.DataBinder(c, &request); err != nil {
 		_ = c.Error(err)
