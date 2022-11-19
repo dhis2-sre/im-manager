@@ -4,7 +4,7 @@ go 1.18
 
 require (
 	github.com/dhis2-sre/im-job v0.1.1-0.20220116121707-efdfb9c56501
-	github.com/dhis2-sre/im-user v0.9.0
+	github.com/dhis2-sre/im-user v0.10.0
 	github.com/dhis2-sre/rabbitmq v0.3.0
 	github.com/gin-contrib/cors v1.4.0
 	github.com/gin-gonic/gin v1.8.1
@@ -21,9 +21,9 @@ require (
 	go.mozilla.org/sops/v3 v3.7.3
 	gorm.io/driver/postgres v1.4.5
 	gorm.io/gorm v1.24.1-0.20221019064659-5dd2bb482755
-	k8s.io/api v0.26.0-beta.0
-	k8s.io/apimachinery v0.26.0-beta.0
-	k8s.io/client-go v0.26.0-beta.0
+	k8s.io/api v0.27.0-alpha.0
+	k8s.io/apimachinery v0.27.0-alpha.0
+	k8s.io/client-go v0.27.0-alpha.0
 )
 
 require (
