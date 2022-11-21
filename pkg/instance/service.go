@@ -180,22 +180,12 @@ func (s service) Save(instance *model.Instance) (*model.Instance, error) {
 }
 
 func (s service) Deploy(accessToken string, instance *model.Instance) error {
-	err := s.instanceRepository.Save(instance)
-	if err != nil {
-		return err
-	}
-
-	instanceWithParameters, err := s.FindByIdDecrypted(instance.ID)
-	if err != nil {
-		return err
-	}
-
 	group, err := s.userClient.FindGroupByName(accessToken, instance.GroupName)
 	if err != nil {
 		return err
 	}
 
-	syncCmd, err := s.helmfileService.sync(accessToken, instanceWithParameters, group)
+	syncCmd, err := s.helmfileService.sync(accessToken, instance, group)
 	if err != nil {
 		return err
 	}
@@ -213,7 +203,7 @@ func (s service) Deploy(accessToken string, instance *model.Instance) error {
 	}
 
 	// TODO: Encrypt before saving? Yes...
-	err = s.instanceRepository.SaveDeployLog(instanceWithParameters, string(deployLog))
+	err = s.instanceRepository.SaveDeployLog(instance, string(deployLog))
 	instance.DeployLog = string(deployLog)
 	if err != nil {
 		// TODO

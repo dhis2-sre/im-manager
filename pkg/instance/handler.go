@@ -68,7 +68,7 @@ type DeployInstanceRequest struct {
 //   404: Error
 //   415: Error
 func (h Handler) Deploy(c *gin.Context) {
-	deploy := true
+	deploy := false
 	if deployParam, ok := c.GetQuery("deploy"); ok {
 		var err error
 		if deploy, err = strconv.ParseBool(deployParam); err != nil {
@@ -87,9 +87,11 @@ func (h Handler) Deploy(c *gin.Context) {
 	}
 
 	if deploy && preset {
-		_ = c.Error(fmt.Errorf("you can't deploy a preset, thus both deploy and preset can't both be true"))
+		_ = c.Error(fmt.Errorf("a preset can't be deployed, thus both deploy and preset can't be true"))
 		return
 	}
+
+	deploy = !preset
 
 	var request DeployInstanceRequest
 	if err := handler.DataBinder(c, &request); err != nil {
@@ -109,7 +111,7 @@ func (h Handler) Deploy(c *gin.Context) {
 		return
 	}
 
-	instance := &model.Instance{
+	i := &model.Instance{
 		Name:               request.Name,
 		UserID:             uint(user.ID),
 		GroupName:          request.Group,
@@ -120,10 +122,22 @@ func (h Handler) Deploy(c *gin.Context) {
 		PresetID:           request.PresetInstance,
 	}
 
-	canWrite := handler.CanWriteInstance(user, instance)
+	canWrite := handler.CanWriteInstance(user, i)
 	if !canWrite {
 		unauthorized := apperror.NewUnauthorized("write access denied")
 		_ = c.Error(unauthorized)
+		return
+	}
+
+	_, err = h.instanceService.Save(i)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	instance, err := h.instanceService.FindByIdDecrypted(i.ID)
+	if err != nil {
+		_ = c.Error(err)
 		return
 	}
 
@@ -150,7 +164,13 @@ func (h Handler) Deploy(c *gin.Context) {
 	}
 
 	if deploy {
-		err = h.instanceService.Deploy(token, savedInstance)
+		decryptedInstance, err := h.instanceService.FindByIdDecrypted(i.ID)
+		if err != nil {
+			_ = c.Error(err)
+			return
+		}
+
+		err = h.instanceService.Deploy(token, decryptedInstance)
 		if err != nil {
 			_ = c.Error(err)
 			return
@@ -167,7 +187,7 @@ func (h Handler) consumeParameters(user *models.User, sourceInstanceId uint, ins
 		return err
 	}
 
-	if preset && sourceInstance.Preset != false {
+	if preset && !sourceInstance.Preset {
 		return apperror.NewUnauthorized(fmt.Sprintf("instance (id: %d) isn't a preset", sourceInstance.ID))
 	}
 
@@ -185,13 +205,8 @@ func (h Handler) consumeParameters(user *models.User, sourceInstanceId uint, ins
 		return err
 	}
 
-	savedInstance, err := h.instanceService.Save(instance)
-	if err != nil {
-		return err
-	}
-
 	if !preset {
-		err = h.instanceService.Link(sourceInstance, savedInstance)
+		err = h.instanceService.Link(sourceInstance, instance)
 		if err != nil {
 			return err
 		}
