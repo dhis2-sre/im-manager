@@ -83,9 +83,6 @@ func (r repository) Save(instance *model.Instance) error {
 
 	enrichParameters(instance)
 
-	// TODO: Handle error?
-	_ = decryptParameters(key, instance)
-
 	err := encryptParameters(key, instance)
 	if err != nil {
 		return err
