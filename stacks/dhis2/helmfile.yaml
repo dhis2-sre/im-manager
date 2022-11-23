@@ -102,7 +102,7 @@ releases:
     namespace: "{{ requiredEnv "INSTANCE_NAMESPACE" }}"
     chart: runix/pgadmin4
     version: "{{ env "PGADMIN_CHART_VERSION" | default "1.9.10" }}"
-    installed: {{ env "PGADMIN_INSTALL" | default "false" }}
+    installed: {{ env "INSTALL_PGADMIN" | default "false" }}
     values:
       - podLabels:
           im-id: "{{ requiredEnv "INSTANCE_ID" }}"
