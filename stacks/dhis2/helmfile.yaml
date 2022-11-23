@@ -45,6 +45,11 @@ releases:
           server.base.url = https://{{ requiredEnv "INSTANCE_HOSTNAME" }}/{{ requiredEnv "INSTANCE_NAME" }}
           flyway.migrate_out_of_order = {{ env "FLYWAY_MIGRATE_OUT_OF_ORDER" | default false }}
           flyway.repair_before_migration = {{ env "FLYWAY_REPAIR_BEFORE_MIGRATION" | default false }}
+          {{- if eq (env "INSTALL_REDIS" | default "false") "true" }}
+          redis.enabled = on
+          redis.host = {{ requiredEnv "INSTANCE_NAME" }}-redis-master.{{ requiredEnv "INSTANCE_NAMESPACE" }}.svc
+          redis.port = 6379
+          {{ end }}
       - googleAuth:
           projectId: "{{ env "GOOGLE_AUTH_PROJECT_ID" | default "" }}"
           privateKeyId: "{{ env "GOOGLE_AUTH_PRIVATE_KEY_ID" | default "" }}"
@@ -132,6 +137,17 @@ releases:
               Host: {{ requiredEnv "INSTANCE_NAME" }}-database-postgresql.{{ requiredEnv "INSTANCE_NAMESPACE" }}.svc
               SSLMode: prefer
               MaintenanceDB: {{ env "DATABASE_NAME" | default "dhis2" }}
+
+  - name: {{ requiredEnv "INSTANCE_NAME" }}-redis
+    namespace: "{{ requiredEnv "INSTANCE_NAMESPACE" }}"
+    chart: bitnami/redis
+    version: 17.3.11
+    verify: false
+    installed: {{ env "INSTALL_REDIS" | default "false" }}
+    values:
+      - architecture: standalone
+      - auth:
+          enabled: false
 
 repositories:
   - name: bitnami

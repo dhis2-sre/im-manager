@@ -18,6 +18,7 @@ IMAGE_TAG=${IMAGE_TAG:-2.39.0}
 IMAGE_PULL_POLICY=${IMAGE_PULL_POLICY:-IfNotPresent}
 DATABASE_SIZE=${DATABASE_SIZE:-30Gi}
 PGADMIN_INSTALL=${PGADMIN_INSTALL:-false}
+INSTALL_REDIS=${INSTALL_REDIS:-false}
 DATABASE_ID=${DATABASE_ID:-1}
 INSTANCE_TTL=${INSTANCE_TTL:-""}
 
@@ -52,6 +53,10 @@ echo "{
     {
       \"name\": \"PGADMIN_INSTALL\",
       \"value\": \"$PGADMIN_INSTALL\"
+    },
+    {
+      \"name\": \"INSTALL_REDIS\",
+      \"value\": \"$INSTALL_REDIS\"
     },
     {
        \"name\": \"INSTANCE_TTL\",
