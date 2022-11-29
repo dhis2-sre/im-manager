@@ -7,8 +7,8 @@ source ./auth.sh
 STACK=dhis2-core
 
 GROUP=$1
-SOURCE_INSTANCE=$2
-DESTINATION_INSTANCE=$3
+NAME=$2
+SOURCE_INSTANCE=${3:-""}
 
 # container(s) in dhis2 pod will be restarted after that due to restartPolicy
 # 5*26=130s
@@ -25,7 +25,7 @@ FLYWAY_REPAIR_BEFORE_MIGRATION=${FLYWAY_REPAIR_BEFORE_MIGRATION:-false}
 SOURCE_INSTANCE_ID=$($HTTP get "$INSTANCE_HOST/instances-name-to-id/$GROUP/$SOURCE_INSTANCE" "Authorization: Bearer $ACCESS_TOKEN")
 
 echo "{
-  \"name\": \"$DESTINATION_INSTANCE\",
+  \"name\": \"$NAME\",
   \"groupName\": \"$GROUP\",
   \"stackName\": \"$STACK\",
   \"sourceInstance\": $SOURCE_INSTANCE_ID,
