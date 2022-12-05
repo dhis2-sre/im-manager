@@ -505,6 +505,21 @@ paths:
                     $ref: '#/responses/Error'
             security:
                 - oauth2: []
+    /integrations:
+        post:
+            description: Return integration for a given key
+            operationId: postIntegration
+            responses:
+                "200":
+                    $ref: '#/responses/Any'
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
     /presets:
         get:
             description: List presets
@@ -571,6 +586,9 @@ responses:
         description: ""
         schema:
             $ref: '#/definitions/GroupWithInstances'
+    Any:
+        description: ""
+        schema: {}
     Error:
         description: ""
     InstanceLogsResponse:

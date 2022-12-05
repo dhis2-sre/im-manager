@@ -13,6 +13,7 @@ type Config struct {
 	BasePath                       string
 	JobService                     Service
 	UserService                    Service
+	DockerHub                      DockerHub
 	DatabaseManagerService         Service
 	Postgresql                     postgresql
 	RabbitMqURL                    rabbitmq
@@ -35,6 +36,10 @@ func New() Config {
 			BasePath: requireEnv("JOB_SERVICE_BASE_PATH"),
 			//			Username: requireEnv("JOB_SERVICE_USERNAME"),
 			//			Password: requireEnv("JOB_SERVICE_PASSWORD"),
+		},
+		DockerHub: DockerHub{
+			Username: requireEnv("DOCKER_HUB_USERNAME"),
+			Password: requireEnv("DOCKER_HUB_PASSWORD"),
 		},
 		DatabaseManagerService: Service{
 			Host:     requireEnv("DATABASE_MANAGER_SERVICE_HOST"),
@@ -68,6 +73,11 @@ func New() Config {
 type Service struct {
 	Host     string
 	BasePath string
+	Username string
+	Password string
+}
+
+type DockerHub struct {
 	Username string
 	Password string
 }

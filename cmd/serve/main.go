@@ -29,6 +29,9 @@ import (
 	"log"
 
 	jobClient "github.com/dhis2-sre/im-job/pkg/client"
+
+	"github.com/dhis2-sre/im-manager/pkg/integration"
+
 	"github.com/dhis2-sre/im-manager/internal/handler"
 	"github.com/dhis2-sre/im-manager/internal/server"
 	"github.com/dhis2-sre/im-manager/pkg/config"
@@ -60,6 +63,8 @@ func run() error {
 	helmfileSvc := instance.NewHelmfileService(stackSvc, cfg)
 	instanceSvc := instance.NewService(cfg, instanceRepo, uc, stackSvc, helmfileSvc)
 
+	integrationHandler := integration.NewHandler(cfg)
+
 	err = stack.LoadStacks("./stacks", stackSvc)
 	if err != nil {
 		return err
@@ -88,6 +93,6 @@ func run() error {
 		return err
 	}
 
-	r := server.GetEngine(cfg.BasePath, stackHandler, instanceHandler, authMiddleware)
+	r := server.GetEngine(cfg.BasePath, stackHandler, instanceHandler, integrationHandler, authMiddleware)
 	return r.Run()
 }
