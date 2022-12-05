@@ -11,7 +11,6 @@ type Config struct {
 	Environment                    string
 	InstanceParameterEncryptionKey string
 	BasePath                       string
-	JobService                     Service
 	UserService                    Service
 	DatabaseManagerService         Service
 	Postgresql                     postgresql
@@ -29,12 +28,6 @@ func New() Config {
 			BasePath: requireEnv("USER_SERVICE_BASE_PATH"),
 			Username: requireEnv("USER_SERVICE_USERNAME"),
 			Password: requireEnv("USER_SERVICE_PASSWORD"),
-		},
-		JobService: Service{
-			Host:     requireEnv("JOB_SERVICE_HOST"),
-			BasePath: requireEnv("JOB_SERVICE_BASE_PATH"),
-			//			Username: requireEnv("JOB_SERVICE_USERNAME"),
-			//			Password: requireEnv("JOB_SERVICE_PASSWORD"),
 		},
 		DatabaseManagerService: Service{
 			Host:     requireEnv("DATABASE_MANAGER_SERVICE_HOST"),
