@@ -12,9 +12,6 @@ environment:
   USER_SERVICE_HOST: im-user-radnov.instance-manager-radnov.svc:8080
   USER_SERVICE_BASE_PATH: /
 
-  JOB_SERVICE_HOST: im-job-radnov.instance-manager-radnov.svc:8080
-  JOB_SERVICE_BASE_PATH: /
-
   DATABASE_MANAGER_SERVICE_HOST: im-database-manager-radnov.instance-manager-radnov.svc:8080
   DATABASE_MANAGER_SERVICE_BASE_PATH: /
 

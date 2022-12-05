@@ -28,7 +28,6 @@ package main
 import (
 	"log"
 
-	jobClient "github.com/dhis2-sre/im-job/pkg/client"
 	"github.com/dhis2-sre/im-manager/internal/handler"
 	"github.com/dhis2-sre/im-manager/internal/server"
 	"github.com/dhis2-sre/im-manager/pkg/config"
@@ -81,8 +80,7 @@ func run() error {
 	}
 
 	stackHandler := stack.NewHandler(stackSvc)
-	jobC := jobClient.ProvideClient(cfg.JobService.Host, cfg.JobService.BasePath)
-	instanceHandler := instance.NewHandler(uc, jobC, instanceSvc, stackSvc)
+	instanceHandler := instance.NewHandler(uc, instanceSvc, stackSvc)
 	authMiddleware, err := handler.NewAuthentication(cfg)
 	if err != nil {
 		return err

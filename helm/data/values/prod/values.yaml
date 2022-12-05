@@ -11,9 +11,6 @@ environment:
   USER_SERVICE_HOST: im-user-prod.instance-manager-prod.svc:8080
   USER_SERVICE_BASE_PATH: /
 
-  JOB_SERVICE_HOST: im-job-prod.instance-manager-prod.svc:8080
-  JOB_SERVICE_BASE_PATH: /skaffold
-
   DATABASE_MANAGER_SERVICE_HOST: im-database-manager-prod.instance-manager-prod.svc:8080
   DATABASE_MANAGER_SERVICE_BASE_PATH: /
 
