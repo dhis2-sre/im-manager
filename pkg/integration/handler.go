@@ -94,7 +94,8 @@ func (h Handler) Integrations(c *gin.Context) {
 			return
 		}
 
-		databases, err := getInstanceManagerDatabases(token)
+		url := fmt.Sprintf("http://%s/databases", h.config.DatabaseManagerService.Host)
+		databases, err := getInstanceManagerDatabases(token, url)
 		if err != nil {
 			_ = c.Error(err)
 			return
@@ -172,9 +173,7 @@ func getInstances(token string, url string) (map[uint]string, error) {
 	return instances, nil
 }
 
-func getInstanceManagerDatabases(token string) (map[uint]string, error) {
-	url := fmt.Sprintf("https://api.im.tons.test.c.dhis2.org/databases")
-
+func getInstanceManagerDatabases(token string, url string) (map[uint]string, error) {
 	b, err := httpGet(token, url)
 	if err != nil {
 		return nil, err
