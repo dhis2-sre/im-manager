@@ -11,6 +11,9 @@ serviceAccount:
 environment:
   ENVIRONMENT: feature
 
+  INSTANCE_SERVICE_HOST: im-manager-feature.instance-manager-feature.svc:8080
+  INSTANCE_SERVICE_BASE_PATH: /
+
   USER_SERVICE_HOST: im-user-feature.instance-manager-feature.svc:8080
   USER_SERVICE_BASE_PATH: /skaffold
 

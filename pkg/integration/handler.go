@@ -103,7 +103,7 @@ func (h Handler) Integrations(c *gin.Context) {
 			return
 		}
 
-		url := "https://api.im.tons.test.c.dhis2.org/presets"
+		url := fmt.Sprintf("http://%s/presets", h.config.InstanceService.Host)
 		presets, err := getInstances(token, url)
 		if err != nil {
 			_ = c.Error(err)
@@ -121,8 +121,7 @@ func (h Handler) Integrations(c *gin.Context) {
 			return
 		}
 
-		// TODO: Put urls in config
-		url := "https://api.im.tons.test.c.dhis2.org/instances"
+		url := fmt.Sprintf("http://%s/instances", h.config.InstanceService.Host)
 		presets, err := getInstances(token, url)
 		if err != nil {
 			_ = c.Error(err)

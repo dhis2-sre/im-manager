@@ -11,6 +11,7 @@ type Config struct {
 	Environment                    string
 	InstanceParameterEncryptionKey string
 	BasePath                       string
+	InstanceService                Service
 	JobService                     Service
 	UserService                    Service
 	DockerHub                      DockerHub
@@ -25,6 +26,10 @@ func New() Config {
 		Environment:                    requireEnv("ENVIRONMENT"),
 		BasePath:                       requireEnv("BASE_PATH"),
 		InstanceParameterEncryptionKey: requireEnv("INSTANCE_PARAMETER_ENCRYPTION_KEY"),
+		InstanceService: Service{
+			Host:     requireEnv("INSTANCE_SERVICE_HOST"),
+			BasePath: requireEnv("INSTANCE_SERVICE_BASE_PATH"),
+		},
 		UserService: Service{
 			Host:     requireEnv("USER_SERVICE_HOST"),
 			BasePath: requireEnv("USER_SERVICE_BASE_PATH"),
