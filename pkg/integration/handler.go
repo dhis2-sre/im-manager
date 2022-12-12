@@ -303,7 +303,6 @@ func getDockerHubImages(token, organization string) ([]string, error) {
 }
 
 func getDockerHubToken(username, password string) (string, error) {
-	// NewDockerImageIntegration(request.Key, request.Payload)
 	url := "https://hub.docker.com/v2/users/login"
 	contentType := "application/json"
 	body := struct {
