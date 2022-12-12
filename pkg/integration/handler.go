@@ -7,7 +7,6 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
-	"time"
 
 	"github.com/dhis2-sre/im-manager/pkg/config"
 
@@ -209,9 +208,7 @@ func httpGet(token string, url string) ([]byte, error) {
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
 
-	client := http.Client{
-		Timeout: 30 * time.Second,
-	}
+	client := http.Client{}
 
 	response, err := client.Do(req)
 	if err != nil {
@@ -235,9 +232,7 @@ func getDockerHubImageTags(token string, organization string, repository string)
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", fmt.Sprintf("JWT %s", token))
 
-	client := http.Client{
-		Timeout: 30 * time.Second,
-	}
+	client := http.Client{}
 
 	response, err := client.Do(req)
 	if err != nil {
@@ -277,9 +272,7 @@ func getDockerHubImages(token, organization string) ([]string, error) {
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", fmt.Sprintf("JWT %s", token))
 
-	client := http.Client{
-		Timeout: 30 * time.Second,
-	}
+	client := http.Client{}
 
 	response, err := client.Do(req)
 	if err != nil {
