@@ -63,7 +63,8 @@ func run() error {
 	helmfileSvc := instance.NewHelmfileService(stackSvc, cfg)
 	instanceSvc := instance.NewService(cfg, instanceRepo, uc, stackSvc, helmfileSvc)
 
-	integrationHandler := integration.NewHandler(cfg)
+	dockerHubClient := integration.NewDockerHubClient(cfg)
+	integrationHandler := integration.NewHandler(cfg, dockerHubClient)
 
 	err = stack.LoadStacks("./stacks", stackSvc)
 	if err != nil {

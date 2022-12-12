@@ -1,11 +1,9 @@
 package integration
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 
 	"github.com/dhis2-sre/im-manager/pkg/config"
@@ -14,12 +12,18 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-type Handler struct {
-	config config.Config
+func NewHandler(config config.Config, client DockerHubClient) Handler {
+	return Handler{config, client}
 }
 
-func NewHandler(config config.Config) Handler {
-	return Handler{config}
+type Handler struct {
+	config          config.Config
+	dockerHubClient DockerHubClient
+}
+
+type DockerHubClient interface {
+	GetImages(organization string) ([]string, error)
+	GetTags(organization, repository string) ([]string, error)
 }
 
 type Request struct {
@@ -48,15 +52,9 @@ func (h Handler) Integrations(c *gin.Context) {
 	}
 
 	if request.Key == "IMAGE_REPOSITORY" {
-		token, err := getDockerHubToken(h.config.DockerHub.Username, h.config.DockerHub.Password)
-		if err != nil {
-			_ = c.Error(err)
-			return
-		}
-
 		payload := request.Payload.(map[string]any)
 		organization := payload["organization"].(string)
-		images, err := getDockerHubImages(token, organization)
+		images, err := h.dockerHubClient.GetImages(organization)
 		if err != nil {
 			_ = c.Error(err)
 			return
@@ -67,16 +65,10 @@ func (h Handler) Integrations(c *gin.Context) {
 	}
 
 	if request.Key == "IMAGE_TAG" {
-		token, err := getDockerHubToken(h.config.DockerHub.Username, h.config.DockerHub.Password)
-		if err != nil {
-			_ = c.Error(err)
-			return
-		}
-
 		payload := request.Payload.(map[string]any)
 		organization := payload["organization"].(string)
 		repository := payload["repository"].(string)
-		tags, err := getDockerHubImageTags(token, organization, repository)
+		tags, err := h.dockerHubClient.GetTags(organization, repository)
 		if err != nil {
 			_ = c.Error(err)
 			return
@@ -94,7 +86,7 @@ func (h Handler) Integrations(c *gin.Context) {
 		}
 
 		url := fmt.Sprintf("http://%s/databases", h.config.DatabaseManagerService.Host)
-		databases, err := getInstanceManagerDatabases(token, url)
+		databases, err := getDatabases(token, url)
 		if err != nil {
 			_ = c.Error(err)
 			return
@@ -172,7 +164,7 @@ func getInstances(token string, url string) (map[uint]string, error) {
 	return instances, nil
 }
 
-func getInstanceManagerDatabases(token string, url string) (map[uint]string, error) {
+func getDatabases(token string, url string) (map[uint]string, error) {
 	b, err := httpGet(token, url)
 	if err != nil {
 		return nil, err
@@ -220,121 +212,4 @@ func httpGet(token string, url string) ([]byte, error) {
 		return nil, err
 	}
 	return b, err
-}
-
-func getDockerHubImageTags(token string, organization string, repository string) ([]string, error) {
-	url := fmt.Sprintf("https://hub.docker.com/v2/repositories/%s/%s/tags?page_size=10000", organization, repository)
-
-	req, err := http.NewRequest(http.MethodGet, url, nil)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", fmt.Sprintf("JWT %s", token))
-
-	client := http.Client{}
-
-	response, err := client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-
-	b, err := io.ReadAll(response.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	body := struct {
-		Results []struct {
-			Name string
-		}
-	}{}
-	err = json.Unmarshal(b, &body)
-	if err != nil {
-		return nil, err
-	}
-
-	tags := make([]string, len(body.Results))
-	for i, image := range body.Results {
-		tags[i] = image.Name
-	}
-
-	return tags, nil
-}
-
-func getDockerHubImages(token, organization string) ([]string, error) {
-	url := fmt.Sprintf("https://hub.docker.com/v2/repositories/%s?page_size=10000", organization)
-
-	req, err := http.NewRequest(http.MethodGet, url, nil)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", fmt.Sprintf("JWT %s", token))
-
-	client := http.Client{}
-
-	response, err := client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-
-	b, err := ioutil.ReadAll(response.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	body := struct {
-		Results []struct {
-			Name string
-		}
-	}{}
-	err = json.Unmarshal(b, &body)
-	if err != nil {
-		return nil, err
-	}
-
-	images := make([]string, len(body.Results))
-	for i, image := range body.Results {
-		images[i] = image.Name
-	}
-
-	return images, nil
-}
-
-func getDockerHubToken(username, password string) (string, error) {
-	url := "https://hub.docker.com/v2/users/login"
-	contentType := "application/json"
-	body := struct {
-		Username string
-		Password string
-	}{
-		Username: username,
-		Password: password,
-	}
-
-	var buf bytes.Buffer
-	err := json.NewEncoder(&buf).Encode(body)
-	if err != nil {
-		return "", err
-	}
-
-	response, err := http.Post(url, contentType, &buf)
-	if err != nil {
-		return "", err
-	}
-
-	b, err := io.ReadAll(response.Body)
-	if err != nil {
-		return "", err
-	}
-
-	token := struct {
-		Token string
-	}{}
-	if err := json.Unmarshal(b, &token); err != nil {
-		return "", err
-	}
-
-	return token.Token, nil
 }
