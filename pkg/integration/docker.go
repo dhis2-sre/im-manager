@@ -108,8 +108,6 @@ func (d dockerHubClient) GetImages(organization string) ([]string, error) {
 }
 
 func (d dockerHubClient) getToken() (string, error) {
-	url := "https://hub.docker.com/v2/users/login"
-	contentType := "application/json"
 	body := struct {
 		Username string
 		Password string
@@ -124,7 +122,7 @@ func (d dockerHubClient) getToken() (string, error) {
 		return "", err
 	}
 
-	response, err := http.Post(url, contentType, &buf)
+	response, err := http.Post("https://hub.docker.com/v2/users/login", "application/json", &buf)
 	if err != nil {
 		return "", err
 	}
