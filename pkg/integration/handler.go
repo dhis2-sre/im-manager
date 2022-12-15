@@ -6,19 +6,17 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/dhis2-sre/im-manager/pkg/config"
-
 	"github.com/dhis2-sre/im-manager/internal/handler"
 	"github.com/gin-gonic/gin"
 )
 
-func NewHandler(config config.Config, client DockerHubClient) Handler {
-	return Handler{config, client}
+func NewHandler(client DockerHubClient, instanceManagerHost, databaseManagerHost string) Handler {
+	return Handler{client, instanceManagerHost, databaseManagerHost}
 }
 
 type Handler struct {
-	config          config.Config
-	dockerHubClient DockerHubClient
+	dockerHubClient                          DockerHubClient
+	databaseManagerHost, instanceManagerHost string
 }
 
 type DockerHubClient interface {
@@ -85,7 +83,7 @@ func (h Handler) Integrations(c *gin.Context) {
 			return
 		}
 
-		url := fmt.Sprintf("http://%s/databases", h.config.DatabaseManagerService.Host)
+		url := fmt.Sprintf("http://%s/databases", h.databaseManagerHost)
 		databases, err := getDatabases(token, url)
 		if err != nil {
 			_ = c.Error(err)
@@ -103,7 +101,7 @@ func (h Handler) Integrations(c *gin.Context) {
 			return
 		}
 
-		url := fmt.Sprintf("http://%s/presets", h.config.InstanceService.Host)
+		url := fmt.Sprintf("http://%s/presets", h.instanceManagerHost)
 		presets, err := getInstances(token, url)
 		if err != nil {
 			_ = c.Error(err)
@@ -121,7 +119,7 @@ func (h Handler) Integrations(c *gin.Context) {
 			return
 		}
 
-		url := fmt.Sprintf("http://%s/instances", h.config.InstanceService.Host)
+		url := fmt.Sprintf("http://%s/instances", h.instanceManagerHost)
 		presets, err := getInstances(token, url)
 		if err != nil {
 			_ = c.Error(err)
