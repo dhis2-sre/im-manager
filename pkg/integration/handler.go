@@ -51,7 +51,19 @@ func (h Handler) Integrations(c *gin.Context) {
 
 	if request.Key == "IMAGE_REPOSITORY" {
 		payload := request.Payload.(map[string]any)
-		organization := payload["organization"].(string)
+
+		org, ok := payload["organization"]
+		if !ok {
+			_ = c.Error(fmt.Errorf("payload doesn't contain \"organization\""))
+			return
+		}
+
+		organization, ok := org.(string)
+		if !ok {
+			_ = c.Error(fmt.Errorf("\"organization\" must be a string"))
+			return
+		}
+
 		images, err := h.dockerHubClient.GetImages(organization)
 		if err != nil {
 			_ = c.Error(err)
