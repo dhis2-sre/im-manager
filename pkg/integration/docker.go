@@ -7,16 +7,14 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
-
-	"github.com/dhis2-sre/im-manager/pkg/config"
 )
 
-func NewDockerHubClient(config config.Config) dockerHubClient {
-	return dockerHubClient{config: config}
+func NewDockerHubClient(username, password string) dockerHubClient {
+	return dockerHubClient{username, password}
 }
 
 type dockerHubClient struct {
-	config config.Config
+	username, password string
 }
 
 func (d dockerHubClient) GetTags(organization string, repository string) ([]string, error) {
@@ -110,17 +108,14 @@ func (d dockerHubClient) GetImages(organization string) ([]string, error) {
 }
 
 func (d dockerHubClient) getToken() (string, error) {
-	username := d.config.DockerHub.Username
-	password := d.config.DockerHub.Password
-
 	url := "https://hub.docker.com/v2/users/login"
 	contentType := "application/json"
 	body := struct {
 		Username string
 		Password string
 	}{
-		Username: username,
-		Password: password,
+		Username: d.username,
+		Password: d.password,
 	}
 
 	var buf bytes.Buffer
