@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"io"
-	"log"
 	"net/http"
 	"testing"
 
@@ -43,7 +42,7 @@ func (c *clientMockImages) Do(*http.Request) (*http.Response, error) {
 
 	data, err := json.Marshal(res)
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
 	reader := bytes.NewReader(data)
 	return &http.Response{
@@ -83,7 +82,7 @@ func (c *clientMockTags) Do(*http.Request) (*http.Response, error) {
 
 	data, err := json.Marshal(res)
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
 	reader := bytes.NewReader(data)
 	return &http.Response{
