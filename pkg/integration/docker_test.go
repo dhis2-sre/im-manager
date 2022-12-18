@@ -38,16 +38,7 @@ func (c *clientMockImages) Do(*http.Request) (*http.Response, error) {
 			Name: "core-dev",
 		},
 	}
-	res := dockerHubResponse{Results: results}
-
-	data, err := json.Marshal(res)
-	if err != nil {
-		return nil, err
-	}
-	reader := bytes.NewReader(data)
-	return &http.Response{
-		Body: io.NopCloser(reader),
-	}, nil
+	return do(results)
 }
 
 func Test_dockerHubClient_GetTags(t *testing.T) {
@@ -78,6 +69,10 @@ func (c *clientMockTags) Do(*http.Request) (*http.Response, error) {
 			Name: "2.37.0",
 		},
 	}
+	return do(results)
+}
+
+func do(results []struct{ Name string }) (*http.Response, error) {
 	res := dockerHubResponse{Results: results}
 
 	data, err := json.Marshal(res)
