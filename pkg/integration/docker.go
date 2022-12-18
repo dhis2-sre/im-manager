@@ -10,11 +10,17 @@ import (
 )
 
 func NewDockerHubClient(username, password string) dockerHubClient {
-	return dockerHubClient{username, password}
+	client := http.Client{}
+	return dockerHubClient{username, password, &client}
+}
+
+type HttpClient interface {
+	Do(req *http.Request) (*http.Response, error)
 }
 
 type dockerHubClient struct {
 	username, password string
+	client             HttpClient
 }
 
 type dockerHubResponse struct {
@@ -38,9 +44,7 @@ func (d dockerHubClient) GetTags(organization string, repository string) ([]stri
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", fmt.Sprintf("JWT %s", token))
 
-	client := http.Client{}
-
-	response, err := client.Do(req)
+	response, err := d.client.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -79,9 +83,7 @@ func (d dockerHubClient) GetImages(organization string) ([]string, error) {
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", fmt.Sprintf("JWT %s", token))
 
-	client := http.Client{}
-
-	response, err := client.Do(req)
+	response, err := d.client.Do(req)
 	if err != nil {
 		return nil, err
 	}

@@ -19,6 +19,7 @@ require (
 	github.com/rabbitmq/amqp091-go v1.3.4
 	github.com/stretchr/testify v1.8.1
 	go.mozilla.org/sops/v3 v3.7.3
+	golang.org/x/exp v0.0.0-20221217163422-3c43f8badb15
 	gorm.io/driver/postgres v1.4.5
 	gorm.io/gorm v1.24.1-0.20221019064659-5dd2bb482755
 	k8s.io/api v0.27.0-alpha.0
