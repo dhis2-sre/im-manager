@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"golang.org/x/exp/slices"
 
 	"github.com/stretchr/testify/assert"
@@ -19,7 +21,7 @@ func Test_dockerHubClient_GetImages(t *testing.T) {
 
 	organization := "dhis2"
 	images, err := hubClient.GetImages(organization)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	assert.True(t, slices.Contains(images, "core"))
 	assert.True(t, slices.Contains(images, "core-dev"))
@@ -55,7 +57,7 @@ func Test_dockerHubClient_GetTags(t *testing.T) {
 
 	organization := "dhis2"
 	images, err := hubClient.GetImages(organization)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	assert.True(t, slices.Contains(images, "2.39.0"))
 	assert.True(t, slices.Contains(images, "2.38.0"))
