@@ -17,6 +17,12 @@ type dockerHubClient struct {
 	username, password string
 }
 
+type dockerHubResponse struct {
+	Results []struct {
+		Name string
+	}
+}
+
 func (d dockerHubClient) GetTags(organization string, repository string) ([]string, error) {
 	url := fmt.Sprintf("https://hub.docker.com/v2/repositories/%s/%s/tags?page_size=10000", organization, repository)
 
@@ -44,11 +50,7 @@ func (d dockerHubClient) GetTags(organization string, repository string) ([]stri
 		return nil, err
 	}
 
-	body := struct {
-		Results []struct {
-			Name string
-		}
-	}{}
+	body := dockerHubResponse{}
 	err = json.Unmarshal(b, &body)
 	if err != nil {
 		return nil, err
@@ -89,11 +91,7 @@ func (d dockerHubClient) GetImages(organization string) ([]string, error) {
 		return nil, err
 	}
 
-	body := struct {
-		Results []struct {
-			Name string
-		}
-	}{}
+	body := dockerHubResponse{}
 	err = json.Unmarshal(b, &body)
 	if err != nil {
 		return nil, err
