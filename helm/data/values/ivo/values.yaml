@@ -15,9 +15,6 @@ environment:
   USER_SERVICE_HOST: im-user-ivo.instance-manager-ivo.svc:8080
   USER_SERVICE_BASE_PATH: /
 
-  JOB_SERVICE_HOST: im-job-ivo.instance-manager-ivo.svc:8080
-  JOB_SERVICE_BASE_PATH: /
-
   DATABASE_MANAGER_SERVICE_HOST: im-database-manager-ivo.instance-manager-ivo.svc:8080
   DATABASE_MANAGER_SERVICE_BASE_PATH: /
 

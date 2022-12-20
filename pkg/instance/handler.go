@@ -9,7 +9,6 @@ import (
 
 	"github.com/dhis2-sre/im-manager/pkg/stack"
 
-	jobClient "github.com/dhis2-sre/im-job/pkg/client"
 	"github.com/dhis2-sre/im-manager/internal/apperror"
 	"github.com/dhis2-sre/im-manager/internal/handler"
 	"github.com/dhis2-sre/im-manager/pkg/model"
@@ -19,20 +18,17 @@ import (
 
 type Handler struct {
 	userClient      userClientHandler
-	jobClient       jobClient.Client
 	instanceService Service
 	stackService    stack.Service
 }
 
 func NewHandler(
 	usrClient userClientHandler,
-	jobClient jobClient.Client,
 	instanceService Service,
 	stackService stack.Service,
 ) Handler {
 	return Handler{
 		usrClient,
-		jobClient,
 		instanceService,
 		stackService,
 	}
