@@ -9,8 +9,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"golang.org/x/exp/slices"
-
 	"github.com/stretchr/testify/assert"
 )
 
@@ -22,8 +20,7 @@ func Test_dockerHubClient_GetImages(t *testing.T) {
 	images, err := hubClient.GetImages(organization)
 	require.NoError(t, err)
 
-	assert.True(t, slices.Contains(images, "core"))
-	assert.True(t, slices.Contains(images, "core-dev"))
+	assert.ElementsMatch(t, images, []string{"core", "core-dev"})
 }
 
 type clientMockImages struct {
@@ -46,12 +43,11 @@ func Test_dockerHubClient_GetTags(t *testing.T) {
 	hubClient.client = &clientMockTags{}
 
 	organization := "dhis2"
-	images, err := hubClient.GetImages(organization)
+	repository := "core"
+	tags, err := hubClient.GetTags(organization, repository)
 	require.NoError(t, err)
 
-	assert.True(t, slices.Contains(images, "2.39.0"))
-	assert.True(t, slices.Contains(images, "2.38.0"))
-	assert.True(t, slices.Contains(images, "2.37.0"))
+	assert.ElementsMatch(t, tags, []string{"2.39.0", "2.38.0", "2.37.0"})
 }
 
 type clientMockTags struct {
