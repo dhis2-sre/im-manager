@@ -5,13 +5,14 @@ import (
 	"github.com/dhis2-sre/im-manager/internal/middleware"
 	"github.com/dhis2-sre/im-manager/pkg/health"
 	"github.com/dhis2-sre/im-manager/pkg/instance"
+	"github.com/dhis2-sre/im-manager/pkg/integration"
 	"github.com/dhis2-sre/im-manager/pkg/stack"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	redocMiddleware "github.com/go-openapi/runtime/middleware"
 )
 
-func GetEngine(basePath string, stackHandler stack.Handler, instanceHandler instance.Handler, authMiddleware *handler.AuthenticationMiddleware) *gin.Engine {
+func GetEngine(basePath string, stackHandler stack.Handler, instanceHandler instance.Handler, integrationHandler integration.Handler, authMiddleware *handler.AuthenticationMiddleware) *gin.Engine {
 	r := gin.Default()
 
 	corsConfig := cors.DefaultConfig()
@@ -33,6 +34,8 @@ func GetEngine(basePath string, stackHandler stack.Handler, instanceHandler inst
 
 	tokenAuthenticationRouter.GET("/stacks", stackHandler.FindAll)
 	tokenAuthenticationRouter.GET("/stacks/:name", stackHandler.Find)
+
+	tokenAuthenticationRouter.POST("/integrations", integrationHandler.Integrations)
 
 	tokenAuthenticationRouter.POST("/instances", instanceHandler.Deploy)
 	tokenAuthenticationRouter.GET("/instances", instanceHandler.List)

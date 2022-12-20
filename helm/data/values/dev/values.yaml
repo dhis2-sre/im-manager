@@ -9,6 +9,9 @@ serviceAccount:
 environment:
   ENVIRONMENT: dev
 
+  INSTANCE_SERVICE_HOST: im-manager-dev.instance-manager-dev.svc:8080
+  INSTANCE_SERVICE_BASE_PATH: /
+
   USER_SERVICE_HOST: im-user-dev.instance-manager-dev.svc:8080
   USER_SERVICE_BASE_PATH: /
 

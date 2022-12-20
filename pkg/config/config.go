@@ -11,7 +11,10 @@ type Config struct {
 	Environment                    string
 	InstanceParameterEncryptionKey string
 	BasePath                       string
+	InstanceService                Service
+	JobService                     Service
 	UserService                    Service
+	DockerHub                      DockerHub
 	DatabaseManagerService         Service
 	Postgresql                     postgresql
 	RabbitMqURL                    rabbitmq
@@ -23,11 +26,25 @@ func New() Config {
 		Environment:                    requireEnv("ENVIRONMENT"),
 		BasePath:                       requireEnv("BASE_PATH"),
 		InstanceParameterEncryptionKey: requireEnv("INSTANCE_PARAMETER_ENCRYPTION_KEY"),
+		InstanceService: Service{
+			Host:     requireEnv("INSTANCE_SERVICE_HOST"),
+			BasePath: requireEnv("INSTANCE_SERVICE_BASE_PATH"),
+		},
 		UserService: Service{
 			Host:     requireEnv("USER_SERVICE_HOST"),
 			BasePath: requireEnv("USER_SERVICE_BASE_PATH"),
 			Username: requireEnv("USER_SERVICE_USERNAME"),
 			Password: requireEnv("USER_SERVICE_PASSWORD"),
+		},
+		JobService: Service{
+			Host:     requireEnv("JOB_SERVICE_HOST"),
+			BasePath: requireEnv("JOB_SERVICE_BASE_PATH"),
+			//			Username: requireEnv("JOB_SERVICE_USERNAME"),
+			//			Password: requireEnv("JOB_SERVICE_PASSWORD"),
+		},
+		DockerHub: DockerHub{
+			Username: requireEnv("DOCKER_HUB_USERNAME"),
+			Password: requireEnv("DOCKER_HUB_PASSWORD"),
 		},
 		DatabaseManagerService: Service{
 			Host:     requireEnv("DATABASE_MANAGER_SERVICE_HOST"),
@@ -61,6 +78,11 @@ func New() Config {
 type Service struct {
 	Host     string
 	BasePath string
+	Username string
+	Password string
+}
+
+type DockerHub struct {
 	Username string
 	Password string
 }
