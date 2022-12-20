@@ -28,8 +28,6 @@ package main
 import (
 	"log"
 
-  jobClient "github.com/dhis2-sre/im-job/pkg/client"
-
 	"github.com/dhis2-sre/im-manager/pkg/integration"
 
 	"github.com/dhis2-sre/im-manager/internal/handler"

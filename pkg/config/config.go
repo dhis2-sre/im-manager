@@ -12,7 +12,6 @@ type Config struct {
 	InstanceParameterEncryptionKey string
 	BasePath                       string
 	InstanceService                Service
-	JobService                     Service
 	UserService                    Service
 	DockerHub                      DockerHub
 	DatabaseManagerService         Service
@@ -35,12 +34,6 @@ func New() Config {
 			BasePath: requireEnv("USER_SERVICE_BASE_PATH"),
 			Username: requireEnv("USER_SERVICE_USERNAME"),
 			Password: requireEnv("USER_SERVICE_PASSWORD"),
-		},
-		JobService: Service{
-			Host:     requireEnv("JOB_SERVICE_HOST"),
-			BasePath: requireEnv("JOB_SERVICE_BASE_PATH"),
-			//			Username: requireEnv("JOB_SERVICE_USERNAME"),
-			//			Password: requireEnv("JOB_SERVICE_PASSWORD"),
 		},
 		DockerHub: DockerHub{
 			Username: requireEnv("DOCKER_HUB_USERNAME"),
