@@ -16,7 +16,7 @@ func NewHandler(client DockerHubClient, instanceManagerHost, databaseManagerHost
 
 type Handler struct {
 	dockerHubClient                          DockerHubClient
-	databaseManagerHost, instanceManagerHost string
+	instanceManagerHost, databaseManagerHost string
 }
 
 type DockerHubClient interface {
