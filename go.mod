@@ -18,8 +18,8 @@ require (
 	github.com/rabbitmq/amqp091-go v1.3.4
 	github.com/stretchr/testify v1.8.1
 	go.mozilla.org/sops/v3 v3.7.3
-	gorm.io/driver/postgres v1.4.5
-	gorm.io/gorm v1.24.1-0.20221019064659-5dd2bb482755
+	gorm.io/driver/postgres v1.4.6
+	gorm.io/gorm v1.24.2
 	k8s.io/api v0.27.0-alpha.0
 	k8s.io/apimachinery v0.27.0-alpha.0
 	k8s.io/client-go v0.27.0-alpha.0
@@ -100,9 +100,8 @@ require (
 	github.com/jackc/pgio v1.0.0 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgproto3/v2 v2.3.1 // indirect
-	github.com/jackc/pgservicefile v0.0.0-20200714003250-2b9c44734f2b // indirect
-	github.com/jackc/pgtype v1.12.0 // indirect
-	github.com/jackc/pgx/v4 v4.17.2 // indirect
+	github.com/jackc/pgservicefile v0.0.0-20221227161230-091c0ba34f0a // indirect
+	github.com/jackc/pgx/v5 v5.2.0 // indirect
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/jinzhu/now v1.1.5 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
@@ -145,8 +144,8 @@ require (
 	go.opencensus.io v0.23.0 // indirect
 	go.opentelemetry.io/otel v1.11.1 // indirect
 	go.opentelemetry.io/otel/trace v1.11.1 // indirect
-	go.uber.org/atomic v1.9.0 // indirect
-	golang.org/x/crypto v0.0.0-20220722155217-630584e8d5aa // indirect
+	go.uber.org/atomic v1.10.0 // indirect
+	golang.org/x/crypto v0.4.0 // indirect
 	golang.org/x/net v0.4.0 // indirect
 	golang.org/x/oauth2 v0.0.0-20220608161450-d0670ef3b1eb // indirect
 	golang.org/x/sys v0.3.0 // indirect
