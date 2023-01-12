@@ -709,7 +709,7 @@ func (h Handler) List(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, h.groupsWithInstances(user.Groups, instances))
+	c.JSON(http.StatusOK, groupsWithInstances(user.Groups, instances))
 }
 
 // ListPresets presets
@@ -738,22 +738,22 @@ func (h Handler) ListPresets(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, h.groupsWithInstances(user.Groups, presets))
+	c.JSON(http.StatusOK, groupsWithInstances(user.Groups, presets))
 }
 
-func (h Handler) groupsWithInstances(groups []*models.Group, instances []*model.Instance) []GroupWithInstances {
+func groupsWithInstances(groups []*models.Group, instances []*model.Instance) []GroupWithInstances {
 	groupsWithInstances := make([]GroupWithInstances, len(groups))
 	for i, group := range groups {
 		groupsWithInstances[i].Name = group.Name
 		groupsWithInstances[i].Hostname = group.Hostname
-		groupsWithInstances[i].Instances = h.filterByGroupId(instances, func(instance *model.Instance) bool {
+		groupsWithInstances[i].Instances = filterByGroupId(instances, func(instance *model.Instance) bool {
 			return instance.GroupName == group.Name
 		})
 	}
 	return groupsWithInstances
 }
 
-func (h Handler) filterByGroupId(instances []*model.Instance, test func(instance *model.Instance) bool) (ret []*model.Instance) {
+func filterByGroupId(instances []*model.Instance, test func(instance *model.Instance) bool) (ret []*model.Instance) {
 	for _, instance := range instances {
 		if test(instance) {
 			ret = append(ret, instance)
