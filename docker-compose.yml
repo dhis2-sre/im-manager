@@ -20,11 +20,15 @@ services:
 
   test:
     <<: *common-dev-test
-    command: /bin/sh -c 'go test -v ./...'
+    command: /bin/sh -c 'go test ./...'
+
+  test-coverage:
+    <<: *common-dev-test
+    command: /bin/sh -c 'go test -coverprofile=./coverage.out ./... && go tool cover -html=./coverage.out -o ./coverage.html'
 
   dev-test:
     <<: *common-dev-test
-    command: reflex -r "Dockerfile|\.go|\.yml$$" -s -- sh -c "go test -v ./..."
+    command: reflex -r "Dockerfile|\.go|\.yml$$" -s -- sh -c "go test ./..."
 
   dev:
     <<: *common-dev-test
