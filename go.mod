@@ -15,7 +15,7 @@ require (
 	github.com/gofrs/uuid v4.3.1+incompatible
 	github.com/jackc/pgconn v1.13.0
 	github.com/lestrrat-go/jwx v1.2.25
-	github.com/rabbitmq/amqp091-go v1.3.4
+	github.com/rabbitmq/amqp091-go v1.6.0
 	github.com/stretchr/testify v1.8.1
 	go.mozilla.org/sops/v3 v3.7.3
 	gorm.io/driver/postgres v1.4.6
