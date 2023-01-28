@@ -90,6 +90,11 @@ func (o *ListInstancesOK) IsCode(code int) bool {
 	return code == 200
 }
 
+// Code gets the status code for the list instances o k response
+func (o *ListInstancesOK) Code() int {
+	return 200
+}
+
 func (o *ListInstancesOK) Error() string {
 	return fmt.Sprintf("[GET /instances][%d] listInstancesOK  %+v", 200, o.Payload)
 }
@@ -149,6 +154,11 @@ func (o *ListInstancesUnauthorized) IsCode(code int) bool {
 	return code == 401
 }
 
+// Code gets the status code for the list instances unauthorized response
+func (o *ListInstancesUnauthorized) Code() int {
+	return 401
+}
+
 func (o *ListInstancesUnauthorized) Error() string {
 	return fmt.Sprintf("[GET /instances][%d] listInstancesUnauthorized ", 401)
 }
@@ -199,6 +209,11 @@ func (o *ListInstancesForbidden) IsCode(code int) bool {
 	return code == 403
 }
 
+// Code gets the status code for the list instances forbidden response
+func (o *ListInstancesForbidden) Code() int {
+	return 403
+}
+
 func (o *ListInstancesForbidden) Error() string {
 	return fmt.Sprintf("[GET /instances][%d] listInstancesForbidden ", 403)
 }
@@ -247,6 +262,11 @@ func (o *ListInstancesUnsupportedMediaType) IsServerError() bool {
 // IsCode returns true when this list instances unsupported media type response a status code equal to that given
 func (o *ListInstancesUnsupportedMediaType) IsCode(code int) bool {
 	return code == 415
+}
+
+// Code gets the status code for the list instances unsupported media type response
+func (o *ListInstancesUnsupportedMediaType) Code() int {
+	return 415
 }
 
 func (o *ListInstancesUnsupportedMediaType) Error() string {

@@ -96,6 +96,11 @@ func (o *DeployInstanceCreated) IsCode(code int) bool {
 	return code == 201
 }
 
+// Code gets the status code for the deploy instance created response
+func (o *DeployInstanceCreated) Code() int {
+	return 201
+}
+
 func (o *DeployInstanceCreated) Error() string {
 	return fmt.Sprintf("[POST /instances][%d] deployInstanceCreated  %+v", 201, o.Payload)
 }
@@ -157,6 +162,11 @@ func (o *DeployInstanceUnauthorized) IsCode(code int) bool {
 	return code == 401
 }
 
+// Code gets the status code for the deploy instance unauthorized response
+func (o *DeployInstanceUnauthorized) Code() int {
+	return 401
+}
+
 func (o *DeployInstanceUnauthorized) Error() string {
 	return fmt.Sprintf("[POST /instances][%d] deployInstanceUnauthorized ", 401)
 }
@@ -205,6 +215,11 @@ func (o *DeployInstanceForbidden) IsServerError() bool {
 // IsCode returns true when this deploy instance forbidden response a status code equal to that given
 func (o *DeployInstanceForbidden) IsCode(code int) bool {
 	return code == 403
+}
+
+// Code gets the status code for the deploy instance forbidden response
+func (o *DeployInstanceForbidden) Code() int {
+	return 403
 }
 
 func (o *DeployInstanceForbidden) Error() string {
@@ -257,6 +272,11 @@ func (o *DeployInstanceNotFound) IsCode(code int) bool {
 	return code == 404
 }
 
+// Code gets the status code for the deploy instance not found response
+func (o *DeployInstanceNotFound) Code() int {
+	return 404
+}
+
 func (o *DeployInstanceNotFound) Error() string {
 	return fmt.Sprintf("[POST /instances][%d] deployInstanceNotFound ", 404)
 }
@@ -305,6 +325,11 @@ func (o *DeployInstanceUnsupportedMediaType) IsServerError() bool {
 // IsCode returns true when this deploy instance unsupported media type response a status code equal to that given
 func (o *DeployInstanceUnsupportedMediaType) IsCode(code int) bool {
 	return code == 415
+}
+
+// Code gets the status code for the deploy instance unsupported media type response
+func (o *DeployInstanceUnsupportedMediaType) Code() int {
+	return 415
 }
 
 func (o *DeployInstanceUnsupportedMediaType) Error() string {

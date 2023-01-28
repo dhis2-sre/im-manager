@@ -96,6 +96,11 @@ func (o *InstanceNameToIDOK) IsCode(code int) bool {
 	return code == 200
 }
 
+// Code gets the status code for the instance name to Id o k response
+func (o *InstanceNameToIDOK) Code() int {
+	return 200
+}
+
 func (o *InstanceNameToIDOK) Error() string {
 	return fmt.Sprintf("[GET /instances-name-to-id/{groupName}/{instanceName}][%d] instanceNameToIdOK  %+v", 200, o.Payload)
 }
@@ -157,6 +162,11 @@ func (o *InstanceNameToIDUnauthorized) IsCode(code int) bool {
 	return code == 401
 }
 
+// Code gets the status code for the instance name to Id unauthorized response
+func (o *InstanceNameToIDUnauthorized) Code() int {
+	return 401
+}
+
 func (o *InstanceNameToIDUnauthorized) Error() string {
 	return fmt.Sprintf("[GET /instances-name-to-id/{groupName}/{instanceName}][%d] instanceNameToIdUnauthorized ", 401)
 }
@@ -205,6 +215,11 @@ func (o *InstanceNameToIDForbidden) IsServerError() bool {
 // IsCode returns true when this instance name to Id forbidden response a status code equal to that given
 func (o *InstanceNameToIDForbidden) IsCode(code int) bool {
 	return code == 403
+}
+
+// Code gets the status code for the instance name to Id forbidden response
+func (o *InstanceNameToIDForbidden) Code() int {
+	return 403
 }
 
 func (o *InstanceNameToIDForbidden) Error() string {
@@ -257,6 +272,11 @@ func (o *InstanceNameToIDNotFound) IsCode(code int) bool {
 	return code == 404
 }
 
+// Code gets the status code for the instance name to Id not found response
+func (o *InstanceNameToIDNotFound) Code() int {
+	return 404
+}
+
 func (o *InstanceNameToIDNotFound) Error() string {
 	return fmt.Sprintf("[GET /instances-name-to-id/{groupName}/{instanceName}][%d] instanceNameToIdNotFound ", 404)
 }
@@ -305,6 +325,11 @@ func (o *InstanceNameToIDUnsupportedMediaType) IsServerError() bool {
 // IsCode returns true when this instance name to Id unsupported media type response a status code equal to that given
 func (o *InstanceNameToIDUnsupportedMediaType) IsCode(code int) bool {
 	return code == 415
+}
+
+// Code gets the status code for the instance name to Id unsupported media type response
+func (o *InstanceNameToIDUnsupportedMediaType) Code() int {
+	return 415
 }
 
 func (o *InstanceNameToIDUnsupportedMediaType) Error() string {

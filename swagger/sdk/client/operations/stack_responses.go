@@ -96,6 +96,11 @@ func (o *StackOK) IsCode(code int) bool {
 	return code == 200
 }
 
+// Code gets the status code for the stack o k response
+func (o *StackOK) Code() int {
+	return 200
+}
+
 func (o *StackOK) Error() string {
 	return fmt.Sprintf("[GET /stacks/{name}][%d] stackOK  %+v", 200, o.Payload)
 }
@@ -157,6 +162,11 @@ func (o *StackUnauthorized) IsCode(code int) bool {
 	return code == 401
 }
 
+// Code gets the status code for the stack unauthorized response
+func (o *StackUnauthorized) Code() int {
+	return 401
+}
+
 func (o *StackUnauthorized) Error() string {
 	return fmt.Sprintf("[GET /stacks/{name}][%d] stackUnauthorized ", 401)
 }
@@ -205,6 +215,11 @@ func (o *StackForbidden) IsServerError() bool {
 // IsCode returns true when this stack forbidden response a status code equal to that given
 func (o *StackForbidden) IsCode(code int) bool {
 	return code == 403
+}
+
+// Code gets the status code for the stack forbidden response
+func (o *StackForbidden) Code() int {
+	return 403
 }
 
 func (o *StackForbidden) Error() string {
@@ -257,6 +272,11 @@ func (o *StackNotFound) IsCode(code int) bool {
 	return code == 404
 }
 
+// Code gets the status code for the stack not found response
+func (o *StackNotFound) Code() int {
+	return 404
+}
+
 func (o *StackNotFound) Error() string {
 	return fmt.Sprintf("[GET /stacks/{name}][%d] stackNotFound ", 404)
 }
@@ -305,6 +325,11 @@ func (o *StackUnsupportedMediaType) IsServerError() bool {
 // IsCode returns true when this stack unsupported media type response a status code equal to that given
 func (o *StackUnsupportedMediaType) IsCode(code int) bool {
 	return code == 415
+}
+
+// Code gets the status code for the stack unsupported media type response
+func (o *StackUnsupportedMediaType) Code() int {
+	return 415
 }
 
 func (o *StackUnsupportedMediaType) Error() string {

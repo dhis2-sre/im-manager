@@ -88,6 +88,11 @@ func (o *PostIntegrationOK) IsCode(code int) bool {
 	return code == 200
 }
 
+// Code gets the status code for the post integration o k response
+func (o *PostIntegrationOK) Code() int {
+	return 200
+}
+
 func (o *PostIntegrationOK) Error() string {
 	return fmt.Sprintf("[POST /integrations][%d] postIntegrationOK  %+v", 200, o.Payload)
 }
@@ -147,6 +152,11 @@ func (o *PostIntegrationUnauthorized) IsCode(code int) bool {
 	return code == 401
 }
 
+// Code gets the status code for the post integration unauthorized response
+func (o *PostIntegrationUnauthorized) Code() int {
+	return 401
+}
+
 func (o *PostIntegrationUnauthorized) Error() string {
 	return fmt.Sprintf("[POST /integrations][%d] postIntegrationUnauthorized ", 401)
 }
@@ -197,6 +207,11 @@ func (o *PostIntegrationForbidden) IsCode(code int) bool {
 	return code == 403
 }
 
+// Code gets the status code for the post integration forbidden response
+func (o *PostIntegrationForbidden) Code() int {
+	return 403
+}
+
 func (o *PostIntegrationForbidden) Error() string {
 	return fmt.Sprintf("[POST /integrations][%d] postIntegrationForbidden ", 403)
 }
@@ -245,6 +260,11 @@ func (o *PostIntegrationUnsupportedMediaType) IsServerError() bool {
 // IsCode returns true when this post integration unsupported media type response a status code equal to that given
 func (o *PostIntegrationUnsupportedMediaType) IsCode(code int) bool {
 	return code == 415
+}
+
+// Code gets the status code for the post integration unsupported media type response
+func (o *PostIntegrationUnsupportedMediaType) Code() int {
+	return 415
 }
 
 func (o *PostIntegrationUnsupportedMediaType) Error() string {

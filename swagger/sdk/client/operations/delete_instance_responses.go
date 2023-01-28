@@ -92,6 +92,11 @@ func (o *DeleteInstanceAccepted) IsCode(code int) bool {
 	return code == 202
 }
 
+// Code gets the status code for the delete instance accepted response
+func (o *DeleteInstanceAccepted) Code() int {
+	return 202
+}
+
 func (o *DeleteInstanceAccepted) Error() string {
 	return fmt.Sprintf("[DELETE /instances/{id}][%d] deleteInstanceAccepted ", 202)
 }
@@ -140,6 +145,11 @@ func (o *DeleteInstanceUnauthorized) IsServerError() bool {
 // IsCode returns true when this delete instance unauthorized response a status code equal to that given
 func (o *DeleteInstanceUnauthorized) IsCode(code int) bool {
 	return code == 401
+}
+
+// Code gets the status code for the delete instance unauthorized response
+func (o *DeleteInstanceUnauthorized) Code() int {
+	return 401
 }
 
 func (o *DeleteInstanceUnauthorized) Error() string {
@@ -192,6 +202,11 @@ func (o *DeleteInstanceForbidden) IsCode(code int) bool {
 	return code == 403
 }
 
+// Code gets the status code for the delete instance forbidden response
+func (o *DeleteInstanceForbidden) Code() int {
+	return 403
+}
+
 func (o *DeleteInstanceForbidden) Error() string {
 	return fmt.Sprintf("[DELETE /instances/{id}][%d] deleteInstanceForbidden ", 403)
 }
@@ -242,6 +257,11 @@ func (o *DeleteInstanceNotFound) IsCode(code int) bool {
 	return code == 404
 }
 
+// Code gets the status code for the delete instance not found response
+func (o *DeleteInstanceNotFound) Code() int {
+	return 404
+}
+
 func (o *DeleteInstanceNotFound) Error() string {
 	return fmt.Sprintf("[DELETE /instances/{id}][%d] deleteInstanceNotFound ", 404)
 }
@@ -290,6 +310,11 @@ func (o *DeleteInstanceUnsupportedMediaType) IsServerError() bool {
 // IsCode returns true when this delete instance unsupported media type response a status code equal to that given
 func (o *DeleteInstanceUnsupportedMediaType) IsCode(code int) bool {
 	return code == 415
+}
+
+// Code gets the status code for the delete instance unsupported media type response
+func (o *DeleteInstanceUnsupportedMediaType) Code() int {
+	return 415
 }
 
 func (o *DeleteInstanceUnsupportedMediaType) Error() string {

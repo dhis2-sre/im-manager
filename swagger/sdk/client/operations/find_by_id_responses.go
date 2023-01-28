@@ -96,6 +96,11 @@ func (o *FindByIDOK) IsCode(code int) bool {
 	return code == 200
 }
 
+// Code gets the status code for the find by Id o k response
+func (o *FindByIDOK) Code() int {
+	return 200
+}
+
 func (o *FindByIDOK) Error() string {
 	return fmt.Sprintf("[GET /instances/{id}][%d] findByIdOK  %+v", 200, o.Payload)
 }
@@ -157,6 +162,11 @@ func (o *FindByIDUnauthorized) IsCode(code int) bool {
 	return code == 401
 }
 
+// Code gets the status code for the find by Id unauthorized response
+func (o *FindByIDUnauthorized) Code() int {
+	return 401
+}
+
 func (o *FindByIDUnauthorized) Error() string {
 	return fmt.Sprintf("[GET /instances/{id}][%d] findByIdUnauthorized ", 401)
 }
@@ -205,6 +215,11 @@ func (o *FindByIDForbidden) IsServerError() bool {
 // IsCode returns true when this find by Id forbidden response a status code equal to that given
 func (o *FindByIDForbidden) IsCode(code int) bool {
 	return code == 403
+}
+
+// Code gets the status code for the find by Id forbidden response
+func (o *FindByIDForbidden) Code() int {
+	return 403
 }
 
 func (o *FindByIDForbidden) Error() string {
@@ -257,6 +272,11 @@ func (o *FindByIDNotFound) IsCode(code int) bool {
 	return code == 404
 }
 
+// Code gets the status code for the find by Id not found response
+func (o *FindByIDNotFound) Code() int {
+	return 404
+}
+
 func (o *FindByIDNotFound) Error() string {
 	return fmt.Sprintf("[GET /instances/{id}][%d] findByIdNotFound ", 404)
 }
@@ -305,6 +325,11 @@ func (o *FindByIDUnsupportedMediaType) IsServerError() bool {
 // IsCode returns true when this find by Id unsupported media type response a status code equal to that given
 func (o *FindByIDUnsupportedMediaType) IsCode(code int) bool {
 	return code == 415
+}
+
+// Code gets the status code for the find by Id unsupported media type response
+func (o *FindByIDUnsupportedMediaType) Code() int {
+	return 415
 }
 
 func (o *FindByIDUnsupportedMediaType) Error() string {

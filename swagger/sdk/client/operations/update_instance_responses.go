@@ -96,6 +96,11 @@ func (o *UpdateInstanceNoContent) IsCode(code int) bool {
 	return code == 204
 }
 
+// Code gets the status code for the update instance no content response
+func (o *UpdateInstanceNoContent) Code() int {
+	return 204
+}
+
 func (o *UpdateInstanceNoContent) Error() string {
 	return fmt.Sprintf("[PUT /instances/{id}][%d] updateInstanceNoContent  %+v", 204, o.Payload)
 }
@@ -157,6 +162,11 @@ func (o *UpdateInstanceUnauthorized) IsCode(code int) bool {
 	return code == 401
 }
 
+// Code gets the status code for the update instance unauthorized response
+func (o *UpdateInstanceUnauthorized) Code() int {
+	return 401
+}
+
 func (o *UpdateInstanceUnauthorized) Error() string {
 	return fmt.Sprintf("[PUT /instances/{id}][%d] updateInstanceUnauthorized ", 401)
 }
@@ -205,6 +215,11 @@ func (o *UpdateInstanceForbidden) IsServerError() bool {
 // IsCode returns true when this update instance forbidden response a status code equal to that given
 func (o *UpdateInstanceForbidden) IsCode(code int) bool {
 	return code == 403
+}
+
+// Code gets the status code for the update instance forbidden response
+func (o *UpdateInstanceForbidden) Code() int {
+	return 403
 }
 
 func (o *UpdateInstanceForbidden) Error() string {
@@ -257,6 +272,11 @@ func (o *UpdateInstanceNotFound) IsCode(code int) bool {
 	return code == 404
 }
 
+// Code gets the status code for the update instance not found response
+func (o *UpdateInstanceNotFound) Code() int {
+	return 404
+}
+
 func (o *UpdateInstanceNotFound) Error() string {
 	return fmt.Sprintf("[PUT /instances/{id}][%d] updateInstanceNotFound ", 404)
 }
@@ -305,6 +325,11 @@ func (o *UpdateInstanceUnsupportedMediaType) IsServerError() bool {
 // IsCode returns true when this update instance unsupported media type response a status code equal to that given
 func (o *UpdateInstanceUnsupportedMediaType) IsCode(code int) bool {
 	return code == 415
+}
+
+// Code gets the status code for the update instance unsupported media type response
+func (o *UpdateInstanceUnsupportedMediaType) Code() int {
+	return 415
 }
 
 func (o *UpdateInstanceUnsupportedMediaType) Error() string {

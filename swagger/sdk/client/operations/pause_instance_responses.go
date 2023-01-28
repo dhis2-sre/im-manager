@@ -92,6 +92,11 @@ func (o *PauseInstanceAccepted) IsCode(code int) bool {
 	return code == 202
 }
 
+// Code gets the status code for the pause instance accepted response
+func (o *PauseInstanceAccepted) Code() int {
+	return 202
+}
+
 func (o *PauseInstanceAccepted) Error() string {
 	return fmt.Sprintf("[PUT /instances/{id}/pause][%d] pauseInstanceAccepted ", 202)
 }
@@ -140,6 +145,11 @@ func (o *PauseInstanceUnauthorized) IsServerError() bool {
 // IsCode returns true when this pause instance unauthorized response a status code equal to that given
 func (o *PauseInstanceUnauthorized) IsCode(code int) bool {
 	return code == 401
+}
+
+// Code gets the status code for the pause instance unauthorized response
+func (o *PauseInstanceUnauthorized) Code() int {
+	return 401
 }
 
 func (o *PauseInstanceUnauthorized) Error() string {
@@ -192,6 +202,11 @@ func (o *PauseInstanceForbidden) IsCode(code int) bool {
 	return code == 403
 }
 
+// Code gets the status code for the pause instance forbidden response
+func (o *PauseInstanceForbidden) Code() int {
+	return 403
+}
+
 func (o *PauseInstanceForbidden) Error() string {
 	return fmt.Sprintf("[PUT /instances/{id}/pause][%d] pauseInstanceForbidden ", 403)
 }
@@ -242,6 +257,11 @@ func (o *PauseInstanceNotFound) IsCode(code int) bool {
 	return code == 404
 }
 
+// Code gets the status code for the pause instance not found response
+func (o *PauseInstanceNotFound) Code() int {
+	return 404
+}
+
 func (o *PauseInstanceNotFound) Error() string {
 	return fmt.Sprintf("[PUT /instances/{id}/pause][%d] pauseInstanceNotFound ", 404)
 }
@@ -290,6 +310,11 @@ func (o *PauseInstanceUnsupportedMediaType) IsServerError() bool {
 // IsCode returns true when this pause instance unsupported media type response a status code equal to that given
 func (o *PauseInstanceUnsupportedMediaType) IsCode(code int) bool {
 	return code == 415
+}
+
+// Code gets the status code for the pause instance unsupported media type response
+func (o *PauseInstanceUnsupportedMediaType) Code() int {
+	return 415
 }
 
 func (o *PauseInstanceUnsupportedMediaType) Error() string {

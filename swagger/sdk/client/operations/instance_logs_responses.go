@@ -92,6 +92,11 @@ func (o *InstanceLogsOK) IsCode(code int) bool {
 	return code == 200
 }
 
+// Code gets the status code for the instance logs o k response
+func (o *InstanceLogsOK) Code() int {
+	return 200
+}
+
 func (o *InstanceLogsOK) Error() string {
 	return fmt.Sprintf("[GET /instances/{id}/logs][%d] instanceLogsOK ", 200)
 }
@@ -140,6 +145,11 @@ func (o *InstanceLogsUnauthorized) IsServerError() bool {
 // IsCode returns true when this instance logs unauthorized response a status code equal to that given
 func (o *InstanceLogsUnauthorized) IsCode(code int) bool {
 	return code == 401
+}
+
+// Code gets the status code for the instance logs unauthorized response
+func (o *InstanceLogsUnauthorized) Code() int {
+	return 401
 }
 
 func (o *InstanceLogsUnauthorized) Error() string {
@@ -192,6 +202,11 @@ func (o *InstanceLogsForbidden) IsCode(code int) bool {
 	return code == 403
 }
 
+// Code gets the status code for the instance logs forbidden response
+func (o *InstanceLogsForbidden) Code() int {
+	return 403
+}
+
 func (o *InstanceLogsForbidden) Error() string {
 	return fmt.Sprintf("[GET /instances/{id}/logs][%d] instanceLogsForbidden ", 403)
 }
@@ -242,6 +257,11 @@ func (o *InstanceLogsNotFound) IsCode(code int) bool {
 	return code == 404
 }
 
+// Code gets the status code for the instance logs not found response
+func (o *InstanceLogsNotFound) Code() int {
+	return 404
+}
+
 func (o *InstanceLogsNotFound) Error() string {
 	return fmt.Sprintf("[GET /instances/{id}/logs][%d] instanceLogsNotFound ", 404)
 }
@@ -290,6 +310,11 @@ func (o *InstanceLogsUnsupportedMediaType) IsServerError() bool {
 // IsCode returns true when this instance logs unsupported media type response a status code equal to that given
 func (o *InstanceLogsUnsupportedMediaType) IsCode(code int) bool {
 	return code == 415
+}
+
+// Code gets the status code for the instance logs unsupported media type response
+func (o *InstanceLogsUnsupportedMediaType) Code() int {
+	return 415
 }
 
 func (o *InstanceLogsUnsupportedMediaType) Error() string {
