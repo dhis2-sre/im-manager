@@ -22,7 +22,7 @@ require (
 	gorm.io/gorm v1.24.3
 	k8s.io/api v0.27.0-alpha.1
 	k8s.io/apimachinery v0.27.0-alpha.1
-	k8s.io/client-go v0.27.0-alpha.0
+	k8s.io/client-go v0.27.0-alpha.1
 )
 
 require (
