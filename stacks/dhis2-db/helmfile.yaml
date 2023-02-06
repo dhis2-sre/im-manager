@@ -12,6 +12,7 @@ releases:
           im-default: "true"
           im-id: "{{ requiredEnv "INSTANCE_ID" }}"
           im-type: "db"
+          im-creationTimestamp: "{{ env "INSTANCE_CREATION_TIMESTAMP" | default "" }}"
           im-ttl: "{{ env "INSTANCE_TTL" | default "" }}"
 
       - primary:

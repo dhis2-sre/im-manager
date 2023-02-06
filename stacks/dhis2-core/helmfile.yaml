@@ -35,6 +35,7 @@ releases:
           im-default: "true"
           im-id: "{{ requiredEnv "INSTANCE_ID" }}"
           im-type: "dhis2"
+          im-creationTimestamp: "{{ env "INSTANCE_CREATION_TIMESTAMP" | default "" }}"
           im-ttl: "{{ env "INSTANCE_TTL" | default "" }}"
       - dhisConfig: |
           connection.dialect = org.hibernate.dialect.PostgreSQLDialect
