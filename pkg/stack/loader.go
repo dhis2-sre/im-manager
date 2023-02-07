@@ -205,7 +205,7 @@ func inSlice(str string, strings []string) bool {
 }
 
 func getSystemParameters() []string {
-	parameters := []string{"INSTANCE_ID", "INSTANCE_NAME", "INSTANCE_HOSTNAME", "INSTANCE_NAMESPACE", "IM_ACCESS_TOKEN"}
+	parameters := []string{"INSTANCE_ID", "INSTANCE_NAME", "INSTANCE_HOSTNAME", "INSTANCE_NAMESPACE", "IM_ACCESS_TOKEN", "INSTANCE_CREATION_TIMESTAMP"}
 	sort.Strings(parameters)
 	return parameters
 }
