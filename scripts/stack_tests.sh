@@ -5,7 +5,7 @@ set -euo pipefail
 INSTANCE_HOST_DEPLOY=https://whoami.im.dev.test.c.dhis2.org
 GROUP=whoami
 INSTANCE_PREFIX=im-e2e
-INSTANCE_POSTFIX=$(tr -dc '[:lower:]' </dev/urandom | head -c 10; echo '')
+INSTANCE_POSTFIX=$(tr -dc '[:lower:]' </dev/urandom | head -c 5; echo '')
 
 # Whoami
 INSTANCE_NAME="$INSTANCE_PREFIX-whoami-$INSTANCE_POSTFIX"
