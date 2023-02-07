@@ -4,9 +4,10 @@ set -euo pipefail
 
 INSTANCE_HOST_DEPLOY=https://whoami.im.dev.test.c.dhis2.org
 GROUP=whoami
+INSTANCE_POSTFIX=$(tr -dc '[:lower:]' </dev/urandom | head -c 10; echo '')
 
 # Whoami
-INSTANCE_NAME=e2e-whoami
+INSTANCE_NAME="e2e-whoami-$INSTANCE_POSTFIX"
 ./deploy-whoami.sh $GROUP $INSTANCE_NAME
 sleep 3
 kubectl wait --for=condition=available --timeout=30s --namespace $GROUP deployment/$INSTANCE_NAME-whoami-go
@@ -15,7 +16,7 @@ http --check-status "$INSTANCE_HOST_DEPLOY/$INSTANCE_NAME"
 ./destroy.sh $GROUP $INSTANCE_NAME
 
 # Whoami Preset
-INSTANCE_NAME=e2e-whoami-preset
+INSTANCE_NAME="e2e-whoami-preset-$INSTANCE_POSTFIX"
 ./deploy-whoami-preset.sh $GROUP $INSTANCE_NAME-preset
 sleep 3
 ./deploy-whoami-from-preset.sh whoami $INSTANCE_NAME $INSTANCE_NAME-preset
@@ -26,7 +27,7 @@ http --check-status "$INSTANCE_HOST_DEPLOY/$INSTANCE_NAME"
 ./destroy.sh $GROUP $INSTANCE_NAME $INSTANCE_NAME-preset
 
 # Monolith
-INSTANCE_NAME=e2e-monolith
+INSTANCE_NAME="e2e-monolith-$INSTANCE_POSTFIX"
 ./deploy-dhis2.sh $GROUP $INSTANCE_NAME
 sleep 3
 kubectl wait --for=condition=available --timeout=600s --namespace $GROUP deployment/$INSTANCE_NAME-core
@@ -36,7 +37,7 @@ http --check-status --follow "$INSTANCE_HOST_DEPLOY/$INSTANCE_NAME"
 kubectl delete pvc --namespace $GROUP data-$INSTANCE_NAME-database-postgresql-0
 
 # Database and core
-INSTANCE_NAME=e2e-db-and-core
+INSTANCE_NAME="e2e-db-and-core-$INSTANCE_POSTFIX"
 ./deploy-dhis2-db.sh $GROUP $INSTANCE_NAME
 ./deploy-dhis2-core.sh $GROUP $INSTANCE_NAME-core $INSTANCE_NAME
 sleep 3
@@ -49,7 +50,7 @@ http --check-status --follow "$INSTANCE_HOST_DEPLOY/$INSTANCE_NAME-core"
 kubectl delete pvc --namespace $GROUP data-$INSTANCE_NAME-database-postgresql-0
 
 # Database preset and core
-INSTANCE_NAME=e2e-db-preset
+INSTANCE_NAME="e2e-db-preset-$INSTANCE_POSTFIX"
 ./deploy-dhis2-db-preset.sh $GROUP $INSTANCE_NAME-preset
 ./deploy-dhis2-db-from-preset.sh whoami $INSTANCE_NAME $INSTANCE_NAME-preset
 ./deploy-dhis2-core.sh $GROUP $INSTANCE_NAME-core $INSTANCE_NAME
@@ -65,7 +66,7 @@ http --check-status --follow "$INSTANCE_HOST_DEPLOY/$INSTANCE_NAME-core"
 kubectl delete pvc --namespace $GROUP data-$INSTANCE_NAME-database-postgresql-0
 
 # Database and core from preset
-INSTANCE_NAME=e2e-db-and-core-preset
+INSTANCE_NAME="e2e-db-and-core-preset-$INSTANCE_POSTFIX"
 ./deploy-dhis2-db.sh $GROUP $INSTANCE_NAME-db
 ./deploy-dhis2-preset.sh $GROUP $INSTANCE_NAME-preset
 ./deploy-dhis2-from-preset.sh $GROUP $INSTANCE_NAME $INSTANCE_NAME-preset
