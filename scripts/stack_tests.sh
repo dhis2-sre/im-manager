@@ -67,7 +67,7 @@ http --check-status --follow "$INSTANCE_HOST_DEPLOY/$INSTANCE_NAME-core"
 kubectl delete pvc --namespace $GROUP "data-$INSTANCE_NAME-database-postgresql-0"
 
 # Database and core from preset
-INSTANCE_NAME="$INSTANCE_PREFIX-db-and-core-preset-$INSTANCE_POSTFIX"
+INSTANCE_NAME="$INSTANCE_PREFIX-db-and-core-pre-$INSTANCE_POSTFIX"
 ./deploy-dhis2-db.sh $GROUP "$INSTANCE_NAME-db"
 ./deploy-dhis2-preset.sh $GROUP "$INSTANCE_NAME-preset"
 ./deploy-dhis2-from-preset.sh $GROUP "$INSTANCE_NAME" "$INSTANCE_NAME-preset"
