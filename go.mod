@@ -18,7 +18,7 @@ require (
 	github.com/rabbitmq/amqp091-go v1.6.1
 	github.com/stretchr/testify v1.8.1
 	go.mozilla.org/sops/v3 v3.7.3
-	gorm.io/driver/postgres v1.4.6
+	gorm.io/driver/postgres v1.4.7
 	gorm.io/gorm v1.24.5
 	k8s.io/api v0.27.0-alpha.1
 	k8s.io/apimachinery v0.27.0-alpha.1
