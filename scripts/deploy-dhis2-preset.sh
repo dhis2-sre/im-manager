@@ -65,4 +65,4 @@ echo "{
       \"value\": \"$DATABASE_ID\"
     }
   ]
-}" | $HTTP post "$INSTANCE_HOST/instances?preset=true" "Authorization: Bearer $ACCESS_TOKEN"
+}" | $HTTP post "$IM_HOST/instances?preset=true" "Authorization: Bearer $ACCESS_TOKEN"

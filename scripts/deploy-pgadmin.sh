@@ -19,7 +19,7 @@ DESTINATION_INSTANCE=$2
 
 INSTANCE_TTL=${INSTANCE_TTL:-""}
 
-SOURCE_INSTANCE_ID=$($HTTP get "$INSTANCE_HOST/instances-name-to-id/$GROUP/$SOURCE_INSTANCE" "Authorization: Bearer $ACCESS_TOKEN")
+SOURCE_INSTANCE_ID=$($HTTP get "$IM_HOST/instances-name-to-id/$GROUP/$SOURCE_INSTANCE" "Authorization: Bearer $ACCESS_TOKEN")
 
 echo "{
   \"name\": \"$DESTINATION_INSTANCE\",
@@ -42,4 +42,4 @@ echo "{
       \"value\": \"$INSTANCE_TTL\"
     }
   ]
-}" | $HTTP post "$INSTANCE_HOST/instances" "Authorization: Bearer $ACCESS_TOKEN"
+}" | $HTTP post "$IM_HOST/instances" "Authorization: Bearer $ACCESS_TOKEN"

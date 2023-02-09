@@ -4,8 +4,6 @@ set -euo pipefail
 
 source ./auth.sh
 
-STACK=dhis2
-
 GROUP=$1
 NAME=$2
 
@@ -23,7 +21,7 @@ INSTALL_REDIS=${INSTALL_REDIS:-false}
 DATABASE_ID=${DATABASE_ID:-1}
 INSTANCE_TTL=${INSTANCE_TTL:-""}
 
-INSTANCE_ID=$($HTTP get "$INSTANCE_HOST/instances-name-to-id/$GROUP/$NAME" "Authorization: Bearer $ACCESS_TOKEN")
+INSTANCE_ID=$($HTTP get "$IM_HOST/instances-name-to-id/$GROUP/$NAME" "Authorization: Bearer $ACCESS_TOKEN")
 
 echo "{
   \"optionalParameters\": [
@@ -74,4 +72,4 @@ echo "{
       \"value\": \"$DATABASE_ID\"
     }
   ]
-}" | $HTTP put "$INSTANCE_HOST/instances/$INSTANCE_ID" "Authorization: Bearer $ACCESS_TOKEN"
+}" | $HTTP put "$IM_HOST/instances/$INSTANCE_ID" "Authorization: Bearer $ACCESS_TOKEN"
