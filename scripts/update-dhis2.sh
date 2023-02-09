@@ -4,8 +4,6 @@ set -euo pipefail
 
 source ./auth.sh
 
-STACK=dhis2
-
 GROUP=$1
 NAME=$2
 
