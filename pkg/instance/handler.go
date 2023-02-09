@@ -273,13 +273,25 @@ func (h Handler) Update(c *gin.Context) {
 	instance.RequiredParameters = request.RequiredParameters
 	instance.OptionalParameters = request.OptionalParameters
 
-	err = h.instanceService.Deploy(token, instance)
+	saved, err := h.instanceService.Save(instance)
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
 
-	c.JSON(http.StatusAccepted, instance)
+	decrypted, err := h.instanceService.FindByIdDecrypted(saved.ID)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	err = h.instanceService.Deploy(token, decrypted)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	c.JSON(http.StatusAccepted, decrypted)
 }
 
 // Pause instance
