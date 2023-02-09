@@ -20,6 +20,8 @@ INSTALL_PGADMIN=${INSTALL_PGADMIN:-false}
 INSTALL_REDIS=${INSTALL_REDIS:-false}
 DATABASE_ID=${DATABASE_ID:-1}
 INSTANCE_TTL=${INSTANCE_TTL:-""}
+FLYWAY_MIGRATE_OUT_OF_ORDER=${FLYWAY_MIGRATE_OUT_OF_ORDER:-false}
+FLYWAY_REPAIR_BEFORE_MIGRATION=${FLYWAY_REPAIR_BEFORE_MIGRATION:-false}
 
 INSTANCE_ID=$($HTTP get "$IM_HOST/instances-name-to-id/$GROUP/$NAME" "Authorization: Bearer $ACCESS_TOKEN")
 
@@ -64,6 +66,14 @@ echo "{
     {
        \"name\": \"INSTANCE_TTL\",
        \"value\": \"$INSTANCE_TTL\"
+    },
+    {
+       \"name\": \"FLYWAY_MIGRATE_OUT_OF_ORDER\",
+       \"value\": \"$FLYWAY_MIGRATE_OUT_OF_ORDER\"
+    },
+    {
+       \"name\": \"FLYWAY_REPAIR_BEFORE_MIGRATION\",
+       \"value\": \"$FLYWAY_REPAIR_BEFORE_MIGRATION\"
     }
   ],
   \"requiredParameters\": [
