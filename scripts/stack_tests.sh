@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-INSTANCE_HOST_DEPLOY=https://whoami.im.dev.test.c.dhis2.org
+INSTANCE_HOST=https://whoami.im.dev.test.c.dhis2.org
 GROUP=whoami
 INSTANCE_PREFIX=im-e2e
 INSTANCE_POSTFIX=$(tr -dc '[:lower:]' </dev/urandom | head -c 5; echo '')
@@ -13,7 +13,7 @@ INSTANCE_NAME="$INSTANCE_PREFIX-whoami-$INSTANCE_POSTFIX"
 sleep 3
 kubectl wait --for=condition=available --timeout=30s --namespace $GROUP "deployment/$INSTANCE_NAME-whoami-go"
 sleep 3
-http --check-status "$INSTANCE_HOST_DEPLOY/$INSTANCE_NAME"
+http --check-status "$INSTANCE_HOST/$INSTANCE_NAME"
 ./destroy.sh $GROUP "$INSTANCE_NAME"
 
 # Whoami Preset
@@ -24,7 +24,7 @@ sleep 3
 sleep 3
 kubectl wait --for=condition=available --timeout=30s --namespace $GROUP "deployment/$INSTANCE_NAME-whoami-go"
 sleep 3
-http --check-status "$INSTANCE_HOST_DEPLOY/$INSTANCE_NAME"
+http --check-status "$INSTANCE_HOST/$INSTANCE_NAME"
 ./destroy.sh $GROUP "$INSTANCE_NAME" "$INSTANCE_NAME-preset"
 
 # Monolith
@@ -33,7 +33,7 @@ INSTANCE_NAME="$INSTANCE_PREFIX-monolith-$INSTANCE_POSTFIX"
 sleep 3
 kubectl wait --for=condition=available --timeout=600s --namespace $GROUP "deployment/$INSTANCE_NAME-core"
 sleep 3
-http --check-status --follow "$INSTANCE_HOST_DEPLOY/$INSTANCE_NAME"
+http --check-status --follow "$INSTANCE_HOST/$INSTANCE_NAME"
 ./destroy.sh $GROUP "$INSTANCE_NAME"
 kubectl delete pvc --namespace $GROUP "data-$INSTANCE_NAME-database-postgresql-0"
 
@@ -45,7 +45,7 @@ sleep 3
 kubectl rollout status --watch --timeout=600s --namespace $GROUP "statefulset/$INSTANCE_NAME-database-postgresql"
 kubectl wait --for=condition=available --timeout=600s --namespace $GROUP "deployment/$INSTANCE_NAME-core"
 sleep 3
-http --check-status --follow "$INSTANCE_HOST_DEPLOY/$INSTANCE_NAME-core"
+http --check-status --follow "$INSTANCE_HOST/$INSTANCE_NAME-core"
 ./destroy.sh $GROUP "$INSTANCE_NAME-core"
 ./destroy.sh $GROUP "$INSTANCE_NAME"
 kubectl delete pvc --namespace $GROUP "data-$INSTANCE_NAME-database-postgresql-0"
@@ -59,7 +59,7 @@ sleep 3
 kubectl rollout status --watch --timeout=600s --namespace $GROUP "statefulset/$INSTANCE_NAME-database-postgresql"
 kubectl wait --for=condition=available --timeout=600s --namespace $GROUP "deployment/$INSTANCE_NAME-core"
 sleep 3
-http --check-status --follow "$INSTANCE_HOST_DEPLOY/$INSTANCE_NAME-core"
+http --check-status --follow "$INSTANCE_HOST/$INSTANCE_NAME-core"
 #./destroy.sh $GROUP $INSTANCE_NAME-core $INSTANCE_NAME $INSTANCE_NAME-preset
 ./destroy.sh $GROUP "$INSTANCE_NAME-core"
 ./destroy.sh $GROUP "$INSTANCE_NAME"
@@ -75,7 +75,7 @@ sleep 3
 kubectl rollout status --watch --timeout=600s --namespace $GROUP "statefulset/$INSTANCE_NAME-db-database-postgresql"
 kubectl wait --for=condition=available --timeout=600s --namespace $GROUP "deployment/$INSTANCE_NAME"
 sleep 3
-http --check-status --follow "$INSTANCE_HOST_DEPLOY/$INSTANCE_NAME"
+http --check-status --follow "$INSTANCE_HOST/$INSTANCE_NAME"
 #./destroy.sh $GROUP $INSTANCE_NAME-db $INSTANCE_NAME-preset $INSTANCE_NAME
 ./destroy.sh $GROUP "$INSTANCE_NAME"
 ./destroy.sh $GROUP "$INSTANCE_NAME-preset"

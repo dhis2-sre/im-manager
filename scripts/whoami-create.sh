@@ -13,4 +13,4 @@ echo "{
   \"name\": \"$NAME\",
   \"groupName\": \"$GROUP\",
   \"stackName\": \"$STACK\"
-}" | $HTTP post "$INSTANCE_HOST/instances?deploy=false" "Authorization: Bearer $ACCESS_TOKEN"
+}" | $HTTP post "$IM_HOST/instances?deploy=false" "Authorization: Bearer $ACCESS_TOKEN"
