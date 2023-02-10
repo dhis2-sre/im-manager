@@ -3,7 +3,8 @@ name: e2e tests
 on:
   push:
     branches: [master]
-  pull_request:
+# TODO: This might run on a PR but it's not running against the PR. In order for this to work, we need the PR running the cluster
+#  pull_request:
   workflow_dispatch:
 
 jobs:
