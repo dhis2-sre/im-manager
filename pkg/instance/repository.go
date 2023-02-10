@@ -8,6 +8,7 @@ import (
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	"github.com/jackc/pgconn"
 	"gorm.io/gorm"
+	"k8s.io/utils/strings/slices"
 )
 
 func NewRepository(DB *gorm.DB, config config.Config) Repository {
@@ -111,12 +112,17 @@ func (r repository) Delete(id uint) error {
 }
 
 func (r repository) FindByGroupNames(names []string, presets bool) ([]*model.Instance, error) {
-	var instances []*model.Instance
-
-	err := r.db.
+	query := r.db.
 		Preload("RequiredParameters.StackRequiredParameter").
-		Preload("OptionalParameters.StackOptionalParameter").
-		Where("group_name IN ?", names).
+		Preload("OptionalParameters.StackOptionalParameter")
+
+	isAdmin := slices.Contains(names, "administrators")
+	if !isAdmin {
+		query = query.Where("group_name IN ?", names)
+	}
+
+	var instances []*model.Instance
+	err := query.
 		Where("preset = ?", presets).
 		Find(&instances).Error
 

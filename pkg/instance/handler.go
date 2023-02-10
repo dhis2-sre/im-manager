@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"sort"
 	"strconv"
 
 	"github.com/dhis2-sre/im-manager/pkg/stack"
@@ -730,13 +731,19 @@ func (h Handler) List(c *gin.Context) {
 		return
 	}
 
-	instances, err := h.instanceService.FindInstances(user.Groups, false)
+	groups := h.uniqueUserGroups(user)
+	instances, err := h.instanceService.FindInstances(groups, false)
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
 
-	c.JSON(http.StatusOK, h.groupsWithInstances(user.Groups, instances))
+	c.JSON(http.StatusOK, h.groupsWithInstances(instances))
+}
+
+func (h Handler) uniqueUserGroups(user *models.User) []*models.Group {
+	groups := append(user.Groups, user.AdminGroups...)
+	return removeDuplicates(groups)
 }
 
 // ListPresets presets
@@ -759,16 +766,18 @@ func (h Handler) ListPresets(c *gin.Context) {
 		return
 	}
 
-	presets, err := h.instanceService.FindInstances(user.Groups, true)
+	groups := h.uniqueUserGroups(user)
+	presets, err := h.instanceService.FindInstances(groups, true)
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
 
-	c.JSON(http.StatusOK, h.groupsWithInstances(user.Groups, presets))
+	c.JSON(http.StatusOK, h.groupsWithInstances(presets))
 }
 
-func (h Handler) groupsWithInstances(groups []*models.Group, instances []*model.Instance) []GroupWithInstances {
+func (h Handler) groupsWithInstances(instances []*model.Instance) []GroupWithInstances {
+	groups := h.uniqueInstanceGroups(instances)
 	groupsWithInstances := make([]GroupWithInstances, len(groups))
 	for i, group := range groups {
 		groupsWithInstances[i].Name = group.Name
@@ -787,4 +796,36 @@ func (h Handler) filterByGroupId(instances []*model.Instance, test func(instance
 		}
 	}
 	return
+}
+
+func (h Handler) uniqueInstanceGroups(instances []*model.Instance) []*models.Group {
+	groups := make([]*models.Group, len(instances))
+	for i, instance := range instances {
+		groups[i] = &models.Group{Name: instance.GroupName}
+	}
+	return removeDuplicates(groups)
+}
+
+type ByName []*models.Group
+
+func (a ByName) Len() int           { return len(a) }
+func (a ByName) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a ByName) Less(i, j int) bool { return a[i].Name < a[j].Name }
+
+func removeDuplicates(s []*models.Group) []*models.Group {
+	if len(s) < 1 {
+		return s
+	}
+
+	sort.Sort(ByName(s))
+
+	prev := 1
+	for curr := 1; curr < len(s); curr++ {
+		if s[curr-1].Name != s[curr].Name {
+			s[prev] = s[curr]
+			prev++
+		}
+	}
+
+	return s[:prev]
 }
