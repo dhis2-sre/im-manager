@@ -16,8 +16,7 @@ function cleanup_handler {
   exit
 }
 
-trap cleanup_handler INT
-trap cleanup_handler EXIT
+trap cleanup_handler INT EXIT
 
 # Whoami
 INSTANCE_NAME="$INSTANCE_PREFIX-whoami-$INSTANCE_POSTFIX"
