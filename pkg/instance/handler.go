@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"sort"
 	"strconv"
 
 	"github.com/dhis2-sre/im-manager/pkg/stack"
@@ -40,7 +39,7 @@ type Service interface {
 	FindByNameAndGroup(instance string, group string) (*model.Instance, error)
 	Delete(token string, id uint) error
 	Logs(instance *model.Instance, group *models.Group, typeSelector string) (io.ReadCloser, error)
-	FindInstances(groups []*models.Group, presets bool) ([]*model.Instance, error)
+	FindInstances(user *models.User, presets bool) ([]GroupWithInstances, error)
 	Link(source, destination *model.Instance) error
 }
 
@@ -705,12 +704,6 @@ func (h Handler) NameToId(c *gin.Context) {
 	c.JSON(http.StatusOK, instance.ID)
 }
 
-type GroupWithInstances struct {
-	Name      string
-	Hostname  string
-	Instances []*model.Instance
-}
-
 // List instances
 // swagger:route GET /instances listInstances
 //
@@ -731,19 +724,13 @@ func (h Handler) List(c *gin.Context) {
 		return
 	}
 
-	groups := h.uniqueUserGroups(user)
-	instances, err := h.instanceService.FindInstances(groups, false)
+	instances, err := h.instanceService.FindInstances(user, false)
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
 
-	c.JSON(http.StatusOK, h.groupsWithInstances(instances))
-}
-
-func (h Handler) uniqueUserGroups(user *models.User) []*models.Group {
-	groups := append(user.Groups, user.AdminGroups...)
-	return removeDuplicates(groups)
+	c.JSON(http.StatusOK, instances)
 }
 
 // ListPresets presets
@@ -766,66 +753,11 @@ func (h Handler) ListPresets(c *gin.Context) {
 		return
 	}
 
-	groups := h.uniqueUserGroups(user)
-	presets, err := h.instanceService.FindInstances(groups, true)
+	presets, err := h.instanceService.FindInstances(user, true)
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
 
-	c.JSON(http.StatusOK, h.groupsWithInstances(presets))
-}
-
-func (h Handler) groupsWithInstances(instances []*model.Instance) []GroupWithInstances {
-	groups := h.uniqueInstanceGroups(instances)
-	groupsWithInstances := make([]GroupWithInstances, len(groups))
-	for i, group := range groups {
-		groupsWithInstances[i].Name = group.Name
-		groupsWithInstances[i].Hostname = group.Hostname
-		groupsWithInstances[i].Instances = h.filterByGroupId(instances, func(instance *model.Instance) bool {
-			return instance.GroupName == group.Name
-		})
-	}
-	return groupsWithInstances
-}
-
-func (h Handler) filterByGroupId(instances []*model.Instance, test func(instance *model.Instance) bool) (ret []*model.Instance) {
-	for _, instance := range instances {
-		if test(instance) {
-			ret = append(ret, instance)
-		}
-	}
-	return
-}
-
-func (h Handler) uniqueInstanceGroups(instances []*model.Instance) []*models.Group {
-	groups := make([]*models.Group, len(instances))
-	for i, instance := range instances {
-		groups[i] = &models.Group{Name: instance.GroupName}
-	}
-	return removeDuplicates(groups)
-}
-
-type ByName []*models.Group
-
-func (a ByName) Len() int           { return len(a) }
-func (a ByName) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-func (a ByName) Less(i, j int) bool { return a[i].Name < a[j].Name }
-
-func removeDuplicates(s []*models.Group) []*models.Group {
-	if len(s) < 1 {
-		return s
-	}
-
-	sort.Sort(ByName(s))
-
-	prev := 1
-	for curr := 1; curr < len(s); curr++ {
-		if s[curr-1].Name != s[curr].Name {
-			s[prev] = s[curr]
-			prev++
-		}
-	}
-
-	return s[:prev]
+	c.JSON(http.StatusOK, presets)
 }
