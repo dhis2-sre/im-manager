@@ -10,25 +10,13 @@ import (
 	"gorm.io/gorm"
 )
 
-type Repository interface {
-	Link(firstInstance, secondInstance *model.Instance) error
-	Unlink(instance *model.Instance) error
-	Save(instance *model.Instance) error
-	FindById(id uint) (*model.Instance, error)
-	FindByIdDecrypted(id uint) (*model.Instance, error)
-	FindByNameAndGroup(instance string, group string) (*model.Instance, error)
-	FindByGroupNames(names []string, presets bool) ([]*model.Instance, error)
-	SaveDeployLog(instance *model.Instance, log string) error
-	Delete(id uint) error
+func NewRepository(DB *gorm.DB, config config.Config) Repository {
+	return &repository{db: DB, config: config}
 }
 
 type repository struct {
 	db     *gorm.DB
 	config config.Config
-}
-
-func NewRepository(DB *gorm.DB, config config.Config) Repository {
-	return &repository{db: DB, config: config}
 }
 
 func (r repository) FindByIdDecrypted(id uint) (*model.Instance, error) {
