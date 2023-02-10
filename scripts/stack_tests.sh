@@ -7,6 +7,18 @@ GROUP=whoami
 INSTANCE_PREFIX=im-e2e
 INSTANCE_POSTFIX=$(tr -dc '[:lower:]' </dev/urandom | head -c 5; echo '')
 
+function cleanup_handler {
+  # shellcheck disable=SC2046
+  ./destroy.sh whoami $(./list.sh | jq -r '.[].Instances[]?.Name' | grep $INSTANCE_PREFIX | grep "$INSTANCE_POSTFIX")
+  # shellcheck disable=SC2046
+  ./destroy.sh whoami $(./listPresets.sh | jq -r '.[].Instances[]?.Name' | grep $INSTANCE_PREFIX | grep "$INSTANCE_POSTFIX")
+  trap - EXIT
+  exit
+}
+
+trap cleanup_handler INT
+trap cleanup_handler EXIT
+
 # Whoami
 INSTANCE_NAME="$INSTANCE_PREFIX-whoami-$INSTANCE_POSTFIX"
 ./deploy-whoami.sh $GROUP "$INSTANCE_NAME"
