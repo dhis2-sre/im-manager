@@ -704,7 +704,7 @@ func (h Handler) NameToId(c *gin.Context) {
 	c.JSON(http.StatusOK, instance.ID)
 }
 
-// List instances
+// ListInstances instances
 // swagger:route GET /instances listInstances
 //
 // List instances
@@ -717,20 +717,8 @@ func (h Handler) NameToId(c *gin.Context) {
 //   401: Error
 //   403: Error
 //   415: Error
-func (h Handler) List(c *gin.Context) {
-	user, err := handler.GetUserFromContext(c)
-	if err != nil {
-		_ = c.Error(err)
-		return
-	}
-
-	instances, err := h.instanceService.FindInstances(user, false)
-	if err != nil {
-		_ = c.Error(err)
-		return
-	}
-
-	c.JSON(http.StatusOK, instances)
+func (h Handler) ListInstances(c *gin.Context) {
+	h.findInstances(c, false)
 }
 
 // ListPresets presets
@@ -747,17 +735,21 @@ func (h Handler) List(c *gin.Context) {
 //   403: Error
 //   415: Error
 func (h Handler) ListPresets(c *gin.Context) {
+	h.findInstances(c, true)
+}
+
+func (h Handler) findInstances(c *gin.Context, presets bool) {
 	user, err := handler.GetUserFromContext(c)
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
 
-	presets, err := h.instanceService.FindInstances(user, true)
+	instances, err := h.instanceService.FindInstances(user, presets)
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
 
-	c.JSON(http.StatusOK, presets)
+	c.JSON(http.StatusOK, instances)
 }
