@@ -16,12 +16,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-type Handler struct {
-	userClient      userClientHandler
-	instanceService Service
-	stackService    stack.Service
-}
-
 func NewHandler(
 	usrClient userClientHandler,
 	instanceService Service,
@@ -32,6 +26,27 @@ func NewHandler(
 		instanceService,
 		stackService,
 	}
+}
+
+type Service interface {
+	ConsumeParameters(source, destination *model.Instance) error
+	Pause(token string, instance *model.Instance) error
+	Restart(token string, instance *model.Instance, typeSelector string) error
+	Save(instance *model.Instance) (*model.Instance, error)
+	Deploy(token string, instance *model.Instance) error
+	FindById(id uint) (*model.Instance, error)
+	FindByIdDecrypted(id uint) (*model.Instance, error)
+	FindByNameAndGroup(instance string, group string) (*model.Instance, error)
+	Delete(token string, id uint) error
+	Logs(instance *model.Instance, group *models.Group, typeSelector string) (io.ReadCloser, error)
+	FindInstances(groups []*models.Group, presets bool) ([]*model.Instance, error)
+	Link(source, destination *model.Instance) error
+}
+
+type Handler struct {
+	userClient      userClientHandler
+	instanceService Service
+	stackService    stack.Service
 }
 
 type userClientHandler interface {
