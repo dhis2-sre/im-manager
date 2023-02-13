@@ -92,3 +92,5 @@ http --check-status --follow "$INSTANCE_HOST/$INSTANCE_NAME"
 ./destroy.sh $GROUP "$INSTANCE_NAME-preset"
 ./destroy.sh $GROUP "$INSTANCE_NAME-db"
 kubectl delete pvc --namespace $GROUP "data-$INSTANCE_NAME-db-database-postgresql-0"
+
+echo "Tests successfully completed!"
