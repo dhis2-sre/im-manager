@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-set -euo pipefail
+set -xeuo pipefail
 
 INSTANCE_HOST=https://whoami.im.dev.test.c.dhis2.org
 GROUP=whoami
