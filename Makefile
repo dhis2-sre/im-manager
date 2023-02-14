@@ -2,8 +2,10 @@ tag ?= latest
 version ?= $(shell yq e '.version' helm/chart/Chart.yaml)
 clean-cmd = docker compose down --remove-orphans --volumes
 
-binary:
-	go build -o im-manager -ldflags "-s -w" ./cmd/serve
+init:
+	direnv allow
+	pip install pre-commit
+	pre-commit install --install-hooks --overwrite
 
 check:
 	pre-commit run --all-files --show-diff-on-failure
@@ -16,40 +18,20 @@ smoke-test:
 docker-image:
 	IMAGE_TAG=$(tag) docker compose build prod
 
-init:
-	direnv allow
-	pip install pre-commit
-	pre-commit install --install-hooks --overwrite
-
 push-docker-image:
 	IMAGE_TAG=$(tag) docker compose push prod
 
 dev:
 	docker compose up --build dev database rabbitmq jwks
 
-cluster-dev:
-	skaffold dev
-
 test: clean
 	docker compose up -d database rabbitmq jwks
 	docker compose run --no-deps test
 	$(clean-cmd)
 
-dev-test: clean
-	docker compose run --no-deps dev-test
-	$(clean-cmd)
-
 clean:
 	$(clean-cmd)
 	go clean
-
-helm-chart:
-	@helm package helm/chart
-
-publish-helm:
-	@curl --user "$(CHART_AUTH_USER):$(CHART_AUTH_PASS)" \
-        -F "chart=@im-manager-$(version).tgz" \
-        https://helm-charts.fitfit.dk/api/charts
 
 swagger-check-install:
 	which swagger || go install github.com/go-swagger/go-swagger/cmd/swagger@latest
@@ -67,4 +49,4 @@ swagger-client: swagger-check-install
 
 swagger: swagger-clean swagger-docs swagger-client
 
-.PHONY: binary check docker-image push-docker-image dev test dev-test helm-chart publish-helm init
+.PHONY: init check docker-image push-docker-image dev test
