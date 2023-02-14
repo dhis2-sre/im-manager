@@ -1,11 +1,22 @@
 #!/usr/bin/env bash
 
-set -euo pipefail
+set -xeuo pipefail
 
 INSTANCE_HOST=https://whoami.im.dev.test.c.dhis2.org
 GROUP=whoami
 INSTANCE_PREFIX=im-e2e
 INSTANCE_POSTFIX=$(tr -dc '[:lower:]' </dev/urandom | head -c 5; echo '')
+
+function cleanup_handler {
+  # shellcheck disable=SC2046
+  ./destroy.sh whoami $(./list.sh | jq -r '.[].Instances[]?.Name' | grep $INSTANCE_PREFIX | grep "$INSTANCE_POSTFIX")
+  # shellcheck disable=SC2046
+  ./destroy.sh whoami $(./listPresets.sh | jq -r '.[].Instances[]?.Name' | grep $INSTANCE_PREFIX | grep "$INSTANCE_POSTFIX")
+  trap - EXIT
+  exit
+}
+
+trap cleanup_handler INT EXIT
 
 # Whoami
 INSTANCE_NAME="$INSTANCE_PREFIX-whoami-$INSTANCE_POSTFIX"
@@ -81,3 +92,5 @@ http --check-status --follow "$INSTANCE_HOST/$INSTANCE_NAME"
 ./destroy.sh $GROUP "$INSTANCE_NAME-preset"
 ./destroy.sh $GROUP "$INSTANCE_NAME-db"
 kubectl delete pvc --namespace $GROUP "data-$INSTANCE_NAME-db-database-postgresql-0"
+
+echo "Tests successfully completed!"
