@@ -324,7 +324,7 @@ func (s service) filterByGroupId(instances []*model.Instance, test func(instance
 }
 
 func (s service) removeDuplicates(groups []*models.Group) []*models.Group {
-	if len(groups) < 1 {
+	if len(groups) <= 1 {
 		return groups
 	}
 
