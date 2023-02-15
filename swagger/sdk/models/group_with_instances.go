@@ -19,9 +19,6 @@ import (
 // swagger:model GroupWithInstances
 type GroupWithInstances struct {
 
-	// hostname
-	Hostname string `json:"Hostname,omitempty"`
-
 	// instances
 	Instances []*Instance `json:"Instances"`
 

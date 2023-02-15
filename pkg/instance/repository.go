@@ -1,8 +1,10 @@
 package instance
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 
 	"github.com/dhis2-sre/im-manager/pkg/config"
 	"github.com/dhis2-sre/im-manager/pkg/model"
@@ -111,22 +113,45 @@ func (r repository) Delete(id uint) error {
 	return r.db.Unscoped().Delete(&model.Instance{}, id).Error
 }
 
-func (r repository) FindByGroupNames(names []string, presets bool) ([]*model.Instance, error) {
+const AdministratorGroupName = "administrators"
+
+func (r repository) FindByGroupNames_oold(names []string, presets bool) ([]*model.Instance, error) {
 	query := r.db.
+		Select("*").
 		Preload("RequiredParameters.StackRequiredParameter").
 		Preload("OptionalParameters.StackOptionalParameter")
 
-	isAdmin := slices.Contains(names, "administrators")
+	isAdmin := slices.Contains(names, AdministratorGroupName)
 	if !isAdmin {
 		query = query.Where("group_name IN ?", names)
 	}
 
-	var instances []*model.Instance
+	//	var instances []*model.Instance
+	var result []GroupWithInstances
 	err := query.
 		Where("preset = ?", presets).
-		Find(&instances).Error
+		Group("group_name").
+		Scan(&result).Error
 
-	return instances, err
+	indent, _ := json.MarshalIndent(result, "", "  ")
+	log.Println(string(indent))
+
+	return nil, err
+}
+
+func (r repository) FindByGroupNames(names []string, presets bool) ([]*model.Instance, error) {
+	var result []GroupWithInstances
+	err := r.db.
+		Model(&model.Instance{}).
+		Where("group_name IN ?", names).
+		Where("preset = ?", presets).
+		Group("group_name").
+		Scan(&result).Error
+
+	indent, _ := json.MarshalIndent(result, "", "  ")
+	log.Println(string(indent))
+
+	return nil, err
 }
 
 // TODO: Rename PopulateRelations? Or something else?

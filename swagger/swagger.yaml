@@ -36,8 +36,6 @@ definitions:
         x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
     GroupWithInstances:
         properties:
-            Hostname:
-                type: string
             Instances:
                 items:
                     $ref: '#/definitions/Instance'

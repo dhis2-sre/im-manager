@@ -14,6 +14,7 @@ import (
 	"github.com/dhis2-sre/im-manager/pkg/config"
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	"github.com/dhis2-sre/im-user/swagger/sdk/models"
+	"golang.org/x/exp/maps"
 )
 
 func NewService(
@@ -268,29 +269,29 @@ func (s service) FindByNameAndGroup(instance string, group string) (*model.Insta
 
 type GroupWithInstances struct {
 	Name      string
-	Hostname  string
 	Instances []*model.Instance
 }
 
 func (s service) FindInstances(user *models.User, presets bool) ([]GroupWithInstances, error) {
-	groups := s.uniqueUserGroups(user)
+	// Get all groups
+	allGroups := append(user.Groups, user.AdminGroups...)
 
-	groupNames := make([]string, len(groups))
-	for i, group := range groups {
-		groupNames[i] = group.Name
+	// Get unique group names
+	groupMap := make(map[string]struct{})
+	for _, group := range allGroups {
+		groupMap[group.Name] = struct{}{}
 	}
-
+	groupNames := maps.Keys(groupMap)
+	log.Println("groupNames")
+	log.Println(groupNames)
+	// Find instances by group names
 	instances, err := s.instanceRepository.FindByGroupNames(groupNames, presets)
 	if err != nil {
 		return nil, err
 	}
 
+	// index instance by group... []GroupWithInstances
 	return s.groupsWithInstances(instances), err
-}
-
-func (s service) uniqueUserGroups(user *models.User) []*models.Group {
-	groups := append(user.Groups, user.AdminGroups...)
-	return s.removeDuplicates(groups)
 }
 
 func (s service) groupsWithInstances(instances []*model.Instance) []GroupWithInstances {
@@ -298,7 +299,6 @@ func (s service) groupsWithInstances(instances []*model.Instance) []GroupWithIns
 	groupsWithInstances := make([]GroupWithInstances, len(groups))
 	for i, group := range groups {
 		groupsWithInstances[i].Name = group.Name
-		groupsWithInstances[i].Hostname = group.Hostname
 		groupsWithInstances[i].Instances = s.filterByGroupId(instances, func(instance *model.Instance) bool {
 			return instance.GroupName == group.Name
 		})
@@ -346,3 +346,11 @@ type ByName []*models.Group
 func (a ByName) Len() int           { return len(a) }
 func (a ByName) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a ByName) Less(i, j int) bool { return a[i].Name < a[j].Name }
+
+// group by name on gorm
+
+// use receiver on the removeDuplicates?
+
+// Can we annotate the administrator group in im-user
+// Define group package... which contains a const for "administrators group"
+// ... Include removeDuplicates
