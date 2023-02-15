@@ -159,7 +159,7 @@ func mapInstances(groupNames []string, result []*model.Instance) map[string][]*m
 	instancesMap := make(map[string][]*model.Instance, len(groupNames))
 	for _, instance := range result {
 		groupName := instance.GroupName
-		instancesMap[groupName] = append(instancesMap[groupName], []*model.Instance{instance}...)
+		instancesMap[groupName] = append(instancesMap[groupName], instance)
 	}
 	return instancesMap
 }
