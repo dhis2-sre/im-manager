@@ -1,19 +1,19 @@
 package instance
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 
 	"github.com/dhis2-sre/im-manager/pkg/config"
 	"github.com/dhis2-sre/im-manager/pkg/model"
+	"github.com/dhis2-sre/im-user/swagger/sdk/models"
 	"github.com/jackc/pgconn"
+	"golang.org/x/exp/maps"
 	"gorm.io/gorm"
 	"k8s.io/utils/strings/slices"
 )
 
-func NewRepository(DB *gorm.DB, config config.Config) Repository {
+func NewRepository(DB *gorm.DB, config config.Config) *repository {
 	return &repository{db: DB, config: config}
 }
 
@@ -115,43 +115,70 @@ func (r repository) Delete(id uint) error {
 
 const AdministratorGroupName = "administrators"
 
-func (r repository) FindByGroupNames_oold(names []string, presets bool) ([]*model.Instance, error) {
+type GroupWithInstances struct {
+	Name      string
+	Hostname  string
+	Instances []*model.Instance
+}
+
+func (r repository) FindByGroups(groups []*models.Group, presets bool) ([]GroupWithInstances, error) {
+	groupsByName := make(map[string]*models.Group)
+	for _, group := range groups {
+		groupsByName[group.Name] = group
+	}
+	groupNames := maps.Keys(groupsByName)
+
+	instances, err := r.findInstances(groupNames, presets)
+	if err != nil {
+		return nil, err
+	}
+
+	instancesMap := r.mapInstances(groupNames, instances)
+	groupWithInstances := r.groupWithInstances(instancesMap, groupsByName)
+
+	return groupWithInstances, err
+}
+
+func (r repository) findInstances(groupNames []string, presets bool) ([]*model.Instance, error) {
 	query := r.db.
-		Select("*").
 		Preload("RequiredParameters.StackRequiredParameter").
 		Preload("OptionalParameters.StackOptionalParameter")
 
-	isAdmin := slices.Contains(names, AdministratorGroupName)
+	isAdmin := slices.Contains(groupNames, AdministratorGroupName)
 	if !isAdmin {
-		query = query.Where("group_name IN ?", names)
+		query = query.Where("group_name IN ?", groupNames)
 	}
 
-	//	var instances []*model.Instance
-	var result []GroupWithInstances
+	var instances []*model.Instance
 	err := query.
 		Where("preset = ?", presets).
-		Group("group_name").
-		Scan(&result).Error
-
-	indent, _ := json.MarshalIndent(result, "", "  ")
-	log.Println(string(indent))
-
-	return nil, err
+		Find(&instances).Error
+	return instances, err
 }
 
-func (r repository) FindByGroupNames(names []string, presets bool) ([]*model.Instance, error) {
-	var result []GroupWithInstances
-	err := r.db.
-		Model(&model.Instance{}).
-		Where("group_name IN ?", names).
-		Where("preset = ?", presets).
-		Group("group_name").
-		Scan(&result).Error
+func (r repository) mapInstances(groupNames []string, result []*model.Instance) map[string][]*model.Instance {
+	instancesMap := make(map[string][]*model.Instance, len(groupNames))
+	for _, instance := range result {
+		groupName := instance.GroupName
+		instancesMap[groupName] = append(instancesMap[groupName], []*model.Instance{instance}...)
+	}
+	return instancesMap
+}
 
-	indent, _ := json.MarshalIndent(result, "", "  ")
-	log.Println(string(indent))
-
-	return nil, err
+func (r repository) groupWithInstances(instancesMap map[string][]*model.Instance, groupMap map[string]*models.Group) []GroupWithInstances {
+	var groupWithInstances []GroupWithInstances
+	for groupName, instances := range instancesMap {
+		if instances == nil {
+			continue
+		}
+		group := groupMap[groupName]
+		groupWithInstances = append(groupWithInstances, GroupWithInstances{
+			Name:      groupName,
+			Hostname:  group.Hostname,
+			Instances: instances,
+		})
+	}
+	return groupWithInstances
 }
 
 // TODO: Rename PopulateRelations? Or something else?

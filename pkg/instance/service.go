@@ -5,7 +5,6 @@ import (
 	"io"
 	"log"
 	"os/exec"
-	"sort"
 
 	"github.com/dhis2-sre/im-manager/pkg/stack"
 
@@ -14,7 +13,6 @@ import (
 	"github.com/dhis2-sre/im-manager/pkg/config"
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	"github.com/dhis2-sre/im-user/swagger/sdk/models"
-	"golang.org/x/exp/maps"
 )
 
 func NewService(
@@ -40,7 +38,7 @@ type Repository interface {
 	FindById(id uint) (*model.Instance, error)
 	FindByIdDecrypted(id uint) (*model.Instance, error)
 	FindByNameAndGroup(instance string, group string) (*model.Instance, error)
-	FindByGroupNames(names []string, presets bool) ([]*model.Instance, error)
+	FindByGroups(groups []*models.Group, presets bool) ([]GroupWithInstances, error)
 	SaveDeployLog(instance *model.Instance, log string) error
 	Delete(id uint) error
 }
@@ -267,90 +265,13 @@ func (s service) FindByNameAndGroup(instance string, group string) (*model.Insta
 	return s.instanceRepository.FindByNameAndGroup(instance, group)
 }
 
-type GroupWithInstances struct {
-	Name      string
-	Instances []*model.Instance
-}
-
 func (s service) FindInstances(user *models.User, presets bool) ([]GroupWithInstances, error) {
-	// Get all groups
 	allGroups := append(user.Groups, user.AdminGroups...)
 
-	// Get unique group names
-	groupMap := make(map[string]struct{})
-	for _, group := range allGroups {
-		groupMap[group.Name] = struct{}{}
-	}
-	groupNames := maps.Keys(groupMap)
-	log.Println("groupNames")
-	log.Println(groupNames)
-	// Find instances by group names
-	instances, err := s.instanceRepository.FindByGroupNames(groupNames, presets)
+	instances, err := s.instanceRepository.FindByGroups(allGroups, presets)
 	if err != nil {
 		return nil, err
 	}
 
-	// index instance by group... []GroupWithInstances
-	return s.groupsWithInstances(instances), err
+	return instances, err
 }
-
-func (s service) groupsWithInstances(instances []*model.Instance) []GroupWithInstances {
-	groups := s.uniqueInstanceGroups(instances)
-	groupsWithInstances := make([]GroupWithInstances, len(groups))
-	for i, group := range groups {
-		groupsWithInstances[i].Name = group.Name
-		groupsWithInstances[i].Instances = s.filterByGroupId(instances, func(instance *model.Instance) bool {
-			return instance.GroupName == group.Name
-		})
-	}
-	return groupsWithInstances
-}
-
-func (s service) uniqueInstanceGroups(instances []*model.Instance) []*models.Group {
-	groups := make([]*models.Group, len(instances))
-	for i, instance := range instances {
-		groups[i] = &models.Group{Name: instance.GroupName}
-	}
-	return s.removeDuplicates(groups)
-}
-
-func (s service) filterByGroupId(instances []*model.Instance, test func(instance *model.Instance) bool) (ret []*model.Instance) {
-	for _, instance := range instances {
-		if test(instance) {
-			ret = append(ret, instance)
-		}
-	}
-	return
-}
-
-func (s service) removeDuplicates(groups []*models.Group) []*models.Group {
-	if len(groups) <= 1 {
-		return groups
-	}
-
-	sort.Sort(ByName(groups))
-
-	prev := 1
-	for curr := 1; curr < len(groups); curr++ {
-		if groups[curr-1].Name != groups[curr].Name {
-			groups[prev] = groups[curr]
-			prev++
-		}
-	}
-
-	return groups[:prev]
-}
-
-type ByName []*models.Group
-
-func (a ByName) Len() int           { return len(a) }
-func (a ByName) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-func (a ByName) Less(i, j int) bool { return a[i].Name < a[j].Name }
-
-// group by name on gorm
-
-// use receiver on the removeDuplicates?
-
-// Can we annotate the administrator group in im-user
-// Define group package... which contains a const for "administrators group"
-// ... Include removeDuplicates
