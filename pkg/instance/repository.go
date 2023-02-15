@@ -9,8 +9,8 @@ import (
 	"github.com/dhis2-sre/im-user/swagger/sdk/models"
 	"github.com/jackc/pgconn"
 	"golang.org/x/exp/maps"
+	"golang.org/x/exp/slices"
 	"gorm.io/gorm"
-	"k8s.io/utils/strings/slices"
 )
 
 func NewRepository(DB *gorm.DB, config config.Config) *repository {
