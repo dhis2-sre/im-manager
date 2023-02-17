@@ -133,9 +133,9 @@ func (r repository) FindByGroups(groups []*models.Group, presets bool) ([]GroupW
 		return nil, err
 	}
 
-	instancesMap := mapInstances(groupNames, instances)
+	instancesByGroup := mapInstancesByGroup(groupNames, instances)
 
-	return groupWithInstances(instancesMap, groupsByName), nil
+	return groupWithInstances(instancesByGroup, groupsByName), nil
 }
 
 func (r repository) findInstances(groupNames []string, presets bool) ([]*model.Instance, error) {
@@ -155,13 +155,13 @@ func (r repository) findInstances(groupNames []string, presets bool) ([]*model.I
 	return instances, err
 }
 
-func mapInstances(groupNames []string, result []*model.Instance) map[string][]*model.Instance {
-	instancesMap := make(map[string][]*model.Instance, len(groupNames))
+func mapInstancesByGroup(groupNames []string, result []*model.Instance) map[string][]*model.Instance {
+	instancesByGroup := make(map[string][]*model.Instance, len(groupNames))
 	for _, instance := range result {
 		groupName := instance.GroupName
-		instancesMap[groupName] = append(instancesMap[groupName], instance)
+		instancesByGroup[groupName] = append(instancesByGroup[groupName], instance)
 	}
-	return instancesMap
+	return instancesByGroup
 }
 
 func groupWithInstances(instancesMap map[string][]*model.Instance, groupMap map[string]*models.Group) []GroupWithInstances {
