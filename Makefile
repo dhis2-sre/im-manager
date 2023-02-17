@@ -34,6 +34,7 @@ clean:
 
 swagger-check-install:
 	which swagger || go install github.com/go-swagger/go-swagger/cmd/swagger@latest
+	swagger version
 
 swagger-clean:
 	rm -rf swagger/sdk/*
