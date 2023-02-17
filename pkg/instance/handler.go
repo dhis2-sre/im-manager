@@ -39,7 +39,7 @@ type Service interface {
 	FindByNameAndGroup(instance string, group string) (*model.Instance, error)
 	Delete(token string, id uint) error
 	Logs(instance *model.Instance, group *models.Group, typeSelector string) (io.ReadCloser, error)
-	FindInstances(groups []*models.Group, presets bool) ([]*model.Instance, error)
+	FindInstances(user *models.User, presets bool) ([]GroupWithInstances, error)
 	Link(source, destination *model.Instance) error
 }
 
@@ -704,13 +704,7 @@ func (h Handler) NameToId(c *gin.Context) {
 	c.JSON(http.StatusOK, instance.ID)
 }
 
-type GroupWithInstances struct {
-	Name      string
-	Hostname  string
-	Instances []*model.Instance
-}
-
-// List instances
+// ListInstances instances
 // swagger:route GET /instances listInstances
 //
 // List instances
@@ -723,20 +717,8 @@ type GroupWithInstances struct {
 //   401: Error
 //   403: Error
 //   415: Error
-func (h Handler) List(c *gin.Context) {
-	user, err := handler.GetUserFromContext(c)
-	if err != nil {
-		_ = c.Error(err)
-		return
-	}
-
-	instances, err := h.instanceService.FindInstances(user.Groups, false)
-	if err != nil {
-		_ = c.Error(err)
-		return
-	}
-
-	c.JSON(http.StatusOK, h.groupsWithInstances(user.Groups, instances))
+func (h Handler) ListInstances(c *gin.Context) {
+	h.findInstances(c, false)
 }
 
 // ListPresets presets
@@ -753,38 +735,21 @@ func (h Handler) List(c *gin.Context) {
 //   403: Error
 //   415: Error
 func (h Handler) ListPresets(c *gin.Context) {
+	h.findInstances(c, true)
+}
+
+func (h Handler) findInstances(c *gin.Context, presets bool) {
 	user, err := handler.GetUserFromContext(c)
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
 
-	presets, err := h.instanceService.FindInstances(user.Groups, true)
+	instances, err := h.instanceService.FindInstances(user, presets)
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
 
-	c.JSON(http.StatusOK, h.groupsWithInstances(user.Groups, presets))
-}
-
-func (h Handler) groupsWithInstances(groups []*models.Group, instances []*model.Instance) []GroupWithInstances {
-	groupsWithInstances := make([]GroupWithInstances, len(groups))
-	for i, group := range groups {
-		groupsWithInstances[i].Name = group.Name
-		groupsWithInstances[i].Hostname = group.Hostname
-		groupsWithInstances[i].Instances = h.filterByGroupId(instances, func(instance *model.Instance) bool {
-			return instance.GroupName == group.Name
-		})
-	}
-	return groupsWithInstances
-}
-
-func (h Handler) filterByGroupId(instances []*model.Instance, test func(instance *model.Instance) bool) (ret []*model.Instance) {
-	for _, instance := range instances {
-		if test(instance) {
-			ret = append(ret, instance)
-		}
-	}
-	return
+	c.JSON(http.StatusOK, instances)
 }

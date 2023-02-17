@@ -10,3 +10,6 @@ Makefile
 *.md
 .pre-commit-config.yaml
 scripts
+.idea
+docker-compose.yml
+skaffold.yaml

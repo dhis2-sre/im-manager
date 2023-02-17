@@ -6,11 +6,14 @@ import (
 
 	"github.com/dhis2-sre/im-manager/pkg/config"
 	"github.com/dhis2-sre/im-manager/pkg/model"
+	"github.com/dhis2-sre/im-user/swagger/sdk/models"
 	"github.com/jackc/pgconn"
+	"golang.org/x/exp/maps"
+	"golang.org/x/exp/slices"
 	"gorm.io/gorm"
 )
 
-func NewRepository(DB *gorm.DB, config config.Config) Repository {
+func NewRepository(DB *gorm.DB, config config.Config) *repository {
 	return &repository{db: DB, config: config}
 }
 
@@ -110,17 +113,71 @@ func (r repository) Delete(id uint) error {
 	return r.db.Unscoped().Delete(&model.Instance{}, id).Error
 }
 
-func (r repository) FindByGroupNames(names []string, presets bool) ([]*model.Instance, error) {
-	var instances []*model.Instance
+const AdministratorGroupName = "administrators"
 
-	err := r.db.
+type GroupWithInstances struct {
+	Name      string
+	Hostname  string
+	Instances []*model.Instance
+}
+
+func (r repository) FindByGroups(groups []*models.Group, presets bool) ([]GroupWithInstances, error) {
+	groupsByName := make(map[string]*models.Group)
+	for _, group := range groups {
+		groupsByName[group.Name] = group
+	}
+	groupNames := maps.Keys(groupsByName)
+
+	instances, err := r.findInstances(groupNames, presets)
+	if err != nil {
+		return nil, err
+	}
+
+	instancesByGroup := mapInstancesByGroup(groupNames, instances)
+
+	return groupWithInstances(instancesByGroup, groupsByName), nil
+}
+
+func (r repository) findInstances(groupNames []string, presets bool) ([]*model.Instance, error) {
+	query := r.db.
 		Preload("RequiredParameters.StackRequiredParameter").
-		Preload("OptionalParameters.StackOptionalParameter").
-		Where("group_name IN ?", names).
+		Preload("OptionalParameters.StackOptionalParameter")
+
+	isAdmin := slices.Contains(groupNames, AdministratorGroupName)
+	if !isAdmin {
+		query = query.Where("group_name IN ?", groupNames)
+	}
+
+	var instances []*model.Instance
+	err := query.
 		Where("preset = ?", presets).
 		Find(&instances).Error
-
 	return instances, err
+}
+
+func mapInstancesByGroup(groupNames []string, result []*model.Instance) map[string][]*model.Instance {
+	instancesByGroup := make(map[string][]*model.Instance, len(groupNames))
+	for _, instance := range result {
+		groupName := instance.GroupName
+		instancesByGroup[groupName] = append(instancesByGroup[groupName], instance)
+	}
+	return instancesByGroup
+}
+
+func groupWithInstances(instancesMap map[string][]*model.Instance, groupMap map[string]*models.Group) []GroupWithInstances {
+	var groupWithInstances []GroupWithInstances
+	for groupName, instances := range instancesMap {
+		if instances == nil {
+			continue
+		}
+		group := groupMap[groupName]
+		groupWithInstances = append(groupWithInstances, GroupWithInstances{
+			Name:      groupName,
+			Hostname:  group.Hostname,
+			Instances: instances,
+		})
+	}
+	return groupWithInstances
 }
 
 // TODO: Rename PopulateRelations? Or something else?
