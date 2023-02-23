@@ -6,9 +6,11 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"k8s.io/apimachinery/pkg/types"
 	"os"
 	"os/exec"
 	"strings"
+	"time"
 
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	"github.com/dhis2-sre/im-user/swagger/sdk/models"
@@ -212,15 +214,8 @@ func (ks kubernetesService) restart(instance *model.Instance, typeSelector strin
 
 	name := items[0].Name
 
-	// Scale down
-	prevReplicas, err := scale(deployments, name, 0)
-	if err != nil {
-		return err
-	}
-
-	// Scale up
-	_, err = scale(deployments, name, prevReplicas)
-
+	data := fmt.Sprintf(`{"spec": {"template": {"metadata": {"annotations": {"kubectl.kubernetes.io/restartedAt": "%s"}}}}}`, time.Now().Format(time.RFC3339))
+	_, err = deployments.Patch(context.TODO(), name, types.StrategicMergePatchType, []byte(data), metav1.PatchOptions{})
 	return err
 }
 
