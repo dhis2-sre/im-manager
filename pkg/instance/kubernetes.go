@@ -6,11 +6,12 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"k8s.io/apimachinery/pkg/types"
 	"os"
 	"os/exec"
 	"strings"
 	"time"
+
+	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	"github.com/dhis2-sre/im-user/swagger/sdk/models"
