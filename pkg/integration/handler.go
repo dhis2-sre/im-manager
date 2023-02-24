@@ -30,19 +30,21 @@ type Request struct {
 }
 
 // Integrations ...
-// swagger:route POST /integrations postIntegration
-//
-// Return integration for a given key
-//
-// Security:
-//  oauth2:
-//
-// responses:
-//   200: Any
-//   401: Error
-//   403: Error
-//   415: Error
 func (h Handler) Integrations(c *gin.Context) {
+	// swagger:route POST /integrations postIntegration
+	//
+	// Integration
+	//
+	// Return integration for a given key
+	//
+	// Security:
+	//  oauth2:
+	//
+	// responses:
+	//   200: Any
+	//   401: Error
+	//   403: Error
+	//   415: Error
 	var request Request
 	if err := handler.DataBinder(c, &request); err != nil {
 		_ = c.Error(err)

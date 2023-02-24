@@ -39,7 +39,8 @@ func NewHealthOK() *HealthOK {
 	return &HealthOK{}
 }
 
-/* HealthOK describes a response with status code 200, with default header values.
+/*
+HealthOK describes a response with status code 200, with default header values.
 
 HealthOK health o k
 */

@@ -63,7 +63,8 @@ func NewUpdateInstanceNoContent() *UpdateInstanceNoContent {
 	return &UpdateInstanceNoContent{}
 }
 
-/* UpdateInstanceNoContent describes a response with status code 204, with default header values.
+/*
+UpdateInstanceNoContent describes a response with status code 204, with default header values.
 
 Instance
 */
@@ -130,7 +131,8 @@ func NewUpdateInstanceUnauthorized() *UpdateInstanceUnauthorized {
 	return &UpdateInstanceUnauthorized{}
 }
 
-/* UpdateInstanceUnauthorized describes a response with status code 401, with default header values.
+/*
+UpdateInstanceUnauthorized describes a response with status code 401, with default header values.
 
 UpdateInstanceUnauthorized update instance unauthorized
 */
@@ -185,7 +187,8 @@ func NewUpdateInstanceForbidden() *UpdateInstanceForbidden {
 	return &UpdateInstanceForbidden{}
 }
 
-/* UpdateInstanceForbidden describes a response with status code 403, with default header values.
+/*
+UpdateInstanceForbidden describes a response with status code 403, with default header values.
 
 UpdateInstanceForbidden update instance forbidden
 */
@@ -240,7 +243,8 @@ func NewUpdateInstanceNotFound() *UpdateInstanceNotFound {
 	return &UpdateInstanceNotFound{}
 }
 
-/* UpdateInstanceNotFound describes a response with status code 404, with default header values.
+/*
+UpdateInstanceNotFound describes a response with status code 404, with default header values.
 
 UpdateInstanceNotFound update instance not found
 */
@@ -295,7 +299,8 @@ func NewUpdateInstanceUnsupportedMediaType() *UpdateInstanceUnsupportedMediaType
 	return &UpdateInstanceUnsupportedMediaType{}
 }
 
-/* UpdateInstanceUnsupportedMediaType describes a response with status code 415, with default header values.
+/*
+UpdateInstanceUnsupportedMediaType describes a response with status code 415, with default header values.
 
 UpdateInstanceUnsupportedMediaType update instance unsupported media type
 */

@@ -90,7 +90,7 @@ type stack struct {
 
 func parseStack(dir, name string) (*stack, error) {
 	path := fmt.Sprintf("%s/%s/helmfile.yaml", dir, name)
-	file, err := os.ReadFile(path)
+	file, err := os.ReadFile(path) // #nosec
 	if err != nil {
 		return nil, fmt.Errorf("error reading stack %q: %v", name, err)
 	}

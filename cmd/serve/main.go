@@ -1,27 +1,24 @@
 // Package classification Instance Manager Manager Service.
 //
-// Manager Service as part of the Instance Manager environment
+// Manager Service is part of the Instance Manager environment
 //
-// Terms Of Service:
+//	Version: 0.1.0
+//	License: TODO
+//	Contact: <info@dhis2.org> https://github.com/dhis2-sre/im-manager
 //
-// there are no TOS at this moment, use at your own risk we take no responsibility
+//	Consumes:
+//	  - application/json
 //
-//    Version: 0.1.0
-//    License: TODO
-//    Contact: <info@dhis2.org> https://github.com/dhis2-sre/im-manager
+//	Produces:
+//	  - application/json
 //
-//    Consumes:
-//      - application/json
+//	SecurityDefinitions:
+//	  oauth2:
+//	    type: oauth2
+//	    tokenUrl: /not-valid--endpoint-is-served-from-the-im-user-service
+//	    refreshUrl: /not-valid--endpoint-is-served-from-the-im-user-service
+//	    flow: password
 //
-//    Produces:
-//      - application/json
-//
-//    SecurityDefinitions:
-//      oauth2:
-//        type: oauth2
-//        tokenUrl: /not-valid--endpoint-is-served-from-the-im-user-service
-//        refreshUrl: /not-valid--endpoint-is-served-from-the-im-user-service
-//        flow: password
 // swagger:meta
 package main
 

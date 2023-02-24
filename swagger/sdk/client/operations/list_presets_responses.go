@@ -57,9 +57,10 @@ func NewListPresetsOK() *ListPresetsOK {
 	return &ListPresetsOK{}
 }
 
-/* ListPresetsOK describes a response with status code 200, with default header values.
+/*
+ListPresetsOK describes a response with status code 200, with default header values.
 
-GroupWithInstances
+ListPresetsOK list presets o k
 */
 type ListPresetsOK struct {
 	Payload []*models.GroupWithInstances
@@ -122,7 +123,8 @@ func NewListPresetsUnauthorized() *ListPresetsUnauthorized {
 	return &ListPresetsUnauthorized{}
 }
 
-/* ListPresetsUnauthorized describes a response with status code 401, with default header values.
+/*
+ListPresetsUnauthorized describes a response with status code 401, with default header values.
 
 ListPresetsUnauthorized list presets unauthorized
 */
@@ -177,7 +179,8 @@ func NewListPresetsForbidden() *ListPresetsForbidden {
 	return &ListPresetsForbidden{}
 }
 
-/* ListPresetsForbidden describes a response with status code 403, with default header values.
+/*
+ListPresetsForbidden describes a response with status code 403, with default header values.
 
 ListPresetsForbidden list presets forbidden
 */
@@ -232,7 +235,8 @@ func NewListPresetsUnsupportedMediaType() *ListPresetsUnsupportedMediaType {
 	return &ListPresetsUnsupportedMediaType{}
 }
 
-/* ListPresetsUnsupportedMediaType describes a response with status code 415, with default header values.
+/*
+ListPresetsUnsupportedMediaType describes a response with status code 415, with default header values.
 
 ListPresetsUnsupportedMediaType list presets unsupported media type
 */

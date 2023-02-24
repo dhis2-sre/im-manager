@@ -64,7 +64,9 @@ type ClientService interface {
 }
 
 /*
-  DeleteInstance Delete an instance by id
+DeleteInstance deletes instance
+
+Delete an instance by id
 */
 func (a *Client) DeleteInstance(params *DeleteInstanceParams, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*DeleteInstanceAccepted, error) {
 	// TODO: Validate the params before sending
@@ -103,7 +105,9 @@ func (a *Client) DeleteInstance(params *DeleteInstanceParams, authInfo runtime.C
 }
 
 /*
-  DeployInstance Deploy instance
+DeployInstance deploys instance
+
+Deploy an instance...
 */
 func (a *Client) DeployInstance(params *DeployInstanceParams, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*DeployInstanceCreated, error) {
 	// TODO: Validate the params before sending
@@ -142,7 +146,9 @@ func (a *Client) DeployInstance(params *DeployInstanceParams, authInfo runtime.C
 }
 
 /*
-  FindByID Find instance by id
+FindByID finds instance
+
+Find an instance by id
 */
 func (a *Client) FindByID(params *FindByIDParams, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*FindByIDOK, error) {
 	// TODO: Validate the params before sending
@@ -181,7 +187,9 @@ func (a *Client) FindByID(params *FindByIDParams, authInfo runtime.ClientAuthInf
 }
 
 /*
-  FindByIDDecrypted Find instance by id with decrypted parameters
+FindByIDDecrypted finds decrypted instance
+
+Find instance by id with decrypted parameters
 */
 func (a *Client) FindByIDDecrypted(params *FindByIDDecryptedParams, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*FindByIDDecryptedOK, error) {
 	// TODO: Validate the params before sending
@@ -220,7 +228,9 @@ func (a *Client) FindByIDDecrypted(params *FindByIDDecryptedParams, authInfo run
 }
 
 /*
-  Health Service health status
+Health healths status
+
+Show service health status
 */
 func (a *Client) Health(params *HealthParams, opts ...ClientOption) (*HealthOK, error) {
 	// TODO: Validate the params before sending
@@ -258,7 +268,9 @@ func (a *Client) Health(params *HealthParams, opts ...ClientOption) (*HealthOK, 
 }
 
 /*
-  InstanceLogs Stream instance logs in real time
+InstanceLogs streams logs
+
+Stream instance logs in real time
 */
 func (a *Client) InstanceLogs(params *InstanceLogsParams, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*InstanceLogsOK, error) {
 	// TODO: Validate the params before sending
@@ -297,7 +309,9 @@ func (a *Client) InstanceLogs(params *InstanceLogsParams, authInfo runtime.Clien
 }
 
 /*
-  InstanceNameToID Find instance id by name and group name
+InstanceNameToID finds an instance
+
+Find instance id by name and group name
 */
 func (a *Client) InstanceNameToID(params *InstanceNameToIDParams, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*InstanceNameToIDOK, error) {
 	// TODO: Validate the params before sending
@@ -336,7 +350,9 @@ func (a *Client) InstanceNameToID(params *InstanceNameToIDParams, authInfo runti
 }
 
 /*
-  ListInstances List instances
+ListInstances lists instances
+
+List all instances accessible by the user
 */
 func (a *Client) ListInstances(params *ListInstancesParams, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*ListInstancesOK, error) {
 	// TODO: Validate the params before sending
@@ -375,7 +391,9 @@ func (a *Client) ListInstances(params *ListInstancesParams, authInfo runtime.Cli
 }
 
 /*
-  ListPresets List presets
+ListPresets lists presets
+
+List all presets accessible by the user
 */
 func (a *Client) ListPresets(params *ListPresetsParams, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*ListPresetsOK, error) {
 	// TODO: Validate the params before sending
@@ -414,7 +432,9 @@ func (a *Client) ListPresets(params *ListPresetsParams, authInfo runtime.ClientA
 }
 
 /*
-  PauseInstance Pause instance
+PauseInstance pauses instance
+
+Pause an instance...
 */
 func (a *Client) PauseInstance(params *PauseInstanceParams, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*PauseInstanceAccepted, error) {
 	// TODO: Validate the params before sending
@@ -453,7 +473,9 @@ func (a *Client) PauseInstance(params *PauseInstanceParams, authInfo runtime.Cli
 }
 
 /*
-  PostIntegration Return integration for a given key
+PostIntegration integrations
+
+Return integration for a given key
 */
 func (a *Client) PostIntegration(params *PostIntegrationParams, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*PostIntegrationOK, error) {
 	// TODO: Validate the params before sending
@@ -492,7 +514,9 @@ func (a *Client) PostIntegration(params *PostIntegrationParams, authInfo runtime
 }
 
 /*
-  RestartInstance Restart instance
+RestartInstance restarts instance
+
+Restart an instance...
 */
 func (a *Client) RestartInstance(params *RestartInstanceParams, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*RestartInstanceAccepted, error) {
 	// TODO: Validate the params before sending
@@ -531,7 +555,9 @@ func (a *Client) RestartInstance(params *RestartInstanceParams, authInfo runtime
 }
 
 /*
-  Stack Find stack by name
+Stack finds stack
+
+Find stack by name
 */
 func (a *Client) Stack(params *StackParams, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*StackOK, error) {
 	// TODO: Validate the params before sending
@@ -570,7 +596,9 @@ func (a *Client) Stack(params *StackParams, authInfo runtime.ClientAuthInfoWrite
 }
 
 /*
-  Stacks Find all stacks
+Stacks finds all stacks
+
+Find all stacks...
 */
 func (a *Client) Stacks(params *StacksParams, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*StacksOK, error) {
 	// TODO: Validate the params before sending
@@ -609,7 +637,9 @@ func (a *Client) Stacks(params *StacksParams, authInfo runtime.ClientAuthInfoWri
 }
 
 /*
-  UpdateInstance Update an instance
+UpdateInstance updates instance
+
+Update an instance...
 */
 func (a *Client) UpdateInstance(params *UpdateInstanceParams, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*UpdateInstanceNoContent, error) {
 	// TODO: Validate the params before sending

@@ -60,7 +60,8 @@ func NewDeleteInstanceAccepted() *DeleteInstanceAccepted {
 	return &DeleteInstanceAccepted{}
 }
 
-/* DeleteInstanceAccepted describes a response with status code 202, with default header values.
+/*
+DeleteInstanceAccepted describes a response with status code 202, with default header values.
 
 DeleteInstanceAccepted delete instance accepted
 */
@@ -115,7 +116,8 @@ func NewDeleteInstanceUnauthorized() *DeleteInstanceUnauthorized {
 	return &DeleteInstanceUnauthorized{}
 }
 
-/* DeleteInstanceUnauthorized describes a response with status code 401, with default header values.
+/*
+DeleteInstanceUnauthorized describes a response with status code 401, with default header values.
 
 DeleteInstanceUnauthorized delete instance unauthorized
 */
@@ -170,7 +172,8 @@ func NewDeleteInstanceForbidden() *DeleteInstanceForbidden {
 	return &DeleteInstanceForbidden{}
 }
 
-/* DeleteInstanceForbidden describes a response with status code 403, with default header values.
+/*
+DeleteInstanceForbidden describes a response with status code 403, with default header values.
 
 DeleteInstanceForbidden delete instance forbidden
 */
@@ -225,7 +228,8 @@ func NewDeleteInstanceNotFound() *DeleteInstanceNotFound {
 	return &DeleteInstanceNotFound{}
 }
 
-/* DeleteInstanceNotFound describes a response with status code 404, with default header values.
+/*
+DeleteInstanceNotFound describes a response with status code 404, with default header values.
 
 DeleteInstanceNotFound delete instance not found
 */
@@ -280,7 +284,8 @@ func NewDeleteInstanceUnsupportedMediaType() *DeleteInstanceUnsupportedMediaType
 	return &DeleteInstanceUnsupportedMediaType{}
 }
 
-/* DeleteInstanceUnsupportedMediaType describes a response with status code 415, with default header values.
+/*
+DeleteInstanceUnsupportedMediaType describes a response with status code 415, with default header values.
 
 DeleteInstanceUnsupportedMediaType delete instance unsupported media type
 */

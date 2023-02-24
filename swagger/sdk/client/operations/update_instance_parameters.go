@@ -55,10 +55,12 @@ func NewUpdateInstanceParamsWithHTTPClient(client *http.Client) *UpdateInstanceP
 	}
 }
 
-/* UpdateInstanceParams contains all the parameters to send to the API endpoint
-   for the update instance operation.
+/*
+UpdateInstanceParams contains all the parameters to send to the API endpoint
 
-   Typically these are written to a http.Request.
+	for the update instance operation.
+
+	Typically these are written to a http.Request.
 */
 type UpdateInstanceParams struct {
 
