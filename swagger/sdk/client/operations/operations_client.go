@@ -555,7 +555,9 @@ func (a *Client) RestartInstance(params *RestartInstanceParams, authInfo runtime
 }
 
 /*
-Stack Find stack by name
+Stack finds stack
+
+Find stack by name
 */
 func (a *Client) Stack(params *StackParams, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*StackOK, error) {
 	// TODO: Validate the params before sending
@@ -594,7 +596,9 @@ func (a *Client) Stack(params *StackParams, authInfo runtime.ClientAuthInfoWrite
 }
 
 /*
-Stacks Find all stacks
+Stacks finds all stacks
+
+Find all stacks...
 */
 func (a *Client) Stacks(params *StacksParams, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*StacksOK, error) {
 	// TODO: Validate the params before sending

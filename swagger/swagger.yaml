@@ -545,7 +545,7 @@ paths:
             summary: List presets
     /stacks:
         get:
-            description: Find all stacks
+            description: Find all stacks...
             operationId: stacks
             responses:
                 "200":
@@ -560,6 +560,7 @@ paths:
                     $ref: '#/responses/Error'
             security:
                 - oauth2: []
+            summary: Find all stacks
     /stacks/{name}:
         get:
             description: Find stack by name
@@ -583,6 +584,7 @@ paths:
                     $ref: '#/responses/Error'
             security:
                 - oauth2: []
+            summary: Find stack
 produces:
     - application/json
 responses:

@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"strings"
@@ -43,7 +42,7 @@ func commandExecutor(cmd *exec.Cmd, configuration *models.ClusterConfiguration) 
 		return nil, nil, err
 	}
 
-	file, err := ioutil.TempFile("", "kubectl")
+	file, err := os.CreateTemp("", "kubectl")
 	if err != nil {
 		return nil, nil, err
 	}

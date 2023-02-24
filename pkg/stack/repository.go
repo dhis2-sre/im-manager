@@ -19,8 +19,8 @@ type repository struct {
 	db *gorm.DB
 }
 
-func NewRepository(DB *gorm.DB) *repository {
-	return &repository{db: DB}
+func NewRepository(db *gorm.DB) *repository {
+	return &repository{db}
 }
 
 func (r repository) Create(stack *model.Stack) error {

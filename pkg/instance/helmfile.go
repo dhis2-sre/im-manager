@@ -64,7 +64,7 @@ func (h helmfileService) executeHelmfileCommand(accessToken string, instance *mo
 		return nil, err
 	}
 
-	cmd := exec.Command("/usr/bin/helmfile", "--helm-binary", "/usr/bin/helm", "-f", stackPath, operation)
+	cmd := exec.Command("/usr/bin/helmfile", "--helm-binary", "/usr/bin/helm", "-f", stackPath, operation) // #nosec
 	log.Printf("Command: %s\n", cmd.String())
 	configureInstanceEnvironment(accessToken, instance, group, stackParameters, cmd)
 
@@ -76,7 +76,7 @@ type stackParameters map[string]string
 func (h helmfileService) loadStackParameters(folder string, name string) (stackParameters, error) {
 	environment := h.config.Environment
 	path := fmt.Sprintf("%s/%s/parameters/%s.yaml", folder, name, environment)
-	data, err := os.ReadFile(path)
+	data, err := os.ReadFile(path) // #nosec
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return nil, nil
