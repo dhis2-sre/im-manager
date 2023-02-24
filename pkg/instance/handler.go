@@ -65,20 +65,22 @@ type DeployInstanceRequest struct {
 }
 
 // Deploy instance
-// swagger:route POST /instances deployInstance
-//
-// Deploy instance
-//
-// Security:
-//  oauth2:
-//
-// responses:
-//   201: Instance
-//   401: Error
-//   403: Error
-//   404: Error
-//   415: Error
 func (h Handler) Deploy(c *gin.Context) {
+	// swagger:route POST /instances deployInstance
+	//
+	// Deploy instance
+	//
+	// Deploy an instance...
+	//
+	// Security:
+	//  oauth2:
+	//
+	// responses:
+	//   201: Instance
+	//   401: Error
+	//   403: Error
+	//   404: Error
+	//   415: Error
 	deploy := false
 	if deployParam, ok := c.GetQuery("deploy"); ok {
 		var err error
@@ -231,20 +233,24 @@ type UpdateInstanceRequest struct {
 }
 
 // Update instance
-// swagger:route PUT /instances/{id} updateInstance
-//
-// Update an instance
-//
-// Security:
-//  oauth2:
-//
-// responses:
-//   204: Instance
-//   401: Error
-//   403: Error
-//   404: Error
-//   415: Error
 func (h Handler) Update(c *gin.Context) {
+	// swagger:route PUT /instances/{id} updateInstance
+	//
+	// Update instance
+	//
+	// Update an instance...
+	//
+	// Security:
+	//
+	//	oauth2:
+	//
+	// responses:
+	//
+	//	204: Instance
+	//	401: Error
+	//	403: Error
+	//	404: Error
+	//	415: Error
 	idParam := c.Param("id")
 	id, err := strconv.ParseUint(idParam, 10, 64)
 	if err != nil {
@@ -310,20 +316,24 @@ func (h Handler) Update(c *gin.Context) {
 }
 
 // Pause instance
-// swagger:route PUT /instances/{id}/pause pauseInstance
-//
-// Pause instance
-//
-// Security:
-//  oauth2:
-//
-// responses:
-//   202:
-//   401: Error
-//   403: Error
-//   404: Error
-//   415: Error
 func (h Handler) Pause(c *gin.Context) {
+	// swagger:route PUT /instances/{id}/pause pauseInstance
+	//
+	// Pause instance
+	//
+	// Pause an instance...
+	//
+	// Security:
+	//
+	//	oauth2:
+	//
+	// responses:
+	//
+	//	202:
+	//	401: Error
+	//	403: Error
+	//	404: Error
+	//	415: Error
 	idParam := c.Param("id")
 	id, err := strconv.ParseUint(idParam, 10, 64)
 	if err != nil {
@@ -366,20 +376,24 @@ func (h Handler) Pause(c *gin.Context) {
 }
 
 // Restart instance
-// swagger:route PUT /instances/{id}/restart restartInstance
-//
-// Restart instance
-//
-// Security:
-//  oauth2:
-//
-// responses:
-//   202:
-//   401: Error
-//   403: Error
-//   404: Error
-//   415: Error
 func (h Handler) Restart(c *gin.Context) {
+	// swagger:route PUT /instances/{id}/restart restartInstance
+	//
+	// Restart instance
+	//
+	// Restart an instance...
+	//
+	// Security:
+	//
+	//	oauth2:
+	//
+	// responses:
+	//
+	//	202:
+	//	401: Error
+	//	403: Error
+	//	404: Error
+	//	415: Error
 	idParam := c.Param("id")
 	id, err := strconv.ParseUint(idParam, 10, 64)
 	if err != nil {
@@ -423,20 +437,24 @@ func (h Handler) Restart(c *gin.Context) {
 }
 
 // Delete instance by id
-// swagger:route DELETE /instances/{id} deleteInstance
-//
-// Delete an instance by id
-//
-// Security:
-//  oauth2:
-//
-// responses:
-//   202:
-//   401: Error
-//   403: Error
-//   404: Error
-//   415: Error
 func (h Handler) Delete(c *gin.Context) {
+	// swagger:route DELETE /instances/{id} deleteInstance
+	//
+	// Delete instance
+	//
+	// Delete an instance by id
+	//
+	// Security:
+	//
+	//	oauth2:
+	//
+	// responses:
+	//
+	//	202:
+	//	401: Error
+	//	403: Error
+	//	404: Error
+	//	415: Error
 	idParam := c.Param("id")
 	id, err := strconv.ParseUint(idParam, 10, 64)
 	if err != nil {
@@ -483,20 +501,24 @@ func (h Handler) Delete(c *gin.Context) {
 }
 
 // FindById instance
-// swagger:route GET /instances/{id} findById
-//
-// Find instance by id
-//
-// Security:
-//  oauth2:
-//
-// responses:
-//   200: Instance
-//   401: Error
-//   403: Error
-//   404: Error
-//   415: Error
 func (h Handler) FindById(c *gin.Context) {
+	// swagger:route GET /instances/{id} findById
+	//
+	// Find instance
+	//
+	// Find an instance by id
+	//
+	// Security:
+	//
+	//	oauth2:
+	//
+	// responses:
+	//
+	//	200: Instance
+	//	401: Error
+	//	403: Error
+	//	404: Error
+	//	415: Error
 	idParam := c.Param("id")
 	id, err := strconv.ParseUint(idParam, 10, 64)
 	if err != nil {
@@ -529,20 +551,24 @@ func (h Handler) FindById(c *gin.Context) {
 }
 
 // FindByIdDecrypted instance
-// swagger:route GET /instances/{id}/parameters findByIdDecrypted
-//
-// Find instance by id with decrypted parameters
-//
-// Security:
-//  oauth2:
-//
-// responses:
-//   200: Instance
-//   401: Error
-//   403: Error
-//   404: Error
-//   415: Error
 func (h Handler) FindByIdDecrypted(c *gin.Context) {
+	// swagger:route GET /instances/{id}/parameters findByIdDecrypted
+	//
+	// Find decrypted instance
+	//
+	// Find instance by id with decrypted parameters
+	//
+	// Security:
+	//
+	//	oauth2:
+	//
+	// responses:
+	//
+	//	200: Instance
+	//	401: Error
+	//	403: Error
+	//	404: Error
+	//	415: Error
 	idParam := c.Param("id")
 	id, err := strconv.ParseUint(idParam, 10, 64)
 	if err != nil {
@@ -575,20 +601,24 @@ func (h Handler) FindByIdDecrypted(c *gin.Context) {
 }
 
 // Logs instance
-// swagger:route GET /instances/{id}/logs instanceLogs
-//
-// Stream instance logs in real time
-//
-// Security:
-//  oauth2:
-//
-// Responses:
-//   200: InstanceLogsResponse
-//   401: Error
-//   403: Error
-//   404: Error
-//   415: Error
 func (h Handler) Logs(c *gin.Context) {
+	// swagger:route GET /instances/{id}/logs instanceLogs
+	//
+	// Stream logs
+	//
+	// Stream instance logs in real time
+	//
+	// Security:
+	//
+	//	oauth2:
+	//
+	// Responses:
+	//
+	//	200: InstanceLogsResponse
+	//	401: Error
+	//	403: Error
+	//	404: Error
+	//	415: Error
 	idParam := c.Param("id")
 	id, err := strconv.ParseUint(idParam, 10, 64)
 	if err != nil {
@@ -659,20 +689,24 @@ func (h Handler) Logs(c *gin.Context) {
 }
 
 // NameToId instance
-// swagger:route GET /instances-name-to-id/{groupName}/{instanceName} instanceNameToId
-//
-// Find instance id by name and group name
-//
-// Security:
-//  oauth2:
-//
-// responses:
-//   200: Instance
-//   401: Error
-//   403: Error
-//   404: Error
-//   415: Error
 func (h Handler) NameToId(c *gin.Context) {
+	// swagger:route GET /instances-name-to-id/{groupName}/{instanceName} instanceNameToId
+	//
+	// Find an instance
+	//
+	// Find instance id by name and group name
+	//
+	// Security:
+	//
+	//	oauth2:
+	//
+	// responses:
+	//
+	//	200: Instance
+	//	401: Error
+	//	403: Error
+	//	404: Error
+	//	415: Error
 	instanceName := c.Param("instanceName")
 	groupName := c.Param("groupName")
 	if groupName == "" {
@@ -705,36 +739,44 @@ func (h Handler) NameToId(c *gin.Context) {
 }
 
 // ListInstances instances
-// swagger:route GET /instances listInstances
-//
-// List instances
-//
-// Security:
-//  oauth2:
-//
-// responses:
-//   200: []GroupWithInstances
-//   401: Error
-//   403: Error
-//   415: Error
 func (h Handler) ListInstances(c *gin.Context) {
+	// swagger:route GET /instances listInstances
+	//
+	// List instances
+	//
+	// List all instances accessible by the user
+	//
+	// Security:
+	//
+	//	oauth2:
+	//
+	// responses:
+	//
+	//	200: []GroupWithInstances
+	//	401: Error
+	//	403: Error
+	//	415: Error
 	h.findInstances(c, false)
 }
 
 // ListPresets presets
-// swagger:route GET /presets listPresets
-//
-// List presets
-//
-// Security:
-//  oauth2:
-//
-// responses:
-//   200: []GroupWithInstances
-//   401: Error
-//   403: Error
-//   415: Error
 func (h Handler) ListPresets(c *gin.Context) {
+	// swagger:route GET /presets listPresets
+	//
+	// List presets
+	//
+	// List all presets accessible by the user
+	//
+	// Security:
+	//
+	//	oauth2:
+	//
+	// responses:
+	//
+	//	200: []GroupWithInstances
+	//	401: Error
+	//	403: Error
+	//	415: Error
 	h.findInstances(c, true)
 }
 

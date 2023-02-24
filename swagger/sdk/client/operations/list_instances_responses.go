@@ -57,9 +57,10 @@ func NewListInstancesOK() *ListInstancesOK {
 	return &ListInstancesOK{}
 }
 
-/* ListInstancesOK describes a response with status code 200, with default header values.
+/*
+ListInstancesOK describes a response with status code 200, with default header values.
 
-GroupWithInstances
+ListInstancesOK list instances o k
 */
 type ListInstancesOK struct {
 	Payload []*models.GroupWithInstances
@@ -122,7 +123,8 @@ func NewListInstancesUnauthorized() *ListInstancesUnauthorized {
 	return &ListInstancesUnauthorized{}
 }
 
-/* ListInstancesUnauthorized describes a response with status code 401, with default header values.
+/*
+ListInstancesUnauthorized describes a response with status code 401, with default header values.
 
 ListInstancesUnauthorized list instances unauthorized
 */
@@ -177,7 +179,8 @@ func NewListInstancesForbidden() *ListInstancesForbidden {
 	return &ListInstancesForbidden{}
 }
 
-/* ListInstancesForbidden describes a response with status code 403, with default header values.
+/*
+ListInstancesForbidden describes a response with status code 403, with default header values.
 
 ListInstancesForbidden list instances forbidden
 */
@@ -232,7 +235,8 @@ func NewListInstancesUnsupportedMediaType() *ListInstancesUnsupportedMediaType {
 	return &ListInstancesUnsupportedMediaType{}
 }
 
-/* ListInstancesUnsupportedMediaType describes a response with status code 415, with default header values.
+/*
+ListInstancesUnsupportedMediaType describes a response with status code 415, with default header values.
 
 ListInstancesUnsupportedMediaType list instances unsupported media type
 */

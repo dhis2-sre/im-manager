@@ -63,7 +63,8 @@ func NewInstanceNameToIDOK() *InstanceNameToIDOK {
 	return &InstanceNameToIDOK{}
 }
 
-/* InstanceNameToIDOK describes a response with status code 200, with default header values.
+/*
+InstanceNameToIDOK describes a response with status code 200, with default header values.
 
 Instance
 */
@@ -130,7 +131,8 @@ func NewInstanceNameToIDUnauthorized() *InstanceNameToIDUnauthorized {
 	return &InstanceNameToIDUnauthorized{}
 }
 
-/* InstanceNameToIDUnauthorized describes a response with status code 401, with default header values.
+/*
+InstanceNameToIDUnauthorized describes a response with status code 401, with default header values.
 
 InstanceNameToIDUnauthorized instance name to Id unauthorized
 */
@@ -185,7 +187,8 @@ func NewInstanceNameToIDForbidden() *InstanceNameToIDForbidden {
 	return &InstanceNameToIDForbidden{}
 }
 
-/* InstanceNameToIDForbidden describes a response with status code 403, with default header values.
+/*
+InstanceNameToIDForbidden describes a response with status code 403, with default header values.
 
 InstanceNameToIDForbidden instance name to Id forbidden
 */
@@ -240,7 +243,8 @@ func NewInstanceNameToIDNotFound() *InstanceNameToIDNotFound {
 	return &InstanceNameToIDNotFound{}
 }
 
-/* InstanceNameToIDNotFound describes a response with status code 404, with default header values.
+/*
+InstanceNameToIDNotFound describes a response with status code 404, with default header values.
 
 InstanceNameToIDNotFound instance name to Id not found
 */
@@ -295,7 +299,8 @@ func NewInstanceNameToIDUnsupportedMediaType() *InstanceNameToIDUnsupportedMedia
 	return &InstanceNameToIDUnsupportedMediaType{}
 }
 
-/* InstanceNameToIDUnsupportedMediaType describes a response with status code 415, with default header values.
+/*
+InstanceNameToIDUnsupportedMediaType describes a response with status code 415, with default header values.
 
 InstanceNameToIDUnsupportedMediaType instance name to Id unsupported media type
 */

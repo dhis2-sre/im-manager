@@ -60,7 +60,8 @@ func NewPauseInstanceAccepted() *PauseInstanceAccepted {
 	return &PauseInstanceAccepted{}
 }
 
-/* PauseInstanceAccepted describes a response with status code 202, with default header values.
+/*
+PauseInstanceAccepted describes a response with status code 202, with default header values.
 
 PauseInstanceAccepted pause instance accepted
 */
@@ -115,7 +116,8 @@ func NewPauseInstanceUnauthorized() *PauseInstanceUnauthorized {
 	return &PauseInstanceUnauthorized{}
 }
 
-/* PauseInstanceUnauthorized describes a response with status code 401, with default header values.
+/*
+PauseInstanceUnauthorized describes a response with status code 401, with default header values.
 
 PauseInstanceUnauthorized pause instance unauthorized
 */
@@ -170,7 +172,8 @@ func NewPauseInstanceForbidden() *PauseInstanceForbidden {
 	return &PauseInstanceForbidden{}
 }
 
-/* PauseInstanceForbidden describes a response with status code 403, with default header values.
+/*
+PauseInstanceForbidden describes a response with status code 403, with default header values.
 
 PauseInstanceForbidden pause instance forbidden
 */
@@ -225,7 +228,8 @@ func NewPauseInstanceNotFound() *PauseInstanceNotFound {
 	return &PauseInstanceNotFound{}
 }
 
-/* PauseInstanceNotFound describes a response with status code 404, with default header values.
+/*
+PauseInstanceNotFound describes a response with status code 404, with default header values.
 
 PauseInstanceNotFound pause instance not found
 */
@@ -280,7 +284,8 @@ func NewPauseInstanceUnsupportedMediaType() *PauseInstanceUnsupportedMediaType {
 	return &PauseInstanceUnsupportedMediaType{}
 }
 
-/* PauseInstanceUnsupportedMediaType describes a response with status code 415, with default header values.
+/*
+PauseInstanceUnsupportedMediaType describes a response with status code 415, with default header values.
 
 PauseInstanceUnsupportedMediaType pause instance unsupported media type
 */

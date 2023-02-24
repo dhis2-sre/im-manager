@@ -2,9 +2,19 @@ tag ?= latest
 clean-cmd = docker compose down --remove-orphans --volumes
 
 init:
-	direnv allow
 	pip install pre-commit
 	pre-commit install --install-hooks --overwrite
+
+	go install github.com/direnv/direnv@latest
+	direnv version
+
+	go install golang.org/x/tools/cmd/goimports@latest
+
+	go install github.com/securego/gosec/v2/cmd/gosec@latest
+	gosec --version
+
+	go install github.com/go-swagger/go-swagger/cmd/swagger@latest
+	swagger version
 
 check:
 	pre-commit run --all-files --show-diff-on-failure
@@ -32,19 +42,15 @@ clean:
 	$(clean-cmd)
 	go clean
 
-swagger-check-install:
-	which swagger || go install github.com/go-swagger/go-swagger/cmd/swagger@latest
-	swagger version
-
 swagger-clean:
 	rm -rf swagger/sdk/*
 	rm -f swagger/swagger.yaml
 
-swagger-docs: swagger-check-install
+swagger-docs:
 	swagger generate spec -o swagger/swagger.yaml -x swagger/sdk --scan-models
 	swagger validate swagger/swagger.yaml
 
-swagger-client: swagger-check-install
+swagger-client:
 	swagger generate client -f swagger/swagger.yaml -t swagger/sdk
 
 swagger: swagger-clean swagger-docs swagger-client

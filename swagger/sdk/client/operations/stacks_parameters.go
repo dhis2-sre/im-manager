@@ -52,10 +52,12 @@ func NewStacksParamsWithHTTPClient(client *http.Client) *StacksParams {
 	}
 }
 
-/* StacksParams contains all the parameters to send to the API endpoint
-   for the stacks operation.
+/*
+StacksParams contains all the parameters to send to the API endpoint
 
-   Typically these are written to a http.Request.
+	for the stacks operation.
+
+	Typically these are written to a http.Request.
 */
 type StacksParams struct {
 	timeout    time.Duration

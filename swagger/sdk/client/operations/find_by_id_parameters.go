@@ -53,10 +53,12 @@ func NewFindByIDParamsWithHTTPClient(client *http.Client) *FindByIDParams {
 	}
 }
 
-/* FindByIDParams contains all the parameters to send to the API endpoint
-   for the find by Id operation.
+/*
+FindByIDParams contains all the parameters to send to the API endpoint
 
-   Typically these are written to a http.Request.
+	for the find by Id operation.
+
+	Typically these are written to a http.Request.
 */
 type FindByIDParams struct {
 

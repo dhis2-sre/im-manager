@@ -60,7 +60,8 @@ func NewInstanceLogsOK() *InstanceLogsOK {
 	return &InstanceLogsOK{}
 }
 
-/* InstanceLogsOK describes a response with status code 200, with default header values.
+/*
+InstanceLogsOK describes a response with status code 200, with default header values.
 
 InstanceLogsOK instance logs o k
 */
@@ -115,7 +116,8 @@ func NewInstanceLogsUnauthorized() *InstanceLogsUnauthorized {
 	return &InstanceLogsUnauthorized{}
 }
 
-/* InstanceLogsUnauthorized describes a response with status code 401, with default header values.
+/*
+InstanceLogsUnauthorized describes a response with status code 401, with default header values.
 
 InstanceLogsUnauthorized instance logs unauthorized
 */
@@ -170,7 +172,8 @@ func NewInstanceLogsForbidden() *InstanceLogsForbidden {
 	return &InstanceLogsForbidden{}
 }
 
-/* InstanceLogsForbidden describes a response with status code 403, with default header values.
+/*
+InstanceLogsForbidden describes a response with status code 403, with default header values.
 
 InstanceLogsForbidden instance logs forbidden
 */
@@ -225,7 +228,8 @@ func NewInstanceLogsNotFound() *InstanceLogsNotFound {
 	return &InstanceLogsNotFound{}
 }
 
-/* InstanceLogsNotFound describes a response with status code 404, with default header values.
+/*
+InstanceLogsNotFound describes a response with status code 404, with default header values.
 
 InstanceLogsNotFound instance logs not found
 */
@@ -280,7 +284,8 @@ func NewInstanceLogsUnsupportedMediaType() *InstanceLogsUnsupportedMediaType {
 	return &InstanceLogsUnsupportedMediaType{}
 }
 
-/* InstanceLogsUnsupportedMediaType describes a response with status code 415, with default header values.
+/*
+InstanceLogsUnsupportedMediaType describes a response with status code 415, with default header values.
 
 InstanceLogsUnsupportedMediaType instance logs unsupported media type
 */

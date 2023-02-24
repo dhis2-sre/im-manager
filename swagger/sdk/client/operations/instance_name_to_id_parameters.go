@@ -52,10 +52,12 @@ func NewInstanceNameToIDParamsWithHTTPClient(client *http.Client) *InstanceNameT
 	}
 }
 
-/* InstanceNameToIDParams contains all the parameters to send to the API endpoint
-   for the instance name to Id operation.
+/*
+InstanceNameToIDParams contains all the parameters to send to the API endpoint
 
-   Typically these are written to a http.Request.
+	for the instance name to Id operation.
+
+	Typically these are written to a http.Request.
 */
 type InstanceNameToIDParams struct {
 

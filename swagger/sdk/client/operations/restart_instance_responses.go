@@ -60,7 +60,8 @@ func NewRestartInstanceAccepted() *RestartInstanceAccepted {
 	return &RestartInstanceAccepted{}
 }
 
-/* RestartInstanceAccepted describes a response with status code 202, with default header values.
+/*
+RestartInstanceAccepted describes a response with status code 202, with default header values.
 
 RestartInstanceAccepted restart instance accepted
 */
@@ -115,7 +116,8 @@ func NewRestartInstanceUnauthorized() *RestartInstanceUnauthorized {
 	return &RestartInstanceUnauthorized{}
 }
 
-/* RestartInstanceUnauthorized describes a response with status code 401, with default header values.
+/*
+RestartInstanceUnauthorized describes a response with status code 401, with default header values.
 
 RestartInstanceUnauthorized restart instance unauthorized
 */
@@ -170,7 +172,8 @@ func NewRestartInstanceForbidden() *RestartInstanceForbidden {
 	return &RestartInstanceForbidden{}
 }
 
-/* RestartInstanceForbidden describes a response with status code 403, with default header values.
+/*
+RestartInstanceForbidden describes a response with status code 403, with default header values.
 
 RestartInstanceForbidden restart instance forbidden
 */
@@ -225,7 +228,8 @@ func NewRestartInstanceNotFound() *RestartInstanceNotFound {
 	return &RestartInstanceNotFound{}
 }
 
-/* RestartInstanceNotFound describes a response with status code 404, with default header values.
+/*
+RestartInstanceNotFound describes a response with status code 404, with default header values.
 
 RestartInstanceNotFound restart instance not found
 */
@@ -280,7 +284,8 @@ func NewRestartInstanceUnsupportedMediaType() *RestartInstanceUnsupportedMediaTy
 	return &RestartInstanceUnsupportedMediaType{}
 }
 
-/* RestartInstanceUnsupportedMediaType describes a response with status code 415, with default header values.
+/*
+RestartInstanceUnsupportedMediaType describes a response with status code 415, with default header values.
 
 RestartInstanceUnsupportedMediaType restart instance unsupported media type
 */

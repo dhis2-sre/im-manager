@@ -55,7 +55,8 @@ func NewPostIntegrationOK() *PostIntegrationOK {
 	return &PostIntegrationOK{}
 }
 
-/* PostIntegrationOK describes a response with status code 200, with default header values.
+/*
+PostIntegrationOK describes a response with status code 200, with default header values.
 
 PostIntegrationOK post integration o k
 */
@@ -120,7 +121,8 @@ func NewPostIntegrationUnauthorized() *PostIntegrationUnauthorized {
 	return &PostIntegrationUnauthorized{}
 }
 
-/* PostIntegrationUnauthorized describes a response with status code 401, with default header values.
+/*
+PostIntegrationUnauthorized describes a response with status code 401, with default header values.
 
 PostIntegrationUnauthorized post integration unauthorized
 */
@@ -175,7 +177,8 @@ func NewPostIntegrationForbidden() *PostIntegrationForbidden {
 	return &PostIntegrationForbidden{}
 }
 
-/* PostIntegrationForbidden describes a response with status code 403, with default header values.
+/*
+PostIntegrationForbidden describes a response with status code 403, with default header values.
 
 PostIntegrationForbidden post integration forbidden
 */
@@ -230,7 +233,8 @@ func NewPostIntegrationUnsupportedMediaType() *PostIntegrationUnsupportedMediaTy
 	return &PostIntegrationUnsupportedMediaType{}
 }
 
-/* PostIntegrationUnsupportedMediaType describes a response with status code 415, with default header values.
+/*
+PostIntegrationUnsupportedMediaType describes a response with status code 415, with default header values.
 
 PostIntegrationUnsupportedMediaType post integration unsupported media type
 */

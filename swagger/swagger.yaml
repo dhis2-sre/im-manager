@@ -224,31 +224,27 @@ info:
     contact:
         email: info@dhis2.org
         url: https://github.com/dhis2-sre/im-manager
-    description: Manager Service as part of the Instance Manager environment
+    description: Manager Service is part of the Instance Manager environment
     license:
         name: TODO
-    termsOfService: there are no TOS at this moment, use at your own risk we take no responsibility
     title: Instance Manager Manager Service.
     version: 0.1.0
 paths:
     /health:
         get:
-            description: Service health status
+            description: Show service health status
             operationId: health
             responses:
                 "200":
                     $ref: '#/responses/Response'
+            summary: Health status
     /instances:
         get:
-            description: List instances
+            description: List all instances accessible by the user
             operationId: listInstances
             responses:
                 "200":
-                    description: GroupWithInstances
-                    schema:
-                        items:
-                            $ref: '#/definitions/GroupWithInstances'
-                        type: array
+                    $ref: '#/responses/GroupWithInstances'
                 "401":
                     $ref: '#/responses/Error'
                 "403":
@@ -257,8 +253,9 @@ paths:
                     $ref: '#/responses/Error'
             security:
                 - oauth2: []
+            summary: List instances
         post:
-            description: Deploy instance
+            description: Deploy an instance...
             operationId: deployInstance
             parameters:
                 - description: Deploy instance request body parameter
@@ -287,6 +284,7 @@ paths:
                     $ref: '#/responses/Error'
             security:
                 - oauth2: []
+            summary: Deploy instance
     /instances-name-to-id/{groupName}/{instanceName}:
         get:
             description: Find instance id by name and group name
@@ -317,6 +315,7 @@ paths:
                     $ref: '#/responses/Error'
             security:
                 - oauth2: []
+            summary: Find an instance
     /instances/{id}:
         delete:
             description: Delete an instance by id
@@ -341,8 +340,9 @@ paths:
                     $ref: '#/responses/Error'
             security:
                 - oauth2: []
+            summary: Delete instance
         get:
-            description: Find instance by id
+            description: Find an instance by id
             operationId: findById
             parameters:
                 - format: uint64
@@ -366,8 +366,9 @@ paths:
                     $ref: '#/responses/Error'
             security:
                 - oauth2: []
+            summary: Find instance
         put:
-            description: Update an instance
+            description: Update an instance...
             operationId: updateInstance
             parameters:
                 - format: uint64
@@ -397,6 +398,7 @@ paths:
                     $ref: '#/responses/Error'
             security:
                 - oauth2: []
+            summary: Update instance
     /instances/{id}/logs:
         get:
             description: Stream instance logs in real time
@@ -426,6 +428,7 @@ paths:
                     $ref: '#/responses/Error'
             security:
                 - oauth2: []
+            summary: Stream logs
     /instances/{id}/parameters:
         get:
             description: Find instance by id with decrypted parameters
@@ -452,9 +455,10 @@ paths:
                     $ref: '#/responses/Error'
             security:
                 - oauth2: []
+            summary: Find decrypted instance
     /instances/{id}/pause:
         put:
-            description: Pause instance
+            description: Pause an instance...
             operationId: pauseInstance
             parameters:
                 - format: uint64
@@ -476,9 +480,10 @@ paths:
                     $ref: '#/responses/Error'
             security:
                 - oauth2: []
+            summary: Pause instance
     /instances/{id}/restart:
         put:
-            description: Restart instance
+            description: Restart an instance...
             operationId: restartInstance
             parameters:
                 - format: uint64
@@ -505,6 +510,7 @@ paths:
                     $ref: '#/responses/Error'
             security:
                 - oauth2: []
+            summary: Restart instance
     /integrations:
         post:
             description: Return integration for a given key
@@ -520,17 +526,14 @@ paths:
                     $ref: '#/responses/Error'
             security:
                 - oauth2: []
+            summary: Integration
     /presets:
         get:
-            description: List presets
+            description: List all presets accessible by the user
             operationId: listPresets
             responses:
                 "200":
-                    description: GroupWithInstances
-                    schema:
-                        items:
-                            $ref: '#/definitions/GroupWithInstances'
-                        type: array
+                    $ref: '#/responses/GroupWithInstances'
                 "401":
                     $ref: '#/responses/Error'
                 "403":
@@ -539,6 +542,7 @@ paths:
                     $ref: '#/responses/Error'
             security:
                 - oauth2: []
+            summary: List presets
     /stacks:
         get:
             description: Find all stacks
@@ -582,15 +586,17 @@ paths:
 produces:
     - application/json
 responses:
-    _:
-        description: ""
-        schema:
-            $ref: '#/definitions/GroupWithInstances'
     Any:
         description: ""
         schema: {}
     Error:
         description: ""
+    GroupWithInstances:
+        description: ""
+        schema:
+            items:
+                $ref: '#/definitions/GroupWithInstances'
+            type: array
     InstanceLogsResponse:
         description: ""
     Response:

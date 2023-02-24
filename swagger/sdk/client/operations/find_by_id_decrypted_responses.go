@@ -63,7 +63,8 @@ func NewFindByIDDecryptedOK() *FindByIDDecryptedOK {
 	return &FindByIDDecryptedOK{}
 }
 
-/* FindByIDDecryptedOK describes a response with status code 200, with default header values.
+/*
+FindByIDDecryptedOK describes a response with status code 200, with default header values.
 
 Instance
 */
@@ -130,7 +131,8 @@ func NewFindByIDDecryptedUnauthorized() *FindByIDDecryptedUnauthorized {
 	return &FindByIDDecryptedUnauthorized{}
 }
 
-/* FindByIDDecryptedUnauthorized describes a response with status code 401, with default header values.
+/*
+FindByIDDecryptedUnauthorized describes a response with status code 401, with default header values.
 
 FindByIDDecryptedUnauthorized find by Id decrypted unauthorized
 */
@@ -185,7 +187,8 @@ func NewFindByIDDecryptedForbidden() *FindByIDDecryptedForbidden {
 	return &FindByIDDecryptedForbidden{}
 }
 
-/* FindByIDDecryptedForbidden describes a response with status code 403, with default header values.
+/*
+FindByIDDecryptedForbidden describes a response with status code 403, with default header values.
 
 FindByIDDecryptedForbidden find by Id decrypted forbidden
 */
@@ -240,7 +243,8 @@ func NewFindByIDDecryptedNotFound() *FindByIDDecryptedNotFound {
 	return &FindByIDDecryptedNotFound{}
 }
 
-/* FindByIDDecryptedNotFound describes a response with status code 404, with default header values.
+/*
+FindByIDDecryptedNotFound describes a response with status code 404, with default header values.
 
 FindByIDDecryptedNotFound find by Id decrypted not found
 */
@@ -295,7 +299,8 @@ func NewFindByIDDecryptedUnsupportedMediaType() *FindByIDDecryptedUnsupportedMed
 	return &FindByIDDecryptedUnsupportedMediaType{}
 }
 
-/* FindByIDDecryptedUnsupportedMediaType describes a response with status code 415, with default header values.
+/*
+FindByIDDecryptedUnsupportedMediaType describes a response with status code 415, with default header values.
 
 FindByIDDecryptedUnsupportedMediaType find by Id decrypted unsupported media type
 */

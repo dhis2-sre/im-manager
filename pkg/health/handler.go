@@ -10,13 +10,15 @@ type Response struct {
 	Status string `json:"status"`
 }
 
-// Health
-// swagger:route GET /health health
-//
-// Service health status
-//
-// responses:
-//   200: Response
+// Health status
 func Health(c *gin.Context) {
+	// swagger:route GET /health health
+	//
+	// Health status
+	//
+	// Show service health status
+	//
+	// Responses:
+	//   200: Response
 	c.JSON(http.StatusOK, Response{"UP"})
 }

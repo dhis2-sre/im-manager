@@ -63,7 +63,8 @@ func NewDeployInstanceCreated() *DeployInstanceCreated {
 	return &DeployInstanceCreated{}
 }
 
-/* DeployInstanceCreated describes a response with status code 201, with default header values.
+/*
+DeployInstanceCreated describes a response with status code 201, with default header values.
 
 Instance
 */
@@ -130,7 +131,8 @@ func NewDeployInstanceUnauthorized() *DeployInstanceUnauthorized {
 	return &DeployInstanceUnauthorized{}
 }
 
-/* DeployInstanceUnauthorized describes a response with status code 401, with default header values.
+/*
+DeployInstanceUnauthorized describes a response with status code 401, with default header values.
 
 DeployInstanceUnauthorized deploy instance unauthorized
 */
@@ -185,7 +187,8 @@ func NewDeployInstanceForbidden() *DeployInstanceForbidden {
 	return &DeployInstanceForbidden{}
 }
 
-/* DeployInstanceForbidden describes a response with status code 403, with default header values.
+/*
+DeployInstanceForbidden describes a response with status code 403, with default header values.
 
 DeployInstanceForbidden deploy instance forbidden
 */
@@ -240,7 +243,8 @@ func NewDeployInstanceNotFound() *DeployInstanceNotFound {
 	return &DeployInstanceNotFound{}
 }
 
-/* DeployInstanceNotFound describes a response with status code 404, with default header values.
+/*
+DeployInstanceNotFound describes a response with status code 404, with default header values.
 
 DeployInstanceNotFound deploy instance not found
 */
@@ -295,7 +299,8 @@ func NewDeployInstanceUnsupportedMediaType() *DeployInstanceUnsupportedMediaType
 	return &DeployInstanceUnsupportedMediaType{}
 }
 
-/* DeployInstanceUnsupportedMediaType describes a response with status code 415, with default header values.
+/*
+DeployInstanceUnsupportedMediaType describes a response with status code 415, with default header values.
 
 DeployInstanceUnsupportedMediaType deploy instance unsupported media type
 */

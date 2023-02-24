@@ -63,7 +63,8 @@ func NewStacksOK() *StacksOK {
 	return &StacksOK{}
 }
 
-/* StacksOK describes a response with status code 200, with default header values.
+/*
+StacksOK describes a response with status code 200, with default header values.
 
 StacksOK stacks o k
 */
@@ -128,7 +129,8 @@ func NewStacksUnauthorized() *StacksUnauthorized {
 	return &StacksUnauthorized{}
 }
 
-/* StacksUnauthorized describes a response with status code 401, with default header values.
+/*
+StacksUnauthorized describes a response with status code 401, with default header values.
 
 StacksUnauthorized stacks unauthorized
 */
@@ -183,7 +185,8 @@ func NewStacksForbidden() *StacksForbidden {
 	return &StacksForbidden{}
 }
 
-/* StacksForbidden describes a response with status code 403, with default header values.
+/*
+StacksForbidden describes a response with status code 403, with default header values.
 
 StacksForbidden stacks forbidden
 */
@@ -238,7 +241,8 @@ func NewStacksNotFound() *StacksNotFound {
 	return &StacksNotFound{}
 }
 
-/* StacksNotFound describes a response with status code 404, with default header values.
+/*
+StacksNotFound describes a response with status code 404, with default header values.
 
 StacksNotFound stacks not found
 */
@@ -293,7 +297,8 @@ func NewStacksUnsupportedMediaType() *StacksUnsupportedMediaType {
 	return &StacksUnsupportedMediaType{}
 }
 
-/* StacksUnsupportedMediaType describes a response with status code 415, with default header values.
+/*
+StacksUnsupportedMediaType describes a response with status code 415, with default header values.
 
 StacksUnsupportedMediaType stacks unsupported media type
 */
