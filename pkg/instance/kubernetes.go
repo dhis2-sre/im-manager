@@ -213,9 +213,10 @@ func (ks kubernetesService) restart(instance *model.Instance, typeSelector strin
 		return fmt.Errorf("multiple deployments found using the selector: %q", selector)
 	}
 
+	deployment := items[0]
 	data := fmt.Sprintf(`{"spec": {"template": {"metadata": {"annotations": {"kubectl.kubernetes.io/restartedAt": "%s"}}}}}`, time.Now().Format(time.RFC3339))
-	_, err = deployments.Patch(context.TODO(), items[0].Name, types.StrategicMergePatchType, []byte(data), metav1.PatchOptions{})
-	return err
+	_, err = deployments.Patch(context.TODO(), deployment.Name, types.StrategicMergePatchType, []byte(data), metav1.PatchOptions{})
+	return fmt.Errorf("error restarting %q: %v", deployment.Name, err)
 }
 
 func (ks kubernetesService) pause(instance *model.Instance) error {
