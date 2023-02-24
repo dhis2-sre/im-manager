@@ -19,20 +19,22 @@ func NewHandler(service Service) Handler {
 }
 
 // Find stack
-// swagger:route GET /stacks/{name} stack
-//
-// Find stack by name
-//
-// Security:
-//  oauth2:
-//
-// Responses:
-//   200: StackResponse
-//   401: Error
-//   403: Error
-//   404: Error
-//   415: Error
 func (h Handler) Find(c *gin.Context) {
+	// swagger:route GET /stacks/{name} stack
+	//
+	// Find stack
+	//
+	// Find stack by name
+	//
+	// Security:
+	//  oauth2:
+	//
+	// Responses:
+	//   200: StackResponse
+	//   401: Error
+	//   403: Error
+	//   404: Error
+	//   415: Error
 	name := c.Param("name")
 	if name == "" {
 		badRequest := apperror.NewBadRequest("stack name missing")
@@ -51,20 +53,22 @@ func (h Handler) Find(c *gin.Context) {
 }
 
 // FindAll stack
-// swagger:route GET /stacks stacks
-//
-// Find all stacks
-//
-// Security:
-//  oauth2:
-//
-// Responses:
-//   200: StacksResponse
-//   401: Error
-//   403: Error
-//   404: Error
-//   415: Error
 func (h Handler) FindAll(c *gin.Context) {
+	// swagger:route GET /stacks stacks
+	//
+	// Find all stacks
+	//
+	// Find all stacks...
+	//
+	// Security:
+	//  oauth2:
+	//
+	// Responses:
+	//   200: StacksResponse
+	//   401: Error
+	//   403: Error
+	//   404: Error
+	//   415: Error
 	stacks, err := h.service.FindAll()
 	if err != nil {
 		message := fmt.Sprintf("Error loading stacks: %s", err)
