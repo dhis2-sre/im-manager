@@ -133,6 +133,10 @@ func (r repository) FindByGroups(groups []*models.Group, presets bool) ([]GroupW
 		return nil, err
 	}
 
+	if len(instances) < 1 {
+		return []GroupWithInstances{}, nil
+	}
+
 	instancesByGroup := mapInstancesByGroup(groupNames, instances)
 
 	return groupWithInstances(instancesByGroup, groupsByName), nil
