@@ -241,11 +241,9 @@ func (h Handler) Update(c *gin.Context) {
 	// Update an instance...
 	//
 	// Security:
-	//
 	//	oauth2:
 	//
 	// responses:
-	//
 	//	204: Instance
 	//	401: Error
 	//	403: Error
@@ -324,11 +322,9 @@ func (h Handler) Pause(c *gin.Context) {
 	// Pause an instance...
 	//
 	// Security:
-	//
 	//	oauth2:
 	//
 	// responses:
-	//
 	//	202:
 	//	401: Error
 	//	403: Error
@@ -384,11 +380,9 @@ func (h Handler) Restart(c *gin.Context) {
 	// Restart an instance...
 	//
 	// Security:
-	//
 	//	oauth2:
 	//
 	// responses:
-	//
 	//	202:
 	//	401: Error
 	//	403: Error
@@ -445,11 +439,9 @@ func (h Handler) Delete(c *gin.Context) {
 	// Delete an instance by id
 	//
 	// Security:
-	//
 	//	oauth2:
 	//
 	// responses:
-	//
 	//	202:
 	//	401: Error
 	//	403: Error
@@ -509,11 +501,9 @@ func (h Handler) FindById(c *gin.Context) {
 	// Find an instance by id
 	//
 	// Security:
-	//
 	//	oauth2:
 	//
 	// responses:
-	//
 	//	200: Instance
 	//	401: Error
 	//	403: Error
@@ -559,11 +549,9 @@ func (h Handler) FindByIdDecrypted(c *gin.Context) {
 	// Find instance by id with decrypted parameters
 	//
 	// Security:
-	//
 	//	oauth2:
 	//
 	// responses:
-	//
 	//	200: Instance
 	//	401: Error
 	//	403: Error
@@ -609,11 +597,9 @@ func (h Handler) Logs(c *gin.Context) {
 	// Stream instance logs in real time
 	//
 	// Security:
-	//
 	//	oauth2:
 	//
 	// Responses:
-	//
 	//	200: InstanceLogsResponse
 	//	401: Error
 	//	403: Error
@@ -697,11 +683,9 @@ func (h Handler) NameToId(c *gin.Context) {
 	// Find instance id by name and group name
 	//
 	// Security:
-	//
 	//	oauth2:
 	//
 	// responses:
-	//
 	//	200: Instance
 	//	401: Error
 	//	403: Error
@@ -747,11 +731,9 @@ func (h Handler) ListInstances(c *gin.Context) {
 	// List all instances accessible by the user
 	//
 	// Security:
-	//
 	//	oauth2:
 	//
 	// responses:
-	//
 	//	200: []GroupWithInstances
 	//	401: Error
 	//	403: Error
@@ -768,11 +750,9 @@ func (h Handler) ListPresets(c *gin.Context) {
 	// List all presets accessible by the user
 	//
 	// Security:
-	//
 	//	oauth2:
 	//
 	// responses:
-	//
 	//	200: []GroupWithInstances
 	//	401: Error
 	//	403: Error
