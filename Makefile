@@ -38,6 +38,11 @@ test: clean
 	docker compose run --no-deps test
 	$(clean-cmd)
 
+test-coverage: clean
+	docker compose up -d database rabbitmq jwks
+	docker compose run --no-deps test-coverage
+	$(clean-cmd)
+
 clean:
 	$(clean-cmd)
 	go clean
