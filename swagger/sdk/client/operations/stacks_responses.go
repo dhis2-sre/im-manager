@@ -11,6 +11,8 @@ import (
 
 	"github.com/go-openapi/runtime"
 	"github.com/go-openapi/strfmt"
+
+	"github.com/dhis2-sre/im-manager/swagger/sdk/models"
 )
 
 // StacksReader is a Reader for the Stacks structure.
@@ -67,7 +69,7 @@ StacksOK describes a response with status code 200, with default header values.
 StacksOK stacks o k
 */
 type StacksOK struct {
-	Payload []interface{}
+	Payload []*models.Stack
 }
 
 // IsSuccess returns true when this stacks o k response has a 2xx status code
@@ -108,7 +110,7 @@ func (o *StacksOK) String() string {
 	return fmt.Sprintf("[GET /stacks][%d] stacksOK  %+v", 200, o.Payload)
 }
 
-func (o *StacksOK) GetPayload() []interface{} {
+func (o *StacksOK) GetPayload() []*models.Stack {
 	return o.Payload
 }
 

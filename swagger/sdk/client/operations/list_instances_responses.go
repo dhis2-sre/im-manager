@@ -11,6 +11,8 @@ import (
 
 	"github.com/go-openapi/runtime"
 	"github.com/go-openapi/strfmt"
+
+	"github.com/dhis2-sre/im-manager/swagger/sdk/models"
 )
 
 // ListInstancesReader is a Reader for the ListInstances structure.
@@ -61,7 +63,7 @@ ListInstancesOK describes a response with status code 200, with default header v
 ListInstancesOK list instances o k
 */
 type ListInstancesOK struct {
-	Payload []interface{}
+	Payload []*models.GroupWithInstances
 }
 
 // IsSuccess returns true when this list instances o k response has a 2xx status code
@@ -102,7 +104,7 @@ func (o *ListInstancesOK) String() string {
 	return fmt.Sprintf("[GET /instances][%d] listInstancesOK  %+v", 200, o.Payload)
 }
 
-func (o *ListInstancesOK) GetPayload() []interface{} {
+func (o *ListInstancesOK) GetPayload() []*models.GroupWithInstances {
 	return o.Payload
 }
 

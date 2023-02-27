@@ -69,7 +69,7 @@ UpdateInstanceNoContent describes a response with status code 204, with default 
 Instance
 */
 type UpdateInstanceNoContent struct {
-	Payload models.Instance
+	Payload *models.Instance
 }
 
 // IsSuccess returns true when this update instance no content response has a 2xx status code
@@ -110,14 +110,16 @@ func (o *UpdateInstanceNoContent) String() string {
 	return fmt.Sprintf("[PUT /instances/{id}][%d] updateInstanceNoContent  %+v", 204, o.Payload)
 }
 
-func (o *UpdateInstanceNoContent) GetPayload() models.Instance {
+func (o *UpdateInstanceNoContent) GetPayload() *models.Instance {
 	return o.Payload
 }
 
 func (o *UpdateInstanceNoContent) readResponse(response runtime.ClientResponse, consumer runtime.Consumer, formats strfmt.Registry) error {
 
+	o.Payload = new(models.Instance)
+
 	// response payload
-	if err := consumer.Consume(response.Body(), &o.Payload); err != nil && err != io.EOF {
+	if err := consumer.Consume(response.Body(), o.Payload); err != nil && err != io.EOF {
 		return err
 	}
 

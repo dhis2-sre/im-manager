@@ -14,6 +14,8 @@ import (
 	"github.com/go-openapi/runtime"
 	cr "github.com/go-openapi/runtime/client"
 	"github.com/go-openapi/strfmt"
+
+	"github.com/dhis2-sre/im-manager/swagger/sdk/models"
 )
 
 // NewDeployInstanceParams creates a new DeployInstanceParams object,
@@ -65,7 +67,7 @@ type DeployInstanceParams struct {
 
 	   Deploy instance request body parameter
 	*/
-	Payload interface{}
+	Payload *models.DeployInstanceRequest
 
 	/* Preset.
 
@@ -127,13 +129,13 @@ func (o *DeployInstanceParams) SetHTTPClient(client *http.Client) {
 }
 
 // WithPayload adds the payload to the deploy instance params
-func (o *DeployInstanceParams) WithPayload(payload interface{}) *DeployInstanceParams {
+func (o *DeployInstanceParams) WithPayload(payload *models.DeployInstanceRequest) *DeployInstanceParams {
 	o.SetPayload(payload)
 	return o
 }
 
 // SetPayload adds the payload to the deploy instance params
-func (o *DeployInstanceParams) SetPayload(payload interface{}) {
+func (o *DeployInstanceParams) SetPayload(payload *models.DeployInstanceRequest) {
 	o.Payload = payload
 }
 

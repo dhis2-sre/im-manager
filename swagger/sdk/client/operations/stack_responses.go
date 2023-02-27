@@ -7,9 +7,12 @@ package operations
 
 import (
 	"fmt"
+	"io"
 
 	"github.com/go-openapi/runtime"
 	"github.com/go-openapi/strfmt"
+
+	"github.com/dhis2-sre/im-manager/swagger/sdk/models"
 )
 
 // StackReader is a Reader for the Stack structure.
@@ -66,6 +69,7 @@ StackOK describes a response with status code 200, with default header values.
 StackOK stack o k
 */
 type StackOK struct {
+	Payload *models.Stack
 }
 
 // IsSuccess returns true when this stack o k response has a 2xx status code
@@ -99,14 +103,25 @@ func (o *StackOK) Code() int {
 }
 
 func (o *StackOK) Error() string {
-	return fmt.Sprintf("[GET /stacks/{name}][%d] stackOK ", 200)
+	return fmt.Sprintf("[GET /stacks/{name}][%d] stackOK  %+v", 200, o.Payload)
 }
 
 func (o *StackOK) String() string {
-	return fmt.Sprintf("[GET /stacks/{name}][%d] stackOK ", 200)
+	return fmt.Sprintf("[GET /stacks/{name}][%d] stackOK  %+v", 200, o.Payload)
+}
+
+func (o *StackOK) GetPayload() *models.Stack {
+	return o.Payload
 }
 
 func (o *StackOK) readResponse(response runtime.ClientResponse, consumer runtime.Consumer, formats strfmt.Registry) error {
+
+	o.Payload = new(models.Stack)
+
+	// response payload
+	if err := consumer.Consume(response.Body(), o.Payload); err != nil && err != io.EOF {
+		return err
+	}
 
 	return nil
 }

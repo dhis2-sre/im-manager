@@ -7,9 +7,12 @@ package operations
 
 import (
 	"fmt"
+	"io"
 
 	"github.com/go-openapi/runtime"
 	"github.com/go-openapi/strfmt"
+
+	"github.com/dhis2-sre/im-manager/swagger/sdk/models"
 )
 
 // HealthReader is a Reader for the Health structure.
@@ -42,6 +45,7 @@ HealthOK describes a response with status code 200, with default header values.
 HealthOK health o k
 */
 type HealthOK struct {
+	Payload *models.Response
 }
 
 // IsSuccess returns true when this health o k response has a 2xx status code
@@ -75,14 +79,25 @@ func (o *HealthOK) Code() int {
 }
 
 func (o *HealthOK) Error() string {
-	return fmt.Sprintf("[GET /health][%d] healthOK ", 200)
+	return fmt.Sprintf("[GET /health][%d] healthOK  %+v", 200, o.Payload)
 }
 
 func (o *HealthOK) String() string {
-	return fmt.Sprintf("[GET /health][%d] healthOK ", 200)
+	return fmt.Sprintf("[GET /health][%d] healthOK  %+v", 200, o.Payload)
+}
+
+func (o *HealthOK) GetPayload() *models.Response {
+	return o.Payload
 }
 
 func (o *HealthOK) readResponse(response runtime.ClientResponse, consumer runtime.Consumer, formats strfmt.Registry) error {
+
+	o.Payload = new(models.Response)
+
+	// response payload
+	if err := consumer.Consume(response.Body(), o.Payload); err != nil && err != io.EOF {
+		return err
+	}
 
 	return nil
 }

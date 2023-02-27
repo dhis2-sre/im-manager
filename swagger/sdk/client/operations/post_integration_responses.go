@@ -7,6 +7,7 @@ package operations
 
 import (
 	"fmt"
+	"io"
 
 	"github.com/go-openapi/runtime"
 	"github.com/go-openapi/strfmt"
@@ -60,6 +61,7 @@ PostIntegrationOK describes a response with status code 200, with default header
 PostIntegrationOK post integration o k
 */
 type PostIntegrationOK struct {
+	Payload interface{}
 }
 
 // IsSuccess returns true when this post integration o k response has a 2xx status code
@@ -93,14 +95,23 @@ func (o *PostIntegrationOK) Code() int {
 }
 
 func (o *PostIntegrationOK) Error() string {
-	return fmt.Sprintf("[POST /integrations][%d] postIntegrationOK ", 200)
+	return fmt.Sprintf("[POST /integrations][%d] postIntegrationOK  %+v", 200, o.Payload)
 }
 
 func (o *PostIntegrationOK) String() string {
-	return fmt.Sprintf("[POST /integrations][%d] postIntegrationOK ", 200)
+	return fmt.Sprintf("[POST /integrations][%d] postIntegrationOK  %+v", 200, o.Payload)
+}
+
+func (o *PostIntegrationOK) GetPayload() interface{} {
+	return o.Payload
 }
 
 func (o *PostIntegrationOK) readResponse(response runtime.ClientResponse, consumer runtime.Consumer, formats strfmt.Registry) error {
+
+	// response payload
+	if err := consumer.Consume(response.Body(), &o.Payload); err != nil && err != io.EOF {
+		return err
+	}
 
 	return nil
 }

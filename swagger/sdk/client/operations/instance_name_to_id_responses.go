@@ -69,7 +69,7 @@ InstanceNameToIDOK describes a response with status code 200, with default heade
 Instance
 */
 type InstanceNameToIDOK struct {
-	Payload models.Instance
+	Payload *models.Instance
 }
 
 // IsSuccess returns true when this instance name to Id o k response has a 2xx status code
@@ -110,14 +110,16 @@ func (o *InstanceNameToIDOK) String() string {
 	return fmt.Sprintf("[GET /instances-name-to-id/{groupName}/{instanceName}][%d] instanceNameToIdOK  %+v", 200, o.Payload)
 }
 
-func (o *InstanceNameToIDOK) GetPayload() models.Instance {
+func (o *InstanceNameToIDOK) GetPayload() *models.Instance {
 	return o.Payload
 }
 
 func (o *InstanceNameToIDOK) readResponse(response runtime.ClientResponse, consumer runtime.Consumer, formats strfmt.Registry) error {
 
+	o.Payload = new(models.Instance)
+
 	// response payload
-	if err := consumer.Consume(response.Body(), &o.Payload); err != nil && err != io.EOF {
+	if err := consumer.Consume(response.Body(), o.Payload); err != nil && err != io.EOF {
 		return err
 	}
 

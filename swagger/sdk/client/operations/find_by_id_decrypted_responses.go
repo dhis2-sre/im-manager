@@ -69,7 +69,7 @@ FindByIDDecryptedOK describes a response with status code 200, with default head
 Instance
 */
 type FindByIDDecryptedOK struct {
-	Payload models.Instance
+	Payload *models.Instance
 }
 
 // IsSuccess returns true when this find by Id decrypted o k response has a 2xx status code
@@ -110,14 +110,16 @@ func (o *FindByIDDecryptedOK) String() string {
 	return fmt.Sprintf("[GET /instances/{id}/parameters][%d] findByIdDecryptedOK  %+v", 200, o.Payload)
 }
 
-func (o *FindByIDDecryptedOK) GetPayload() models.Instance {
+func (o *FindByIDDecryptedOK) GetPayload() *models.Instance {
 	return o.Payload
 }
 
 func (o *FindByIDDecryptedOK) readResponse(response runtime.ClientResponse, consumer runtime.Consumer, formats strfmt.Registry) error {
 
+	o.Payload = new(models.Instance)
+
 	// response payload
-	if err := consumer.Consume(response.Body(), &o.Payload); err != nil && err != io.EOF {
+	if err := consumer.Consume(response.Body(), o.Payload); err != nil && err != io.EOF {
 		return err
 	}
 

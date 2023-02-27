@@ -69,7 +69,7 @@ DeployInstanceCreated describes a response with status code 201, with default he
 Instance
 */
 type DeployInstanceCreated struct {
-	Payload models.Instance
+	Payload *models.Instance
 }
 
 // IsSuccess returns true when this deploy instance created response has a 2xx status code
@@ -110,14 +110,16 @@ func (o *DeployInstanceCreated) String() string {
 	return fmt.Sprintf("[POST /instances][%d] deployInstanceCreated  %+v", 201, o.Payload)
 }
 
-func (o *DeployInstanceCreated) GetPayload() models.Instance {
+func (o *DeployInstanceCreated) GetPayload() *models.Instance {
 	return o.Payload
 }
 
 func (o *DeployInstanceCreated) readResponse(response runtime.ClientResponse, consumer runtime.Consumer, formats strfmt.Registry) error {
 
+	o.Payload = new(models.Instance)
+
 	// response payload
-	if err := consumer.Consume(response.Body(), &o.Payload); err != nil && err != io.EOF {
+	if err := consumer.Consume(response.Body(), o.Payload); err != nil && err != io.EOF {
 		return err
 	}
 

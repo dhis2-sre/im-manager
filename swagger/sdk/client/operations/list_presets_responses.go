@@ -11,6 +11,8 @@ import (
 
 	"github.com/go-openapi/runtime"
 	"github.com/go-openapi/strfmt"
+
+	"github.com/dhis2-sre/im-manager/swagger/sdk/models"
 )
 
 // ListPresetsReader is a Reader for the ListPresets structure.
@@ -61,7 +63,7 @@ ListPresetsOK describes a response with status code 200, with default header val
 ListPresetsOK list presets o k
 */
 type ListPresetsOK struct {
-	Payload []interface{}
+	Payload []*models.GroupWithInstances
 }
 
 // IsSuccess returns true when this list presets o k response has a 2xx status code
@@ -102,7 +104,7 @@ func (o *ListPresetsOK) String() string {
 	return fmt.Sprintf("[GET /presets][%d] listPresetsOK  %+v", 200, o.Payload)
 }
 
-func (o *ListPresetsOK) GetPayload() []interface{} {
+func (o *ListPresetsOK) GetPayload() []*models.GroupWithInstances {
 	return o.Payload
 }
 

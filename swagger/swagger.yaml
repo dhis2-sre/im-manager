@@ -1,10 +1,225 @@
 consumes:
     - application/json
 definitions:
+    DeletedAt:
+        $ref: '#/definitions/NullTime'
+    DeployInstanceRequest:
+        properties:
+            groupName:
+                type: string
+                x-go-name: Group
+            name:
+                type: string
+                x-go-name: Name
+            optionalParameters:
+                items:
+                    $ref: '#/definitions/InstanceOptionalParameter'
+                type: array
+                x-go-name: OptionalParameters
+            presetInstance:
+                format: uint64
+                type: integer
+                x-go-name: PresetInstance
+            requiredParameters:
+                items:
+                    $ref: '#/definitions/InstanceRequiredParameter'
+                type: array
+                x-go-name: RequiredParameters
+            sourceInstance:
+                format: uint64
+                type: integer
+                x-go-name: SourceInstance
+            stackName:
+                type: string
+                x-go-name: Stack
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
+    GroupWithInstances:
+        properties:
+            Hostname:
+                type: string
+            Instances:
+                items:
+                    $ref: '#/definitions/Instance'
+                type: array
+            Name:
+                type: string
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
     Instance:
+        properties:
+            CreatedAt:
+                format: date-time
+                type: string
+            DeletedAt:
+                $ref: '#/definitions/DeletedAt'
+            DeployLog:
+                type: string
+            GroupName:
+                type: string
+            ID:
+                format: uint64
+                type: integer
+            Name:
+                type: string
+            Preset:
+                type: boolean
+            PresetID:
+                format: uint64
+                type: integer
+            StackName:
+                type: string
+            UpdatedAt:
+                format: date-time
+                type: string
+            UserID:
+                format: uint64
+                type: integer
+            optionalParameters:
+                items:
+                    $ref: '#/definitions/InstanceOptionalParameter'
+                type: array
+                x-go-name: OptionalParameters
+            requiredParameters:
+                items:
+                    $ref: '#/definitions/InstanceRequiredParameter'
+                type: array
+                x-go-name: RequiredParameters
+        type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/model
+    InstanceOptionalParameter:
+        properties:
+            name:
+                description: 'TODO: Rename StackOptionalParameterID to Name'
+                type: string
+                x-go-name: StackOptionalParameterID
+            value:
+                type: string
+                x-go-name: Value
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/model
+    InstanceRequiredParameter:
+        properties:
+            name:
+                description: 'TODO: Rename StackRequiredParameterID to Name'
+                type: string
+                x-go-name: StackRequiredParameterID
+            value:
+                type: string
+                x-go-name: Value
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/model
+    Model:
+        description: |-
+            Model a basic GoLang struct which includes the following fields: ID, CreatedAt, UpdatedAt, DeletedAt
+            It may be embedded into your model or you may build your own model without it
+            type User struct {
+            gorm.Model
+            }
+        properties:
+            CreatedAt:
+                format: date-time
+                type: string
+            DeletedAt:
+                $ref: '#/definitions/DeletedAt'
+            ID:
+                format: uint64
+                type: integer
+            UpdatedAt:
+                format: date-time
+                type: string
+        type: object
+        x-go-package: gorm.io/gorm
+    NullTime:
+        description: |-
+            NullTime implements the Scanner interface so
+            it can be used as a scan destination, similar to NullString.
+        properties:
+            Time:
+                format: date-time
+                type: string
+            Valid:
+                type: boolean
+        title: NullTime represents a time.Time that may be null.
+        type: object
+        x-go-package: database/sql
+    Response:
+        properties:
+            status:
+                type: string
+                x-go-name: Status
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/health
     Stack:
+        properties:
+            CreatedAt:
+                format: date-time
+                type: string
+            DeletedAt:
+                $ref: '#/definitions/DeletedAt'
+            HostnamePattern:
+                type: string
+            HostnameVariable:
+                type: string
+            UpdatedAt:
+                format: date-time
+                type: string
+            instances:
+                items:
+                    $ref: '#/definitions/Instance'
+                type: array
+                x-go-name: Instances
+            name:
+                type: string
+                x-go-name: Name
+            optionalParameters:
+                items:
+                    $ref: '#/definitions/StackOptionalParameter'
+                type: array
+                x-go-name: OptionalParameters
+            requiredParameters:
+                items:
+                    $ref: '#/definitions/StackRequiredParameter'
+                type: array
+                x-go-name: RequiredParameters
+        type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/model
+    StackOptionalParameter:
+        properties:
+            Consumed:
+                type: boolean
+            DefaultValue:
+                type: string
+            Name:
+                type: string
+            StackName:
+                type: string
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/model
+    StackRequiredParameter:
+        properties:
+            Consumed:
+                type: boolean
+            Name:
+                type: string
+            StackName:
+                type: string
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/model
+    UpdateInstanceRequest:
+        properties:
+            optionalParameters:
+                items:
+                    $ref: '#/definitions/InstanceOptionalParameter'
+                type: array
+                x-go-name: OptionalParameters
+            requiredParameters:
+                items:
+                    $ref: '#/definitions/InstanceRequiredParameter'
+                type: array
+                x-go-name: RequiredParameters
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
 info:
     contact:
         email: info@dhis2.org
@@ -47,7 +262,8 @@ paths:
                   in: body
                   name: Payload
                   required: true
-                  schema: {}
+                  schema:
+                    $ref: '#/definitions/DeployInstanceRequest'
                 - description: preset
                   in: query
                   name: preset
@@ -165,7 +381,8 @@ paths:
                   in: body
                   name: Payload
                   required: true
-                  schema: {}
+                  schema:
+                    $ref: '#/definitions/UpdateInstanceRequest'
             responses:
                 "204":
                     description: Instance
@@ -373,23 +590,30 @@ produces:
 responses:
     Any:
         description: ""
+        schema: {}
     Error:
         description: ""
     GroupWithInstances:
         description: ""
         schema:
-            items: {}
+            items:
+                $ref: '#/definitions/GroupWithInstances'
             type: array
     InstanceLogsResponse:
         description: ""
     Response:
         description: ""
+        schema:
+            $ref: '#/definitions/Response'
     StackResponse:
         description: ""
+        schema:
+            $ref: '#/definitions/Stack'
     StacksResponse:
         description: ""
         schema:
-            items: {}
+            items:
+                $ref: '#/definitions/Stack'
             type: array
 securityDefinitions:
     oauth2:
