@@ -28,7 +28,7 @@ if [[ -n $DATABASE_ID ]]; then
 # Try pg_restore... Or gzipped sql
 # pg_restore often returns a non zero return code due to benign errors resulting in executing of gunzip despite the restore being successful
 # gunzip will fail because the input isn't gzipped causing the whole seed script to fail... Which is why there's a "|| true" at the end
-  (pg_restore --verbose --create -U postgres -d "$DATABASE_NAME" -j 4 "$tmp_file") || \
+  (pg_restore --verbose -U postgres -d "$DATABASE_NAME" -j 4 "$tmp_file") || \
   (gunzip -v -c "$tmp_file" | psql -U postgres -d "$DATABASE_NAME") || true
   rm "$tmp_file"
 

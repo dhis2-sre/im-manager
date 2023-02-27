@@ -11,6 +11,7 @@ releases:
           im-default: "true"
           im-id: "{{ requiredEnv "INSTANCE_ID" }}"
           im-type: "job"
+          im-creation-timestamp: "{{ env "INSTANCE_CREATION_TIMESTAMP" | default "" }}"
           im-ttl: "{{ env "INSTANCE_TTL" | default "" }}"
       - command: "{{ requiredEnv "COMMAND" }}"
       - payload: "{{ env "PAYLOAD" | default "-" }}"

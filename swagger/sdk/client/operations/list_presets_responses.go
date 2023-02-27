@@ -11,8 +11,6 @@ import (
 
 	"github.com/go-openapi/runtime"
 	"github.com/go-openapi/strfmt"
-
-	"github.com/dhis2-sre/im-manager/swagger/sdk/models"
 )
 
 // ListPresetsReader is a Reader for the ListPresets structure.
@@ -57,12 +55,13 @@ func NewListPresetsOK() *ListPresetsOK {
 	return &ListPresetsOK{}
 }
 
-/* ListPresetsOK describes a response with status code 200, with default header values.
+/*
+ListPresetsOK describes a response with status code 200, with default header values.
 
-GroupWithInstances
+ListPresetsOK list presets o k
 */
 type ListPresetsOK struct {
-	Payload []*models.GroupWithInstances
+	Payload []interface{}
 }
 
 // IsSuccess returns true when this list presets o k response has a 2xx status code
@@ -90,6 +89,11 @@ func (o *ListPresetsOK) IsCode(code int) bool {
 	return code == 200
 }
 
+// Code gets the status code for the list presets o k response
+func (o *ListPresetsOK) Code() int {
+	return 200
+}
+
 func (o *ListPresetsOK) Error() string {
 	return fmt.Sprintf("[GET /presets][%d] listPresetsOK  %+v", 200, o.Payload)
 }
@@ -98,7 +102,7 @@ func (o *ListPresetsOK) String() string {
 	return fmt.Sprintf("[GET /presets][%d] listPresetsOK  %+v", 200, o.Payload)
 }
 
-func (o *ListPresetsOK) GetPayload() []*models.GroupWithInstances {
+func (o *ListPresetsOK) GetPayload() []interface{} {
 	return o.Payload
 }
 
@@ -117,7 +121,8 @@ func NewListPresetsUnauthorized() *ListPresetsUnauthorized {
 	return &ListPresetsUnauthorized{}
 }
 
-/* ListPresetsUnauthorized describes a response with status code 401, with default header values.
+/*
+ListPresetsUnauthorized describes a response with status code 401, with default header values.
 
 ListPresetsUnauthorized list presets unauthorized
 */
@@ -149,6 +154,11 @@ func (o *ListPresetsUnauthorized) IsCode(code int) bool {
 	return code == 401
 }
 
+// Code gets the status code for the list presets unauthorized response
+func (o *ListPresetsUnauthorized) Code() int {
+	return 401
+}
+
 func (o *ListPresetsUnauthorized) Error() string {
 	return fmt.Sprintf("[GET /presets][%d] listPresetsUnauthorized ", 401)
 }
@@ -167,7 +177,8 @@ func NewListPresetsForbidden() *ListPresetsForbidden {
 	return &ListPresetsForbidden{}
 }
 
-/* ListPresetsForbidden describes a response with status code 403, with default header values.
+/*
+ListPresetsForbidden describes a response with status code 403, with default header values.
 
 ListPresetsForbidden list presets forbidden
 */
@@ -199,6 +210,11 @@ func (o *ListPresetsForbidden) IsCode(code int) bool {
 	return code == 403
 }
 
+// Code gets the status code for the list presets forbidden response
+func (o *ListPresetsForbidden) Code() int {
+	return 403
+}
+
 func (o *ListPresetsForbidden) Error() string {
 	return fmt.Sprintf("[GET /presets][%d] listPresetsForbidden ", 403)
 }
@@ -217,7 +233,8 @@ func NewListPresetsUnsupportedMediaType() *ListPresetsUnsupportedMediaType {
 	return &ListPresetsUnsupportedMediaType{}
 }
 
-/* ListPresetsUnsupportedMediaType describes a response with status code 415, with default header values.
+/*
+ListPresetsUnsupportedMediaType describes a response with status code 415, with default header values.
 
 ListPresetsUnsupportedMediaType list presets unsupported media type
 */
@@ -247,6 +264,11 @@ func (o *ListPresetsUnsupportedMediaType) IsServerError() bool {
 // IsCode returns true when this list presets unsupported media type response a status code equal to that given
 func (o *ListPresetsUnsupportedMediaType) IsCode(code int) bool {
 	return code == 415
+}
+
+// Code gets the status code for the list presets unsupported media type response
+func (o *ListPresetsUnsupportedMediaType) Code() int {
+	return 415
 }
 
 func (o *ListPresetsUnsupportedMediaType) Error() string {

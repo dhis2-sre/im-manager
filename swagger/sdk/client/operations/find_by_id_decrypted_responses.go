@@ -63,12 +63,13 @@ func NewFindByIDDecryptedOK() *FindByIDDecryptedOK {
 	return &FindByIDDecryptedOK{}
 }
 
-/* FindByIDDecryptedOK describes a response with status code 200, with default header values.
+/*
+FindByIDDecryptedOK describes a response with status code 200, with default header values.
 
 Instance
 */
 type FindByIDDecryptedOK struct {
-	Payload *models.Instance
+	Payload models.Instance
 }
 
 // IsSuccess returns true when this find by Id decrypted o k response has a 2xx status code
@@ -96,6 +97,11 @@ func (o *FindByIDDecryptedOK) IsCode(code int) bool {
 	return code == 200
 }
 
+// Code gets the status code for the find by Id decrypted o k response
+func (o *FindByIDDecryptedOK) Code() int {
+	return 200
+}
+
 func (o *FindByIDDecryptedOK) Error() string {
 	return fmt.Sprintf("[GET /instances/{id}/parameters][%d] findByIdDecryptedOK  %+v", 200, o.Payload)
 }
@@ -104,16 +110,14 @@ func (o *FindByIDDecryptedOK) String() string {
 	return fmt.Sprintf("[GET /instances/{id}/parameters][%d] findByIdDecryptedOK  %+v", 200, o.Payload)
 }
 
-func (o *FindByIDDecryptedOK) GetPayload() *models.Instance {
+func (o *FindByIDDecryptedOK) GetPayload() models.Instance {
 	return o.Payload
 }
 
 func (o *FindByIDDecryptedOK) readResponse(response runtime.ClientResponse, consumer runtime.Consumer, formats strfmt.Registry) error {
 
-	o.Payload = new(models.Instance)
-
 	// response payload
-	if err := consumer.Consume(response.Body(), o.Payload); err != nil && err != io.EOF {
+	if err := consumer.Consume(response.Body(), &o.Payload); err != nil && err != io.EOF {
 		return err
 	}
 
@@ -125,7 +129,8 @@ func NewFindByIDDecryptedUnauthorized() *FindByIDDecryptedUnauthorized {
 	return &FindByIDDecryptedUnauthorized{}
 }
 
-/* FindByIDDecryptedUnauthorized describes a response with status code 401, with default header values.
+/*
+FindByIDDecryptedUnauthorized describes a response with status code 401, with default header values.
 
 FindByIDDecryptedUnauthorized find by Id decrypted unauthorized
 */
@@ -157,6 +162,11 @@ func (o *FindByIDDecryptedUnauthorized) IsCode(code int) bool {
 	return code == 401
 }
 
+// Code gets the status code for the find by Id decrypted unauthorized response
+func (o *FindByIDDecryptedUnauthorized) Code() int {
+	return 401
+}
+
 func (o *FindByIDDecryptedUnauthorized) Error() string {
 	return fmt.Sprintf("[GET /instances/{id}/parameters][%d] findByIdDecryptedUnauthorized ", 401)
 }
@@ -175,7 +185,8 @@ func NewFindByIDDecryptedForbidden() *FindByIDDecryptedForbidden {
 	return &FindByIDDecryptedForbidden{}
 }
 
-/* FindByIDDecryptedForbidden describes a response with status code 403, with default header values.
+/*
+FindByIDDecryptedForbidden describes a response with status code 403, with default header values.
 
 FindByIDDecryptedForbidden find by Id decrypted forbidden
 */
@@ -207,6 +218,11 @@ func (o *FindByIDDecryptedForbidden) IsCode(code int) bool {
 	return code == 403
 }
 
+// Code gets the status code for the find by Id decrypted forbidden response
+func (o *FindByIDDecryptedForbidden) Code() int {
+	return 403
+}
+
 func (o *FindByIDDecryptedForbidden) Error() string {
 	return fmt.Sprintf("[GET /instances/{id}/parameters][%d] findByIdDecryptedForbidden ", 403)
 }
@@ -225,7 +241,8 @@ func NewFindByIDDecryptedNotFound() *FindByIDDecryptedNotFound {
 	return &FindByIDDecryptedNotFound{}
 }
 
-/* FindByIDDecryptedNotFound describes a response with status code 404, with default header values.
+/*
+FindByIDDecryptedNotFound describes a response with status code 404, with default header values.
 
 FindByIDDecryptedNotFound find by Id decrypted not found
 */
@@ -257,6 +274,11 @@ func (o *FindByIDDecryptedNotFound) IsCode(code int) bool {
 	return code == 404
 }
 
+// Code gets the status code for the find by Id decrypted not found response
+func (o *FindByIDDecryptedNotFound) Code() int {
+	return 404
+}
+
 func (o *FindByIDDecryptedNotFound) Error() string {
 	return fmt.Sprintf("[GET /instances/{id}/parameters][%d] findByIdDecryptedNotFound ", 404)
 }
@@ -275,7 +297,8 @@ func NewFindByIDDecryptedUnsupportedMediaType() *FindByIDDecryptedUnsupportedMed
 	return &FindByIDDecryptedUnsupportedMediaType{}
 }
 
-/* FindByIDDecryptedUnsupportedMediaType describes a response with status code 415, with default header values.
+/*
+FindByIDDecryptedUnsupportedMediaType describes a response with status code 415, with default header values.
 
 FindByIDDecryptedUnsupportedMediaType find by Id decrypted unsupported media type
 */
@@ -305,6 +328,11 @@ func (o *FindByIDDecryptedUnsupportedMediaType) IsServerError() bool {
 // IsCode returns true when this find by Id decrypted unsupported media type response a status code equal to that given
 func (o *FindByIDDecryptedUnsupportedMediaType) IsCode(code int) bool {
 	return code == 415
+}
+
+// Code gets the status code for the find by Id decrypted unsupported media type response
+func (o *FindByIDDecryptedUnsupportedMediaType) Code() int {
+	return 415
 }
 
 func (o *FindByIDDecryptedUnsupportedMediaType) Error() string {

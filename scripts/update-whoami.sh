@@ -10,7 +10,7 @@ CHART_VERSION=${CHART_VERSION:-0.9.0}
 IMAGE_TAG=${IMAGE_TAG:-0.6.0}
 INSTANCE_TTL=${INSTANCE_TTL:-""}
 
-INSTANCE_ID=$($HTTP --check-status "$INSTANCE_HOST/instances-name-to-id/$GROUP/$NAME" "Authorization: Bearer $ACCESS_TOKEN")
+INSTANCE_ID=$($HTTP get "$IM_HOST/instances-name-to-id/$GROUP/$NAME" "Authorization: Bearer $ACCESS_TOKEN")
 
 echo "{
   \"optionalParameters\": [
@@ -27,4 +27,4 @@ echo "{
       \"value\": \"$INSTANCE_TTL\"
     }
   ]
-}" | $HTTP put "$INSTANCE_HOST/instances/$INSTANCE_ID" "Authorization: Bearer $ACCESS_TOKEN"
+}" | $HTTP put "$IM_HOST/instances/$INSTANCE_ID" "Authorization: Bearer $ACCESS_TOKEN"

@@ -11,8 +11,6 @@ import (
 
 	"github.com/go-openapi/runtime"
 	"github.com/go-openapi/strfmt"
-
-	"github.com/dhis2-sre/im-manager/swagger/sdk/models"
 )
 
 // StacksReader is a Reader for the Stacks structure.
@@ -63,12 +61,13 @@ func NewStacksOK() *StacksOK {
 	return &StacksOK{}
 }
 
-/* StacksOK describes a response with status code 200, with default header values.
+/*
+StacksOK describes a response with status code 200, with default header values.
 
 StacksOK stacks o k
 */
 type StacksOK struct {
-	Payload []*models.Stack
+	Payload []interface{}
 }
 
 // IsSuccess returns true when this stacks o k response has a 2xx status code
@@ -96,6 +95,11 @@ func (o *StacksOK) IsCode(code int) bool {
 	return code == 200
 }
 
+// Code gets the status code for the stacks o k response
+func (o *StacksOK) Code() int {
+	return 200
+}
+
 func (o *StacksOK) Error() string {
 	return fmt.Sprintf("[GET /stacks][%d] stacksOK  %+v", 200, o.Payload)
 }
@@ -104,7 +108,7 @@ func (o *StacksOK) String() string {
 	return fmt.Sprintf("[GET /stacks][%d] stacksOK  %+v", 200, o.Payload)
 }
 
-func (o *StacksOK) GetPayload() []*models.Stack {
+func (o *StacksOK) GetPayload() []interface{} {
 	return o.Payload
 }
 
@@ -123,7 +127,8 @@ func NewStacksUnauthorized() *StacksUnauthorized {
 	return &StacksUnauthorized{}
 }
 
-/* StacksUnauthorized describes a response with status code 401, with default header values.
+/*
+StacksUnauthorized describes a response with status code 401, with default header values.
 
 StacksUnauthorized stacks unauthorized
 */
@@ -155,6 +160,11 @@ func (o *StacksUnauthorized) IsCode(code int) bool {
 	return code == 401
 }
 
+// Code gets the status code for the stacks unauthorized response
+func (o *StacksUnauthorized) Code() int {
+	return 401
+}
+
 func (o *StacksUnauthorized) Error() string {
 	return fmt.Sprintf("[GET /stacks][%d] stacksUnauthorized ", 401)
 }
@@ -173,7 +183,8 @@ func NewStacksForbidden() *StacksForbidden {
 	return &StacksForbidden{}
 }
 
-/* StacksForbidden describes a response with status code 403, with default header values.
+/*
+StacksForbidden describes a response with status code 403, with default header values.
 
 StacksForbidden stacks forbidden
 */
@@ -205,6 +216,11 @@ func (o *StacksForbidden) IsCode(code int) bool {
 	return code == 403
 }
 
+// Code gets the status code for the stacks forbidden response
+func (o *StacksForbidden) Code() int {
+	return 403
+}
+
 func (o *StacksForbidden) Error() string {
 	return fmt.Sprintf("[GET /stacks][%d] stacksForbidden ", 403)
 }
@@ -223,7 +239,8 @@ func NewStacksNotFound() *StacksNotFound {
 	return &StacksNotFound{}
 }
 
-/* StacksNotFound describes a response with status code 404, with default header values.
+/*
+StacksNotFound describes a response with status code 404, with default header values.
 
 StacksNotFound stacks not found
 */
@@ -255,6 +272,11 @@ func (o *StacksNotFound) IsCode(code int) bool {
 	return code == 404
 }
 
+// Code gets the status code for the stacks not found response
+func (o *StacksNotFound) Code() int {
+	return 404
+}
+
 func (o *StacksNotFound) Error() string {
 	return fmt.Sprintf("[GET /stacks][%d] stacksNotFound ", 404)
 }
@@ -273,7 +295,8 @@ func NewStacksUnsupportedMediaType() *StacksUnsupportedMediaType {
 	return &StacksUnsupportedMediaType{}
 }
 
-/* StacksUnsupportedMediaType describes a response with status code 415, with default header values.
+/*
+StacksUnsupportedMediaType describes a response with status code 415, with default header values.
 
 StacksUnsupportedMediaType stacks unsupported media type
 */
@@ -303,6 +326,11 @@ func (o *StacksUnsupportedMediaType) IsServerError() bool {
 // IsCode returns true when this stacks unsupported media type response a status code equal to that given
 func (o *StacksUnsupportedMediaType) IsCode(code int) bool {
 	return code == 415
+}
+
+// Code gets the status code for the stacks unsupported media type response
+func (o *StacksUnsupportedMediaType) Code() int {
+	return 415
 }
 
 func (o *StacksUnsupportedMediaType) Error() string {

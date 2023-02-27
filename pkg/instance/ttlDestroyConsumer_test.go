@@ -1,6 +1,7 @@
 package instance_test
 
 import (
+	"context"
 	"io"
 	"testing"
 	"time"
@@ -35,7 +36,7 @@ func (s *ttlSuite) TestConsumeDeletesInstance() {
 	td := instance.NewTTLDestroyConsumer("username", "password", uc, consumer, is)
 	require.NoError(td.Consume())
 
-	require.NoError(s.amqpClient.ch.Publish("", "ttl-destroy", false, false, amqp.Publishing{
+	require.NoError(s.amqpClient.ch.PublishWithContext(context.TODO(), "", "ttl-destroy", false, false, amqp.Publishing{
 		DeliveryMode: amqp.Persistent,
 		Body:         []byte(`{"ID": 1}`),
 	}))
@@ -103,7 +104,7 @@ func (is *instanceService) FindByNameAndGroup(instance string, groupId string) (
 	return nil, nil
 }
 
-func (is *instanceService) FindInstances(groups []*models.Group, presets bool) ([]*model.Instance, error) {
+func (is *instanceService) FindInstances(user *models.User, presets bool) ([]instance.GroupWithInstances, error) {
 	return nil, nil
 }
 
@@ -141,8 +142,8 @@ type amqpTestClient struct {
 	ch   *amqp.Channel
 }
 
-func setupAMQPTestClient(URI string) (*amqpTestClient, error) {
-	c, err := amqp.Dial(URI)
+func setupAMQPTestClient(uri string) (*amqpTestClient, error) {
+	c, err := amqp.Dial(uri)
 	if err != nil {
 		return nil, err
 	}

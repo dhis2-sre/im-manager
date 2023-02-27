@@ -53,10 +53,12 @@ func NewPauseInstanceParamsWithHTTPClient(client *http.Client) *PauseInstancePar
 	}
 }
 
-/* PauseInstanceParams contains all the parameters to send to the API endpoint
-   for the pause instance operation.
+/*
+PauseInstanceParams contains all the parameters to send to the API endpoint
 
-   Typically these are written to a http.Request.
+	for the pause instance operation.
+
+	Typically these are written to a http.Request.
 */
 type PauseInstanceParams struct {
 

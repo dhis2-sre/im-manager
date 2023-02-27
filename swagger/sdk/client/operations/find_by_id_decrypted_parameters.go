@@ -53,10 +53,12 @@ func NewFindByIDDecryptedParamsWithHTTPClient(client *http.Client) *FindByIDDecr
 	}
 }
 
-/* FindByIDDecryptedParams contains all the parameters to send to the API endpoint
-   for the find by Id decrypted operation.
+/*
+FindByIDDecryptedParams contains all the parameters to send to the API endpoint
 
-   Typically these are written to a http.Request.
+	for the find by Id decrypted operation.
+
+	Typically these are written to a http.Request.
 */
 type FindByIDDecryptedParams struct {
 

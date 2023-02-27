@@ -63,12 +63,13 @@ func NewUpdateInstanceNoContent() *UpdateInstanceNoContent {
 	return &UpdateInstanceNoContent{}
 }
 
-/* UpdateInstanceNoContent describes a response with status code 204, with default header values.
+/*
+UpdateInstanceNoContent describes a response with status code 204, with default header values.
 
 Instance
 */
 type UpdateInstanceNoContent struct {
-	Payload *models.Instance
+	Payload models.Instance
 }
 
 // IsSuccess returns true when this update instance no content response has a 2xx status code
@@ -96,6 +97,11 @@ func (o *UpdateInstanceNoContent) IsCode(code int) bool {
 	return code == 204
 }
 
+// Code gets the status code for the update instance no content response
+func (o *UpdateInstanceNoContent) Code() int {
+	return 204
+}
+
 func (o *UpdateInstanceNoContent) Error() string {
 	return fmt.Sprintf("[PUT /instances/{id}][%d] updateInstanceNoContent  %+v", 204, o.Payload)
 }
@@ -104,16 +110,14 @@ func (o *UpdateInstanceNoContent) String() string {
 	return fmt.Sprintf("[PUT /instances/{id}][%d] updateInstanceNoContent  %+v", 204, o.Payload)
 }
 
-func (o *UpdateInstanceNoContent) GetPayload() *models.Instance {
+func (o *UpdateInstanceNoContent) GetPayload() models.Instance {
 	return o.Payload
 }
 
 func (o *UpdateInstanceNoContent) readResponse(response runtime.ClientResponse, consumer runtime.Consumer, formats strfmt.Registry) error {
 
-	o.Payload = new(models.Instance)
-
 	// response payload
-	if err := consumer.Consume(response.Body(), o.Payload); err != nil && err != io.EOF {
+	if err := consumer.Consume(response.Body(), &o.Payload); err != nil && err != io.EOF {
 		return err
 	}
 
@@ -125,7 +129,8 @@ func NewUpdateInstanceUnauthorized() *UpdateInstanceUnauthorized {
 	return &UpdateInstanceUnauthorized{}
 }
 
-/* UpdateInstanceUnauthorized describes a response with status code 401, with default header values.
+/*
+UpdateInstanceUnauthorized describes a response with status code 401, with default header values.
 
 UpdateInstanceUnauthorized update instance unauthorized
 */
@@ -157,6 +162,11 @@ func (o *UpdateInstanceUnauthorized) IsCode(code int) bool {
 	return code == 401
 }
 
+// Code gets the status code for the update instance unauthorized response
+func (o *UpdateInstanceUnauthorized) Code() int {
+	return 401
+}
+
 func (o *UpdateInstanceUnauthorized) Error() string {
 	return fmt.Sprintf("[PUT /instances/{id}][%d] updateInstanceUnauthorized ", 401)
 }
@@ -175,7 +185,8 @@ func NewUpdateInstanceForbidden() *UpdateInstanceForbidden {
 	return &UpdateInstanceForbidden{}
 }
 
-/* UpdateInstanceForbidden describes a response with status code 403, with default header values.
+/*
+UpdateInstanceForbidden describes a response with status code 403, with default header values.
 
 UpdateInstanceForbidden update instance forbidden
 */
@@ -207,6 +218,11 @@ func (o *UpdateInstanceForbidden) IsCode(code int) bool {
 	return code == 403
 }
 
+// Code gets the status code for the update instance forbidden response
+func (o *UpdateInstanceForbidden) Code() int {
+	return 403
+}
+
 func (o *UpdateInstanceForbidden) Error() string {
 	return fmt.Sprintf("[PUT /instances/{id}][%d] updateInstanceForbidden ", 403)
 }
@@ -225,7 +241,8 @@ func NewUpdateInstanceNotFound() *UpdateInstanceNotFound {
 	return &UpdateInstanceNotFound{}
 }
 
-/* UpdateInstanceNotFound describes a response with status code 404, with default header values.
+/*
+UpdateInstanceNotFound describes a response with status code 404, with default header values.
 
 UpdateInstanceNotFound update instance not found
 */
@@ -257,6 +274,11 @@ func (o *UpdateInstanceNotFound) IsCode(code int) bool {
 	return code == 404
 }
 
+// Code gets the status code for the update instance not found response
+func (o *UpdateInstanceNotFound) Code() int {
+	return 404
+}
+
 func (o *UpdateInstanceNotFound) Error() string {
 	return fmt.Sprintf("[PUT /instances/{id}][%d] updateInstanceNotFound ", 404)
 }
@@ -275,7 +297,8 @@ func NewUpdateInstanceUnsupportedMediaType() *UpdateInstanceUnsupportedMediaType
 	return &UpdateInstanceUnsupportedMediaType{}
 }
 
-/* UpdateInstanceUnsupportedMediaType describes a response with status code 415, with default header values.
+/*
+UpdateInstanceUnsupportedMediaType describes a response with status code 415, with default header values.
 
 UpdateInstanceUnsupportedMediaType update instance unsupported media type
 */
@@ -305,6 +328,11 @@ func (o *UpdateInstanceUnsupportedMediaType) IsServerError() bool {
 // IsCode returns true when this update instance unsupported media type response a status code equal to that given
 func (o *UpdateInstanceUnsupportedMediaType) IsCode(code int) bool {
 	return code == 415
+}
+
+// Code gets the status code for the update instance unsupported media type response
+func (o *UpdateInstanceUnsupportedMediaType) Code() int {
+	return 415
 }
 
 func (o *UpdateInstanceUnsupportedMediaType) Error() string {

@@ -15,21 +15,6 @@ import (
 	"github.com/dhis2-sre/im-user/swagger/sdk/models"
 )
 
-type Service interface {
-	ConsumeParameters(source, destination *model.Instance) error
-	Pause(token string, instance *model.Instance) error
-	Restart(token string, instance *model.Instance, typeSelector string) error
-	Save(instance *model.Instance) (*model.Instance, error)
-	Deploy(token string, instance *model.Instance) error
-	FindById(id uint) (*model.Instance, error)
-	FindByIdDecrypted(id uint) (*model.Instance, error)
-	FindByNameAndGroup(instance string, group string) (*model.Instance, error)
-	Delete(token string, id uint) error
-	Logs(instance *model.Instance, group *models.Group, typeSelector string) (io.ReadCloser, error)
-	FindInstances(groups []*models.Group, presets bool) ([]*model.Instance, error)
-	Link(source, destination *model.Instance) error
-}
-
 func NewService(
 	config config.Config,
 	instanceRepository Repository,
@@ -44,6 +29,18 @@ func NewService(
 		stackService,
 		helmfileService,
 	}
+}
+
+type Repository interface {
+	Link(firstInstance, secondInstance *model.Instance) error
+	Unlink(instance *model.Instance) error
+	Save(instance *model.Instance) error
+	FindById(id uint) (*model.Instance, error)
+	FindByIdDecrypted(id uint) (*model.Instance, error)
+	FindByNameAndGroup(instance string, group string) (*model.Instance, error)
+	FindByGroups(groups []*models.Group, presets bool) ([]GroupWithInstances, error)
+	SaveDeployLog(instance *model.Instance, log string) error
+	Delete(id uint) error
 }
 
 type userClientService interface {
@@ -268,11 +265,13 @@ func (s service) FindByNameAndGroup(instance string, group string) (*model.Insta
 	return s.instanceRepository.FindByNameAndGroup(instance, group)
 }
 
-func (s service) FindInstances(groups []*models.Group, presets bool) ([]*model.Instance, error) {
-	groupNames := make([]string, len(groups))
-	for i, group := range groups {
-		groupNames[i] = group.Name
+func (s service) FindInstances(user *models.User, presets bool) ([]GroupWithInstances, error) {
+	allGroups := append(user.Groups, user.AdminGroups...) //nolint:gocritic
+
+	instances, err := s.instanceRepository.FindByGroups(allGroups, presets)
+	if err != nil {
+		return nil, err
 	}
 
-	return s.instanceRepository.FindByGroupNames(groupNames, presets)
+	return instances, err
 }

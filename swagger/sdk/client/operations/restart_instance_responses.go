@@ -60,7 +60,8 @@ func NewRestartInstanceAccepted() *RestartInstanceAccepted {
 	return &RestartInstanceAccepted{}
 }
 
-/* RestartInstanceAccepted describes a response with status code 202, with default header values.
+/*
+RestartInstanceAccepted describes a response with status code 202, with default header values.
 
 RestartInstanceAccepted restart instance accepted
 */
@@ -92,6 +93,11 @@ func (o *RestartInstanceAccepted) IsCode(code int) bool {
 	return code == 202
 }
 
+// Code gets the status code for the restart instance accepted response
+func (o *RestartInstanceAccepted) Code() int {
+	return 202
+}
+
 func (o *RestartInstanceAccepted) Error() string {
 	return fmt.Sprintf("[PUT /instances/{id}/restart][%d] restartInstanceAccepted ", 202)
 }
@@ -110,7 +116,8 @@ func NewRestartInstanceUnauthorized() *RestartInstanceUnauthorized {
 	return &RestartInstanceUnauthorized{}
 }
 
-/* RestartInstanceUnauthorized describes a response with status code 401, with default header values.
+/*
+RestartInstanceUnauthorized describes a response with status code 401, with default header values.
 
 RestartInstanceUnauthorized restart instance unauthorized
 */
@@ -142,6 +149,11 @@ func (o *RestartInstanceUnauthorized) IsCode(code int) bool {
 	return code == 401
 }
 
+// Code gets the status code for the restart instance unauthorized response
+func (o *RestartInstanceUnauthorized) Code() int {
+	return 401
+}
+
 func (o *RestartInstanceUnauthorized) Error() string {
 	return fmt.Sprintf("[PUT /instances/{id}/restart][%d] restartInstanceUnauthorized ", 401)
 }
@@ -160,7 +172,8 @@ func NewRestartInstanceForbidden() *RestartInstanceForbidden {
 	return &RestartInstanceForbidden{}
 }
 
-/* RestartInstanceForbidden describes a response with status code 403, with default header values.
+/*
+RestartInstanceForbidden describes a response with status code 403, with default header values.
 
 RestartInstanceForbidden restart instance forbidden
 */
@@ -192,6 +205,11 @@ func (o *RestartInstanceForbidden) IsCode(code int) bool {
 	return code == 403
 }
 
+// Code gets the status code for the restart instance forbidden response
+func (o *RestartInstanceForbidden) Code() int {
+	return 403
+}
+
 func (o *RestartInstanceForbidden) Error() string {
 	return fmt.Sprintf("[PUT /instances/{id}/restart][%d] restartInstanceForbidden ", 403)
 }
@@ -210,7 +228,8 @@ func NewRestartInstanceNotFound() *RestartInstanceNotFound {
 	return &RestartInstanceNotFound{}
 }
 
-/* RestartInstanceNotFound describes a response with status code 404, with default header values.
+/*
+RestartInstanceNotFound describes a response with status code 404, with default header values.
 
 RestartInstanceNotFound restart instance not found
 */
@@ -242,6 +261,11 @@ func (o *RestartInstanceNotFound) IsCode(code int) bool {
 	return code == 404
 }
 
+// Code gets the status code for the restart instance not found response
+func (o *RestartInstanceNotFound) Code() int {
+	return 404
+}
+
 func (o *RestartInstanceNotFound) Error() string {
 	return fmt.Sprintf("[PUT /instances/{id}/restart][%d] restartInstanceNotFound ", 404)
 }
@@ -260,7 +284,8 @@ func NewRestartInstanceUnsupportedMediaType() *RestartInstanceUnsupportedMediaTy
 	return &RestartInstanceUnsupportedMediaType{}
 }
 
-/* RestartInstanceUnsupportedMediaType describes a response with status code 415, with default header values.
+/*
+RestartInstanceUnsupportedMediaType describes a response with status code 415, with default header values.
 
 RestartInstanceUnsupportedMediaType restart instance unsupported media type
 */
@@ -290,6 +315,11 @@ func (o *RestartInstanceUnsupportedMediaType) IsServerError() bool {
 // IsCode returns true when this restart instance unsupported media type response a status code equal to that given
 func (o *RestartInstanceUnsupportedMediaType) IsCode(code int) bool {
 	return code == 415
+}
+
+// Code gets the status code for the restart instance unsupported media type response
+func (o *RestartInstanceUnsupportedMediaType) Code() int {
+	return 415
 }
 
 func (o *RestartInstanceUnsupportedMediaType) Error() string {

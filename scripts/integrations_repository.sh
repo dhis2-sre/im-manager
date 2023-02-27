@@ -12,4 +12,4 @@ echo "{
   \"payload\": {
     \"organization\": \"$organization\"
   }
-}" | $HTTP post "$INSTANCE_HOST/integrations" "Authorization: Bearer $ACCESS_TOKEN"
+}" | $HTTP post "$IM_HOST/integrations" "Authorization: Bearer $ACCESS_TOKEN"

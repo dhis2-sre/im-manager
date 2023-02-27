@@ -5,10 +5,12 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"strings"
+	"time"
+
+	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	"github.com/dhis2-sre/im-user/swagger/sdk/models"
@@ -43,7 +45,7 @@ func commandExecutor(cmd *exec.Cmd, configuration *models.ClusterConfiguration) 
 		return nil, nil, err
 	}
 
-	file, err := ioutil.TempFile("", "kubectl")
+	file, err := os.CreateTemp("", "kubectl")
 	if err != nil {
 		return nil, nil, err
 	}
@@ -210,18 +212,13 @@ func (ks kubernetesService) restart(instance *model.Instance, typeSelector strin
 		return fmt.Errorf("multiple deployments found using the selector: %q", selector)
 	}
 
-	name := items[0].Name
-
-	// Scale down
-	prevReplicas, err := scale(deployments, name, 0)
+	deployment := items[0]
+	data := fmt.Sprintf(`{"spec": {"template": {"metadata": {"annotations": {"kubectl.kubernetes.io/restartedAt": "%s"}}}}}`, time.Now().Format(time.RFC3339))
+	_, err = deployments.Patch(context.TODO(), deployment.Name, types.StrategicMergePatchType, []byte(data), metav1.PatchOptions{})
 	if err != nil {
-		return err
+		return fmt.Errorf("error restarting %q: %v", deployment.Name, err)
 	}
-
-	// Scale up
-	_, err = scale(deployments, name, prevReplicas)
-
-	return err
+	return nil
 }
 
 func (ks kubernetesService) pause(instance *model.Instance) error {

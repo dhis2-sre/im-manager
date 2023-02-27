@@ -24,7 +24,7 @@ FLYWAY_REPAIR_BEFORE_MIGRATION=${FLYWAY_REPAIR_BEFORE_MIGRATION:-false}
 
 SOURCE_INSTANCE_ID=0
 if [ -n "$SOURCE_INSTANCE" ]; then
-  SOURCE_INSTANCE_ID=$($HTTP get "$INSTANCE_HOST/instances-name-to-id/$GROUP/$SOURCE_INSTANCE" "Authorization: Bearer $ACCESS_TOKEN")
+  SOURCE_INSTANCE_ID=$($HTTP get "$IM_HOST/instances-name-to-id/$GROUP/$SOURCE_INSTANCE" "Authorization: Bearer $ACCESS_TOKEN")
 fi
 
 echo "{
@@ -70,4 +70,4 @@ echo "{
       \"value\": \"$FLYWAY_REPAIR_BEFORE_MIGRATION\"
     }
   ]
-}" | $HTTP post "$INSTANCE_HOST/instances" "Authorization: Bearer $ACCESS_TOKEN"
+}" | $HTTP post "$IM_HOST/instances" "Authorization: Bearer $ACCESS_TOKEN"

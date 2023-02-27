@@ -15,8 +15,6 @@ import (
 	cr "github.com/go-openapi/runtime/client"
 	"github.com/go-openapi/strfmt"
 	"github.com/go-openapi/swag"
-
-	"github.com/dhis2-sre/im-manager/swagger/sdk/models"
 )
 
 // NewUpdateInstanceParams creates a new UpdateInstanceParams object,
@@ -55,10 +53,12 @@ func NewUpdateInstanceParamsWithHTTPClient(client *http.Client) *UpdateInstanceP
 	}
 }
 
-/* UpdateInstanceParams contains all the parameters to send to the API endpoint
-   for the update instance operation.
+/*
+UpdateInstanceParams contains all the parameters to send to the API endpoint
 
-   Typically these are written to a http.Request.
+	for the update instance operation.
+
+	Typically these are written to a http.Request.
 */
 type UpdateInstanceParams struct {
 
@@ -66,7 +66,7 @@ type UpdateInstanceParams struct {
 
 	   Update instance request body parameter
 	*/
-	Payload *models.UpdateInstanceRequest
+	Payload interface{}
 
 	// ID.
 	//
@@ -127,13 +127,13 @@ func (o *UpdateInstanceParams) SetHTTPClient(client *http.Client) {
 }
 
 // WithPayload adds the payload to the update instance params
-func (o *UpdateInstanceParams) WithPayload(payload *models.UpdateInstanceRequest) *UpdateInstanceParams {
+func (o *UpdateInstanceParams) WithPayload(payload interface{}) *UpdateInstanceParams {
 	o.SetPayload(payload)
 	return o
 }
 
 // SetPayload adds the payload to the update instance params
-func (o *UpdateInstanceParams) SetPayload(payload *models.UpdateInstanceRequest) {
+func (o *UpdateInstanceParams) SetPayload(payload interface{}) {
 	o.Payload = payload
 }
 

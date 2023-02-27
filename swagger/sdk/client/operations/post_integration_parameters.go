@@ -52,10 +52,12 @@ func NewPostIntegrationParamsWithHTTPClient(client *http.Client) *PostIntegratio
 	}
 }
 
-/* PostIntegrationParams contains all the parameters to send to the API endpoint
-   for the post integration operation.
+/*
+PostIntegrationParams contains all the parameters to send to the API endpoint
 
-   Typically these are written to a http.Request.
+	for the post integration operation.
+
+	Typically these are written to a http.Request.
 */
 type PostIntegrationParams struct {
 	timeout    time.Duration

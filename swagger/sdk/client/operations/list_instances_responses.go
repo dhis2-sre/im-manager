@@ -11,8 +11,6 @@ import (
 
 	"github.com/go-openapi/runtime"
 	"github.com/go-openapi/strfmt"
-
-	"github.com/dhis2-sre/im-manager/swagger/sdk/models"
 )
 
 // ListInstancesReader is a Reader for the ListInstances structure.
@@ -57,12 +55,13 @@ func NewListInstancesOK() *ListInstancesOK {
 	return &ListInstancesOK{}
 }
 
-/* ListInstancesOK describes a response with status code 200, with default header values.
+/*
+ListInstancesOK describes a response with status code 200, with default header values.
 
-GroupWithInstances
+ListInstancesOK list instances o k
 */
 type ListInstancesOK struct {
-	Payload []*models.GroupWithInstances
+	Payload []interface{}
 }
 
 // IsSuccess returns true when this list instances o k response has a 2xx status code
@@ -90,6 +89,11 @@ func (o *ListInstancesOK) IsCode(code int) bool {
 	return code == 200
 }
 
+// Code gets the status code for the list instances o k response
+func (o *ListInstancesOK) Code() int {
+	return 200
+}
+
 func (o *ListInstancesOK) Error() string {
 	return fmt.Sprintf("[GET /instances][%d] listInstancesOK  %+v", 200, o.Payload)
 }
@@ -98,7 +102,7 @@ func (o *ListInstancesOK) String() string {
 	return fmt.Sprintf("[GET /instances][%d] listInstancesOK  %+v", 200, o.Payload)
 }
 
-func (o *ListInstancesOK) GetPayload() []*models.GroupWithInstances {
+func (o *ListInstancesOK) GetPayload() []interface{} {
 	return o.Payload
 }
 
@@ -117,7 +121,8 @@ func NewListInstancesUnauthorized() *ListInstancesUnauthorized {
 	return &ListInstancesUnauthorized{}
 }
 
-/* ListInstancesUnauthorized describes a response with status code 401, with default header values.
+/*
+ListInstancesUnauthorized describes a response with status code 401, with default header values.
 
 ListInstancesUnauthorized list instances unauthorized
 */
@@ -149,6 +154,11 @@ func (o *ListInstancesUnauthorized) IsCode(code int) bool {
 	return code == 401
 }
 
+// Code gets the status code for the list instances unauthorized response
+func (o *ListInstancesUnauthorized) Code() int {
+	return 401
+}
+
 func (o *ListInstancesUnauthorized) Error() string {
 	return fmt.Sprintf("[GET /instances][%d] listInstancesUnauthorized ", 401)
 }
@@ -167,7 +177,8 @@ func NewListInstancesForbidden() *ListInstancesForbidden {
 	return &ListInstancesForbidden{}
 }
 
-/* ListInstancesForbidden describes a response with status code 403, with default header values.
+/*
+ListInstancesForbidden describes a response with status code 403, with default header values.
 
 ListInstancesForbidden list instances forbidden
 */
@@ -199,6 +210,11 @@ func (o *ListInstancesForbidden) IsCode(code int) bool {
 	return code == 403
 }
 
+// Code gets the status code for the list instances forbidden response
+func (o *ListInstancesForbidden) Code() int {
+	return 403
+}
+
 func (o *ListInstancesForbidden) Error() string {
 	return fmt.Sprintf("[GET /instances][%d] listInstancesForbidden ", 403)
 }
@@ -217,7 +233,8 @@ func NewListInstancesUnsupportedMediaType() *ListInstancesUnsupportedMediaType {
 	return &ListInstancesUnsupportedMediaType{}
 }
 
-/* ListInstancesUnsupportedMediaType describes a response with status code 415, with default header values.
+/*
+ListInstancesUnsupportedMediaType describes a response with status code 415, with default header values.
 
 ListInstancesUnsupportedMediaType list instances unsupported media type
 */
@@ -247,6 +264,11 @@ func (o *ListInstancesUnsupportedMediaType) IsServerError() bool {
 // IsCode returns true when this list instances unsupported media type response a status code equal to that given
 func (o *ListInstancesUnsupportedMediaType) IsCode(code int) bool {
 	return code == 415
+}
+
+// Code gets the status code for the list instances unsupported media type response
+func (o *ListInstancesUnsupportedMediaType) Code() int {
+	return 415
 }
 
 func (o *ListInstancesUnsupportedMediaType) Error() string {

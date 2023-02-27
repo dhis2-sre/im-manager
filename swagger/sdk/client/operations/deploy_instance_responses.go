@@ -63,12 +63,13 @@ func NewDeployInstanceCreated() *DeployInstanceCreated {
 	return &DeployInstanceCreated{}
 }
 
-/* DeployInstanceCreated describes a response with status code 201, with default header values.
+/*
+DeployInstanceCreated describes a response with status code 201, with default header values.
 
 Instance
 */
 type DeployInstanceCreated struct {
-	Payload *models.Instance
+	Payload models.Instance
 }
 
 // IsSuccess returns true when this deploy instance created response has a 2xx status code
@@ -96,6 +97,11 @@ func (o *DeployInstanceCreated) IsCode(code int) bool {
 	return code == 201
 }
 
+// Code gets the status code for the deploy instance created response
+func (o *DeployInstanceCreated) Code() int {
+	return 201
+}
+
 func (o *DeployInstanceCreated) Error() string {
 	return fmt.Sprintf("[POST /instances][%d] deployInstanceCreated  %+v", 201, o.Payload)
 }
@@ -104,16 +110,14 @@ func (o *DeployInstanceCreated) String() string {
 	return fmt.Sprintf("[POST /instances][%d] deployInstanceCreated  %+v", 201, o.Payload)
 }
 
-func (o *DeployInstanceCreated) GetPayload() *models.Instance {
+func (o *DeployInstanceCreated) GetPayload() models.Instance {
 	return o.Payload
 }
 
 func (o *DeployInstanceCreated) readResponse(response runtime.ClientResponse, consumer runtime.Consumer, formats strfmt.Registry) error {
 
-	o.Payload = new(models.Instance)
-
 	// response payload
-	if err := consumer.Consume(response.Body(), o.Payload); err != nil && err != io.EOF {
+	if err := consumer.Consume(response.Body(), &o.Payload); err != nil && err != io.EOF {
 		return err
 	}
 
@@ -125,7 +129,8 @@ func NewDeployInstanceUnauthorized() *DeployInstanceUnauthorized {
 	return &DeployInstanceUnauthorized{}
 }
 
-/* DeployInstanceUnauthorized describes a response with status code 401, with default header values.
+/*
+DeployInstanceUnauthorized describes a response with status code 401, with default header values.
 
 DeployInstanceUnauthorized deploy instance unauthorized
 */
@@ -157,6 +162,11 @@ func (o *DeployInstanceUnauthorized) IsCode(code int) bool {
 	return code == 401
 }
 
+// Code gets the status code for the deploy instance unauthorized response
+func (o *DeployInstanceUnauthorized) Code() int {
+	return 401
+}
+
 func (o *DeployInstanceUnauthorized) Error() string {
 	return fmt.Sprintf("[POST /instances][%d] deployInstanceUnauthorized ", 401)
 }
@@ -175,7 +185,8 @@ func NewDeployInstanceForbidden() *DeployInstanceForbidden {
 	return &DeployInstanceForbidden{}
 }
 
-/* DeployInstanceForbidden describes a response with status code 403, with default header values.
+/*
+DeployInstanceForbidden describes a response with status code 403, with default header values.
 
 DeployInstanceForbidden deploy instance forbidden
 */
@@ -207,6 +218,11 @@ func (o *DeployInstanceForbidden) IsCode(code int) bool {
 	return code == 403
 }
 
+// Code gets the status code for the deploy instance forbidden response
+func (o *DeployInstanceForbidden) Code() int {
+	return 403
+}
+
 func (o *DeployInstanceForbidden) Error() string {
 	return fmt.Sprintf("[POST /instances][%d] deployInstanceForbidden ", 403)
 }
@@ -225,7 +241,8 @@ func NewDeployInstanceNotFound() *DeployInstanceNotFound {
 	return &DeployInstanceNotFound{}
 }
 
-/* DeployInstanceNotFound describes a response with status code 404, with default header values.
+/*
+DeployInstanceNotFound describes a response with status code 404, with default header values.
 
 DeployInstanceNotFound deploy instance not found
 */
@@ -257,6 +274,11 @@ func (o *DeployInstanceNotFound) IsCode(code int) bool {
 	return code == 404
 }
 
+// Code gets the status code for the deploy instance not found response
+func (o *DeployInstanceNotFound) Code() int {
+	return 404
+}
+
 func (o *DeployInstanceNotFound) Error() string {
 	return fmt.Sprintf("[POST /instances][%d] deployInstanceNotFound ", 404)
 }
@@ -275,7 +297,8 @@ func NewDeployInstanceUnsupportedMediaType() *DeployInstanceUnsupportedMediaType
 	return &DeployInstanceUnsupportedMediaType{}
 }
 
-/* DeployInstanceUnsupportedMediaType describes a response with status code 415, with default header values.
+/*
+DeployInstanceUnsupportedMediaType describes a response with status code 415, with default header values.
 
 DeployInstanceUnsupportedMediaType deploy instance unsupported media type
 */
@@ -305,6 +328,11 @@ func (o *DeployInstanceUnsupportedMediaType) IsServerError() bool {
 // IsCode returns true when this deploy instance unsupported media type response a status code equal to that given
 func (o *DeployInstanceUnsupportedMediaType) IsCode(code int) bool {
 	return code == 415
+}
+
+// Code gets the status code for the deploy instance unsupported media type response
+func (o *DeployInstanceUnsupportedMediaType) Code() int {
+	return 415
 }
 
 func (o *DeployInstanceUnsupportedMediaType) Error() string {

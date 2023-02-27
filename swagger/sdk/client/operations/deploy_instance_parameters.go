@@ -14,8 +14,6 @@ import (
 	"github.com/go-openapi/runtime"
 	cr "github.com/go-openapi/runtime/client"
 	"github.com/go-openapi/strfmt"
-
-	"github.com/dhis2-sre/im-manager/swagger/sdk/models"
 )
 
 // NewDeployInstanceParams creates a new DeployInstanceParams object,
@@ -54,10 +52,12 @@ func NewDeployInstanceParamsWithHTTPClient(client *http.Client) *DeployInstanceP
 	}
 }
 
-/* DeployInstanceParams contains all the parameters to send to the API endpoint
-   for the deploy instance operation.
+/*
+DeployInstanceParams contains all the parameters to send to the API endpoint
 
-   Typically these are written to a http.Request.
+	for the deploy instance operation.
+
+	Typically these are written to a http.Request.
 */
 type DeployInstanceParams struct {
 
@@ -65,7 +65,7 @@ type DeployInstanceParams struct {
 
 	   Deploy instance request body parameter
 	*/
-	Payload *models.DeployInstanceRequest
+	Payload interface{}
 
 	/* Preset.
 
@@ -127,13 +127,13 @@ func (o *DeployInstanceParams) SetHTTPClient(client *http.Client) {
 }
 
 // WithPayload adds the payload to the deploy instance params
-func (o *DeployInstanceParams) WithPayload(payload *models.DeployInstanceRequest) *DeployInstanceParams {
+func (o *DeployInstanceParams) WithPayload(payload interface{}) *DeployInstanceParams {
 	o.SetPayload(payload)
 	return o
 }
 
 // SetPayload adds the payload to the deploy instance params
-func (o *DeployInstanceParams) SetPayload(payload *models.DeployInstanceRequest) {
+func (o *DeployInstanceParams) SetPayload(payload interface{}) {
 	o.Payload = payload
 }
 

@@ -30,4 +30,4 @@ echo "{
       \"value\": \"$INSTANCE_TTL\"
     }
   ]
-}" | $HTTP post "$INSTANCE_HOST/instances" "Authorization: Bearer $ACCESS_TOKEN"
+}" | $HTTP post "$IM_HOST/instances" "Authorization: Bearer $ACCESS_TOKEN"

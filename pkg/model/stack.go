@@ -7,6 +7,7 @@ import (
 	"gorm.io/gorm"
 )
 
+// swagger:model Stack
 type Stack struct {
 	Name               string                   `gorm:"primaryKey" json:"name"`
 	RequiredParameters []StackRequiredParameter `gorm:"foreignKey:StackName; references: Name; constraint:OnUpdate:CASCADE,OnDelete:CASCADE" json:"requiredParameters"`

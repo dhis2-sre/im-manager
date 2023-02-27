@@ -90,7 +90,7 @@ type stack struct {
 
 func parseStack(dir, name string) (*stack, error) {
 	path := fmt.Sprintf("%s/%s/helmfile.yaml", dir, name)
-	file, err := os.ReadFile(path)
+	file, err := os.ReadFile(path) // #nosec
 	if err != nil {
 		return nil, fmt.Errorf("error reading stack %q: %v", name, err)
 	}
@@ -205,7 +205,7 @@ func inSlice(str string, strings []string) bool {
 }
 
 func getSystemParameters() []string {
-	parameters := []string{"INSTANCE_ID", "INSTANCE_NAME", "INSTANCE_HOSTNAME", "INSTANCE_NAMESPACE", "IM_ACCESS_TOKEN"}
+	parameters := []string{"INSTANCE_ID", "INSTANCE_NAME", "INSTANCE_HOSTNAME", "INSTANCE_NAMESPACE", "IM_ACCESS_TOKEN", "INSTANCE_CREATION_TIMESTAMP"}
 	sort.Strings(parameters)
 	return parameters
 }

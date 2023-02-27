@@ -60,7 +60,8 @@ func NewInstanceLogsOK() *InstanceLogsOK {
 	return &InstanceLogsOK{}
 }
 
-/* InstanceLogsOK describes a response with status code 200, with default header values.
+/*
+InstanceLogsOK describes a response with status code 200, with default header values.
 
 InstanceLogsOK instance logs o k
 */
@@ -92,6 +93,11 @@ func (o *InstanceLogsOK) IsCode(code int) bool {
 	return code == 200
 }
 
+// Code gets the status code for the instance logs o k response
+func (o *InstanceLogsOK) Code() int {
+	return 200
+}
+
 func (o *InstanceLogsOK) Error() string {
 	return fmt.Sprintf("[GET /instances/{id}/logs][%d] instanceLogsOK ", 200)
 }
@@ -110,7 +116,8 @@ func NewInstanceLogsUnauthorized() *InstanceLogsUnauthorized {
 	return &InstanceLogsUnauthorized{}
 }
 
-/* InstanceLogsUnauthorized describes a response with status code 401, with default header values.
+/*
+InstanceLogsUnauthorized describes a response with status code 401, with default header values.
 
 InstanceLogsUnauthorized instance logs unauthorized
 */
@@ -142,6 +149,11 @@ func (o *InstanceLogsUnauthorized) IsCode(code int) bool {
 	return code == 401
 }
 
+// Code gets the status code for the instance logs unauthorized response
+func (o *InstanceLogsUnauthorized) Code() int {
+	return 401
+}
+
 func (o *InstanceLogsUnauthorized) Error() string {
 	return fmt.Sprintf("[GET /instances/{id}/logs][%d] instanceLogsUnauthorized ", 401)
 }
@@ -160,7 +172,8 @@ func NewInstanceLogsForbidden() *InstanceLogsForbidden {
 	return &InstanceLogsForbidden{}
 }
 
-/* InstanceLogsForbidden describes a response with status code 403, with default header values.
+/*
+InstanceLogsForbidden describes a response with status code 403, with default header values.
 
 InstanceLogsForbidden instance logs forbidden
 */
@@ -192,6 +205,11 @@ func (o *InstanceLogsForbidden) IsCode(code int) bool {
 	return code == 403
 }
 
+// Code gets the status code for the instance logs forbidden response
+func (o *InstanceLogsForbidden) Code() int {
+	return 403
+}
+
 func (o *InstanceLogsForbidden) Error() string {
 	return fmt.Sprintf("[GET /instances/{id}/logs][%d] instanceLogsForbidden ", 403)
 }
@@ -210,7 +228,8 @@ func NewInstanceLogsNotFound() *InstanceLogsNotFound {
 	return &InstanceLogsNotFound{}
 }
 
-/* InstanceLogsNotFound describes a response with status code 404, with default header values.
+/*
+InstanceLogsNotFound describes a response with status code 404, with default header values.
 
 InstanceLogsNotFound instance logs not found
 */
@@ -242,6 +261,11 @@ func (o *InstanceLogsNotFound) IsCode(code int) bool {
 	return code == 404
 }
 
+// Code gets the status code for the instance logs not found response
+func (o *InstanceLogsNotFound) Code() int {
+	return 404
+}
+
 func (o *InstanceLogsNotFound) Error() string {
 	return fmt.Sprintf("[GET /instances/{id}/logs][%d] instanceLogsNotFound ", 404)
 }
@@ -260,7 +284,8 @@ func NewInstanceLogsUnsupportedMediaType() *InstanceLogsUnsupportedMediaType {
 	return &InstanceLogsUnsupportedMediaType{}
 }
 
-/* InstanceLogsUnsupportedMediaType describes a response with status code 415, with default header values.
+/*
+InstanceLogsUnsupportedMediaType describes a response with status code 415, with default header values.
 
 InstanceLogsUnsupportedMediaType instance logs unsupported media type
 */
@@ -290,6 +315,11 @@ func (o *InstanceLogsUnsupportedMediaType) IsServerError() bool {
 // IsCode returns true when this instance logs unsupported media type response a status code equal to that given
 func (o *InstanceLogsUnsupportedMediaType) IsCode(code int) bool {
 	return code == 415
+}
+
+// Code gets the status code for the instance logs unsupported media type response
+func (o *InstanceLogsUnsupportedMediaType) Code() int {
+	return 415
 }
 
 func (o *InstanceLogsUnsupportedMediaType) Error() string {

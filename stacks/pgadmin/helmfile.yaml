@@ -11,7 +11,8 @@ releases:
           im-default: "true"
           im-id: "{{ requiredEnv "INSTANCE_ID" }}"
           im-type: "pgadmin"
-          im-ttl: "{{ env "INSTANCE_TTL" | default "" }}"
+          im-creation-timestamp: "{{ env "INSTANCE_CREATION_TIMESTAMP" | default "" }}"
+          im-ttl: "{{ env "INSTANCE_TTL" | default "172800" }}"
 
       - ingress:
           enabled: true

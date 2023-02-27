@@ -63,12 +63,13 @@ func NewInstanceNameToIDOK() *InstanceNameToIDOK {
 	return &InstanceNameToIDOK{}
 }
 
-/* InstanceNameToIDOK describes a response with status code 200, with default header values.
+/*
+InstanceNameToIDOK describes a response with status code 200, with default header values.
 
 Instance
 */
 type InstanceNameToIDOK struct {
-	Payload *models.Instance
+	Payload models.Instance
 }
 
 // IsSuccess returns true when this instance name to Id o k response has a 2xx status code
@@ -96,6 +97,11 @@ func (o *InstanceNameToIDOK) IsCode(code int) bool {
 	return code == 200
 }
 
+// Code gets the status code for the instance name to Id o k response
+func (o *InstanceNameToIDOK) Code() int {
+	return 200
+}
+
 func (o *InstanceNameToIDOK) Error() string {
 	return fmt.Sprintf("[GET /instances-name-to-id/{groupName}/{instanceName}][%d] instanceNameToIdOK  %+v", 200, o.Payload)
 }
@@ -104,16 +110,14 @@ func (o *InstanceNameToIDOK) String() string {
 	return fmt.Sprintf("[GET /instances-name-to-id/{groupName}/{instanceName}][%d] instanceNameToIdOK  %+v", 200, o.Payload)
 }
 
-func (o *InstanceNameToIDOK) GetPayload() *models.Instance {
+func (o *InstanceNameToIDOK) GetPayload() models.Instance {
 	return o.Payload
 }
 
 func (o *InstanceNameToIDOK) readResponse(response runtime.ClientResponse, consumer runtime.Consumer, formats strfmt.Registry) error {
 
-	o.Payload = new(models.Instance)
-
 	// response payload
-	if err := consumer.Consume(response.Body(), o.Payload); err != nil && err != io.EOF {
+	if err := consumer.Consume(response.Body(), &o.Payload); err != nil && err != io.EOF {
 		return err
 	}
 
@@ -125,7 +129,8 @@ func NewInstanceNameToIDUnauthorized() *InstanceNameToIDUnauthorized {
 	return &InstanceNameToIDUnauthorized{}
 }
 
-/* InstanceNameToIDUnauthorized describes a response with status code 401, with default header values.
+/*
+InstanceNameToIDUnauthorized describes a response with status code 401, with default header values.
 
 InstanceNameToIDUnauthorized instance name to Id unauthorized
 */
@@ -157,6 +162,11 @@ func (o *InstanceNameToIDUnauthorized) IsCode(code int) bool {
 	return code == 401
 }
 
+// Code gets the status code for the instance name to Id unauthorized response
+func (o *InstanceNameToIDUnauthorized) Code() int {
+	return 401
+}
+
 func (o *InstanceNameToIDUnauthorized) Error() string {
 	return fmt.Sprintf("[GET /instances-name-to-id/{groupName}/{instanceName}][%d] instanceNameToIdUnauthorized ", 401)
 }
@@ -175,7 +185,8 @@ func NewInstanceNameToIDForbidden() *InstanceNameToIDForbidden {
 	return &InstanceNameToIDForbidden{}
 }
 
-/* InstanceNameToIDForbidden describes a response with status code 403, with default header values.
+/*
+InstanceNameToIDForbidden describes a response with status code 403, with default header values.
 
 InstanceNameToIDForbidden instance name to Id forbidden
 */
@@ -207,6 +218,11 @@ func (o *InstanceNameToIDForbidden) IsCode(code int) bool {
 	return code == 403
 }
 
+// Code gets the status code for the instance name to Id forbidden response
+func (o *InstanceNameToIDForbidden) Code() int {
+	return 403
+}
+
 func (o *InstanceNameToIDForbidden) Error() string {
 	return fmt.Sprintf("[GET /instances-name-to-id/{groupName}/{instanceName}][%d] instanceNameToIdForbidden ", 403)
 }
@@ -225,7 +241,8 @@ func NewInstanceNameToIDNotFound() *InstanceNameToIDNotFound {
 	return &InstanceNameToIDNotFound{}
 }
 
-/* InstanceNameToIDNotFound describes a response with status code 404, with default header values.
+/*
+InstanceNameToIDNotFound describes a response with status code 404, with default header values.
 
 InstanceNameToIDNotFound instance name to Id not found
 */
@@ -257,6 +274,11 @@ func (o *InstanceNameToIDNotFound) IsCode(code int) bool {
 	return code == 404
 }
 
+// Code gets the status code for the instance name to Id not found response
+func (o *InstanceNameToIDNotFound) Code() int {
+	return 404
+}
+
 func (o *InstanceNameToIDNotFound) Error() string {
 	return fmt.Sprintf("[GET /instances-name-to-id/{groupName}/{instanceName}][%d] instanceNameToIdNotFound ", 404)
 }
@@ -275,7 +297,8 @@ func NewInstanceNameToIDUnsupportedMediaType() *InstanceNameToIDUnsupportedMedia
 	return &InstanceNameToIDUnsupportedMediaType{}
 }
 
-/* InstanceNameToIDUnsupportedMediaType describes a response with status code 415, with default header values.
+/*
+InstanceNameToIDUnsupportedMediaType describes a response with status code 415, with default header values.
 
 InstanceNameToIDUnsupportedMediaType instance name to Id unsupported media type
 */
@@ -305,6 +328,11 @@ func (o *InstanceNameToIDUnsupportedMediaType) IsServerError() bool {
 // IsCode returns true when this instance name to Id unsupported media type response a status code equal to that given
 func (o *InstanceNameToIDUnsupportedMediaType) IsCode(code int) bool {
 	return code == 415
+}
+
+// Code gets the status code for the instance name to Id unsupported media type response
+func (o *InstanceNameToIDUnsupportedMediaType) Code() int {
+	return 415
 }
 
 func (o *InstanceNameToIDUnsupportedMediaType) Error() string {

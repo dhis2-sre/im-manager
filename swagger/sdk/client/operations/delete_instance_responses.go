@@ -60,7 +60,8 @@ func NewDeleteInstanceAccepted() *DeleteInstanceAccepted {
 	return &DeleteInstanceAccepted{}
 }
 
-/* DeleteInstanceAccepted describes a response with status code 202, with default header values.
+/*
+DeleteInstanceAccepted describes a response with status code 202, with default header values.
 
 DeleteInstanceAccepted delete instance accepted
 */
@@ -92,6 +93,11 @@ func (o *DeleteInstanceAccepted) IsCode(code int) bool {
 	return code == 202
 }
 
+// Code gets the status code for the delete instance accepted response
+func (o *DeleteInstanceAccepted) Code() int {
+	return 202
+}
+
 func (o *DeleteInstanceAccepted) Error() string {
 	return fmt.Sprintf("[DELETE /instances/{id}][%d] deleteInstanceAccepted ", 202)
 }
@@ -110,7 +116,8 @@ func NewDeleteInstanceUnauthorized() *DeleteInstanceUnauthorized {
 	return &DeleteInstanceUnauthorized{}
 }
 
-/* DeleteInstanceUnauthorized describes a response with status code 401, with default header values.
+/*
+DeleteInstanceUnauthorized describes a response with status code 401, with default header values.
 
 DeleteInstanceUnauthorized delete instance unauthorized
 */
@@ -142,6 +149,11 @@ func (o *DeleteInstanceUnauthorized) IsCode(code int) bool {
 	return code == 401
 }
 
+// Code gets the status code for the delete instance unauthorized response
+func (o *DeleteInstanceUnauthorized) Code() int {
+	return 401
+}
+
 func (o *DeleteInstanceUnauthorized) Error() string {
 	return fmt.Sprintf("[DELETE /instances/{id}][%d] deleteInstanceUnauthorized ", 401)
 }
@@ -160,7 +172,8 @@ func NewDeleteInstanceForbidden() *DeleteInstanceForbidden {
 	return &DeleteInstanceForbidden{}
 }
 
-/* DeleteInstanceForbidden describes a response with status code 403, with default header values.
+/*
+DeleteInstanceForbidden describes a response with status code 403, with default header values.
 
 DeleteInstanceForbidden delete instance forbidden
 */
@@ -192,6 +205,11 @@ func (o *DeleteInstanceForbidden) IsCode(code int) bool {
 	return code == 403
 }
 
+// Code gets the status code for the delete instance forbidden response
+func (o *DeleteInstanceForbidden) Code() int {
+	return 403
+}
+
 func (o *DeleteInstanceForbidden) Error() string {
 	return fmt.Sprintf("[DELETE /instances/{id}][%d] deleteInstanceForbidden ", 403)
 }
@@ -210,7 +228,8 @@ func NewDeleteInstanceNotFound() *DeleteInstanceNotFound {
 	return &DeleteInstanceNotFound{}
 }
 
-/* DeleteInstanceNotFound describes a response with status code 404, with default header values.
+/*
+DeleteInstanceNotFound describes a response with status code 404, with default header values.
 
 DeleteInstanceNotFound delete instance not found
 */
@@ -242,6 +261,11 @@ func (o *DeleteInstanceNotFound) IsCode(code int) bool {
 	return code == 404
 }
 
+// Code gets the status code for the delete instance not found response
+func (o *DeleteInstanceNotFound) Code() int {
+	return 404
+}
+
 func (o *DeleteInstanceNotFound) Error() string {
 	return fmt.Sprintf("[DELETE /instances/{id}][%d] deleteInstanceNotFound ", 404)
 }
@@ -260,7 +284,8 @@ func NewDeleteInstanceUnsupportedMediaType() *DeleteInstanceUnsupportedMediaType
 	return &DeleteInstanceUnsupportedMediaType{}
 }
 
-/* DeleteInstanceUnsupportedMediaType describes a response with status code 415, with default header values.
+/*
+DeleteInstanceUnsupportedMediaType describes a response with status code 415, with default header values.
 
 DeleteInstanceUnsupportedMediaType delete instance unsupported media type
 */
@@ -290,6 +315,11 @@ func (o *DeleteInstanceUnsupportedMediaType) IsServerError() bool {
 // IsCode returns true when this delete instance unsupported media type response a status code equal to that given
 func (o *DeleteInstanceUnsupportedMediaType) IsCode(code int) bool {
 	return code == 415
+}
+
+// Code gets the status code for the delete instance unsupported media type response
+func (o *DeleteInstanceUnsupportedMediaType) Code() int {
+	return 415
 }
 
 func (o *DeleteInstanceUnsupportedMediaType) Error() string {

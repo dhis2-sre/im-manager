@@ -60,7 +60,8 @@ func NewPauseInstanceAccepted() *PauseInstanceAccepted {
 	return &PauseInstanceAccepted{}
 }
 
-/* PauseInstanceAccepted describes a response with status code 202, with default header values.
+/*
+PauseInstanceAccepted describes a response with status code 202, with default header values.
 
 PauseInstanceAccepted pause instance accepted
 */
@@ -92,6 +93,11 @@ func (o *PauseInstanceAccepted) IsCode(code int) bool {
 	return code == 202
 }
 
+// Code gets the status code for the pause instance accepted response
+func (o *PauseInstanceAccepted) Code() int {
+	return 202
+}
+
 func (o *PauseInstanceAccepted) Error() string {
 	return fmt.Sprintf("[PUT /instances/{id}/pause][%d] pauseInstanceAccepted ", 202)
 }
@@ -110,7 +116,8 @@ func NewPauseInstanceUnauthorized() *PauseInstanceUnauthorized {
 	return &PauseInstanceUnauthorized{}
 }
 
-/* PauseInstanceUnauthorized describes a response with status code 401, with default header values.
+/*
+PauseInstanceUnauthorized describes a response with status code 401, with default header values.
 
 PauseInstanceUnauthorized pause instance unauthorized
 */
@@ -142,6 +149,11 @@ func (o *PauseInstanceUnauthorized) IsCode(code int) bool {
 	return code == 401
 }
 
+// Code gets the status code for the pause instance unauthorized response
+func (o *PauseInstanceUnauthorized) Code() int {
+	return 401
+}
+
 func (o *PauseInstanceUnauthorized) Error() string {
 	return fmt.Sprintf("[PUT /instances/{id}/pause][%d] pauseInstanceUnauthorized ", 401)
 }
@@ -160,7 +172,8 @@ func NewPauseInstanceForbidden() *PauseInstanceForbidden {
 	return &PauseInstanceForbidden{}
 }
 
-/* PauseInstanceForbidden describes a response with status code 403, with default header values.
+/*
+PauseInstanceForbidden describes a response with status code 403, with default header values.
 
 PauseInstanceForbidden pause instance forbidden
 */
@@ -192,6 +205,11 @@ func (o *PauseInstanceForbidden) IsCode(code int) bool {
 	return code == 403
 }
 
+// Code gets the status code for the pause instance forbidden response
+func (o *PauseInstanceForbidden) Code() int {
+	return 403
+}
+
 func (o *PauseInstanceForbidden) Error() string {
 	return fmt.Sprintf("[PUT /instances/{id}/pause][%d] pauseInstanceForbidden ", 403)
 }
@@ -210,7 +228,8 @@ func NewPauseInstanceNotFound() *PauseInstanceNotFound {
 	return &PauseInstanceNotFound{}
 }
 
-/* PauseInstanceNotFound describes a response with status code 404, with default header values.
+/*
+PauseInstanceNotFound describes a response with status code 404, with default header values.
 
 PauseInstanceNotFound pause instance not found
 */
@@ -242,6 +261,11 @@ func (o *PauseInstanceNotFound) IsCode(code int) bool {
 	return code == 404
 }
 
+// Code gets the status code for the pause instance not found response
+func (o *PauseInstanceNotFound) Code() int {
+	return 404
+}
+
 func (o *PauseInstanceNotFound) Error() string {
 	return fmt.Sprintf("[PUT /instances/{id}/pause][%d] pauseInstanceNotFound ", 404)
 }
@@ -260,7 +284,8 @@ func NewPauseInstanceUnsupportedMediaType() *PauseInstanceUnsupportedMediaType {
 	return &PauseInstanceUnsupportedMediaType{}
 }
 
-/* PauseInstanceUnsupportedMediaType describes a response with status code 415, with default header values.
+/*
+PauseInstanceUnsupportedMediaType describes a response with status code 415, with default header values.
 
 PauseInstanceUnsupportedMediaType pause instance unsupported media type
 */
@@ -290,6 +315,11 @@ func (o *PauseInstanceUnsupportedMediaType) IsServerError() bool {
 // IsCode returns true when this pause instance unsupported media type response a status code equal to that given
 func (o *PauseInstanceUnsupportedMediaType) IsCode(code int) bool {
 	return code == 415
+}
+
+// Code gets the status code for the pause instance unsupported media type response
+func (o *PauseInstanceUnsupportedMediaType) Code() int {
+	return 415
 }
 
 func (o *PauseInstanceUnsupportedMediaType) Error() string {

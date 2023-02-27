@@ -63,12 +63,13 @@ func NewFindByIDOK() *FindByIDOK {
 	return &FindByIDOK{}
 }
 
-/* FindByIDOK describes a response with status code 200, with default header values.
+/*
+FindByIDOK describes a response with status code 200, with default header values.
 
 Instance
 */
 type FindByIDOK struct {
-	Payload *models.Instance
+	Payload models.Instance
 }
 
 // IsSuccess returns true when this find by Id o k response has a 2xx status code
@@ -96,6 +97,11 @@ func (o *FindByIDOK) IsCode(code int) bool {
 	return code == 200
 }
 
+// Code gets the status code for the find by Id o k response
+func (o *FindByIDOK) Code() int {
+	return 200
+}
+
 func (o *FindByIDOK) Error() string {
 	return fmt.Sprintf("[GET /instances/{id}][%d] findByIdOK  %+v", 200, o.Payload)
 }
@@ -104,16 +110,14 @@ func (o *FindByIDOK) String() string {
 	return fmt.Sprintf("[GET /instances/{id}][%d] findByIdOK  %+v", 200, o.Payload)
 }
 
-func (o *FindByIDOK) GetPayload() *models.Instance {
+func (o *FindByIDOK) GetPayload() models.Instance {
 	return o.Payload
 }
 
 func (o *FindByIDOK) readResponse(response runtime.ClientResponse, consumer runtime.Consumer, formats strfmt.Registry) error {
 
-	o.Payload = new(models.Instance)
-
 	// response payload
-	if err := consumer.Consume(response.Body(), o.Payload); err != nil && err != io.EOF {
+	if err := consumer.Consume(response.Body(), &o.Payload); err != nil && err != io.EOF {
 		return err
 	}
 
@@ -125,7 +129,8 @@ func NewFindByIDUnauthorized() *FindByIDUnauthorized {
 	return &FindByIDUnauthorized{}
 }
 
-/* FindByIDUnauthorized describes a response with status code 401, with default header values.
+/*
+FindByIDUnauthorized describes a response with status code 401, with default header values.
 
 FindByIDUnauthorized find by Id unauthorized
 */
@@ -157,6 +162,11 @@ func (o *FindByIDUnauthorized) IsCode(code int) bool {
 	return code == 401
 }
 
+// Code gets the status code for the find by Id unauthorized response
+func (o *FindByIDUnauthorized) Code() int {
+	return 401
+}
+
 func (o *FindByIDUnauthorized) Error() string {
 	return fmt.Sprintf("[GET /instances/{id}][%d] findByIdUnauthorized ", 401)
 }
@@ -175,7 +185,8 @@ func NewFindByIDForbidden() *FindByIDForbidden {
 	return &FindByIDForbidden{}
 }
 
-/* FindByIDForbidden describes a response with status code 403, with default header values.
+/*
+FindByIDForbidden describes a response with status code 403, with default header values.
 
 FindByIDForbidden find by Id forbidden
 */
@@ -207,6 +218,11 @@ func (o *FindByIDForbidden) IsCode(code int) bool {
 	return code == 403
 }
 
+// Code gets the status code for the find by Id forbidden response
+func (o *FindByIDForbidden) Code() int {
+	return 403
+}
+
 func (o *FindByIDForbidden) Error() string {
 	return fmt.Sprintf("[GET /instances/{id}][%d] findByIdForbidden ", 403)
 }
@@ -225,7 +241,8 @@ func NewFindByIDNotFound() *FindByIDNotFound {
 	return &FindByIDNotFound{}
 }
 
-/* FindByIDNotFound describes a response with status code 404, with default header values.
+/*
+FindByIDNotFound describes a response with status code 404, with default header values.
 
 FindByIDNotFound find by Id not found
 */
@@ -257,6 +274,11 @@ func (o *FindByIDNotFound) IsCode(code int) bool {
 	return code == 404
 }
 
+// Code gets the status code for the find by Id not found response
+func (o *FindByIDNotFound) Code() int {
+	return 404
+}
+
 func (o *FindByIDNotFound) Error() string {
 	return fmt.Sprintf("[GET /instances/{id}][%d] findByIdNotFound ", 404)
 }
@@ -275,7 +297,8 @@ func NewFindByIDUnsupportedMediaType() *FindByIDUnsupportedMediaType {
 	return &FindByIDUnsupportedMediaType{}
 }
 
-/* FindByIDUnsupportedMediaType describes a response with status code 415, with default header values.
+/*
+FindByIDUnsupportedMediaType describes a response with status code 415, with default header values.
 
 FindByIDUnsupportedMediaType find by Id unsupported media type
 */
@@ -305,6 +328,11 @@ func (o *FindByIDUnsupportedMediaType) IsServerError() bool {
 // IsCode returns true when this find by Id unsupported media type response a status code equal to that given
 func (o *FindByIDUnsupportedMediaType) IsCode(code int) bool {
 	return code == 415
+}
+
+// Code gets the status code for the find by Id unsupported media type response
+func (o *FindByIDUnsupportedMediaType) Code() int {
+	return 415
 }
 
 func (o *FindByIDUnsupportedMediaType) Error() string {

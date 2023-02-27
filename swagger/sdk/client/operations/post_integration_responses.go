@@ -7,7 +7,6 @@ package operations
 
 import (
 	"fmt"
-	"io"
 
 	"github.com/go-openapi/runtime"
 	"github.com/go-openapi/strfmt"
@@ -55,12 +54,12 @@ func NewPostIntegrationOK() *PostIntegrationOK {
 	return &PostIntegrationOK{}
 }
 
-/* PostIntegrationOK describes a response with status code 200, with default header values.
+/*
+PostIntegrationOK describes a response with status code 200, with default header values.
 
 PostIntegrationOK post integration o k
 */
 type PostIntegrationOK struct {
-	Payload interface{}
 }
 
 // IsSuccess returns true when this post integration o k response has a 2xx status code
@@ -88,24 +87,20 @@ func (o *PostIntegrationOK) IsCode(code int) bool {
 	return code == 200
 }
 
+// Code gets the status code for the post integration o k response
+func (o *PostIntegrationOK) Code() int {
+	return 200
+}
+
 func (o *PostIntegrationOK) Error() string {
-	return fmt.Sprintf("[POST /integrations][%d] postIntegrationOK  %+v", 200, o.Payload)
+	return fmt.Sprintf("[POST /integrations][%d] postIntegrationOK ", 200)
 }
 
 func (o *PostIntegrationOK) String() string {
-	return fmt.Sprintf("[POST /integrations][%d] postIntegrationOK  %+v", 200, o.Payload)
-}
-
-func (o *PostIntegrationOK) GetPayload() interface{} {
-	return o.Payload
+	return fmt.Sprintf("[POST /integrations][%d] postIntegrationOK ", 200)
 }
 
 func (o *PostIntegrationOK) readResponse(response runtime.ClientResponse, consumer runtime.Consumer, formats strfmt.Registry) error {
-
-	// response payload
-	if err := consumer.Consume(response.Body(), &o.Payload); err != nil && err != io.EOF {
-		return err
-	}
 
 	return nil
 }
@@ -115,7 +110,8 @@ func NewPostIntegrationUnauthorized() *PostIntegrationUnauthorized {
 	return &PostIntegrationUnauthorized{}
 }
 
-/* PostIntegrationUnauthorized describes a response with status code 401, with default header values.
+/*
+PostIntegrationUnauthorized describes a response with status code 401, with default header values.
 
 PostIntegrationUnauthorized post integration unauthorized
 */
@@ -147,6 +143,11 @@ func (o *PostIntegrationUnauthorized) IsCode(code int) bool {
 	return code == 401
 }
 
+// Code gets the status code for the post integration unauthorized response
+func (o *PostIntegrationUnauthorized) Code() int {
+	return 401
+}
+
 func (o *PostIntegrationUnauthorized) Error() string {
 	return fmt.Sprintf("[POST /integrations][%d] postIntegrationUnauthorized ", 401)
 }
@@ -165,7 +166,8 @@ func NewPostIntegrationForbidden() *PostIntegrationForbidden {
 	return &PostIntegrationForbidden{}
 }
 
-/* PostIntegrationForbidden describes a response with status code 403, with default header values.
+/*
+PostIntegrationForbidden describes a response with status code 403, with default header values.
 
 PostIntegrationForbidden post integration forbidden
 */
@@ -197,6 +199,11 @@ func (o *PostIntegrationForbidden) IsCode(code int) bool {
 	return code == 403
 }
 
+// Code gets the status code for the post integration forbidden response
+func (o *PostIntegrationForbidden) Code() int {
+	return 403
+}
+
 func (o *PostIntegrationForbidden) Error() string {
 	return fmt.Sprintf("[POST /integrations][%d] postIntegrationForbidden ", 403)
 }
@@ -215,7 +222,8 @@ func NewPostIntegrationUnsupportedMediaType() *PostIntegrationUnsupportedMediaTy
 	return &PostIntegrationUnsupportedMediaType{}
 }
 
-/* PostIntegrationUnsupportedMediaType describes a response with status code 415, with default header values.
+/*
+PostIntegrationUnsupportedMediaType describes a response with status code 415, with default header values.
 
 PostIntegrationUnsupportedMediaType post integration unsupported media type
 */
@@ -245,6 +253,11 @@ func (o *PostIntegrationUnsupportedMediaType) IsServerError() bool {
 // IsCode returns true when this post integration unsupported media type response a status code equal to that given
 func (o *PostIntegrationUnsupportedMediaType) IsCode(code int) bool {
 	return code == 415
+}
+
+// Code gets the status code for the post integration unsupported media type response
+func (o *PostIntegrationUnsupportedMediaType) Code() int {
+	return 415
 }
 
 func (o *PostIntegrationUnsupportedMediaType) Error() string {

@@ -4,4 +4,4 @@ set -euo pipefail
 
 source ./auth.sh
 
-$HTTP "$INSTANCE_HOST/stacks" "Authorization: Bearer $ACCESS_TOKEN"
+$HTTP get "$IM_HOST/stacks" "Authorization: Bearer $ACCESS_TOKEN"
