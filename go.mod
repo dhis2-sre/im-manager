@@ -16,7 +16,7 @@ require (
 	github.com/jackc/pgconn v1.14.0
 	github.com/lestrrat-go/jwx v1.2.25
 	github.com/rabbitmq/amqp091-go v1.7.0
-	github.com/stretchr/testify v1.8.1
+	github.com/stretchr/testify v1.8.2
 	go.mozilla.org/sops/v3 v3.7.3
 	golang.org/x/exp v0.0.0-20230213192124-5e25df0256eb
 	gorm.io/driver/postgres v1.4.8
