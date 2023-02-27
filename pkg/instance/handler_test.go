@@ -1,141 +1,142 @@
 package instance
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
+	"github.com/dhis2-sre/im-manager/pkg/config"
+
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	"github.com/dhis2-sre/im-user/swagger/sdk/models"
 	"github.com/gin-gonic/gin"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"gorm.io/gorm"
 )
 
-func TestHandler_List_ServiceError(t *testing.T) {
+func TestHandler_ListInstances(t *testing.T) {
+	repository := &mockRepository{}
 	groups := []*models.Group{
+		{Name: "group name"},
+	}
+	groupsWithInstances := []GroupWithInstances{
 		{
-			Name:     "name",
-			Hostname: "hostname",
+			Name: "group name",
+			Instances: []*model.Instance{
+				{
+					Model:     gorm.Model{ID: 1},
+					Name:      "instance name",
+					GroupName: "group name",
+				},
+			},
 		},
 	}
-
-	service := &mockInstanceService{}
-	errorMessage := "some error"
-	service.
-		On("FindInstances", groups, false).
-		Return(nil, errors.New(errorMessage))
-
+	repository.
+		On("FindByGroups", groups, false).
+		Return(groupsWithInstances, nil)
+	service := NewService(config.Config{}, repository, nil, nil, nil)
 	handler := NewHandler(nil, service, nil)
 
 	w := httptest.NewRecorder()
-	c, _ := gin.CreateTestContext(w)
-	c.Set("user", &models.User{Groups: groups})
+	c := newContext(w, "group name")
 
 	handler.ListInstances(c)
 
-	assert.Empty(t, w.Body.Bytes())
-	assert.NotEmpty(t, c.Errors)
-
-	service.AssertExpectations(t)
+	require.Empty(t, c.Errors)
+	assertResponse(t, w, http.StatusOK, groupsWithInstances)
+	repository.AssertExpectations(t)
 }
 
-func TestHandler_List(t *testing.T) {
+func TestHandler_ListInstances_RepositoryError(t *testing.T) {
 	groups := []*models.Group{
-		{
-			Name:     "name",
-			Hostname: "hostname",
-		},
+		{Name: "group name"},
 	}
-
-	instances := []*model.Instance{
-		{
-			Model:     gorm.Model{ID: 1},
-			Name:      "some name",
-			GroupName: groups[0].Name,
-		},
-	}
-
-	service := &mockInstanceService{}
-	service.
-		On("FindInstances", groups, false).
-		Return(instances, nil)
-
+	repository := &mockRepository{}
+	repository.
+		On("FindByGroups", groups, false).
+		Return(nil, errors.New("some error"))
+	service := NewService(config.Config{}, repository, nil, nil, nil)
 	handler := NewHandler(nil, service, nil)
 
 	w := httptest.NewRecorder()
-	c, _ := gin.CreateTestContext(w)
-	c.Set("user", &models.User{Groups: groups})
+	c := newContext(w, "group name")
 
 	handler.ListInstances(c)
 
-	assert.Empty(t, c.Errors)
-	assert.Equal(t, http.StatusOK, w.Code)
-	var body []GroupWithInstances
-	err := json.Unmarshal(w.Body.Bytes(), &body)
+	require.Empty(t, w.Body.Bytes())
+	require.Len(t, c.Errors, 1)
+	require.ErrorContains(t, c.Errors[0].Err, "some error")
+	repository.AssertExpectations(t)
+}
+
+func newContext(w *httptest.ResponseRecorder, group string) *gin.Context {
+	user := &models.User{
+		ID: uint64(1),
+		Groups: []*models.Group{
+			{Name: group},
+		},
+	}
+	c, _ := gin.CreateTestContext(w)
+	c.Set("user", user)
+	return c
+}
+
+func assertResponse[V any](t *testing.T, rec *httptest.ResponseRecorder, expectedCode int, expectedBody V) {
+	require.Equal(t, expectedCode, rec.Code, "HTTP status code does not match")
+	assertJSON(t, rec.Body, expectedBody)
+}
+
+func assertJSON[V any](t *testing.T, body *bytes.Buffer, expected V) {
+	actualBody := new(V)
+	err := json.Unmarshal(body.Bytes(), &actualBody)
 	require.NoError(t, err)
-	//	assert.Equal(t, groupsWithInstances(groups, instances), body)
-
-	service.AssertExpectations(t)
+	require.Equal(t, expected, *actualBody, "HTTP response body does not match")
 }
 
-type mockInstanceService struct{ mock.Mock }
+type mockRepository struct{ mock.Mock }
 
-func (m *mockInstanceService) ConsumeParameters(source, destination *model.Instance) error {
+func (m *mockRepository) Link(firstInstance, secondInstance *model.Instance) error {
 	panic("implement me")
 }
 
-func (m *mockInstanceService) Pause(token string, instance *model.Instance) error {
+func (m *mockRepository) Unlink(instance *model.Instance) error {
 	panic("implement me")
 }
 
-func (m *mockInstanceService) Restart(token string, instance *model.Instance, typeSelector string) error {
+func (m *mockRepository) Save(instance *model.Instance) error {
 	panic("implement me")
 }
 
-func (m *mockInstanceService) Save(instance *model.Instance) (*model.Instance, error) {
+func (m *mockRepository) FindById(id uint) (*model.Instance, error) {
 	panic("implement me")
 }
 
-func (m *mockInstanceService) Deploy(token string, instance *model.Instance) error {
+func (m *mockRepository) FindByIdDecrypted(id uint) (*model.Instance, error) {
 	panic("implement me")
 }
 
-func (m *mockInstanceService) FindById(id uint) (*model.Instance, error) {
+func (m *mockRepository) FindByNameAndGroup(instance string, group string) (*model.Instance, error) {
 	panic("implement me")
 }
 
-func (m *mockInstanceService) FindByIdDecrypted(id uint) (*model.Instance, error) {
-	panic("implement me")
-}
-
-func (m *mockInstanceService) FindByNameAndGroup(instance string, group string) (*model.Instance, error) {
-	panic("implement me")
-}
-
-func (m *mockInstanceService) Delete(token string, id uint) error {
-	panic("implement me")
-}
-
-func (m *mockInstanceService) Logs(instance *model.Instance, group *models.Group, typeSelector string) (io.ReadCloser, error) {
-	panic("implement me")
-}
-
-func (m *mockInstanceService) FindInstances(user *models.User, presets bool) ([]GroupWithInstances, error) {
-	called := m.Called(user, presets)
-	instances, ok := called.Get(0).([]GroupWithInstances)
+func (m *mockRepository) FindByGroups(groups []*models.Group, presets bool) ([]GroupWithInstances, error) {
+	called := m.Called(groups, presets)
+	groupsWithInstances, ok := called.Get(0).([]GroupWithInstances)
 	if ok {
-		return instances, nil
+		return groupsWithInstances, nil
 	} else {
 		return nil, called.Error(1)
 	}
 }
 
-func (m *mockInstanceService) Link(source, destination *model.Instance) error {
+func (m *mockRepository) SaveDeployLog(instance *model.Instance, log string) error {
+	panic("implement me")
+}
+
+func (m *mockRepository) Delete(id uint) error {
 	panic("implement me")
 }
