@@ -50,6 +50,7 @@ releases:
           flyway.repair_before_migration = {{ env "FLYWAY_REPAIR_BEFORE_MIGRATION" | default false }}
           {{- if eq (env "INSTALL_REDIS" | default "false") "true" }}
           redis.enabled = on
+          redis.cache.invalidation.enabled = on
           redis.host = {{ requiredEnv "INSTANCE_NAME" }}-redis-master.{{ requiredEnv "INSTANCE_NAMESPACE" }}.svc
           redis.port = 6379
           {{ end }}
