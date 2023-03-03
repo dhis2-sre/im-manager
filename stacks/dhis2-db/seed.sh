@@ -23,7 +23,7 @@ if [[ -n $DATABASE_ID ]]; then
   (gunzip -v -c "$tmp_file" | psql -U postgres -d "$DATABASE_NAME") || true
   rm "$tmp_file"
 
-  ## Change ownership of database entities
+  ## Grant access to the "dhis" user
   exec_psql "grant all privileges on all tables in schema public to dhis"
   exec_psql "grant all privileges on all sequences in schema public to dhis"
   # At some point we needed to grant access to view while deploying using IM, I'm leaving the below here as an easy fix in case the problem shows up here
