@@ -111,8 +111,6 @@ definitions:
         x-go-package: github.com/dhis2-sre/im-manager/pkg/model
     Model:
         description: |-
-            Model a basic GoLang struct which includes the following fields: ID, CreatedAt, UpdatedAt, DeletedAt
-            It may be embedded into your model or you may build your own model without it
             type User struct {
             gorm.Model
             }
@@ -128,6 +126,9 @@ definitions:
             UpdatedAt:
                 format: date-time
                 type: string
+        title: |-
+            Model a basic GoLang struct which includes the following fields: ID, CreatedAt, UpdatedAt, DeletedAt
+            It may be embedded into your model or you may build your own model without it
         type: object
         x-go-package: gorm.io/gorm
     NullTime:
