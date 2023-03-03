@@ -17,7 +17,6 @@ IMAGE_REPOSITORY=${IMAGE_REPOSITORY:-core}
 IMAGE_TAG=${IMAGE_TAG:-2.39.0}
 IMAGE_PULL_POLICY=${IMAGE_PULL_POLICY:-IfNotPresent}
 DATABASE_SIZE=${DATABASE_SIZE:-10Gi}
-INSTALL_PGADMIN=${INSTALL_PGADMIN:-false}
 DATABASE_ID=${DATABASE_ID:-2}
 INSTANCE_TTL=${INSTANCE_TTL:-""}
 
@@ -49,10 +48,6 @@ echo "{
     {
       \"name\": \"DATABASE_SIZE\",
       \"value\": \"$DATABASE_SIZE\"
-    },
-    {
-      \"name\": \"INSTALL_PGADMIN\",
-      \"value\": \"$INSTALL_PGADMIN\"
     },
     {
        \"name\": \"INSTANCE_TTL\",
