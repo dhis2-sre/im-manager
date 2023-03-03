@@ -7,15 +7,6 @@ function exec_psql() {
 }
 
 if [[ -n $DATABASE_ID ]]; then
-  table_exists=$(exec_psql "select exists (select from information_schema.tables where table_schema = 'schema_name' and table_name = 'table_name')")
-  if [[ $table_exists = true ]]; then
-    row_count=$(exec_psql "select count(*) from organisationunit")
-    if [[ $row_count -ne 0 ]]; then
-      echo "Seeding aborted!"
-      exit 0
-    fi
-  fi
-
   DATABASE_MANAGER_ABSOLUTE_URL="$DATABASE_MANAGER_URL/databases/$DATABASE_ID/download"
   echo "DATABASE_MANAGER_ABSOLUTE_URL: $DATABASE_MANAGER_ABSOLUTE_URL"
 
