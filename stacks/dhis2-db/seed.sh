@@ -23,26 +23,9 @@ if [[ -n $DATABASE_ID ]]; then
   (gunzip -v -c "$tmp_file" | psql -U postgres -d "$DATABASE_NAME") || true
   rm "$tmp_file"
 
-  ## Change ownership to $DATABASE_USERNAME
-  # Tables
-  entities=$(exec_psql "select tablename from pg_tables where schemaname = 'public'")
-  for entity in $entities; do
-    echo "Changing owner of $entity to $DATABASE_USERNAME"
-    exec_psql "alter table \"$entity\" owner to $DATABASE_USERNAME"
-  done
-
-  # Sequences
-  entities=$(exec_psql "select sequence_name from information_schema.sequences where sequence_schema = 'public'")
-  for entity in $entities; do
-    echo "Changing owner of $entity to $DATABASE_USERNAME"
-    exec_psql "alter sequence \"$entity\" owner to $DATABASE_USERNAME"
-  done
-
-  # Views
-  entities=$(exec_psql "select table_name from information_schema.views where table_schema = 'public'")
-  for entity in $entities; do
-    echo "Changing owner of $entity to $DATABASE_USERNAME"
-    exec_psql "alter view \"$entity\" owner to $DATABASE_USERNAME"
-  done
-
+  ## Change ownership of database entities
+  exec_psql "grant all privileges on all tables in schema public to dhis"
+  exec_psql "grant all privileges on all sequences in schema public to dhis"
+  # At some point we needed to grant access to view while deploying using IM, I'm leaving the below here as an easy fix in case the problem shows up here
+  #psql -At -d dhis2 -c "SELECT 'GRANT ALL ON '||viewname||' TO dhis;' FROM pg_views WHERE schemaname='public';" | psql -d dhis2
 fi
