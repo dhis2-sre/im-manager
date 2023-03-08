@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -128,6 +129,31 @@ func TestHandler_ListPresets_RepositoryError(t *testing.T) {
 	repository.AssertExpectations(t)
 }
 
+func TestHandler_FindById(t *testing.T) {
+	repository := &mockRepository{}
+	instance := &model.Instance{
+		Model:     gorm.Model{ID: 1},
+		Name:      "instance name",
+		GroupName: "group name",
+	}
+	repository.
+		On("FindById", uint(1)).
+		Return(instance, nil)
+	service := NewService(config.Config{}, repository, nil, nil, nil)
+	handler := NewHandler(nil, service, nil)
+
+	w := httptest.NewRecorder()
+	c := newContext(w, "group name")
+	c.AddParam("id", "1")
+
+	handler.FindById(c)
+
+	log.Println(c.Errors.String())
+	require.Empty(t, c.Errors)
+	assertResponse(t, w, http.StatusOK, instance)
+	repository.AssertExpectations(t)
+}
+
 func newContext(w *httptest.ResponseRecorder, group string) *gin.Context {
 	user := &models.User{
 		ID: uint64(1),
@@ -167,7 +193,8 @@ func (m *mockRepository) Save(instance *model.Instance) error {
 }
 
 func (m *mockRepository) FindById(id uint) (*model.Instance, error) {
-	panic("implement me")
+	called := m.Called(id)
+	return called.Get(0).(*model.Instance), nil
 }
 
 func (m *mockRepository) FindByIdDecrypted(id uint) (*model.Instance, error) {
