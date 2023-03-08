@@ -20,6 +20,7 @@ exec_psql "create extension if not exists btree_gin"
 
 tmp_file=$(mktemp)
 curl --connect-timeout 10 --retry 5 --retry-delay 1 --fail -L "$DATABASE_MANAGER_ABSOLUTE_URL" -H "Authorization: $IM_ACCESS_TOKEN" >"$tmp_file"
+
 # Try pg_restore... Or gzipped sql
 # pg_restore often returns a non zero return code due to benign errors resulting in executing of gunzip despite the restore being successful
 # gunzip will fail because the input isn't gzipped causing the whole seed script to fail... Which is why there's a "|| true" at the end
