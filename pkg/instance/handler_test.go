@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"os/exec"
 	"testing"
 
 	"github.com/dhis2-sre/im-manager/pkg/config"
@@ -17,6 +18,67 @@ import (
 	"github.com/stretchr/testify/require"
 	"gorm.io/gorm"
 )
+
+func TestHandler_Deploy(t *testing.T) {
+	userClient := &mockUserClient{}
+	group := &models.Group{
+		Name:                 "group name",
+		ClusterConfiguration: &models.ClusterConfiguration{},
+	}
+	userClient.
+		On("FindGroupByName", "token", "group name").
+		Return(group, nil)
+	helmfileService := &mockHelmfileService{}
+	instance := &model.Instance{
+		Name:      "instance-name",
+		GroupName: "group name",
+		StackName: "instance stack",
+		UserID:    1,
+	}
+	helmfileService.
+		On("sync", "token", instance, group).
+		Return(exec.Command("echo", "-n", ""), nil)
+	repository := &mockRepository{}
+	repository.
+		On("FindByIdDecrypted", uint(0)).
+		Return(instance, nil)
+	repository.
+		On("Save", instance).
+		Return(nil)
+	repository.
+		On("SaveDeployLog", instance, "").
+		Return(nil)
+	service := NewService(config.Config{}, repository, userClient, nil, helmfileService)
+	handler := NewHandler(nil, service, nil)
+
+	w := httptest.NewRecorder()
+	c := newContext(w, "group name")
+	c.AddParam("id", "1")
+	c.Request = newPost(t, "", &DeployInstanceRequest{
+		Name:  "instance-name",
+		Group: "group name",
+		Stack: "instance stack",
+	})
+
+	handler.Deploy(c)
+
+	require.Empty(t, c.Errors)
+	require.Equal(t, http.StatusCreated, w.Code)
+	repository.AssertExpectations(t)
+}
+
+func newPost(t *testing.T, path string, jsonBody any) *http.Request {
+	body, err := json.Marshal(jsonBody)
+	require.NoError(t, err)
+
+	req, err := http.NewRequest(http.MethodPost, path, bytes.NewReader(body))
+	require.NoError(t, err)
+
+	req.Header.Set("Content-Type", "application/json; charset=UTF-8")
+	req.Header.Set("Authorization", "token")
+
+	return req
+}
 
 func TestHandler_ListInstances(t *testing.T) {
 	repository := &mockRepository{}
@@ -278,7 +340,8 @@ func (m *mockRepository) Unlink(instance *model.Instance) error {
 }
 
 func (m *mockRepository) Save(instance *model.Instance) error {
-	panic("implement me")
+	called := m.Called(instance)
+	return called.Error(0)
 }
 
 func (m *mockRepository) FindById(id uint) (*model.Instance, error) {
@@ -307,10 +370,29 @@ func (m *mockRepository) FindByGroups(groups []*models.Group, presets bool) ([]G
 }
 
 func (m *mockRepository) SaveDeployLog(instance *model.Instance, log string) error {
-	panic("implement me")
+	called := m.Called(instance, log)
+	return called.Error(0)
 }
 
 func (m *mockRepository) Delete(id uint) error {
 	called := m.Called(id)
 	return called.Error(0)
+}
+
+type mockUserClient struct{ mock.Mock }
+
+func (m *mockUserClient) FindGroupByName(token string, name string) (*models.Group, error) {
+	called := m.Called(token, name)
+	return called.Get(0).(*models.Group), nil
+}
+
+type mockHelmfileService struct{ mock.Mock }
+
+func (m *mockHelmfileService) sync(token string, instance *model.Instance, group *models.Group) (*exec.Cmd, error) {
+	called := m.Called(token, instance, group)
+	return called.Get(0).(*exec.Cmd), nil
+}
+
+func (m *mockHelmfileService) destroy(token string, instance *model.Instance, group *models.Group) (*exec.Cmd, error) {
+	panic("implement me")
 }
