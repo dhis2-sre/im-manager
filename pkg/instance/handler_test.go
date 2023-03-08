@@ -73,6 +73,39 @@ func TestHandler_ListInstances_RepositoryError(t *testing.T) {
 	repository.AssertExpectations(t)
 }
 
+func TestHandler_ListPresets(t *testing.T) {
+	repository := &mockRepository{}
+	groups := []*models.Group{
+		{Name: "group name"},
+	}
+	groupsWithInstances := []GroupWithInstances{
+		{
+			Name: "group name",
+			Instances: []*model.Instance{
+				{
+					Model:     gorm.Model{ID: 1},
+					Name:      "instance name",
+					GroupName: "group name",
+				},
+			},
+		},
+	}
+	repository.
+		On("FindByGroups", groups, true).
+		Return(groupsWithInstances, nil)
+	service := NewService(config.Config{}, repository, nil, nil, nil)
+	handler := NewHandler(nil, service, nil)
+
+	w := httptest.NewRecorder()
+	c := newContext(w, "group name")
+
+	handler.ListPresets(c)
+
+	require.Empty(t, c.Errors)
+	assertResponse(t, w, http.StatusOK, groupsWithInstances)
+	repository.AssertExpectations(t)
+}
+
 func newContext(w *httptest.ResponseRecorder, group string) *gin.Context {
 	user := &models.User{
 		ID: uint64(1),
