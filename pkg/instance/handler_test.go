@@ -177,6 +177,31 @@ func TestHandler_FindByIdDecrypted(t *testing.T) {
 	repository.AssertExpectations(t)
 }
 
+func TestHandler_NameToId(t *testing.T) {
+	repository := &mockRepository{}
+	instance := &model.Instance{
+		Model:     gorm.Model{ID: 1},
+		Name:      "instance name",
+		GroupName: "group name",
+	}
+	repository.
+		On("FindByNameAndGroup", "instance name", "group name").
+		Return(instance, nil)
+	service := NewService(config.Config{}, repository, nil, nil, nil)
+	handler := NewHandler(nil, service, nil)
+
+	w := httptest.NewRecorder()
+	c := newContext(w, "group name")
+	c.AddParam("groupName", "group name")
+	c.AddParam("instanceName", "instance name")
+
+	handler.NameToId(c)
+
+	require.Empty(t, c.Errors)
+	assertResponse(t, w, http.StatusOK, 1)
+	repository.AssertExpectations(t)
+}
+
 func newContext(w *httptest.ResponseRecorder, group string) *gin.Context {
 	user := &models.User{
 		ID: uint64(1),
@@ -226,7 +251,8 @@ func (m *mockRepository) FindByIdDecrypted(id uint) (*model.Instance, error) {
 }
 
 func (m *mockRepository) FindByNameAndGroup(instance string, group string) (*model.Instance, error) {
-	panic("implement me")
+	called := m.Called(instance, group)
+	return called.Get(0).(*model.Instance), nil
 }
 
 func (m *mockRepository) FindByGroups(groups []*models.Group, presets bool) ([]GroupWithInstances, error) {
