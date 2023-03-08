@@ -202,6 +202,46 @@ func TestHandler_NameToId(t *testing.T) {
 	repository.AssertExpectations(t)
 }
 
+func TestHandler_Delete(t *testing.T) {
+	repository := &mockRepository{}
+	instance := &model.Instance{
+		Model:     gorm.Model{ID: 1},
+		UserID:    1,
+		Name:      "instance name",
+		GroupName: "group name",
+	}
+	repository.
+		On("FindById", uint(1)).
+		Return(instance, nil)
+	repository.
+		On("FindByIdDecrypted", uint(1)).
+		Return(instance, nil)
+	repository.
+		On("Unlink", &model.Instance{
+			Model: gorm.Model{ID: 1},
+		}).
+		Return(nil)
+	repository.
+		On("Delete", uint(1)).
+		Return(nil)
+	service := NewService(config.Config{}, repository, nil, nil, nil)
+	handler := NewHandler(nil, service, nil)
+
+	w := httptest.NewRecorder()
+	c := newContext(w, "group name")
+	c.AddParam("id", "1")
+	request, err := http.NewRequest(http.MethodDelete, "", nil)
+	require.NoError(t, err)
+	request.Header.Set("Authorization", "token")
+	c.Request = request
+
+	handler.Delete(c)
+
+	require.Empty(t, c.Errors)
+	require.Equal(t, http.StatusOK, w.Code)
+	repository.AssertExpectations(t)
+}
+
 func newContext(w *httptest.ResponseRecorder, group string) *gin.Context {
 	user := &models.User{
 		ID: uint64(1),
@@ -233,7 +273,8 @@ func (m *mockRepository) Link(firstInstance, secondInstance *model.Instance) err
 }
 
 func (m *mockRepository) Unlink(instance *model.Instance) error {
-	panic("implement me")
+	called := m.Called(instance)
+	return called.Error(0)
 }
 
 func (m *mockRepository) Save(instance *model.Instance) error {
@@ -270,5 +311,6 @@ func (m *mockRepository) SaveDeployLog(instance *model.Instance, log string) err
 }
 
 func (m *mockRepository) Delete(id uint) error {
-	panic("implement me")
+	called := m.Called(id)
+	return called.Error(0)
 }
