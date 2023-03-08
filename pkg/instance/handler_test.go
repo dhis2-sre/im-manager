@@ -67,6 +67,57 @@ func TestHandler_Deploy(t *testing.T) {
 	repository.AssertExpectations(t)
 }
 
+func TestHandler_Update(t *testing.T) {
+	userClient := &mockUserClient{}
+	group := &models.Group{
+		Name:                 "group name",
+		ClusterConfiguration: &models.ClusterConfiguration{},
+	}
+	userClient.
+		On("FindGroupByName", "token", "group name").
+		Return(group, nil)
+	helmfileService := &mockHelmfileService{}
+	instance := &model.Instance{
+		Model:     gorm.Model{ID: 1},
+		UserID:    1,
+		Name:      "instance-name",
+		GroupName: "group name",
+		StackName: "instance stack",
+	}
+	helmfileService.
+		On("sync", "token", instance, group).
+		Return(exec.Command("echo", "-n", ""), nil)
+	repository := &mockRepository{}
+	repository.
+		On("FindById", uint(1)).
+		Return(instance, nil)
+	repository.
+		On("FindByIdDecrypted", uint(1)).
+		Return(instance, nil)
+	repository.
+		On("Save", instance).
+		Return(nil)
+	repository.
+		On("SaveDeployLog", instance, "").
+		Return(nil)
+	service := NewService(config.Config{}, repository, userClient, nil, helmfileService)
+	handler := NewHandler(nil, service, nil)
+
+	w := httptest.NewRecorder()
+	c := newContext(w, "group name")
+	c.AddParam("id", "1")
+	c.Request = newPost(t, "", &UpdateInstanceRequest{
+		RequiredParameters: nil,
+		OptionalParameters: nil,
+	})
+
+	handler.Update(c)
+
+	require.Empty(t, c.Errors)
+	assertResponse(t, w, http.StatusAccepted, instance)
+	repository.AssertExpectations(t)
+}
+
 func newPost(t *testing.T, path string, jsonBody any) *http.Request {
 	body, err := json.Marshal(jsonBody)
 	require.NoError(t, err)
