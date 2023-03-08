@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"log"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -148,7 +147,6 @@ func TestHandler_FindById(t *testing.T) {
 
 	handler.FindById(c)
 
-	log.Println(c.Errors.String())
 	require.Empty(t, c.Errors)
 	assertResponse(t, w, http.StatusOK, instance)
 	repository.AssertExpectations(t)
