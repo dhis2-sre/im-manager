@@ -106,6 +106,28 @@ func TestHandler_ListPresets(t *testing.T) {
 	repository.AssertExpectations(t)
 }
 
+func TestHandler_ListPresets_RepositoryError(t *testing.T) {
+	groups := []*models.Group{
+		{Name: "group name"},
+	}
+	repository := &mockRepository{}
+	repository.
+		On("FindByGroups", groups, true).
+		Return(nil, errors.New("some error"))
+	service := NewService(config.Config{}, repository, nil, nil, nil)
+	handler := NewHandler(nil, service, nil)
+
+	w := httptest.NewRecorder()
+	c := newContext(w, "group name")
+
+	handler.ListPresets(c)
+
+	require.Empty(t, w.Body.Bytes())
+	require.Len(t, c.Errors, 1)
+	require.ErrorContains(t, c.Errors[0].Err, "some error")
+	repository.AssertExpectations(t)
+}
+
 func newContext(w *httptest.ResponseRecorder, group string) *gin.Context {
 	user := &models.User{
 		ID: uint64(1),
