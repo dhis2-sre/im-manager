@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os/exec"
@@ -18,6 +19,121 @@ import (
 	"github.com/stretchr/testify/require"
 	"gorm.io/gorm"
 )
+
+func TestHandler_Restart(t *testing.T) {
+	userClient := &mockUserClient{}
+	group := &models.Group{
+		Name:                 "group name",
+		ClusterConfiguration: &models.ClusterConfiguration{},
+	}
+	userClient.
+		On("FindGroupByName", "token", "group name").
+		Return(group, nil)
+	instance := &model.Instance{
+		Model:     gorm.Model{ID: 1},
+		Name:      "instance-name",
+		GroupName: "group name",
+		StackName: "instance stack",
+		UserID:    1,
+	}
+	repository := &mockRepository{}
+	repository.
+		On("FindById", uint(1)).
+		Return(instance, nil)
+	kubernetesService := &mockKubernetesService{}
+	kubernetesService.
+		On("loadConfiguration", group.ClusterConfiguration).
+		Return(nil)
+	kubernetesService.
+		On("restart", instance, "").
+		Return(nil)
+	service := NewService(config.Config{}, repository, userClient, nil, nil, kubernetesService)
+	handler := NewHandler(nil, service, nil)
+
+	w := httptest.NewRecorder()
+	c := newContext(w, "group name")
+	c.AddParam("id", "1")
+	request, err := http.NewRequest(http.MethodPut, "", nil)
+	require.NoError(t, err)
+	request.Header.Set("Authorization", "token")
+	c.Request = request
+
+	handler.Restart(c)
+
+	require.Empty(t, c.Errors)
+	require.Equal(t, http.StatusOK, w.Code)
+	kubernetesService.AssertExpectations(t)
+	repository.AssertExpectations(t)
+	userClient.AssertExpectations(t)
+}
+
+func TestHandler_Pause(t *testing.T) {
+	userClient := &mockUserClient{}
+	group := &models.Group{
+		Name:                 "group name",
+		ClusterConfiguration: &models.ClusterConfiguration{},
+	}
+	userClient.
+		On("FindGroupByName", "token", "group name").
+		Return(group, nil)
+	instance := &model.Instance{
+		Model:     gorm.Model{ID: 1},
+		Name:      "instance-name",
+		GroupName: "group name",
+		StackName: "instance stack",
+		UserID:    1,
+	}
+	repository := &mockRepository{}
+	repository.
+		On("FindById", uint(1)).
+		Return(instance, nil)
+	kubernetesService := &mockKubernetesService{}
+	kubernetesService.
+		On("loadConfiguration", group.ClusterConfiguration).
+		Return(nil)
+	kubernetesService.
+		On("pause", instance).
+		Return(nil)
+	service := NewService(config.Config{}, repository, userClient, nil, nil, kubernetesService)
+	handler := NewHandler(nil, service, nil)
+
+	w := httptest.NewRecorder()
+	c := newContext(w, "group name")
+	c.AddParam("id", "1")
+	request, err := http.NewRequest(http.MethodPut, "", nil)
+	require.NoError(t, err)
+	request.Header.Set("Authorization", "token")
+	c.Request = request
+
+	handler.Pause(c)
+
+	require.Empty(t, c.Errors)
+	require.Equal(t, http.StatusOK, w.Code)
+	kubernetesService.AssertExpectations(t)
+	repository.AssertExpectations(t)
+	userClient.AssertExpectations(t)
+}
+
+type mockKubernetesService struct{ mock.Mock }
+
+func (m *mockKubernetesService) loadConfiguration(config *models.ClusterConfiguration) error {
+	called := m.Called(config)
+	return called.Error(0)
+}
+
+func (m *mockKubernetesService) pause(instance *model.Instance) error {
+	called := m.Called(instance)
+	return called.Error(0)
+}
+
+func (m *mockKubernetesService) restart(instance *model.Instance, selector string) error {
+	called := m.Called(instance, selector)
+	return called.Error(0)
+}
+
+func (m *mockKubernetesService) getLogs(instance *model.Instance, selector string) (io.ReadCloser, error) {
+	panic("implement me")
+}
 
 func TestHandler_Deploy(t *testing.T) {
 	userClient := &mockUserClient{}
@@ -48,7 +164,7 @@ func TestHandler_Deploy(t *testing.T) {
 	repository.
 		On("SaveDeployLog", instance, "").
 		Return(nil)
-	service := NewService(config.Config{}, repository, userClient, nil, helmfileService)
+	service := NewService(config.Config{}, repository, userClient, nil, helmfileService, nil)
 	handler := NewHandler(nil, service, nil)
 
 	w := httptest.NewRecorder()
@@ -100,7 +216,7 @@ func TestHandler_Update(t *testing.T) {
 	repository.
 		On("SaveDeployLog", instance, "").
 		Return(nil)
-	service := NewService(config.Config{}, repository, userClient, nil, helmfileService)
+	service := NewService(config.Config{}, repository, userClient, nil, helmfileService, nil)
 	handler := NewHandler(nil, service, nil)
 
 	w := httptest.NewRecorder()
@@ -151,7 +267,7 @@ func TestHandler_ListInstances(t *testing.T) {
 	repository.
 		On("FindByGroups", groups, false).
 		Return(groupsWithInstances, nil)
-	service := NewService(config.Config{}, repository, nil, nil, nil)
+	service := NewService(config.Config{}, repository, nil, nil, nil, nil)
 	handler := NewHandler(nil, service, nil)
 
 	w := httptest.NewRecorder()
@@ -172,7 +288,7 @@ func TestHandler_ListInstances_RepositoryError(t *testing.T) {
 	repository.
 		On("FindByGroups", groups, false).
 		Return(nil, errors.New("some error"))
-	service := NewService(config.Config{}, repository, nil, nil, nil)
+	service := NewService(config.Config{}, repository, nil, nil, nil, nil)
 	handler := NewHandler(nil, service, nil)
 
 	w := httptest.NewRecorder()
@@ -206,7 +322,7 @@ func TestHandler_ListPresets(t *testing.T) {
 	repository.
 		On("FindByGroups", groups, true).
 		Return(groupsWithInstances, nil)
-	service := NewService(config.Config{}, repository, nil, nil, nil)
+	service := NewService(config.Config{}, repository, nil, nil, nil, nil)
 	handler := NewHandler(nil, service, nil)
 
 	w := httptest.NewRecorder()
@@ -227,7 +343,7 @@ func TestHandler_ListPresets_RepositoryError(t *testing.T) {
 	repository.
 		On("FindByGroups", groups, true).
 		Return(nil, errors.New("some error"))
-	service := NewService(config.Config{}, repository, nil, nil, nil)
+	service := NewService(config.Config{}, repository, nil, nil, nil, nil)
 	handler := NewHandler(nil, service, nil)
 
 	w := httptest.NewRecorder()
@@ -251,7 +367,7 @@ func TestHandler_FindById(t *testing.T) {
 	repository.
 		On("FindById", uint(1)).
 		Return(instance, nil)
-	service := NewService(config.Config{}, repository, nil, nil, nil)
+	service := NewService(config.Config{}, repository, nil, nil, nil, nil)
 	handler := NewHandler(nil, service, nil)
 
 	w := httptest.NewRecorder()
@@ -276,7 +392,7 @@ func TestHandler_FindByIdDecrypted(t *testing.T) {
 	repository.
 		On("FindByIdDecrypted", uint(1)).
 		Return(instance, nil)
-	service := NewService(config.Config{}, repository, nil, nil, nil)
+	service := NewService(config.Config{}, repository, nil, nil, nil, nil)
 	handler := NewHandler(nil, service, nil)
 
 	w := httptest.NewRecorder()
@@ -300,7 +416,7 @@ func TestHandler_NameToId(t *testing.T) {
 	repository.
 		On("FindByNameAndGroup", "instance name", "group name").
 		Return(instance, nil)
-	service := NewService(config.Config{}, repository, nil, nil, nil)
+	service := NewService(config.Config{}, repository, nil, nil, nil, nil)
 	handler := NewHandler(nil, service, nil)
 
 	w := httptest.NewRecorder()
@@ -337,7 +453,7 @@ func TestHandler_Delete(t *testing.T) {
 	repository.
 		On("Delete", uint(1)).
 		Return(nil)
-	service := NewService(config.Config{}, repository, nil, nil, nil)
+	service := NewService(config.Config{}, repository, nil, nil, nil, nil)
 	handler := NewHandler(nil, service, nil)
 
 	w := httptest.NewRecorder()

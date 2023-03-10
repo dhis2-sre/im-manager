@@ -21,6 +21,7 @@ func NewService(
 	userClient userClientService,
 	stackService stack.Service,
 	helmfileService helmfile,
+	kubernetesService KubernetesService,
 ) *service {
 	return &service{
 		config,
@@ -28,7 +29,15 @@ func NewService(
 		userClient,
 		stackService,
 		helmfileService,
+		kubernetesService,
 	}
+}
+
+type KubernetesService interface {
+	loadConfiguration(config *models.ClusterConfiguration) error
+	pause(instance *model.Instance) error
+	restart(instance *model.Instance, selector string) error
+	getLogs(instance *model.Instance, selector string) (io.ReadCloser, error)
 }
 
 type Repository interface {
@@ -58,6 +67,7 @@ type service struct {
 	userClient         userClientService
 	stackService       stack.Service
 	helmfileService    helmfile
+	kubernetesService  KubernetesService
 }
 
 func (s service) ConsumeParameters(source, destination *model.Instance) error {
@@ -138,12 +148,12 @@ func (s service) Pause(token string, instance *model.Instance) error {
 		return err
 	}
 
-	ks, err := NewKubernetesService(group.ClusterConfiguration)
+	err = s.kubernetesService.loadConfiguration(group.ClusterConfiguration)
 	if err != nil {
 		return err
 	}
 
-	return ks.pause(instance)
+	return s.kubernetesService.pause(instance)
 }
 
 func (s service) Restart(token string, instance *model.Instance, typeSelector string) error {
@@ -152,12 +162,12 @@ func (s service) Restart(token string, instance *model.Instance, typeSelector st
 		return err
 	}
 
-	ks, err := NewKubernetesService(group.ClusterConfiguration)
+	err = s.kubernetesService.loadConfiguration(group.ClusterConfiguration)
 	if err != nil {
 		return err
 	}
 
-	return ks.restart(instance, typeSelector)
+	return s.kubernetesService.restart(instance, typeSelector)
 }
 
 func (s service) Link(source, destination *model.Instance) error {
@@ -245,12 +255,12 @@ func (s service) Delete(token string, id uint) error {
 }
 
 func (s service) Logs(instance *model.Instance, group *models.Group, typeSelector string) (io.ReadCloser, error) {
-	ks, err := NewKubernetesService(group.ClusterConfiguration)
+	err := s.kubernetesService.loadConfiguration(group.ClusterConfiguration)
 	if err != nil {
 		return nil, err
 	}
 
-	return ks.getLogs(instance, typeSelector)
+	return s.kubernetesService.getLogs(instance, typeSelector)
 }
 
 func (s service) FindById(id uint) (*model.Instance, error) {

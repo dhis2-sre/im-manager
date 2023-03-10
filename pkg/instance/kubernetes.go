@@ -22,17 +22,23 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 )
 
+func NewKubernetesService() *kubernetesService {
+	return &kubernetesService{}
+}
+
 type kubernetesService struct {
 	client *kubernetes.Clientset
 }
 
-func NewKubernetesService(config *models.ClusterConfiguration) (*kubernetesService, error) {
+func (ks *kubernetesService) loadConfiguration(config *models.ClusterConfiguration) error {
 	client, err := newClient(config)
 	if err != nil {
-		return nil, fmt.Errorf("error creating kube client: %v", err)
+		return fmt.Errorf("error creating kube client: %v", err)
 	}
 
-	return &kubernetesService{client: client}, nil
+	ks.client = client
+
+	return nil
 }
 
 func commandExecutor(cmd *exec.Cmd, configuration *models.ClusterConfiguration) (stdout []byte, stderr []byte, err error) {
@@ -126,7 +132,7 @@ func newClient(configuration *models.ClusterConfiguration) (*kubernetes.Clientse
 	return client, nil
 }
 
-func (ks kubernetesService) getLogs(instance *model.Instance, typeSelector string) (io.ReadCloser, error) {
+func (ks *kubernetesService) getLogs(instance *model.Instance, typeSelector string) (io.ReadCloser, error) {
 	pod, err := ks.getPod(instance, typeSelector)
 	if err != nil {
 		return nil, err
@@ -143,7 +149,7 @@ func (ks kubernetesService) getLogs(instance *model.Instance, typeSelector strin
 		Stream(context.TODO())
 }
 
-func (ks kubernetesService) getPod(instance *model.Instance, typeSelector string) (v1.Pod, error) {
+func (ks *kubernetesService) getPod(instance *model.Instance, typeSelector string) (v1.Pod, error) {
 	selector, err := labelSelector(instance, typeSelector)
 	if err != nil {
 		return v1.Pod{}, err
@@ -189,7 +195,7 @@ func labelSelector(instance *model.Instance, typeSelector string) (string, error
 	return sl.String(), nil
 }
 
-func (ks kubernetesService) restart(instance *model.Instance, typeSelector string) error {
+func (ks *kubernetesService) restart(instance *model.Instance, typeSelector string) error {
 	selector, err := labelSelector(instance, typeSelector)
 	if err != nil {
 		return err
@@ -221,7 +227,7 @@ func (ks kubernetesService) restart(instance *model.Instance, typeSelector strin
 	return nil
 }
 
-func (ks kubernetesService) pause(instance *model.Instance) error {
+func (ks *kubernetesService) pause(instance *model.Instance) error {
 	labelSelector := fmt.Sprintf("im-id=%d", instance.ID)
 	listOptions := metav1.ListOptions{LabelSelector: labelSelector}
 

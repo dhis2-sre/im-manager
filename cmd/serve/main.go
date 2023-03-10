@@ -56,7 +56,8 @@ func run() error {
 	instanceRepo := instance.NewRepository(db, cfg)
 	uc := userClient.New(cfg.UserService.Host, cfg.UserService.BasePath)
 	helmfileSvc := instance.NewHelmfileService(stackSvc, cfg)
-	instanceSvc := instance.NewService(cfg, instanceRepo, uc, stackSvc, helmfileSvc)
+	kubernetesService := instance.NewKubernetesService()
+	instanceSvc := instance.NewService(cfg, instanceRepo, uc, stackSvc, helmfileSvc, kubernetesService)
 
 	dockerHubClient := integration.NewDockerHubClient(cfg.DockerHub.Username, cfg.DockerHub.Password)
 
