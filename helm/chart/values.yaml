@@ -2,6 +2,11 @@
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 
+tmpfsSizeLimit: 128Mi
+
+dataSizeLimit: 30Gi
+dataMountPath: /mnt/data
+
 containerPort: 8080
 
 basePath: ""

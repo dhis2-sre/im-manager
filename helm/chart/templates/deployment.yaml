@@ -73,11 +73,16 @@ spec:
             - mountPath: /tmp
               name: tmp
               subPath: tmp
+            - mountPath: {{ .Values.dataMountPath }}
+              name: data
       volumes:
         - name: tmp
           emptyDir:
             medium: Memory
-            sizeLimit: 64Mi
+            sizeLimit: {{ .Values.tmpfsSizeLimit }}
+        - name: data
+          emptyDir:
+            sizeLimit: {{ .Values.dataSizeLimit }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

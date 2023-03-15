@@ -15,7 +15,7 @@ environment:
   USER_SERVICE_HOST: im-user-tons.instance-manager-tons.svc:8080
   USER_SERVICE_BASE_PATH: /
 
-  DATABASE_MANAGER_SERVICE_HOST: im-database-manager-tons.instance-manager-tons.svc:8080
+  DATABASE_MANAGER_SERVICE_HOST: im-manager-tons.instance-manager-tons.svc:8080
   DATABASE_MANAGER_SERVICE_BASE_PATH: /
 
   DATABASE_HOST: im-manager-postgresql-tons.instance-manager-tons.svc
@@ -27,6 +27,8 @@ environment:
   JWKS_HOST: http://im-user-tons.instance-manager-tons.svc:8080/jwks
   JWKS_INDEX: "0"
   JWKS_MINIMUM_REFRESH_INTERVAL: "960" # 15 minutes
+
+  S3_BUCKET: test-db-manager-bucket
 
 groups:
   names: whoami

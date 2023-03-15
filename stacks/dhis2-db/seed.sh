@@ -2,8 +2,10 @@
 
 set -euo pipefail
 
+export PGPASSWORD=$POSTGRES_POSTGRES_PASSWORD
+
 function exec_psql() {
-  PGPASSWORD=$POSTGRES_POSTGRES_PASSWORD psql -U postgres -qAt -d "$DATABASE_NAME" -c "$1"
+  psql -U postgres -qAt -d "$DATABASE_NAME" -c "$1"
 }
 
 if [[ -z $DATABASE_ID ]]; then
