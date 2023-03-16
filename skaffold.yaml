@@ -44,3 +44,66 @@ deploy:
         valuesFiles:
           - helm/data/secrets/{{ .ENVIRONMENT }}/values.yaml
           - helm/data/values/{{ .ENVIRONMENT }}/values.yaml
+
+profiles:
+  - name: dev
+    deploy:
+      helm:
+        releases:
+          - name: im-group-whoami
+            namespace: whoami
+            createNamespace: true
+            remoteChart: im-group
+            repo: https://dhis2-sre.github.io/im-group
+            version: 0.2.0
+            setValues:
+              serviceAccount:
+                name: im-manager-dev
+                namespace: instance-manager-dev
+  - name: prod
+    deploy:
+      helm:
+        releases:
+          - name: im-group-dev
+            namespace: dev
+            createNamespace: true
+            remoteChart: im-group
+            repo: https://dhis2-sre.github.io/im-group
+            version: 0.2.0
+            setValues:
+              serviceAccount:
+                name: im-manager-prod
+                namespace: instance-manager-prod
+
+          - name: im-group-play
+            namespace: play
+            createNamespace: true
+            remoteChart: im-group
+            repo: https://dhis2-sre.github.io/im-group
+            version: 0.2.0
+            setValues:
+              serviceAccount:
+                name: im-manager-prod
+                namespace: instance-manager-prod
+
+          - name: im-group-qa
+            namespace: qa
+            createNamespace: true
+            remoteChart: im-group
+            repo: https://dhis2-sre.github.io/im-group
+            version: 0.2.0
+            setValues:
+              serviceAccount:
+                name: im-manager-prod
+                namespace: instance-manager-prod
+
+          - name: im-group-meta-packages
+            namespace: meta-packages
+            createNamespace: true
+            remoteChart: im-group
+            repo: https://dhis2-sre.github.io/im-group
+            version: 0.2.0
+            setValues:
+              serviceAccount:
+                name: im-manager-prod
+                namespace: instance-manager-prod
