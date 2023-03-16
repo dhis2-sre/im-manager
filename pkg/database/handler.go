@@ -205,7 +205,7 @@ func (h Handler) SaveAs(c *gin.Context) {
 		return
 	}
 
-	databaseId, err := strconv.ParseUint(databaseIdString, 10, 64)
+	databaseId, err := strconv.ParseUint(databaseIdString, 10, 32)
 	if err != nil {
 		badRequest := apperror.NewBadRequest("error parsing databaseId")
 		_ = c.Error(badRequest)
@@ -255,7 +255,7 @@ func (h Handler) Copy(c *gin.Context) {
 	//	403: Error
 	//	415: Error
 	idParam := c.Param("id")
-	id, err := strconv.ParseUint(idParam, 10, 64)
+	id, err := strconv.ParseUint(idParam, 10, 32)
 	if err != nil {
 		badRequest := apperror.NewBadRequest("error parsing id")
 		_ = c.Error(badRequest)
@@ -356,7 +356,7 @@ func (h Handler) Lock(c *gin.Context) {
 	//	409: Error
 	//	415: Error
 	idParam := c.Param("id")
-	id, err := strconv.ParseUint(idParam, 10, 64)
+	id, err := strconv.ParseUint(idParam, 10, 32)
 	if err != nil {
 		badRequest := apperror.NewBadRequest("error parsing id")
 		_ = c.Error(badRequest)
@@ -414,7 +414,7 @@ func (h Handler) Unlock(c *gin.Context) {
 	//	404: Error
 	//	415: Error
 	idParam := c.Param("id")
-	id, err := strconv.ParseUint(idParam, 10, 64)
+	id, err := strconv.ParseUint(idParam, 10, 32)
 	if err != nil {
 		badRequest := apperror.NewBadRequest("error parsing id")
 		_ = c.Error(badRequest)
@@ -517,7 +517,7 @@ func (h Handler) Delete(c *gin.Context) {
 	//	404: Error
 	//	415: Error
 	idParam := c.Param("id")
-	id, err := strconv.ParseUint(idParam, 10, 64)
+	id, err := strconv.ParseUint(idParam, 10, 32)
 	if err != nil {
 		badRequest := apperror.NewBadRequest("error parsing id")
 		_ = c.Error(badRequest)
@@ -627,7 +627,7 @@ func (h Handler) Update(c *gin.Context) {
 	//	403: Error
 	//	415: Error
 	idParam := c.Param("id")
-	id, err := strconv.ParseUint(idParam, 10, 64)
+	id, err := strconv.ParseUint(idParam, 10, 32)
 	if err != nil {
 		badRequest := apperror.NewBadRequest("error parsing id")
 		_ = c.Error(badRequest)
@@ -699,7 +699,7 @@ func (h Handler) CreateExternalDownload(c *gin.Context) {
 	//	404: Error
 	//	415: Error
 	idParam := c.Param("id")
-	id, err := strconv.ParseUint(idParam, 10, 64)
+	id, err := strconv.ParseUint(idParam, 10, 32)
 	if err != nil {
 		badRequest := apperror.NewBadRequest("error parsing id")
 		_ = c.Error(badRequest)

@@ -63,7 +63,7 @@ type S3Client interface {
 }
 
 func (s service) FindByIdentifier(identifier string) (*model.Database, error) {
-	id, err := strconv.ParseUint(identifier, 10, 64)
+	id, err := strconv.ParseUint(identifier, 10, 32)
 	if err != nil {
 		database, err := s.FindBySlug(identifier)
 		if err != nil {
