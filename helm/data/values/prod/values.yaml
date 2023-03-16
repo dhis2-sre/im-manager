@@ -27,6 +27,8 @@ environment:
   JWKS_INDEX: "0"
   JWKS_MINIMUM_REFRESH_INTERVAL: "960" # 15 minutes
 
+  S3_BUCKET: test-db-manager-bucket
+
 groups:
   names: whoami,dev,play,qa,meta-packages
 
