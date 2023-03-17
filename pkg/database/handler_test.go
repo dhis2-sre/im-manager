@@ -14,6 +14,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dhis2-sre/im-manager/pkg/config"
+
 	"github.com/dhis2-sre/im-manager/pkg/storage"
 
 	"github.com/dhis2-sre/im-manager/pkg/model"
@@ -56,7 +58,7 @@ func TestHandler_Upload(t *testing.T) {
 	repository.
 		On("Save", mock.AnythingOfType("*model.Database")).
 		Return(nil)
-	service := NewService(Config{}, nil, s3Client, repository)
+	service := NewService(config.Config{}, nil, s3Client, repository)
 	handler := New(userClient, service, nil, nil)
 
 	w := httptest.NewRecorder()
@@ -125,7 +127,7 @@ func TestHandler_ExternalDownload(t *testing.T) {
 	repository.
 		On("PurgeExternalDownload").
 		Return(nil)
-	service := NewService(Config{}, nil, s3Client, repository)
+	service := NewService(config.Config{}, nil, s3Client, repository)
 	handler := New(nil, service, nil, nil)
 
 	w := httptest.NewRecorder()
@@ -166,7 +168,7 @@ func TestHandler_CreateExternalDownload(t *testing.T) {
 	repository.
 		On("CreateExternalDownload", uint(1), expiration).
 		Return(externalDownload, nil)
-	service := NewService(Config{}, nil, nil, repository)
+	service := NewService(config.Config{}, nil, nil, repository)
 	handler := New(nil, service, nil, nil)
 
 	w := httptest.NewRecorder()
@@ -199,7 +201,7 @@ func TestHandler_Download(t *testing.T) {
 			GroupName: "group-name",
 			Url:       "s3://whatever",
 		}, nil)
-	service := NewService(Config{}, nil, s3Client, repository)
+	service := NewService(config.Config{}, nil, s3Client, repository)
 	handler := New(nil, service, nil, nil)
 
 	w := httptest.NewRecorder()
@@ -246,7 +248,7 @@ func TestHandler_Update(t *testing.T) {
 	repository.
 		On("Update", database).
 		Return(nil)
-	service := NewService(Config{}, nil, nil, repository)
+	service := NewService(config.Config{}, nil, nil, repository)
 	handler := New(nil, service, nil, nil)
 
 	w := httptest.NewRecorder()
@@ -277,7 +279,7 @@ func TestHandler_Unlock(t *testing.T) {
 	repository.
 		On("Unlock", uint(1)).
 		Return(nil)
-	service := NewService(Config{}, nil, nil, repository)
+	service := NewService(config.Config{}, nil, nil, repository)
 	handler := New(nil, service, nil, nil)
 
 	w := httptest.NewRecorder()
@@ -307,7 +309,7 @@ func TestHandler_Lock(t *testing.T) {
 	repository.
 		On("Lock", uint(1), uint(1), uint(1)).
 		Return(lock, nil)
-	service := NewService(Config{}, nil, nil, repository)
+	service := NewService(config.Config{}, nil, nil, repository)
 	handler := New(nil, service, nil, nil)
 
 	w := httptest.NewRecorder()
@@ -340,7 +342,7 @@ func TestHandler_Delete(t *testing.T) {
 	repository.
 		On("Delete", uint(1)).
 		Return(nil)
-	service := NewService(Config{}, nil, s3Client, repository)
+	service := NewService(config.Config{}, nil, s3Client, repository)
 	handler := New(nil, service, nil, nil)
 
 	w := httptest.NewRecorder()
@@ -377,7 +379,7 @@ func TestHandler_FindByIdentifier(t *testing.T) {
 	repository.
 		On("FindById", uint(1)).
 		Return(database, nil)
-	service := NewService(Config{}, nil, nil, repository)
+	service := NewService(config.Config{}, nil, nil, repository)
 	handler := New(nil, service, nil, nil)
 
 	w := httptest.NewRecorder()
@@ -400,7 +402,7 @@ func TestHandler_FindByIdentifier_Slug(t *testing.T) {
 	repository.
 		On("FindBySlug", "slug").
 		Return(database, nil)
-	service := NewService(Config{}, nil, nil, repository)
+	service := NewService(config.Config{}, nil, nil, repository)
 	handler := New(nil, service, nil, nil)
 
 	w := httptest.NewRecorder()
@@ -435,7 +437,7 @@ func TestHandler_Copy(t *testing.T) {
 	repository.
 		On("Create", mock.AnythingOfType("*model.Database")).
 		Return(nil)
-	service := NewService(Config{}, nil, s3Client, repository)
+	service := NewService(config.Config{}, nil, s3Client, repository)
 	handler := New(userClient, service, nil, nil)
 
 	w := httptest.NewRecorder()
@@ -482,7 +484,7 @@ func TestHandler_List(t *testing.T) {
 	repository.
 		On("FindByGroupNames", []string{"group-name"}).
 		Return(databases, nil)
-	service := NewService(Config{}, nil, nil, repository)
+	service := NewService(config.Config{}, nil, nil, repository)
 	handler := New(nil, service, nil, nil)
 
 	w := httptest.NewRecorder()
@@ -518,7 +520,7 @@ func TestHandler_List_RepositoryError(t *testing.T) {
 	repository.
 		On("FindByGroupNames", []string{"group-name"}).
 		Return(nil, errors.New("some error"))
-	service := NewService(Config{}, nil, nil, repository)
+	service := NewService(config.Config{}, nil, nil, repository)
 	handler := New(nil, service, nil, nil)
 
 	w := httptest.NewRecorder()

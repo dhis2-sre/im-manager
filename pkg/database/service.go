@@ -14,6 +14,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/dhis2-sre/im-manager/pkg/config"
+
 	"github.com/dhis2-sre/im-manager/internal/apperror"
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	"github.com/dhis2-sre/im-manager/pkg/storage"
@@ -29,12 +31,12 @@ import (
 	userModels "github.com/dhis2-sre/im-user/swagger/sdk/models"
 )
 
-func NewService(c Config, userClient userClientHandler, s3Client S3Client, repository Repository) *service {
+func NewService(c config.Config, userClient userClientHandler, s3Client S3Client, repository Repository) *service {
 	return &service{c, userClient, s3Client, repository}
 }
 
 type service struct {
-	c          Config
+	c          config.Config
 	userClient userClientHandler
 	s3Client   S3Client
 	repository Repository

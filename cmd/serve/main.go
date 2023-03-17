@@ -104,11 +104,7 @@ func run() error {
 
 	databaseRepository := database.NewRepository(db)
 
-	databaseConfig, err := database.NewConfig()
-	if err != nil {
-		return err
-	}
-	databaseService := database.NewService(databaseConfig, uc, s3Client, databaseRepository)
+	databaseService := database.NewService(cfg, uc, s3Client, databaseRepository)
 	databaseHandler := database.New(uc, databaseService, instanceSvc, stackSvc)
 
 	err = handler.RegisterValidation()

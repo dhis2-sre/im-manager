@@ -3,6 +3,8 @@ package database
 import (
 	"testing"
 
+	"github.com/dhis2-sre/im-manager/pkg/config"
+
 	"github.com/dhis2-sre/im-manager/pkg/model"
 
 	"github.com/stretchr/testify/require"
@@ -15,7 +17,7 @@ func Test_service_FindByIdentifier_Slug(t *testing.T) {
 	repository.
 		On("FindBySlug", "database-identifier").
 		Return(database, nil)
-	service := NewService(Config{}, nil, nil, repository)
+	service := NewService(config.Config{}, nil, nil, repository)
 
 	d, err := service.FindByIdentifier("database-identifier")
 
@@ -29,7 +31,7 @@ func Test_service_FindByIdentifier_Slug_NotFound(t *testing.T) {
 	repository.
 		On("FindBySlug", "database-identifier").
 		Return(nil, gorm.ErrRecordNotFound)
-	service := NewService(Config{}, nil, nil, repository)
+	service := NewService(config.Config{}, nil, nil, repository)
 
 	d, err := service.FindByIdentifier("database-identifier")
 
@@ -43,7 +45,7 @@ func Test_service_FindByIdentifier_Id(t *testing.T) {
 	repository.
 		On("FindById", uint(1)).
 		Return(database, nil)
-	service := NewService(Config{}, nil, nil, repository)
+	service := NewService(config.Config{}, nil, nil, repository)
 
 	d, err := service.FindByIdentifier("1")
 
@@ -57,7 +59,7 @@ func Test_service_FindByIdentifier_Id_NotFound(t *testing.T) {
 	repository.
 		On("FindById", uint(1)).
 		Return(nil, gorm.ErrRecordNotFound)
-	service := NewService(Config{}, nil, nil, repository)
+	service := NewService(config.Config{}, nil, nil, repository)
 
 	d, err := service.FindByIdentifier("1")
 
