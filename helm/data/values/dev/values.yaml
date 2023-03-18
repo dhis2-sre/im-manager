@@ -15,7 +15,7 @@ environment:
   USER_SERVICE_HOST: im-user-dev.instance-manager-dev.svc:8080
   USER_SERVICE_BASE_PATH: /
 
-  DATABASE_MANAGER_SERVICE_HOST: im-database-manager-dev.instance-manager-dev.svc:8080
+  DATABASE_MANAGER_SERVICE_HOST: im-manager-dev.instance-manager-dev.svc:8080
   DATABASE_MANAGER_SERVICE_BASE_PATH: /
 
   DATABASE_HOST: im-manager-postgresql-dev.instance-manager-dev.svc
