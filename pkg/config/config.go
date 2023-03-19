@@ -66,6 +66,7 @@ func New() Config {
 				MinimumRefreshInterval: requireEnvAsInt("JWKS_MINIMUM_REFRESH_INTERVAL"),
 			},
 		},
+		Bucket: requireEnv("S3_BUCKET"),
 	}
 }
 
