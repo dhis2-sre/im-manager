@@ -30,7 +30,7 @@ jobs:
           echo "KUBECONFIG=$PWD/.kube/config" >> $GITHUB_ENV
 
       - name: Run e2e
-        run: cd scripts/ && ./stack_tests.sh
+        run: cd scripts/instances && ./stack_tests.sh
         env:
           HTTP: http --check-status
           IM_HOST: https://api.im.dev.test.c.dhis2.org
