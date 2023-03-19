@@ -23,8 +23,14 @@
 package main
 
 import (
+	"context"
 	"log"
 
+	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/dhis2-sre/im-manager/pkg/database"
+
+	s3config "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/dhis2-sre/im-manager/pkg/integration"
 
 	"github.com/dhis2-sre/im-manager/internal/handler"
@@ -60,8 +66,6 @@ func run() error {
 
 	dockerHubClient := integration.NewDockerHubClient(cfg.DockerHub.Username, cfg.DockerHub.Password)
 
-	integrationHandler := integration.NewHandler(dockerHubClient, cfg.InstanceService.Host, cfg.DatabaseManagerService.Host)
-
 	err = stack.LoadStacks("./stacks", stackSvc)
 	if err != nil {
 		return err
@@ -89,6 +93,27 @@ func run() error {
 		return err
 	}
 
-	r := server.GetEngine(cfg.BasePath, stackHandler, instanceHandler, integrationHandler, authMiddleware)
+	// TODO: Database... Move into... Function?
+	s3Config, err := s3config.LoadDefaultConfig(context.TODO(), s3config.WithRegion("eu-west-1"))
+	if err != nil {
+		return err
+	}
+	s3AWSClient := s3.NewFromConfig(s3Config)
+	uploader := manager.NewUploader(s3AWSClient)
+	s3Client := storage.NewS3Client(s3AWSClient, uploader)
+
+	databaseRepository := database.NewRepository(db)
+
+	databaseService := database.NewService(cfg, uc, s3Client, databaseRepository)
+	databaseHandler := database.New(uc, databaseService, instanceSvc, stackSvc)
+
+	err = handler.RegisterValidation()
+	if err != nil {
+		return err
+	}
+
+	integrationHandler := integration.NewHandler(dockerHubClient, cfg.InstanceService.Host, cfg.DatabaseManagerService.Host)
+
+	r := server.GetEngine(cfg.BasePath, stackHandler, instanceHandler, integrationHandler, databaseHandler, authMiddleware)
 	return r.Run()
 }

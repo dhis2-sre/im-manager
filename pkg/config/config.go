@@ -18,6 +18,7 @@ type Config struct {
 	Postgresql                     postgresql
 	RabbitMqURL                    rabbitmq
 	Authentication                 Authentication
+	Bucket                         string
 }
 
 func New() Config {

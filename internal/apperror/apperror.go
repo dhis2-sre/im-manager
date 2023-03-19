@@ -18,6 +18,7 @@ const (
 	Unauthorized         Type = "AUTHORIZATION"
 	NotFound             Type = "NOT_FOUND"
 	Conflict             Type = "CONFLICT"
+	Forbidden            Type = "FORBIDDEN"
 )
 
 type Error struct {
@@ -44,6 +45,8 @@ func (e *Error) HttpStatusCode() int {
 		return http.StatusNotFound
 	case Conflict:
 		return http.StatusConflict
+	case Forbidden:
+		return http.StatusForbidden
 	default:
 		return http.StatusInternalServerError
 	}
@@ -97,6 +100,13 @@ func NewNotFound(name string, value string) *Error {
 func NewConflict(message string) *Error {
 	return &Error{
 		Type:    Conflict,
+		Message: message,
+	}
+}
+
+func NewForbidden(message string) *Error {
+	return &Error{
+		Type:    Forbidden,
 		Message: message,
 	}
 }

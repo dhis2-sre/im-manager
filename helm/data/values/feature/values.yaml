@@ -17,7 +17,7 @@ environment:
   USER_SERVICE_HOST: im-user-feature.instance-manager-feature.svc:8080
   USER_SERVICE_BASE_PATH: /skaffold
 
-  DATABASE_MANAGER_SERVICE_HOST: im-database-manager-feature.instance-manager-feature.svc:8080
+  DATABASE_MANAGER_SERVICE_HOST: im-manager-feature.instance-manager-feature.svc:8080
   DATABASE_MANAGER_SERVICE_BASE_PATH: /skaffold
 
   DATABASE_HOST: im-manager-postgresql-feature.instance-manager-feature.svc
@@ -29,6 +29,8 @@ environment:
   JWKS_HOST: http://im-user-feature.instance-manager-feature.svc:8080/skaffold/jwks
   JWKS_INDEX: "0"
   JWKS_MINIMUM_REFRESH_INTERVAL: "960" # 15 minutes
+
+  S3_BUCKET: test-db-manager-bucket
 
 groups:
   names: whoami

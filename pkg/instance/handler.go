@@ -250,7 +250,7 @@ func (h Handler) Update(c *gin.Context) {
 	//	404: Error
 	//	415: Error
 	idParam := c.Param("id")
-	id, err := strconv.ParseUint(idParam, 10, 64)
+	id, err := strconv.ParseUint(idParam, 10, 32)
 	if err != nil {
 		badRequest := apperror.NewBadRequest("error parsing id")
 		_ = c.Error(badRequest)
@@ -331,7 +331,7 @@ func (h Handler) Pause(c *gin.Context) {
 	//	404: Error
 	//	415: Error
 	idParam := c.Param("id")
-	id, err := strconv.ParseUint(idParam, 10, 64)
+	id, err := strconv.ParseUint(idParam, 10, 32)
 	if err != nil {
 		_ = c.AbortWithError(http.StatusBadRequest, fmt.Errorf("failed to parse id: %s", err))
 		return
@@ -389,7 +389,7 @@ func (h Handler) Restart(c *gin.Context) {
 	//	404: Error
 	//	415: Error
 	idParam := c.Param("id")
-	id, err := strconv.ParseUint(idParam, 10, 64)
+	id, err := strconv.ParseUint(idParam, 10, 32)
 	if err != nil {
 		_ = c.AbortWithError(http.StatusBadRequest, fmt.Errorf("failed to parse id: %s", err))
 		return
@@ -448,7 +448,7 @@ func (h Handler) Delete(c *gin.Context) {
 	//	404: Error
 	//	415: Error
 	idParam := c.Param("id")
-	id, err := strconv.ParseUint(idParam, 10, 64)
+	id, err := strconv.ParseUint(idParam, 10, 32)
 	if err != nil {
 		badRequest := apperror.NewBadRequest("error parsing id")
 		_ = c.Error(badRequest)
@@ -510,7 +510,7 @@ func (h Handler) FindById(c *gin.Context) {
 	//	404: Error
 	//	415: Error
 	idParam := c.Param("id")
-	id, err := strconv.ParseUint(idParam, 10, 64)
+	id, err := strconv.ParseUint(idParam, 10, 32)
 	if err != nil {
 		badRequest := apperror.NewBadRequest("error parsing id")
 		_ = c.Error(badRequest)
@@ -558,7 +558,7 @@ func (h Handler) FindByIdDecrypted(c *gin.Context) {
 	//	404: Error
 	//	415: Error
 	idParam := c.Param("id")
-	id, err := strconv.ParseUint(idParam, 10, 64)
+	id, err := strconv.ParseUint(idParam, 10, 32)
 	if err != nil {
 		badRequest := apperror.NewBadRequest("error parsing id")
 		_ = c.Error(badRequest)
@@ -606,7 +606,7 @@ func (h Handler) Logs(c *gin.Context) {
 	//	404: Error
 	//	415: Error
 	idParam := c.Param("id")
-	id, err := strconv.ParseUint(idParam, 10, 64)
+	id, err := strconv.ParseUint(idParam, 10, 32)
 	if err != nil {
 		badRequest := apperror.NewBadRequest("error parsing id")
 		_ = c.Error(badRequest)

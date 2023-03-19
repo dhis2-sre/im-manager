@@ -1,6 +1,45 @@
 consumes:
     - application/json
 definitions:
+    CopyDatabaseRequest:
+        properties:
+            group:
+                type: string
+                x-go-name: Group
+            name:
+                type: string
+                x-go-name: Name
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/database
+    Database:
+        properties:
+            CreatedAt:
+                format: date-time
+                type: string
+            DeletedAt:
+                $ref: '#/definitions/DeletedAt'
+            ExternalDownloads:
+                items:
+                    $ref: '#/definitions/ExternalDownload'
+                type: array
+            GroupName:
+                type: string
+            ID:
+                format: uint64
+                type: integer
+            Lock:
+                $ref: '#/definitions/Lock'
+            Name:
+                type: string
+            Slug:
+                type: string
+            UpdatedAt:
+                format: date-time
+                type: string
+            Url:
+                type: string
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/model
     DeletedAt:
         $ref: '#/definitions/NullTime'
     DeployInstanceRequest:
@@ -34,6 +73,19 @@ definitions:
                 x-go-name: Stack
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
+    ExternalDownload:
+        properties:
+            DatabaseID:
+                format: uint64
+                type: integer
+            Expiration:
+                format: date-time
+                type: string
+            UUID:
+                format: uuid
+                type: string
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/model
     GroupWithInstances:
         properties:
             Hostname:
@@ -46,6 +98,21 @@ definitions:
                 type: string
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
+    GroupsWithDatabases:
+        properties:
+            Databases:
+                items:
+                    $ref: '#/definitions/Database'
+                type: array
+            Hostname:
+                type: string
+            ID:
+                format: uint64
+                type: integer
+            Name:
+                type: string
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/database
     Instance:
         properties:
             CreatedAt:
@@ -109,6 +176,27 @@ definitions:
                 x-go-name: Value
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/model
+    Lock:
+        properties:
+            DatabaseID:
+                format: uint64
+                type: integer
+            InstanceID:
+                format: uint64
+                type: integer
+            UserID:
+                format: uint64
+                type: integer
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/model
+    LockDatabaseRequest:
+        properties:
+            instanceId:
+                format: uint64
+                type: integer
+                x-go-name: InstanceId
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/database
     Model:
         description: |-
             type User struct {
@@ -207,6 +295,13 @@ definitions:
                 type: string
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/model
+    UpdateDatabaseRequest:
+        properties:
+            name:
+                type: string
+                x-go-name: Name
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/database
     UpdateInstanceRequest:
         properties:
             optionalParameters:
@@ -221,6 +316,18 @@ definitions:
                 x-go-name: RequiredParameters
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
+    saveAsRequest:
+        properties:
+            format:
+                description: Database dump format. Currently plain and custom are support, please see https://www.postgresql.org/docs/current/app-pgdump.html
+                type: string
+                x-go-name: Format
+            name:
+                description: Name of the new database
+                type: string
+                x-go-name: Name
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/database
 info:
     contact:
         email: info@dhis2.org
@@ -231,6 +338,333 @@ info:
     title: Instance Manager Manager Service.
     version: 0.1.0
 paths:
+    /databases:
+        get:
+            description: List databases...
+            operationId: listDatabases
+            responses:
+                "200":
+                    description: GroupsWithDatabases
+                    schema:
+                        items:
+                            $ref: '#/definitions/GroupsWithDatabases'
+                        type: array
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: List databases
+        post:
+            description: Upload database...
+            operationId: uploadDatabase
+            parameters:
+                - description: Upload database request body parameter
+                  in: formData
+                  name: Group
+                  required: true
+                  type: string
+                - description: Upload database request body parameter
+                  in: formData
+                  name: File
+                  required: true
+                  type: file
+            responses:
+                "201":
+                    $ref: '#/responses/Database'
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Upload database
+    /databases/{id}:
+        delete:
+            description: Delete database by id...
+            operationId: deleteDatabaseById
+            parameters:
+                - format: uint64
+                  in: path
+                  name: id
+                  required: true
+                  type: integer
+                  x-go-name: ID
+            responses:
+                "202":
+                    description: ""
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Delete database
+        get:
+            description: Find a database by its identifier. The identifier could be either the actual id of the database or the slug associated with it
+            operationId: findDatabase
+            parameters:
+                - format: uint64
+                  in: path
+                  name: id
+                  required: true
+                  type: integer
+                  x-go-name: ID
+            responses:
+                "200":
+                    $ref: '#/responses/Database'
+                "400":
+                    $ref: '#/responses/Error'
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Find database
+        put:
+            description: |-
+                Update database by id
+                TODO: Race condition? If two clients request at the same time... Do we need a transaction between find and update
+            operationId: updateDatabaseById
+            parameters:
+                - format: uint64
+                  in: path
+                  name: id
+                  required: true
+                  type: integer
+                  x-go-name: ID
+                - description: Update database request body parameter
+                  in: body
+                  name: Body
+                  required: true
+                  schema:
+                    $ref: '#/definitions/UpdateDatabaseRequest'
+            responses:
+                "200":
+                    $ref: '#/responses/Database'
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Update database
+    /databases/{id}/copy:
+        post:
+            description: Copy database...
+            operationId: copyDatabase
+            parameters:
+                - format: uint64
+                  in: path
+                  name: id
+                  required: true
+                  type: integer
+                  x-go-name: ID
+                - description: Copy database request body parameter
+                  in: body
+                  name: Body
+                  required: true
+                  schema:
+                    $ref: '#/definitions/CopyDatabaseRequest'
+            responses:
+                "202":
+                    $ref: '#/responses/Database'
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Copy database
+    /databases/{id}/download:
+        get:
+            description: Download a database by its identifier. The identifier could be either the actual id of the database or the slug associated with it
+            operationId: downloadDatabase
+            parameters:
+                - format: uint64
+                  in: path
+                  name: id
+                  required: true
+                  type: integer
+                  x-go-name: ID
+            responses:
+                "200":
+                    $ref: '#/responses/DownloadDatabaseResponse'
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Download database
+    /databases/{id}/external:
+        post:
+            description: Create link so the database can be downloaded without log in
+            operationId: createExternalDownloadDatabase
+            parameters:
+                - format: uint64
+                  in: path
+                  name: id
+                  required: true
+                  type: integer
+                  x-go-name: ID
+            responses:
+                "200":
+                    $ref: '#/responses/CreateExternalDownloadResponse'
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: External download link
+    /databases/{id}/lock:
+        delete:
+            description: Unlock database by id
+            operationId: unlockDatabaseById
+            parameters:
+                - format: uint64
+                  in: path
+                  name: id
+                  required: true
+                  type: integer
+                  x-go-name: ID
+                - description: Lock/unlock database request body parameter
+                  in: body
+                  name: Body
+                  required: true
+                  schema:
+                    $ref: '#/definitions/LockDatabaseRequest'
+            responses:
+                "202":
+                    description: ""
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Unlock database
+        post:
+            description: Lock database by id...
+            operationId: lockDatabaseById
+            parameters:
+                - format: uint64
+                  in: path
+                  name: id
+                  required: true
+                  type: integer
+                  x-go-name: ID
+                - description: Lock/unlock database request body parameter
+                  in: body
+                  name: Body
+                  required: true
+                  schema:
+                    $ref: '#/definitions/LockDatabaseRequest'
+            responses:
+                "200":
+                    $ref: '#/responses/Lock'
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+                "409":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Lock database
+    /databases/external/{uuid}:
+        get:
+            description: Download database...
+            operationId: externalDownloadDatabase
+            parameters:
+                - format: uint64
+                  in: path
+                  name: uuid
+                  required: true
+                  type: integer
+                  x-go-name: UUID
+            responses:
+                "200":
+                    $ref: '#/responses/DownloadDatabaseResponse'
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Download database
+    /databases/save-as/{instanceId}:
+        post:
+            description: Save database under a new name. If you want to simple save, you currently have to delete the old one and rename the new one
+            operationId: saveAsDatabase
+            parameters:
+                - format: uint64
+                  in: path
+                  name: instanceId
+                  required: true
+                  type: integer
+                  x-go-name: InstanceID
+                - description: SaveAs database request body parameter
+                  in: body
+                  name: Body
+                  required: true
+                  schema:
+                    $ref: '#/definitions/saveAsRequest'
+            responses:
+                "201":
+                    $ref: '#/responses/Database'
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: '"Save as" database'
     /health:
         get:
             description: Show service health status
@@ -592,6 +1026,21 @@ responses:
     Any:
         description: ""
         schema: {}
+    CreateExternalDownloadResponse:
+        description: ""
+        schema:
+            $ref: '#/definitions/ExternalDownload'
+    Database:
+        description: ""
+        schema:
+            $ref: '#/definitions/Database'
+    DownloadDatabaseResponse:
+        description: ""
+        schema:
+            items:
+                format: uint8
+                type: integer
+            type: array
     Error:
         description: ""
     GroupWithInstances:
@@ -602,6 +1051,10 @@ responses:
             type: array
     InstanceLogsResponse:
         description: ""
+    Lock:
+        description: ""
+        schema:
+            $ref: '#/definitions/Lock'
     Response:
         description: ""
         schema:
