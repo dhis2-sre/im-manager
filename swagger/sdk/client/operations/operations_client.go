@@ -70,6 +70,8 @@ type ClientService interface {
 
 	RestartInstance(params *RestartInstanceParams, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*RestartInstanceAccepted, error)
 
+	ResumeInstance(params *ResumeInstanceParams, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*ResumeInstanceAccepted, error)
+
 	SaveAsDatabase(params *SaveAsDatabaseParams, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*SaveAsDatabaseCreated, error)
 
 	Stack(params *StackParams, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*StackOK, error)
@@ -903,6 +905,47 @@ func (a *Client) RestartInstance(params *RestartInstanceParams, authInfo runtime
 	// unexpected success response
 	// safeguard: normally, absent a default response, unknown success responses return an error above: so this is a codegen issue
 	msg := fmt.Sprintf("unexpected success response for restartInstance: API contract not enforced by server. Client expected to get an error, but got: %T", result)
+	panic(msg)
+}
+
+/*
+ResumeInstance resumes paused instance
+
+Resume paused instance...
+*/
+func (a *Client) ResumeInstance(params *ResumeInstanceParams, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*ResumeInstanceAccepted, error) {
+	// TODO: Validate the params before sending
+	if params == nil {
+		params = NewResumeInstanceParams()
+	}
+	op := &runtime.ClientOperation{
+		ID:                 "resumeInstance",
+		Method:             "PUT",
+		PathPattern:        "/instances/{id}/resume",
+		ProducesMediaTypes: []string{"application/json"},
+		ConsumesMediaTypes: []string{"application/json"},
+		Schemes:            []string{"http"},
+		Params:             params,
+		Reader:             &ResumeInstanceReader{formats: a.formats},
+		AuthInfo:           authInfo,
+		Context:            params.Context,
+		Client:             params.HTTPClient,
+	}
+	for _, opt := range opts {
+		opt(op)
+	}
+
+	result, err := a.transport.Submit(op)
+	if err != nil {
+		return nil, err
+	}
+	success, ok := result.(*ResumeInstanceAccepted)
+	if ok {
+		return success, nil
+	}
+	// unexpected success response
+	// safeguard: normally, absent a default response, unknown success responses return an error above: so this is a codegen issue
+	msg := fmt.Sprintf("unexpected success response for resumeInstance: API contract not enforced by server. Client expected to get an error, but got: %T", result)
 	panic(msg)
 }
 

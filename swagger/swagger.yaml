@@ -946,6 +946,31 @@ paths:
             security:
                 - oauth2: []
             summary: Restart instance
+    /instances/{id}/resume:
+        put:
+            description: Resume paused instance...
+            operationId: resumeInstance
+            parameters:
+                - format: uint64
+                  in: path
+                  name: id
+                  required: true
+                  type: integer
+                  x-go-name: ID
+            responses:
+                "202":
+                    description: ""
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Resume paused instance
     /integrations:
         post:
             description: Return integration for a given key

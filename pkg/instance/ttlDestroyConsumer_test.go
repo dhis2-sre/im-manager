@@ -2,12 +2,10 @@ package instance_test
 
 import (
 	"context"
-	"io"
 	"testing"
 	"time"
 
 	"github.com/dhis2-sre/im-manager/pkg/instance"
-	"github.com/dhis2-sre/im-manager/pkg/model"
 	"github.com/dhis2-sre/im-user/swagger/sdk/models"
 	"github.com/dhis2-sre/rabbitmq"
 	amqp "github.com/rabbitmq/amqp091-go"
@@ -61,51 +59,9 @@ type instanceService struct {
 	mock.Mock
 }
 
-func (is *instanceService) ConsumeParameters(sourceInstance, destinationInstance *model.Instance) error {
-	return nil
-}
-
-func (is *instanceService) Save(instance *model.Instance) (*model.Instance, error) {
-	return nil, nil
-}
-
-func (is *instanceService) Link(source, destination *model.Instance) error {
-	return nil
-}
-
-func (is *instanceService) Pause(token string, instance *model.Instance) error {
-	return nil
-}
-
-func (is *instanceService) Restart(token string, instance *model.Instance, typeSelector string) error {
-	return nil
-}
-
 func (is *instanceService) Delete(token string, id uint) error {
 	args := is.Called(token, id)
 	return args.Error(0)
-}
-
-func (is *instanceService) Deploy(token string, instance *model.Instance) error {
-	return nil
-}
-
-func (is *instanceService) FindById(id uint) (*model.Instance, error) { return nil, nil }
-
-func (is *instanceService) Logs(instance *model.Instance, group *models.Group, selector string) (io.ReadCloser, error) {
-	return nil, nil
-}
-
-func (is *instanceService) FindByIdDecrypted(id uint) (*model.Instance, error) {
-	return nil, nil
-}
-
-func (is *instanceService) FindByNameAndGroup(instance string, groupId string) (*model.Instance, error) {
-	return nil, nil
-}
-
-func (is *instanceService) FindInstances(user *models.User, presets bool) ([]instance.GroupWithInstances, error) {
-	return nil, nil
 }
 
 type ttlSuite struct {

@@ -34,6 +34,13 @@ type _ struct {
 	ID uint `json:"id"`
 }
 
+// swagger:parameters resumeInstance
+type _ struct {
+	// in: path
+	// required: true
+	ID uint `json:"id"`
+}
+
 // swagger:parameters restartInstance
 type _ struct {
 	// in: path

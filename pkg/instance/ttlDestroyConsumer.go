@@ -18,20 +18,24 @@ type ttlDestroyConsumer struct {
 	usrClientPassword string
 	usrAuth           userAuth
 	consumer          *rabbitmq.Consumer
-	instanceService   Service
+	instanceDeleter   deleter
 }
 
 type userAuth interface {
 	SignIn(username, password string) (*models.Tokens, error)
 }
 
-func NewTTLDestroyConsumer(userClientUsername, userClientPassword string, usrAuth userAuth, consumer *rabbitmq.Consumer, instanceService Service) *ttlDestroyConsumer {
+type deleter interface {
+	Delete(token string, id uint) error
+}
+
+func NewTTLDestroyConsumer(userClientUsername, userClientPassword string, usrAuth userAuth, consumer *rabbitmq.Consumer, instanceDeleter deleter) *ttlDestroyConsumer {
 	return &ttlDestroyConsumer{
 		usrClientUsername: userClientUsername,
 		usrClientPassword: userClientPassword,
 		usrAuth:           usrAuth,
 		consumer:          consumer,
-		instanceService:   instanceService,
+		instanceDeleter:   instanceDeleter,
 	}
 }
 
@@ -55,7 +59,7 @@ func (c *ttlDestroyConsumer) Consume() error {
 			return
 		}
 
-		err = c.instanceService.Delete(tokens.AccessToken, payload.ID)
+		err = c.instanceDeleter.Delete(tokens.AccessToken, payload.ID)
 		if err != nil {
 			// TODO: gorm shouldn't be used outside of the repository thus the error should be one we define... Instance.ErrInstanceNotFound
 			if errors.Is(err, gorm.ErrRecordNotFound) {

@@ -45,6 +45,7 @@ func GetEngine(basePath string, stackHandler stack.Handler, instanceHandler inst
 	tokenAuthenticationRouter.DELETE("/instances/:id", instanceHandler.Delete)
 	tokenAuthenticationRouter.PUT("/instances/:id", instanceHandler.Update)
 	tokenAuthenticationRouter.PUT("/instances/:id/pause", instanceHandler.Pause)
+	tokenAuthenticationRouter.PUT("/instances/:id/resume", instanceHandler.Resume)
 	tokenAuthenticationRouter.PUT("/instances/:id/restart", instanceHandler.Restart)
 	tokenAuthenticationRouter.GET("/instances/:id/logs", instanceHandler.Logs)
 	tokenAuthenticationRouter.GET("/instances-name-to-id/:groupName/:instanceName", instanceHandler.NameToId)
