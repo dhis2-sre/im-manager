@@ -28,6 +28,7 @@ releases:
           timeoutSeconds: {{ env "LIVENESS_PROBE_TIMEOUT_SECONDS" | default 1 }}
           path: /{{ requiredEnv "INSTANCE_NAME" }}
       - readinessProbe:
+          timeoutSeconds: {{ env "READINESS_PROBE_TIMEOUT_SECONDS" | default 1 }}
           path: /{{ requiredEnv "INSTANCE_NAME" }}
       - commonLabels:
           im: "true"
