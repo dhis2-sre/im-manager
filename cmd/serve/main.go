@@ -114,6 +114,9 @@ func run() error {
 
 	integrationHandler := integration.NewHandler(dockerHubClient, cfg.InstanceService.Host, cfg.DatabaseManagerService.Host)
 
-	r := server.GetEngine(cfg.BasePath, stackHandler, instanceHandler, integrationHandler, databaseHandler, authMiddleware)
+	r := server.GetEngine(cfg.BasePath, stackHandler, instanceHandler, integrationHandler, authMiddleware)
+
+	database.ConfigureRoutes(r, authMiddleware, databaseHandler)
+
 	return r.Run()
 }
