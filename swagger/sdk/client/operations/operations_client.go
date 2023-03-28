@@ -786,9 +786,11 @@ func (a *Client) LockDatabaseByID(params *LockDatabaseByIDParams, authInfo runti
 }
 
 /*
-PauseInstance pauses instance
+	PauseInstance pauses instance
 
-Pause an instance...
+	Pause an instance. Pause can be called multiple times even on an already paused instance
+
+(idempotent).
 */
 func (a *Client) PauseInstance(params *PauseInstanceParams, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*PauseInstanceAccepted, error) {
 	// TODO: Validate the params before sending
@@ -909,9 +911,11 @@ func (a *Client) RestartInstance(params *RestartInstanceParams, authInfo runtime
 }
 
 /*
-ResumeInstance resumes paused instance
+	ResumeInstance resumes paused instance
 
-Resume paused instance...
+	Resume a paused instance. Resume can be called multiple times even on an already running
+
+instance (idempotent).
 */
 func (a *Client) ResumeInstance(params *ResumeInstanceParams, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*ResumeInstanceAccepted, error) {
 	// TODO: Validate the params before sending

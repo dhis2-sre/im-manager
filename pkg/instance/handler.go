@@ -320,7 +320,8 @@ func (h Handler) Pause(c *gin.Context) {
 	//
 	// Pause instance
 	//
-	// Pause an instance...
+	// Pause an instance. Pause can be called multiple times even on an already paused instance
+	// (idempotent).
 	//
 	// Security:
 	//	oauth2:
@@ -378,7 +379,8 @@ func (h Handler) Resume(c *gin.Context) {
 	//
 	// Resume paused instance
 	//
-	// Resume paused instance...
+	// Resume a paused instance. Resume can be called multiple times even on an already running
+	// instance (idempotent).
 	//
 	// Security:
 	//	oauth2:

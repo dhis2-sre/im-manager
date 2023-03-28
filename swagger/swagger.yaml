@@ -893,7 +893,9 @@ paths:
             summary: Find decrypted instance
     /instances/{id}/pause:
         put:
-            description: Pause an instance...
+            description: |-
+                Pause an instance. Pause can be called multiple times even on an already paused instance
+                (idempotent).
             operationId: pauseInstance
             parameters:
                 - format: uint64
@@ -948,7 +950,9 @@ paths:
             summary: Restart instance
     /instances/{id}/resume:
         put:
-            description: Resume paused instance...
+            description: |-
+                Resume a paused instance. Resume can be called multiple times even on an already running
+                instance (idempotent).
             operationId: resumeInstance
             parameters:
                 - format: uint64
