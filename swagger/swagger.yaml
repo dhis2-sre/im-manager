@@ -893,7 +893,9 @@ paths:
             summary: Find decrypted instance
     /instances/{id}/pause:
         put:
-            description: Pause an instance...
+            description: |-
+                Pause an instance. Pause can be called multiple times even on an already paused instance
+                (idempotent).
             operationId: pauseInstance
             parameters:
                 - format: uint64
@@ -946,6 +948,33 @@ paths:
             security:
                 - oauth2: []
             summary: Restart instance
+    /instances/{id}/resume:
+        put:
+            description: |-
+                Resume a paused instance. Resume can be called multiple times even on an already running
+                instance (idempotent).
+            operationId: resumeInstance
+            parameters:
+                - format: uint64
+                  in: path
+                  name: id
+                  required: true
+                  type: integer
+                  x-go-name: ID
+            responses:
+                "202":
+                    description: ""
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Resume paused instance
     /integrations:
         post:
             description: Return integration for a given key

@@ -146,6 +146,20 @@ func (s service) Pause(token string, instance *model.Instance) error {
 	return ks.pause(instance)
 }
 
+func (s service) Resume(token string, instance *model.Instance) error {
+	group, err := s.userClient.FindGroupByName(token, instance.GroupName)
+	if err != nil {
+		return err
+	}
+
+	ks, err := NewKubernetesService(group.ClusterConfiguration)
+	if err != nil {
+		return err
+	}
+
+	return ks.resume(instance)
+}
+
 func (s service) Restart(token string, instance *model.Instance, typeSelector string) error {
 	group, err := s.userClient.FindGroupByName(token, instance.GroupName)
 	if err != nil {

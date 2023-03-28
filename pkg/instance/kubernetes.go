@@ -222,6 +222,24 @@ func (ks kubernetesService) restart(instance *model.Instance, typeSelector strin
 }
 
 func (ks kubernetesService) pause(instance *model.Instance) error {
+	err := ks.scale(instance, 0)
+	if err != nil {
+		return fmt.Errorf("failed to pause instance %q: %v", instance.ID, err)
+	}
+
+	return nil
+}
+
+func (ks kubernetesService) resume(instance *model.Instance) error {
+	err := ks.scale(instance, 1)
+	if err != nil {
+		return fmt.Errorf("failed to resume instance %q: %v", instance.ID, err)
+	}
+
+	return nil
+}
+
+func (ks kubernetesService) scale(instance *model.Instance, replicas uint) error {
 	labelSelector := fmt.Sprintf("im-id=%d", instance.ID)
 	listOptions := metav1.ListOptions{LabelSelector: labelSelector}
 
@@ -232,7 +250,7 @@ func (ks kubernetesService) pause(instance *model.Instance) error {
 	}
 
 	for _, d := range deploymentList.Items {
-		_, err = scale(deployments, d.Name, 0)
+		_, err = scale(deployments, d.Name, int32(replicas))
 		if err != nil {
 			return err
 		}
@@ -245,7 +263,7 @@ func (ks kubernetesService) pause(instance *model.Instance) error {
 	}
 
 	for _, s := range setsList.Items {
-		_, err = scale(sets, s.Name, 0)
+		_, err = scale(sets, s.Name, int32(replicas))
 		if err != nil {
 			return err
 		}
@@ -266,13 +284,16 @@ type scaler interface {
 func scale(sc scaler, name string, replicas int32) (int32, error) {
 	scale, err := sc.GetScale(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("failed to get scale of %q: %v", name, err)
 	}
 
 	prevReplicas := scale.Spec.Replicas
 	scale.Spec.Replicas = replicas
 
 	_, err = sc.UpdateScale(context.TODO(), name, scale, metav1.UpdateOptions{})
+	if err != nil {
+		return 0, fmt.Errorf("failed to update scale of %q to %d: %v", name, replicas, err)
+	}
 
-	return prevReplicas, err
+	return prevReplicas, nil
 }

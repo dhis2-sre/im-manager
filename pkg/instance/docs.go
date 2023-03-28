@@ -27,13 +27,6 @@ type _ struct {
 	Payload UpdateInstanceRequest
 }
 
-// swagger:parameters pauseInstance
-type _ struct {
-	// in: path
-	// required: true
-	ID uint `json:"id"`
-}
-
 // swagger:parameters restartInstance
 type _ struct {
 	// in: path
@@ -62,7 +55,7 @@ type _ struct {
 	Selector string `json:"selector"`
 }
 
-// swagger:parameters deleteInstance findById findByIdDecrypted saveInstance
+// swagger:parameters deleteInstance findById findByIdDecrypted saveInstance pauseInstance resumeInstance
 type _ struct {
 	// in: path
 	// required: true
