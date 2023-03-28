@@ -1,4 +1,4 @@
-apiVersion: skaffold/v2beta25
+apiVersion: skaffold/v4beta2
 kind: Config
 metadata:
   name: im-manager
@@ -9,6 +9,7 @@ build:
     inputDigest: { }
 deploy:
   statusCheckDeadlineSeconds: 240
+  tolerateFailuresUntilDeadline: true
   helm:
     releases:
       - name: im-rabbitmq-{{ .ENVIRONMENT }}
@@ -36,10 +37,8 @@ deploy:
         namespace: instance-manager-{{ .ENVIRONMENT }}
         createNamespace: true
         chartPath: helm/chart
-        artifactOverrides:
-          image: dhis2/im-manager
-        imageStrategy:
-          helm: { }
+        setValueTemplates:
+          image.repository: dhis2/im-manager
         useHelmSecrets: true
         valuesFiles:
           - helm/data/secrets/{{ .ENVIRONMENT }}/values.yaml
