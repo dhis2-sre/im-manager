@@ -29,58 +29,45 @@ echo "{
   \"name\": \"$NAME\",
   \"groupName\": \"$GROUP\",
   \"stackName\": \"$STACK\",
-  \"parameters\": [
-    {
-      \"name\": \"DATABASE_ID\",
-      \"value\": \"$DATABASE_ID\"
-    },
-    {
-      \"name\": \"STARTUP_PROBE_FAILURE_THRESHOLD\",
-      \"value\": \"$STARTUP_PROBE_FAILURE_THRESHOLD\"
-    },
-    {
-      \"name\": \"STARTUP_PROBE_PERIOD_SECONDS\",
-      \"value\": \"$STARTUP_PROBE_PERIOD_SECONDS\"
-    },
-    {
-      \"name\": \"LIVENESS_PROBE_TIMEOUT_SECONDS\",
-      \"value\": \"$LIVENESS_PROBE_TIMEOUT_SECONDS\"
-    },
-    {
-      \"name\": \"READINESS_PROBE_TIMEOUT_SECONDS\",
-      \"value\": \"$READINESS_PROBE_TIMEOUT_SECONDS\"
-    },
-    {
-      \"name\": \"IMAGE_REPOSITORY\",
-      \"value\": \"$IMAGE_REPOSITORY\"
-    },
-    {
-      \"name\": \"IMAGE_TAG\",
-      \"value\": \"$IMAGE_TAG\"
-    },
-    {
-      \"name\": \"IMAGE_PULL_POLICY\",
-      \"value\": \"$IMAGE_PULL_POLICY\"
-    },
-    {
-      \"name\": \"DATABASE_SIZE\",
-      \"value\": \"$DATABASE_SIZE\"
-    },
-    {
-      \"name\": \"INSTALL_REDIS\",
-      \"value\": \"$INSTALL_REDIS\"
-    },
-    {
-       \"name\": \"INSTANCE_TTL\",
-       \"value\": \"$INSTANCE_TTL\"
-    },
-    {
-       \"name\": \"FLYWAY_MIGRATE_OUT_OF_ORDER\",
-       \"value\": \"$FLYWAY_MIGRATE_OUT_OF_ORDER\"
-    },
-    {
-       \"name\": \"FLYWAY_REPAIR_BEFORE_MIGRATION\",
-       \"value\": \"$FLYWAY_REPAIR_BEFORE_MIGRATION\"
-    }
-  ]
+  \"parameters\": {
+        \"DATABASE_ID\": {
+            \"value\": \"$DATABASE_ID\"
+        },
+        \"STARTUP_PROBE_FAILURE_THRESHOLD\": {
+            \"value\": \"$STARTUP_PROBE_FAILURE_THRESHOLD\"
+        },
+        \"STARTUP_PROBE_PERIOD_SECONDS\": {
+            \"value\": \"$STARTUP_PROBE_PERIOD_SECONDS\"
+        },
+        \"LIVENESS_PROBE_TIMEOUT_SECONDS\": {
+            \"value\": \"$LIVENESS_PROBE_TIMEOUT_SECONDS\"
+        },
+        \"READINESS_PROBE_TIMEOUT_SECONDS\": {
+            \"value\": \"$READINESS_PROBE_TIMEOUT_SECONDS\"
+        },
+        \"IMAGE_REPOSITORY\": {
+            \"value\": \"$IMAGE_REPOSITORY\"
+        },
+        \"IMAGE_TAG\": {
+            \"value\": \"$IMAGE_TAG\"
+        },
+        \"IMAGE_PULL_POLICY\": {
+            \"value\": \"$IMAGE_PULL_POLICY\"
+        },
+        \"DATABASE_SIZE\": {
+            \"value\": \"$DATABASE_SIZE\"
+        },
+        \"INSTALL_REDIS\": {
+            \"value\": \"$INSTALL_REDIS\"
+        },
+        \"INSTANCE_TTL\": {
+            \"value\": \"$INSTANCE_TTL\"
+        },
+        \"FLYWAY_MIGRATE_OUT_OF_ORDER\": {
+            \"value\": \"$FLYWAY_MIGRATE_OUT_OF_ORDER\"
+        },
+        \"FLYWAY_REPAIR_BEFORE_MIGRATION\": {
+            \"value\": \"$FLYWAY_REPAIR_BEFORE_MIGRATION\"
+        }
+  }
 }" | $HTTP post "$IM_HOST/instances" "Authorization: Bearer $ACCESS_TOKEN"

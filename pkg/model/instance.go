@@ -39,7 +39,7 @@ func (i Instance) FindParameter(name string) (InstanceParameter, error) {
 type InstanceParameter struct {
 	InstanceID         uint      `gorm:"primaryKey" json:"-"`
 	StackParameterName string    `gorm:"primaryKey" json:"name"`
-	StackParameter     Parameter `gorm:"foreignKey:StackParameterID,StackName; references:Name,StackName; constraint:OnUpdate:CASCADE,OnDelete:CASCADE" json:"-"`
+	StackParameter     Parameter `gorm:"foreignKey:StackParameterName,StackName; references:Name,StackName; constraint:OnUpdate:CASCADE,OnDelete:CASCADE" json:"-"`
 	StackName          string    `json:"-"`
 	Value              string    `json:"value"`
 }

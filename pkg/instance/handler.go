@@ -56,12 +56,16 @@ type userClientHandler interface {
 }
 
 type DeployInstanceRequest struct {
-	Name           string                    `json:"name" binding:"required,dns_rfc1035_label"`
-	Group          string                    `json:"groupName" binding:"required"`
-	Stack          string                    `json:"stackName" binding:"required"`
-	Parameters     []model.InstanceParameter `json:"parameters"`
-	SourceInstance uint                      `json:"sourceInstance"`
-	PresetInstance uint                      `json:"presetInstance"`
+	Name           string               `json:"name" binding:"required,dns_rfc1035_label"`
+	Group          string               `json:"groupName" binding:"required"`
+	Stack          string               `json:"stackName" binding:"required"`
+	Parameters     map[string]parameter `json:"parameters"` // model.InstanceParameter `json:"parameters"`
+	SourceInstance uint                 `json:"sourceInstance"`
+	PresetInstance uint                 `json:"presetInstance"`
+}
+
+type parameter struct {
+	Value string `json:"value"`
 }
 
 // Deploy instance
@@ -124,12 +128,21 @@ func (h Handler) Deploy(c *gin.Context) {
 		return
 	}
 
+	params := make([]model.InstanceParameter, len(request.Parameters))
+	j := 0
+	for name, p := range request.Parameters {
+		params[j] = model.InstanceParameter{
+			StackParameterName: name,
+			Value:              p.Value,
+		}
+		j++
+	}
 	i := &model.Instance{
 		Name:       request.Name,
 		UserID:     uint(user.ID),
 		GroupName:  request.Group,
 		StackName:  request.Stack,
-		Parameters: request.Parameters,
+		Parameters: params,
 		Preset:     preset,
 		PresetID:   request.PresetInstance,
 	}

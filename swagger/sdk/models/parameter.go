@@ -14,20 +14,11 @@ import (
 
 // Parameter parameter
 //
-// swagger:model Parameter
+// swagger:model parameter
 type Parameter struct {
 
-	// consumed
-	Consumed bool `json:"Consumed,omitempty"`
-
-	// name
-	Name string `json:"Name,omitempty"`
-
-	// stack name
-	StackName string `json:"StackName,omitempty"`
-
 	// value
-	Value string `json:"Value,omitempty"`
+	Value string `json:"value,omitempty"`
 }
 
 // Validate validates this parameter

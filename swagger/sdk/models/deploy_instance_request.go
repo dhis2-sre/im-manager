@@ -7,11 +7,11 @@ package models
 
 import (
 	"context"
-	"strconv"
 
 	"github.com/go-openapi/errors"
 	"github.com/go-openapi/strfmt"
 	"github.com/go-openapi/swag"
+	"github.com/go-openapi/validate"
 )
 
 // DeployInstanceRequest deploy instance request
@@ -26,7 +26,7 @@ type DeployInstanceRequest struct {
 	Name string `json:"name,omitempty"`
 
 	// parameters
-	Parameters []*InstanceParameter `json:"parameters"`
+	Parameters map[string]Parameter `json:"parameters,omitempty"`
 
 	// preset instance
 	PresetInstance uint64 `json:"presetInstance,omitempty"`
@@ -57,17 +57,17 @@ func (m *DeployInstanceRequest) validateParameters(formats strfmt.Registry) erro
 		return nil
 	}
 
-	for i := 0; i < len(m.Parameters); i++ {
-		if swag.IsZero(m.Parameters[i]) { // not required
-			continue
-		}
+	for k := range m.Parameters {
 
-		if m.Parameters[i] != nil {
-			if err := m.Parameters[i].Validate(formats); err != nil {
+		if err := validate.Required("parameters"+"."+k, "body", m.Parameters[k]); err != nil {
+			return err
+		}
+		if val, ok := m.Parameters[k]; ok {
+			if err := val.Validate(formats); err != nil {
 				if ve, ok := err.(*errors.Validation); ok {
-					return ve.ValidateName("parameters" + "." + strconv.Itoa(i))
+					return ve.ValidateName("parameters" + "." + k)
 				} else if ce, ok := err.(*errors.CompositeError); ok {
-					return ce.ValidateName("parameters" + "." + strconv.Itoa(i))
+					return ce.ValidateName("parameters" + "." + k)
 				}
 				return err
 			}
@@ -94,15 +94,10 @@ func (m *DeployInstanceRequest) ContextValidate(ctx context.Context, formats str
 
 func (m *DeployInstanceRequest) contextValidateParameters(ctx context.Context, formats strfmt.Registry) error {
 
-	for i := 0; i < len(m.Parameters); i++ {
+	for k := range m.Parameters {
 
-		if m.Parameters[i] != nil {
-			if err := m.Parameters[i].ContextValidate(ctx, formats); err != nil {
-				if ve, ok := err.(*errors.Validation); ok {
-					return ve.ValidateName("parameters" + "." + strconv.Itoa(i))
-				} else if ce, ok := err.(*errors.CompositeError); ok {
-					return ce.ValidateName("parameters" + "." + strconv.Itoa(i))
-				}
+		if val, ok := m.Parameters[k]; ok {
+			if err := val.ContextValidate(ctx, formats); err != nil {
 				return err
 			}
 		}

@@ -30,10 +30,11 @@ func TestHandler_Deploy(t *testing.T) {
 		Return(group, nil)
 	helmfileService := &mockHelmfileService{}
 	instance := &model.Instance{
-		Name:      "instance-name",
-		GroupName: "group name",
-		StackName: "instance stack",
-		UserID:    1,
+		Name:       "instance-name",
+		GroupName:  "group name",
+		StackName:  "instance stack",
+		UserID:     1,
+		Parameters: []model.InstanceParameter{},
 	}
 	helmfileService.
 		On("sync", "token", instance, group).
