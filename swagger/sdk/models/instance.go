@@ -39,17 +39,14 @@ type Instance struct {
 	// name
 	Name string `json:"Name,omitempty"`
 
-	// optional parameters
-	OptionalParameters []*InstanceOptionalParameter `json:"optionalParameters"`
+	// parameters
+	Parameters []*InstanceParameter `json:"parameters"`
 
 	// preset
 	Preset bool `json:"Preset,omitempty"`
 
 	// preset ID
 	PresetID uint64 `json:"PresetID,omitempty"`
-
-	// required parameters
-	RequiredParameters []*InstanceRequiredParameter `json:"requiredParameters"`
 
 	// stack name
 	StackName string `json:"StackName,omitempty"`
@@ -74,11 +71,7 @@ func (m *Instance) Validate(formats strfmt.Registry) error {
 		res = append(res, err)
 	}
 
-	if err := m.validateOptionalParameters(formats); err != nil {
-		res = append(res, err)
-	}
-
-	if err := m.validateRequiredParameters(formats); err != nil {
+	if err := m.validateParameters(formats); err != nil {
 		res = append(res, err)
 	}
 
@@ -123,48 +116,22 @@ func (m *Instance) validateDeletedAt(formats strfmt.Registry) error {
 	return nil
 }
 
-func (m *Instance) validateOptionalParameters(formats strfmt.Registry) error {
-	if swag.IsZero(m.OptionalParameters) { // not required
+func (m *Instance) validateParameters(formats strfmt.Registry) error {
+	if swag.IsZero(m.Parameters) { // not required
 		return nil
 	}
 
-	for i := 0; i < len(m.OptionalParameters); i++ {
-		if swag.IsZero(m.OptionalParameters[i]) { // not required
+	for i := 0; i < len(m.Parameters); i++ {
+		if swag.IsZero(m.Parameters[i]) { // not required
 			continue
 		}
 
-		if m.OptionalParameters[i] != nil {
-			if err := m.OptionalParameters[i].Validate(formats); err != nil {
+		if m.Parameters[i] != nil {
+			if err := m.Parameters[i].Validate(formats); err != nil {
 				if ve, ok := err.(*errors.Validation); ok {
-					return ve.ValidateName("optionalParameters" + "." + strconv.Itoa(i))
+					return ve.ValidateName("parameters" + "." + strconv.Itoa(i))
 				} else if ce, ok := err.(*errors.CompositeError); ok {
-					return ce.ValidateName("optionalParameters" + "." + strconv.Itoa(i))
-				}
-				return err
-			}
-		}
-
-	}
-
-	return nil
-}
-
-func (m *Instance) validateRequiredParameters(formats strfmt.Registry) error {
-	if swag.IsZero(m.RequiredParameters) { // not required
-		return nil
-	}
-
-	for i := 0; i < len(m.RequiredParameters); i++ {
-		if swag.IsZero(m.RequiredParameters[i]) { // not required
-			continue
-		}
-
-		if m.RequiredParameters[i] != nil {
-			if err := m.RequiredParameters[i].Validate(formats); err != nil {
-				if ve, ok := err.(*errors.Validation); ok {
-					return ve.ValidateName("requiredParameters" + "." + strconv.Itoa(i))
-				} else if ce, ok := err.(*errors.CompositeError); ok {
-					return ce.ValidateName("requiredParameters" + "." + strconv.Itoa(i))
+					return ce.ValidateName("parameters" + "." + strconv.Itoa(i))
 				}
 				return err
 			}
@@ -195,11 +162,7 @@ func (m *Instance) ContextValidate(ctx context.Context, formats strfmt.Registry)
 		res = append(res, err)
 	}
 
-	if err := m.contextValidateOptionalParameters(ctx, formats); err != nil {
-		res = append(res, err)
-	}
-
-	if err := m.contextValidateRequiredParameters(ctx, formats); err != nil {
+	if err := m.contextValidateParameters(ctx, formats); err != nil {
 		res = append(res, err)
 	}
 
@@ -225,36 +188,16 @@ func (m *Instance) contextValidateDeletedAt(ctx context.Context, formats strfmt.
 	return nil
 }
 
-func (m *Instance) contextValidateOptionalParameters(ctx context.Context, formats strfmt.Registry) error {
+func (m *Instance) contextValidateParameters(ctx context.Context, formats strfmt.Registry) error {
 
-	for i := 0; i < len(m.OptionalParameters); i++ {
+	for i := 0; i < len(m.Parameters); i++ {
 
-		if m.OptionalParameters[i] != nil {
-			if err := m.OptionalParameters[i].ContextValidate(ctx, formats); err != nil {
+		if m.Parameters[i] != nil {
+			if err := m.Parameters[i].ContextValidate(ctx, formats); err != nil {
 				if ve, ok := err.(*errors.Validation); ok {
-					return ve.ValidateName("optionalParameters" + "." + strconv.Itoa(i))
+					return ve.ValidateName("parameters" + "." + strconv.Itoa(i))
 				} else if ce, ok := err.(*errors.CompositeError); ok {
-					return ce.ValidateName("optionalParameters" + "." + strconv.Itoa(i))
-				}
-				return err
-			}
-		}
-
-	}
-
-	return nil
-}
-
-func (m *Instance) contextValidateRequiredParameters(ctx context.Context, formats strfmt.Registry) error {
-
-	for i := 0; i < len(m.RequiredParameters); i++ {
-
-		if m.RequiredParameters[i] != nil {
-			if err := m.RequiredParameters[i].ContextValidate(ctx, formats); err != nil {
-				if ve, ok := err.(*errors.Validation); ok {
-					return ve.ValidateName("requiredParameters" + "." + strconv.Itoa(i))
-				} else if ce, ok := err.(*errors.CompositeError); ok {
-					return ce.ValidateName("requiredParameters" + "." + strconv.Itoa(i))
+					return ce.ValidateName("parameters" + "." + strconv.Itoa(i))
 				}
 				return err
 			}

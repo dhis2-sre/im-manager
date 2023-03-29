@@ -9,10 +9,9 @@ import (
 
 // swagger:model Stack
 type Stack struct {
-	Name               string                   `gorm:"primaryKey" json:"name"`
-	RequiredParameters []StackRequiredParameter `gorm:"foreignKey:StackName; references: Name; constraint:OnUpdate:CASCADE,OnDelete:CASCADE" json:"requiredParameters"`
-	OptionalParameters []StackOptionalParameter `gorm:"foreignKey:StackName; references: Name; constraint:OnUpdate:CASCADE,OnDelete:CASCADE" json:"optionalParameters"`
-	Instances          []Instance               `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;" json:"instances"`
+	Name       string      `gorm:"primaryKey" json:"name"`
+	Parameters []Parameter `gorm:"foreignKey:StackName; references: Name; constraint:OnUpdate:CASCADE,OnDelete:CASCADE" json:"parameters"`
+	Instances  []Instance  `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;" json:"instances"`
 
 	HostnamePattern  string
 	HostnameVariable string
@@ -26,24 +25,18 @@ func (s Stack) GetHostname(name, namespace string) string {
 	return fmt.Sprintf(s.HostnamePattern, name, namespace)
 }
 
-func (s Stack) FindOptionalParameter(name string) (StackOptionalParameter, error) {
-	for _, parameter := range s.OptionalParameters {
+func (s Stack) FindParameter(name string) (Parameter, error) {
+	for _, parameter := range s.Parameters {
 		if parameter.Name == name {
 			return parameter, nil
 		}
 	}
-	return StackOptionalParameter{}, fmt.Errorf("optional parameter not found: %s", name)
+	return Parameter{}, fmt.Errorf("parameter not found: %q", name)
 }
 
-type StackRequiredParameter struct {
+type Parameter struct {
 	Name      string `gorm:"primaryKey"`
 	StackName string `gorm:"primaryKey"`
+	Value     string
 	Consumed  bool
-}
-
-type StackOptionalParameter struct {
-	Name         string `gorm:"primaryKey"`
-	StackName    string `gorm:"primaryKey"`
-	DefaultValue string
-	Consumed     bool
 }

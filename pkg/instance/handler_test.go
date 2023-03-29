@@ -107,8 +107,7 @@ func TestHandler_Update(t *testing.T) {
 	c := newContext(w, "group name")
 	c.AddParam("id", "1")
 	c.Request = newPost(t, "", &UpdateInstanceRequest{
-		RequiredParameters: nil,
-		OptionalParameters: nil,
+		Parameters: nil,
 	})
 
 	handler.Update(c)

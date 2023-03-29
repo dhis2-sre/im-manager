@@ -85,8 +85,8 @@ func (r repository) Save(instance *model.Instance) error {
 func (r repository) FindById(id uint) (*model.Instance, error) {
 	var instance *model.Instance
 	err := r.db.
-		Preload("RequiredParameters.StackRequiredParameter").
-		Preload("OptionalParameters.StackOptionalParameter").
+		Preload("Parameters.StackParameter").
+		Preload("Parameters.StackParameter").
 		First(&instance, id).Error
 	return instance, err
 }
@@ -144,8 +144,8 @@ func (r repository) FindByGroups(groups []*models.Group, presets bool) ([]GroupW
 
 func (r repository) findInstances(groupNames []string, presets bool) ([]*model.Instance, error) {
 	query := r.db.
-		Preload("RequiredParameters.StackRequiredParameter").
-		Preload("OptionalParameters.StackOptionalParameter")
+		Preload("Parameters.StackParameter").
+		Preload("Parameters.StackParameter")
 
 	isAdmin := slices.Contains(groupNames, AdministratorGroupName)
 	if !isAdmin {
@@ -186,58 +186,34 @@ func groupWithInstances(instancesMap map[string][]*model.Instance, groupMap map[
 
 // TODO: Rename PopulateRelations? Or something else?
 func enrichParameters(instance *model.Instance) {
-	requiredParameters := instance.RequiredParameters
-	if len(requiredParameters) > 0 {
-		for i := range requiredParameters {
-			requiredParameters[i].InstanceID = instance.ID
-			requiredParameters[i].StackName = instance.StackName
-		}
-	}
-
-	optionalParameters := instance.OptionalParameters
-	if len(optionalParameters) > 0 {
-		for i := range optionalParameters {
-			optionalParameters[i].InstanceID = instance.ID
-			optionalParameters[i].StackName = instance.StackName
+	param := instance.Parameters
+	if len(param) > 0 {
+		for i := range param {
+			param[i].InstanceID = instance.ID
+			param[i].StackName = instance.StackName
 		}
 	}
 }
 
 func encryptParameters(key string, instance *model.Instance) error {
-	for i, parameter := range instance.RequiredParameters {
-		value, err := encryptText(key, parameter.Value)
+	for i, param := range instance.Parameters {
+		value, err := encryptText(key, param.Value)
 		if err != nil {
 			return err
 		}
-		instance.RequiredParameters[i].Value = value
-	}
-
-	for i, parameter := range instance.OptionalParameters {
-		value, err := encryptText(key, parameter.Value)
-		if err != nil {
-			return err
-		}
-		instance.OptionalParameters[i].Value = value
+		instance.Parameters[i].Value = value
 	}
 
 	return nil
 }
 
 func decryptParameters(key string, instance *model.Instance) error {
-	for i, parameter := range instance.RequiredParameters {
+	for i, parameter := range instance.Parameters {
 		value, err := decryptText(key, parameter.Value)
 		if err != nil {
 			return err
 		}
-		instance.RequiredParameters[i].Value = value
-	}
-
-	for i, parameter := range instance.OptionalParameters {
-		value, err := decryptText(key, parameter.Value)
-		if err != nil {
-			return err
-		}
-		instance.OptionalParameters[i].Value = value
+		instance.Parameters[i].Value = value
 	}
 
 	return nil

@@ -60,13 +60,13 @@ func LoadStacks(dir string, stackService Service) error {
 		}
 		for _, name := range stackTemplate.requiredParameters {
 			isConsumed := isConsumedParameter(name, stackTemplate.consumedParameters)
-			parameter := &model.StackRequiredParameter{Name: name, StackName: stack.Name, Consumed: isConsumed}
-			stack.RequiredParameters = append(stack.RequiredParameters, *parameter)
+			parameter := &model.Parameter{Name: name, StackName: stack.Name, Consumed: isConsumed}
+			stack.Parameters = append(stack.Parameters, *parameter)
 		}
 		for name, v := range stackTemplate.optionalParameters {
 			isConsumed := isConsumedParameter(name, stackTemplate.consumedParameters)
-			parameter := &model.StackOptionalParameter{Name: name, StackName: stack.Name, Consumed: isConsumed, DefaultValue: v}
-			stack.OptionalParameters = append(stack.OptionalParameters, *parameter)
+			parameter := &model.Parameter{Name: name, StackName: stack.Name, Consumed: isConsumed, Value: v}
+			stack.Parameters = append(stack.Parameters, *parameter)
 		}
 
 		stack, err = stackService.Create(stack)

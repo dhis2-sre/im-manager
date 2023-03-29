@@ -169,7 +169,6 @@ type ReadAtSeeker interface {
 func (s service) Upload(d *model.Database, group *userModels.Group, reader ReadAtSeeker, size int64) (*model.Database, error) {
 	key := fmt.Sprintf("%s/%s", group.Name, d.Name)
 	err := s.s3Client.Upload(s.c.Bucket, key, reader, size)
-
 	if err != nil {
 		return nil, err
 	}
@@ -454,21 +453,14 @@ func newPgDumpConfig(instance *model.Instance, stack *model.Stack) (*pg.Dump, er
 }
 
 func findParameter(parameter string, instance *model.Instance, stack *model.Stack) (string, error) {
-	for _, p := range instance.RequiredParameters {
-		if p.StackRequiredParameterID == parameter {
+	for _, p := range instance.Parameters {
+		if p.StackParameterName == parameter {
 			return p.Value, nil
 		}
 	}
-
-	for _, p := range instance.OptionalParameters {
-		if p.StackOptionalParameterID == parameter {
-			return p.Value, nil
-		}
-	}
-
-	for _, p := range stack.OptionalParameters {
+	for _, p := range stack.Parameters {
 		if p.Name == parameter {
-			return p.DefaultValue, nil
+			return p.Value, nil
 		}
 	}
 

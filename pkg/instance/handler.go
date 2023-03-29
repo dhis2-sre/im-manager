@@ -56,13 +56,12 @@ type userClientHandler interface {
 }
 
 type DeployInstanceRequest struct {
-	Name               string                            `json:"name" binding:"required,dns_rfc1035_label"`
-	Group              string                            `json:"groupName" binding:"required"`
-	Stack              string                            `json:"stackName" binding:"required"`
-	RequiredParameters []model.InstanceRequiredParameter `json:"requiredParameters"`
-	OptionalParameters []model.InstanceOptionalParameter `json:"optionalParameters"`
-	SourceInstance     uint                              `json:"sourceInstance"`
-	PresetInstance     uint                              `json:"presetInstance"`
+	Name           string                    `json:"name" binding:"required,dns_rfc1035_label"`
+	Group          string                    `json:"groupName" binding:"required"`
+	Stack          string                    `json:"stackName" binding:"required"`
+	Parameters     []model.InstanceParameter `json:"parameters"`
+	SourceInstance uint                      `json:"sourceInstance"`
+	PresetInstance uint                      `json:"presetInstance"`
 }
 
 // Deploy instance
@@ -126,14 +125,13 @@ func (h Handler) Deploy(c *gin.Context) {
 	}
 
 	i := &model.Instance{
-		Name:               request.Name,
-		UserID:             uint(user.ID),
-		GroupName:          request.Group,
-		StackName:          request.Stack,
-		RequiredParameters: request.RequiredParameters,
-		OptionalParameters: request.OptionalParameters,
-		Preset:             preset,
-		PresetID:           request.PresetInstance,
+		Name:       request.Name,
+		UserID:     uint(user.ID),
+		GroupName:  request.Group,
+		StackName:  request.Stack,
+		Parameters: request.Parameters,
+		Preset:     preset,
+		PresetID:   request.PresetInstance,
 	}
 
 	canWrite := handler.CanWriteInstance(user, i)
@@ -229,8 +227,7 @@ func (h Handler) consumeParameters(user *models.User, sourceInstanceId uint, ins
 }
 
 type UpdateInstanceRequest struct {
-	RequiredParameters []model.InstanceRequiredParameter `json:"requiredParameters"`
-	OptionalParameters []model.InstanceOptionalParameter `json:"optionalParameters"`
+	Parameters []model.InstanceParameter `json:"parameters"`
 }
 
 // Update instance
@@ -290,8 +287,7 @@ func (h Handler) Update(c *gin.Context) {
 		return
 	}
 
-	instance.RequiredParameters = request.RequiredParameters
-	instance.OptionalParameters = request.OptionalParameters
+	instance.Parameters = request.Parameters
 
 	saved, err := h.instanceService.Save(instance)
 	if err != nil {

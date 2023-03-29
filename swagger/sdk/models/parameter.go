@@ -12,10 +12,10 @@ import (
 	"github.com/go-openapi/swag"
 )
 
-// StackRequiredParameter stack required parameter
+// Parameter parameter
 //
-// swagger:model StackRequiredParameter
-type StackRequiredParameter struct {
+// swagger:model Parameter
+type Parameter struct {
 
 	// consumed
 	Consumed bool `json:"Consumed,omitempty"`
@@ -25,20 +25,23 @@ type StackRequiredParameter struct {
 
 	// stack name
 	StackName string `json:"StackName,omitempty"`
+
+	// value
+	Value string `json:"Value,omitempty"`
 }
 
-// Validate validates this stack required parameter
-func (m *StackRequiredParameter) Validate(formats strfmt.Registry) error {
+// Validate validates this parameter
+func (m *Parameter) Validate(formats strfmt.Registry) error {
 	return nil
 }
 
-// ContextValidate validates this stack required parameter based on context it is used
-func (m *StackRequiredParameter) ContextValidate(ctx context.Context, formats strfmt.Registry) error {
+// ContextValidate validates this parameter based on context it is used
+func (m *Parameter) ContextValidate(ctx context.Context, formats strfmt.Registry) error {
 	return nil
 }
 
 // MarshalBinary interface implementation
-func (m *StackRequiredParameter) MarshalBinary() ([]byte, error) {
+func (m *Parameter) MarshalBinary() ([]byte, error) {
 	if m == nil {
 		return nil, nil
 	}
@@ -46,8 +49,8 @@ func (m *StackRequiredParameter) MarshalBinary() ([]byte, error) {
 }
 
 // UnmarshalBinary interface implementation
-func (m *StackRequiredParameter) UnmarshalBinary(b []byte) error {
-	var res StackRequiredParameter
+func (m *Parameter) UnmarshalBinary(b []byte) error {
+	var res Parameter
 	if err := swag.ReadJSON(b, &res); err != nil {
 		return err
 	}

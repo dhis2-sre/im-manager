@@ -10,8 +10,7 @@ type Repository interface {
 	Delete(name string) error
 	Find(name string) (*model.Stack, error)
 	FindAll() (*[]model.Stack, error)
-	CreateRequiredParameter(parameter *model.StackRequiredParameter) error
-	CreateOptionalParameter(parameter *model.StackOptionalParameter) error
+	CreateParameter(parameter *model.Parameter) error
 	Save(stack *model.Stack) error
 }
 
@@ -34,10 +33,7 @@ func (r repository) Delete(name string) error {
 func (r repository) Find(name string) (*model.Stack, error) {
 	var stack *model.Stack
 	err := r.db.
-		//		Preload("RequiredParameters", "consumed <> ?", true).
-		//		Preload("OptionalParameters", "consumed <> ?", true).
-		Preload("RequiredParameters").
-		Preload("OptionalParameters").
+		Preload("Parameters").
 		First(&stack, "name = ?", name).Error
 	return stack, err
 }
@@ -48,11 +44,7 @@ func (r repository) FindAll() (*[]model.Stack, error) {
 	return &stacks, err
 }
 
-func (r repository) CreateOptionalParameter(parameter *model.StackOptionalParameter) error {
-	return r.db.FirstOrCreate(&parameter).Error
-}
-
-func (r repository) CreateRequiredParameter(parameter *model.StackRequiredParameter) error {
+func (r repository) CreateParameter(parameter *model.Parameter) error {
 	return r.db.FirstOrCreate(&parameter).Error
 }
 

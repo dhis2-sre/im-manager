@@ -50,20 +50,15 @@ definitions:
             name:
                 type: string
                 x-go-name: Name
-            optionalParameters:
+            parameters:
                 items:
-                    $ref: '#/definitions/InstanceOptionalParameter'
+                    $ref: '#/definitions/InstanceParameter'
                 type: array
-                x-go-name: OptionalParameters
+                x-go-name: Parameters
             presetInstance:
                 format: uint64
                 type: integer
                 x-go-name: PresetInstance
-            requiredParameters:
-                items:
-                    $ref: '#/definitions/InstanceRequiredParameter'
-                type: array
-                x-go-name: RequiredParameters
             sourceInstance:
                 format: uint64
                 type: integer
@@ -142,35 +137,18 @@ definitions:
             UserID:
                 format: uint64
                 type: integer
-            optionalParameters:
+            parameters:
                 items:
-                    $ref: '#/definitions/InstanceOptionalParameter'
+                    $ref: '#/definitions/InstanceParameter'
                 type: array
-                x-go-name: OptionalParameters
-            requiredParameters:
-                items:
-                    $ref: '#/definitions/InstanceRequiredParameter'
-                type: array
-                x-go-name: RequiredParameters
+                x-go-name: Parameters
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/model
-    InstanceOptionalParameter:
+    InstanceParameter:
         properties:
             name:
-                description: 'TODO: Rename StackOptionalParameterID to Name'
                 type: string
-                x-go-name: StackOptionalParameterID
-            value:
-                type: string
-                x-go-name: Value
-        type: object
-        x-go-package: github.com/dhis2-sre/im-manager/pkg/model
-    InstanceRequiredParameter:
-        properties:
-            name:
-                description: 'TODO: Rename StackRequiredParameterID to Name'
-                type: string
-                x-go-name: StackRequiredParameterID
+                x-go-name: StackParameterName
             value:
                 type: string
                 x-go-name: Value
@@ -232,6 +210,18 @@ definitions:
         title: NullTime represents a time.Time that may be null.
         type: object
         x-go-package: database/sql
+    Parameter:
+        properties:
+            Consumed:
+                type: boolean
+            Name:
+                type: string
+            StackName:
+                type: string
+            Value:
+                type: string
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/model
     Response:
         properties:
             status:
@@ -261,38 +251,11 @@ definitions:
             name:
                 type: string
                 x-go-name: Name
-            optionalParameters:
+            parameters:
                 items:
-                    $ref: '#/definitions/StackOptionalParameter'
+                    $ref: '#/definitions/Parameter'
                 type: array
-                x-go-name: OptionalParameters
-            requiredParameters:
-                items:
-                    $ref: '#/definitions/StackRequiredParameter'
-                type: array
-                x-go-name: RequiredParameters
-        type: object
-        x-go-package: github.com/dhis2-sre/im-manager/pkg/model
-    StackOptionalParameter:
-        properties:
-            Consumed:
-                type: boolean
-            DefaultValue:
-                type: string
-            Name:
-                type: string
-            StackName:
-                type: string
-        type: object
-        x-go-package: github.com/dhis2-sre/im-manager/pkg/model
-    StackRequiredParameter:
-        properties:
-            Consumed:
-                type: boolean
-            Name:
-                type: string
-            StackName:
-                type: string
+                x-go-name: Parameters
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/model
     UpdateDatabaseRequest:
@@ -304,16 +267,11 @@ definitions:
         x-go-package: github.com/dhis2-sre/im-manager/pkg/database
     UpdateInstanceRequest:
         properties:
-            optionalParameters:
+            parameters:
                 items:
-                    $ref: '#/definitions/InstanceOptionalParameter'
+                    $ref: '#/definitions/InstanceParameter'
                 type: array
-                x-go-name: OptionalParameters
-            requiredParameters:
-                items:
-                    $ref: '#/definitions/InstanceRequiredParameter'
-                type: array
-                x-go-name: RequiredParameters
+                x-go-name: Parameters
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
     saveAsRequest:

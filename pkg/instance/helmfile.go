@@ -126,13 +126,8 @@ func configureInstanceEnvironment(accessToken string, instance *model.Instance, 
 	cmd.Env = injectEnv(cmd.Env, "KUBERNETES_SERVICE_PORT_HTTPS")
 	cmd.Env = injectEnv(cmd.Env, "KUBERNETES_SERVICE_HOST")
 
-	for _, parameter := range instance.RequiredParameters {
-		instanceEnv := fmt.Sprintf("%s=%s", parameter.StackRequiredParameter.Name, parameter.Value)
-		cmd.Env = append(cmd.Env, instanceEnv)
-	}
-
-	for _, parameter := range instance.OptionalParameters {
-		instanceEnv := fmt.Sprintf("%s=%s", parameter.StackOptionalParameter.Name, parameter.Value)
+	for _, parameter := range instance.Parameters {
+		instanceEnv := fmt.Sprintf("%s=%s", parameter.StackParameter.Name, parameter.Value)
 		cmd.Env = append(cmd.Env, instanceEnv)
 	}
 

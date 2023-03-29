@@ -8,8 +8,7 @@ import (
 type Service interface {
 	Create(stack *model.Stack) (*model.Stack, error)
 	Delete(name string) error
-	CreateRequiredParameter(stack *model.Stack, parameterName string, consumed bool) (*model.StackRequiredParameter, error)
-	CreateOptionalParameter(stack *model.Stack, parameterName string, defaultValue string, consumed bool) (*model.StackOptionalParameter, error)
+	CreateParameter(stack *model.Stack, parameterName string, consumed bool) (*model.Parameter, error)
 	Find(name string) (*model.Stack, error)
 	FindAll() (*[]model.Stack, error)
 	Save(stack *model.Stack) error
@@ -36,18 +35,10 @@ func (s service) Delete(name string) error {
 	return s.repository.Delete(name)
 }
 
-func (s service) CreateRequiredParameter(stack *model.Stack, parameterName string, consumed bool) (*model.StackRequiredParameter, error) {
-	parameter := &model.StackRequiredParameter{Name: parameterName, StackName: stack.Name, Consumed: consumed}
+func (s service) CreateParameter(stack *model.Stack, parameterName string, consumed bool) (*model.Parameter, error) {
+	parameter := &model.Parameter{Name: parameterName, StackName: stack.Name, Consumed: consumed}
 
-	err := s.repository.CreateRequiredParameter(parameter)
-
-	return parameter, err
-}
-
-func (s service) CreateOptionalParameter(stack *model.Stack, parameterName string, defaultValue string, consumed bool) (*model.StackOptionalParameter, error) {
-	parameter := &model.StackOptionalParameter{Name: parameterName, StackName: stack.Name, Consumed: consumed, DefaultValue: defaultValue}
-
-	err := s.repository.CreateOptionalParameter(parameter)
+	err := s.repository.CreateParameter(parameter)
 
 	return parameter, err
 }

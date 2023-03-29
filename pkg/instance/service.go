@@ -72,61 +72,42 @@ func (s service) ConsumeParameters(source, destination *model.Instance) error {
 	}
 
 	// Consumed required parameters
-	for _, parameter := range destinationStack.RequiredParameters {
+	for _, parameter := range destinationStack.Parameters {
 		if (parameter.Consumed || source.Preset) && parameter.Name != destinationStack.HostnameVariable {
 			value, err := s.findParameterValue(parameter.Name, source, sourceStack)
 			if err != nil {
 				return err
 			}
-			parameterRequest := model.InstanceRequiredParameter{
-				StackRequiredParameterID: parameter.Name,
-				Value:                    value,
+			parameterRequest := model.InstanceParameter{
+				StackParameterName: parameter.Name,
+				Value:              value,
 			}
-			destination.RequiredParameters = append(destination.RequiredParameters, parameterRequest)
-		}
-	}
-
-	// Consumed optional parameters
-	for _, parameter := range destinationStack.OptionalParameters {
-		if (parameter.Consumed || source.Preset) && parameter.Name != destinationStack.HostnameVariable {
-			value, err := s.findParameterValue(parameter.Name, source, sourceStack)
-			if err != nil {
-				return err
-			}
-			parameterRequest := model.InstanceOptionalParameter{
-				StackOptionalParameterID: parameter.Name,
-				Value:                    value,
-			}
-			destination.OptionalParameters = append(destination.OptionalParameters, parameterRequest)
+			destination.Parameters = append(destination.Parameters, parameterRequest)
 		}
 	}
 
 	// Hostname parameter
 	if !source.Preset && destinationStack.HostnameVariable != "" {
-		hostnameParameter := model.InstanceRequiredParameter{
-			StackRequiredParameterID: destinationStack.HostnameVariable,
-			Value:                    fmt.Sprintf(sourceStack.HostnamePattern, source.Name, source.GroupName),
+		hostnameParameter := model.InstanceParameter{
+			StackParameterName: destinationStack.HostnameVariable,
+			Value:              fmt.Sprintf(sourceStack.HostnamePattern, source.Name, source.GroupName),
 		}
-		destination.RequiredParameters = append(destination.RequiredParameters, hostnameParameter)
+		destination.Parameters = append(destination.Parameters, hostnameParameter)
 	}
 
 	return nil
 }
 
 func (s service) findParameterValue(parameter string, sourceInstance *model.Instance, sourceStack *model.Stack) (string, error) {
-	requiredParameter, err := sourceInstance.FindRequiredParameter(parameter)
+	requiredParameter, err := sourceInstance.FindParameter(parameter)
 	if err == nil {
 		return requiredParameter.Value, nil
 	}
 
-	optionalParameter, err := sourceInstance.FindOptionalParameter(parameter)
+	// TODO(ivo) value could be nil for a required parameter
+	param, err := sourceStack.FindParameter(parameter)
 	if err == nil {
-		return optionalParameter.Value, nil
-	}
-
-	stackOptionalParameter, err := sourceStack.FindOptionalParameter(parameter)
-	if err == nil {
-		return stackOptionalParameter.DefaultValue, nil
+		return param.Value, nil
 	}
 
 	return "", fmt.Errorf("unable to find value for parameter: %s", parameter)

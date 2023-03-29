@@ -29,7 +29,11 @@ echo "{
   \"name\": \"$NAME\",
   \"groupName\": \"$GROUP\",
   \"stackName\": \"$STACK\",
-  \"optionalParameters\": [
+  \"parameters\": [
+    {
+      \"name\": \"DATABASE_ID\",
+      \"value\": \"$DATABASE_ID\"
+    },
     {
       \"name\": \"STARTUP_PROBE_FAILURE_THRESHOLD\",
       \"value\": \"$STARTUP_PROBE_FAILURE_THRESHOLD\"
@@ -77,12 +81,6 @@ echo "{
     {
        \"name\": \"FLYWAY_REPAIR_BEFORE_MIGRATION\",
        \"value\": \"$FLYWAY_REPAIR_BEFORE_MIGRATION\"
-    }
-  ],
-  \"requiredParameters\": [
-    {
-      \"name\": \"DATABASE_ID\",
-      \"value\": \"$DATABASE_ID\"
     }
   ]
 }" | $HTTP post "$IM_HOST/instances" "Authorization: Bearer $ACCESS_TOKEN"
