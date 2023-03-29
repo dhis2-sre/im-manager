@@ -8,7 +8,6 @@ import (
 type Service interface {
 	Create(stack *model.Stack) (*model.Stack, error)
 	Delete(name string) error
-	CreateParameter(stack *model.Stack, parameterName string, consumed bool) (*model.Parameter, error)
 	Find(name string) (*model.Stack, error)
 	FindAll() (*[]model.Stack, error)
 	Save(stack *model.Stack) error
@@ -33,14 +32,6 @@ func (s service) Create(stack *model.Stack) (*model.Stack, error) {
 
 func (s service) Delete(name string) error {
 	return s.repository.Delete(name)
-}
-
-func (s service) CreateParameter(stack *model.Stack, parameterName string, consumed bool) (*model.Parameter, error) {
-	parameter := &model.Parameter{Name: parameterName, StackName: stack.Name, Consumed: consumed}
-
-	err := s.repository.CreateParameter(parameter)
-
-	return parameter, err
 }
 
 func (s service) Find(name string) (*model.Stack, error) {

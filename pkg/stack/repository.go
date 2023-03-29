@@ -10,7 +10,6 @@ type Repository interface {
 	Delete(name string) error
 	Find(name string) (*model.Stack, error)
 	FindAll() (*[]model.Stack, error)
-	CreateParameter(parameter *model.Parameter) error
 	Save(stack *model.Stack) error
 }
 
@@ -42,10 +41,6 @@ func (r repository) FindAll() (*[]model.Stack, error) {
 	var stacks []model.Stack
 	err := r.db.Find(&stacks).Error
 	return &stacks, err
-}
-
-func (r repository) CreateParameter(parameter *model.Parameter) error {
-	return r.db.FirstOrCreate(&parameter).Error
 }
 
 func (r repository) Save(stack *model.Stack) error {
