@@ -33,7 +33,7 @@ require (
 	gorm.io/gorm v1.24.7-0.20230306060331-85eaf9eeda11
 	k8s.io/api v0.28.0-alpha.0
 	k8s.io/apimachinery v0.28.0-alpha.0
-	k8s.io/client-go v0.27.0-alpha.3
+	k8s.io/client-go v0.28.0-alpha.0
 )
 
 require (
