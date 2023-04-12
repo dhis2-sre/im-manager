@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dhis2-sre/im-manager/pkg/model"
 	"github.com/dhis2-sre/im-manager/pkg/token"
 
 	"github.com/dhis2-sre/im-manager/pkg/instance"
@@ -14,24 +13,6 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 )
-
-type userService struct{ mock.Mock }
-
-func (u *userService) SignIn(username, password string) (*model.User, error) {
-	called := u.Called(username, password)
-	user := called.Get(0).(*model.User)
-	err := called.Error(1)
-	return user, err
-}
-
-type tokenService struct{ mock.Mock }
-
-func (t *tokenService) GetTokens(user *model.User, previousRefreshTokenId string) (*token.Tokens, error) {
-	called := t.Called(user, previousRefreshTokenId)
-	tokens := called.Get(0).(*token.Tokens)
-	err := called.Error(1)
-	return tokens, err
-}
 
 func (s *ttlSuite) TestConsumeDeletesInstance() {
 	require := s.Require()

@@ -571,17 +571,17 @@ func groupsWithDatabases(groups []model.Group, databases []model.Database) []Gro
 	for i, group := range groups {
 		groupsWithDatabases[i].Name = group.Name
 		groupsWithDatabases[i].Hostname = group.Hostname
-		groupsWithDatabases[i].Databases = filterByGroupId(databases, func(instance *model.Database) bool {
-			return instance.GroupName == group.Name
+		groupsWithDatabases[i].Databases = filterDatabases(databases, func(database *model.Database) bool {
+			return database.GroupName == group.Name
 		})
 	}
 	return groupsWithDatabases
 }
 
-func filterByGroupId(databases []model.Database, test func(instance *model.Database) bool) (ret []model.Database) {
-	for _, database := range databases {
-		if test(&database) {
-			ret = append(ret, database)
+func filterDatabases(databases []model.Database, test func(database *model.Database) bool) (ret []model.Database) {
+	for i := range databases {
+		if test(&databases[i]) {
+			ret = append(ret, databases[i])
 		}
 	}
 	return

@@ -133,15 +133,15 @@ func run() error {
 
 	err = createAdminUser(cfg, userService, groupService)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 	err = createGroups(cfg, groupService)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 	err = createServiceUsers(cfg, userService, groupService)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 
 	r := server.GetEngine(cfg.BasePath, stackHandler, instanceHandler, integrationHandler, authMiddleware)

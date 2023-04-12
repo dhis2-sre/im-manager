@@ -1,9 +1,10 @@
 package handler
 
 import (
+	"testing"
+
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	"gorm.io/gorm"
-	"testing"
 
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"

@@ -5,9 +5,6 @@ import (
 	"errors"
 	"log"
 
-	"github.com/dhis2-sre/im-manager/pkg/model"
-	"github.com/dhis2-sre/im-manager/pkg/token"
-
 	"gorm.io/gorm"
 
 	"github.com/dhis2-sre/rabbitmq"
@@ -15,20 +12,8 @@ import (
 )
 
 type ttlDestroyConsumer struct {
-	usrClientUsername string
-	usrClientPassword string
-	userService       userService
-	tokenService      tokenService
-	consumer          *rabbitmq.Consumer
-	instanceDeleter   deleter
-}
-
-type userService interface {
-	SignIn(username, password string) (*model.User, error)
-}
-
-type tokenService interface {
-	GetTokens(user *model.User, previousRefreshTokenId string) (*token.Tokens, error)
+	consumer        *rabbitmq.Consumer
+	instanceDeleter deleter
 }
 
 type deleter interface {
