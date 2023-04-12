@@ -22,6 +22,17 @@ deploy:
         valuesFiles:
           - helm/data/secrets/{{ .ENVIRONMENT }}/rabbitmq.yaml
 
+      - name: im-manager-redis-{{ .ENVIRONMENT }}
+        namespace: instance-manager-{{ .ENVIRONMENT }}
+        createNamespace: true
+        remoteChart: redis
+        repo: https://charts.bitnami.com/bitnami
+        version: 17.6.0
+        setValues:
+          architecture: standalone
+          auth:
+            enabled: false
+
       - name: im-manager-postgresql-{{ .ENVIRONMENT }}
         namespace: instance-manager-{{ .ENVIRONMENT }}
         createNamespace: true

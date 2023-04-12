@@ -5,19 +5,39 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dhis2-sre/im-manager/pkg/model"
+	"github.com/dhis2-sre/im-manager/pkg/token"
+
 	"github.com/dhis2-sre/im-manager/pkg/instance"
-	"github.com/dhis2-sre/im-user/swagger/sdk/models"
 	"github.com/dhis2-sre/rabbitmq"
 	amqp "github.com/rabbitmq/amqp091-go"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 )
 
+type userService struct{ mock.Mock }
+
+func (u *userService) SignIn(username, password string) (*model.User, error) {
+	called := u.Called(username, password)
+	user := called.Get(0).(*model.User)
+	err := called.Error(1)
+	return user, err
+}
+
+type tokenService struct{ mock.Mock }
+
+func (t *tokenService) GetTokens(user *model.User, previousRefreshTokenId string) (*token.Tokens, error) {
+	called := t.Called(user, previousRefreshTokenId)
+	tokens := called.Get(0).(*token.Tokens)
+	err := called.Error(1)
+	return tokens, err
+}
+
 func (s *ttlSuite) TestConsumeDeletesInstance() {
 	require := s.Require()
 
 	uc := &userClient{}
-	uc.On("SignIn", "username", "password").Return(&models.Tokens{
+	uc.On("SignIn", "username", "password").Return(&token.Tokens{
 		AccessToken: "token",
 	}, nil)
 
@@ -31,7 +51,7 @@ func (s *ttlSuite) TestConsumeDeletesInstance() {
 	is := &instanceService{}
 	is.On("Delete", "token", uint(1)).Return(nil)
 
-	td := instance.NewTTLDestroyConsumer("username", "password", uc, consumer, is)
+	td := instance.NewTTLDestroyConsumer(consumer, is)
 	require.NoError(td.Consume())
 
 	require.NoError(s.amqpClient.ch.PublishWithContext(context.TODO(), "", "ttl-destroy", false, false, amqp.Publishing{
@@ -48,9 +68,9 @@ type userClient struct {
 	mock.Mock
 }
 
-func (u *userClient) SignIn(username, password string) (*models.Tokens, error) {
+func (u *userClient) SignIn(username, password string) (*token.Tokens, error) {
 	args := u.Called(username, password)
-	tokens := args.Get(0).(*models.Tokens)
+	tokens := args.Get(0).(*token.Tokens)
 	err := args.Error(1)
 	return tokens, err
 }

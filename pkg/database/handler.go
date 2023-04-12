@@ -15,46 +15,46 @@ import (
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	"github.com/dhis2-sre/im-manager/pkg/stack"
 
-	userModels "github.com/dhis2-sre/im-user/swagger/sdk/models"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
 
-func New(userClient userClientHandler, databaseService Service, instanceService instance.Service, stackService stack.Service) Handler {
+func New(databaseService Service, userService userService, groupService groupService, instanceService instance.Service, stackService stack.Service) Handler {
 	return Handler{
-		userClient,
+		databaseService,
+		userService,
+		groupService,
 		instanceService,
 		stackService,
-		databaseService,
 	}
 }
 
+type userService interface {
+	FindById(id uint) (*model.User, error)
+}
+
 type Handler struct {
-	userClient      userClientHandler
+	databaseService Service
+	userService     userService
+	groupService    groupService
 	instanceService instance.Service
 	stackService    stack.Service
-	databaseService Service
 }
 
 type Service interface {
-	Copy(id uint, d *model.Database, group *userModels.Group) error
+	Copy(id uint, d *model.Database, group *model.Group) error
 	FindById(id uint) (*model.Database, error)
 	FindByIdentifier(identifier string) (*model.Database, error)
 	Lock(id uint, instanceId uint, userId uint) (*model.Lock, error)
 	Unlock(id uint) error
-	Upload(d *model.Database, group *userModels.Group, reader ReadAtSeeker, size int64) (*model.Database, error)
+	Upload(d *model.Database, group *model.Group, reader ReadAtSeeker, size int64) (*model.Database, error)
 	Download(id uint, dst io.Writer, headers func(contentLength int64)) error
 	Delete(id uint) error
-	List(groups []*userModels.Group) ([]*model.Database, error)
+	List(groups []model.Group) ([]model.Database, error)
 	Update(d *model.Database) error
 	CreateExternalDownload(databaseID uint, expiration time.Time) (model.ExternalDownload, error)
 	FindExternalDownload(uuid uuid.UUID) (model.ExternalDownload, error)
-	SaveAs(token string, database *model.Database, instance *model.Instance, stack *model.Stack, newName string, format string) (*model.Database, error)
-}
-
-type userClientHandler interface {
-	FindGroupByName(token string, name string) (*userModels.Group, error)
-	FindUserById(token string, id uint) (*userModels.User, error)
+	SaveAs(database *model.Database, instance *model.Instance, stack *model.Stack, newName string, format string) (*model.Database, error)
 }
 
 // Upload database
@@ -97,13 +97,7 @@ func (h Handler) Upload(c *gin.Context) {
 		return
 	}
 
-	token, err := handler.GetTokenFromHttpAuthHeader(c)
-	if err != nil {
-		_ = c.Error(err)
-		return
-	}
-
-	group, err := h.userClient.FindGroupByName(token, d.GroupName)
+	group, err := h.groupService.Find(d.GroupName)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -173,12 +167,6 @@ func (h Handler) SaveAs(c *gin.Context) {
 		return
 	}
 
-	token, err := handler.GetTokenFromHttpAuthHeader(c)
-	if err != nil {
-		_ = c.Error(err)
-		return
-	}
-
 	instanceIdParam := c.Param("instanceId")
 	instanceId, err := strconv.ParseUint(instanceIdParam, 10, 32)
 	if err != nil {
@@ -224,7 +212,7 @@ func (h Handler) SaveAs(c *gin.Context) {
 		return
 	}
 
-	save, err := h.databaseService.SaveAs(token, database, instance, stack, request.Name, request.Format)
+	save, err := h.databaseService.SaveAs(database, instance, stack, request.Name, request.Format)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -279,13 +267,7 @@ func (h Handler) Copy(c *gin.Context) {
 		return
 	}
 
-	token, err := handler.GetTokenFromHttpAuthHeader(c)
-	if err != nil {
-		_ = c.Error(err)
-		return
-	}
-
-	group, err := h.userClient.FindGroupByName(token, d.GroupName)
+	group, err := h.groupService.Find(d.GroupName)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -550,7 +532,7 @@ type GroupsWithDatabases struct {
 	ID        uint
 	Name      string
 	Hostname  string
-	Databases []*model.Database
+	Databases []model.Database
 }
 
 // List databases
@@ -584,7 +566,7 @@ func (h Handler) List(c *gin.Context) {
 	c.JSON(http.StatusOK, groupsWithDatabases(user.Groups, d))
 }
 
-func groupsWithDatabases(groups []*userModels.Group, databases []*model.Database) []GroupsWithDatabases {
+func groupsWithDatabases(groups []model.Group, databases []model.Database) []GroupsWithDatabases {
 	groupsWithDatabases := make([]GroupsWithDatabases, len(groups))
 	for i, group := range groups {
 		groupsWithDatabases[i].Name = group.Name
@@ -596,9 +578,9 @@ func groupsWithDatabases(groups []*userModels.Group, databases []*model.Database
 	return groupsWithDatabases
 }
 
-func filterByGroupId(databases []*model.Database, test func(instance *model.Database) bool) (ret []*model.Database) {
+func filterByGroupId(databases []model.Database, test func(instance *model.Database) bool) (ret []model.Database) {
 	for _, database := range databases {
-		if test(database) {
+		if test(&database) {
 			ret = append(ret, database)
 		}
 	}

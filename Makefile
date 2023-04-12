@@ -48,16 +48,12 @@ clean:
 	go clean
 
 swagger-clean:
-	rm -rf swagger/sdk/*
 	rm -f swagger/swagger.yaml
 
 swagger-spec:
-	swagger generate spec -o swagger/swagger.yaml -x swagger/sdk --scan-models
+	swagger generate spec -o swagger/swagger.yaml --scan-models
 	swagger validate swagger/swagger.yaml
 
-swagger-client:
-	swagger generate client -f swagger/swagger.yaml -t swagger/sdk
-
-swagger: swagger-clean swagger-spec swagger-client
+swagger: swagger-clean swagger-spec
 
 .PHONY: init check docker-image push-docker-image dev test

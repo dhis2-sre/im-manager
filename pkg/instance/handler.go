@@ -12,17 +12,18 @@ import (
 	"github.com/dhis2-sre/im-manager/internal/apperror"
 	"github.com/dhis2-sre/im-manager/internal/handler"
 	"github.com/dhis2-sre/im-manager/pkg/model"
-	"github.com/dhis2-sre/im-user/swagger/sdk/models"
 	"github.com/gin-gonic/gin"
 )
 
 func NewHandler(
-	usrClient userClientHandler,
+	userService userServiceHandler,
+	groupService groupServiceHandler,
 	instanceService Service,
 	stackService stack.Service,
 ) Handler {
 	return Handler{
-		usrClient,
+		userService,
+		groupService,
 		instanceService,
 		stackService,
 	}
@@ -39,20 +40,24 @@ type Service interface {
 	FindByIdDecrypted(id uint) (*model.Instance, error)
 	FindByNameAndGroup(instance string, group string) (*model.Instance, error)
 	Delete(token string, id uint) error
-	Logs(instance *model.Instance, group *models.Group, typeSelector string) (io.ReadCloser, error)
-	FindInstances(user *models.User, presets bool) ([]GroupWithInstances, error)
+	Logs(instance *model.Instance, group *model.Group, typeSelector string) (io.ReadCloser, error)
+	FindInstances(user *model.User, presets bool) ([]GroupWithInstances, error)
 	Link(source, destination *model.Instance) error
 }
 
 type Handler struct {
-	userClient      userClientHandler
+	userService     userServiceHandler
+	groupService    groupServiceHandler
 	instanceService Service
 	stackService    stack.Service
 }
 
-type userClientHandler interface {
-	FindGroupByName(token string, name string) (*models.Group, error)
-	FindUserById(token string, id uint) (*models.User, error)
+type userServiceHandler interface {
+	FindById(id uint) (*model.User, error)
+}
+
+type groupServiceHandler interface {
+	Find(name string) (*model.Group, error)
 }
 
 type DeployInstanceRequest struct {
@@ -127,7 +132,7 @@ func (h Handler) Deploy(c *gin.Context) {
 
 	i := &model.Instance{
 		Name:               request.Name,
-		UserID:             uint(user.ID),
+		UserID:             user.ID,
 		GroupName:          request.Group,
 		StackName:          request.Stack,
 		RequiredParameters: request.RequiredParameters,
@@ -195,7 +200,7 @@ func (h Handler) Deploy(c *gin.Context) {
 	c.JSON(http.StatusAccepted, savedInstance)
 }
 
-func (h Handler) consumeParameters(user *models.User, sourceInstanceId uint, instance *model.Instance, preset bool) error {
+func (h Handler) consumeParameters(user *model.User, sourceInstanceId uint, instance *model.Instance, preset bool) error {
 	sourceInstance, err := h.instanceService.FindByIdDecrypted(sourceInstanceId)
 	if err != nil {
 		return err
@@ -680,12 +685,6 @@ func (h Handler) Logs(c *gin.Context) {
 		return
 	}
 
-	token, err := handler.GetTokenFromHttpAuthHeader(c)
-	if err != nil {
-		_ = c.Error(err)
-		return
-	}
-
 	instance, err := h.instanceService.FindById(uint(id))
 	if err != nil {
 		notFound := apperror.NewNotFound("instance", idParam)
@@ -700,7 +699,7 @@ func (h Handler) Logs(c *gin.Context) {
 		return
 	}
 
-	group, err := h.userClient.FindGroupByName(token, instance.GroupName)
+	group, err := h.groupService.Find(instance.GroupName)
 	if err != nil {
 		_ = c.Error(err)
 	}

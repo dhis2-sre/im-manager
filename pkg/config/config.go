@@ -1,10 +1,15 @@
 package config
 
 import (
+	"crypto/rsa"
+	"crypto/x509"
+	"encoding/pem"
+	"errors"
 	"fmt"
 	"log"
 	"os"
 	"strconv"
+	"strings"
 )
 
 type Config struct {
@@ -12,12 +17,16 @@ type Config struct {
 	InstanceParameterEncryptionKey string
 	BasePath                       string
 	InstanceService                Service
-	UserService                    Service
 	DockerHub                      DockerHub
 	DatabaseManagerService         Service
 	Postgresql                     postgresql
 	RabbitMqURL                    rabbitmq
-	Authentication                 Authentication
+	Redis                          redis
+	Authentication                 authentication
+	Groups                         []group
+	AdminUser                      user
+	ServiceUsers                   []user
+	DefaultUser                    user
 	Bucket                         string
 }
 
@@ -29,12 +38,6 @@ func New() Config {
 		InstanceService: Service{
 			Host:     requireEnv("INSTANCE_SERVICE_HOST"),
 			BasePath: requireEnv("INSTANCE_SERVICE_BASE_PATH"),
-		},
-		UserService: Service{
-			Host:     requireEnv("USER_SERVICE_HOST"),
-			BasePath: requireEnv("USER_SERVICE_BASE_PATH"),
-			Username: requireEnv("USER_SERVICE_USERNAME"),
-			Password: requireEnv("USER_SERVICE_PASSWORD"),
 		},
 		DockerHub: DockerHub{
 			Username: requireEnv("DOCKER_HUB_USERNAME"),
@@ -59,14 +62,24 @@ func New() Config {
 			Username: requireEnv("RABBITMQ_USERNAME"),
 			Password: requireEnv("RABBITMQ_PASSWORD"),
 		},
-		Authentication: Authentication{
-			Jwks: Jwks{
-				Host:                   requireEnv("JWKS_HOST"),
-				Index:                  requireEnvAsInt("JWKS_INDEX"),
-				MinimumRefreshInterval: requireEnvAsInt("JWKS_MINIMUM_REFRESH_INTERVAL"),
-			},
+		Redis: redis{
+			Host: requireEnv("REDIS_HOST"),
+			Port: requireEnvAsInt("REDIS_PORT"),
 		},
-		Bucket: requireEnv("S3_BUCKET"),
+		Authentication: authentication{
+			Keys: keys{
+				PrivateKey: requireEnv("PRIVATE_KEY"),
+				PublicKey:  requireEnv("PUBLIC_KEY"),
+			},
+			RefreshTokenSecretKey:         requireEnv("REFRESH_TOKEN_SECRET_KEY"),
+			AccessTokenExpirationSeconds:  requireEnvAsInt("ACCESS_TOKEN_EXPIRATION_IN_SECONDS"),
+			RefreshTokenExpirationSeconds: requireEnvAsInt("REFRESH_TOKEN_EXPIRATION_IN_SECONDS"),
+		},
+		Groups:       newGroups(),
+		AdminUser:    newAdminUser(),
+		ServiceUsers: newServiceUsers(),
+		DefaultUser:  user{},
+		Bucket:       requireEnv("S3_BUCKET"),
 	}
 }
 
@@ -101,14 +114,114 @@ func (r rabbitmq) GetUrl() string {
 	return fmt.Sprintf("amqp://%s:%s@%s:%d/", r.Username, r.Password, r.Host, r.Port)
 }
 
-type Authentication struct {
-	Jwks Jwks
+type redis struct {
+	Host string
+	Port int
 }
 
-type Jwks struct {
-	Host                   string
-	Index                  int
-	MinimumRefreshInterval int
+type authentication struct {
+	Keys                          keys
+	RefreshTokenSecretKey         string
+	AccessTokenExpirationSeconds  int
+	RefreshTokenExpirationSeconds int
+}
+
+type keys struct {
+	PrivateKey string
+	PublicKey  string
+}
+
+func (k keys) GetPrivateKey() (*rsa.PrivateKey, error) {
+	decode, _ := pem.Decode([]byte(k.PrivateKey))
+	if decode == nil {
+		return nil, errors.New("failed to decode private key")
+	}
+
+	// Openssl generates keys formatted as PKCS8 but terraform tls_private_key is producing PKCS1
+	// So if parsing of PKCS8 fails we try PKCS1
+	privateKey, err := x509.ParsePKCS8PrivateKey(decode.Bytes)
+	if err != nil {
+		if err.Error() == "x509: failed to parse private key (use ParsePKCS1PrivateKey instead for this key format)" {
+			log.Println("Trying to parse PKCS1 format...")
+			privateKey, err = x509.ParsePKCS1PrivateKey(decode.Bytes)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			return nil, err
+		}
+		log.Println("Successfully parsed private key")
+	}
+
+	return privateKey.(*rsa.PrivateKey), nil
+}
+
+func (k keys) GetPublicKey() (*rsa.PublicKey, error) {
+	decode, _ := pem.Decode([]byte(k.PublicKey))
+	if decode == nil {
+		return nil, errors.New("failed to decode public key")
+	}
+
+	publicKey, err := x509.ParsePKIXPublicKey(decode.Bytes)
+	if err != nil {
+		return nil, err
+	}
+
+	return publicKey.(*rsa.PublicKey), nil
+}
+
+type group struct {
+	Name     string
+	Hostname string
+}
+
+func newGroups() []group {
+	groupNames := requireEnvAsArray("GROUP_NAMES")
+	groupHostnames := requireEnvAsArray("GROUP_HOSTNAMES")
+
+	if len(groupNames) != len(groupHostnames) {
+		log.Fatalf("len(GROUP_NAMES) != len(GROUP_HOSTNAMES)")
+	}
+
+	groups := make([]group, len(groupNames))
+	for i := 0; i < len(groupNames); i++ {
+		groups[i].Name = groupNames[i]
+		groups[i].Hostname = groupHostnames[i]
+	}
+
+	return groups
+}
+
+type user struct {
+	Email    string
+	Password string
+}
+
+func newAdminUser() user {
+	email := requireEnv("ADMIN_USER_EMAIL")
+	pw := requireEnv("ADMIN_USER_PASSWORD")
+
+	return user{
+		Email:    email,
+		Password: pw,
+	}
+}
+
+func newServiceUsers() []user {
+	emails := requireEnvAsArray("SERVICE_USER_EMAILS")
+	pws := requireEnvAsArray("SERVICE_USER_PASSWORDS")
+
+	if len(emails) != len(pws) {
+		log.Fatalf("len(SERVICE_USER_EMAILS) != len(SERVICE_USER_PASSWORDS)")
+	}
+
+	users := make([]user, len(emails))
+	for i := 0; i < len(emails); i++ {
+		users[i].Email = emails[i]
+		users[i].Password = pws[i]
+	}
+
+	return users
 }
 
 func requireEnv(key string) string {
@@ -126,4 +239,9 @@ func requireEnvAsInt(key string) int {
 		log.Fatalf("Can't parse value as integer: %s", err.Error())
 	}
 	return value
+}
+
+func requireEnvAsArray(key string) []string {
+	value := requireEnv(key)
+	return strings.Split(value, ",")
 }

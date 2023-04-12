@@ -1,75 +1,32 @@
 package handler
 
 import (
-	"context"
 	"crypto/rsa"
 	"errors"
 	"net/http"
-	"time"
-
-	"github.com/dhis2-sre/im-user/swagger/sdk/models"
 
 	"github.com/dhis2-sre/im-manager/internal/apperror"
 	"github.com/dhis2-sre/im-manager/pkg/config"
+	"github.com/dhis2-sre/im-manager/pkg/model"
 	"github.com/gin-gonic/gin"
 	"github.com/lestrrat-go/jwx/jwa"
-	"github.com/lestrrat-go/jwx/jwk"
 	"github.com/lestrrat-go/jwx/jwt"
+	"gorm.io/gorm"
 )
 
-type AuthenticationMiddleware struct {
-	c              config.Config
-	jwkAutoRefresh *jwk.AutoRefresh
-}
+type AuthenticationMiddleware struct{ c config.Config }
 
-func NewAuthentication(c config.Config) (*AuthenticationMiddleware, error) {
-	jwksHost := c.Authentication.Jwks.Host
-	minimumRefreshInterval := time.Duration(c.Authentication.Jwks.MinimumRefreshInterval) * time.Second
-	autoRefresh, err := provideJwkAutoRefresh(jwksHost, minimumRefreshInterval)
-	if err != nil {
-		return nil, err
-	}
-
-	return &AuthenticationMiddleware{
-		c,
-		autoRefresh,
-	}, nil
-}
-
-func provideJwkAutoRefresh(host string, minRefreshInterval time.Duration) (*jwk.AutoRefresh, error) {
-	if host != "" {
-		ctx := context.TODO()
-		ar := jwk.NewAutoRefresh(ctx)
-		ar.Configure(host, jwk.WithMinRefreshInterval(minRefreshInterval))
-
-		_, err := ar.Refresh(ctx, host)
-		if err != nil {
-			return nil, err
-		}
-
-		return ar, nil
-	}
-	return nil, nil
+func NewAuthentication(c config.Config) *AuthenticationMiddleware {
+	return &AuthenticationMiddleware{c}
 }
 
 func (m AuthenticationMiddleware) TokenAuthentication(c *gin.Context) {
-	keySet, err := m.jwkAutoRefresh.Fetch(context.TODO(), m.c.Authentication.Jwks.Host)
+	publicKey, err := m.c.Authentication.Keys.GetPublicKey()
 	if err != nil {
-		internal := apperror.NewInternal("failed to refresh key set")
+		internal := apperror.NewInternal("failed to get public key")
 		_ = c.Error(internal)
 		c.Abort()
 		return
-	}
-
-	publicKey := &rsa.PublicKey{}
-	if key, ok := keySet.Get(m.c.Authentication.Jwks.Index); ok {
-		err := key.Raw(publicKey)
-		if err != nil {
-			internal := apperror.NewInternal("failed to extract public key")
-			_ = c.Error(internal)
-			c.Abort()
-			return
-		}
 	}
 
 	u, err := parseRequest(c.Request, publicKey)
@@ -91,7 +48,7 @@ func (m AuthenticationMiddleware) TokenAuthentication(c *gin.Context) {
 	}
 }
 
-func parseRequest(request *http.Request, key *rsa.PublicKey) (*models.User, error) {
+func parseRequest(request *http.Request, key *rsa.PublicKey) (*model.User, error) {
 	token, err := jwt.ParseRequest(
 		request,
 		jwt.WithValidate(true),
@@ -109,7 +66,7 @@ func parseRequest(request *http.Request, key *rsa.PublicKey) (*models.User, erro
 	return extractUser(userData)
 }
 
-func extractUser(userData interface{}) (*models.User, error) {
+func extractUser(userData interface{}) (*model.User, error) {
 	userMap, ok := userData.(map[string]interface{})
 	if !ok {
 		return nil, errors.New("failed to parse user data")
@@ -118,8 +75,8 @@ func extractUser(userData interface{}) (*models.User, error) {
 	id := userMap["ID"].(float64)
 	email := userMap["Email"].(string)
 
-	user := &models.User{
-		ID:          uint64(id),
+	user := &model.User{
+		Model:       gorm.Model{ID: uint(id)},
 		Email:       email,
 		Groups:      extractGroups("Groups", userMap),
 		AdminGroups: extractGroups("AdminGroups", userMap),
@@ -127,13 +84,13 @@ func extractUser(userData interface{}) (*models.User, error) {
 	return user, nil
 }
 
-func extractGroups(key string, userMap map[string]interface{}) []*models.Group {
+func extractGroups(key string, userMap map[string]interface{}) []model.Group {
 	groupsData, ok := userMap[key].([]interface{})
 	if ok {
-		groups := make([]*models.Group, len(groupsData))
+		groups := make([]model.Group, len(groupsData))
 		for i := 0; i < len(groupsData); i++ {
 			group := groupsData[i].(map[string]interface{})
-			groups[i] = &models.Group{
+			groups[i] = model.Group{
 				Name:     group["Name"].(string),
 				Hostname: group["Hostname"].(string),
 			}

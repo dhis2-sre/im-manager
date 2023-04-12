@@ -1,6 +1,28 @@
 consumes:
     - application/json
 definitions:
+    ClusterConfiguration:
+        properties:
+            CreatedAt:
+                format: date-time
+                type: string
+            DeletedAt:
+                $ref: '#/definitions/DeletedAt'
+            GroupName:
+                type: string
+            ID:
+                format: uint64
+                type: integer
+            KubernetesConfiguration:
+                items:
+                    format: uint8
+                    type: integer
+                type: array
+            UpdatedAt:
+                format: date-time
+                type: string
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/model
     CopyDatabaseRequest:
         properties:
             group:
@@ -11,6 +33,16 @@ definitions:
                 x-go-name: Name
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/database
+    CreateGroupRequest:
+        properties:
+            hostname:
+                type: string
+                x-go-name: Hostname
+            name:
+                type: string
+                x-go-name: Name
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/group
     Database:
         properties:
             CreatedAt:
@@ -84,6 +116,29 @@ definitions:
             UUID:
                 format: uuid
                 type: string
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/model
+    Group:
+        description: Group domain object defining a group
+        properties:
+            CreatedAt:
+                format: date-time
+                type: string
+            DeletedAt:
+                $ref: '#/definitions/DeletedAt'
+            Hostname:
+                type: string
+            Name:
+                type: string
+            UpdatedAt:
+                format: date-time
+                type: string
+            Users:
+                items:
+                    $ref: '#/definitions/User'
+                type: array
+            clusterConfiguration:
+                $ref: '#/definitions/ClusterConfiguration'
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/model
     GroupWithInstances:
@@ -232,6 +287,13 @@ definitions:
         title: NullTime represents a time.Time that may be null.
         type: object
         x-go-package: database/sql
+    RefreshTokenRequest:
+        properties:
+            refreshToken:
+                type: string
+                x-go-name: RefreshToken
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/user
     Response:
         properties:
             status:
@@ -239,6 +301,16 @@ definitions:
                 x-go-name: Status
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/health
+    SignUpRequest:
+        properties:
+            email:
+                type: string
+                x-go-name: Email
+            password:
+                type: string
+                x-go-name: Password
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/user
     Stack:
         properties:
             CreatedAt:
@@ -295,6 +367,24 @@ definitions:
                 type: string
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/model
+    Tokens:
+        description: Tokens domain object defining user tokens
+        properties:
+            access_token:
+                type: string
+                x-go-name: AccessToken
+            expires_in:
+                format: uint64
+                type: integer
+                x-go-name: ExpiresIn
+            refresh_token:
+                type: string
+                x-go-name: RefreshToken
+            token_type:
+                type: string
+                x-go-name: TokenType
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/token
     UpdateDatabaseRequest:
         properties:
             name:
@@ -316,6 +406,32 @@ definitions:
                 x-go-name: RequiredParameters
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
+    User:
+        description: User domain object defining a user
+        properties:
+            AdminGroups:
+                items:
+                    $ref: '#/definitions/Group'
+                type: array
+            CreatedAt:
+                format: date-time
+                type: string
+            DeletedAt:
+                $ref: '#/definitions/DeletedAt'
+            Email:
+                type: string
+            Groups:
+                items:
+                    $ref: '#/definitions/Group'
+                type: array
+            ID:
+                format: uint64
+                type: integer
+            UpdatedAt:
+                format: date-time
+                type: string
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/model
     saveAsRequest:
         properties:
             format:
@@ -332,10 +448,10 @@ info:
     contact:
         email: info@dhis2.org
         url: https://github.com/dhis2-sre/im-manager
-    description: Manager Service is part of the Instance Manager environment
+    description: Instance Manager
     license:
         name: TODO
-    title: Instance Manager Manager Service.
+    title: Instance Manager
     version: 0.1.0
 paths:
     /databases:
@@ -665,6 +781,125 @@ paths:
             security:
                 - oauth2: []
             summary: '"Save as" database'
+    /groups:
+        post:
+            description: Create a group...
+            operationId: groupCreate
+            parameters:
+                - description: Refresh token request body parameter
+                  in: body
+                  name: Body
+                  required: true
+                  schema:
+                    $ref: '#/definitions/CreateGroupRequest'
+            responses:
+                "201":
+                    description: Group
+                    schema:
+                        $ref: '#/definitions/Group'
+                "400":
+                    $ref: '#/responses/Error'
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Create group
+    /groups/{group}/cluster-configuration:
+        post:
+            description: |-
+                Add a cluster configuration to a group. This will allow deploying to a remote cluster.
+                Currently only configurations with embedded access tokens are support.
+                The configuration needs to be encrypted using Mozilla Sops. Please see ./scripts/addClusterConfigToGroup.sh for an example of how this can be done.
+            operationId: addClusterConfigurationToGroup
+            parameters:
+                - in: path
+                  name: group
+                  required: true
+                  type: string
+                  x-go-name: Group
+                - description: SOPS encrypted Kubernetes configuration file
+                  in: formData
+                  name: Body
+                  required: true
+                  type: file
+            responses:
+                "201":
+                    description: Group
+                    schema:
+                        $ref: '#/definitions/Group'
+                "400":
+                    $ref: '#/responses/Error'
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Add cluster configuration to group
+    /groups/{group}/users/{userId}:
+        post:
+            description: Add a user to a group...
+            operationId: addUserToGroup
+            parameters:
+                - in: path
+                  name: group
+                  required: true
+                  type: string
+                  x-go-name: Group
+                - format: uint64
+                  in: path
+                  name: userId
+                  required: true
+                  type: integer
+                  x-go-name: UserID
+            responses:
+                "201":
+                    description: Group
+                    schema:
+                        $ref: '#/definitions/Group'
+                "400":
+                    $ref: '#/responses/Error'
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Add user to group
+    /groups/{name}:
+        get:
+            description: Find a group by its name
+            operationId: findGroupByName
+            parameters:
+                - in: path
+                  name: name
+                  required: true
+                  type: string
+                  x-go-name: Name
+            responses:
+                "200":
+                    description: Group
+                    schema:
+                        $ref: '#/definitions/Group'
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Find group
     /health:
         get:
             description: Show service health status
@@ -991,6 +1226,26 @@ paths:
             security:
                 - oauth2: []
             summary: Integration
+    /me:
+        get:
+            description: Current user details
+            operationId: me
+            responses:
+                "200":
+                    description: User
+                    schema:
+                        $ref: '#/definitions/User'
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: User details
     /presets:
         get:
             description: List all presets accessible by the user
@@ -1007,6 +1262,25 @@ paths:
             security:
                 - oauth2: []
             summary: List presets
+    /refresh:
+        post:
+            description: Refresh user tokens
+            operationId: refreshToken
+            parameters:
+                - description: Refresh token request body parameter
+                  in: body
+                  name: Body
+                  required: true
+                  schema:
+                    $ref: '#/definitions/RefreshTokenRequest'
+            responses:
+                "201":
+                    $ref: '#/responses/Tokens'
+                "400":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            summary: Refresh tokens
     /stacks:
         get:
             description: Find all stacks...
@@ -1049,6 +1323,85 @@ paths:
             security:
                 - oauth2: []
             summary: Find stack
+    /tokens:
+        post:
+            description: Sign in... And get tokens
+            operationId: signIn
+            responses:
+                "201":
+                    $ref: '#/responses/Tokens'
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - basicAuth: []
+            summary: Sign in
+    /users:
+        delete:
+            description: Sign out user... The authentication is done using oauth and JWT. A JWT can't easily be invalidated so even after calling this endpoint a user can still sign in assuming the JWT isn't expired. However, the token can't be refreshed using the refresh token supplied upon signin
+            operationId: signOut
+            responses:
+                "200":
+                    description: ""
+                "401":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Sign out
+        post:
+            description: Sign up a user. This endpoint is publicly accessible and therefor anyone can sign up. However, before being able to perform any actions, users needs to be a member of a group. And only administrators can add users to groups.
+            operationId: signUp
+            parameters:
+                - description: SignUp request body parameter
+                  in: body
+                  name: Body
+                  required: true
+                  schema:
+                    $ref: '#/definitions/SignUpRequest'
+            responses:
+                "201":
+                    description: User
+                    schema:
+                        $ref: '#/definitions/User'
+                "400":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            summary: SignUp user
+    /users/{id}:
+        get:
+            description: Find a user by its id
+            operationId: findUserById
+            parameters:
+                - format: uint64
+                  in: path
+                  name: id
+                  required: true
+                  type: integer
+                  x-go-name: ID
+            responses:
+                "200":
+                    description: User
+                    schema:
+                        $ref: '#/definitions/User'
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Find user
 produces:
     - application/json
 responses:
@@ -1098,9 +1451,13 @@ responses:
             items:
                 $ref: '#/definitions/Stack'
             type: array
+    Tokens:
+        description: ""
+        schema:
+            $ref: '#/definitions/Tokens'
 securityDefinitions:
     oauth2:
         flow: password
-        tokenUrl: /not-valid--endpoint-is-served-from-the-im-user-service
+        tokenUrl: /tokens
         type: oauth2
 swagger: "2.0"

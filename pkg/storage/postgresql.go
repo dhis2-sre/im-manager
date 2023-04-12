@@ -29,6 +29,10 @@ func NewDatabase(c config.Config) (*gorm.DB, error) {
 	}
 
 	err = db.AutoMigrate(
+		&model.User{},
+		&model.Group{},
+		&model.ClusterConfiguration{},
+
 		&model.Stack{},
 		&model.StackRequiredParameter{},
 		&model.StackOptionalParameter{},

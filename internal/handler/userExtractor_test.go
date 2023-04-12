@@ -1,19 +1,20 @@
 package handler
 
 import (
+	"github.com/dhis2-sre/im-manager/pkg/model"
+	"gorm.io/gorm"
 	"testing"
 
-	"github.com/dhis2-sre/im-user/swagger/sdk/models"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestGetUserFromContext(t *testing.T) {
-	id := uint64(1000)
+	id := uint(1000)
 	email := "some@thing.dk"
 	groupName := "whoami"
 	groupHostname := "whoami.org"
-	groups := []*models.Group{
+	groups := []model.Group{
 		{
 			Name:     groupName,
 			Hostname: groupHostname,
@@ -23,14 +24,14 @@ func TestGetUserFromContext(t *testing.T) {
 			Hostname: "play.org",
 		},
 	}
-	adminGroups := []*models.Group{
+	adminGroups := []model.Group{
 		{
 			Name:     groupName,
 			Hostname: groupHostname,
 		},
 	}
-	user := &models.User{
-		ID:          id,
+	user := &model.User{
+		Model:       gorm.Model{ID: id},
 		Email:       email,
 		Groups:      groups,
 		AdminGroups: adminGroups,

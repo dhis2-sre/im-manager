@@ -12,20 +12,19 @@ import (
 
 	"github.com/dhis2-sre/im-manager/pkg/config"
 	"github.com/dhis2-sre/im-manager/pkg/model"
-	"github.com/dhis2-sre/im-user/swagger/sdk/models"
 )
 
 func NewService(
 	config config.Config,
 	instanceRepository Repository,
-	userClient userClientService,
+	groupService groupService,
 	stackService stack.Service,
 	helmfileService helmfile,
 ) *service {
 	return &service{
 		config,
 		instanceRepository,
-		userClient,
+		groupService,
 		stackService,
 		helmfileService,
 	}
@@ -38,24 +37,24 @@ type Repository interface {
 	FindById(id uint) (*model.Instance, error)
 	FindByIdDecrypted(id uint) (*model.Instance, error)
 	FindByNameAndGroup(instance string, group string) (*model.Instance, error)
-	FindByGroups(groups []*models.Group, presets bool) ([]GroupWithInstances, error)
+	FindByGroups(groups []model.Group, presets bool) ([]GroupWithInstances, error)
 	SaveDeployLog(instance *model.Instance, log string) error
 	Delete(id uint) error
 }
 
-type userClientService interface {
-	FindGroupByName(token string, name string) (*models.Group, error)
+type groupService interface {
+	Find(name string) (*model.Group, error)
 }
 
 type helmfile interface {
-	sync(token string, instance *model.Instance, group *models.Group) (*exec.Cmd, error)
-	destroy(token string, instance *model.Instance, group *models.Group) (*exec.Cmd, error)
+	sync(token string, instance *model.Instance, group *model.Group) (*exec.Cmd, error)
+	destroy(token string, instance *model.Instance, group *model.Group) (*exec.Cmd, error)
 }
 
 type service struct {
 	config             config.Config
 	instanceRepository Repository
-	userClient         userClientService
+	groupService       groupService
 	stackService       stack.Service
 	helmfileService    helmfile
 }
@@ -133,7 +132,7 @@ func (s service) findParameterValue(parameter string, sourceInstance *model.Inst
 }
 
 func (s service) Pause(token string, instance *model.Instance) error {
-	group, err := s.userClient.FindGroupByName(token, instance.GroupName)
+	group, err := s.groupService.Find(instance.GroupName)
 	if err != nil {
 		return err
 	}
@@ -147,7 +146,7 @@ func (s service) Pause(token string, instance *model.Instance) error {
 }
 
 func (s service) Resume(token string, instance *model.Instance) error {
-	group, err := s.userClient.FindGroupByName(token, instance.GroupName)
+	group, err := s.groupService.Find(instance.GroupName)
 	if err != nil {
 		return err
 	}
@@ -161,7 +160,7 @@ func (s service) Resume(token string, instance *model.Instance) error {
 }
 
 func (s service) Restart(token string, instance *model.Instance, typeSelector string) error {
-	group, err := s.userClient.FindGroupByName(token, instance.GroupName)
+	group, err := s.groupService.Find(instance.GroupName)
 	if err != nil {
 		return err
 	}
@@ -191,7 +190,7 @@ func (s service) Save(instance *model.Instance) (*model.Instance, error) {
 }
 
 func (s service) Deploy(accessToken string, instance *model.Instance) error {
-	group, err := s.userClient.FindGroupByName(accessToken, instance.GroupName)
+	group, err := s.groupService.Find(instance.GroupName)
 	if err != nil {
 		return err
 	}
@@ -237,7 +236,7 @@ func (s service) Delete(token string, id uint) error {
 	}
 
 	if instanceWithParameters.DeployLog != "" {
-		group, err := s.userClient.FindGroupByName(token, instanceWithParameters.GroupName)
+		group, err := s.groupService.Find(instanceWithParameters.GroupName)
 		if err != nil {
 			return err
 		}
@@ -258,7 +257,7 @@ func (s service) Delete(token string, id uint) error {
 	return s.instanceRepository.Delete(id)
 }
 
-func (s service) Logs(instance *model.Instance, group *models.Group, typeSelector string) (io.ReadCloser, error) {
+func (s service) Logs(instance *model.Instance, group *model.Group, typeSelector string) (io.ReadCloser, error) {
 	ks, err := NewKubernetesService(group.ClusterConfiguration)
 	if err != nil {
 		return nil, err
@@ -279,7 +278,7 @@ func (s service) FindByNameAndGroup(instance string, group string) (*model.Insta
 	return s.instanceRepository.FindByNameAndGroup(instance, group)
 }
 
-func (s service) FindInstances(user *models.User, presets bool) ([]GroupWithInstances, error) {
+func (s service) FindInstances(user *model.User, presets bool) ([]GroupWithInstances, error) {
 	allGroups := append(user.Groups, user.AdminGroups...) //nolint:gocritic
 
 	instances, err := s.instanceRepository.FindByGroups(allGroups, presets)

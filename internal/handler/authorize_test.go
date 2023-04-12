@@ -3,18 +3,19 @@ package handler
 import (
 	"testing"
 
+	"gorm.io/gorm"
+
 	"github.com/dhis2-sre/im-manager/pkg/model"
-	"github.com/dhis2-sre/im-user/swagger/sdk/models"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestCanWriteInstance_isOwnerAndMember(t *testing.T) {
-	var userId uint64 = 123
+	var userId uint = 123
 	var group = "321"
 
-	user := &models.User{
-		ID: userId,
-		Groups: []*models.Group{
+	user := &model.User{
+		Model: gorm.Model{ID: userId},
+		Groups: []model.Group{
 			{
 				Name: group,
 			},
@@ -22,7 +23,7 @@ func TestCanWriteInstance_isOwnerAndMember(t *testing.T) {
 	}
 
 	instance := &model.Instance{
-		UserID:    uint(userId),
+		UserID:    userId,
 		GroupName: group,
 	}
 
@@ -34,8 +35,8 @@ func TestCanWriteInstance_isOwnerAndMember(t *testing.T) {
 func TestCanWriteInstance_isGroupAdministrator(t *testing.T) {
 	var group = "123"
 
-	user := &models.User{
-		AdminGroups: []*models.Group{
+	user := &model.User{
+		AdminGroups: []model.Group{
 			{
 				Name: group,
 			},
@@ -50,8 +51,8 @@ func TestCanWriteInstance_isGroupAdministrator(t *testing.T) {
 }
 
 func TestCanWriteInstance_isAdministrator(t *testing.T) {
-	user := &models.User{
-		Groups: []*models.Group{
+	user := &model.User{
+		Groups: []model.Group{
 			{
 				Name: AdministratorGroupName,
 			},
@@ -71,8 +72,8 @@ func TestCanWriteInstance_isAdministrator(t *testing.T) {
 func TestCanReadInstance_isMemberOf(t *testing.T) {
 	var group = "123"
 
-	user := &models.User{
-		Groups: []*models.Group{
+	user := &model.User{
+		Groups: []model.Group{
 			{
 				Name: group,
 			},
@@ -87,8 +88,8 @@ func TestCanReadInstance_isMemberOf(t *testing.T) {
 }
 
 func TestCanReadInstance_isAdministrator(t *testing.T) {
-	user := &models.User{
-		Groups: []*models.Group{
+	user := &model.User{
+		Groups: []model.Group{
 			{
 				Name: AdministratorGroupName,
 			},
@@ -106,8 +107,8 @@ func TestCanReadInstance_isAdministrator(t *testing.T) {
 }
 
 func TestCanReadInstance_AccessDenied(t *testing.T) {
-	user := &models.User{
-		Groups: []*models.Group{
+	user := &model.User{
+		Groups: []model.Group{
 			{
 				Name: "123",
 			},
