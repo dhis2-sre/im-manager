@@ -14,7 +14,7 @@ ARG AWS_IAM_AUTHENTICATOR_CHECKSUM=fe958eff955bea1499015b45dc53392a33f737630efd8
 
 ARG REFLEX_VERSION=v0.3.1
 
-RUN apk add gcc musl-dev git postgresql-client && \
+RUN apk add gcc musl-dev git && \
 \
     wget https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl && \
     echo "${KUBECTL_CHECKSUM}  kubectl" | sha256sum -c - && \
@@ -41,9 +41,8 @@ COPY . .
 RUN go build -o /app/im-manager -ldflags "-s -w" ./cmd/serve
 
 FROM alpine:3.17
-RUN apk --no-cache -U upgrade
-COPY --from=build /usr/bin/pg_dump /usr/bin/pg_dump
-COPY --from=build /usr/bin/pg_restore /usr/bin/pg_restore
+RUN apk --no-cache -U upgrade \
+    && apk add --no-cache postgresql-client
 COPY --from=build /usr/bin/kubectl /usr/bin/kubectl
 COPY --from=build /usr/bin/helm /usr/bin/helm
 COPY --from=build /usr/bin/helmfile /usr/bin/helmfile
