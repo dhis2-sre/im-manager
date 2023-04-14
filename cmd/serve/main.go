@@ -108,7 +108,6 @@ func run() error {
 
 	stackHandler := stack.NewHandler(stackSvc)
 	instanceHandler := instance.NewHandler(userService, groupService, instanceSvc, stackSvc)
-	authMiddleware := handler.NewAuthentication(cfg)
 
 	// TODO: Database... Move into... Function?
 	s3Config, err := s3config.LoadDefaultConfig(context.TODO(), s3config.WithRegion("eu-west-1"))
@@ -144,11 +143,14 @@ func run() error {
 		return err
 	}
 
-	r := server.GetEngine(cfg.BasePath, stackHandler, instanceHandler, integrationHandler, authMiddleware)
+	r := server.GetEngine(cfg.BasePath)
 
 	group.Routes(r, authentication, authorization, groupHandler)
 	user.Routes(r, authentication, userHandler)
-	database.ConfigureRoutes(r, authMiddleware, databaseHandler)
+	stack.Routes(r, authentication, stackHandler)
+	integration.Routes(r, authentication, integrationHandler)
+	database.Routes(r, authentication, databaseHandler)
+	instance.Routes(r, authentication, instanceHandler)
 
 	return r.Run()
 }

@@ -1,18 +1,14 @@
 package server
 
 import (
-	"github.com/dhis2-sre/im-manager/internal/handler"
 	"github.com/dhis2-sre/im-manager/internal/middleware"
 	"github.com/dhis2-sre/im-manager/pkg/health"
-	"github.com/dhis2-sre/im-manager/pkg/instance"
-	"github.com/dhis2-sre/im-manager/pkg/integration"
-	"github.com/dhis2-sre/im-manager/pkg/stack"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	redocMiddleware "github.com/go-openapi/runtime/middleware"
 )
 
-func GetEngine(basePath string, stackHandler stack.Handler, instanceHandler instance.Handler, integrationHandler integration.Handler, authMiddleware *handler.AuthenticationMiddleware) *gin.Engine {
+func GetEngine(basePath string) *gin.Engine {
 	r := gin.Default()
 
 	corsConfig := cors.DefaultConfig()
@@ -28,27 +24,6 @@ func GetEngine(basePath string, stackHandler stack.Handler, instanceHandler inst
 	redoc(router, basePath)
 
 	router.GET("/health", health.Health)
-
-	tokenAuthenticationRouter := router.Group("")
-	tokenAuthenticationRouter.Use(authMiddleware.TokenAuthentication)
-
-	tokenAuthenticationRouter.GET("/stacks", stackHandler.FindAll)
-	tokenAuthenticationRouter.GET("/stacks/:name", stackHandler.Find)
-
-	tokenAuthenticationRouter.POST("/integrations", integrationHandler.Integrations)
-
-	tokenAuthenticationRouter.POST("/instances", instanceHandler.Deploy)
-	tokenAuthenticationRouter.GET("/instances", instanceHandler.ListInstances)
-	tokenAuthenticationRouter.GET("/presets", instanceHandler.ListPresets)
-	tokenAuthenticationRouter.GET("/instances/:id", instanceHandler.FindById)
-	tokenAuthenticationRouter.GET("/instances/:id/parameters", instanceHandler.FindByIdDecrypted)
-	tokenAuthenticationRouter.DELETE("/instances/:id", instanceHandler.Delete)
-	tokenAuthenticationRouter.PUT("/instances/:id", instanceHandler.Update)
-	tokenAuthenticationRouter.PUT("/instances/:id/pause", instanceHandler.Pause)
-	tokenAuthenticationRouter.PUT("/instances/:id/resume", instanceHandler.Resume)
-	tokenAuthenticationRouter.PUT("/instances/:id/restart", instanceHandler.Restart)
-	tokenAuthenticationRouter.GET("/instances/:id/logs", instanceHandler.Logs)
-	tokenAuthenticationRouter.GET("/instances-name-to-id/:groupName/:instanceName", instanceHandler.NameToId)
 
 	return r
 }
