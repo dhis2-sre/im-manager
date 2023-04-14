@@ -41,7 +41,7 @@ func (c *ttlDestroyConsumer) Consume() error {
 			return
 		}
 
-		err := c.instanceDeleter.Delete("", payload.ID)
+		err := c.instanceDeleter.Delete("dummy-token", payload.ID)
 		if err != nil {
 			// TODO: gorm shouldn't be used outside of the repository thus the error should be one we define... Instance.ErrInstanceNotFound
 			if errors.Is(err, gorm.ErrRecordNotFound) {

@@ -9,7 +9,6 @@ import (
 
 func GetUserFromContext(c *gin.Context) (*model.User, error) {
 	userData, exists := c.Get("user")
-
 	if !exists {
 		return nil, errors.New("user not found on context")
 	}

@@ -17,7 +17,7 @@ func CanWriteInstance(user *model.User, instance *model.Instance) bool {
 }
 
 func isOwner(user *model.User, instance *model.Instance) bool {
-	return uint(user.ID) == instance.UserID
+	return user.ID == instance.UserID
 }
 
 func isMemberOf(groupName string, groups []model.Group) bool {
