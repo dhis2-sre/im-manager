@@ -228,7 +228,7 @@ func (h Handler) FindById(c *gin.Context) {
 	//	404: Error
 	//	415: Error
 	idParam := c.Param("id")
-	id, err := strconv.ParseUint(idParam, 10, 64)
+	id, err := strconv.ParseUint(idParam, 10, 32)
 	if err != nil {
 		_ = c.AbortWithError(http.StatusBadRequest, errors.New("error parsing id"))
 		return

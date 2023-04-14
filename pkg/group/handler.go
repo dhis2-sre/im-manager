@@ -92,7 +92,7 @@ func (h Handler) AddUserToGroup(c *gin.Context) {
 	groupName := c.Param("group")
 	userIdString := c.Param("userId")
 
-	userId, err := strconv.ParseUint(userIdString, 10, 64)
+	userId, err := strconv.ParseUint(userIdString, 10, 32)
 	if err != nil {
 		_ = c.AbortWithError(http.StatusBadRequest, fmt.Errorf("failed to parse userId: %s", err))
 		return
