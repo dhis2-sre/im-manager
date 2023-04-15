@@ -19,7 +19,7 @@ func (s *ttlSuite) TestConsumeDeletesInstance() {
 
 	uc := &userClient{}
 	uc.On("SignIn", "username", "password").Return(&token.Tokens{
-		AccessToken: "token",
+		AccessToken: "dummy-token",
 	}, nil)
 
 	consumer, err := rabbitmq.NewConsumer(
