@@ -3,6 +3,7 @@ package user
 import (
 	"errors"
 	"fmt"
+	"log"
 
 	"github.com/dhis2-sre/im-manager/internal/errdef"
 
@@ -33,6 +34,8 @@ func (r repository) create(u *model.User) error {
 }
 
 func (r repository) findByEmail(email string) (*model.User, error) {
+	log.Println("email")
+	log.Println(email)
 	var u *model.User
 	err := r.db.
 		Preload("Groups").

@@ -30,7 +30,7 @@ func (s *ttlSuite) TestConsumeDeletesInstance() {
 	defer func() { require.NoError(consumer.Close()) }()
 
 	is := &instanceService{}
-	is.On("Delete", "token", uint(1)).Return(nil)
+	is.On("Delete", "dummy-token", uint(1)).Return(nil)
 
 	td := instance.NewTTLDestroyConsumer(consumer, is)
 	require.NoError(td.Consume())

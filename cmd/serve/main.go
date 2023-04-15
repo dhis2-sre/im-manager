@@ -138,10 +138,6 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	err = createServiceUsers(cfg, userService, groupService)
-	if err != nil {
-		return err
-	}
 
 	r := server.GetEngine(cfg.BasePath)
 
@@ -197,33 +193,6 @@ func createAdminUser(config config.Config, userService userService, groupService
 	err = groupService.AddUser(g.Name, u.ID)
 	if err != nil {
 		return fmt.Errorf("error adding admin user to admin group: %v", err)
-	}
-
-	return nil
-}
-
-func createServiceUsers(config config.Config, userService userService, groupService groupService) error {
-	log.Println("Creating service users...")
-	g, err := groupService.FindOrCreate(model.AdministratorGroupName, "")
-	if err != nil {
-		return fmt.Errorf("error creating admin group: %v", err)
-	}
-
-	for _, serviceUser := range config.ServiceUsers {
-		email := serviceUser.Email
-		password := serviceUser.Password
-
-		u, err := userService.FindOrCreate(email, password)
-		if err != nil {
-			return fmt.Errorf("error creating service user: %v", err)
-		}
-
-		err = groupService.AddUser(g.Name, u.ID)
-		if err != nil {
-			return fmt.Errorf("error adding service user to admin group: %v", err)
-		}
-
-		log.Println("Created:", serviceUser.Email)
 	}
 
 	return nil

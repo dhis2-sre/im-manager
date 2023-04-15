@@ -25,7 +25,6 @@ type Config struct {
 	Authentication                 authentication
 	Groups                         []group
 	AdminUser                      user
-	ServiceUsers                   []user
 	DefaultUser                    user
 	Bucket                         string
 }
@@ -75,11 +74,10 @@ func New() Config {
 			AccessTokenExpirationSeconds:  requireEnvAsInt("ACCESS_TOKEN_EXPIRATION_IN_SECONDS"),
 			RefreshTokenExpirationSeconds: requireEnvAsInt("REFRESH_TOKEN_EXPIRATION_IN_SECONDS"),
 		},
-		Groups:       newGroups(),
-		AdminUser:    newAdminUser(),
-		ServiceUsers: newServiceUsers(),
-		DefaultUser:  user{},
-		Bucket:       requireEnv("S3_BUCKET"),
+		Groups:      newGroups(),
+		AdminUser:   newAdminUser(),
+		DefaultUser: user{},
+		Bucket:      requireEnv("S3_BUCKET"),
 	}
 }
 
@@ -205,23 +203,6 @@ func newAdminUser() user {
 		Email:    email,
 		Password: pw,
 	}
-}
-
-func newServiceUsers() []user {
-	emails := requireEnvAsArray("SERVICE_USER_EMAILS")
-	pws := requireEnvAsArray("SERVICE_USER_PASSWORDS")
-
-	if len(emails) != len(pws) {
-		log.Fatalf("len(SERVICE_USER_EMAILS) != len(SERVICE_USER_PASSWORDS)")
-	}
-
-	users := make([]user, len(emails))
-	for i := 0; i < len(emails); i++ {
-		users[i].Email = emails[i]
-		users[i].Password = pws[i]
-	}
-
-	return users
 }
 
 func requireEnv(key string) string {
