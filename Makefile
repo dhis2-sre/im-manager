@@ -35,6 +35,8 @@ push-docker-image:
 	IMAGE_TAG=$(tag) docker compose push prod
 
 dev:
+	docker compose up database rabbitmq redis jwks -d
+	sleep 3
 	docker compose up --build dev database rabbitmq redis jwks
 
 test: clean
