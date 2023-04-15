@@ -5,8 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dhis2-sre/im-manager/pkg/token"
-
 	"github.com/dhis2-sre/im-manager/pkg/instance"
 	"github.com/dhis2-sre/rabbitmq"
 	amqp "github.com/rabbitmq/amqp091-go"
@@ -16,11 +14,6 @@ import (
 
 func (s *ttlSuite) TestConsumeDeletesInstance() {
 	require := s.Require()
-
-	uc := &userClient{}
-	uc.On("SignIn", "username", "password").Return(&token.Tokens{
-		AccessToken: "dummy-token",
-	}, nil)
 
 	consumer, err := rabbitmq.NewConsumer(
 		s.rabbitURI,
@@ -41,19 +34,8 @@ func (s *ttlSuite) TestConsumeDeletesInstance() {
 	}))
 
 	require.Eventually(func() bool {
-		return is.AssertExpectations(s.T()) && uc.AssertExpectations(s.T())
+		return is.AssertExpectations(s.T())
 	}, s.timeout, time.Second)
-}
-
-type userClient struct {
-	mock.Mock
-}
-
-func (u *userClient) SignIn(username, password string) (*token.Tokens, error) {
-	args := u.Called(username, password)
-	tokens := args.Get(0).(*token.Tokens)
-	err := args.Error(1)
-	return tokens, err
 }
 
 type instanceService struct {
