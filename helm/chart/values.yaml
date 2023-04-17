@@ -40,7 +40,7 @@ readinessProbe: /health
 replicaCount: 1
 
 image:
-  repository: nginx
+  repository: dhis2/im-manager
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
   tag: ""
