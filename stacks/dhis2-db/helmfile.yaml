@@ -38,6 +38,11 @@ releases:
               seed.sh: |
                 {{- readFile "./seed.sh" | indent 16 }}
 
+          resources:
+            requests:
+              cpu: {{ env "RESOURCES_REQUESTS_CPU" | default "250m" }}
+              memory: {{ env "RESOURCES_REQUESTS_MEMORY" | default "256Mi" }}
+
       - image:
           repository: dhis2/postgresql-curl
           tag: {{ env "DATABASE_VERSION" | default "13" }}

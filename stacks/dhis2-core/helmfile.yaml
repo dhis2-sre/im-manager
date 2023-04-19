@@ -56,6 +56,10 @@ releases:
           privateKey: {{ env "GOOGLE_AUTH_PRIVATE_KEY" | default "" }}
           clientEmail: "{{ env "GOOGLE_AUTH_CLIENT_EMAIL" | default "" }}"
           clientId: "{{ env "GOOGLE_AUTH_CLIENT_ID" | default "" }}"
+      - resources:
+          requests:
+            cpu: {{ env "RESOURCES_REQUESTS_CPU" | default "250m" }}
+            memory: {{ env "RESOURCES_REQUESTS_MEMORY" | default "256Mi" }}
 
 repositories:
   - name: dhis2
