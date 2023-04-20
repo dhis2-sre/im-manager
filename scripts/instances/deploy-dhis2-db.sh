@@ -12,6 +12,8 @@ NAME=$2
 DATABASE_ID=${DATABASE_ID:-1}
 DATABASE_SIZE=${DATABASE_SIZE:-5Gi}
 INSTANCE_TTL=${INSTANCE_TTL:-""}
+RESOURCES_REQUESTS_CPU=${RESOURCES_REQUESTS_CPU:-250m}
+RESOURCES_REQUESTS_MEMORY=${RESOURCES_REQUESTS_MEMORY:-256Mi}
 
 echo "{
   \"name\": \"$NAME\",
@@ -31,6 +33,14 @@ echo "{
     {
       \"name\": \"DATABASE_SIZE\",
       \"value\": \"$DATABASE_SIZE\"
+    },
+    {
+      \"name\": \"RESOURCES_REQUESTS_CPU\",
+      \"value\": \"$RESOURCES_REQUESTS_CPU\"
+    },
+    {
+      \"name\": \"RESOURCES_REQUESTS_MEMORY\",
+      \"value\": \"$RESOURCES_REQUESTS_MEMORY\"
     }
  ]
 }" | $HTTP post "$IM_HOST/instances" "Authorization: Bearer $ACCESS_TOKEN"

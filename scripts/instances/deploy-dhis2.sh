@@ -24,6 +24,10 @@ DATABASE_ID=${DATABASE_ID:-1}
 INSTANCE_TTL=${INSTANCE_TTL:-""}
 FLYWAY_MIGRATE_OUT_OF_ORDER=${FLYWAY_MIGRATE_OUT_OF_ORDER:-false}
 FLYWAY_REPAIR_BEFORE_MIGRATION=${FLYWAY_REPAIR_BEFORE_MIGRATION:-false}
+CORE_RESOURCES_REQUESTS_CPU=${CORE_RESOURCES_REQUESTS_CPU:-250m}
+CORE_RESOURCES_REQUESTS_MEMORY=${CORE_RESOURCES_REQUESTS_MEMORY:-256Mi}
+DB_RESOURCES_REQUESTS_CPU=${DB_RESOURCES_REQUESTS_CPU:-250m}
+DB_RESOURCES_REQUESTS_MEMORY=${DB_RESOURCES_REQUESTS_MEMORY:-256Mi}
 
 echo "{
   \"name\": \"$NAME\",
@@ -67,16 +71,32 @@ echo "{
       \"value\": \"$INSTALL_REDIS\"
     },
     {
-       \"name\": \"INSTANCE_TTL\",
-       \"value\": \"$INSTANCE_TTL\"
+      \"name\": \"INSTANCE_TTL\",
+      \"value\": \"$INSTANCE_TTL\"
     },
     {
-       \"name\": \"FLYWAY_MIGRATE_OUT_OF_ORDER\",
-       \"value\": \"$FLYWAY_MIGRATE_OUT_OF_ORDER\"
+      \"name\": \"FLYWAY_MIGRATE_OUT_OF_ORDER\",
+      \"value\": \"$FLYWAY_MIGRATE_OUT_OF_ORDER\"
     },
     {
-       \"name\": \"FLYWAY_REPAIR_BEFORE_MIGRATION\",
-       \"value\": \"$FLYWAY_REPAIR_BEFORE_MIGRATION\"
+      \"name\": \"FLYWAY_REPAIR_BEFORE_MIGRATION\",
+      \"value\": \"$FLYWAY_REPAIR_BEFORE_MIGRATION\"
+    },
+    {
+      \"name\": \"CORE_RESOURCES_REQUESTS_CPU\",
+      \"value\": \"$CORE_RESOURCES_REQUESTS_CPU\"
+    },
+    {
+      \"name\": \"CORE_RESOURCES_REQUESTS_MEMORY\",
+      \"value\": \"$CORE_RESOURCES_REQUESTS_MEMORY\"
+    },
+    {
+      \"name\": \"DB_RESOURCES_REQUESTS_CPU\",
+      \"value\": \"$DB_RESOURCES_REQUESTS_CPU\"
+    },
+    {
+      \"name\": \"DB_RESOURCES_REQUESTS_MEMORY\",
+      \"value\": \"$DB_RESOURCES_REQUESTS_MEMORY\"
     }
   ],
   \"requiredParameters\": [
