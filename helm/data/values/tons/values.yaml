@@ -6,14 +6,28 @@ serviceAccount:
   annotations:
     eks.amazonaws.com/role-arn: arn:aws:iam::767224633206:role/instance-cluster-test-im-manager-tons
 
+ingress:
+  enabled: true
+  hostname: api.im.tons.test.c.dhis2.org
+  path: /
+  certIssuer: cert-issuer-prod
+  annotations: {}
+  # kubernetes.io/ingress.class: nginx
+  # kubernetes.io/tls-acme: "true"
+
+redis:
+  host: im-manager-redis-tons-master.instance-manager-tons.svc
+  port: "6379"
+
+groups:
+  names: whoami,play
+  hostnames: whoami.im.tons.test.c.dhis2.org,play.im.tons.test.c.dhis2.org
+
 environment:
   ENVIRONMENT: tons
 
   INSTANCE_SERVICE_HOST: im-manager-tons.instance-manager-tons.svc:8080
   INSTANCE_SERVICE_BASE_PATH: /
-
-  USER_SERVICE_HOST: im-user-tons.instance-manager-tons.svc:8080
-  USER_SERVICE_BASE_PATH: /
 
   DATABASE_MANAGER_SERVICE_HOST: im-manager-tons.instance-manager-tons.svc:8080
   DATABASE_MANAGER_SERVICE_BASE_PATH: /
@@ -24,14 +38,11 @@ environment:
   RABBITMQ_HOST: im-rabbitmq-tons.instance-manager-tons.svc
   RABBITMQ_PORT: "5672"
 
-  JWKS_HOST: http://im-user-tons.instance-manager-tons.svc:8080/jwks
+  JWKS_HOST: http://im-manager-tons.instance-manager-tons.svc:8080/jwks
   JWKS_INDEX: "0"
   JWKS_MINIMUM_REFRESH_INTERVAL: "960" # 15 minutes
 
   S3_BUCKET: test-db-manager-bucket
-
-groups:
-  names: whoami
 
 resources:
   limits:

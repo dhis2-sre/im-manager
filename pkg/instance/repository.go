@@ -6,7 +6,6 @@ import (
 
 	"github.com/dhis2-sre/im-manager/pkg/config"
 	"github.com/dhis2-sre/im-manager/pkg/model"
-	"github.com/dhis2-sre/im-user/swagger/sdk/models"
 	"github.com/jackc/pgconn"
 	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
@@ -121,8 +120,8 @@ type GroupWithInstances struct {
 	Instances []*model.Instance
 }
 
-func (r repository) FindByGroups(groups []*models.Group, presets bool) ([]GroupWithInstances, error) {
-	groupsByName := make(map[string]*models.Group)
+func (r repository) FindByGroups(groups []model.Group, presets bool) ([]GroupWithInstances, error) {
+	groupsByName := make(map[string]model.Group)
 	for _, group := range groups {
 		groupsByName[group.Name] = group
 	}
@@ -168,7 +167,7 @@ func mapInstancesByGroup(groupNames []string, result []*model.Instance) map[stri
 	return instancesByGroup
 }
 
-func groupWithInstances(instancesMap map[string][]*model.Instance, groupMap map[string]*models.Group) []GroupWithInstances {
+func groupWithInstances(instancesMap map[string][]*model.Instance, groupMap map[string]model.Group) []GroupWithInstances {
 	var groupWithInstances []GroupWithInstances
 	for groupName, instances := range instancesMap {
 		if instances == nil {

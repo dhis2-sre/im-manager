@@ -13,7 +13,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/dhis2-sre/im-manager/pkg/model"
-	"github.com/dhis2-sre/im-user/swagger/sdk/models"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -26,7 +25,7 @@ type kubernetesService struct {
 	client *kubernetes.Clientset
 }
 
-func NewKubernetesService(config *models.ClusterConfiguration) (*kubernetesService, error) {
+func NewKubernetesService(config *model.ClusterConfiguration) (*kubernetesService, error) {
 	client, err := newClient(config)
 	if err != nil {
 		return nil, fmt.Errorf("error creating kube client: %v", err)
@@ -35,8 +34,8 @@ func NewKubernetesService(config *models.ClusterConfiguration) (*kubernetesServi
 	return &kubernetesService{client: client}, nil
 }
 
-func commandExecutor(cmd *exec.Cmd, configuration *models.ClusterConfiguration) (stdout []byte, stderr []byte, err error) {
-	if len(configuration.KubernetesConfiguration) == 0 {
+func commandExecutor(cmd *exec.Cmd, configuration *model.ClusterConfiguration) (stdout []byte, stderr []byte, err error) {
+	if configuration == nil {
 		return runCommand(cmd)
 	}
 
@@ -93,9 +92,9 @@ func runCommand(cmd *exec.Cmd) ([]byte, []byte, error) {
 	return stdout.Bytes(), stderr.Bytes(), err
 }
 
-func newClient(configuration *models.ClusterConfiguration) (*kubernetes.Clientset, error) {
+func newClient(configuration *model.ClusterConfiguration) (*kubernetes.Clientset, error) {
 	var restClientConfig *rest.Config
-	if len(configuration.KubernetesConfiguration) > 0 {
+	if configuration != nil && len(configuration.KubernetesConfiguration) > 0 {
 		kubeCfg, err := decryptYaml(configuration.KubernetesConfiguration)
 		if err != nil {
 			return nil, err

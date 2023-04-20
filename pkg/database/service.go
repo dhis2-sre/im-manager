@@ -27,19 +27,21 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/google/uuid"
-
-	userModels "github.com/dhis2-sre/im-user/swagger/sdk/models"
 )
 
-func NewService(c config.Config, userClient userClientHandler, s3Client S3Client, repository Repository) *service {
-	return &service{c, userClient, s3Client, repository}
+func NewService(c config.Config, groupService groupService, s3Client S3Client, repository Repository) *service {
+	return &service{c, groupService, s3Client, repository}
+}
+
+type groupService interface {
+	Find(name string) (*model.Group, error)
 }
 
 type service struct {
-	c          config.Config
-	userClient userClientHandler
-	s3Client   S3Client
-	repository Repository
+	c            config.Config
+	groupService groupService
+	s3Client     S3Client
+	repository   Repository
 }
 
 type Repository interface {
@@ -49,7 +51,7 @@ type Repository interface {
 	Lock(id, instanceId, userId uint) (*model.Lock, error)
 	Unlock(id uint) error
 	Delete(id uint) error
-	FindByGroupNames(names []string) ([]*model.Database, error)
+	FindByGroupNames(names []string) ([]model.Database, error)
 	Update(d *model.Database) error
 	CreateExternalDownload(databaseID uint, expiration time.Time) (model.ExternalDownload, error)
 	FindExternalDownload(uuid uuid.UUID) (model.ExternalDownload, error)
@@ -81,7 +83,7 @@ func (s service) FindByIdentifier(identifier string) (*model.Database, error) {
 	return database, nil
 }
 
-func (s service) Copy(id uint, d *model.Database, group *userModels.Group) error {
+func (s service) Copy(id uint, d *model.Database, group *model.Group) error {
 	source, err := s.FindById(id)
 	if err != nil {
 		if err.Error() == "record not found" {
@@ -166,7 +168,7 @@ type ReadAtSeeker interface {
 	io.ReadSeeker
 }
 
-func (s service) Upload(d *model.Database, group *userModels.Group, reader ReadAtSeeker, size int64) (*model.Database, error) {
+func (s service) Upload(d *model.Database, group *model.Group, reader ReadAtSeeker, size int64) (*model.Database, error) {
 	key := fmt.Sprintf("%s/%s", group.Name, d.Name)
 	err := s.s3Client.Upload(s.c.Bucket, key, reader, size)
 
@@ -225,7 +227,7 @@ func (s service) Delete(id uint) error {
 	return s.repository.Delete(id)
 }
 
-func (s service) List(groups []*userModels.Group) ([]*model.Database, error) {
+func (s service) List(groups []model.Group) ([]model.Database, error) {
 	groupNames := make([]string, len(groups))
 	for i, group := range groups {
 		groupNames[i] = group.Name
@@ -264,11 +266,11 @@ func (s service) FindExternalDownload(uuid uuid.UUID) (model.ExternalDownload, e
 	return s.repository.FindExternalDownload(uuid)
 }
 
-func (s service) SaveAs(token string, database *model.Database, instance *model.Instance, stack *model.Stack, newName string, format string) (*model.Database, error) {
+func (s service) SaveAs(database *model.Database, instance *model.Instance, stack *model.Stack, newName string, format string) (*model.Database, error) {
 	// TODO: Add to config
 	dumpPath := "/mnt/data/"
 
-	group, err := s.userClient.FindGroupByName(token, instance.GroupName)
+	group, err := s.groupService.Find(instance.GroupName)
 	if err != nil {
 		return nil, err
 	}

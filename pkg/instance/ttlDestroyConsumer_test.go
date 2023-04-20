@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/dhis2-sre/im-manager/pkg/instance"
-	"github.com/dhis2-sre/im-user/swagger/sdk/models"
 	"github.com/dhis2-sre/rabbitmq"
 	amqp "github.com/rabbitmq/amqp091-go"
 	"github.com/stretchr/testify/mock"
@@ -16,11 +15,6 @@ import (
 func (s *ttlSuite) TestConsumeDeletesInstance() {
 	require := s.Require()
 
-	uc := &userClient{}
-	uc.On("SignIn", "username", "password").Return(&models.Tokens{
-		AccessToken: "token",
-	}, nil)
-
 	consumer, err := rabbitmq.NewConsumer(
 		s.rabbitURI,
 		rabbitmq.WithConsumerPrefix("im-manager"),
@@ -29,9 +23,9 @@ func (s *ttlSuite) TestConsumeDeletesInstance() {
 	defer func() { require.NoError(consumer.Close()) }()
 
 	is := &instanceService{}
-	is.On("Delete", "token", uint(1)).Return(nil)
+	is.On("Delete", "dummy-token", uint(1)).Return(nil)
 
-	td := instance.NewTTLDestroyConsumer("username", "password", uc, consumer, is)
+	td := instance.NewTTLDestroyConsumer(consumer, is)
 	require.NoError(td.Consume())
 
 	require.NoError(s.amqpClient.ch.PublishWithContext(context.TODO(), "", "ttl-destroy", false, false, amqp.Publishing{
@@ -40,19 +34,8 @@ func (s *ttlSuite) TestConsumeDeletesInstance() {
 	}))
 
 	require.Eventually(func() bool {
-		return is.AssertExpectations(s.T()) && uc.AssertExpectations(s.T())
+		return is.AssertExpectations(s.T())
 	}, s.timeout, time.Second)
-}
-
-type userClient struct {
-	mock.Mock
-}
-
-func (u *userClient) SignIn(username, password string) (*models.Tokens, error) {
-	args := u.Called(username, password)
-	tokens := args.Get(0).(*models.Tokens)
-	err := args.Error(1)
-	return tokens, err
 }
 
 type instanceService struct {

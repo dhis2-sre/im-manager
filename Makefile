@@ -1,6 +1,10 @@
 tag ?= latest
 clean-cmd = docker compose down --remove-orphans --volumes
 
+keys:
+	openssl genpkey -algorithm RSA -out ./rsa_private.pem -pkeyopt rsa_keygen_bits:2048
+	openssl rsa -in ./rsa_private.pem -pubout -out ./rsa_public.pem
+
 init:
 	pip install pre-commit
 	pre-commit install --install-hooks --overwrite
@@ -31,7 +35,9 @@ push-docker-image:
 	IMAGE_TAG=$(tag) docker compose push prod
 
 dev:
-	docker compose up --build dev database rabbitmq jwks
+	docker compose up database rabbitmq redis jwks -d
+	sleep 3
+	docker compose up --build dev database rabbitmq redis jwks
 
 test: clean
 	docker compose up -d database rabbitmq jwks
@@ -48,16 +54,12 @@ clean:
 	go clean
 
 swagger-clean:
-	rm -rf swagger/sdk/*
 	rm -f swagger/swagger.yaml
 
 swagger-spec:
-	swagger generate spec -o swagger/swagger.yaml -x swagger/sdk --scan-models
+	swagger generate spec -o swagger/swagger.yaml --scan-models
 	swagger validate swagger/swagger.yaml
 
-swagger-client:
-	swagger generate client -f swagger/swagger.yaml -t swagger/sdk
-
-swagger: swagger-clean swagger-spec swagger-client
+swagger: swagger-clean swagger-spec
 
 .PHONY: init check docker-image push-docker-image dev test

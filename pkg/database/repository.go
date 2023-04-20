@@ -88,8 +88,8 @@ func (r repository) Delete(id uint) error {
 	return r.db.Unscoped().Delete(&model.Database{}, id).Error
 }
 
-func (r repository) FindByGroupNames(names []string) ([]*model.Database, error) {
-	var databases []*model.Database
+func (r repository) FindByGroupNames(names []string) ([]model.Database, error) {
+	var databases []model.Database
 
 	err := r.db.
 		Where("group_name IN ?", names).
