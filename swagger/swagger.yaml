@@ -1221,7 +1221,7 @@ paths:
             description: Return integration for a given key
             operationId: postIntegration
             parameters:
-                - description: Integration request parameter
+                - description: Integration request body
                   in: body
                   name: Body
                   required: true

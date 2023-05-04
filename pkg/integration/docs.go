@@ -2,7 +2,7 @@ package integration
 
 // swagger:parameters postIntegration
 type _ struct {
-	// Integration request parameter
+	// Integration request body
 	// in: body
 	// required: true
 	Body Request
