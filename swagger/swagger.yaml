@@ -294,13 +294,19 @@ definitions:
                 x-go-name: RefreshToken
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/user
-    Response:
+    Request:
         properties:
-            status:
+            key:
                 type: string
-                x-go-name: Status
+                x-go-name: Key
+            payload:
+                x-go-name: Payload
         type: object
-        x-go-package: github.com/dhis2-sre/im-manager/pkg/health
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/integration
+    Response:
+        description: Response depends on the input and can be either a list or a map
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/integration
     SignUpRequest:
         properties:
             email:
@@ -1214,9 +1220,16 @@ paths:
         post:
             description: Return integration for a given key
             operationId: postIntegration
+            parameters:
+                - description: Integration request parameter
+                  in: body
+                  name: Body
+                  required: true
+                  schema:
+                    $ref: '#/definitions/Request'
             responses:
                 "200":
-                    $ref: '#/responses/Any'
+                    $ref: '#/responses/Response'
                 "401":
                     $ref: '#/responses/Error'
                 "403":
@@ -1405,9 +1418,6 @@ paths:
 produces:
     - application/json
 responses:
-    Any:
-        description: ""
-        schema: {}
     CreateExternalDownloadResponse:
         description: ""
         schema:
