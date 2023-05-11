@@ -950,6 +950,8 @@ paths:
                     description: Instance
                     schema:
                         $ref: '#/definitions/Instance'
+                "400":
+                    $ref: '#/responses/Error'
                 "401":
                     $ref: '#/responses/Error'
                 "403":
