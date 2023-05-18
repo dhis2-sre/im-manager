@@ -293,7 +293,7 @@ func (s service) SaveAs(database *model.Database, instance *model.Instance, stac
 
 	go func() {
 		var ret *forwarder.Result
-		if len(group.ClusterConfiguration.KubernetesConfiguration) > 0 {
+		if group.ClusterConfiguration != nil && len(group.ClusterConfiguration.KubernetesConfiguration) > 0 {
 			hostname := fmt.Sprintf(stack.HostnamePattern, instance.Name, instance.GroupName)
 			serviceName := strings.Split(hostname, ".")[0]
 			options := []*forwarder.Option{
