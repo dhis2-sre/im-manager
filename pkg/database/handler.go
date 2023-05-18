@@ -3,6 +3,7 @@ package database
 import (
 	"errors"
 	"io"
+	"log"
 	"mime/multipart"
 	"net/http"
 	"path"
@@ -54,7 +55,7 @@ type Service interface {
 	Update(d *model.Database) error
 	CreateExternalDownload(databaseID uint, expiration time.Time) (model.ExternalDownload, error)
 	FindExternalDownload(uuid uuid.UUID) (model.ExternalDownload, error)
-	SaveAs(database *model.Database, instance *model.Instance, stack *model.Stack, newName string, format string) (*model.Database, error)
+	SaveAs(database *model.Database, instance *model.Instance, stack *model.Stack, newName string, format string, done func(saved *model.Database)) (*model.Database, error)
 }
 
 // Upload database
@@ -212,7 +213,9 @@ func (h Handler) SaveAs(c *gin.Context) {
 		return
 	}
 
-	save, err := h.databaseService.SaveAs(database, instance, stack, request.Name, request.Format)
+	save, err := h.databaseService.SaveAs(database, instance, stack, request.Name, request.Format, func(saved *model.Database) {
+		log.Printf("Done saving database: %+v", saved)
+	})
 	if err != nil {
 		_ = c.Error(err)
 		return

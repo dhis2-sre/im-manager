@@ -266,7 +266,7 @@ func (s service) FindExternalDownload(uuid uuid.UUID) (model.ExternalDownload, e
 	return s.repository.FindExternalDownload(uuid)
 }
 
-func (s service) SaveAs(database *model.Database, instance *model.Instance, stack *model.Stack, newName string, format string) (*model.Database, error) {
+func (s service) SaveAs(database *model.Database, instance *model.Instance, stack *model.Stack, newName string, format string, done func(saved *model.Database)) (*model.Database, error) {
 	// TODO: Add to config
 	dumpPath := "/mnt/data/"
 
@@ -373,6 +373,8 @@ func (s service) SaveAs(database *model.Database, instance *model.Instance, stac
 			logError(err)
 			return
 		}
+
+		done(newDatabase)
 	}()
 
 	return newDatabase, nil
