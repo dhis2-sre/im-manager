@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"os/exec"
 	"strings"
@@ -233,6 +234,17 @@ func (ks kubernetesService) resume(instance *model.Instance) error {
 	err := ks.scale(instance, 1)
 	if err != nil {
 		return fmt.Errorf("failed to resume instance %q: %v", instance.ID, err)
+	}
+
+	return nil
+}
+
+func (ks kubernetesService) deletePersistentVolumeClaim(instance *model.Instance) error {
+	pvcs := ks.client.CoreV1().PersistentVolumeClaims(instance.GroupName)
+	name := fmt.Sprintf("data-%s-database-postgresql-0", instance.Name)
+	err := pvcs.Delete(context.TODO(), name, metav1.DeleteOptions{})
+	if err != nil {
+		log.Printf("failed to delete pvc %d: %v", instance.ID, err)
 	}
 
 	return nil
