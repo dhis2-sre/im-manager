@@ -274,7 +274,6 @@ func (s service) Save(database *model.Database, instance *model.Instance, stack 
 	tmpName := randomString(20)
 	format := getFormat(database)
 	_, err := s.SaveAs(database, instance, stack, tmpName, format, func(saved *model.Database) {
-		log.Printf("saved: %+v", saved)
 		err := s.Delete(database.ID)
 		if err != nil {
 			logError(err)
@@ -391,7 +390,6 @@ func (s service) SaveAs(database *model.Database, instance *model.Instance, stac
 			dump.Port = int(ports[0][0].Local)
 		}
 
-		log.Println("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!Before dump")
 		dump.SetPath(dumpPath)
 		fileId := uuid.New().String()
 		dump.SetFileName(fileId + ".dump")
@@ -400,9 +398,7 @@ func (s service) SaveAs(database *model.Database, instance *model.Instance, stac
 		// TODO: Remove... Or at least make configurable
 		dump.EnableVerbose()
 
-		log.Println("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!Before dump.exec")
 		dumpExec := dump.Exec(pg.ExecOptions{StreamPrint: true, StreamDestination: os.Stdout})
-		log.Println("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!After dump.exec")
 		if dumpExec.Error != nil {
 			log.Println(dumpExec.Error.Err)
 			log.Println(dumpExec.Output)
@@ -410,7 +406,6 @@ func (s service) SaveAs(database *model.Database, instance *model.Instance, stac
 			return
 		}
 
-		log.Println("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!Before open file")
 		dumpFile := path.Join(dumpPath, dumpExec.File)
 		file, err := os.Open(dumpFile) // #nosec
 		if err != nil {
@@ -420,7 +415,6 @@ func (s service) SaveAs(database *model.Database, instance *model.Instance, stac
 		defer removeTempFile(file)
 
 		if format == "plain" {
-			log.Println("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!Plain")
 			gzFileName := path.Join(dumpPath, fileId+".gz")
 			file, err = gz(gzFileName, database, file)
 			if err != nil {
@@ -437,7 +431,6 @@ func (s service) SaveAs(database *model.Database, instance *model.Instance, stac
 			return
 		}
 
-		log.Println("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!Before upload")
 		_, err = s.Upload(newDatabase, group, file, stat.Size())
 		if err != nil {
 			logError(err)
