@@ -252,16 +252,6 @@ func (s service) Delete(token string, id uint) error {
 		if err != nil {
 			return err
 		}
-
-		ks, err := NewKubernetesService(group.ClusterConfiguration)
-		if err != nil {
-			return err
-		}
-
-		err = ks.deletePersistentVolumeClaim(instanceWithParameters)
-		if err != nil {
-			return err
-		}
 	}
 
 	return s.instanceRepository.Delete(id)
