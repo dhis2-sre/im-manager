@@ -6,6 +6,8 @@ import (
 	"log"
 	"os/exec"
 
+	"github.com/dhis2-sre/im-manager/internal/apperror"
+
 	"github.com/dhis2-sre/im-manager/pkg/stack"
 
 	"gorm.io/gorm"
@@ -184,8 +186,69 @@ func (s service) unlink(id uint) error {
 	return s.instanceRepository.Unlink(instance)
 }
 
+func matchRequiredParameters(stackParams []model.StackRequiredParameter, instanceParams []model.InstanceRequiredParameter) []string {
+	unmatchedParams := make([]string, 0)
+	paramNames := make(map[string]struct{})
+
+	for _, param := range stackParams {
+		paramNames[param.Name] = struct{}{}
+	}
+
+	for _, param := range instanceParams {
+		if _, ok := paramNames[param.StackRequiredParameterID]; !ok {
+			unmatchedParams = append(unmatchedParams, param.StackRequiredParameterID)
+		}
+	}
+
+	return unmatchedParams
+}
+
+func matchOptionalParameters(stackParams []model.StackOptionalParameter, instanceParams []model.InstanceOptionalParameter) []string {
+	unmatchedParams := make([]string, 0)
+	paramNames := make(map[string]struct{})
+
+	for _, param := range stackParams {
+		paramNames[param.Name] = struct{}{}
+	}
+
+	for _, param := range instanceParams {
+		if _, ok := paramNames[param.StackOptionalParameterID]; !ok {
+			unmatchedParams = append(unmatchedParams, param.StackOptionalParameterID)
+		}
+	}
+
+	return unmatchedParams
+}
+
+func validateParameters(stack *model.Stack, instance *model.Instance) error {
+	unmatchedReqParams := matchRequiredParameters(stack.RequiredParameters, instance.RequiredParameters)
+	unmatchedOptParams := matchOptionalParameters(stack.OptionalParameters, instance.OptionalParameters)
+
+	unmatchedParams := make([]string, 0)
+	unmatchedParams = append(unmatchedParams, unmatchedReqParams...)
+	unmatchedParams = append(unmatchedParams, unmatchedOptParams...)
+
+	if len(unmatchedParams) > 0 {
+		return apperror.NewBadRequest(
+			fmt.Sprintf("parameters %q are not valid parameters for stack %q", unmatchedParams, instance.StackName),
+		)
+	}
+
+	return nil
+}
+
 func (s service) Save(instance *model.Instance) (*model.Instance, error) {
-	err := s.instanceRepository.Save(instance)
+	instanceStack, err := s.stackService.Find(instance.StackName)
+	if err != nil {
+		return nil, err
+	}
+
+	err = validateParameters(instanceStack, instance)
+	if err != nil {
+		return nil, err
+	}
+
+	err = s.instanceRepository.Save(instance)
 	return instance, err
 }
 

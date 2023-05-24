@@ -83,6 +83,7 @@ func (h Handler) Deploy(c *gin.Context) {
 	//
 	// responses:
 	//   201: Instance
+	//   400: Error
 	//   401: Error
 	//   403: Error
 	//   404: Error
