@@ -297,16 +297,33 @@ func (h Handler) Save(c *gin.Context) {
 	}
 
 	lock := database.Lock
-	if lock != nil && (lock.InstanceID != uint(instanceId) || lock.UserID != user.ID) {
+	isLocked := lock != nil
+	if isLocked && (lock.InstanceID != uint(instanceId) || lock.UserID != user.ID) {
 		unauthorized := apperror.NewUnauthorized("database is locked")
 		_ = c.Error(unauthorized)
 		return
+	}
+
+	if !isLocked {
+		_, err := h.databaseService.Lock(uint(databaseId), uint(instanceId), user.ID)
+		if err != nil {
+			_ = c.Error(err)
+			return
+		}
 	}
 
 	err = h.databaseService.Save(database, instance, stack)
 	if err != nil {
 		_ = c.Error(err)
 		return
+	}
+
+	if !isLocked {
+		err := h.databaseService.Unlock(uint(databaseId))
+		if err != nil {
+			_ = c.Error(err)
+			return
+		}
 	}
 
 	c.Status(http.StatusAccepted)
