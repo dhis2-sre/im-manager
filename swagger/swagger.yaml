@@ -787,6 +787,31 @@ paths:
             security:
                 - oauth2: []
             summary: '"Save as" database'
+    /databases/save/{instanceId}:
+        post:
+            description: Save database...
+            operationId: saveDatabase
+            parameters:
+                - format: uint64
+                  in: path
+                  name: instanceId
+                  required: true
+                  type: integer
+                  x-go-name: InstanceID
+            responses:
+                "202":
+                    description: ""
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Save database
     /groups:
         post:
             description: Create a group...

@@ -14,6 +14,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/dhis2-sre/im-manager/pkg/instance"
+
 	"github.com/dhis2-sre/im-manager/pkg/config"
 
 	"github.com/dhis2-sre/im-manager/internal/apperror"
@@ -29,8 +31,8 @@ import (
 	"github.com/google/uuid"
 )
 
-func NewService(c config.Config, groupService groupService, s3Client S3Client, repository Repository) *service {
-	return &service{c, groupService, s3Client, repository}
+func NewService(c config.Config, instanceService instance.Service, groupService groupService, s3Client S3Client, repository Repository) *service {
+	return &service{c, instanceService, groupService, s3Client, repository}
 }
 
 type groupService interface {
@@ -38,10 +40,11 @@ type groupService interface {
 }
 
 type service struct {
-	c            config.Config
-	groupService groupService
-	s3Client     S3Client
-	repository   Repository
+	c               config.Config
+	instanceService instance.Service
+	groupService    groupService
+	s3Client        S3Client
+	repository      Repository
 }
 
 type Repository interface {
@@ -57,6 +60,7 @@ type Repository interface {
 	FindExternalDownload(uuid uuid.UUID) (model.ExternalDownload, error)
 	PurgeExternalDownload() error
 	FindBySlug(slug string) (*model.Database, error)
+	UpdateId(old, new uint) error
 }
 
 type S3Client interface {
@@ -266,6 +270,66 @@ func (s service) FindExternalDownload(uuid uuid.UUID) (model.ExternalDownload, e
 	return s.repository.FindExternalDownload(uuid)
 }
 
+func (s service) Save(database *model.Database, instance *model.Instance, stack *model.Stack) error {
+	tmpName := randomString(20)
+	format := getFormat(database)
+	_, err := s.SaveAs(database, instance, stack, tmpName, format, func(saved *model.Database) {
+		log.Printf("saved: %+v", saved)
+		err := s.Delete(database.ID)
+		if err != nil {
+			logError(err)
+			return
+		}
+
+		u, err := url.Parse(saved.Url)
+		if err != nil {
+			logError(err)
+			return
+		}
+
+		sourceKey := strings.TrimPrefix(u.Path, "/")
+		destinationKey := fmt.Sprintf("%s/%s", saved.GroupName, database.Name)
+		err = s.s3Client.Copy(s.c.Bucket, sourceKey, destinationKey)
+		if err != nil {
+			logError(err)
+			return
+		}
+
+		err = s.s3Client.Delete(s.c.Bucket, saved.Url)
+		if err != nil {
+			logError(err)
+			return
+		}
+
+		saved.Name = database.Name
+		saved.Url = database.Url
+		saved.Slug = database.Slug
+		err = s.Update(saved)
+		if err != nil {
+			logError(err)
+			return
+		}
+
+		err = s.repository.UpdateId(saved.ID, database.ID)
+		if err != nil {
+			logError(err)
+			return
+		}
+	})
+	if err != nil {
+		return err
+	}
+
+	return err
+}
+
+func getFormat(database *model.Database) string {
+	if strings.HasSuffix(database.Url, ".pgc") {
+		return "custom"
+	}
+	return "plain"
+}
+
 func (s service) SaveAs(database *model.Database, instance *model.Instance, stack *model.Stack, newName string, format string, done func(saved *model.Database)) (*model.Database, error) {
 	// TODO: Add to config
 	dumpPath := "/mnt/data/"
@@ -327,6 +391,7 @@ func (s service) SaveAs(database *model.Database, instance *model.Instance, stac
 			dump.Port = int(ports[0][0].Local)
 		}
 
+		log.Println("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!Before dump")
 		dump.SetPath(dumpPath)
 		fileId := uuid.New().String()
 		dump.SetFileName(fileId + ".dump")
@@ -335,7 +400,9 @@ func (s service) SaveAs(database *model.Database, instance *model.Instance, stac
 		// TODO: Remove... Or at least make configurable
 		dump.EnableVerbose()
 
+		log.Println("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!Before dump.exec")
 		dumpExec := dump.Exec(pg.ExecOptions{StreamPrint: true, StreamDestination: os.Stdout})
+		log.Println("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!After dump.exec")
 		if dumpExec.Error != nil {
 			log.Println(dumpExec.Error.Err)
 			log.Println(dumpExec.Output)
@@ -343,6 +410,7 @@ func (s service) SaveAs(database *model.Database, instance *model.Instance, stac
 			return
 		}
 
+		log.Println("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!Before open file")
 		dumpFile := path.Join(dumpPath, dumpExec.File)
 		file, err := os.Open(dumpFile) // #nosec
 		if err != nil {
@@ -352,6 +420,7 @@ func (s service) SaveAs(database *model.Database, instance *model.Instance, stac
 		defer removeTempFile(file)
 
 		if format == "plain" {
+			log.Println("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!Plain")
 			gzFileName := path.Join(dumpPath, fileId+".gz")
 			file, err = gz(gzFileName, database, file)
 			if err != nil {
@@ -368,6 +437,7 @@ func (s service) SaveAs(database *model.Database, instance *model.Instance, stac
 			return
 		}
 
+		log.Println("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!Before upload")
 		_, err = s.Upload(newDatabase, group, file, stat.Size())
 		if err != nil {
 			logError(err)

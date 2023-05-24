@@ -2,6 +2,7 @@ package database
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"log"
 	"mime/multipart"
@@ -9,6 +10,8 @@ import (
 	"path"
 	"strconv"
 	"time"
+
+	"golang.org/x/exp/rand"
 
 	"github.com/dhis2-sre/im-manager/internal/apperror"
 	"github.com/dhis2-sre/im-manager/internal/handler"
@@ -56,6 +59,7 @@ type Service interface {
 	CreateExternalDownload(databaseID uint, expiration time.Time) (model.ExternalDownload, error)
 	FindExternalDownload(uuid uuid.UUID) (model.ExternalDownload, error)
 	SaveAs(database *model.Database, instance *model.Instance, stack *model.Stack, newName string, format string, done func(saved *model.Database)) (*model.Database, error)
+	Save(database *model.Database, instance *model.Instance, stack *model.Stack) error
 }
 
 // Upload database
@@ -214,7 +218,7 @@ func (h Handler) SaveAs(c *gin.Context) {
 	}
 
 	save, err := h.databaseService.SaveAs(database, instance, stack, request.Name, request.Format, func(saved *model.Database) {
-		log.Printf("Done saving database: %+v", saved)
+		log.Printf("Database saved as: %+v\nInstance: %+v", saved, instance)
 	})
 	if err != nil {
 		_ = c.Error(err)
@@ -222,6 +226,97 @@ func (h Handler) SaveAs(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusCreated, save)
+}
+
+// Save database
+func (h Handler) Save(c *gin.Context) {
+	// swagger:route POST /databases/save/{instanceId} saveDatabase
+	//
+	// Save database
+	//
+	// Save database...
+	//
+	// Security:
+	//	oauth2:
+	//
+	// Responses:
+	//	202:
+	//	401: Error
+	//	403: Error
+	//	404: Error
+	//	415: Error
+	instanceIdParam := c.Param("instanceId")
+	instanceId, err := strconv.ParseUint(instanceIdParam, 10, 32)
+	if err != nil {
+		badRequest := apperror.NewBadRequest("error parsing instanceId")
+		_ = c.Error(badRequest)
+		return
+	}
+
+	instance, err := h.instanceService.FindByIdDecrypted(uint(instanceId))
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	stack, err := h.stackService.Find(instance.StackName)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	databaseIdString, err := findParameter("DATABASE_ID", instance, stack)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	databaseId, err := strconv.ParseUint(databaseIdString, 10, 32)
+	if err != nil {
+		badRequest := apperror.NewBadRequest("error parsing databaseId")
+		_ = c.Error(badRequest)
+		return
+	}
+
+	database, err := h.databaseService.FindById(uint(databaseId))
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	err = h.canAccess(c, database)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	user, err := handler.GetUserFromContext(c)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	lock := database.Lock
+	if lock != nil && (lock.InstanceID != uint(instanceId) || lock.UserID != user.ID) {
+		unauthorized := apperror.NewUnauthorized("database is locked")
+		_ = c.Error(unauthorized)
+		return
+	}
+
+	err = h.databaseService.Save(database, instance, stack)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	c.Status(http.StatusAccepted)
+}
+
+func randomString(length int) string {
+	rand.Seed(uint64(time.Now().UnixNano()))
+	b := make([]byte, length+2)
+	_, _ = rand.Read(b)
+	return fmt.Sprintf("%x", b)[2 : length+2]
 }
 
 type CopyDatabaseRequest struct {

@@ -39,6 +39,14 @@ func (r repository) FindById(id uint) (*model.Database, error) {
 	return d, err
 }
 
+func (r repository) UpdateId(old, new uint) error {
+	return r.db.
+		Model(&model.Database{}).
+		Where("id = ?", old).
+		Update("id", new).
+		Error
+}
+
 func (r repository) FindBySlug(slug string) (*model.Database, error) {
 	var d *model.Database
 	err := r.db.
