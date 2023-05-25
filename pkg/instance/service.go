@@ -6,6 +6,8 @@ import (
 	"log"
 	"os/exec"
 
+	"github.com/dhis2-sre/im-manager/internal/errdef"
+
 	"github.com/dhis2-sre/im-manager/internal/apperror"
 
 	"github.com/dhis2-sre/im-manager/pkg/stack"
@@ -298,33 +300,9 @@ func (s service) Delete(token string, id uint) error {
 		return err
 	}
 
-	if instanceWithParameters.DeployLog != "" {
-		group, err := s.groupService.Find(instanceWithParameters.GroupName)
-		if err != nil {
-			return err
-		}
-
-		destroyCmd, err := s.helmfileService.destroy(token, instanceWithParameters, group)
-		if err != nil {
-			return err
-		}
-
-		destroyLog, destroyErrorLog, err := commandExecutor(destroyCmd, group.ClusterConfiguration)
-		log.Printf("Destroy log: %s\n", destroyLog)
-		log.Printf("Destroy error log: %s\n", destroyErrorLog)
-		if err != nil {
-			return err
-		}
-
-		ks, err := NewKubernetesService(group.ClusterConfiguration)
-		if err != nil {
-			return err
-		}
-
-		err = ks.deletePersistentVolumeClaim(instanceWithParameters)
-		if err != nil {
-			return err
-		}
+	err = s.destroy(token, instanceWithParameters)
+	if err != nil {
+		return err
 	}
 
 	return s.instanceRepository.Delete(id)
@@ -360,4 +338,55 @@ func (s service) FindInstances(user *model.User, presets bool) ([]GroupWithInsta
 	}
 
 	return instances, err
+}
+
+func (s service) Reset(token string, instance *model.Instance) error {
+	decrypted, err := s.FindByIdDecrypted(instance.ID)
+	if err != nil {
+		return errdef.NewNotFound(err)
+	}
+
+	err = s.destroy(token, decrypted)
+	if err != nil {
+		return err
+	}
+
+	err = s.Deploy(token, decrypted)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (s service) destroy(token string, decrypted *model.Instance) error {
+	if decrypted.DeployLog != "" {
+		group, err := s.groupService.Find(decrypted.GroupName)
+		if err != nil {
+			return err
+		}
+
+		destroyCmd, err := s.helmfileService.destroy(token, decrypted, group)
+		if err != nil {
+			return err
+		}
+
+		destroyLog, destroyErrorLog, err := commandExecutor(destroyCmd, group.ClusterConfiguration)
+		log.Printf("Destroy log: %s\n", destroyLog)
+		log.Printf("Destroy error log: %s\n", destroyErrorLog)
+		if err != nil {
+			return err
+		}
+
+		ks, err := NewKubernetesService(group.ClusterConfiguration)
+		if err != nil {
+			return err
+		}
+
+		err = ks.deletePersistentVolumeClaim(decrypted)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
