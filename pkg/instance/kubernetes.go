@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"os/exec"
 	"strings"
@@ -256,10 +255,8 @@ func (ks kubernetesService) deletePersistentVolumeClaim(instance *model.Instance
 		name := fmt.Sprintf(pattern, instance.Name)
 		err := pvcs.Delete(context.TODO(), name, metav1.DeleteOptions{})
 		if err != nil {
-			log.Printf("failed to delete pvc %d: %v", instance.ID, err)
-			continue
+			return err
 		}
-		log.Printf("successfully deleted pvc %q", name)
 	}
 
 	return nil
