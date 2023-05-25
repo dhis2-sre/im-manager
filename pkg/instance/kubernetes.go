@@ -238,6 +238,30 @@ func (ks kubernetesService) resume(instance *model.Instance) error {
 	return nil
 }
 
+func (ks kubernetesService) deletePersistentVolumeClaim(instance *model.Instance) error {
+	// TODO: This should be stack metadata
+	storageMap := map[string][]string{
+		"dhis2":    {"data-%s-database-postgresql-0", "redis-data-%s-redis-master-0"},
+		"dhis2-db": {"data-%s-database-postgresql-0"},
+	}
+
+	pvcs := ks.client.CoreV1().PersistentVolumeClaims(instance.GroupName)
+	pvcNamePatterns := storageMap[instance.StackName]
+	if pvcNamePatterns == nil {
+		return nil
+	}
+
+	for _, pattern := range pvcNamePatterns {
+		name := fmt.Sprintf(pattern, instance.Name)
+		err := pvcs.Delete(context.TODO(), name, metav1.DeleteOptions{})
+		if err != nil {
+			return fmt.Errorf("failed to delete pvc: %v", err)
+		}
+	}
+
+	return nil
+}
+
 func (ks kubernetesService) scale(instance *model.Instance, replicas uint) error {
 	labelSelector := fmt.Sprintf("im-id=%d", instance.ID)
 	listOptions := metav1.ListOptions{LabelSelector: labelSelector}
