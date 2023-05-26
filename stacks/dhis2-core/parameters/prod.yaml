@@ -5,9 +5,9 @@ GOOGLE_AUTH_CLIENT_EMAIL: ENC[AES256_GCM,data:6C5Lk8CxGByR3zOiAIGwhuMfSnrU7SLNZR
 GOOGLE_AUTH_CLIENT_ID: ENC[AES256_GCM,data:3guKiVOqGUl4+9l8FBLam9FmrJmA,iv:ASZbfjacdmnsNyBXrh4/AZHhxF2Uli2rqoi9HsaNQDQ=,tag:cvDXegn4Wqg//mxLS2MXWw==,type:str]
 sops:
     kms:
-        - arn: arn:aws:kms:eu-central-1:767224633206:key/mrk-f5d88b4c53ec4100acd9c8ae3bde0a65
-          created_at: "2022-06-21T13:37:47Z"
-          enc: AQICAHhXq0BmrdaY1Tzk4VwL7hDRIr4Zx4dXQZOaXDZfdG+52gHhDryMCvvyHZcNU9wIM/SWAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMP9duZUvoruO5l4KYAgEQgDtXPV7LII/JAbh5kJfEpprpkvhq+MShyQLL3AMUoJpQKowCLEp7bNYXMTa8e6qzUdzLWIbLPh09P69V0w==
+        - arn: arn:aws:kms:eu-central-1:767224633206:alias/im-prod-secrets
+          created_at: "2023-05-25T09:03:41Z"
+          enc: AQICAHgT8e97X192OKPTpaXOewhDtMqGDOe1qFP0c6FMw0ekSQHjbsikNxjsMwxtfpTl/ecEAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMYomEG2IOj1sMG3ADAgEQgDsNaBYyrO3M5+lkbMYh+tfFaYlgdaU4FrkXoKlUdoinzy0jbJn65SWCUKoPogYjDFPYsyWugu/KA40k/w==
           aws_profile: ""
     gcp_kms: []
     azure_kv: []
