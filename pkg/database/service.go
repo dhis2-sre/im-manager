@@ -274,13 +274,13 @@ func (s service) Save(database *model.Database, instance *model.Instance, stack 
 	tmpName := uuid.New().String()
 	format := getFormat(database)
 	_, err := s.SaveAs(database, instance, stack, tmpName, format, func(saved *model.Database) {
-		err := s.Delete(database.ID)
+		u, err := url.Parse(saved.Url)
 		if err != nil {
 			logError(err)
 			return
 		}
 
-		u, err := url.Parse(saved.Url)
+		err = s.Delete(database.ID)
 		if err != nil {
 			logError(err)
 			return
