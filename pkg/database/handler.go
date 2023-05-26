@@ -2,7 +2,6 @@ package database
 
 import (
 	"errors"
-	"fmt"
 	"io"
 	"log"
 	"mime/multipart"
@@ -10,8 +9,6 @@ import (
 	"path"
 	"strconv"
 	"time"
-
-	"golang.org/x/exp/rand"
 
 	"github.com/dhis2-sre/im-manager/internal/apperror"
 	"github.com/dhis2-sre/im-manager/internal/handler"
@@ -336,13 +333,6 @@ func (h Handler) Save(c *gin.Context) {
 	}
 
 	c.Status(http.StatusAccepted)
-}
-
-func randomString(length int) string {
-	rand.Seed(uint64(time.Now().UnixNano()))
-	b := make([]byte, length+2)
-	_, _ = rand.Read(b)
-	return fmt.Sprintf("%x", b)[2 : length+2]
 }
 
 type CopyDatabaseRequest struct {

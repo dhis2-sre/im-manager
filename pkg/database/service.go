@@ -271,7 +271,7 @@ func (s service) FindExternalDownload(uuid uuid.UUID) (model.ExternalDownload, e
 }
 
 func (s service) Save(database *model.Database, instance *model.Instance, stack *model.Stack) error {
-	tmpName := randomString(20)
+	tmpName := uuid.New().String()
 	format := getFormat(database)
 	_, err := s.SaveAs(database, instance, stack, tmpName, format, func(saved *model.Database) {
 		err := s.Delete(database.ID)
