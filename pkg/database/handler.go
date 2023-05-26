@@ -254,8 +254,7 @@ func (h Handler) Save(c *gin.Context) {
 	instanceIdParam := c.Param("instanceId")
 	instanceId, err := strconv.ParseUint(instanceIdParam, 10, 32)
 	if err != nil {
-		badRequest := apperror.NewBadRequest("error parsing instanceId")
-		_ = c.Error(badRequest)
+		_ = c.AbortWithError(http.StatusBadRequest, errors.New("error parsing instanceId"))
 		return
 	}
 
