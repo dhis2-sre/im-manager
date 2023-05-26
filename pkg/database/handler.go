@@ -317,19 +317,20 @@ func (h Handler) Save(c *gin.Context) {
 			return
 		}
 	}
+	defer func() {
+		if !isLocked {
+			err := h.databaseService.Unlock(uint(databaseId))
+			if err != nil {
+				_ = c.Error(err)
+				return
+			}
+		}
+	}()
 
 	err = h.databaseService.Save(database, instance, stack)
 	if err != nil {
 		_ = c.Error(err)
 		return
-	}
-
-	if !isLocked {
-		err := h.databaseService.Unlock(uint(databaseId))
-		if err != nil {
-			_ = c.Error(err)
-			return
-		}
 	}
 
 	c.Status(http.StatusAccepted)
