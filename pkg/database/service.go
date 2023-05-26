@@ -315,9 +315,6 @@ func (s service) Save(database *model.Database, instance *model.Instance, stack 
 			return
 		}
 	})
-	if err != nil {
-		return err
-	}
 
 	return err
 }
