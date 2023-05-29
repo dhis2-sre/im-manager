@@ -270,7 +270,26 @@ func (s service) FindExternalDownload(uuid uuid.UUID) (model.ExternalDownload, e
 	return s.repository.FindExternalDownload(uuid)
 }
 
-func (s service) Save(database *model.Database, instance *model.Instance, stack *model.Stack) error {
+func (s service) Save(userId uint, database *model.Database, instance *model.Instance, stack *model.Stack) error {
+	lock := database.Lock
+	isLocked := lock != nil
+
+	if !isLocked {
+		_, err := s.Lock(database.ID, instance.ID, userId)
+		if err != nil {
+			return err
+		}
+	}
+
+	defer func() {
+		if !isLocked {
+			err := s.Unlock(database.ID)
+			if err != nil {
+				logError(fmt.Errorf("unlock database failed: %v", err))
+			}
+		}
+	}()
+
 	tmpName := uuid.New().String()
 	format := getFormat(database)
 	_, err := s.SaveAs(database, instance, stack, tmpName, format, func(saved *model.Database) {

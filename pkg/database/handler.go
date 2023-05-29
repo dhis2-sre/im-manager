@@ -56,7 +56,7 @@ type Service interface {
 	CreateExternalDownload(databaseID uint, expiration time.Time) (model.ExternalDownload, error)
 	FindExternalDownload(uuid uuid.UUID) (model.ExternalDownload, error)
 	SaveAs(database *model.Database, instance *model.Instance, stack *model.Stack, newName string, format string, done func(saved *model.Database)) (*model.Database, error)
-	Save(database *model.Database, instance *model.Instance, stack *model.Stack) error
+	Save(userId uint, database *model.Database, instance *model.Instance, stack *model.Stack) error
 }
 
 // Upload database
@@ -309,24 +309,7 @@ func (h Handler) Save(c *gin.Context) {
 		return
 	}
 
-	if !isLocked {
-		_, err := h.databaseService.Lock(uint(databaseId), uint(instanceId), user.ID)
-		if err != nil {
-			_ = c.Error(err)
-			return
-		}
-	}
-	defer func() {
-		if !isLocked {
-			err := h.databaseService.Unlock(uint(databaseId))
-			if err != nil {
-				_ = c.Error(err)
-				return
-			}
-		}
-	}()
-
-	err = h.databaseService.Save(database, instance, stack)
+	err = h.databaseService.Save(user.ID, database, instance, stack)
 	if err != nil {
 		_ = c.Error(err)
 		return
