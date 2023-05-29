@@ -39,7 +39,7 @@ dev:
 	sleep 3
 	docker compose up --build dev database rabbitmq redis jwks
 
-test: clean
+test:
 	docker compose up -d database rabbitmq jwks
 	docker compose run --no-deps test
 	$(clean-cmd)
