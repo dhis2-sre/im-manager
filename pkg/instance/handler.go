@@ -34,7 +34,7 @@ type Service interface {
 	Pause(instance *model.Instance) error
 	Resume(instance *model.Instance) error
 	Restart(instance *model.Instance, typeSelector string) error
-	Save(instance *model.Instance) (*model.Instance, error)
+	Save(instance *model.Instance) error
 	Deploy(token string, instance *model.Instance) error
 	FindById(id uint) (*model.Instance, error)
 	FindByIdDecrypted(id uint) (*model.Instance, error)
@@ -149,7 +149,7 @@ func (h Handler) Deploy(c *gin.Context) {
 		return
 	}
 
-	_, err = h.instanceService.Save(i)
+	err = h.instanceService.Save(i)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -177,7 +177,7 @@ func (h Handler) Deploy(c *gin.Context) {
 		}
 	}
 
-	savedInstance, err := h.instanceService.Save(instance)
+	err = h.instanceService.Save(instance)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -195,10 +195,10 @@ func (h Handler) Deploy(c *gin.Context) {
 			_ = c.Error(err)
 			return
 		}
-		c.JSON(http.StatusCreated, savedInstance)
+		c.JSON(http.StatusCreated, instance)
 		return
 	}
-	c.JSON(http.StatusAccepted, savedInstance)
+	c.JSON(http.StatusAccepted, instance)
 }
 
 func (h Handler) consumeParameters(user *model.User, sourceInstanceId uint, instance *model.Instance, preset bool) error {
@@ -299,13 +299,13 @@ func (h Handler) Update(c *gin.Context) {
 	instance.RequiredParameters = request.RequiredParameters
 	instance.OptionalParameters = request.OptionalParameters
 
-	saved, err := h.instanceService.Save(instance)
+	err = h.instanceService.Save(instance)
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
 
-	decrypted, err := h.instanceService.FindByIdDecrypted(saved.ID)
+	decrypted, err := h.instanceService.FindByIdDecrypted(instance.ID)
 	if err != nil {
 		_ = c.Error(err)
 		return

@@ -237,19 +237,18 @@ func validateParameters(stack *model.Stack, instance *model.Instance) error {
 	return nil
 }
 
-func (s service) Save(instance *model.Instance) (*model.Instance, error) {
+func (s service) Save(instance *model.Instance) error {
 	instanceStack, err := s.stackService.Find(instance.StackName)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	err = validateParameters(instanceStack, instance)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	err = s.instanceRepository.Save(instance)
-	return instance, err
+	return s.instanceRepository.Save(instance)
 }
 
 func (s service) Deploy(accessToken string, instance *model.Instance) error {
