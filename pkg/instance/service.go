@@ -133,7 +133,7 @@ func (s service) findParameterValue(parameter string, sourceInstance *model.Inst
 	return "", fmt.Errorf("unable to find value for parameter: %s", parameter)
 }
 
-func (s service) Pause(token string, instance *model.Instance) error {
+func (s service) Pause(instance *model.Instance) error {
 	group, err := s.groupService.Find(instance.GroupName)
 	if err != nil {
 		return err
@@ -147,7 +147,7 @@ func (s service) Pause(token string, instance *model.Instance) error {
 	return ks.pause(instance)
 }
 
-func (s service) Resume(token string, instance *model.Instance) error {
+func (s service) Resume(instance *model.Instance) error {
 	group, err := s.groupService.Find(instance.GroupName)
 	if err != nil {
 		return err
@@ -161,7 +161,7 @@ func (s service) Resume(token string, instance *model.Instance) error {
 	return ks.resume(instance)
 }
 
-func (s service) Restart(token string, instance *model.Instance, typeSelector string) error {
+func (s service) Restart(instance *model.Instance, typeSelector string) error {
 	group, err := s.groupService.Find(instance.GroupName)
 	if err != nil {
 		return err
