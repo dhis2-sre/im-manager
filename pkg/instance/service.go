@@ -186,51 +186,51 @@ func (s service) unlink(id uint) error {
 	return s.instanceRepository.Unlink(instance)
 }
 
-func matchRequiredParameters(stackParams []model.StackRequiredParameter, instanceParams []model.InstanceRequiredParameter) []string {
-	unmatchedParams := make([]string, 0)
-	paramNames := make(map[string]struct{})
+func matchRequiredParameters(stackParameters []model.StackRequiredParameter, instanceParameters []model.InstanceRequiredParameter) []string {
+	unmatchedParameters := make([]string, 0)
+	parameterNames := make(map[string]struct{})
 
-	for _, param := range stackParams {
-		paramNames[param.Name] = struct{}{}
+	for _, parameter := range stackParameters {
+		parameterNames[parameter.Name] = struct{}{}
 	}
 
-	for _, param := range instanceParams {
-		if _, ok := paramNames[param.StackRequiredParameterID]; !ok {
-			unmatchedParams = append(unmatchedParams, param.StackRequiredParameterID)
+	for _, parameter := range instanceParameters {
+		if _, ok := parameterNames[parameter.StackRequiredParameterID]; !ok {
+			unmatchedParameters = append(unmatchedParameters, parameter.StackRequiredParameterID)
 		}
 	}
 
-	return unmatchedParams
+	return unmatchedParameters
 }
 
-func matchOptionalParameters(stackParams []model.StackOptionalParameter, instanceParams []model.InstanceOptionalParameter) []string {
-	unmatchedParams := make([]string, 0)
-	paramNames := make(map[string]struct{})
+func matchOptionalParameters(stackParameters []model.StackOptionalParameter, instanceParameters []model.InstanceOptionalParameter) []string {
+	unmatchedParameters := make([]string, 0)
+	parameterNames := make(map[string]struct{})
 
-	for _, param := range stackParams {
-		paramNames[param.Name] = struct{}{}
+	for _, parameter := range stackParameters {
+		parameterNames[parameter.Name] = struct{}{}
 	}
 
-	for _, param := range instanceParams {
-		if _, ok := paramNames[param.StackOptionalParameterID]; !ok {
-			unmatchedParams = append(unmatchedParams, param.StackOptionalParameterID)
+	for _, parameter := range instanceParameters {
+		if _, ok := parameterNames[parameter.StackOptionalParameterID]; !ok {
+			unmatchedParameters = append(unmatchedParameters, parameter.StackOptionalParameterID)
 		}
 	}
 
-	return unmatchedParams
+	return unmatchedParameters
 }
 
 func validateParameters(stack *model.Stack, instance *model.Instance) error {
-	unmatchedReqParams := matchRequiredParameters(stack.RequiredParameters, instance.RequiredParameters)
-	unmatchedOptParams := matchOptionalParameters(stack.OptionalParameters, instance.OptionalParameters)
+	unmatchedRequiredParameters := matchRequiredParameters(stack.RequiredParameters, instance.RequiredParameters)
+	unmatchedOptionalParameters := matchOptionalParameters(stack.OptionalParameters, instance.OptionalParameters)
 
-	unmatchedParams := make([]string, 0)
-	unmatchedParams = append(unmatchedParams, unmatchedReqParams...)
-	unmatchedParams = append(unmatchedParams, unmatchedOptParams...)
+	unmatchedParameters := make([]string, 0)
+	unmatchedParameters = append(unmatchedParameters, unmatchedRequiredParameters...)
+	unmatchedParameters = append(unmatchedParameters, unmatchedOptionalParameters...)
 
-	if len(unmatchedParams) > 0 {
+	if len(unmatchedParameters) > 0 {
 		return apperror.NewBadRequest(
-			fmt.Sprintf("parameters %q are not valid parameters for stack %q", unmatchedParams, instance.StackName),
+			fmt.Sprintf("parameters %q are not valid parameters for stack %q", unmatchedParameters, instance.StackName),
 		)
 	}
 
