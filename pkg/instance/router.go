@@ -16,6 +16,7 @@ func Routes(r *gin.Engine, authenticationMiddleware handler.AuthenticationMiddle
 	tokenAuthenticationRouter.GET("/instances/:id/parameters", handler.FindByIdDecrypted)
 	tokenAuthenticationRouter.DELETE("/instances/:id", handler.Delete)
 	tokenAuthenticationRouter.PUT("/instances/:id", handler.Update)
+	tokenAuthenticationRouter.PUT("/instances/:id/reset", handler.Reset)
 	tokenAuthenticationRouter.PUT("/instances/:id/pause", handler.Pause)
 	tokenAuthenticationRouter.PUT("/instances/:id/resume", handler.Resume)
 	tokenAuthenticationRouter.PUT("/instances/:id/restart", handler.Restart)

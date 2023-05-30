@@ -28,12 +28,12 @@ func NewHelmfileService(stackService stack.Service, config config.Config) helmfi
 	}
 }
 
-func (h helmfileService) sync(accessToken string, instance *model.Instance, group *model.Group) (*exec.Cmd, error) {
-	return h.executeHelmfileCommand(accessToken, instance, group, "sync")
+func (h helmfileService) sync(token string, instance *model.Instance, group *model.Group) (*exec.Cmd, error) {
+	return h.executeHelmfileCommand(token, instance, group, "sync")
 }
 
-func (h helmfileService) destroy(accessToken string, instance *model.Instance, group *model.Group) (*exec.Cmd, error) {
-	return h.executeHelmfileCommand(accessToken, instance, group, "destroy")
+func (h helmfileService) destroy(instance *model.Instance, group *model.Group) (*exec.Cmd, error) {
+	return h.executeHelmfileCommand("token", instance, group, "destroy")
 }
 
 // **Security considerations**
@@ -42,7 +42,7 @@ func (h helmfileService) destroy(accessToken string, instance *model.Instance, g
 // * stack.Name is populated by reading the name of a folder and even if that folder name could contain something malicious it won't be running in a shell anyway
 // * stackPath is concatenated using path.Join which also cleans the path and furthermore it's existence is validated
 // * Binaries are executed using their full path and not from $PATH which would be very difficult to exploit anyway
-func (h helmfileService) executeHelmfileCommand(accessToken string, instance *model.Instance, group *model.Group, operation string) (*exec.Cmd, error) {
+func (h helmfileService) executeHelmfileCommand(token string, instance *model.Instance, group *model.Group, operation string) (*exec.Cmd, error) {
 	stack, err := h.stackService.Find(instance.StackName)
 	if err != nil {
 		return nil, err
@@ -65,7 +65,7 @@ func (h helmfileService) executeHelmfileCommand(accessToken string, instance *mo
 
 	cmd := exec.Command("/usr/bin/helmfile", "--helm-binary", "/usr/bin/helm", "-f", stackPath, operation) // #nosec
 	log.Printf("Command: %s\n", cmd.String())
-	configureInstanceEnvironment(accessToken, instance, group, stackParameters, cmd)
+	configureInstanceEnvironment(token, instance, group, stackParameters, cmd)
 
 	return cmd, nil
 }

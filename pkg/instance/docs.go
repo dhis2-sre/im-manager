@@ -55,7 +55,7 @@ type _ struct {
 	Selector string `json:"selector"`
 }
 
-// swagger:parameters deleteInstance findById findByIdDecrypted saveInstance pauseInstance resumeInstance
+// swagger:parameters deleteInstance findById findByIdDecrypted saveInstance pauseInstance resumeInstance resetInstance
 type _ struct {
 	// in: path
 	// required: true

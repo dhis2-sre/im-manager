@@ -34,6 +34,7 @@ type Service interface {
 	Pause(instance *model.Instance) error
 	Resume(instance *model.Instance) error
 	Restart(instance *model.Instance, typeSelector string) error
+	Reset(token string, instance *model.Instance) error
 	Save(instance *model.Instance) error
 	Deploy(token string, instance *model.Instance) error
 	FindById(id uint) (*model.Instance, error)
@@ -373,6 +374,64 @@ func (h Handler) Pause(c *gin.Context) {
 	c.Status(http.StatusAccepted)
 }
 
+// Reset instance
+func (h Handler) Reset(c *gin.Context) {
+	// swagger:route PUT /instances/{id}/reset resetInstance
+	//
+	// Reset instance
+	//
+	// Resetting an instance will completely destroy it and redeploy using the same parameters
+	//
+	// Security:
+	//	oauth2:
+	//
+	// responses:
+	//	202:
+	//	400: Error
+	//	401: Error
+	//	403: Error
+	//	404: Error
+	idParam := c.Param("id")
+	id, err := strconv.ParseUint(idParam, 10, 32)
+	if err != nil {
+		_ = c.AbortWithError(http.StatusBadRequest, fmt.Errorf("failed to parse id: %s", err))
+		return
+	}
+
+	token, err := handler.GetTokenFromHttpAuthHeader(c)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	user, err := handler.GetUserFromContext(c)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	instance, err := h.instanceService.FindByIdDecrypted(uint(id))
+	if err != nil {
+		notFound := apperror.NewNotFound("instance", idParam)
+		_ = c.Error(notFound)
+		return
+	}
+
+	canWrite := handler.CanWriteInstance(user, instance)
+	if !canWrite {
+		_ = c.AbortWithError(http.StatusUnauthorized, fmt.Errorf("write access denied"))
+		return
+	}
+
+	err = h.instanceService.Reset(token, instance)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	c.Status(http.StatusAccepted)
+}
+
 // Resume paused instance
 func (h Handler) Resume(c *gin.Context) {
 	// swagger:route PUT /instances/{id}/resume resumeInstance
@@ -404,7 +463,7 @@ func (h Handler) Resume(c *gin.Context) {
 		return
 	}
 
-	instance, err := h.instanceService.FindById(uint(id))
+	instance, err := h.instanceService.FindByIdDecrypted(uint(id))
 	if err != nil {
 		notFound := apperror.NewNotFound("instance", idParam)
 		_ = c.Error(notFound)
