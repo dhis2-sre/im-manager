@@ -230,7 +230,7 @@ func (h Handler) FindById(c *gin.Context) {
 		return
 	}
 
-	userWithGroups, err := h.userService.FindById(uint(id))
+	userWithGroups, err := h.userService.FindById(id)
 	if err != nil {
 		_ = c.Error(err)
 		return
