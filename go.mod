@@ -21,7 +21,7 @@ require (
 	github.com/jackc/pgconn v1.14.0
 	github.com/lestrrat-go/jwx v1.2.25
 	github.com/rabbitmq/amqp091-go v1.8.1
-	github.com/stretchr/testify v1.8.3
+	github.com/stretchr/testify v1.8.4
 	go.mozilla.org/sops/v3 v3.7.3
 	golang.org/x/crypto v0.9.0
 	golang.org/x/exp v0.0.0-20230213192124-5e25df0256eb
