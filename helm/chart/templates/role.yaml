@@ -70,6 +70,15 @@ rules:
       - get
       - update
 
+# Reset an instance
+  - apiGroups:
+      - ""
+    resources:
+      - persistentvolumeclaims
+    verbs:
+      - list
+      - delete
+
 # PgAdmin
   - apiGroups:
       - networking.k8s.io
