@@ -31,11 +31,11 @@ func NewHandler(
 
 type Service interface {
 	ConsumeParameters(source, destination *model.Instance) error
-	Pause(token string, instance *model.Instance) error
-	Resume(token string, instance *model.Instance) error
 	Reset(token string, instance *model.Instance) error
-	Restart(token string, instance *model.Instance, typeSelector string) error
-	Save(instance *model.Instance) (*model.Instance, error)
+	Pause(instance *model.Instance) error
+	Resume(instance *model.Instance) error
+	Restart(instance *model.Instance, typeSelector string) error
+	Save(instance *model.Instance) error
 	Deploy(token string, instance *model.Instance) error
 	FindById(id uint) (*model.Instance, error)
 	FindByIdDecrypted(id uint) (*model.Instance, error)
@@ -150,7 +150,7 @@ func (h Handler) Deploy(c *gin.Context) {
 		return
 	}
 
-	_, err = h.instanceService.Save(i)
+	err = h.instanceService.Save(i)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -178,7 +178,7 @@ func (h Handler) Deploy(c *gin.Context) {
 		}
 	}
 
-	savedInstance, err := h.instanceService.Save(instance)
+	err = h.instanceService.Save(instance)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -196,10 +196,10 @@ func (h Handler) Deploy(c *gin.Context) {
 			_ = c.Error(err)
 			return
 		}
-		c.JSON(http.StatusCreated, savedInstance)
+		c.JSON(http.StatusCreated, instance)
 		return
 	}
-	c.JSON(http.StatusAccepted, savedInstance)
+	c.JSON(http.StatusAccepted, instance)
 }
 
 func (h Handler) consumeParameters(user *model.User, sourceInstanceId uint, instance *model.Instance, preset bool) error {
@@ -300,13 +300,13 @@ func (h Handler) Update(c *gin.Context) {
 	instance.RequiredParameters = request.RequiredParameters
 	instance.OptionalParameters = request.OptionalParameters
 
-	saved, err := h.instanceService.Save(instance)
+	err = h.instanceService.Save(instance)
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
 
-	decrypted, err := h.instanceService.FindByIdDecrypted(saved.ID)
+	decrypted, err := h.instanceService.FindByIdDecrypted(instance.ID)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -346,12 +346,6 @@ func (h Handler) Pause(c *gin.Context) {
 		return
 	}
 
-	token, err := handler.GetTokenFromHttpAuthHeader(c)
-	if err != nil {
-		_ = c.Error(err)
-		return
-	}
-
 	user, err := handler.GetUserFromContext(c)
 	if err != nil {
 		_ = c.Error(err)
@@ -371,7 +365,7 @@ func (h Handler) Pause(c *gin.Context) {
 		return
 	}
 
-	err = h.instanceService.Pause(token, instance)
+	err = h.instanceService.Pause(instance)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -463,12 +457,6 @@ func (h Handler) Resume(c *gin.Context) {
 		return
 	}
 
-	token, err := handler.GetTokenFromHttpAuthHeader(c)
-	if err != nil {
-		_ = c.Error(err)
-		return
-	}
-
 	user, err := handler.GetUserFromContext(c)
 	if err != nil {
 		_ = c.Error(err)
@@ -488,7 +476,7 @@ func (h Handler) Resume(c *gin.Context) {
 		return
 	}
 
-	err = h.instanceService.Resume(token, instance)
+	err = h.instanceService.Resume(instance)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -521,12 +509,6 @@ func (h Handler) Restart(c *gin.Context) {
 		return
 	}
 
-	token, err := handler.GetTokenFromHttpAuthHeader(c)
-	if err != nil {
-		_ = c.Error(err)
-		return
-	}
-
 	user, err := handler.GetUserFromContext(c)
 	if err != nil {
 		_ = c.Error(err)
@@ -547,7 +529,7 @@ func (h Handler) Restart(c *gin.Context) {
 	}
 
 	selector := c.Query("selector")
-	err = h.instanceService.Restart(token, instance, selector)
+	err = h.instanceService.Restart(instance, selector)
 	if err != nil {
 		_ = c.Error(err)
 		return
