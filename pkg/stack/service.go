@@ -6,7 +6,7 @@ import (
 )
 
 type Service interface {
-	Create(stack *model.Stack) (*model.Stack, error)
+	Create(stack *model.Stack) error
 	Delete(name string) error
 	CreateRequiredParameter(stack *model.Stack, parameterName string, consumed bool) (*model.StackRequiredParameter, error)
 	CreateOptionalParameter(stack *model.Stack, parameterName string, defaultValue string, consumed bool) (*model.StackOptionalParameter, error)
@@ -23,13 +23,13 @@ func NewService(repository Repository) *service {
 	return &service{repository}
 }
 
-func (s service) Create(stack *model.Stack) (*model.Stack, error) {
+func (s service) Create(stack *model.Stack) error {
 	err := s.repository.Create(stack)
 	if err != nil {
-		return nil, apperror.NewBadRequest(err.Error())
+		return apperror.NewBadRequest(err.Error())
 	}
 
-	return stack, err
+	return err
 }
 
 func (s service) Delete(name string) error {
