@@ -135,7 +135,7 @@ func (s service) findParameterValue(parameter string, sourceInstance *model.Inst
 	return "", fmt.Errorf("unable to find value for parameter: %s", parameter)
 }
 
-func (s service) Pause(token string, instance *model.Instance) error {
+func (s service) Pause(instance *model.Instance) error {
 	group, err := s.groupService.Find(instance.GroupName)
 	if err != nil {
 		return err
@@ -149,7 +149,7 @@ func (s service) Pause(token string, instance *model.Instance) error {
 	return ks.pause(instance)
 }
 
-func (s service) Resume(token string, instance *model.Instance) error {
+func (s service) Resume(instance *model.Instance) error {
 	group, err := s.groupService.Find(instance.GroupName)
 	if err != nil {
 		return err
@@ -163,7 +163,7 @@ func (s service) Resume(token string, instance *model.Instance) error {
 	return ks.resume(instance)
 }
 
-func (s service) Restart(token string, instance *model.Instance, typeSelector string) error {
+func (s service) Restart(instance *model.Instance, typeSelector string) error {
 	group, err := s.groupService.Find(instance.GroupName)
 	if err != nil {
 		return err
@@ -239,19 +239,18 @@ func validateParameters(stack *model.Stack, instance *model.Instance) error {
 	return nil
 }
 
-func (s service) Save(instance *model.Instance) (*model.Instance, error) {
+func (s service) Save(instance *model.Instance) error {
 	instanceStack, err := s.stackService.Find(instance.StackName)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	err = validateParameters(instanceStack, instance)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	err = s.instanceRepository.Save(instance)
-	return instance, err
+	return s.instanceRepository.Save(instance)
 }
 
 func (s service) Deploy(accessToken string, instance *model.Instance) error {
