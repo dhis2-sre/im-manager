@@ -28,12 +28,12 @@ func NewHelmfileService(stackService stack.Service, config config.Config) helmfi
 	}
 }
 
-func (h helmfileService) sync(accessToken string, instance *model.Instance, group *model.Group) (*exec.Cmd, error) {
-	return h.executeHelmfileCommand(accessToken, instance, group, "sync")
+func (h helmfileService) sync(token string, instance *model.Instance, group *model.Group) (*exec.Cmd, error) {
+	return h.executeHelmfileCommand(token, instance, group, "sync")
 }
 
-func (h helmfileService) destroy(accessToken string, instance *model.Instance, group *model.Group) (*exec.Cmd, error) {
-	return h.executeHelmfileCommand(accessToken, instance, group, "destroy")
+func (h helmfileService) destroy(instance *model.Instance, group *model.Group) (*exec.Cmd, error) {
+	return h.executeHelmfileCommand("token", instance, group, "destroy")
 }
 
 // **Security considerations**

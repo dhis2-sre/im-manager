@@ -410,7 +410,7 @@ func (h Handler) Reset(c *gin.Context) {
 		return
 	}
 
-	instance, err := h.instanceService.FindById(uint(id))
+	instance, err := h.instanceService.FindByIdDecrypted(uint(id))
 	if err != nil {
 		notFound := apperror.NewNotFound("instance", idParam)
 		_ = c.Error(notFound)
@@ -463,7 +463,7 @@ func (h Handler) Resume(c *gin.Context) {
 		return
 	}
 
-	instance, err := h.instanceService.FindById(uint(id))
+	instance, err := h.instanceService.FindByIdDecrypted(uint(id))
 	if err != nil {
 		notFound := apperror.NewNotFound("instance", idParam)
 		_ = c.Error(notFound)

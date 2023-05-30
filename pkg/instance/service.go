@@ -6,8 +6,6 @@ import (
 	"log"
 	"os/exec"
 
-	"github.com/dhis2-sre/im-manager/internal/errdef"
-
 	"github.com/dhis2-sre/im-manager/internal/apperror"
 
 	"github.com/dhis2-sre/im-manager/pkg/stack"
@@ -52,7 +50,7 @@ type groupService interface {
 
 type helmfile interface {
 	sync(token string, instance *model.Instance, group *model.Group) (*exec.Cmd, error)
-	destroy(token string, instance *model.Instance, group *model.Group) (*exec.Cmd, error)
+	destroy(instance *model.Instance, group *model.Group) (*exec.Cmd, error)
 }
 
 type service struct {
@@ -253,13 +251,13 @@ func (s service) Save(instance *model.Instance) error {
 	return s.instanceRepository.Save(instance)
 }
 
-func (s service) Deploy(accessToken string, instance *model.Instance) error {
+func (s service) Deploy(token string, instance *model.Instance) error {
 	group, err := s.groupService.Find(instance.GroupName)
 	if err != nil {
 		return err
 	}
 
-	syncCmd, err := s.helmfileService.sync(accessToken, instance, group)
+	syncCmd, err := s.helmfileService.sync(token, instance, group)
 	if err != nil {
 		return err
 	}
@@ -294,12 +292,12 @@ func (s service) Delete(token string, id uint) error {
 		return err
 	}
 
-	instanceWithParameters, err := s.FindByIdDecrypted(id)
+	instance, err := s.FindByIdDecrypted(id)
 	if err != nil {
 		return err
 	}
 
-	err = s.destroy(token, instanceWithParameters)
+	err = s.destroy(instance)
 	if err != nil {
 		return err
 	}
@@ -340,32 +338,22 @@ func (s service) FindInstances(user *model.User, presets bool) ([]GroupWithInsta
 }
 
 func (s service) Reset(token string, instance *model.Instance) error {
-	decrypted, err := s.FindByIdDecrypted(instance.ID)
-	if err != nil {
-		return errdef.NewNotFound(err)
-	}
-
-	err = s.destroy(token, decrypted)
+	err := s.destroy(instance)
 	if err != nil {
 		return err
 	}
 
-	err = s.Deploy(token, decrypted)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return s.Deploy(token, instance)
 }
 
-func (s service) destroy(token string, decrypted *model.Instance) error {
-	if decrypted.DeployLog != "" {
-		group, err := s.groupService.Find(decrypted.GroupName)
+func (s service) destroy(instance *model.Instance) error {
+	if instance.DeployLog != "" {
+		group, err := s.groupService.Find(instance.GroupName)
 		if err != nil {
 			return err
 		}
 
-		destroyCmd, err := s.helmfileService.destroy(token, decrypted, group)
+		destroyCmd, err := s.helmfileService.destroy(instance, group)
 		if err != nil {
 			return err
 		}
@@ -382,7 +370,7 @@ func (s service) destroy(token string, decrypted *model.Instance) error {
 			return err
 		}
 
-		err = ks.deletePersistentVolumeClaim(decrypted)
+		err = ks.deletePersistentVolumeClaim(instance)
 		if err != nil {
 			return err
 		}
