@@ -215,7 +215,7 @@ func (h Handler) SaveAs(c *gin.Context) {
 	}
 
 	save, err := h.databaseService.SaveAs(database, instance, stack, request.Name, request.Format, func(saved *model.Database) {
-		log.Printf("Database saved as: %+v\nInstance: %+v", saved, instance)
+		log.Printf("Database %s/%s from instance: %v", saved.GroupName, saved.Name, instance)
 	})
 	if err != nil {
 		_ = c.Error(err)
