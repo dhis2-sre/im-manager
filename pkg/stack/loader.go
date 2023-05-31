@@ -69,7 +69,7 @@ func LoadStacks(dir string, stackService Service) error {
 			stack.OptionalParameters = append(stack.OptionalParameters, *parameter)
 		}
 
-		stack, err = stackService.Create(stack)
+		err = stackService.Create(stack)
 		log.Printf("Stack created: %+v\n", stack)
 		if err != nil {
 			return fmt.Errorf("error creating stack %q: %v", name, err)

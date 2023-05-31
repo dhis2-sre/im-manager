@@ -6,6 +6,8 @@ import (
 	"log"
 	"os/exec"
 
+	"github.com/dhis2-sre/im-manager/internal/apperror"
+
 	"github.com/dhis2-sre/im-manager/pkg/stack"
 
 	"gorm.io/gorm"
@@ -48,7 +50,7 @@ type groupService interface {
 
 type helmfile interface {
 	sync(token string, instance *model.Instance, group *model.Group) (*exec.Cmd, error)
-	destroy(token string, instance *model.Instance, group *model.Group) (*exec.Cmd, error)
+	destroy(instance *model.Instance, group *model.Group) (*exec.Cmd, error)
 }
 
 type service struct {
@@ -131,7 +133,7 @@ func (s service) findParameterValue(parameter string, sourceInstance *model.Inst
 	return "", fmt.Errorf("unable to find value for parameter: %s", parameter)
 }
 
-func (s service) Pause(token string, instance *model.Instance) error {
+func (s service) Pause(instance *model.Instance) error {
 	group, err := s.groupService.Find(instance.GroupName)
 	if err != nil {
 		return err
@@ -145,7 +147,7 @@ func (s service) Pause(token string, instance *model.Instance) error {
 	return ks.pause(instance)
 }
 
-func (s service) Resume(token string, instance *model.Instance) error {
+func (s service) Resume(instance *model.Instance) error {
 	group, err := s.groupService.Find(instance.GroupName)
 	if err != nil {
 		return err
@@ -159,7 +161,7 @@ func (s service) Resume(token string, instance *model.Instance) error {
 	return ks.resume(instance)
 }
 
-func (s service) Restart(token string, instance *model.Instance, typeSelector string) error {
+func (s service) Restart(instance *model.Instance, typeSelector string) error {
 	group, err := s.groupService.Find(instance.GroupName)
 	if err != nil {
 		return err
@@ -184,18 +186,78 @@ func (s service) unlink(id uint) error {
 	return s.instanceRepository.Unlink(instance)
 }
 
-func (s service) Save(instance *model.Instance) (*model.Instance, error) {
-	err := s.instanceRepository.Save(instance)
-	return instance, err
+func matchRequiredParameters(stackParameters []model.StackRequiredParameter, instanceParameters []model.InstanceRequiredParameter) []string {
+	unmatchedParameters := make([]string, 0)
+	parameterNames := make(map[string]struct{})
+
+	for _, parameter := range stackParameters {
+		parameterNames[parameter.Name] = struct{}{}
+	}
+
+	for _, parameter := range instanceParameters {
+		if _, ok := parameterNames[parameter.StackRequiredParameterID]; !ok {
+			unmatchedParameters = append(unmatchedParameters, parameter.StackRequiredParameterID)
+		}
+	}
+
+	return unmatchedParameters
 }
 
-func (s service) Deploy(accessToken string, instance *model.Instance) error {
+func matchOptionalParameters(stackParameters []model.StackOptionalParameter, instanceParameters []model.InstanceOptionalParameter) []string {
+	unmatchedParameters := make([]string, 0)
+	parameterNames := make(map[string]struct{})
+
+	for _, parameter := range stackParameters {
+		parameterNames[parameter.Name] = struct{}{}
+	}
+
+	for _, parameter := range instanceParameters {
+		if _, ok := parameterNames[parameter.StackOptionalParameterID]; !ok {
+			unmatchedParameters = append(unmatchedParameters, parameter.StackOptionalParameterID)
+		}
+	}
+
+	return unmatchedParameters
+}
+
+func validateParameters(stack *model.Stack, instance *model.Instance) error {
+	unmatchedRequiredParameters := matchRequiredParameters(stack.RequiredParameters, instance.RequiredParameters)
+	unmatchedOptionalParameters := matchOptionalParameters(stack.OptionalParameters, instance.OptionalParameters)
+
+	unmatchedParameters := make([]string, 0)
+	unmatchedParameters = append(unmatchedParameters, unmatchedRequiredParameters...)
+	unmatchedParameters = append(unmatchedParameters, unmatchedOptionalParameters...)
+
+	if len(unmatchedParameters) > 0 {
+		return apperror.NewBadRequest(
+			fmt.Sprintf("parameters %q are not valid parameters for stack %q", unmatchedParameters, instance.StackName),
+		)
+	}
+
+	return nil
+}
+
+func (s service) Save(instance *model.Instance) error {
+	instanceStack, err := s.stackService.Find(instance.StackName)
+	if err != nil {
+		return err
+	}
+
+	err = validateParameters(instanceStack, instance)
+	if err != nil {
+		return err
+	}
+
+	return s.instanceRepository.Save(instance)
+}
+
+func (s service) Deploy(token string, instance *model.Instance) error {
 	group, err := s.groupService.Find(instance.GroupName)
 	if err != nil {
 		return err
 	}
 
-	syncCmd, err := s.helmfileService.sync(accessToken, instance, group)
+	syncCmd, err := s.helmfileService.sync(token, instance, group)
 	if err != nil {
 		return err
 	}
@@ -230,28 +292,14 @@ func (s service) Delete(token string, id uint) error {
 		return err
 	}
 
-	instanceWithParameters, err := s.FindByIdDecrypted(id)
+	instance, err := s.FindByIdDecrypted(id)
 	if err != nil {
 		return err
 	}
 
-	if instanceWithParameters.DeployLog != "" {
-		group, err := s.groupService.Find(instanceWithParameters.GroupName)
-		if err != nil {
-			return err
-		}
-
-		destroyCmd, err := s.helmfileService.destroy(token, instanceWithParameters, group)
-		if err != nil {
-			return err
-		}
-
-		destroyLog, destroyErrorLog, err := commandExecutor(destroyCmd, group.ClusterConfiguration)
-		log.Printf("Destroy log: %s\n", destroyLog)
-		log.Printf("Destroy error log: %s\n", destroyErrorLog)
-		if err != nil {
-			return err
-		}
+	err = s.destroy(instance)
+	if err != nil {
+		return err
 	}
 
 	return s.instanceRepository.Delete(id)
@@ -287,4 +335,45 @@ func (s service) FindInstances(user *model.User, presets bool) ([]GroupWithInsta
 	}
 
 	return instances, err
+}
+
+func (s service) Reset(token string, instance *model.Instance) error {
+	err := s.destroy(instance)
+	if err != nil {
+		return err
+	}
+
+	return s.Deploy(token, instance)
+}
+
+func (s service) destroy(instance *model.Instance) error {
+	if instance.DeployLog != "" {
+		group, err := s.groupService.Find(instance.GroupName)
+		if err != nil {
+			return err
+		}
+
+		destroyCmd, err := s.helmfileService.destroy(instance, group)
+		if err != nil {
+			return err
+		}
+
+		destroyLog, destroyErrorLog, err := commandExecutor(destroyCmd, group.ClusterConfiguration)
+		log.Printf("Destroy log: %s\n", destroyLog)
+		log.Printf("Destroy error log: %s\n", destroyErrorLog)
+		if err != nil {
+			return err
+		}
+
+		ks, err := NewKubernetesService(group.ClusterConfiguration)
+		if err != nil {
+			return err
+		}
+
+		err = ks.deletePersistentVolumeClaim(instance)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }

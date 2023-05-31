@@ -1,9 +1,9 @@
 DATABASE_MANAGER_URL: ENC[AES256_GCM,data:/vPSq2zMfSGD/ory0jZRQb3Qyi8N+A/CDBGI6NC4xnkmlsTi,iv:C7bE//z+C/i0mQ5tptlgF2KSzybzBbNBGLO6u3F/X04=,tag:JDSaiL/JP4AqRL0Kikd6gg==,type:str]
 sops:
     kms:
-        - arn: arn:aws:kms:eu-central-1:767224633206:key/mrk-f5d88b4c53ec4100acd9c8ae3bde0a65
-          created_at: "2022-06-21T13:50:22Z"
-          enc: AQICAHhXq0BmrdaY1Tzk4VwL7hDRIr4Zx4dXQZOaXDZfdG+52gEhUFa4oTFxHPkWTJJDR9e1AAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMIa50YXJJ5qXY2nHmAgEQgDvXeJ2Ooy+6GJbTGqcVXFNBUX8hIIBuZdUxyQHxunnMllG7DHI3ChnmZg60tgmopfeSrPkaQvCTm7WKMw==
+        - arn: arn:aws:kms:eu-central-1:767224633206:alias/im-prod-secrets
+          created_at: "2023-05-25T09:05:23Z"
+          enc: AQICAHgT8e97X192OKPTpaXOewhDtMqGDOe1qFP0c6FMw0ekSQHjCG6pjllufjJ044YOd9B1AAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMdvQyRfDF5iYiPcKeAgEQgDuSH+I6++ZWJMGMthvkDL46CiaqgUZTXhLYDi2xRTXVqdNcjDos1CyPdESpLYUEM8VWGBBPa2cd4B1Ivw==
           aws_profile: ""
     gcp_kms: []
     azure_kv: []

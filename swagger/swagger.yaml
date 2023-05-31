@@ -985,6 +985,8 @@ paths:
                     description: Instance
                     schema:
                         $ref: '#/definitions/Instance'
+                "400":
+                    $ref: '#/responses/Error'
                 "401":
                     $ref: '#/responses/Error'
                 "403":
@@ -1194,6 +1196,31 @@ paths:
             security:
                 - oauth2: []
             summary: Pause instance
+    /instances/{id}/reset:
+        put:
+            description: Resetting an instance will completely destroy it and redeploy using the same parameters
+            operationId: resetInstance
+            parameters:
+                - format: uint64
+                  in: path
+                  name: id
+                  required: true
+                  type: integer
+                  x-go-name: ID
+            responses:
+                "202":
+                    description: ""
+                "400":
+                    $ref: '#/responses/Error'
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Reset instance
     /instances/{id}/restart:
         put:
             description: Restart an instance...

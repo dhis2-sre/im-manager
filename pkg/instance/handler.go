@@ -31,10 +31,11 @@ func NewHandler(
 
 type Service interface {
 	ConsumeParameters(source, destination *model.Instance) error
-	Pause(token string, instance *model.Instance) error
-	Resume(token string, instance *model.Instance) error
-	Restart(token string, instance *model.Instance, typeSelector string) error
-	Save(instance *model.Instance) (*model.Instance, error)
+	Pause(instance *model.Instance) error
+	Resume(instance *model.Instance) error
+	Restart(instance *model.Instance, typeSelector string) error
+	Reset(token string, instance *model.Instance) error
+	Save(instance *model.Instance) error
 	Deploy(token string, instance *model.Instance) error
 	FindById(id uint) (*model.Instance, error)
 	FindByIdDecrypted(id uint) (*model.Instance, error)
@@ -83,6 +84,7 @@ func (h Handler) Deploy(c *gin.Context) {
 	//
 	// responses:
 	//   201: Instance
+	//   400: Error
 	//   401: Error
 	//   403: Error
 	//   404: Error
@@ -148,7 +150,7 @@ func (h Handler) Deploy(c *gin.Context) {
 		return
 	}
 
-	_, err = h.instanceService.Save(i)
+	err = h.instanceService.Save(i)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -176,7 +178,7 @@ func (h Handler) Deploy(c *gin.Context) {
 		}
 	}
 
-	savedInstance, err := h.instanceService.Save(instance)
+	err = h.instanceService.Save(instance)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -194,10 +196,10 @@ func (h Handler) Deploy(c *gin.Context) {
 			_ = c.Error(err)
 			return
 		}
-		c.JSON(http.StatusCreated, savedInstance)
+		c.JSON(http.StatusCreated, instance)
 		return
 	}
-	c.JSON(http.StatusAccepted, savedInstance)
+	c.JSON(http.StatusAccepted, instance)
 }
 
 func (h Handler) consumeParameters(user *model.User, sourceInstanceId uint, instance *model.Instance, preset bool) error {
@@ -298,13 +300,13 @@ func (h Handler) Update(c *gin.Context) {
 	instance.RequiredParameters = request.RequiredParameters
 	instance.OptionalParameters = request.OptionalParameters
 
-	saved, err := h.instanceService.Save(instance)
+	err = h.instanceService.Save(instance)
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
 
-	decrypted, err := h.instanceService.FindByIdDecrypted(saved.ID)
+	decrypted, err := h.instanceService.FindByIdDecrypted(instance.ID)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -344,12 +346,6 @@ func (h Handler) Pause(c *gin.Context) {
 		return
 	}
 
-	token, err := handler.GetTokenFromHttpAuthHeader(c)
-	if err != nil {
-		_ = c.Error(err)
-		return
-	}
-
 	user, err := handler.GetUserFromContext(c)
 	if err != nil {
 		_ = c.Error(err)
@@ -369,7 +365,65 @@ func (h Handler) Pause(c *gin.Context) {
 		return
 	}
 
-	err = h.instanceService.Pause(token, instance)
+	err = h.instanceService.Pause(instance)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	c.Status(http.StatusAccepted)
+}
+
+// Reset instance
+func (h Handler) Reset(c *gin.Context) {
+	// swagger:route PUT /instances/{id}/reset resetInstance
+	//
+	// Reset instance
+	//
+	// Resetting an instance will completely destroy it and redeploy using the same parameters
+	//
+	// Security:
+	//	oauth2:
+	//
+	// responses:
+	//	202:
+	//	400: Error
+	//	401: Error
+	//	403: Error
+	//	404: Error
+	idParam := c.Param("id")
+	id, err := strconv.ParseUint(idParam, 10, 32)
+	if err != nil {
+		_ = c.AbortWithError(http.StatusBadRequest, fmt.Errorf("failed to parse id: %s", err))
+		return
+	}
+
+	token, err := handler.GetTokenFromHttpAuthHeader(c)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	user, err := handler.GetUserFromContext(c)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	instance, err := h.instanceService.FindByIdDecrypted(uint(id))
+	if err != nil {
+		notFound := apperror.NewNotFound("instance", idParam)
+		_ = c.Error(notFound)
+		return
+	}
+
+	canWrite := handler.CanWriteInstance(user, instance)
+	if !canWrite {
+		_ = c.AbortWithError(http.StatusUnauthorized, fmt.Errorf("write access denied"))
+		return
+	}
+
+	err = h.instanceService.Reset(token, instance)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -403,19 +457,13 @@ func (h Handler) Resume(c *gin.Context) {
 		return
 	}
 
-	token, err := handler.GetTokenFromHttpAuthHeader(c)
-	if err != nil {
-		_ = c.Error(err)
-		return
-	}
-
 	user, err := handler.GetUserFromContext(c)
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
 
-	instance, err := h.instanceService.FindById(uint(id))
+	instance, err := h.instanceService.FindByIdDecrypted(uint(id))
 	if err != nil {
 		notFound := apperror.NewNotFound("instance", idParam)
 		_ = c.Error(notFound)
@@ -428,7 +476,7 @@ func (h Handler) Resume(c *gin.Context) {
 		return
 	}
 
-	err = h.instanceService.Resume(token, instance)
+	err = h.instanceService.Resume(instance)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -461,12 +509,6 @@ func (h Handler) Restart(c *gin.Context) {
 		return
 	}
 
-	token, err := handler.GetTokenFromHttpAuthHeader(c)
-	if err != nil {
-		_ = c.Error(err)
-		return
-	}
-
 	user, err := handler.GetUserFromContext(c)
 	if err != nil {
 		_ = c.Error(err)
@@ -487,7 +529,7 @@ func (h Handler) Restart(c *gin.Context) {
 	}
 
 	selector := c.Query("selector")
-	err = h.instanceService.Restart(token, instance, selector)
+	err = h.instanceService.Restart(instance, selector)
 	if err != nil {
 		_ = c.Error(err)
 		return

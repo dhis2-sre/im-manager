@@ -46,7 +46,6 @@ kubectl wait --for=condition=available --timeout=600s --namespace $GROUP "deploy
 sleep 3
 http --check-status --follow "$INSTANCE_HOST/$INSTANCE_NAME"
 ./destroy.sh $GROUP "$INSTANCE_NAME"
-kubectl delete pvc --namespace $GROUP "data-$INSTANCE_NAME-database-postgresql-0"
 
 # Database and core
 INSTANCE_NAME="$INSTANCE_PREFIX-db-and-core-$INSTANCE_POSTFIX"
@@ -59,7 +58,6 @@ sleep 3
 http --check-status --follow "$INSTANCE_HOST/$INSTANCE_NAME-core"
 ./destroy.sh $GROUP "$INSTANCE_NAME-core"
 ./destroy.sh $GROUP "$INSTANCE_NAME"
-kubectl delete pvc --namespace $GROUP "data-$INSTANCE_NAME-database-postgresql-0"
 
 # Database preset and core
 INSTANCE_NAME="$INSTANCE_PREFIX-db-preset-$INSTANCE_POSTFIX"
@@ -75,7 +73,6 @@ http --check-status --follow "$INSTANCE_HOST/$INSTANCE_NAME-core"
 ./destroy.sh $GROUP "$INSTANCE_NAME-core"
 ./destroy.sh $GROUP "$INSTANCE_NAME"
 ./destroy.sh $GROUP "$INSTANCE_NAME-preset"
-kubectl delete pvc --namespace $GROUP "data-$INSTANCE_NAME-database-postgresql-0"
 
 # Database and core from preset
 INSTANCE_NAME="$INSTANCE_PREFIX-db-and-core-pre-$INSTANCE_POSTFIX"
@@ -91,6 +88,5 @@ http --check-status --follow "$INSTANCE_HOST/$INSTANCE_NAME"
 ./destroy.sh $GROUP "$INSTANCE_NAME"
 ./destroy.sh $GROUP "$INSTANCE_NAME-preset"
 ./destroy.sh $GROUP "$INSTANCE_NAME-db"
-kubectl delete pvc --namespace $GROUP "data-$INSTANCE_NAME-db-database-postgresql-0"
 
 echo "Tests successfully completed!"

@@ -6,13 +6,9 @@ GOOGLE_AUTH_CLIENT_EMAIL: ENC[AES256_GCM,data:R33EXPTxskjtA9lC9LZBdRq0IwI0YSGsxi
 GOOGLE_AUTH_CLIENT_ID: ENC[AES256_GCM,data:a41/ers0ZjAjNF3kSk4Yp7ygJayN,iv:kbXna/HkVWNIqNXum6IiY4drmWr9eZhuwUrLfEakcPk=,tag:z446kQPsPczHfIdjhel6Ig==,type:str]
 sops:
     kms:
-        - arn: arn:aws:kms:eu-north-1:767224633206:key/mrk-f5d88b4c53ec4100acd9c8ae3bde0a65
-          created_at: "2022-05-11T11:16:58Z"
-          enc: AQICAHhXq0BmrdaY1Tzk4VwL7hDRIr4Zx4dXQZOaXDZfdG+52gFRukCgEnckpLxYBm3qMPgPAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMxmZIr4EFnLWWU9XEAgEQgDtD3ZVQgjWxCKZB66ZwsME0KdjxEdD05jOxUavtIdQ64lamerA/6MbpUXYJfpTbHWwCr1OOIHws/9WQqQ==
-          aws_profile: ""
-        - arn: arn:aws:kms:eu-central-1:767224633206:key/mrk-f5d88b4c53ec4100acd9c8ae3bde0a65
-          created_at: "2022-06-08T13:14:41Z"
-          enc: AQICAHhXq0BmrdaY1Tzk4VwL7hDRIr4Zx4dXQZOaXDZfdG+52gEVuf8ZCyCDDDZkGPGIQk3LAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMd5EHR7rtTdAzkKLMAgEQgDvg6G+TFCrZLljl/wevy9ubpUtLhXc7ilD/ozIAF5KDxvecH1i+Id02LqpeS9wu3O88IKo1j5Xg87sIAQ==
+        - arn: arn:aws:kms:eu-central-1:767224633206:alias/im-prod-secrets
+          created_at: "2023-05-25T09:05:35Z"
+          enc: AQICAHgT8e97X192OKPTpaXOewhDtMqGDOe1qFP0c6FMw0ekSQEGf4U56ZgeBw4DeClUVbBYAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMpURhEbi1dtbJvg79AgEQgDv9SGbQWvzTrEIZtCcmrSp+CVwnywhJPF3l4Xghzi0ZsIa2rP26Nzw8Kb8OzVG8n8PrxLC+tcZp2M2bqw==
           aws_profile: ""
     gcp_kms: []
     azure_kv: []
