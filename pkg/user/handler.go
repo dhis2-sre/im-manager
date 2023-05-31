@@ -31,6 +31,7 @@ type userService interface {
 	SignUp(email string, password string) (*model.User, error)
 	SignIn(email string, password string) (*model.User, error)
 	FindById(id uint) (*model.User, error)
+	FindAll() ([]*model.User, error)
 }
 
 type tokenService interface {
@@ -237,4 +238,30 @@ func (h Handler) FindById(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, userWithGroups)
+}
+
+// FindAll user
+func (h Handler) FindAll(c *gin.Context) {
+	// swagger:route GET /users findAllUsers
+	//
+	// Find users
+	//
+	// Find all users with the groups they belong to
+	//
+	// security:
+	//	oauth2:
+	//
+	// responses:
+	//	200: []User
+	//	401: Error
+	//	403: Error
+	//	404: Error
+	//	415: Error
+	users, err := h.userService.FindAll()
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	c.JSON(http.StatusOK, users)
 }
