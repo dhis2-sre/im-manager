@@ -237,7 +237,7 @@ func (h Handler) Save(c *gin.Context) {
 	// 2. Save as
 	// 3. Delete the existing database
 	// 4. Rename the saved database in the file storage
-	// 5. Overwrite the saved as database's properties with the ones from the old database (including the id)
+	// 5. Overwrite the saved database's properties with the ones from the old database (including the id)
 	// 6. Unlock the database if it wasn't already locked
 	//
 	// This won't affect the instance running the database. However, it should be noted that if two databases are deployed from the same database they can both overwrite it. It's up to the users to ensure this doesn't happen accidentally.
