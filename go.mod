@@ -29,7 +29,7 @@ require (
 	gorm.io/gorm v1.25.1
 	k8s.io/api v0.28.0-alpha.1
 	k8s.io/apimachinery v0.28.0-alpha.1
-	k8s.io/client-go v0.28.0-alpha.0
+	k8s.io/client-go v0.28.0-alpha.1
 )
 
 require (
@@ -188,7 +188,7 @@ require (
 	go.uber.org/atomic v1.10.0 // indirect
 	golang.org/x/arch v0.3.0 // indirect
 	golang.org/x/net v0.10.0 // indirect
-	golang.org/x/oauth2 v0.0.0-20220909003341-f21342109be1 // indirect
+	golang.org/x/oauth2 v0.6.0 // indirect
 	golang.org/x/sync v0.1.0 // indirect
 	golang.org/x/sys v0.8.0 // indirect
 	golang.org/x/term v0.8.0 // indirect
