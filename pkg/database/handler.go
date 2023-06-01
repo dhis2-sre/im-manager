@@ -375,7 +375,7 @@ func (h Handler) Lock(c *gin.Context) {
 		return
 	}
 
-	lock, err := h.databaseService.Lock(uint(id), request.InstanceId, uint(user.ID))
+	lock, err := h.databaseService.Lock(uint(id), request.InstanceId, user.ID)
 	if err != nil {
 		_ = c.Error(err)
 		return
