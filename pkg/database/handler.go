@@ -351,6 +351,12 @@ func (h Handler) Lock(c *gin.Context) {
 		return
 	}
 
+	_, err = h.instanceService.FindById(request.InstanceId)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
 	d, err := h.databaseService.FindById(uint(id))
 	if err != nil {
 		_ = c.Error(err)
