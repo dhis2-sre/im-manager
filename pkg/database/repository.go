@@ -52,7 +52,7 @@ func (r repository) FindBySlug(slug string) (*model.Database, error) {
 		Where("slug = ?", slug).
 		First(&d).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, errdef.NewNotFound("database not found by slug: %s", slug)
+		return nil, errdef.NewNotFound("database not found by slug: %q", slug)
 	}
 	return d, err
 }
