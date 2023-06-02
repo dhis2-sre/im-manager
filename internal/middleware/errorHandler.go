@@ -1,25 +1,44 @@
 package middleware
 
 import (
-	"github.com/dhis2-sre/im-manager/internal/apperror"
+	"fmt"
+	"log"
+	"net/http"
+
+	"github.com/dhis2-sre/im-manager/internal/errdef"
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 )
 
 func ErrorHandler() gin.HandlerFunc {
-	return errorHandlerT(gin.ErrorTypeAny)
-}
-
-func errorHandlerT(errType gin.ErrorType) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		c.Next()
-		detectedErrors := c.Errors.ByType(errType)
 
-		if len(detectedErrors) > 0 {
-			// TODO: Handle more than one error
-			err := detectedErrors[0].Err
-			c.String(apperror.ToHttpStatusCode(err), err.Error())
-			c.Abort()
+		err := c.Errors.Last()
+		if err == nil {
 			return
+		}
+		if c.Writer.Status() != http.StatusOK {
+			_, _ = c.Writer.WriteString(err.Error())
+			return
+		}
+
+		// nolint:gocritic
+		if errdef.IsBadRequest(err) {
+			c.String(http.StatusBadRequest, err.Error())
+		} else if errdef.IsUnsupportedMediaType(err) {
+			c.String(http.StatusBadRequest, err.Error())
+		} else if errdef.IsDuplicated(err) {
+			c.String(http.StatusBadRequest, err.Error())
+		} else if errdef.IsNotFound(err) {
+			c.String(http.StatusNotFound, err.Error())
+		} else if errdef.IsUnauthorized(err) {
+			c.String(http.StatusUnauthorized, err.Error())
+		} else {
+			id := uuid.New()
+			log.Printf("unhandled error: %q, log id: %s\n", err, id)
+			err := fmt.Errorf("something went wrong. We'll look into it if you send us the id %q :)", id)
+			c.String(http.StatusInternalServerError, err.Error())
 		}
 	}
 }

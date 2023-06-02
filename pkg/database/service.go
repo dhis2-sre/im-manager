@@ -14,17 +14,16 @@ import (
 	"strings"
 	"time"
 
+	"github.com/dhis2-sre/im-manager/internal/errdef"
+
 	"github.com/dhis2-sre/im-manager/pkg/config"
 
-	"github.com/dhis2-sre/im-manager/internal/apperror"
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	"github.com/dhis2-sre/im-manager/pkg/storage"
 
 	"github.com/anthhub/forwarder"
 
 	pg "github.com/habx/pg-commands"
-
-	"gorm.io/gorm"
 
 	"github.com/google/uuid"
 )
@@ -53,8 +52,8 @@ type Repository interface {
 	Delete(id uint) error
 	FindByGroupNames(names []string) ([]model.Database, error)
 	Update(d *model.Database) error
-	CreateExternalDownload(databaseID uint, expiration time.Time) (model.ExternalDownload, error)
-	FindExternalDownload(uuid uuid.UUID) (model.ExternalDownload, error)
+	CreateExternalDownload(databaseID uint, expiration time.Time) (*model.ExternalDownload, error)
+	FindExternalDownload(uuid uuid.UUID) (*model.ExternalDownload, error)
 	PurgeExternalDownload() error
 	FindBySlug(slug string) (*model.Database, error)
 }
@@ -86,10 +85,6 @@ func (s service) FindByIdentifier(identifier string) (*model.Database, error) {
 func (s service) Copy(id uint, d *model.Database, group *model.Group) error {
 	source, err := s.FindById(id)
 	if err != nil {
-		if err.Error() == "record not found" {
-			idStr := strconv.FormatUint(uint64(id), 10)
-			err = apperror.NewNotFound("database not found", idStr)
-		}
 		return err
 	}
 
@@ -111,56 +106,19 @@ func (s service) Copy(id uint, d *model.Database, group *model.Group) error {
 }
 
 func (s service) FindById(id uint) (*model.Database, error) {
-	d, err := s.repository.FindById(id)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			idStr := strconv.FormatUint(uint64(id), 10)
-			err = apperror.NewNotFound("database not found by id", idStr)
-		}
-	}
-	return d, err
+	return s.repository.FindById(id)
 }
 
 func (s service) FindBySlug(slug string) (*model.Database, error) {
-	d, err := s.repository.FindBySlug(slug)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			err = apperror.NewNotFound("database not found by slug", slug)
-		}
-	}
-	return d, err
+	return s.repository.FindBySlug(slug)
 }
 
 func (s service) Lock(id uint, instanceId uint, userId uint) (*model.Lock, error) {
-	lock, err := s.repository.Lock(id, instanceId, userId)
-	if err != nil {
-		// TODO: Don't handle errors like this
-		// Don't check the error by looking at the error message... Use the type
-		// Don't allow gorm errors outside the repository
-		if err.Error() == "record not found" {
-			idStr := strconv.FormatUint(uint64(id), 10)
-			err = apperror.NewNotFound("database not found", idStr)
-		}
-
-		// TODO: Don't handle errors like this
-		// Don't check the error by looking at the error message... Use the type
-		// Don't allow gorm errors outside the repository
-		if strings.HasPrefix(err.Error(), "already locked by: ") {
-			err = apperror.NewConflict(err.Error())
-		}
-	}
-	return lock, err
+	return s.repository.Lock(id, instanceId, userId)
 }
 
 func (s service) Unlock(id uint) error {
-	err := s.repository.Unlock(id)
-	if err != nil {
-		if err.Error() == "record not found" {
-			idStr := strconv.FormatUint(uint64(id), 10)
-			err = apperror.NewNotFound("database not found", idStr)
-		}
-	}
-	return err
+	return s.repository.Unlock(id)
 }
 
 type ReadAtSeeker interface {
@@ -171,7 +129,6 @@ type ReadAtSeeker interface {
 func (s service) Upload(d *model.Database, group *model.Group, reader ReadAtSeeker, size int64) (*model.Database, error) {
 	key := fmt.Sprintf("%s/%s", group.Name, d.Name)
 	err := s.s3Client.Upload(s.c.Bucket, key, reader, size)
-
 	if err != nil {
 		return nil, err
 	}
@@ -193,7 +150,7 @@ func (s service) Download(id uint, dst io.Writer, cb func(contentLength int64)) 
 	}
 
 	if d.Url == "" {
-		return apperror.NewBadRequest(fmt.Sprintf("database with %d doesn't reference any url", id))
+		return errdef.NewBadRequest("database with %d doesn't reference any url", id)
 	}
 
 	u, err := url.Parse(d.Url)
@@ -244,24 +201,24 @@ func (s service) Update(d *model.Database) error {
 	return s.repository.Update(d)
 }
 
-func (s service) CreateExternalDownload(databaseID uint, expiration time.Time) (model.ExternalDownload, error) {
+func (s service) CreateExternalDownload(databaseID uint, expiration time.Time) (*model.ExternalDownload, error) {
 	err := s.repository.PurgeExternalDownload()
 	if err != nil {
-		return model.ExternalDownload{}, err
+		return nil, err
 	}
 
 	now := time.Now()
 	if expiration.Before(now) {
-		return model.ExternalDownload{}, fmt.Errorf("expiration %s needs to be in the future (current %s)", expiration, now)
+		return nil, fmt.Errorf("expiration %s needs to be in the future (current %s)", expiration, now)
 	}
 
 	return s.repository.CreateExternalDownload(databaseID, expiration)
 }
 
-func (s service) FindExternalDownload(uuid uuid.UUID) (model.ExternalDownload, error) {
+func (s service) FindExternalDownload(uuid uuid.UUID) (*model.ExternalDownload, error) {
 	err := s.repository.PurgeExternalDownload()
 	if err != nil {
-		return model.ExternalDownload{}, err
+		return nil, err
 	}
 	return s.repository.FindExternalDownload(uuid)
 }

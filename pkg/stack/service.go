@@ -1,7 +1,6 @@
 package stack
 
 import (
-	"github.com/dhis2-sre/im-manager/internal/apperror"
 	"github.com/dhis2-sre/im-manager/pkg/model"
 )
 
@@ -24,12 +23,7 @@ func NewService(repository Repository) *service {
 }
 
 func (s service) Create(stack *model.Stack) error {
-	err := s.repository.Create(stack)
-	if err != nil {
-		return apperror.NewBadRequest(err.Error())
-	}
-
-	return err
+	return s.repository.Create(stack)
 }
 
 func (s service) Delete(name string) error {

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/dhis2-sre/im-manager/internal/errdef"
 	"github.com/dhis2-sre/im-manager/pkg/config"
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	"github.com/jackc/pgconn"
@@ -87,21 +88,25 @@ func (r repository) FindById(id uint) (*model.Instance, error) {
 		Preload("RequiredParameters.StackRequiredParameter").
 		Preload("OptionalParameters.StackOptionalParameter").
 		First(&instance, id).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, errdef.NewNotFound("instance not found by id: %d", id)
+	}
+
 	return instance, err
 }
 
-func (r repository) FindByNameAndGroup(instance string, group string) (*model.Instance, error) {
-	var i *model.Instance
+func (r repository) FindByNameAndGroup(name, group string) (*model.Instance, error) {
+	var instance *model.Instance
 
 	err := r.db.
-		Where("name = ?", instance).
+		Where("name = ?", name).
 		Where("group_name = ?", group).
-		First(&i).Error
-	if err != nil {
-		return nil, err
+		First(&instance).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, errdef.NewNotFound("instance not found by name %q and group %q", name, group)
 	}
 
-	return i, err
+	return instance, err
 }
 
 func (r repository) SaveDeployLog(instance *model.Instance, log string) error {
