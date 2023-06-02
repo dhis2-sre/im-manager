@@ -294,6 +294,7 @@ func (h Handler) Delete(c *gin.Context) {
 
 	user, err := handler.GetUserFromContext(c)
 	if err != nil {
+		_ = c.Error(err)
 		return
 	}
 
