@@ -114,7 +114,11 @@ func (r repository) SaveDeployLog(instance *model.Instance, log string) error {
 }
 
 func (r repository) Delete(id uint) error {
-	return r.db.Unscoped().Delete(&model.Instance{}, id).Error
+	err := r.db.Unscoped().Delete(&model.Instance{}, id).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return errdef.NewNotFound("instance not found by id: %d", id)
+	}
+	return err
 }
 
 const AdministratorGroupName = "administrators"
