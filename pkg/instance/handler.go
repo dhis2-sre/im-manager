@@ -744,6 +744,7 @@ func (h Handler) Logs(c *gin.Context) {
 	group, err := h.groupService.Find(instance.GroupName)
 	if err != nil {
 		_ = c.Error(err)
+		return
 	}
 
 	selector := c.Query("selector")
