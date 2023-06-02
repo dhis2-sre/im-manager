@@ -92,6 +92,7 @@ func (h *Handler) SignIn(c *gin.Context) {
 	//   415: Error
 	user, err := handler.GetUserFromContext(c)
 	if err != nil {
+		_ = c.Error(err)
 		return
 	}
 
@@ -170,6 +171,7 @@ func (h Handler) Me(c *gin.Context) {
 	//   415: Error
 	user, err := handler.GetUserFromContext(c)
 	if err != nil {
+		_ = c.Error(err)
 		return
 	}
 
@@ -199,6 +201,7 @@ func (h Handler) SignOut(c *gin.Context) {
 	//	415: Error
 	user, err := handler.GetUserFromContext(c)
 	if err != nil {
+		_ = c.Error(err)
 		return
 	}
 
