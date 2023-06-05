@@ -1,7 +1,6 @@
 package user
 
 import (
-	"github.com/dhis2-sre/im-manager/internal/handler"
 	"github.com/dhis2-sre/im-manager/internal/middleware"
 	"github.com/gin-gonic/gin"
 )
