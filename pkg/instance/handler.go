@@ -258,11 +258,8 @@ func (h Handler) Update(c *gin.Context) {
 	//	403: Error
 	//	404: Error
 	//	415: Error
-	idParam := c.Param("id")
-	id, err := strconv.ParseUint(idParam, 10, 32)
-	if err != nil {
-		badRequest := errdef.NewBadRequest("error parsing id: %s", idParam)
-		_ = c.Error(badRequest)
+	id, ok := handler.GetPathParameter(c, "id")
+	if !ok {
 		return
 	}
 
@@ -284,9 +281,9 @@ func (h Handler) Update(c *gin.Context) {
 		return
 	}
 
-	instance, err := h.instanceService.FindById(uint(id))
+	instance, err := h.instanceService.FindById(id)
 	if err != nil {
-		notFound := errdef.NewNotFound("instance not found by id: %s", idParam)
+		notFound := errdef.NewNotFound("instance not found by id: %d", id)
 		_ = c.Error(notFound)
 		return
 	}
@@ -340,10 +337,8 @@ func (h Handler) Pause(c *gin.Context) {
 	//	403: Error
 	//	404: Error
 	//	415: Error
-	idParam := c.Param("id")
-	id, err := strconv.ParseUint(idParam, 10, 32)
-	if err != nil {
-		_ = c.AbortWithError(http.StatusBadRequest, fmt.Errorf("failed to parse id: %s", err))
+	id, ok := handler.GetPathParameter(c, "id")
+	if !ok {
 		return
 	}
 
@@ -353,9 +348,9 @@ func (h Handler) Pause(c *gin.Context) {
 		return
 	}
 
-	instance, err := h.instanceService.FindById(uint(id))
+	instance, err := h.instanceService.FindById(id)
 	if err != nil {
-		notFound := errdef.NewNotFound("instance not found by id: %s", idParam)
+		notFound := errdef.NewNotFound("instance not found by id: %d", id)
 		_ = c.Error(notFound)
 		return
 	}
@@ -392,10 +387,8 @@ func (h Handler) Reset(c *gin.Context) {
 	//	401: Error
 	//	403: Error
 	//	404: Error
-	idParam := c.Param("id")
-	id, err := strconv.ParseUint(idParam, 10, 32)
-	if err != nil {
-		_ = c.AbortWithError(http.StatusBadRequest, fmt.Errorf("failed to parse id: %s", err))
+	id, ok := handler.GetPathParameter(c, "id")
+	if !ok {
 		return
 	}
 
@@ -411,9 +404,9 @@ func (h Handler) Reset(c *gin.Context) {
 		return
 	}
 
-	instance, err := h.instanceService.FindByIdDecrypted(uint(id))
+	instance, err := h.instanceService.FindByIdDecrypted(id)
 	if err != nil {
-		notFound := errdef.NewNotFound("instance not found by id: %s", idParam)
+		notFound := errdef.NewNotFound("instance not found by id: %d", id)
 		_ = c.Error(notFound)
 		return
 	}
@@ -451,10 +444,8 @@ func (h Handler) Resume(c *gin.Context) {
 	//	403: Error
 	//	404: Error
 	//	415: Error
-	idParam := c.Param("id")
-	id, err := strconv.ParseUint(idParam, 10, 32)
-	if err != nil {
-		_ = c.AbortWithError(http.StatusBadRequest, fmt.Errorf("failed to parse id: %s", err))
+	id, ok := handler.GetPathParameter(c, "id")
+	if !ok {
 		return
 	}
 
@@ -464,9 +455,9 @@ func (h Handler) Resume(c *gin.Context) {
 		return
 	}
 
-	instance, err := h.instanceService.FindByIdDecrypted(uint(id))
+	instance, err := h.instanceService.FindByIdDecrypted(id)
 	if err != nil {
-		notFound := errdef.NewNotFound("instance not found by id: %s", idParam)
+		notFound := errdef.NewNotFound("instance not found by id: %d", id)
 		_ = c.Error(notFound)
 		return
 	}
@@ -503,10 +494,8 @@ func (h Handler) Restart(c *gin.Context) {
 	//	403: Error
 	//	404: Error
 	//	415: Error
-	idParam := c.Param("id")
-	id, err := strconv.ParseUint(idParam, 10, 32)
-	if err != nil {
-		_ = c.AbortWithError(http.StatusBadRequest, fmt.Errorf("failed to parse id: %s", err))
+	id, ok := handler.GetPathParameter(c, "id")
+	if !ok {
 		return
 	}
 
@@ -516,9 +505,9 @@ func (h Handler) Restart(c *gin.Context) {
 		return
 	}
 
-	instance, err := h.instanceService.FindById(uint(id))
+	instance, err := h.instanceService.FindById(id)
 	if err != nil {
-		notFound := errdef.NewNotFound("instance not found by id: %s", idParam)
+		notFound := errdef.NewNotFound("instance not found by id: %d", id)
 		_ = c.Error(notFound)
 		return
 	}
@@ -556,11 +545,8 @@ func (h Handler) Delete(c *gin.Context) {
 	//	403: Error
 	//	404: Error
 	//	415: Error
-	idParam := c.Param("id")
-	id, err := strconv.ParseUint(idParam, 10, 32)
-	if err != nil {
-		badRequest := errdef.NewBadRequest("error parsing id: %s", idParam)
-		_ = c.Error(badRequest)
+	id, ok := handler.GetPathParameter(c, "id")
+	if !ok {
 		return
 	}
 
@@ -570,9 +556,9 @@ func (h Handler) Delete(c *gin.Context) {
 		return
 	}
 
-	instance, err := h.instanceService.FindById(uint(id))
+	instance, err := h.instanceService.FindById(id)
 	if err != nil {
-		notFound := errdef.NewNotFound("instance not found by id: %s", idParam)
+		notFound := errdef.NewNotFound("instance not found by id: %d", id)
 		_ = c.Error(notFound)
 		return
 	}
@@ -586,7 +572,7 @@ func (h Handler) Delete(c *gin.Context) {
 
 	err = h.instanceService.Delete(instance.ID)
 	if err != nil {
-		_ = c.Error(fmt.Errorf("unable to delete instance: %s", err))
+		_ = c.Error(fmt.Errorf("unable to delete instance: %v", err))
 		return
 	}
 
@@ -610,11 +596,8 @@ func (h Handler) FindById(c *gin.Context) {
 	//	403: Error
 	//	404: Error
 	//	415: Error
-	idParam := c.Param("id")
-	id, err := strconv.ParseUint(idParam, 10, 32)
-	if err != nil {
-		badRequest := errdef.NewBadRequest("error parsing id: %s", idParam)
-		_ = c.Error(badRequest)
+	id, ok := handler.GetPathParameter(c, "id")
+	if !ok {
 		return
 	}
 
@@ -624,9 +607,9 @@ func (h Handler) FindById(c *gin.Context) {
 		return
 	}
 
-	instance, err := h.instanceService.FindById(uint(id))
+	instance, err := h.instanceService.FindById(id)
 	if err != nil {
-		notFound := errdef.NewNotFound("instance not found by id: %s", idParam)
+		notFound := errdef.NewNotFound("instance not found by id: %d", id)
 		_ = c.Error(notFound)
 		return
 	}
@@ -658,11 +641,8 @@ func (h Handler) FindByIdDecrypted(c *gin.Context) {
 	//	403: Error
 	//	404: Error
 	//	415: Error
-	idParam := c.Param("id")
-	id, err := strconv.ParseUint(idParam, 10, 32)
-	if err != nil {
-		badRequest := errdef.NewBadRequest("error parsing id: %s", idParam)
-		_ = c.Error(badRequest)
+	id, ok := handler.GetPathParameter(c, "id")
+	if !ok {
 		return
 	}
 
@@ -672,9 +652,9 @@ func (h Handler) FindByIdDecrypted(c *gin.Context) {
 		return
 	}
 
-	instance, err := h.instanceService.FindByIdDecrypted(uint(id))
+	instance, err := h.instanceService.FindByIdDecrypted(id)
 	if err != nil {
-		notFound := errdef.NewNotFound("instance not found by id: %s", idParam)
+		notFound := errdef.NewNotFound("instance not found by id: %d", id)
 		_ = c.Error(notFound)
 		return
 	}
@@ -706,11 +686,8 @@ func (h Handler) Logs(c *gin.Context) {
 	//	403: Error
 	//	404: Error
 	//	415: Error
-	idParam := c.Param("id")
-	id, err := strconv.ParseUint(idParam, 10, 32)
-	if err != nil {
-		badRequest := errdef.NewBadRequest("error parsing id: %s", idParam)
-		_ = c.Error(badRequest)
+	id, ok := handler.GetPathParameter(c, "id")
+	if !ok {
 		return
 	}
 
@@ -720,9 +697,9 @@ func (h Handler) Logs(c *gin.Context) {
 		return
 	}
 
-	instance, err := h.instanceService.FindById(uint(id))
+	instance, err := h.instanceService.FindById(id)
 	if err != nil {
-		notFound := errdef.NewNotFound("instance not found by id: %s", idParam)
+		notFound := errdef.NewNotFound("instance not found by id: %d", id)
 		_ = c.Error(notFound)
 		return
 	}
