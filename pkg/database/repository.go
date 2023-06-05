@@ -88,7 +88,7 @@ func (r repository) Lock(id, instanceId, userId uint) (*model.Lock, error) {
 }
 
 func (r repository) Unlock(id uint) error {
-	db := r.db.Delete(&model.Lock{}, id)
+	db := r.db.Unscoped().Delete(&model.Lock{}, id)
 	if db.Error != nil {
 		return db.Error
 	}

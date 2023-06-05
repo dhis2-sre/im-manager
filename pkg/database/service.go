@@ -325,6 +325,13 @@ func (s service) SaveAs(database *model.Database, instance *model.Instance, stac
 			return
 		}
 
+		// This is added due to the following issue - https://github.com/aws/aws-sdk-go/issues/1962
+		_, err = file.Seek(0, 0)
+		if err != nil {
+			logError(err)
+			return
+		}
+
 		_, err = s.Upload(newDatabase, group, file, stat.Size())
 		if err != nil {
 			logError(err)

@@ -283,8 +283,7 @@ func (h Handler) Update(c *gin.Context) {
 
 	instance, err := h.instanceService.FindById(id)
 	if err != nil {
-		notFound := errdef.NewNotFound("instance not found by id: %d", id)
-		_ = c.Error(notFound)
+		_ = c.Error(err)
 		return
 	}
 
@@ -350,8 +349,7 @@ func (h Handler) Pause(c *gin.Context) {
 
 	instance, err := h.instanceService.FindById(id)
 	if err != nil {
-		notFound := errdef.NewNotFound("instance not found by id: %d", id)
-		_ = c.Error(notFound)
+		_ = c.Error(err)
 		return
 	}
 
@@ -406,8 +404,7 @@ func (h Handler) Reset(c *gin.Context) {
 
 	instance, err := h.instanceService.FindByIdDecrypted(id)
 	if err != nil {
-		notFound := errdef.NewNotFound("instance not found by id: %d", id)
-		_ = c.Error(notFound)
+		_ = c.Error(err)
 		return
 	}
 
@@ -457,8 +454,7 @@ func (h Handler) Resume(c *gin.Context) {
 
 	instance, err := h.instanceService.FindByIdDecrypted(id)
 	if err != nil {
-		notFound := errdef.NewNotFound("instance not found by id: %d", id)
-		_ = c.Error(notFound)
+		_ = c.Error(err)
 		return
 	}
 
@@ -507,8 +503,7 @@ func (h Handler) Restart(c *gin.Context) {
 
 	instance, err := h.instanceService.FindById(id)
 	if err != nil {
-		notFound := errdef.NewNotFound("instance not found by id: %d", id)
-		_ = c.Error(notFound)
+		_ = c.Error(err)
 		return
 	}
 
@@ -558,8 +553,7 @@ func (h Handler) Delete(c *gin.Context) {
 
 	instance, err := h.instanceService.FindById(id)
 	if err != nil {
-		notFound := errdef.NewNotFound("instance not found by id: %d", id)
-		_ = c.Error(notFound)
+		_ = c.Error(err)
 		return
 	}
 
@@ -609,8 +603,7 @@ func (h Handler) FindById(c *gin.Context) {
 
 	instance, err := h.instanceService.FindById(id)
 	if err != nil {
-		notFound := errdef.NewNotFound("instance not found by id: %d", id)
-		_ = c.Error(notFound)
+		_ = c.Error(err)
 		return
 	}
 
@@ -654,8 +647,7 @@ func (h Handler) FindByIdDecrypted(c *gin.Context) {
 
 	instance, err := h.instanceService.FindByIdDecrypted(id)
 	if err != nil {
-		notFound := errdef.NewNotFound("instance not found by id: %d", id)
-		_ = c.Error(notFound)
+		_ = c.Error(err)
 		return
 	}
 
@@ -699,8 +691,7 @@ func (h Handler) Logs(c *gin.Context) {
 
 	instance, err := h.instanceService.FindById(id)
 	if err != nil {
-		notFound := errdef.NewNotFound("instance not found by id: %d", id)
-		_ = c.Error(notFound)
+		_ = c.Error(err)
 		return
 	}
 
@@ -714,6 +705,7 @@ func (h Handler) Logs(c *gin.Context) {
 	group, err := h.groupService.Find(instance.GroupName)
 	if err != nil {
 		_ = c.Error(err)
+		return
 	}
 
 	selector := c.Query("selector")
@@ -778,8 +770,7 @@ func (h Handler) NameToId(c *gin.Context) {
 
 	instance, err := h.instanceService.FindByNameAndGroup(instanceName, groupName)
 	if err != nil {
-		notFound := errdef.NewNotFound("instance not found by name: %s", instanceName)
-		_ = c.Error(notFound)
+		_ = c.Error(err)
 		return
 	}
 
