@@ -572,8 +572,7 @@ func (h Handler) Delete(c *gin.Context) {
 
 	instance, err := h.instanceService.FindById(uint(id))
 	if err != nil {
-		notFound := errdef.NewNotFound("instance not found by id: %s", idParam)
-		_ = c.Error(notFound)
+		_ = c.Error(err)
 		return
 	}
 
