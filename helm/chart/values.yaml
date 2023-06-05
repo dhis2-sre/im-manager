@@ -2,8 +2,8 @@
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 
-accessTokenExpirationInSeconds: 86400 # 24 hours
-refreshTokenExpirationInSeconds: 172800 # 2 days
+accessTokenExpirationInSeconds: 300 # 5 minutes
+refreshTokenExpirationInSeconds: 900 # 15 minutes
 
 redis:
   host: redis-master.namespace.svc
