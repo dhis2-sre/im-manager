@@ -793,8 +793,7 @@ func (h Handler) NameToId(c *gin.Context) {
 
 	instance, err := h.instanceService.FindByNameAndGroup(instanceName, groupName)
 	if err != nil {
-		notFound := errdef.NewNotFound("instance not found by name: %s", instanceName)
-		_ = c.Error(notFound)
+		_ = c.Error(err)
 		return
 	}
 
