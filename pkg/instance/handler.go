@@ -286,8 +286,7 @@ func (h Handler) Update(c *gin.Context) {
 
 	instance, err := h.instanceService.FindById(uint(id))
 	if err != nil {
-		notFound := errdef.NewNotFound("instance not found by id: %s", idParam)
-		_ = c.Error(notFound)
+		_ = c.Error(err)
 		return
 	}
 
@@ -355,8 +354,7 @@ func (h Handler) Pause(c *gin.Context) {
 
 	instance, err := h.instanceService.FindById(uint(id))
 	if err != nil {
-		notFound := errdef.NewNotFound("instance not found by id: %s", idParam)
-		_ = c.Error(notFound)
+		_ = c.Error(err)
 		return
 	}
 
@@ -413,8 +411,7 @@ func (h Handler) Reset(c *gin.Context) {
 
 	instance, err := h.instanceService.FindByIdDecrypted(uint(id))
 	if err != nil {
-		notFound := errdef.NewNotFound("instance not found by id: %s", idParam)
-		_ = c.Error(notFound)
+		_ = c.Error(err)
 		return
 	}
 
@@ -466,8 +463,7 @@ func (h Handler) Resume(c *gin.Context) {
 
 	instance, err := h.instanceService.FindByIdDecrypted(uint(id))
 	if err != nil {
-		notFound := errdef.NewNotFound("instance not found by id: %s", idParam)
-		_ = c.Error(notFound)
+		_ = c.Error(err)
 		return
 	}
 
@@ -518,8 +514,7 @@ func (h Handler) Restart(c *gin.Context) {
 
 	instance, err := h.instanceService.FindById(uint(id))
 	if err != nil {
-		notFound := errdef.NewNotFound("instance not found by id: %s", idParam)
-		_ = c.Error(notFound)
+		_ = c.Error(err)
 		return
 	}
 
@@ -625,8 +620,7 @@ func (h Handler) FindById(c *gin.Context) {
 
 	instance, err := h.instanceService.FindById(uint(id))
 	if err != nil {
-		notFound := errdef.NewNotFound("instance not found by id: %s", idParam)
-		_ = c.Error(notFound)
+		_ = c.Error(err)
 		return
 	}
 
@@ -673,8 +667,7 @@ func (h Handler) FindByIdDecrypted(c *gin.Context) {
 
 	instance, err := h.instanceService.FindByIdDecrypted(uint(id))
 	if err != nil {
-		notFound := errdef.NewNotFound("instance not found by id: %s", idParam)
-		_ = c.Error(notFound)
+		_ = c.Error(err)
 		return
 	}
 
@@ -721,8 +714,7 @@ func (h Handler) Logs(c *gin.Context) {
 
 	instance, err := h.instanceService.FindById(uint(id))
 	if err != nil {
-		notFound := errdef.NewNotFound("instance not found by id: %s", idParam)
-		_ = c.Error(notFound)
+		_ = c.Error(err)
 		return
 	}
 
