@@ -210,16 +210,16 @@ func (h Handler) consumeParameters(user *model.User, sourceInstanceId uint, inst
 	}
 
 	if preset && !sourceInstance.Preset {
-		return errdef.NewUnauthorized(fmt.Sprintf("instance (id: %d) isn't a preset", sourceInstance.ID))
+		return errdef.NewUnauthorized("instance (id: %d) isn't a preset", sourceInstance.ID)
 	}
 
 	if preset && sourceInstance.StackName != instance.StackName {
-		return errdef.NewUnauthorized(fmt.Sprintf("preset stack (%s) doesn't match instance stack (%s)", sourceInstance.StackName, instance.StackName))
+		return errdef.NewUnauthorized("preset stack (%s) doesn't match instance stack (%s)", sourceInstance.StackName, instance.StackName)
 	}
 
 	canReadSource := handler.CanReadInstance(user, sourceInstance)
 	if !canReadSource {
-		return errdef.NewUnauthorized(fmt.Sprintf("read access to source instance (id: %d) denied", sourceInstance.ID))
+		return errdef.NewUnauthorized("read access to source instance (id: %d) denied", sourceInstance.ID)
 	}
 
 	err = h.instanceService.ConsumeParameters(sourceInstance, instance)
