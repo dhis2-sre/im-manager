@@ -8,6 +8,8 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/dhis2-sre/im-manager/internal/errdef"
+
 	"github.com/dhis2-sre/im-manager/pkg/model"
 )
 
@@ -42,8 +44,8 @@ func LoadStacks(dir string, stackService Service) error {
 
 		existingStack, err := stackService.Find(name)
 		if err != nil {
-			if err.Error() != "record not found" {
-				return fmt.Errorf("error searching existing stack %q: %v", name, err)
+			if !errdef.IsNotFound(err) {
+				return fmt.Errorf("error searching existing stack %q: %w", name, err)
 			}
 		}
 		if err == nil {
@@ -69,7 +71,7 @@ func LoadStacks(dir string, stackService Service) error {
 			stack.OptionalParameters = append(stack.OptionalParameters, *parameter)
 		}
 
-		stack, err = stackService.Create(stack)
+		err = stackService.Create(stack)
 		log.Printf("Stack created: %+v\n", stack)
 		if err != nil {
 			return fmt.Errorf("error creating stack %q: %v", name, err)

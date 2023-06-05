@@ -6,7 +6,7 @@ import (
 	"log"
 	"os/exec"
 
-	"github.com/dhis2-sre/im-manager/internal/apperror"
+	"github.com/dhis2-sre/im-manager/internal/errdef"
 
 	"github.com/dhis2-sre/im-manager/pkg/stack"
 
@@ -50,7 +50,7 @@ type groupService interface {
 
 type helmfile interface {
 	sync(token string, instance *model.Instance, group *model.Group) (*exec.Cmd, error)
-	destroy(token string, instance *model.Instance, group *model.Group) (*exec.Cmd, error)
+	destroy(instance *model.Instance, group *model.Group) (*exec.Cmd, error)
 }
 
 type service struct {
@@ -186,52 +186,50 @@ func (s service) unlink(id uint) error {
 	return s.instanceRepository.Unlink(instance)
 }
 
-func matchRequiredParameters(stackParams []model.StackRequiredParameter, instanceParams []model.InstanceRequiredParameter) []string {
-	unmatchedParams := make([]string, 0)
-	paramNames := make(map[string]struct{})
+func matchRequiredParameters(stackParameters []model.StackRequiredParameter, instanceParameters []model.InstanceRequiredParameter) []string {
+	unmatchedParameters := make([]string, 0)
+	parameterNames := make(map[string]struct{})
 
-	for _, param := range stackParams {
-		paramNames[param.Name] = struct{}{}
+	for _, parameter := range stackParameters {
+		parameterNames[parameter.Name] = struct{}{}
 	}
 
-	for _, param := range instanceParams {
-		if _, ok := paramNames[param.StackRequiredParameterID]; !ok {
-			unmatchedParams = append(unmatchedParams, param.StackRequiredParameterID)
+	for _, parameter := range instanceParameters {
+		if _, ok := parameterNames[parameter.StackRequiredParameterID]; !ok {
+			unmatchedParameters = append(unmatchedParameters, parameter.StackRequiredParameterID)
 		}
 	}
 
-	return unmatchedParams
+	return unmatchedParameters
 }
 
-func matchOptionalParameters(stackParams []model.StackOptionalParameter, instanceParams []model.InstanceOptionalParameter) []string {
-	unmatchedParams := make([]string, 0)
-	paramNames := make(map[string]struct{})
+func matchOptionalParameters(stackParameters []model.StackOptionalParameter, instanceParameters []model.InstanceOptionalParameter) []string {
+	unmatchedParameters := make([]string, 0)
+	parameterNames := make(map[string]struct{})
 
-	for _, param := range stackParams {
-		paramNames[param.Name] = struct{}{}
+	for _, parameter := range stackParameters {
+		parameterNames[parameter.Name] = struct{}{}
 	}
 
-	for _, param := range instanceParams {
-		if _, ok := paramNames[param.StackOptionalParameterID]; !ok {
-			unmatchedParams = append(unmatchedParams, param.StackOptionalParameterID)
+	for _, parameter := range instanceParameters {
+		if _, ok := parameterNames[parameter.StackOptionalParameterID]; !ok {
+			unmatchedParameters = append(unmatchedParameters, parameter.StackOptionalParameterID)
 		}
 	}
 
-	return unmatchedParams
+	return unmatchedParameters
 }
 
 func validateParameters(stack *model.Stack, instance *model.Instance) error {
-	unmatchedReqParams := matchRequiredParameters(stack.RequiredParameters, instance.RequiredParameters)
-	unmatchedOptParams := matchOptionalParameters(stack.OptionalParameters, instance.OptionalParameters)
+	unmatchedRequiredParameters := matchRequiredParameters(stack.RequiredParameters, instance.RequiredParameters)
+	unmatchedOptionalParameters := matchOptionalParameters(stack.OptionalParameters, instance.OptionalParameters)
 
-	unmatchedParams := make([]string, 0)
-	unmatchedParams = append(unmatchedParams, unmatchedReqParams...)
-	unmatchedParams = append(unmatchedParams, unmatchedOptParams...)
+	unmatchedParameters := make([]string, 0)
+	unmatchedParameters = append(unmatchedParameters, unmatchedRequiredParameters...)
+	unmatchedParameters = append(unmatchedParameters, unmatchedOptionalParameters...)
 
-	if len(unmatchedParams) > 0 {
-		return apperror.NewBadRequest(
-			fmt.Sprintf("parameters %q are not valid parameters for stack %q", unmatchedParams, instance.StackName),
-		)
+	if len(unmatchedParameters) > 0 {
+		return errdef.NewBadRequest("parameters %q are not valid parameters for stack %q", unmatchedParameters, instance.StackName)
 	}
 
 	return nil
@@ -251,13 +249,13 @@ func (s service) Save(instance *model.Instance) error {
 	return s.instanceRepository.Save(instance)
 }
 
-func (s service) Deploy(accessToken string, instance *model.Instance) error {
+func (s service) Deploy(token string, instance *model.Instance) error {
 	group, err := s.groupService.Find(instance.GroupName)
 	if err != nil {
 		return err
 	}
 
-	syncCmd, err := s.helmfileService.sync(accessToken, instance, group)
+	syncCmd, err := s.helmfileService.sync(token, instance, group)
 	if err != nil {
 		return err
 	}
@@ -286,44 +284,20 @@ func (s service) Deploy(accessToken string, instance *model.Instance) error {
 	return nil
 }
 
-func (s service) Delete(token string, id uint) error {
+func (s service) Delete(id uint) error {
 	err := s.unlink(id)
 	if err != nil {
 		return err
 	}
 
-	instanceWithParameters, err := s.FindByIdDecrypted(id)
+	instance, err := s.FindByIdDecrypted(id)
 	if err != nil {
 		return err
 	}
 
-	if instanceWithParameters.DeployLog != "" {
-		group, err := s.groupService.Find(instanceWithParameters.GroupName)
-		if err != nil {
-			return err
-		}
-
-		destroyCmd, err := s.helmfileService.destroy(token, instanceWithParameters, group)
-		if err != nil {
-			return err
-		}
-
-		destroyLog, destroyErrorLog, err := commandExecutor(destroyCmd, group.ClusterConfiguration)
-		log.Printf("Destroy log: %s\n", destroyLog)
-		log.Printf("Destroy error log: %s\n", destroyErrorLog)
-		if err != nil {
-			return err
-		}
-
-		ks, err := NewKubernetesService(group.ClusterConfiguration)
-		if err != nil {
-			return err
-		}
-
-		err = ks.deletePersistentVolumeClaim(instanceWithParameters)
-		if err != nil {
-			return err
-		}
+	err = s.destroy(instance)
+	if err != nil {
+		return err
 	}
 
 	return s.instanceRepository.Delete(id)
@@ -359,4 +333,45 @@ func (s service) FindInstances(user *model.User, presets bool) ([]GroupWithInsta
 	}
 
 	return instances, err
+}
+
+func (s service) Reset(token string, instance *model.Instance) error {
+	err := s.destroy(instance)
+	if err != nil {
+		return err
+	}
+
+	return s.Deploy(token, instance)
+}
+
+func (s service) destroy(instance *model.Instance) error {
+	if instance.DeployLog != "" {
+		group, err := s.groupService.Find(instance.GroupName)
+		if err != nil {
+			return err
+		}
+
+		destroyCmd, err := s.helmfileService.destroy(instance, group)
+		if err != nil {
+			return err
+		}
+
+		destroyLog, destroyErrorLog, err := commandExecutor(destroyCmd, group.ClusterConfiguration)
+		log.Printf("Destroy log: %s\n", destroyLog)
+		log.Printf("Destroy error log: %s\n", destroyErrorLog)
+		if err != nil {
+			return err
+		}
+
+		ks, err := NewKubernetesService(group.ClusterConfiguration)
+		if err != nil {
+			return err
+		}
+
+		err = ks.deletePersistentVolumeClaim(instance)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }

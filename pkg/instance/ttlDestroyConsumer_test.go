@@ -23,7 +23,7 @@ func (s *ttlSuite) TestConsumeDeletesInstance() {
 	defer func() { require.NoError(consumer.Close()) }()
 
 	is := &instanceService{}
-	is.On("Delete", "dummy-token", uint(1)).Return(nil)
+	is.On("Delete", uint(1)).Return(nil)
 
 	td := instance.NewTTLDestroyConsumer(consumer, is)
 	require.NoError(td.Consume())
@@ -42,8 +42,8 @@ type instanceService struct {
 	mock.Mock
 }
 
-func (is *instanceService) Delete(token string, id uint) error {
-	args := is.Called(token, id)
+func (is *instanceService) Delete(id uint) error {
+	args := is.Called(id)
 	return args.Error(0)
 }
 

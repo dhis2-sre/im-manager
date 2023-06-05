@@ -1,6 +1,9 @@
 package stack
 
 import (
+	"errors"
+
+	"github.com/dhis2-sre/im-manager/internal/errdef"
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	"gorm.io/gorm"
 )
@@ -34,11 +37,14 @@ func (r repository) Delete(name string) error {
 func (r repository) Find(name string) (*model.Stack, error) {
 	var stack *model.Stack
 	err := r.db.
-		//		Preload("RequiredParameters", "consumed <> ?", true).
-		//		Preload("OptionalParameters", "consumed <> ?", true).
 		Preload("RequiredParameters").
 		Preload("OptionalParameters").
 		First(&stack, "name = ?", name).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			err = errdef.NewNotFound("stack not found by name: %s", name)
+		}
+	}
 	return stack, err
 }
 
