@@ -9,7 +9,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/dhis2-sre/im-manager/internal/apperror"
+	"github.com/dhis2-sre/im-manager/internal/errdef"
+
 	"github.com/dhis2-sre/im-manager/internal/handler"
 	"github.com/dhis2-sre/im-manager/pkg/instance"
 	"github.com/dhis2-sre/im-manager/pkg/model"
@@ -52,8 +53,8 @@ type Service interface {
 	Delete(id uint) error
 	List(groups []model.Group) ([]model.Database, error)
 	Update(d *model.Database) error
-	CreateExternalDownload(databaseID uint, expiration time.Time) (model.ExternalDownload, error)
-	FindExternalDownload(uuid uuid.UUID) (model.ExternalDownload, error)
+	CreateExternalDownload(databaseID uint, expiration time.Time) (*model.ExternalDownload, error)
+	FindExternalDownload(uuid uuid.UUID) (*model.ExternalDownload, error)
 	SaveAs(database *model.Database, instance *model.Instance, stack *model.Stack, newName string, format string) (*model.Database, error)
 }
 
@@ -170,7 +171,7 @@ func (h Handler) SaveAs(c *gin.Context) {
 	instanceIdParam := c.Param("instanceId")
 	instanceId, err := strconv.ParseUint(instanceIdParam, 10, 32)
 	if err != nil {
-		badRequest := apperror.NewBadRequest("error parsing instanceId")
+		badRequest := errdef.NewBadRequest("error parsing instanceId")
 		_ = c.Error(badRequest)
 		return
 	}
@@ -195,7 +196,7 @@ func (h Handler) SaveAs(c *gin.Context) {
 
 	databaseId, err := strconv.ParseUint(databaseIdString, 10, 32)
 	if err != nil {
-		badRequest := apperror.NewBadRequest("error parsing databaseId")
+		badRequest := errdef.NewBadRequest("error parsing databaseId: %s", databaseIdString)
 		_ = c.Error(badRequest)
 		return
 	}
@@ -245,7 +246,7 @@ func (h Handler) Copy(c *gin.Context) {
 	idParam := c.Param("id")
 	id, err := strconv.ParseUint(idParam, 10, 32)
 	if err != nil {
-		badRequest := apperror.NewBadRequest("error parsing id")
+		badRequest := errdef.NewBadRequest("error parsing id: %s", idParam)
 		_ = c.Error(badRequest)
 		return
 	}
@@ -340,7 +341,7 @@ func (h Handler) Lock(c *gin.Context) {
 	idParam := c.Param("id")
 	id, err := strconv.ParseUint(idParam, 10, 32)
 	if err != nil {
-		badRequest := apperror.NewBadRequest("error parsing id")
+		badRequest := errdef.NewBadRequest("error parsing id: %s", idParam)
 		_ = c.Error(badRequest)
 		return
 	}
@@ -404,7 +405,7 @@ func (h Handler) Unlock(c *gin.Context) {
 	idParam := c.Param("id")
 	id, err := strconv.ParseUint(idParam, 10, 32)
 	if err != nil {
-		badRequest := apperror.NewBadRequest("error parsing id")
+		badRequest := errdef.NewBadRequest("error parsing id: %s", idParam)
 		_ = c.Error(badRequest)
 		return
 	}
@@ -428,7 +429,7 @@ func (h Handler) Unlock(c *gin.Context) {
 
 	canUnlock := handler.CanUnlock(user, d)
 	if !canUnlock {
-		forbidden := apperror.NewForbidden("access denied")
+		forbidden := errdef.NewForbidden("access denied")
 		_ = c.Error(forbidden)
 		return
 	}
@@ -507,7 +508,7 @@ func (h Handler) Delete(c *gin.Context) {
 	idParam := c.Param("id")
 	id, err := strconv.ParseUint(idParam, 10, 32)
 	if err != nil {
-		badRequest := apperror.NewBadRequest("error parsing id")
+		badRequest := errdef.NewBadRequest("error parsing id: %s", idParam)
 		_ = c.Error(badRequest)
 		return
 	}
@@ -617,7 +618,7 @@ func (h Handler) Update(c *gin.Context) {
 	idParam := c.Param("id")
 	id, err := strconv.ParseUint(idParam, 10, 32)
 	if err != nil {
-		badRequest := apperror.NewBadRequest("error parsing id")
+		badRequest := errdef.NewBadRequest("error parsing id: %s", idParam)
 		_ = c.Error(badRequest)
 		return
 	}
@@ -659,7 +660,7 @@ func (h Handler) canAccess(c *gin.Context, d *model.Database) error {
 
 	can := handler.CanAccess(user, d)
 	if !can {
-		return apperror.NewForbidden("access denied")
+		return errdef.NewForbidden("access denied")
 	}
 
 	return nil
@@ -689,7 +690,7 @@ func (h Handler) CreateExternalDownload(c *gin.Context) {
 	idParam := c.Param("id")
 	id, err := strconv.ParseUint(idParam, 10, 32)
 	if err != nil {
-		badRequest := apperror.NewBadRequest("error parsing id")
+		badRequest := errdef.NewBadRequest("error parsing id: %s", idParam)
 		_ = c.Error(badRequest)
 		return
 	}
@@ -740,7 +741,7 @@ func (h Handler) ExternalDownload(c *gin.Context) {
 	//	415: Error
 	uuidParam := c.Param("uuid")
 	if uuidParam == "" {
-		badRequest := apperror.NewBadRequest("error missing uuid")
+		badRequest := errdef.NewBadRequest("error missing uuid")
 		_ = c.Error(badRequest)
 		return
 	}

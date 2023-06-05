@@ -2,7 +2,6 @@ package user
 
 import (
 	"errors"
-	"fmt"
 
 	"github.com/dhis2-sre/im-manager/internal/errdef"
 
@@ -25,8 +24,7 @@ func (r repository) create(u *model.User) error {
 	var perr *pgconn.PgError
 	const uniqueKeyConstraint = "23505"
 	if errors.As(err, &perr) && perr.Code == uniqueKeyConstraint {
-		err := fmt.Errorf("user %q already exists", u.Email)
-		return errdef.NewDuplicated(err)
+		return errdef.NewDuplicated("user %q already exists", u.Email)
 	}
 
 	return err
@@ -40,8 +38,7 @@ func (r repository) findByEmail(email string) (*model.User, error) {
 		Where("email = ?", email).
 		First(&u).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		err := fmt.Errorf("failed to find user with email %q", email)
-		return u, errdef.NewNotFound(err)
+		return nil, errdef.NewNotFound("failed to find user with email %q", email)
 	}
 	return u, err
 }
@@ -59,8 +56,7 @@ func (r repository) findById(id uint) (*model.User, error) {
 		Preload("AdminGroups").
 		First(&u, id).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		err := fmt.Errorf("failed to find user with id %d", id)
-		return u, errdef.NewNotFound(err)
+		return nil, errdef.NewNotFound("failed to find user with id %d", id)
 	}
 	return u, err
 }

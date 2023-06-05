@@ -2,10 +2,9 @@ package instance
 
 import (
 	"encoding/json"
-	"errors"
 	"log"
 
-	"gorm.io/gorm"
+	"github.com/dhis2-sre/im-manager/internal/errdef"
 
 	"github.com/dhis2-sre/rabbitmq"
 	amqp "github.com/rabbitmq/amqp091-go"
@@ -17,7 +16,7 @@ type ttlDestroyConsumer struct {
 }
 
 type deleter interface {
-	Delete(token string, id uint) error
+	Delete(id uint) error
 }
 
 func NewTTLDestroyConsumer(consumer *rabbitmq.Consumer, instanceDeleter deleter) *ttlDestroyConsumer {
@@ -41,10 +40,9 @@ func (c *ttlDestroyConsumer) Consume() error {
 			return
 		}
 
-		err := c.instanceDeleter.Delete("dummy-token", payload.ID)
+		err := c.instanceDeleter.Delete(payload.ID)
 		if err != nil {
-			// TODO: gorm shouldn't be used outside of the repository thus the error should be one we define... Instance.ErrInstanceNotFound
-			if errors.Is(err, gorm.ErrRecordNotFound) {
+			if errdef.IsNotFound(err) {
 				err := d.Ack(false)
 				if err != nil {
 					log.Printf("Error acknowledging ttl-destroy message for instance %d: %v\n", payload.ID, err)

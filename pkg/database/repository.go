@@ -1,8 +1,11 @@
 package database
 
 import (
+	"errors"
 	"fmt"
 	"time"
+
+	"github.com/dhis2-sre/im-manager/internal/errdef"
 
 	"github.com/dhis2-sre/im-manager/pkg/model"
 
@@ -36,6 +39,9 @@ func (r repository) FindById(id uint) (*model.Database, error) {
 	err := r.db.
 		Preload("Lock").
 		First(&d, id).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, errdef.NewNotFound("database not found by id: %d", id)
+	}
 	return d, err
 }
 
@@ -45,6 +51,9 @@ func (r repository) FindBySlug(slug string) (*model.Database, error) {
 		Preload("Lock").
 		Where("slug = ?", slug).
 		First(&d).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, errdef.NewNotFound("database not found by slug: %q", slug)
+	}
 	return d, err
 }
 
@@ -57,11 +66,14 @@ func (r repository) Lock(id, instanceId, userId uint) (*model.Lock, error) {
 			Preload("Lock").
 			First(&d, id).Error
 		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				err = errdef.NewNotFound("database not found by id: %d", id)
+			}
 			return err
 		}
 
 		if d.Lock != nil && d.Lock.InstanceID != 0 {
-			return fmt.Errorf("database already locked by user \"%d\" and instance \"%d\"", userId, d.Lock.InstanceID)
+			return errdef.NewBadRequest("database already locked by user %q and instance %q", userId, d.Lock.InstanceID)
 		}
 
 		lock = &model.Lock{
@@ -69,19 +81,23 @@ func (r repository) Lock(id, instanceId, userId uint) (*model.Lock, error) {
 			InstanceID: instanceId,
 			UserID:     userId,
 		}
-		err = tx.Create(lock).Error
-		if err != nil {
-			return err
-		}
-
-		return nil
+		return tx.Create(lock).Error
 	})
 
 	return lock, errTx
 }
 
 func (r repository) Unlock(id uint) error {
-	return r.db.Delete(&model.Lock{}, id).Error
+	db := r.db.Unscoped().Delete(&model.Lock{}, id)
+	if db.Error != nil {
+		return db.Error
+	}
+
+	if db.RowsAffected < 1 {
+		return errdef.NewNotFound("database not found by id: %d", id)
+	}
+
+	return nil
 }
 
 func (r repository) Delete(id uint) error {
@@ -102,8 +118,8 @@ func (r repository) Update(d *model.Database) error {
 	return r.db.Save(d).Error
 }
 
-func (r repository) CreateExternalDownload(databaseID uint, expiration time.Time) (model.ExternalDownload, error) {
-	externalDownload := model.ExternalDownload{
+func (r repository) CreateExternalDownload(databaseID uint, expiration time.Time) (*model.ExternalDownload, error) {
+	externalDownload := &model.ExternalDownload{
 		UUID:       uuid.New(),
 		Expiration: expiration,
 		DatabaseID: databaseID,
@@ -114,16 +130,19 @@ func (r repository) CreateExternalDownload(databaseID uint, expiration time.Time
 	return externalDownload, err
 }
 
-func (r repository) FindExternalDownload(uuid uuid.UUID) (model.ExternalDownload, error) {
-	var d model.ExternalDownload
+func (r repository) FindExternalDownload(uuid uuid.UUID) (*model.ExternalDownload, error) {
+	var d *model.ExternalDownload
 	err := r.db.
 		Where("expiration > ?", time.Now().UTC()).
 		First(&d, uuid).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, errdef.NewNotFound("external download not found by id: %q", uuid)
+	}
 	return d, err
 }
 
 func (r repository) PurgeExternalDownload() error {
-	var d model.ExternalDownload
+	var d *model.ExternalDownload
 	err := r.db.
 		Where("expiration < ?", time.Now().UTC()).
 		Delete(&d).Error

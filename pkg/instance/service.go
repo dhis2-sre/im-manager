@@ -6,7 +6,7 @@ import (
 	"log"
 	"os/exec"
 
-	"github.com/dhis2-sre/im-manager/internal/apperror"
+	"github.com/dhis2-sre/im-manager/internal/errdef"
 
 	"github.com/dhis2-sre/im-manager/pkg/stack"
 
@@ -229,9 +229,7 @@ func validateParameters(stack *model.Stack, instance *model.Instance) error {
 	unmatchedParameters = append(unmatchedParameters, unmatchedOptionalParameters...)
 
 	if len(unmatchedParameters) > 0 {
-		return apperror.NewBadRequest(
-			fmt.Sprintf("parameters %q are not valid parameters for stack %q", unmatchedParameters, instance.StackName),
-		)
+		return errdef.NewBadRequest("parameters %q are not valid parameters for stack %q", unmatchedParameters, instance.StackName)
 	}
 
 	return nil
@@ -286,7 +284,7 @@ func (s service) Deploy(token string, instance *model.Instance) error {
 	return nil
 }
 
-func (s service) Delete(token string, id uint) error {
+func (s service) Delete(id uint) error {
 	err := s.unlink(id)
 	if err != nil {
 		return err
