@@ -73,7 +73,7 @@ func (r repository) Lock(id, instanceId, userId uint) (*model.Lock, error) {
 		}
 
 		if d.Lock != nil && d.Lock.InstanceID != 0 {
-			return errdef.NewBadRequest("database already locked by user \"%d\" and instance \"%d\"", userId, d.Lock.InstanceID)
+			return errdef.NewBadRequest("database already locked by user %q and instance %q", userId, d.Lock.InstanceID)
 		}
 
 		lock = &model.Lock{
