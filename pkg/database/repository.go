@@ -136,7 +136,7 @@ func (r repository) FindExternalDownload(uuid uuid.UUID) (*model.ExternalDownloa
 		Where("expiration > ?", time.Now().UTC()).
 		First(&d, uuid).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, errdef.NewNotFound("external download not found by id: %s", uuid.String())
+		return nil, errdef.NewNotFound("external download not found by id: %q", uuid)
 	}
 	return d, err
 }
