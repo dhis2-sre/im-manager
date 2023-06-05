@@ -150,7 +150,7 @@ func (s service) Download(id uint, dst io.Writer, cb func(contentLength int64)) 
 	}
 
 	if d.Url == "" {
-		return errdef.NewBadRequest("database with %d doesn't reference any url", id)
+		return errdef.NewBadRequest("database with id %d doesn't reference any url", id)
 	}
 
 	u, err := url.Parse(d.Url)
