@@ -88,11 +88,16 @@ func (r repository) Lock(id, instanceId, userId uint) (*model.Lock, error) {
 }
 
 func (r repository) Unlock(id uint) error {
-	err := r.db.Delete(&model.Lock{}, id).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
+	db := r.db.Delete(&model.Lock{}, id)
+	if db.Error != nil {
+		return db.Error
+	}
+
+	if db.RowsAffected < 1 {
 		return errdef.NewNotFound("database not found by id: %d", id)
 	}
-	return err
+
+	return nil
 }
 
 func (r repository) Delete(id uint) error {
