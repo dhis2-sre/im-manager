@@ -26,8 +26,6 @@ func ErrorHandler() gin.HandlerFunc {
 		// nolint:gocritic
 		if errdef.IsBadRequest(err) {
 			c.String(http.StatusBadRequest, err.Error())
-		} else if errdef.IsUnsupportedMediaType(err) {
-			c.String(http.StatusUnsupportedMediaType, err.Error())
 		} else if errdef.IsDuplicated(err) {
 			c.String(http.StatusConflict, err.Error())
 		} else if errdef.IsNotFound(err) {

@@ -27,17 +27,6 @@ func IsBadRequest(err error) bool {
 	return errors.As(err, &e)
 }
 
-func NewUnsupportedMediaType(format string, a ...any) error {
-	return unsupportedMediaType{fmt.Errorf(format, a...)}
-}
-
-type unsupportedMediaType struct{ error }
-
-func IsUnsupportedMediaType(err error) bool {
-	var e unsupportedMediaType
-	return errors.As(err, &e)
-}
-
 func NewDuplicated(format string, a ...any) error {
 	return duplicated{fmt.Errorf(format, a...)}
 }

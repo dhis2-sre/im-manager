@@ -19,11 +19,6 @@ func TestIsBadRequest(t *testing.T) {
 	assert.True(t, errdef.IsBadRequest(errdef.NewBadRequest("some error")))
 }
 
-func TestIsUnsupportedMediaType(t *testing.T) {
-	assert.False(t, errdef.IsUnsupportedMediaType(errors.New("some error")))
-	assert.True(t, errdef.IsUnsupportedMediaType(errdef.NewUnsupportedMediaType("some error")))
-}
-
 func TestIsDuplicate(t *testing.T) {
 	assert.False(t, errdef.IsDuplicated(errors.New("some error")))
 	assert.True(t, errdef.IsDuplicated(errdef.NewDuplicated("some error")))
