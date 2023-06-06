@@ -231,16 +231,7 @@ func (h Handler) Save(c *gin.Context) {
 	//
 	// Save database
 	//
-	// Saving a database involves the following steps
-	//
-	// 1. Lock database if not already locked
-	// 2. Save as
-	// 3. Delete the existing database
-	// 4. Rename the saved database in the file storage
-	// 5. Overwrite the saved database's properties with the ones from the old database (including the id)
-	// 6. Unlock the database if it wasn't already locked
-	//
-	// This won't affect the instance running the database. However, it should be noted that if two databases are deployed from the same database they can both overwrite it. It's up to the users to ensure this doesn't happen accidentally.
+	// Saving a database won't affect the instances running the database. However, it should be noted that if two unlocked databases are deployed from the same database they can both overwrite it. It's up to the users to ensure this doesn't happen accidentally.
 	//
 	// Security:
 	//	oauth2:
