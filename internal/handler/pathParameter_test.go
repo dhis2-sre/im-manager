@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"net/http"
 	"net/http/httptest"
 	"testing"
 
@@ -24,5 +25,6 @@ func TestGetPathParameter_NotFound(t *testing.T) {
 
 	id, ok := GetPathParameter(ctx, "id")
 	assert.False(t, ok)
-	assert.Equal(t, 0, id)
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+	assert.Equal(t, uint(0), id)
 }
