@@ -279,6 +279,12 @@ func (s service) Save(userId uint, database *model.Database, instance *model.Ins
 		if err != nil {
 			return err
 		}
+
+		reloaded, err := s.FindById(database.ID)
+		if err != nil {
+			return err
+		}
+		database = reloaded
 	}
 
 	defer func() {
