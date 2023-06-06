@@ -287,18 +287,18 @@ func (s service) Save(userId uint, database *model.Database, instance *model.Ins
 		database = reloaded
 	}
 
-	defer func() {
-		if !isLocked {
-			err := s.Unlock(database.ID)
-			if err != nil {
-				logError(fmt.Errorf("unlock database failed: %v", err))
-			}
-		}
-	}()
-
 	tmpName := uuid.New().String()
 	format := getFormat(database)
 	_, err := s.SaveAs(database, instance, stack, tmpName, format, func(saved *model.Database) {
+		defer func() {
+			if !isLocked {
+				err := s.Unlock(database.ID)
+				if err != nil {
+					logError(fmt.Errorf("unlock database failed: %v", err))
+				}
+			}
+		}()
+
 		u, err := url.Parse(saved.Url)
 		if err != nil {
 			logError(err)
