@@ -2,11 +2,9 @@ package group
 
 import (
 	"errors"
-	"fmt"
 	"io"
 	"mime/multipart"
 	"net/http"
-	"strconv"
 
 	"github.com/dhis2-sre/im-manager/internal/errdef"
 	"github.com/dhis2-sre/im-manager/internal/handler"
@@ -90,15 +88,13 @@ func (h Handler) AddUserToGroup(c *gin.Context) {
 	//   403: Error
 	//   415: Error
 	groupName := c.Param("group")
-	userIdString := c.Param("userId")
 
-	userId, err := strconv.ParseUint(userIdString, 10, 32)
-	if err != nil {
-		_ = c.AbortWithError(http.StatusBadRequest, fmt.Errorf("failed to parse userId: %s", err))
+	userId, ok := handler.GetPathParameter(c, "userId")
+	if !ok {
 		return
 	}
 
-	err = h.groupService.AddUser(groupName, uint(userId))
+	err := h.groupService.AddUser(groupName, userId)
 	if err != nil {
 		if errdef.IsNotFound(err) {
 			_ = c.AbortWithError(http.StatusNotFound, err)
