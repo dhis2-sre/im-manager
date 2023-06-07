@@ -4,7 +4,8 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/dhis2-sre/im-manager/internal/apperror"
+	"github.com/dhis2-sre/im-manager/internal/errdef"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -37,15 +38,14 @@ func (h Handler) Find(c *gin.Context) {
 	//   415: Error
 	name := c.Param("name")
 	if name == "" {
-		badRequest := apperror.NewBadRequest("stack name missing")
+		badRequest := errdef.NewBadRequest("stack name missing")
 		_ = c.Error(badRequest)
 		return
 	}
 
 	stack, err := h.service.Find(name)
 	if err != nil {
-		notFound := apperror.NewNotFound("stack", name)
-		_ = c.Error(notFound)
+		_ = c.Error(err)
 		return
 	}
 
@@ -71,9 +71,7 @@ func (h Handler) FindAll(c *gin.Context) {
 	//   415: Error
 	stacks, err := h.service.FindAll()
 	if err != nil {
-		message := fmt.Sprintf("Error loading stacks: %s", err)
-		internal := apperror.NewInternal(message)
-		_ = c.Error(internal)
+		_ = c.Error(fmt.Errorf("error loading stacks: %w", err))
 		return
 	}
 	c.JSON(http.StatusOK, stacks)

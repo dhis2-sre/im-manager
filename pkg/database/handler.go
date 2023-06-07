@@ -10,7 +10,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/dhis2-sre/im-manager/internal/apperror"
+	"github.com/dhis2-sre/im-manager/internal/errdef"
+
 	"github.com/dhis2-sre/im-manager/internal/handler"
 	"github.com/dhis2-sre/im-manager/pkg/instance"
 	"github.com/dhis2-sre/im-manager/pkg/model"
@@ -53,8 +54,8 @@ type Service interface {
 	Delete(id uint) error
 	List(groups []model.Group) ([]model.Database, error)
 	Update(d *model.Database) error
-	CreateExternalDownload(databaseID uint, expiration time.Time) (model.ExternalDownload, error)
-	FindExternalDownload(uuid uuid.UUID) (model.ExternalDownload, error)
+	CreateExternalDownload(databaseID uint, expiration time.Time) (*model.ExternalDownload, error)
+	FindExternalDownload(uuid uuid.UUID) (*model.ExternalDownload, error)
 	SaveAs(database *model.Database, instance *model.Instance, stack *model.Stack, newName string, format string, done func(saved *model.Database)) (*model.Database, error)
 	Save(userId uint, database *model.Database, instance *model.Instance, stack *model.Stack) error
 }
@@ -169,15 +170,12 @@ func (h Handler) SaveAs(c *gin.Context) {
 		return
 	}
 
-	instanceIdParam := c.Param("instanceId")
-	instanceId, err := strconv.ParseUint(instanceIdParam, 10, 32)
-	if err != nil {
-		badRequest := apperror.NewBadRequest("error parsing instanceId")
-		_ = c.Error(badRequest)
+	instanceId, ok := handler.GetPathParameter(c, "instanceId")
+	if !ok {
 		return
 	}
 
-	instance, err := h.instanceService.FindByIdDecrypted(uint(instanceId))
+	instance, err := h.instanceService.FindByIdDecrypted(instanceId)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -197,7 +195,7 @@ func (h Handler) SaveAs(c *gin.Context) {
 
 	databaseId, err := strconv.ParseUint(databaseIdString, 10, 32)
 	if err != nil {
-		badRequest := apperror.NewBadRequest("error parsing databaseId")
+		badRequest := errdef.NewBadRequest("error parsing databaseId: %s", databaseIdString)
 		_ = c.Error(badRequest)
 		return
 	}
@@ -269,7 +267,7 @@ func (h Handler) Save(c *gin.Context) {
 
 	databaseId, err := strconv.ParseUint(databaseIdString, 10, 32)
 	if err != nil {
-		badRequest := apperror.NewBadRequest("error parsing databaseId")
+		badRequest := errdef.NewBadRequest("error parsing databaseId")
 		_ = c.Error(badRequest)
 		return
 	}
@@ -295,7 +293,7 @@ func (h Handler) Save(c *gin.Context) {
 	lock := database.Lock
 	isLocked := lock != nil
 	if isLocked && (lock.InstanceID != uint(instanceId) || lock.UserID != user.ID) {
-		unauthorized := apperror.NewUnauthorized("database is locked")
+		unauthorized := errdef.NewUnauthorized("database is locked")
 		_ = c.Error(unauthorized)
 		return
 	}
@@ -330,11 +328,8 @@ func (h Handler) Copy(c *gin.Context) {
 	//	401: Error
 	//	403: Error
 	//	415: Error
-	idParam := c.Param("id")
-	id, err := strconv.ParseUint(idParam, 10, 32)
-	if err != nil {
-		badRequest := apperror.NewBadRequest("error parsing id")
-		_ = c.Error(badRequest)
+	id, ok := handler.GetPathParameter(c, "id")
+	if !ok {
 		return
 	}
 
@@ -349,7 +344,7 @@ func (h Handler) Copy(c *gin.Context) {
 		GroupName: request.Group,
 	}
 
-	err = h.canAccess(c, d)
+	err := h.canAccess(c, d)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -361,7 +356,7 @@ func (h Handler) Copy(c *gin.Context) {
 		return
 	}
 
-	if err := h.databaseService.Copy(uint(id), d, group); err != nil {
+	if err := h.databaseService.Copy(id, d, group); err != nil {
 		_ = c.Error(err)
 		return
 	}
@@ -425,11 +420,8 @@ func (h Handler) Lock(c *gin.Context) {
 	//	404: Error
 	//	409: Error
 	//	415: Error
-	idParam := c.Param("id")
-	id, err := strconv.ParseUint(idParam, 10, 32)
-	if err != nil {
-		badRequest := apperror.NewBadRequest("error parsing id")
-		_ = c.Error(badRequest)
+	id, ok := handler.GetPathParameter(c, "id")
+	if !ok {
 		return
 	}
 
@@ -439,7 +431,7 @@ func (h Handler) Lock(c *gin.Context) {
 		return
 	}
 
-	d, err := h.databaseService.FindById(uint(id))
+	d, err := h.databaseService.FindById(id)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -457,7 +449,7 @@ func (h Handler) Lock(c *gin.Context) {
 		return
 	}
 
-	lock, err := h.databaseService.Lock(uint(id), request.InstanceId, uint(user.ID))
+	lock, err := h.databaseService.Lock(id, request.InstanceId, user.ID)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -483,15 +475,12 @@ func (h Handler) Unlock(c *gin.Context) {
 	//	403: Error
 	//	404: Error
 	//	415: Error
-	idParam := c.Param("id")
-	id, err := strconv.ParseUint(idParam, 10, 32)
-	if err != nil {
-		badRequest := apperror.NewBadRequest("error parsing id")
-		_ = c.Error(badRequest)
+	id, ok := handler.GetPathParameter(c, "id")
+	if !ok {
 		return
 	}
 
-	d, err := h.databaseService.FindById(uint(id))
+	d, err := h.databaseService.FindById(id)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -510,12 +499,12 @@ func (h Handler) Unlock(c *gin.Context) {
 
 	canUnlock := handler.CanUnlock(user, d)
 	if !canUnlock {
-		forbidden := apperror.NewForbidden("access denied")
+		forbidden := errdef.NewForbidden("access denied")
 		_ = c.Error(forbidden)
 		return
 	}
 
-	err = h.databaseService.Unlock(uint(id))
+	err = h.databaseService.Unlock(id)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -586,15 +575,12 @@ func (h Handler) Delete(c *gin.Context) {
 	//	403: Error
 	//	404: Error
 	//	415: Error
-	idParam := c.Param("id")
-	id, err := strconv.ParseUint(idParam, 10, 32)
-	if err != nil {
-		badRequest := apperror.NewBadRequest("error parsing id")
-		_ = c.Error(badRequest)
+	id, ok := handler.GetPathParameter(c, "id")
+	if !ok {
 		return
 	}
 
-	d, err := h.databaseService.FindById(uint(id))
+	d, err := h.databaseService.FindById(id)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -606,7 +592,7 @@ func (h Handler) Delete(c *gin.Context) {
 		return
 	}
 
-	err = h.databaseService.Delete(uint(id))
+	err = h.databaseService.Delete(id)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -696,11 +682,8 @@ func (h Handler) Update(c *gin.Context) {
 	//	401: Error
 	//	403: Error
 	//	415: Error
-	idParam := c.Param("id")
-	id, err := strconv.ParseUint(idParam, 10, 32)
-	if err != nil {
-		badRequest := apperror.NewBadRequest("error parsing id")
-		_ = c.Error(badRequest)
+	id, ok := handler.GetPathParameter(c, "id")
+	if !ok {
 		return
 	}
 
@@ -710,7 +693,7 @@ func (h Handler) Update(c *gin.Context) {
 		return
 	}
 
-	d, err := h.databaseService.FindById(uint(id))
+	d, err := h.databaseService.FindById(id)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -741,7 +724,7 @@ func (h Handler) canAccess(c *gin.Context, d *model.Database) error {
 
 	can := handler.CanAccess(user, d)
 	if !can {
-		return apperror.NewForbidden("access denied")
+		return errdef.NewForbidden("access denied")
 	}
 
 	return nil
@@ -768,11 +751,8 @@ func (h Handler) CreateExternalDownload(c *gin.Context) {
 	//	403: Error
 	//	404: Error
 	//	415: Error
-	idParam := c.Param("id")
-	id, err := strconv.ParseUint(idParam, 10, 32)
-	if err != nil {
-		badRequest := apperror.NewBadRequest("error parsing id")
-		_ = c.Error(badRequest)
+	id, ok := handler.GetPathParameter(c, "id")
+	if !ok {
 		return
 	}
 
@@ -782,7 +762,7 @@ func (h Handler) CreateExternalDownload(c *gin.Context) {
 		return
 	}
 
-	d, err := h.databaseService.FindById(uint(id))
+	d, err := h.databaseService.FindById(id)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -822,7 +802,7 @@ func (h Handler) ExternalDownload(c *gin.Context) {
 	//	415: Error
 	uuidParam := c.Param("uuid")
 	if uuidParam == "" {
-		badRequest := apperror.NewBadRequest("error missing uuid")
+		badRequest := errdef.NewBadRequest("error missing uuid")
 		_ = c.Error(badRequest)
 		return
 	}

@@ -7,9 +7,10 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/dhis2-sre/im-manager/internal/errdef"
+
 	"github.com/dhis2-sre/im-manager/pkg/stack"
 
-	"github.com/dhis2-sre/im-manager/internal/apperror"
 	"github.com/dhis2-sre/im-manager/internal/handler"
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	"github.com/gin-gonic/gin"
@@ -40,7 +41,7 @@ type Service interface {
 	FindById(id uint) (*model.Instance, error)
 	FindByIdDecrypted(id uint) (*model.Instance, error)
 	FindByNameAndGroup(instance string, group string) (*model.Instance, error)
-	Delete(token string, id uint) error
+	Delete(id uint) error
 	Logs(instance *model.Instance, group *model.Group, typeSelector string) (io.ReadCloser, error)
 	FindInstances(user *model.User, presets bool) ([]GroupWithInstances, error)
 	Link(source, destination *model.Instance) error
@@ -145,7 +146,7 @@ func (h Handler) Deploy(c *gin.Context) {
 
 	canWrite := handler.CanWriteInstance(user, i)
 	if !canWrite {
-		unauthorized := apperror.NewUnauthorized("write access denied")
+		unauthorized := errdef.NewUnauthorized("write access denied")
 		_ = c.Error(unauthorized)
 		return
 	}
@@ -209,16 +210,16 @@ func (h Handler) consumeParameters(user *model.User, sourceInstanceId uint, inst
 	}
 
 	if preset && !sourceInstance.Preset {
-		return apperror.NewUnauthorized(fmt.Sprintf("instance (id: %d) isn't a preset", sourceInstance.ID))
+		return errdef.NewUnauthorized("instance (id: %d) isn't a preset", sourceInstance.ID)
 	}
 
 	if preset && sourceInstance.StackName != instance.StackName {
-		return apperror.NewUnauthorized(fmt.Sprintf("preset stack (%s) doesn't match instance stack (%s)", sourceInstance.StackName, instance.StackName))
+		return errdef.NewUnauthorized("preset stack (%s) doesn't match instance stack (%s)", sourceInstance.StackName, instance.StackName)
 	}
 
 	canReadSource := handler.CanReadInstance(user, sourceInstance)
 	if !canReadSource {
-		return apperror.NewUnauthorized(fmt.Sprintf("read access to source instance (id: %d) denied", sourceInstance.ID))
+		return errdef.NewUnauthorized("read access to source instance (id: %d) denied", sourceInstance.ID)
 	}
 
 	err = h.instanceService.ConsumeParameters(sourceInstance, instance)
@@ -257,11 +258,8 @@ func (h Handler) Update(c *gin.Context) {
 	//	403: Error
 	//	404: Error
 	//	415: Error
-	idParam := c.Param("id")
-	id, err := strconv.ParseUint(idParam, 10, 32)
-	if err != nil {
-		badRequest := apperror.NewBadRequest("error parsing id")
-		_ = c.Error(badRequest)
+	id, ok := handler.GetPathParameter(c, "id")
+	if !ok {
 		return
 	}
 
@@ -283,16 +281,15 @@ func (h Handler) Update(c *gin.Context) {
 		return
 	}
 
-	instance, err := h.instanceService.FindById(uint(id))
+	instance, err := h.instanceService.FindById(id)
 	if err != nil {
-		notFound := apperror.NewNotFound("instance", idParam)
-		_ = c.Error(notFound)
+		_ = c.Error(err)
 		return
 	}
 
 	canWrite := handler.CanWriteInstance(user, instance)
 	if !canWrite {
-		unauthorized := apperror.NewUnauthorized("write access denied")
+		unauthorized := errdef.NewUnauthorized("write access denied")
 		_ = c.Error(unauthorized)
 		return
 	}
@@ -339,10 +336,8 @@ func (h Handler) Pause(c *gin.Context) {
 	//	403: Error
 	//	404: Error
 	//	415: Error
-	idParam := c.Param("id")
-	id, err := strconv.ParseUint(idParam, 10, 32)
-	if err != nil {
-		_ = c.AbortWithError(http.StatusBadRequest, fmt.Errorf("failed to parse id: %s", err))
+	id, ok := handler.GetPathParameter(c, "id")
+	if !ok {
 		return
 	}
 
@@ -352,10 +347,9 @@ func (h Handler) Pause(c *gin.Context) {
 		return
 	}
 
-	instance, err := h.instanceService.FindById(uint(id))
+	instance, err := h.instanceService.FindById(id)
 	if err != nil {
-		notFound := apperror.NewNotFound("instance", idParam)
-		_ = c.Error(notFound)
+		_ = c.Error(err)
 		return
 	}
 
@@ -391,10 +385,8 @@ func (h Handler) Reset(c *gin.Context) {
 	//	401: Error
 	//	403: Error
 	//	404: Error
-	idParam := c.Param("id")
-	id, err := strconv.ParseUint(idParam, 10, 32)
-	if err != nil {
-		_ = c.AbortWithError(http.StatusBadRequest, fmt.Errorf("failed to parse id: %s", err))
+	id, ok := handler.GetPathParameter(c, "id")
+	if !ok {
 		return
 	}
 
@@ -410,10 +402,9 @@ func (h Handler) Reset(c *gin.Context) {
 		return
 	}
 
-	instance, err := h.instanceService.FindByIdDecrypted(uint(id))
+	instance, err := h.instanceService.FindByIdDecrypted(id)
 	if err != nil {
-		notFound := apperror.NewNotFound("instance", idParam)
-		_ = c.Error(notFound)
+		_ = c.Error(err)
 		return
 	}
 
@@ -450,10 +441,8 @@ func (h Handler) Resume(c *gin.Context) {
 	//	403: Error
 	//	404: Error
 	//	415: Error
-	idParam := c.Param("id")
-	id, err := strconv.ParseUint(idParam, 10, 32)
-	if err != nil {
-		_ = c.AbortWithError(http.StatusBadRequest, fmt.Errorf("failed to parse id: %s", err))
+	id, ok := handler.GetPathParameter(c, "id")
+	if !ok {
 		return
 	}
 
@@ -463,10 +452,9 @@ func (h Handler) Resume(c *gin.Context) {
 		return
 	}
 
-	instance, err := h.instanceService.FindByIdDecrypted(uint(id))
+	instance, err := h.instanceService.FindByIdDecrypted(id)
 	if err != nil {
-		notFound := apperror.NewNotFound("instance", idParam)
-		_ = c.Error(notFound)
+		_ = c.Error(err)
 		return
 	}
 
@@ -502,10 +490,8 @@ func (h Handler) Restart(c *gin.Context) {
 	//	403: Error
 	//	404: Error
 	//	415: Error
-	idParam := c.Param("id")
-	id, err := strconv.ParseUint(idParam, 10, 32)
-	if err != nil {
-		_ = c.AbortWithError(http.StatusBadRequest, fmt.Errorf("failed to parse id: %s", err))
+	id, ok := handler.GetPathParameter(c, "id")
+	if !ok {
 		return
 	}
 
@@ -515,10 +501,9 @@ func (h Handler) Restart(c *gin.Context) {
 		return
 	}
 
-	instance, err := h.instanceService.FindById(uint(id))
+	instance, err := h.instanceService.FindById(id)
 	if err != nil {
-		notFound := apperror.NewNotFound("instance", idParam)
-		_ = c.Error(notFound)
+		_ = c.Error(err)
 		return
 	}
 
@@ -555,11 +540,8 @@ func (h Handler) Delete(c *gin.Context) {
 	//	403: Error
 	//	404: Error
 	//	415: Error
-	idParam := c.Param("id")
-	id, err := strconv.ParseUint(idParam, 10, 32)
-	if err != nil {
-		badRequest := apperror.NewBadRequest("error parsing id")
-		_ = c.Error(badRequest)
+	id, ok := handler.GetPathParameter(c, "id")
+	if !ok {
 		return
 	}
 
@@ -569,31 +551,22 @@ func (h Handler) Delete(c *gin.Context) {
 		return
 	}
 
-	token, err := handler.GetTokenFromHttpAuthHeader(c)
+	instance, err := h.instanceService.FindById(id)
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
 
-	instance, err := h.instanceService.FindById(uint(id))
-	if err != nil {
-		notFound := apperror.NewNotFound("instance", idParam)
-		_ = c.Error(notFound)
-		return
-	}
-
 	canWrite := handler.CanWriteInstance(user, instance)
 	if !canWrite {
-		unauthorized := apperror.NewUnauthorized("write access denied")
+		unauthorized := errdef.NewUnauthorized("write access denied")
 		_ = c.Error(unauthorized)
 		return
 	}
 
-	err = h.instanceService.Delete(token, instance.ID)
+	err = h.instanceService.Delete(instance.ID)
 	if err != nil {
-		message := fmt.Sprintf("Unable to delete instance: %s", err)
-		internal := apperror.NewInternal(message)
-		_ = c.Error(internal)
+		_ = c.Error(fmt.Errorf("unable to delete instance: %v", err))
 		return
 	}
 
@@ -617,11 +590,8 @@ func (h Handler) FindById(c *gin.Context) {
 	//	403: Error
 	//	404: Error
 	//	415: Error
-	idParam := c.Param("id")
-	id, err := strconv.ParseUint(idParam, 10, 32)
-	if err != nil {
-		badRequest := apperror.NewBadRequest("error parsing id")
-		_ = c.Error(badRequest)
+	id, ok := handler.GetPathParameter(c, "id")
+	if !ok {
 		return
 	}
 
@@ -631,16 +601,15 @@ func (h Handler) FindById(c *gin.Context) {
 		return
 	}
 
-	instance, err := h.instanceService.FindById(uint(id))
+	instance, err := h.instanceService.FindById(id)
 	if err != nil {
-		notFound := apperror.NewNotFound("instance", idParam)
-		_ = c.Error(notFound)
+		_ = c.Error(err)
 		return
 	}
 
 	canRead := handler.CanReadInstance(user, instance)
 	if !canRead {
-		unauthorized := apperror.NewUnauthorized("read access denied")
+		unauthorized := errdef.NewUnauthorized("read access denied")
 		_ = c.Error(unauthorized)
 		return
 	}
@@ -665,11 +634,8 @@ func (h Handler) FindByIdDecrypted(c *gin.Context) {
 	//	403: Error
 	//	404: Error
 	//	415: Error
-	idParam := c.Param("id")
-	id, err := strconv.ParseUint(idParam, 10, 32)
-	if err != nil {
-		badRequest := apperror.NewBadRequest("error parsing id")
-		_ = c.Error(badRequest)
+	id, ok := handler.GetPathParameter(c, "id")
+	if !ok {
 		return
 	}
 
@@ -679,16 +645,15 @@ func (h Handler) FindByIdDecrypted(c *gin.Context) {
 		return
 	}
 
-	instance, err := h.instanceService.FindByIdDecrypted(uint(id))
+	instance, err := h.instanceService.FindByIdDecrypted(id)
 	if err != nil {
-		notFound := apperror.NewNotFound("instance", idParam)
-		_ = c.Error(notFound)
+		_ = c.Error(err)
 		return
 	}
 
 	canRead := handler.CanWriteInstance(user, instance)
 	if !canRead {
-		unauthorized := apperror.NewUnauthorized("read access denied")
+		unauthorized := errdef.NewUnauthorized("read access denied")
 		_ = c.Error(unauthorized)
 		return
 	}
@@ -713,11 +678,8 @@ func (h Handler) Logs(c *gin.Context) {
 	//	403: Error
 	//	404: Error
 	//	415: Error
-	idParam := c.Param("id")
-	id, err := strconv.ParseUint(idParam, 10, 32)
-	if err != nil {
-		badRequest := apperror.NewBadRequest("error parsing id")
-		_ = c.Error(badRequest)
+	id, ok := handler.GetPathParameter(c, "id")
+	if !ok {
 		return
 	}
 
@@ -727,16 +689,15 @@ func (h Handler) Logs(c *gin.Context) {
 		return
 	}
 
-	instance, err := h.instanceService.FindById(uint(id))
+	instance, err := h.instanceService.FindById(id)
 	if err != nil {
-		notFound := apperror.NewNotFound("instance", idParam)
-		_ = c.Error(notFound)
+		_ = c.Error(err)
 		return
 	}
 
 	canRead := handler.CanReadInstance(user, instance)
 	if !canRead {
-		unauthorized := apperror.NewUnauthorized("read access denied")
+		unauthorized := errdef.NewUnauthorized("read access denied")
 		_ = c.Error(unauthorized)
 		return
 	}
@@ -744,13 +705,13 @@ func (h Handler) Logs(c *gin.Context) {
 	group, err := h.groupService.Find(instance.GroupName)
 	if err != nil {
 		_ = c.Error(err)
+		return
 	}
 
 	selector := c.Query("selector")
 	r, err := h.instanceService.Logs(instance, group, selector)
 	if err != nil {
-		conflict := apperror.NewConflict(err.Error())
-		_ = c.Error(conflict)
+		_ = c.Error(err)
 		return
 	}
 
@@ -796,7 +757,7 @@ func (h Handler) NameToId(c *gin.Context) {
 	instanceName := c.Param("instanceName")
 	groupName := c.Param("groupName")
 	if groupName == "" {
-		badRequest := apperror.NewBadRequest("missing group name")
+		badRequest := errdef.NewBadRequest("missing group name")
 		_ = c.Error(badRequest)
 		return
 	}
@@ -809,14 +770,13 @@ func (h Handler) NameToId(c *gin.Context) {
 
 	instance, err := h.instanceService.FindByNameAndGroup(instanceName, groupName)
 	if err != nil {
-		notFound := apperror.NewNotFound("instance", instanceName)
-		_ = c.Error(notFound)
+		_ = c.Error(err)
 		return
 	}
 
 	canRead := handler.CanReadInstance(user, instance)
 	if !canRead {
-		unauthorized := apperror.NewUnauthorized("read access denied")
+		unauthorized := errdef.NewUnauthorized("read access denied")
 		_ = c.Error(unauthorized)
 		return
 	}

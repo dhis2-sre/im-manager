@@ -1,11 +1,12 @@
-package handler
+package middleware
 
 import (
 	"crypto/rsa"
 	"errors"
 	"net/http"
 
-	"github.com/dhis2-sre/im-manager/internal/apperror"
+	"github.com/dhis2-sre/im-manager/internal/errdef"
+
 	"github.com/dhis2-sre/im-manager/pkg/config"
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	"github.com/gin-gonic/gin"
@@ -54,8 +55,7 @@ func (m AuthenticationMiddleware) handleError(c *gin.Context, e error) {
 func (m AuthenticationMiddleware) TokenAuthentication(c *gin.Context) {
 	publicKey, err := m.c.Authentication.Keys.GetPublicKey()
 	if err != nil {
-		internal := apperror.NewInternal("failed to get public key")
-		_ = c.Error(internal)
+		_ = c.Error(errors.New("failed to get public key"))
 		c.Abort()
 		return
 	}
@@ -63,7 +63,7 @@ func (m AuthenticationMiddleware) TokenAuthentication(c *gin.Context) {
 	u, err := parseRequest(c.Request, publicKey)
 	if err != nil {
 		// TODO: token could be not valid for lots of reasons, return err or at least log it
-		unauthorized := apperror.NewUnauthorized("token not valid")
+		unauthorized := errdef.NewUnauthorized("token not valid")
 		_ = c.Error(unauthorized)
 		c.Abort()
 		return

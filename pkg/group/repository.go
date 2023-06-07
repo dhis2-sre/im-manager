@@ -2,7 +2,6 @@ package group
 
 import (
 	"errors"
-	"fmt"
 
 	"github.com/dhis2-sre/im-manager/internal/errdef"
 	"github.com/dhis2-sre/im-manager/pkg/model"
@@ -24,8 +23,7 @@ func (r repository) find(name string) (*model.Group, error) {
 		Where("name = ?", name).
 		First(&group).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		err := fmt.Errorf("group %q doesn't exist", name)
-		return group, errdef.NewNotFound(err)
+		return nil, errdef.NewNotFound("group %q doesn't exist", name)
 	}
 
 	return group, err
@@ -55,9 +53,7 @@ func (r repository) getClusterConfiguration(groupName string) (*model.ClusterCon
 		Where("group_name = ?", groupName).
 		First(&configuration).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		err := fmt.Errorf("group %q doesn't exist", groupName)
-		return nil, errdef.NewNotFound(err)
+		return nil, errdef.NewNotFound("group %q doesn't exist", groupName)
 	}
-
 	return configuration, err
 }

@@ -1,9 +1,7 @@
 package user
 
 import (
-	"errors"
 	"net/http"
-	"strconv"
 
 	"github.com/dhis2-sre/im-manager/pkg/model"
 
@@ -227,14 +225,12 @@ func (h Handler) FindById(c *gin.Context) {
 	//	403: Error
 	//	404: Error
 	//	415: Error
-	idParam := c.Param("id")
-	id, err := strconv.ParseUint(idParam, 10, 32)
-	if err != nil {
-		_ = c.AbortWithError(http.StatusBadRequest, errors.New("error parsing id"))
+	id, ok := handler.GetPathParameter(c, "id")
+	if !ok {
 		return
 	}
 
-	userWithGroups, err := h.userService.FindById(uint(id))
+	userWithGroups, err := h.userService.FindById(id)
 	if err != nil {
 		_ = c.Error(err)
 		return
