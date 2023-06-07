@@ -288,14 +288,6 @@ func (h Handler) Save(c *gin.Context) {
 		return
 	}
 
-	lock := database.Lock
-	isLocked := lock != nil
-	if isLocked && (lock.InstanceID != uint(instanceId) || lock.UserID != user.ID) {
-		unauthorized := errdef.NewUnauthorized("database is locked")
-		_ = c.Error(unauthorized)
-		return
-	}
-
 	err = h.databaseService.Save(user.ID, database, instance, stack)
 	if err != nil {
 		_ = c.Error(err)

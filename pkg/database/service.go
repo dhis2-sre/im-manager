@@ -229,6 +229,9 @@ func (s service) FindExternalDownload(uuid uuid.UUID) (*model.ExternalDownload, 
 func (s service) Save(userId uint, database *model.Database, instance *model.Instance, stack *model.Stack) error {
 	lock := database.Lock
 	isLocked := lock != nil
+	if isLocked && (lock.InstanceID != instance.ID || lock.UserID != userId) {
+		return errdef.NewUnauthorized("database is locked")
+	}
 
 	if !isLocked {
 		_, err := s.Lock(database.ID, instance.ID, userId)
