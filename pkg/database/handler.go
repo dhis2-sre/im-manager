@@ -240,10 +240,8 @@ func (h Handler) Save(c *gin.Context) {
 	//	403: Error
 	//	404: Error
 	//	415: Error
-	instanceIdParam := c.Param("instanceId")
-	instanceId, err := strconv.ParseUint(instanceIdParam, 10, 32)
-	if err != nil {
-		_ = c.AbortWithError(http.StatusBadRequest, errors.New("error parsing instanceId"))
+	instanceId, ok := handler.GetPathParameter(c, "instanceId")
+	if !ok {
 		return
 	}
 
