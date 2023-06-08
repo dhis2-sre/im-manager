@@ -2,6 +2,7 @@ package user
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/dhis2-sre/im-manager/internal/errdef"
 
@@ -28,6 +29,20 @@ func (r repository) create(u *model.User) error {
 	}
 
 	return err
+}
+
+func (r repository) findAll() ([]*model.User, error) {
+	var users []*model.User
+
+	err := r.db.
+		Preload("Groups").
+		Preload("AdminGroups").
+		Find(&users).Error
+	if err != nil {
+		return nil, fmt.Errorf("failed to find all users: %v", err)
+	}
+
+	return users, nil
 }
 
 func (r repository) findByEmail(email string) (*model.User, error) {

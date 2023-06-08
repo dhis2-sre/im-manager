@@ -21,6 +21,7 @@ type userRepository interface {
 	findByEmail(email string) (*model.User, error)
 	findById(id uint) (*model.User, error)
 	findOrCreate(email *model.User) (*model.User, error)
+	findAll() ([]*model.User, error)
 }
 
 type service struct {
@@ -105,6 +106,10 @@ func comparePasswords(storedPassword string, suppliedPassword string) (bool, err
 	}
 
 	return hex.EncodeToString(hash) == passwordAndSalt[0], nil
+}
+
+func (s service) FindAll() ([]*model.User, error) {
+	return s.repository.findAll()
 }
 
 func (s service) FindById(id uint) (*model.User, error) {
