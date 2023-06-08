@@ -33,6 +33,7 @@ type userService interface {
 	FindById(id uint) (*model.User, error)
 	FindAll() ([]*model.User, error)
 	Delete(id uint) error
+	Update(id uint, email, password string) (*model.User, error)
 }
 
 type tokenService interface {
@@ -316,4 +317,51 @@ func (h Handler) Delete(c *gin.Context) {
 	}
 
 	c.Status(http.StatusAccepted)
+}
+
+type UpdateUserRequest struct {
+	Email    string `json:"email" binding:"omitempty,email"`
+	Password string `json:"password" binding:"omitempty,gte=16,lte=128"`
+}
+
+// Update user
+func (h *Handler) Update(c *gin.Context) {
+	// swagger:route PUT /users/{id} updateUser
+	//
+	// Update user
+	//
+	// Update user's email and/or password
+	//
+	// security:
+	//   oauth2:
+	//
+	// responses:
+	//   200: User
+	//   401: Error
+	//   403: Error
+	//   404: Error
+	//   415: Error
+	id, ok := handler.GetPathParameter(c, "id")
+	if !ok {
+		return
+	}
+
+	var request UpdateUserRequest
+	if err := handler.DataBinder(c, &request); err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	if request.Email == "" && request.Password == "" {
+		_ = c.Error(errdef.NewBadRequest("neither email nor password are specified"))
+		return
+	}
+
+	user, err := h.userService.Update(id, request.Email, request.Password)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	c.JSON(http.StatusOK, user)
 }
