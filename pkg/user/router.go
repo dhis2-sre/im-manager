@@ -23,4 +23,5 @@ func Routes(r *gin.Engine, authenticationMiddleware handler.AuthenticationMiddle
 	administratorRestrictedRouter := tokenAuthenticationRouter.Group("")
 	administratorRestrictedRouter.Use(authorizationMiddleware.RequireAdministrator)
 	administratorRestrictedRouter.GET("/users", handler.FindAll)
+	administratorRestrictedRouter.DELETE("/users/:id", handler.Delete)
 }

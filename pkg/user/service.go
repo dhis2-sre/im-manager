@@ -22,6 +22,7 @@ type userRepository interface {
 	findById(id uint) (*model.User, error)
 	findOrCreate(email *model.User) (*model.User, error)
 	findAll() ([]*model.User, error)
+	delete(id uint) error
 }
 
 type service struct {
@@ -128,4 +129,8 @@ func (s service) FindOrCreate(email string, password string) (*model.User, error
 	}
 
 	return s.repository.findOrCreate(user)
+}
+
+func (s service) Delete(id uint) error {
+	return s.repository.delete(id)
 }

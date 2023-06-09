@@ -75,3 +75,14 @@ func (r repository) findById(id uint) (*model.User, error) {
 	}
 	return u, err
 }
+
+func (r repository) delete(id uint) error {
+	db := r.db.Unscoped().Delete(&model.User{}, id)
+	if db.Error != nil {
+		return fmt.Errorf("failed to delete user with id %d: %v", id, db.Error)
+	} else if db.RowsAffected < 1 {
+		return errdef.NewNotFound("failed to find user with id %d", id)
+	}
+
+	return nil
+}

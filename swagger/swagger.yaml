@@ -1437,6 +1437,30 @@ paths:
                     $ref: '#/responses/Error'
             summary: SignUp user
     /users/{id}:
+        delete:
+            description: Delete user by id
+            operationId: deleteUser
+            parameters:
+                - format: uint64
+                  in: path
+                  name: id
+                  required: true
+                  type: integer
+                  x-go-name: ID
+            responses:
+                "202":
+                    description: ""
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Delete user
         get:
             description: Find a user by its id
             operationId: findUserById
