@@ -8,21 +8,18 @@ import (
 	"github.com/dhis2-sre/im-manager/internal/errdef"
 	"github.com/dhis2-sre/im-manager/internal/handler"
 
-	"github.com/dhis2-sre/im-manager/pkg/config"
 	"github.com/dhis2-sre/im-manager/pkg/token"
 	"github.com/gin-gonic/gin"
 )
 
-func NewHandler(config config.Config, userService userService, tokenService tokenService) Handler {
+func NewHandler(userService userService, tokenService tokenService) Handler {
 	return Handler{
-		config,
 		userService,
 		tokenService,
 	}
 }
 
 type Handler struct {
-	config       config.Config
 	userService  userService
 	tokenService tokenService
 }
@@ -62,6 +59,7 @@ func (h Handler) SignUp(c *gin.Context) {
 	var request signUpRequest
 
 	if err := handler.DataBinder(c, &request); err != nil {
+		_ = c.Error(err)
 		return
 	}
 

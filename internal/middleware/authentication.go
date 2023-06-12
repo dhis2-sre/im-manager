@@ -7,15 +7,17 @@ import (
 
 	"github.com/dhis2-sre/im-manager/internal/errdef"
 
-	"github.com/dhis2-sre/im-manager/pkg/config"
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	"github.com/gin-gonic/gin"
 	"github.com/lestrrat-go/jwx/jwa"
 	"github.com/lestrrat-go/jwx/jwt"
 )
 
-func NewAuthentication(c config.Config, signInService signInService) AuthenticationMiddleware {
-	return AuthenticationMiddleware{c, signInService}
+func NewAuthentication(publicKey *rsa.PublicKey, signInService signInService) AuthenticationMiddleware {
+	return AuthenticationMiddleware{
+		publicKey:     publicKey,
+		signInService: signInService,
+	}
 }
 
 type signInService interface {
@@ -23,7 +25,7 @@ type signInService interface {
 }
 
 type AuthenticationMiddleware struct {
-	c             config.Config
+	publicKey     *rsa.PublicKey
 	signInService signInService
 }
 
@@ -52,18 +54,10 @@ func (m AuthenticationMiddleware) handleError(c *gin.Context, e error) {
 }
 
 func (m AuthenticationMiddleware) TokenAuthentication(c *gin.Context) {
-	publicKey, err := m.c.Authentication.Keys.GetPublicKey()
-	if err != nil {
-		_ = c.Error(errors.New("failed to get public key"))
-		c.Abort()
-		return
-	}
-
-	u, err := parseRequest(c.Request, publicKey)
+	u, err := parseRequest(c.Request, m.publicKey)
 	if err != nil {
 		// TODO: token could be not valid for lots of reasons, return err or at least log it
-		unauthorized := errdef.NewUnauthorized("token not valid")
-		_ = c.Error(unauthorized)
+		_ = c.Error(errdef.NewUnauthorized("token not valid"))
 		c.Abort()
 		return
 	}

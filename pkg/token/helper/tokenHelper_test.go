@@ -1,26 +1,25 @@
 package helper
 
 import (
+	"crypto/rand"
+	"crypto/rsa"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/dhis2-sre/im-manager/pkg/config"
 	"github.com/dhis2-sre/im-manager/pkg/model"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestGenerateAccessToken(t *testing.T) {
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	require.NoError(t, err, "failed to generate private key")
 	user := &model.User{
 		Email:    "email",
 		Password: "pass",
 	}
-
-	c := config.New()
-
-	key, err := c.Authentication.Keys.GetPrivateKey()
-	assert.NoError(t, err)
 
 	_, err = GenerateAccessToken(user, key, 12)
 	assert.NoError(t, err)
@@ -34,23 +33,17 @@ func TestGenerateAccessToken(t *testing.T) {
 }
 
 func TestValidateAccessToken(t *testing.T) {
+	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	require.NoError(t, err, "failed to generate private key")
 	user := &model.User{
 		Email:    "email",
 		Password: "pass",
 	}
 
-	c := config.New()
-
-	privateKey, err := c.Authentication.Keys.GetPrivateKey()
-	assert.NoError(t, err)
-
-	publicKey, err := c.Authentication.Keys.GetPublicKey()
-	assert.NoError(t, err)
-
 	token, err := GenerateAccessToken(user, privateKey, 12)
 	assert.NoError(t, err)
 
-	claims, err := ValidateAccessToken(token, publicKey)
+	claims, err := ValidateAccessToken(token, &privateKey.PublicKey)
 	assert.NoError(t, err)
 
 	// TODO: Assert more
