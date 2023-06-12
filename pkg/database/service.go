@@ -16,8 +16,6 @@ import (
 
 	"github.com/dhis2-sre/im-manager/internal/errdef"
 
-	"github.com/dhis2-sre/im-manager/pkg/config"
-
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	"github.com/dhis2-sre/im-manager/pkg/storage"
 
@@ -28,8 +26,13 @@ import (
 	"github.com/google/uuid"
 )
 
-func NewService(c config.Config, groupService groupService, s3Client S3Client, repository Repository) *service {
-	return &service{c, groupService, s3Client, repository}
+func NewService(s3Bucket string, s3Client S3Client, groupService groupService, repository Repository) *service {
+	return &service{
+		s3Bucket:     s3Bucket,
+		s3Client:     s3Client,
+		groupService: groupService,
+		repository:   repository,
+	}
 }
 
 type groupService interface {
@@ -37,9 +40,9 @@ type groupService interface {
 }
 
 type service struct {
-	c            config.Config
-	groupService groupService
+	s3Bucket     string
 	s3Client     S3Client
+	groupService groupService
 	repository   Repository
 }
 
@@ -95,12 +98,12 @@ func (s service) Copy(id uint, d *model.Database, group *model.Group) error {
 
 	sourceKey := strings.TrimPrefix(u.Path, "/")
 	destinationKey := fmt.Sprintf("%s/%s", group.Name, d.Name)
-	err = s.s3Client.Copy(s.c.Bucket, sourceKey, destinationKey)
+	err = s.s3Client.Copy(s.s3Bucket, sourceKey, destinationKey)
 	if err != nil {
 		return err
 	}
 
-	d.Url = fmt.Sprintf("s3://%s/%s", s.c.Bucket, destinationKey)
+	d.Url = fmt.Sprintf("s3://%s/%s", s.s3Bucket, destinationKey)
 
 	return s.repository.Create(d)
 }
@@ -128,12 +131,12 @@ type ReadAtSeeker interface {
 
 func (s service) Upload(d *model.Database, group *model.Group, reader ReadAtSeeker, size int64) (*model.Database, error) {
 	key := fmt.Sprintf("%s/%s", group.Name, d.Name)
-	err := s.s3Client.Upload(s.c.Bucket, key, reader, size)
+	err := s.s3Client.Upload(s.s3Bucket, key, reader, size)
 	if err != nil {
 		return nil, err
 	}
 
-	d.Url = fmt.Sprintf("s3://%s/%s", s.c.Bucket, key)
+	d.Url = fmt.Sprintf("s3://%s/%s", s.s3Bucket, key)
 
 	err = s.repository.Save(d)
 	if err != nil {
@@ -159,7 +162,7 @@ func (s service) Download(id uint, dst io.Writer, cb func(contentLength int64)) 
 	}
 
 	key := strings.TrimPrefix(u.Path, "/")
-	return s.s3Client.Download(s.c.Bucket, key, dst, cb)
+	return s.s3Client.Download(s.s3Bucket, key, dst, cb)
 }
 
 func (s service) Delete(id uint) error {
@@ -175,7 +178,7 @@ func (s service) Delete(id uint) error {
 
 	key := strings.TrimPrefix(u.Path, "/")
 	if key != "" {
-		err = s.s3Client.Delete(s.c.Bucket, key)
+		err = s.s3Client.Delete(s.s3Bucket, key)
 		if err != nil {
 			return err
 		}

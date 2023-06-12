@@ -7,40 +7,33 @@ import (
 	"log"
 	"time"
 
-	"github.com/dhis2-sre/im-manager/pkg/config"
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	"github.com/dhis2-sre/im-manager/pkg/token/helper"
 	"github.com/gofrs/uuid"
 )
 
 func NewService(
-	c config.Config,
 	tokenRepository repository,
+	privateKey *rsa.PrivateKey,
+	publicKey *rsa.PublicKey,
+	accessTokenExpirationSeconds int,
+	refreshTokenSecretKey string,
+	refreshTokenExpirationSeconds int,
 ) (*tokenService, error) {
-	privateKey, err := c.Authentication.Keys.GetPrivateKey()
-	if err != nil {
-		return nil, err
-	}
-
-	publicKey, err := c.Authentication.Keys.GetPublicKey()
-	if err != nil {
-		return nil, err
-	}
-
 	return &tokenService{
-		tokenRepository,
-		privateKey,
-		publicKey,
-		c.Authentication.AccessTokenExpirationSeconds,
-		c.Authentication.RefreshTokenSecretKey,
-		c.Authentication.RefreshTokenExpirationSeconds,
+		repository:                    tokenRepository,
+		privateKey:                    privateKey,
+		publicKey:                     publicKey,
+		accessTokenExpirationSeconds:  accessTokenExpirationSeconds,
+		refreshTokenSecretKey:         refreshTokenSecretKey,
+		refreshTokenExpirationSeconds: refreshTokenExpirationSeconds,
 	}, nil
 }
 
 type repository interface {
-	setRefreshToken(userId uint, tokenId string, expiresIn time.Duration) error
-	deleteRefreshToken(userId uint, previousTokenId string) error
-	deleteRefreshTokens(userId uint) error
+	SetRefreshToken(userId uint, tokenId string, expiresIn time.Duration) error
+	DeleteRefreshToken(userId uint, previousTokenId string) error
+	DeleteRefreshTokens(userId uint) error
 }
 
 // Tokens domain object defining user tokens
@@ -69,7 +62,7 @@ type tokenService struct {
 
 func (t tokenService) GetTokens(user *model.User, previousRefreshTokenId string) (*Tokens, error) {
 	if previousRefreshTokenId != "" {
-		if err := t.repository.deleteRefreshToken(user.ID, previousRefreshTokenId); err != nil {
+		if err := t.repository.DeleteRefreshToken(user.ID, previousRefreshTokenId); err != nil {
 			return nil, fmt.Errorf("could not delete previous refreshToken for user.Id: %d, tokenId: %s", user.ID, previousRefreshTokenId)
 		}
 	}
@@ -84,7 +77,7 @@ func (t tokenService) GetTokens(user *model.User, previousRefreshTokenId string)
 		return nil, fmt.Errorf("error generating refreshToken for user: %+v\nError: %s", user, err)
 	}
 
-	if err := t.repository.setRefreshToken(user.ID, refreshToken.TokenId.String(), refreshToken.ExpiresIn); err != nil {
+	if err := t.repository.SetRefreshToken(user.ID, refreshToken.TokenId.String(), refreshToken.ExpiresIn); err != nil {
 		return nil, fmt.Errorf("error storing token: %d\nError: %s", user.ID, err)
 	}
 
@@ -127,5 +120,5 @@ func (t tokenService) ValidateRefreshToken(tokenString string) (*RefreshTokenDat
 }
 
 func (t tokenService) SignOut(userId uint) error {
-	return t.repository.deleteRefreshTokens(userId)
+	return t.repository.DeleteRefreshTokens(userId)
 }

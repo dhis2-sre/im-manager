@@ -12,34 +12,26 @@ import (
 	"github.com/dhis2-sre/im-manager/internal/errdef"
 
 	"github.com/dhis2-sre/im-manager/internal/handler"
-	"github.com/dhis2-sre/im-manager/pkg/instance"
 	"github.com/dhis2-sre/im-manager/pkg/model"
-	"github.com/dhis2-sre/im-manager/pkg/stack"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
 
-func New(databaseService Service, userService userService, groupService groupService, instanceService instance.Service, stackService stack.Service) Handler {
+func NewHandler(databaseService Service, groupService groupService, instanceService instanceService, stackService stackService) Handler {
 	return Handler{
 		databaseService,
-		userService,
 		groupService,
 		instanceService,
 		stackService,
 	}
 }
 
-type userService interface {
-	FindById(id uint) (*model.User, error)
-}
-
 type Handler struct {
 	databaseService Service
-	userService     userService
 	groupService    groupService
-	instanceService instance.Service
-	stackService    stack.Service
+	instanceService instanceService
+	stackService    stackService
 }
 
 type Service interface {
@@ -56,6 +48,15 @@ type Service interface {
 	CreateExternalDownload(databaseID uint, expiration time.Time) (*model.ExternalDownload, error)
 	FindExternalDownload(uuid uuid.UUID) (*model.ExternalDownload, error)
 	SaveAs(database *model.Database, instance *model.Instance, stack *model.Stack, newName string, format string) (*model.Database, error)
+}
+
+type instanceService interface {
+	FindById(id uint) (*model.Instance, error)
+	FindByIdDecrypted(id uint) (*model.Instance, error)
+}
+
+type stackService interface {
+	Find(name string) (*model.Stack, error)
 }
 
 // Upload database

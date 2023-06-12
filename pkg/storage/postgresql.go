@@ -10,12 +10,12 @@ import (
 	"gorm.io/gorm/logger"
 )
 
-func NewDatabase(c config.Config) (*gorm.DB, error) {
-	host := c.Postgresql.Host
-	port := c.Postgresql.Port
-	username := c.Postgresql.Username
-	password := c.Postgresql.Password
-	name := c.Postgresql.DatabaseName
+func NewDatabase(c config.Postgresql) (*gorm.DB, error) {
+	host := c.Host
+	port := c.Port
+	username := c.Username
+	password := c.Password
+	name := c.DatabaseName
 
 	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%d sslmode=disable", host, username, password, name, port)
 

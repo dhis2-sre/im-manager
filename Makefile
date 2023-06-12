@@ -40,14 +40,10 @@ dev:
 	docker compose up --build dev database rabbitmq redis jwks
 
 test:
-	docker compose up -d database rabbitmq jwks
-	docker compose run --no-deps test
-	$(clean-cmd)
+	go test -race ./...
 
-test-coverage: clean
-	docker compose up -d database rabbitmq jwks
-	docker compose run --no-deps test-coverage
-	$(clean-cmd)
+test-coverage:
+	go test -coverprofile=./coverage.out ./... && go tool cover -html=./coverage.out -o ./coverage.html
 
 clean:
 	$(clean-cmd)

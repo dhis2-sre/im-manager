@@ -21,7 +21,7 @@ type Config struct {
 	InstanceService                Service
 	DockerHub                      DockerHub
 	DatabaseManagerService         Service
-	Postgresql                     postgresql
+	Postgresql                     Postgresql
 	RabbitMqURL                    rabbitmq
 	Redis                          redis
 	Authentication                 authentication
@@ -52,7 +52,7 @@ func New() Config {
 			//			Username: requireEnv("DATABASE_MANAGER_SERVICE_USERNAME"),
 			//			Password: requireEnv("DATABASE_MANAGER_SERVICE_PASSWORD"),
 		},
-		Postgresql: postgresql{
+		Postgresql: Postgresql{
 			Host:         requireEnv("DATABASE_HOST"),
 			Port:         requireEnvAsInt("DATABASE_PORT"),
 			Username:     requireEnv("DATABASE_USERNAME"),
@@ -97,7 +97,7 @@ type DockerHub struct {
 	Password string
 }
 
-type postgresql struct {
+type Postgresql struct {
 	Host         string
 	Port         int
 	Username     string

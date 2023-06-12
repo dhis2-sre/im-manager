@@ -56,7 +56,7 @@ func main() {
 func run() error {
 	cfg := config.New()
 
-	db, err := storage.NewDatabase(cfg)
+	db, err := storage.NewDatabase(cfg.Postgresql)
 	if err != nil {
 		return err
 	}
@@ -66,14 +66,22 @@ func run() error {
 	authorization := middleware.NewAuthorization(userService)
 	redis := storage.NewRedis(cfg)
 	tokenRepository := token.NewRepository(redis)
-	tokenService, err := token.NewService(cfg, tokenRepository)
+	privateKey, err := cfg.Authentication.Keys.GetPrivateKey()
+	if err != nil {
+		return err
+	}
+	publicKey, err := cfg.Authentication.Keys.GetPublicKey()
+	if err != nil {
+		return err
+	}
+	tokenService, err := token.NewService(tokenRepository, privateKey, publicKey, cfg.Authentication.AccessTokenExpirationSeconds, cfg.Authentication.RefreshTokenSecretKey, cfg.Authentication.RefreshTokenExpirationSeconds)
 	if err != nil {
 		return err
 	}
 
-	userHandler := user.NewHandler(cfg, userService, tokenService)
+	userHandler := user.NewHandler(userService, tokenService)
 
-	authentication := middleware.NewAuthentication(cfg, userService)
+	authentication := middleware.NewAuthentication(publicKey, userService)
 	groupRepository := group.NewRepository(db)
 	groupService := group.NewService(groupRepository, userService)
 	groupHandler := group.NewHandler(groupService)
@@ -119,9 +127,8 @@ func run() error {
 	s3Client := storage.NewS3Client(s3AWSClient, uploader)
 
 	databaseRepository := database.NewRepository(db)
-
-	databaseService := database.NewService(cfg, groupService, s3Client, databaseRepository)
-	databaseHandler := database.New(databaseService, userService, groupService, instanceSvc, stackSvc)
+	databaseService := database.NewService(cfg.Bucket, s3Client, groupService, databaseRepository)
+	databaseHandler := database.NewHandler(databaseService, groupService, instanceSvc, stackSvc)
 
 	err = handler.RegisterValidation()
 	if err != nil {
@@ -143,9 +150,9 @@ func run() error {
 
 	group.Routes(r, authentication, authorization, groupHandler)
 	user.Routes(r, authentication, authorization, userHandler)
-	stack.Routes(r, authentication, stackHandler)
+	stack.Routes(r, authentication.TokenAuthentication, stackHandler)
 	integration.Routes(r, authentication, integrationHandler)
-	database.Routes(r, authentication, databaseHandler)
+	database.Routes(r, authentication.TokenAuthentication, databaseHandler)
 	instance.Routes(r, authentication, instanceHandler)
 
 	return r.Run()

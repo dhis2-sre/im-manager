@@ -6,36 +6,39 @@ import (
 	"time"
 
 	"github.com/dhis2-sre/im-manager/pkg/instance"
+	"github.com/dhis2-sre/im-manager/pkg/inttest"
 	"github.com/dhis2-sre/rabbitmq"
 	amqp "github.com/rabbitmq/amqp091-go"
 	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/suite"
+	"github.com/stretchr/testify/require"
 )
 
-func (s *ttlSuite) TestConsumeDeletesInstance() {
-	require := s.Require()
+func TestConsumeDeletesInstance(t *testing.T) {
+	t.Parallel()
+
+	amqpClient := inttest.SetupRabbitMQ(t)
 
 	consumer, err := rabbitmq.NewConsumer(
-		s.rabbitURI,
+		amqpClient.URI,
 		rabbitmq.WithConsumerPrefix("im-manager"),
 	)
-	require.NoError(err)
-	defer func() { require.NoError(consumer.Close()) }()
+	require.NoError(t, err, "failed to create new RabbitMQ consumer")
+	defer func() { require.NoError(t, consumer.Close()) }()
 
 	is := &instanceService{}
 	is.On("Delete", uint(1)).Return(nil)
 
 	td := instance.NewTTLDestroyConsumer(consumer, is)
-	require.NoError(td.Consume())
+	require.NoError(t, td.Consume())
 
-	require.NoError(s.amqpClient.ch.PublishWithContext(context.TODO(), "", "ttl-destroy", false, false, amqp.Publishing{
+	require.NoError(t, amqpClient.Channel.PublishWithContext(context.TODO(), "", "ttl-destroy", false, false, amqp.Publishing{
 		DeliveryMode: amqp.Persistent,
 		Body:         []byte(`{"ID": 1}`),
-	}))
+	}), "failed to send message with key \"ttl-destroy\"")
 
-	require.Eventually(func() bool {
-		return is.AssertExpectations(s.T())
-	}, s.timeout, time.Second)
+	require.Eventually(t, func() bool {
+		return is.AssertExpectations(t)
+	}, time.Second*10, time.Second)
 }
 
 type instanceService struct {
@@ -45,51 +48,4 @@ type instanceService struct {
 func (is *instanceService) Delete(id uint) error {
 	args := is.Called(id)
 	return args.Error(0)
-}
-
-type ttlSuite struct {
-	suite.Suite
-	rabbitURI  string
-	amqpClient *amqpTestClient
-	timeout    time.Duration
-}
-
-func TestSuiteTTLDestroyConsumer(t *testing.T) {
-	suite.Run(t, new(ttlSuite))
-}
-
-func (s *ttlSuite) SetupSuite() {
-	s.timeout = time.Second * 30
-}
-
-func (s *ttlSuite) SetupTest() {
-	require := s.Require()
-
-	amqpURI := "amqp://guest:guest@rabbitmq:5672"
-	ac, err := setupAMQPTestClient(amqpURI)
-	require.NoError(err, "failed setting up AMQP client")
-	s.rabbitURI = amqpURI
-	s.amqpClient = ac
-}
-
-func (s *ttlSuite) TearDownTest() {
-	s.Require().NoError(s.amqpClient.conn.Close())
-}
-
-type amqpTestClient struct {
-	conn *amqp.Connection
-	ch   *amqp.Channel
-}
-
-func setupAMQPTestClient(uri string) (*amqpTestClient, error) {
-	c, err := amqp.Dial(uri)
-	if err != nil {
-		return nil, err
-	}
-	ch, err := c.Channel()
-	if err != nil {
-		return nil, err
-	}
-
-	return &amqpTestClient{conn: c, ch: ch}, nil
 }
