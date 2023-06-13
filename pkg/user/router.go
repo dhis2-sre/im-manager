@@ -1,12 +1,11 @@
 package user
 
 import (
-	"github.com/dhis2-sre/im-manager/internal/handler"
 	"github.com/dhis2-sre/im-manager/internal/middleware"
 	"github.com/gin-gonic/gin"
 )
 
-func Routes(r *gin.Engine, authenticationMiddleware handler.AuthenticationMiddleware, authorizationMiddleware middleware.AuthorizationMiddleware, handler Handler) {
+func Routes(r *gin.Engine, authenticationMiddleware middleware.AuthenticationMiddleware, authorizationMiddleware middleware.AuthorizationMiddleware, handler Handler) {
 	r.POST("/users", handler.SignUp)
 	r.POST("/refresh", handler.RefreshToken)
 
