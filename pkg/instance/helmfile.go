@@ -73,8 +73,8 @@ func (h helmfileService) executeHelmfileCommand(token string, instance *model.In
 type stackParameters map[string]string
 
 func (h helmfileService) loadStackParameters(folder string, name string) (stackParameters, error) {
-	environment := h.config.Environment
-	path := fmt.Sprintf("%s/%s/parameters/%s.yaml", folder, name, environment)
+	classification := h.config.Classification
+	path := fmt.Sprintf("%s/%s/parameters/%s.yaml", folder, name, classification)
 	data, err := os.ReadFile(path) // #nosec
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {

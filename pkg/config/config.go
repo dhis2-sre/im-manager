@@ -14,6 +14,7 @@ import (
 
 type Config struct {
 	Environment                    string
+	Classification                 string
 	InstanceParameterEncryptionKey string
 	BasePath                       string
 	InstanceService                Service
@@ -32,6 +33,7 @@ type Config struct {
 func New() Config {
 	return Config{
 		Environment:                    requireEnv("ENVIRONMENT"),
+		Classification:                 requireEnv("CLASSIFICATION"),
 		BasePath:                       requireEnv("BASE_PATH"),
 		InstanceParameterEncryptionKey: requireEnv("INSTANCE_PARAMETER_ENCRYPTION_KEY"),
 		InstanceService: Service{
