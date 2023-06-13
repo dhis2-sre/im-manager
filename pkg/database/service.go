@@ -49,8 +49,8 @@ type Repository interface {
 	Create(d *model.Database) error
 	Save(d *model.Database) error
 	FindById(id uint) (*model.Database, error)
-	Lock(id, instanceId, userId uint) (*model.Lock, error)
-	Unlock(id uint) error
+	Lock(databaseId, instanceId, userId uint) (*model.Lock, error)
+	Unlock(databaseId uint) error
 	Delete(id uint) error
 	FindByGroupNames(names []string) ([]model.Database, error)
 	Update(d *model.Database) error
@@ -116,8 +116,8 @@ func (s service) FindBySlug(slug string) (*model.Database, error) {
 	return s.repository.FindBySlug(slug)
 }
 
-func (s service) Lock(id uint, instanceId uint, userId uint) (*model.Lock, error) {
-	return s.repository.Lock(id, instanceId, userId)
+func (s service) Lock(databaseId uint, instanceId uint, userId uint) (*model.Lock, error) {
+	return s.repository.Lock(databaseId, instanceId, userId)
 }
 
 func (s service) Unlock(id uint) error {

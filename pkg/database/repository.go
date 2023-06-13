@@ -65,17 +65,17 @@ func (r repository) FindBySlug(slug string) (*model.Database, error) {
 	return d, err
 }
 
-func (r repository) Lock(id, instanceId, userId uint) (*model.Lock, error) {
+func (r repository) Lock(databaseId, instanceId, userId uint) (*model.Lock, error) {
 	var lock *model.Lock
 
 	errTx := r.db.Transaction(func(tx *gorm.DB) error {
 		var d *model.Database
 		err := tx.
 			Preload("Lock").
-			First(&d, id).Error
+			First(&d, databaseId).Error
 		if err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
-				err = errdef.NewNotFound("database not found by id: %d", id)
+				err = errdef.NewNotFound("database not found by id: %d", databaseId)
 			}
 			return err
 		}
@@ -85,7 +85,7 @@ func (r repository) Lock(id, instanceId, userId uint) (*model.Lock, error) {
 		}
 
 		lock = &model.Lock{
-			DatabaseID: id,
+			DatabaseID: databaseId,
 			InstanceID: instanceId,
 			UserID:     userId,
 		}
@@ -95,14 +95,14 @@ func (r repository) Lock(id, instanceId, userId uint) (*model.Lock, error) {
 	return lock, errTx
 }
 
-func (r repository) Unlock(id uint) error {
-	db := r.db.Unscoped().Delete(&model.Lock{}, id)
+func (r repository) Unlock(databaseId uint) error {
+	db := r.db.Unscoped().Delete(&model.Lock{}, "database_id = ?", databaseId)
 	if db.Error != nil {
 		return db.Error
 	}
 
 	if db.RowsAffected < 1 {
-		return errdef.NewNotFound("database not found by id: %d", id)
+		return errdef.NewNotFound("lock not found by database id: %d", databaseId)
 	}
 
 	return nil
