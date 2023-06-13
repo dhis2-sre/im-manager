@@ -142,7 +142,7 @@ func run() error {
 	r := server.GetEngine(cfg.BasePath)
 
 	group.Routes(r, authentication, authorization, groupHandler)
-	user.Routes(r, authentication, userHandler)
+	user.Routes(r, authentication, authorization, userHandler)
 	stack.Routes(r, authentication, stackHandler)
 	integration.Routes(r, authentication, integrationHandler)
 	database.Routes(r, authentication, databaseHandler)
