@@ -1487,6 +1487,32 @@ paths:
             security:
                 - oauth2: []
             summary: Find user
+        put:
+            description: Update user's email and/or password
+            operationId: updateUser
+            parameters:
+                - format: uint64
+                  in: path
+                  name: id
+                  required: true
+                  type: integer
+                  x-go-name: ID
+            responses:
+                "200":
+                    description: User
+                    schema:
+                        $ref: '#/definitions/User'
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Update user
 produces:
     - application/json
 responses:

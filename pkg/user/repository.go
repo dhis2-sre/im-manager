@@ -86,3 +86,17 @@ func (r repository) delete(id uint) error {
 
 	return nil
 }
+
+func (r repository) update(user *model.User) (*model.User, error) {
+	updatedUser := model.User{
+		Email:    user.Email,
+		Password: user.Password,
+	}
+
+	err := r.db.Model(&user).Updates(updatedUser).Error
+	if err != nil {
+		return nil, fmt.Errorf("failed to update user: %v", err)
+	}
+
+	return user, nil
+}

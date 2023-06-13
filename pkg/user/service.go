@@ -23,6 +23,7 @@ type userRepository interface {
 	findOrCreate(email *model.User) (*model.User, error)
 	findAll() ([]*model.User, error)
 	delete(id uint) error
+	update(user *model.User) (*model.User, error)
 }
 
 type service struct {
@@ -120,7 +121,7 @@ func (s service) FindById(id uint) (*model.User, error) {
 func (s service) FindOrCreate(email string, password string) (*model.User, error) {
 	hashedPassword, err := hashPassword(password)
 	if err != nil {
-		return nil, fmt.Errorf("password hashing failed: %s", err)
+		return nil, fmt.Errorf("failed to hash password: %s", err)
 	}
 
 	user := &model.User{
@@ -133,4 +134,25 @@ func (s service) FindOrCreate(email string, password string) (*model.User, error
 
 func (s service) Delete(id uint) error {
 	return s.repository.delete(id)
+}
+
+func (s service) Update(id uint, email, password string) (*model.User, error) {
+	user, err := s.repository.findById(id)
+	if err != nil {
+		return nil, err
+	}
+
+	if email != "" {
+		user.Email = email
+	}
+
+	if password != "" {
+		var err error
+		user.Password, err = hashPassword(password)
+		if err != nil {
+			return nil, fmt.Errorf("failed to hash password: %s", err)
+		}
+	}
+
+	return s.repository.update(user)
 }
