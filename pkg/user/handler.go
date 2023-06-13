@@ -6,8 +6,8 @@ import (
 	"github.com/dhis2-sre/im-manager/pkg/model"
 
 	"github.com/dhis2-sre/im-manager/internal/errdef"
-
 	"github.com/dhis2-sre/im-manager/internal/handler"
+
 	"github.com/dhis2-sre/im-manager/pkg/config"
 	"github.com/dhis2-sre/im-manager/pkg/token"
 	"github.com/gin-gonic/gin"
@@ -31,6 +31,8 @@ type userService interface {
 	SignUp(email string, password string) (*model.User, error)
 	SignIn(email string, password string) (*model.User, error)
 	FindById(id uint) (*model.User, error)
+	FindAll() ([]*model.User, error)
+	Delete(id uint) error
 }
 
 type tokenService interface {
@@ -90,6 +92,7 @@ func (h *Handler) SignIn(c *gin.Context) {
 	//   415: Error
 	user, err := handler.GetUserFromContext(c)
 	if err != nil {
+		_ = c.Error(err)
 		return
 	}
 
@@ -168,6 +171,7 @@ func (h Handler) Me(c *gin.Context) {
 	//   415: Error
 	user, err := handler.GetUserFromContext(c)
 	if err != nil {
+		_ = c.Error(err)
 		return
 	}
 
@@ -197,6 +201,7 @@ func (h Handler) SignOut(c *gin.Context) {
 	//	415: Error
 	user, err := handler.GetUserFromContext(c)
 	if err != nil {
+		_ = c.Error(err)
 		return
 	}
 
@@ -237,4 +242,78 @@ func (h Handler) FindById(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, userWithGroups)
+}
+
+// FindAll user
+func (h Handler) FindAll(c *gin.Context) {
+	// swagger:route GET /users findAllUsers
+	//
+	// Find users
+	//
+	// Find all users with the groups they belong to
+	//
+	// security:
+	//	oauth2:
+	//
+	// responses:
+	//	200: []User
+	//	401: Error
+	//	403: Error
+	//	404: Error
+	//	415: Error
+	users, err := h.userService.FindAll()
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	c.JSON(http.StatusOK, users)
+}
+
+// Delete user
+func (h Handler) Delete(c *gin.Context) {
+	// swagger:route DELETE /users/{id} deleteUser
+	//
+	// Delete user
+	//
+	// Delete user by id
+	//
+	// Security:
+	//	oauth2:
+	//
+	// Responses:
+	//	202:
+	//	401: Error
+	//	403: Error
+	//	404: Error
+	//	415: Error
+	id, ok := handler.GetPathParameter(c, "id")
+	if !ok {
+		return
+	}
+
+	user, err := handler.GetUserFromContext(c)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	_, err = h.userService.FindById(id)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	if user.ID == id {
+		_ = c.Error(errdef.NewBadRequest("cannot delete the current user"))
+		return
+	}
+
+	err = h.userService.Delete(id)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	c.Status(http.StatusAccepted)
 }

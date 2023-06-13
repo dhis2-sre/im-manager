@@ -637,6 +637,7 @@ func (h Handler) Update(c *gin.Context) {
 func (h Handler) canAccess(c *gin.Context, d *model.Database) error {
 	user, err := handler.GetUserFromContext(c)
 	if err != nil {
+		_ = c.Error(err)
 		return err
 	}
 

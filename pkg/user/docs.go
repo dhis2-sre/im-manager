@@ -18,7 +18,7 @@ type _ struct {
 	Body RefreshTokenRequest
 }
 
-// swagger:parameters findUserById
+// swagger:parameters findUserById deleteUser
 type _ struct {
 	// in: path
 	// required: true

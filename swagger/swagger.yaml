@@ -1395,6 +1395,27 @@ paths:
             security:
                 - oauth2: []
             summary: Sign out
+        get:
+            description: Find all users with the groups they belong to
+            operationId: findAllUsers
+            responses:
+                "200":
+                    description: User
+                    schema:
+                        items:
+                            $ref: '#/definitions/User'
+                        type: array
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Find users
         post:
             description: Sign up a user. This endpoint is publicly accessible and therefor anyone can sign up. However, before being able to perform any actions, users needs to be a member of a group. And only administrators can add users to groups.
             operationId: signUp
@@ -1416,6 +1437,30 @@ paths:
                     $ref: '#/responses/Error'
             summary: SignUp user
     /users/{id}:
+        delete:
+            description: Delete user by id
+            operationId: deleteUser
+            parameters:
+                - format: uint64
+                  in: path
+                  name: id
+                  required: true
+                  type: integer
+                  x-go-name: ID
+            responses:
+                "202":
+                    description: ""
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Delete user
         get:
             description: Find a user by its id
             operationId: findUserById
