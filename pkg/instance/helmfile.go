@@ -109,6 +109,7 @@ func configureInstanceEnvironment(accessToken string, instance *model.Instance, 
 	imCreationTimestamp := fmt.Sprintf("%s=%d", "INSTANCE_CREATION_TIMESTAMP", time.Now().Unix())
 	cmd.Env = append(cmd.Env, instanceNameEnv, instanceNamespaceEnv, instanceIdEnv, instanceHostnameEnv, imTokenEnv, homeEnv, imCreationTimestamp)
 
+	cmd.Env = injectEnv(cmd.Env, "HOSTNAME")
 	cmd.Env = injectEnv(cmd.Env, "AWS_ACCESS_KEY_ID")
 	cmd.Env = injectEnv(cmd.Env, "AWS_SECRET_ACCESS_KEY")
 	cmd.Env = injectEnv(cmd.Env, "AWS_DEFAULT_REGION")
