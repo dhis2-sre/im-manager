@@ -62,6 +62,7 @@ deploy:
             host: im-manager-redis-{{ .ENVIRONMENT }}-master.instance-manager-{{ .ENVIRONMENT }}.svc
           environment:
             ENVIRONMENT: "{{ .ENVIRONMENT }}"
+            CLASSIFICATION: "{{ .CLASSIFICATION }}"
             INSTANCE_SERVICE_HOST: im-manager-{{ .ENVIRONMENT }}.instance-manager-{{ .ENVIRONMENT }}.svc:8080
             INSTANCE_SERVICE_BASE_PATH: /
             DATABASE_MANAGER_SERVICE_HOST: im-manager-{{ .ENVIRONMENT }}.instance-manager-{{ .ENVIRONMENT }}.svc:8080
