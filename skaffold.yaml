@@ -56,13 +56,14 @@ deploy:
               "eks\\.amazonaws\\.com\\/role-arn": arn:aws:iam::767224633206:role/instance-cluster-test-im-manager-{{ .ENVIRONMENT }}
           ingress:
             enabled: true
-            hostname: api.im.{{ .ENVIRONMENT }}.test.c.dhis2.org
+            hostname: "{{ .HOSTNAME }}"
             certIssuer: cert-issuer-prod
           redis:
             host: im-manager-redis-{{ .ENVIRONMENT }}-master.instance-manager-{{ .ENVIRONMENT }}.svc
           environment:
             ENVIRONMENT: "{{ .ENVIRONMENT }}"
             CLASSIFICATION: "{{ .CLASSIFICATION }}"
+            HOSTNAME: "https://{{ .HOSTNAME }}"
             INSTANCE_SERVICE_HOST: im-manager-{{ .ENVIRONMENT }}.instance-manager-{{ .ENVIRONMENT }}.svc:8080
             INSTANCE_SERVICE_BASE_PATH: /
             DATABASE_MANAGER_SERVICE_HOST: im-manager-{{ .ENVIRONMENT }}.instance-manager-{{ .ENVIRONMENT }}.svc:8080
