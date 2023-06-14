@@ -46,10 +46,10 @@ type repository interface {
 // Tokens domain object defining user tokens
 // swagger:model
 type Tokens struct {
-	AccessToken  string `json:"access_token"`
-	TokenType    string `json:"token_type"`
-	RefreshToken string `json:"refresh_token"`
-	ExpiresIn    uint   `json:"expires_in"`
+	AccessToken  string `json:"accessToken"`
+	TokenType    string `json:"tokenType"`
+	RefreshToken string `json:"refreshToken"`
+	ExpiresIn    uint   `json:"expiresIn"`
 }
 
 type RefreshTokenData struct {

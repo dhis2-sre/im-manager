@@ -2,23 +2,23 @@ package model
 
 import (
 	"fmt"
-
-	"gorm.io/gorm"
+	"time"
 )
 
 // swagger:model Instance
 type Instance struct {
-	gorm.Model
-	UserID             uint
-	Name               string `gorm:"index:idx_name_and_group,unique"`
-	GroupName          string `gorm:"index:idx_name_and_group,unique"`
-	StackName          string
+	ID                 uint                        `gorm:"primarykey" json:"id"`
+	CreatedAt          time.Time                   `json:"createdAt"`
+	UpdatedAt          time.Time                   `json:"updatedAt"`
+	UserID             uint                        `json:"userId"`
+	Name               string                      `gorm:"index:idx_name_and_group,unique" json:"name"`
+	GroupName          string                      `gorm:"index:idx_name_and_group,unique" json:"groupName"`
+	StackName          string                      `json:"stackName"`
 	RequiredParameters []InstanceRequiredParameter `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;" json:"requiredParameters"`
 	OptionalParameters []InstanceOptionalParameter `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;" json:"optionalParameters"`
-	DeployLog          string                      `gorm:"type:text"`
-	Preset             bool
-	PresetID           uint
-	Lock               *Lock `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
+	DeployLog          string                      `gorm:"type:text" json:"deployLog"`
+	Preset             bool                        `json:"preset"`
+	PresetID           uint                        `json:"presetId"`
 }
 
 type Linked struct {

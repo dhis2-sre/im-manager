@@ -3,24 +3,27 @@ consumes:
 definitions:
     ClusterConfiguration:
         properties:
-            CreatedAt:
+            createdAt:
                 format: date-time
                 type: string
-            DeletedAt:
-                $ref: '#/definitions/DeletedAt'
-            GroupName:
+                x-go-name: CreatedAt
+            groupName:
                 type: string
-            ID:
+                x-go-name: GroupName
+            id:
                 format: uint64
                 type: integer
-            KubernetesConfiguration:
+                x-go-name: ID
+            kubernetesConfiguration:
                 items:
                     format: uint8
                     type: integer
                 type: array
-            UpdatedAt:
+                x-go-name: KubernetesConfiguration
+            updatedAt:
                 format: date-time
                 type: string
+                x-go-name: UpdatedAt
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/model
     CopyDatabaseRequest:
@@ -45,35 +48,39 @@ definitions:
         x-go-package: github.com/dhis2-sre/im-manager/pkg/group
     Database:
         properties:
-            CreatedAt:
+            createdAt:
                 format: date-time
                 type: string
-            DeletedAt:
-                $ref: '#/definitions/DeletedAt'
-            ExternalDownloads:
+                x-go-name: CreatedAt
+            externalDownloads:
                 items:
                     $ref: '#/definitions/ExternalDownload'
                 type: array
-            GroupName:
+                x-go-name: ExternalDownloads
+            groupName:
                 type: string
-            ID:
+                x-go-name: GroupName
+            id:
                 format: uint64
                 type: integer
-            Lock:
+                x-go-name: ID
+            lock:
                 $ref: '#/definitions/Lock'
-            Name:
+            name:
                 type: string
-            Slug:
+                x-go-name: Name
+            slug:
                 type: string
-            UpdatedAt:
+                x-go-name: Slug
+            updatedAt:
                 format: date-time
                 type: string
-            Url:
+                x-go-name: UpdatedAt
+            url:
                 type: string
+                x-go-name: Url
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/model
-    DeletedAt:
-        $ref: '#/definitions/NullTime'
     DeployInstanceRequest:
         properties:
             groupName:
@@ -107,108 +114,127 @@ definitions:
         x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
     ExternalDownload:
         properties:
-            DatabaseID:
+            databaseId:
                 format: uint64
                 type: integer
-            Expiration:
+                x-go-name: DatabaseID
+            expiration:
                 format: date-time
                 type: string
-            UUID:
+                x-go-name: Expiration
+            uuid:
                 format: uuid
                 type: string
+                x-go-name: UUID
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/model
     Group:
         description: Group domain object defining a group
         properties:
-            CreatedAt:
+            clusterConfiguration:
+                $ref: '#/definitions/ClusterConfiguration'
+            createdAt:
                 format: date-time
                 type: string
-            DeletedAt:
-                $ref: '#/definitions/DeletedAt'
-            Hostname:
+                x-go-name: CreatedAt
+            hostname:
                 type: string
-            Name:
+                x-go-name: Hostname
+            name:
                 type: string
-            UpdatedAt:
+                x-go-name: Name
+            updatedAt:
                 format: date-time
                 type: string
-            Users:
+                x-go-name: UpdatedAt
+            users:
                 items:
                     $ref: '#/definitions/User'
                 type: array
-            clusterConfiguration:
-                $ref: '#/definitions/ClusterConfiguration'
+                x-go-name: Users
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/model
     GroupWithInstances:
         properties:
-            Hostname:
+            hostname:
                 type: string
-            Instances:
+                x-go-name: Hostname
+            instances:
                 items:
                     $ref: '#/definitions/Instance'
                 type: array
-            Name:
+                x-go-name: Instances
+            name:
                 type: string
+                x-go-name: Name
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
     GroupsWithDatabases:
         properties:
-            Databases:
+            databases:
                 items:
                     $ref: '#/definitions/Database'
                 type: array
-            Hostname:
+                x-go-name: Databases
+            hostname:
                 type: string
-            ID:
+                x-go-name: Hostname
+            id:
                 format: uint64
                 type: integer
-            Name:
+                x-go-name: ID
+            name:
                 type: string
+                x-go-name: Name
         type: object
-        x-go-package: github.com/dhis2-sre/im-manager/pkg/database
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/model
     Instance:
         properties:
-            CreatedAt:
+            createdAt:
                 format: date-time
                 type: string
-            DeletedAt:
-                $ref: '#/definitions/DeletedAt'
-            DeployLog:
+                x-go-name: CreatedAt
+            deployLog:
                 type: string
-            GroupName:
+                x-go-name: DeployLog
+            groupName:
                 type: string
-            ID:
+                x-go-name: GroupName
+            id:
                 format: uint64
                 type: integer
-            Lock:
-                $ref: '#/definitions/Lock'
-            Name:
+                x-go-name: ID
+            name:
                 type: string
-            Preset:
-                type: boolean
-            PresetID:
-                format: uint64
-                type: integer
-            StackName:
-                type: string
-            UpdatedAt:
-                format: date-time
-                type: string
-            UserID:
-                format: uint64
-                type: integer
+                x-go-name: Name
             optionalParameters:
                 items:
                     $ref: '#/definitions/InstanceOptionalParameter'
                 type: array
                 x-go-name: OptionalParameters
+            preset:
+                type: boolean
+                x-go-name: Preset
+            presetId:
+                format: uint64
+                type: integer
+                x-go-name: PresetID
             requiredParameters:
                 items:
                     $ref: '#/definitions/InstanceRequiredParameter'
                 type: array
                 x-go-name: RequiredParameters
+            stackName:
+                type: string
+                x-go-name: StackName
+            updatedAt:
+                format: date-time
+                type: string
+                x-go-name: UpdatedAt
+            userId:
+                format: uint64
+                type: integer
+                x-go-name: UserID
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/model
     InstanceOptionalParameter:
@@ -235,15 +261,18 @@ definitions:
         x-go-package: github.com/dhis2-sre/im-manager/pkg/model
     Lock:
         properties:
-            DatabaseID:
+            databaseId:
                 format: uint64
                 type: integer
-            InstanceID:
+                x-go-name: DatabaseID
+            instanceId:
                 format: uint64
                 type: integer
-            UserID:
+                x-go-name: InstanceID
+            userId:
                 format: uint64
                 type: integer
+                x-go-name: UserID
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/model
     LockDatabaseRequest:
@@ -254,41 +283,6 @@ definitions:
                 x-go-name: InstanceId
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/database
-    Model:
-        description: |-
-            type User struct {
-            gorm.Model
-            }
-        properties:
-            CreatedAt:
-                format: date-time
-                type: string
-            DeletedAt:
-                $ref: '#/definitions/DeletedAt'
-            ID:
-                format: uint64
-                type: integer
-            UpdatedAt:
-                format: date-time
-                type: string
-        title: |-
-            Model a basic GoLang struct which includes the following fields: ID, CreatedAt, UpdatedAt, DeletedAt
-            It may be embedded into your model or you may build your own model without it
-        type: object
-        x-go-package: gorm.io/gorm
-    NullTime:
-        description: |-
-            NullTime implements the Scanner interface so
-            it can be used as a scan destination, similar to NullString.
-        properties:
-            Time:
-                format: date-time
-                type: string
-            Valid:
-                type: boolean
-        title: NullTime represents a time.Time that may be null.
-        type: object
-        x-go-package: database/sql
     RefreshTokenRequest:
         properties:
             refreshToken:
@@ -321,18 +315,16 @@ definitions:
         x-go-package: github.com/dhis2-sre/im-manager/pkg/user
     Stack:
         properties:
-            CreatedAt:
+            createdAt:
                 format: date-time
                 type: string
-            DeletedAt:
-                $ref: '#/definitions/DeletedAt'
-            HostnamePattern:
+                x-go-name: CreatedAt
+            hostnamePattern:
                 type: string
-            HostnameVariable:
+                x-go-name: HostnamePattern
+            hostnameVariable:
                 type: string
-            UpdatedAt:
-                format: date-time
-                type: string
+                x-go-name: HostnameVariable
             instances:
                 items:
                     $ref: '#/definitions/Instance'
@@ -351,44 +343,55 @@ definitions:
                     $ref: '#/definitions/StackRequiredParameter'
                 type: array
                 x-go-name: RequiredParameters
+            updatedAt:
+                format: date-time
+                type: string
+                x-go-name: UpdatedAt
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/model
     StackOptionalParameter:
         properties:
-            Consumed:
+            consumed:
                 type: boolean
-            DefaultValue:
+                x-go-name: Consumed
+            defaultValue:
                 type: string
-            Name:
+                x-go-name: DefaultValue
+            name:
                 type: string
-            StackName:
+                x-go-name: Name
+            stackName:
                 type: string
+                x-go-name: StackName
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/model
     StackRequiredParameter:
         properties:
-            Consumed:
+            consumed:
                 type: boolean
-            Name:
+                x-go-name: Consumed
+            name:
                 type: string
-            StackName:
+                x-go-name: Name
+            stackName:
                 type: string
+                x-go-name: StackName
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/model
     Tokens:
         description: Tokens domain object defining user tokens
         properties:
-            access_token:
+            accessToken:
                 type: string
                 x-go-name: AccessToken
-            expires_in:
+            expiresIn:
                 format: uint64
                 type: integer
                 x-go-name: ExpiresIn
-            refresh_token:
+            refreshToken:
                 type: string
                 x-go-name: RefreshToken
-            token_type:
+            tokenType:
                 type: string
                 x-go-name: TokenType
         type: object
@@ -417,31 +420,31 @@ definitions:
     User:
         description: User domain object defining a user
         properties:
-            AdminGroups:
+            adminGroups:
                 items:
                     $ref: '#/definitions/Group'
                 type: array
-            CreatedAt:
+                x-go-name: AdminGroups
+            createdAt:
                 format: date-time
                 type: string
-            DeletedAt:
-                $ref: '#/definitions/DeletedAt'
-            Email:
+                x-go-name: CreatedAt
+            email:
                 type: string
-            Groups:
+                x-go-name: Email
+            groups:
                 items:
                     $ref: '#/definitions/Group'
                 type: array
-            ID:
+                x-go-name: Groups
+            id:
                 format: uint64
                 type: integer
-            Locks:
-                items:
-                    $ref: '#/definitions/Lock'
-                type: array
-            UpdatedAt:
+                x-go-name: ID
+            updatedAt:
                 format: date-time
                 type: string
+                x-go-name: UpdatedAt
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/model
     saveAsRequest:
@@ -1431,11 +1434,7 @@ paths:
             operationId: findAllUsers
             responses:
                 "200":
-                    description: User
-                    schema:
-                        items:
-                            $ref: '#/definitions/User'
-                        type: array
+                    $ref: '#/responses/UsersResponse'
                 "401":
                     $ref: '#/responses/Error'
                 "403":
@@ -1594,6 +1593,12 @@ responses:
         description: ""
         schema:
             $ref: '#/definitions/Tokens'
+    UsersResponse:
+        description: ""
+        schema:
+            items:
+                $ref: '#/definitions/User'
+            type: array
 securityDefinitions:
     oauth2:
         flow: password

@@ -1,6 +1,9 @@
 package user
 
-import "github.com/dhis2-sre/im-manager/pkg/token"
+import (
+	"github.com/dhis2-sre/im-manager/pkg/model"
+	"github.com/dhis2-sre/im-manager/pkg/token"
+)
 
 // swagger:parameters signUp
 type _ struct {
@@ -29,4 +32,11 @@ type _ struct {
 type _ struct {
 	//in: body
 	_ token.Tokens
+}
+
+// swagger:response UsersResponse
+type _ struct {
+	// Users list response
+	//in: body
+	_ *[]model.User
 }

@@ -4,8 +4,6 @@ import (
 	"testing"
 
 	"github.com/dhis2-sre/im-manager/pkg/model"
-	"gorm.io/gorm"
-
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 )
@@ -32,7 +30,7 @@ func TestGetUserFromContext(t *testing.T) {
 		},
 	}
 	user := &model.User{
-		Model:       gorm.Model{ID: id},
+		ID:          id,
 		Email:       email,
 		Groups:      groups,
 		AdminGroups: adminGroups,

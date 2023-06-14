@@ -12,7 +12,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/lestrrat-go/jwx/jwa"
 	"github.com/lestrrat-go/jwx/jwt"
-	"gorm.io/gorm"
 )
 
 func NewAuthentication(c config.Config, signInService signInService) AuthenticationMiddleware {
@@ -103,14 +102,14 @@ func extractUser(userData any) (*model.User, error) {
 		return nil, errors.New("failed to parse user data")
 	}
 
-	id := userMap["ID"].(float64)
-	email := userMap["Email"].(string)
+	id := userMap["id"].(float64)
+	email := userMap["email"].(string)
 
 	user := &model.User{
-		Model:       gorm.Model{ID: uint(id)},
+		ID:          uint(id),
 		Email:       email,
-		Groups:      extractGroups("Groups", userMap),
-		AdminGroups: extractGroups("AdminGroups", userMap),
+		Groups:      extractGroups("groups", userMap),
+		AdminGroups: extractGroups("adminGroups", userMap),
 	}
 	return user, nil
 }
@@ -122,8 +121,8 @@ func extractGroups(key string, userMap map[string]any) []model.Group {
 		for i := 0; i < len(groupsData); i++ {
 			group := groupsData[i].(map[string]any)
 			groups[i] = model.Group{
-				Name:     group["Name"].(string),
-				Hostname: group["Hostname"].(string),
+				Name:     group["name"].(string),
+				Hostname: group["hostname"].(string),
 			}
 		}
 		return groups

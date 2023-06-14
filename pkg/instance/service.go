@@ -10,8 +10,6 @@ import (
 
 	"github.com/dhis2-sre/im-manager/pkg/stack"
 
-	"gorm.io/gorm"
-
 	"github.com/dhis2-sre/im-manager/pkg/config"
 	"github.com/dhis2-sre/im-manager/pkg/model"
 )
@@ -181,7 +179,7 @@ func (s service) Link(source, destination *model.Instance) error {
 
 func (s service) unlink(id uint) error {
 	instance := &model.Instance{
-		Model: gorm.Model{ID: id},
+		ID: id,
 	}
 	return s.instanceRepository.Unlink(instance)
 }
