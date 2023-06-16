@@ -9,8 +9,6 @@ import (
 
 	"github.com/dhis2-sre/im-manager/internal/errdef"
 
-	"github.com/dhis2-sre/im-manager/pkg/stack"
-
 	"github.com/dhis2-sre/im-manager/internal/handler"
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	"github.com/gin-gonic/gin"
@@ -20,13 +18,11 @@ func NewHandler(
 	userService userServiceHandler,
 	groupService groupServiceHandler,
 	instanceService Service,
-	stackService stack.Service,
 ) Handler {
 	return Handler{
 		userService,
 		groupService,
 		instanceService,
-		stackService,
 	}
 }
 
@@ -51,7 +47,6 @@ type Handler struct {
 	userService     userServiceHandler
 	groupService    groupServiceHandler
 	instanceService Service
-	stackService    stack.Service
 }
 
 type userServiceHandler interface {

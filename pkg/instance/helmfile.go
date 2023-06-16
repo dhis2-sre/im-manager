@@ -11,20 +11,21 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/yaml"
 
-	"github.com/dhis2-sre/im-manager/pkg/config"
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	"github.com/dhis2-sre/im-manager/pkg/stack"
 )
 
 type helmfileService struct {
-	stackService stack.Service
-	config       config.Config
+	stackFolder    string
+	stackService   stack.Service
+	classification string
 }
 
-func NewHelmfileService(stackService stack.Service, config config.Config) helmfileService {
+func NewHelmfileService(stackFolder string, stackService stack.Service, classification string) helmfileService {
 	return helmfileService{
-		stackService,
-		config,
+		stackFolder:    stackFolder,
+		stackService:   stackService,
+		classification: classification,
 	}
 }
 
@@ -48,17 +49,13 @@ func (h helmfileService) executeHelmfileCommand(token string, instance *model.In
 		return nil, err
 	}
 
-	// TODO
-	// stacksFolder := h.config.StacksFolder
-	stacksFolder := "./stacks"
-
-	stackPath := path.Join(stacksFolder, "/", stack.Name, "/helmfile.yaml")
+	stackPath := path.Join(h.stackFolder, "/", stack.Name, "/helmfile.yaml")
 	if _, err = os.Stat(stackPath); err != nil {
 		log.Printf("Stack doesn't exists: %s\n", stackPath)
 		return nil, err
 	}
 
-	stackParameters, err := h.loadStackParameters(stacksFolder, stack.Name)
+	stackParameters, err := h.loadStackParameters(h.stackFolder, stack.Name)
 	if err != nil {
 		return nil, err
 	}
@@ -66,6 +63,10 @@ func (h helmfileService) executeHelmfileCommand(token string, instance *model.In
 	cmd := exec.Command("/usr/bin/helmfile", "--helm-binary", "/usr/bin/helm", "-f", stackPath, operation) // #nosec
 	log.Printf("Command: %s\n", cmd.String())
 	configureInstanceEnvironment(token, instance, group, stackParameters, cmd)
+	// TODO(ivo) this is a remaining issue. We should rely on the groups.KubernetesConfiguration
+	// I am getting unhandled error: "sops metadata not found" remove this line.
+	// this is likely as I have not configured sops (nor mocked it).
+	cmd.Env = append(cmd.Env, "KUBECONFIG=/tmp/k3sconfig")
 
 	return cmd, nil
 }
@@ -73,8 +74,7 @@ func (h helmfileService) executeHelmfileCommand(token string, instance *model.In
 type stackParameters map[string]string
 
 func (h helmfileService) loadStackParameters(folder string, name string) (stackParameters, error) {
-	classification := h.config.Classification
-	path := fmt.Sprintf("%s/%s/parameters/%s.yaml", folder, name, classification)
+	path := fmt.Sprintf("%s/%s/parameters/%s.yaml", folder, name, h.classification)
 	data, err := os.ReadFile(path) // #nosec
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {

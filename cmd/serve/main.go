@@ -88,9 +88,9 @@ func run() error {
 
 	stackSvc := stack.NewService(stack.NewRepository(db))
 
-	instanceRepo := instance.NewRepository(db, cfg)
-	helmfileSvc := instance.NewHelmfileService(stackSvc, cfg)
-	instanceSvc := instance.NewService(cfg, instanceRepo, groupService, stackSvc, helmfileSvc)
+	instanceRepo := instance.NewRepository(db, cfg.InstanceParameterEncryptionKey)
+	helmfileSvc := instance.NewHelmfileService("./stacks", stackSvc, cfg.Classification)
+	instanceSvc := instance.NewService(instanceRepo, groupService, stackSvc, helmfileSvc)
 
 	dockerHubClient := integration.NewDockerHubClient(cfg.DockerHub.Username, cfg.DockerHub.Password)
 
@@ -115,7 +115,7 @@ func run() error {
 	}
 
 	stackHandler := stack.NewHandler(stackSvc)
-	instanceHandler := instance.NewHandler(userService, groupService, instanceSvc, stackSvc)
+	instanceHandler := instance.NewHandler(userService, groupService, instanceSvc)
 
 	// TODO: Database... Move into... Function?
 	s3Config, err := s3config.LoadDefaultConfig(context.TODO(), s3config.WithRegion("eu-west-1"))
@@ -153,7 +153,7 @@ func run() error {
 	stack.Routes(r, authentication.TokenAuthentication, stackHandler)
 	integration.Routes(r, authentication, integrationHandler)
 	database.Routes(r, authentication.TokenAuthentication, databaseHandler)
-	instance.Routes(r, authentication, instanceHandler)
+	instance.Routes(r, authentication.TokenAuthentication, instanceHandler)
 
 	return r.Run()
 }

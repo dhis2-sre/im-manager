@@ -12,19 +12,16 @@ import (
 
 	"gorm.io/gorm"
 
-	"github.com/dhis2-sre/im-manager/pkg/config"
 	"github.com/dhis2-sre/im-manager/pkg/model"
 )
 
 func NewService(
-	config config.Config,
 	instanceRepository Repository,
 	groupService groupService,
 	stackService stack.Service,
 	helmfileService helmfile,
 ) *service {
 	return &service{
-		config,
 		instanceRepository,
 		groupService,
 		stackService,
@@ -48,16 +45,19 @@ type groupService interface {
 	Find(name string) (*model.Group, error)
 }
 
+type stackService interface {
+	Find(name string) (*model.Stack, error)
+}
+
 type helmfile interface {
 	sync(token string, instance *model.Instance, group *model.Group) (*exec.Cmd, error)
 	destroy(instance *model.Instance, group *model.Group) (*exec.Cmd, error)
 }
 
 type service struct {
-	config             config.Config
 	instanceRepository Repository
 	groupService       groupService
-	stackService       stack.Service
+	stackService       stackService
 	helmfileService    helmfile
 }
 

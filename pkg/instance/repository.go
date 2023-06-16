@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/dhis2-sre/im-manager/internal/errdef"
-	"github.com/dhis2-sre/im-manager/pkg/config"
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	"github.com/jackc/pgconn"
 	"golang.org/x/exp/maps"
@@ -13,13 +12,13 @@ import (
 	"gorm.io/gorm"
 )
 
-func NewRepository(db *gorm.DB, config config.Config) *repository {
-	return &repository{db: db, config: config}
+func NewRepository(db *gorm.DB, instanceParameterEncryptionKey string) *repository {
+	return &repository{db: db, instanceParameterEncryptionKey: instanceParameterEncryptionKey}
 }
 
 type repository struct {
-	db     *gorm.DB
-	config config.Config
+	db                             *gorm.DB
+	instanceParameterEncryptionKey string
 }
 
 func (r repository) FindByIdDecrypted(id uint) (*model.Instance, error) {
@@ -28,7 +27,7 @@ func (r repository) FindByIdDecrypted(id uint) (*model.Instance, error) {
 		return nil, err
 	}
 
-	err = decryptParameters(r.config.InstanceParameterEncryptionKey, instance)
+	err = decryptParameters(r.instanceParameterEncryptionKey, instance)
 
 	return instance, err
 }
@@ -70,7 +69,7 @@ func (r repository) Unlink(instance *model.Instance) error {
 }
 
 func (r repository) Save(instance *model.Instance) error {
-	key := r.config.InstanceParameterEncryptionKey
+	key := r.instanceParameterEncryptionKey
 
 	enrichParameters(instance)
 
