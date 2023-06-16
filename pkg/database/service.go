@@ -63,6 +63,7 @@ type Repository interface {
 
 type S3Client interface {
 	Copy(bucket string, source string, destination string) error
+	Move(bucket string, source string, destination string) error
 	Upload(bucket string, key string, body storage.ReadAtSeeker, size int64) error
 	Delete(bucket string, key string) error
 	Download(bucket string, key string, dst io.Writer, cb func(contentLength int64)) error
@@ -120,8 +121,8 @@ func (s service) Lock(databaseId uint, instanceId uint, userId uint) (*model.Loc
 	return s.repository.Lock(databaseId, instanceId, userId)
 }
 
-func (s service) Unlock(id uint) error {
-	return s.repository.Unlock(id)
+func (s service) Unlock(databaseId uint) error {
+	return s.repository.Unlock(databaseId)
 }
 
 type ReadAtSeeker interface {
@@ -272,13 +273,7 @@ func (s service) Save(userId uint, database *model.Database, instance *model.Ins
 
 		sourceKey := strings.TrimPrefix(u.Path, "/")
 		destinationKey := fmt.Sprintf("%s/%s", saved.GroupName, database.Name)
-		err = s.s3Client.Copy(s.c.Bucket, sourceKey, destinationKey)
-		if err != nil {
-			logError(err)
-			return
-		}
-
-		err = s.s3Client.Delete(s.c.Bucket, saved.Url)
+		err = s.s3Client.Move(s.c.Bucket, sourceKey, destinationKey)
 		if err != nil {
 			logError(err)
 			return
@@ -297,6 +292,14 @@ func (s service) Save(userId uint, database *model.Database, instance *model.Ins
 		if err != nil {
 			logError(err)
 			return
+		}
+
+		if database.Lock != nil {
+			_, err := s.repository.Lock(database.ID, database.Lock.InstanceID, database.Lock.UserID)
+			if err != nil {
+				logError(err)
+				return
+			}
 		}
 	})
 

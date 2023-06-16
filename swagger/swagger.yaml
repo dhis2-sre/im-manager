@@ -182,6 +182,8 @@ definitions:
             ID:
                 format: uint64
                 type: integer
+            Lock:
+                $ref: '#/definitions/Lock'
             Name:
                 type: string
             Preset:
@@ -433,6 +435,10 @@ definitions:
             ID:
                 format: uint64
                 type: integer
+            Locks:
+                items:
+                    $ref: '#/definitions/Lock'
+                type: array
             UpdatedAt:
                 format: date-time
                 type: string

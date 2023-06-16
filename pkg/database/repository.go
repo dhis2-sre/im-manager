@@ -109,6 +109,19 @@ func (r repository) Unlock(databaseId uint) error {
 }
 
 func (r repository) Delete(id uint) error {
+	// TODO: Why do I manually have to delete the lock when I've configured cascading on the database struct?
+	database, err := r.FindById(id)
+	if err != nil {
+		return err
+	}
+
+	if database.Lock != nil {
+		err := r.db.Unscoped().Delete(&model.Lock{}, database.ID).Error
+		if err != nil {
+			return err
+		}
+	}
+
 	return r.db.Unscoped().Delete(&model.Database{}, id).Error
 }
 
