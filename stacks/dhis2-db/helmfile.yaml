@@ -17,8 +17,8 @@ releases:
 
       - primary:
           extraEnvVars:
-            - name: DATABASE_MANAGER_URL
-              value: {{ requiredEnv "DATABASE_MANAGER_URL" }}
+            - name: HOSTNAME
+              value: {{ requiredEnv "HOSTNAME" }}
             - name: DATABASE_ID
               value: "{{ requiredEnv "DATABASE_ID" }}"
             - name: IM_ACCESS_TOKEN
