@@ -20,7 +20,7 @@ deploy:
         version: 10.3.9
         useHelmSecrets: true
         valuesFiles:
-          - helm/data/secrets/{{ .ENVIRONMENT }}/rabbitmq.yaml
+          - helm/data/secrets/{{ .CLASSIFICATION }}/rabbitmq.yaml
 
       - name: im-manager-redis-{{ .ENVIRONMENT }}
         namespace: instance-manager-{{ .ENVIRONMENT }}
@@ -41,35 +41,58 @@ deploy:
         version: 11.6.2
         useHelmSecrets: true
         valuesFiles:
-          - helm/data/secrets/{{ .ENVIRONMENT }}/postgresql.yaml
-          - helm/data/values/{{ .ENVIRONMENT }}/postgresql.yaml
+          - helm/data/secrets/{{ .CLASSIFICATION }}/postgresql.yaml
+          - helm/data/values/{{ .CLASSIFICATION }}/postgresql.yaml
 
       - name: im-manager-{{ .ENVIRONMENT }}
         namespace: instance-manager-{{ .ENVIRONMENT }}
         createNamespace: true
         chartPath: helm/chart
         setValueTemplates:
-          image.repository: dhis2/im-manager
+          image:
+            repository: dhis2/im-manager
+          serviceAccount:
+            annotations:
+              "eks\\.amazonaws\\.com\\/role-arn": arn:aws:iam::767224633206:role/instance-cluster-test-im-manager-{{ .ENVIRONMENT }}
+          ingress:
+            enabled: true
+            hostname: "{{ .HOSTNAME }}"
+            certIssuer: cert-issuer-prod
+          redis:
+            host: im-manager-redis-{{ .ENVIRONMENT }}-master.instance-manager-{{ .ENVIRONMENT }}.svc
+          environment:
+            ENVIRONMENT: "{{ .ENVIRONMENT }}"
+            CLASSIFICATION: "{{ .CLASSIFICATION }}"
+            HOSTNAME: "https://{{ .HOSTNAME }}"
+            INSTANCE_SERVICE_HOST: im-manager-{{ .ENVIRONMENT }}.instance-manager-{{ .ENVIRONMENT }}.svc:8080
+            INSTANCE_SERVICE_BASE_PATH: /
+            DATABASE_MANAGER_SERVICE_HOST: im-manager-{{ .ENVIRONMENT }}.instance-manager-{{ .ENVIRONMENT }}.svc:8080
+            DATABASE_MANAGER_SERVICE_BASE_PATH: /
+            DATABASE_HOST: im-manager-postgresql-{{ .ENVIRONMENT }}.instance-manager-{{ .ENVIRONMENT }}.svc
+            DATABASE_PORT: "5432"
+            RABBITMQ_HOST: im-rabbitmq-{{ .ENVIRONMENT }}.instance-manager-{{ .ENVIRONMENT }}.svc
+            RABBITMQ_PORT: "5672"
+            S3_BUCKET: test-db-manager-bucket
         useHelmSecrets: true
         valuesFiles:
-          - helm/data/secrets/{{ .ENVIRONMENT }}/values.yaml
-          - helm/data/values/{{ .ENVIRONMENT }}/values.yaml
+          - helm/data/secrets/{{ .CLASSIFICATION }}/values.yaml
 
 profiles:
   - name: dev
     deploy:
       helm:
         releases:
-          - name: im-group-whoami
+          - name: im-group-whoami-{{ .ENVIRONMENT }}
             namespace: whoami
             createNamespace: true
             remoteChart: im-group
             repo: https://dhis2-sre.github.io/im-group
             version: 0.2.0
-            setValues:
+            setValueTemplates:
               serviceAccount:
-                name: im-manager-dev
-                namespace: instance-manager-dev
+                name: im-manager-{{ .ENVIRONMENT }}
+                namespace: instance-manager-{{ .ENVIRONMENT }}
+
   - name: prod
     deploy:
       helm:

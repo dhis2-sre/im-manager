@@ -73,8 +73,8 @@ func (h helmfileService) executeHelmfileCommand(token string, instance *model.In
 type stackParameters map[string]string
 
 func (h helmfileService) loadStackParameters(folder string, name string) (stackParameters, error) {
-	environment := h.config.Environment
-	path := fmt.Sprintf("%s/%s/parameters/%s.yaml", folder, name, environment)
+	classification := h.config.Classification
+	path := fmt.Sprintf("%s/%s/parameters/%s.yaml", folder, name, classification)
 	data, err := os.ReadFile(path) // #nosec
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
@@ -109,6 +109,7 @@ func configureInstanceEnvironment(accessToken string, instance *model.Instance, 
 	imCreationTimestamp := fmt.Sprintf("%s=%d", "INSTANCE_CREATION_TIMESTAMP", time.Now().Unix())
 	cmd.Env = append(cmd.Env, instanceNameEnv, instanceNamespaceEnv, instanceIdEnv, instanceHostnameEnv, imTokenEnv, homeEnv, imCreationTimestamp)
 
+	cmd.Env = injectEnv(cmd.Env, "HOSTNAME")
 	cmd.Env = injectEnv(cmd.Env, "AWS_ACCESS_KEY_ID")
 	cmd.Env = injectEnv(cmd.Env, "AWS_SECRET_ACCESS_KEY")
 	cmd.Env = injectEnv(cmd.Env, "AWS_DEFAULT_REGION")
