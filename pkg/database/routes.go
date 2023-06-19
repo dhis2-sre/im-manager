@@ -20,5 +20,6 @@ func Routes(router *gin.Engine, authenticationMiddleware middleware.Authenticati
 	tokenAuthenticationRouter.POST("/:id/lock", handler.Lock)
 	tokenAuthenticationRouter.DELETE("/:id/unlock", handler.Unlock)
 	tokenAuthenticationRouter.POST("/save-as/:instanceId", handler.SaveAs)
+	tokenAuthenticationRouter.POST("/save/:instanceId", handler.Save)
 	tokenAuthenticationRouter.POST("/:id/external", handler.CreateExternalDownload)
 }

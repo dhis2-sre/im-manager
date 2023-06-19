@@ -46,6 +46,20 @@ func (s S3Client) Copy(bucket string, source string, destination string) error {
 	return nil
 }
 
+func (s S3Client) Move(bucket string, source string, destination string) error {
+	err := s.Copy(bucket, source, destination)
+	if err != nil {
+		return fmt.Errorf("error moving object from %q to %q during copy operation: %s", source, destination, err)
+	}
+
+	err = s.Delete(bucket, source)
+	if err != nil {
+		return fmt.Errorf("error moving object from bucket %q using key %q during delete operation: %s", bucket, source, err)
+	}
+
+	return nil
+}
+
 func (s S3Client) Upload(bucket string, key string, body ReadAtSeeker, size int64) error {
 	target := path.Join(bucket, key)
 	log.Printf("Uploading: " + target)

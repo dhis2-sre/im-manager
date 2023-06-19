@@ -12,6 +12,7 @@ type User struct {
 	Password    string  `json:"-"`
 	Groups      []Group `gorm:"many2many:user_groups;constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
 	AdminGroups []Group `gorm:"many2many:user_groups_admin;constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
+	Locks       []*Lock `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
 }
 
 func (u *User) IsMemberOf(group string) bool {

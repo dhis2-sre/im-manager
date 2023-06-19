@@ -45,6 +45,14 @@ func (r repository) FindById(id uint) (*model.Database, error) {
 	return d, err
 }
 
+func (r repository) UpdateId(old, new uint) error {
+	return r.db.
+		Model(&model.Database{}).
+		Where("id = ?", old).
+		Update("id", new).
+		Error
+}
+
 func (r repository) FindBySlug(slug string) (*model.Database, error) {
 	var d *model.Database
 	err := r.db.
@@ -57,17 +65,17 @@ func (r repository) FindBySlug(slug string) (*model.Database, error) {
 	return d, err
 }
 
-func (r repository) Lock(id, instanceId, userId uint) (*model.Lock, error) {
+func (r repository) Lock(databaseId, instanceId, userId uint) (*model.Lock, error) {
 	var lock *model.Lock
 
 	errTx := r.db.Transaction(func(tx *gorm.DB) error {
 		var d *model.Database
 		err := tx.
 			Preload("Lock").
-			First(&d, id).Error
+			First(&d, databaseId).Error
 		if err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
-				err = errdef.NewNotFound("database not found by id: %d", id)
+				err = errdef.NewNotFound("database not found by id: %d", databaseId)
 			}
 			return err
 		}
@@ -77,7 +85,7 @@ func (r repository) Lock(id, instanceId, userId uint) (*model.Lock, error) {
 		}
 
 		lock = &model.Lock{
-			DatabaseID: id,
+			DatabaseID: databaseId,
 			InstanceID: instanceId,
 			UserID:     userId,
 		}
@@ -87,20 +95,33 @@ func (r repository) Lock(id, instanceId, userId uint) (*model.Lock, error) {
 	return lock, errTx
 }
 
-func (r repository) Unlock(id uint) error {
-	db := r.db.Unscoped().Delete(&model.Lock{}, id)
+func (r repository) Unlock(databaseId uint) error {
+	db := r.db.Unscoped().Delete(&model.Lock{}, "database_id = ?", databaseId)
 	if db.Error != nil {
 		return db.Error
 	}
 
 	if db.RowsAffected < 1 {
-		return errdef.NewNotFound("database not found by id: %d", id)
+		return errdef.NewNotFound("lock not found by database id: %d", databaseId)
 	}
 
 	return nil
 }
 
 func (r repository) Delete(id uint) error {
+	// TODO: Why do I manually have to delete the lock when I've configured cascading on the database struct?
+	database, err := r.FindById(id)
+	if err != nil {
+		return err
+	}
+
+	if database.Lock != nil {
+		err := r.db.Unscoped().Delete(&model.Lock{}, database.ID).Error
+		if err != nil {
+			return err
+		}
+	}
+
 	return r.db.Unscoped().Delete(&model.Database{}, id).Error
 }
 

@@ -18,6 +18,7 @@ type Instance struct {
 	DeployLog          string                      `gorm:"type:text"`
 	Preset             bool
 	PresetID           uint
+	Lock               *Lock `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
 }
 
 type Linked struct {

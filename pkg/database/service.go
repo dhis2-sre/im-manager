@@ -18,6 +18,7 @@ import (
 
 	"github.com/dhis2-sre/im-manager/pkg/config"
 
+	"github.com/dhis2-sre/im-manager/pkg/instance"
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	"github.com/dhis2-sre/im-manager/pkg/storage"
 
@@ -28,8 +29,8 @@ import (
 	"github.com/google/uuid"
 )
 
-func NewService(c config.Config, groupService groupService, s3Client S3Client, repository Repository) *service {
-	return &service{c, groupService, s3Client, repository}
+func NewService(c config.Config, instanceService instance.Service, groupService groupService, s3Client S3Client, repository Repository) *service {
+	return &service{c, instanceService, groupService, s3Client, repository}
 }
 
 type groupService interface {
@@ -37,18 +38,19 @@ type groupService interface {
 }
 
 type service struct {
-	c            config.Config
-	groupService groupService
-	s3Client     S3Client
-	repository   Repository
+	c               config.Config
+	instanceService instance.Service
+	groupService    groupService
+	s3Client        S3Client
+	repository      Repository
 }
 
 type Repository interface {
 	Create(d *model.Database) error
 	Save(d *model.Database) error
 	FindById(id uint) (*model.Database, error)
-	Lock(id, instanceId, userId uint) (*model.Lock, error)
-	Unlock(id uint) error
+	Lock(databaseId, instanceId, userId uint) (*model.Lock, error)
+	Unlock(databaseId uint) error
 	Delete(id uint) error
 	FindByGroupNames(names []string) ([]model.Database, error)
 	Update(d *model.Database) error
@@ -56,10 +58,12 @@ type Repository interface {
 	FindExternalDownload(uuid uuid.UUID) (*model.ExternalDownload, error)
 	PurgeExternalDownload() error
 	FindBySlug(slug string) (*model.Database, error)
+	UpdateId(old, new uint) error
 }
 
 type S3Client interface {
 	Copy(bucket string, source string, destination string) error
+	Move(bucket string, source string, destination string) error
 	Upload(bucket string, key string, body storage.ReadAtSeeker, size int64) error
 	Delete(bucket string, key string) error
 	Download(bucket string, key string, dst io.Writer, cb func(contentLength int64)) error
@@ -113,12 +117,12 @@ func (s service) FindBySlug(slug string) (*model.Database, error) {
 	return s.repository.FindBySlug(slug)
 }
 
-func (s service) Lock(id uint, instanceId uint, userId uint) (*model.Lock, error) {
-	return s.repository.Lock(id, instanceId, userId)
+func (s service) Lock(databaseId uint, instanceId uint, userId uint) (*model.Lock, error) {
+	return s.repository.Lock(databaseId, instanceId, userId)
 }
 
-func (s service) Unlock(id uint) error {
-	return s.repository.Unlock(id)
+func (s service) Unlock(databaseId uint) error {
+	return s.repository.Unlock(databaseId)
 }
 
 type ReadAtSeeker interface {
@@ -223,7 +227,93 @@ func (s service) FindExternalDownload(uuid uuid.UUID) (*model.ExternalDownload, 
 	return s.repository.FindExternalDownload(uuid)
 }
 
-func (s service) SaveAs(database *model.Database, instance *model.Instance, stack *model.Stack, newName string, format string) (*model.Database, error) {
+func (s service) Save(userId uint, database *model.Database, instance *model.Instance, stack *model.Stack) error {
+	lock := database.Lock
+	isLocked := lock != nil
+	if isLocked && (lock.InstanceID != instance.ID || lock.UserID != userId) {
+		return errdef.NewUnauthorized("database is locked")
+	}
+
+	if !isLocked {
+		_, err := s.Lock(database.ID, instance.ID, userId)
+		if err != nil {
+			return err
+		}
+
+		reloaded, err := s.FindById(database.ID)
+		if err != nil {
+			return err
+		}
+		database = reloaded
+	}
+
+	tmpName := uuid.New().String()
+	format := getFormat(database)
+	_, err := s.SaveAs(database, instance, stack, tmpName, format, func(saved *model.Database) {
+		defer func() {
+			if !isLocked {
+				err := s.Unlock(database.ID)
+				if err != nil {
+					logError(fmt.Errorf("unlock database failed: %v", err))
+				}
+			}
+		}()
+
+		u, err := url.Parse(saved.Url)
+		if err != nil {
+			logError(err)
+			return
+		}
+
+		err = s.Delete(database.ID)
+		if err != nil {
+			logError(err)
+			return
+		}
+
+		sourceKey := strings.TrimPrefix(u.Path, "/")
+		destinationKey := fmt.Sprintf("%s/%s", saved.GroupName, database.Name)
+		err = s.s3Client.Move(s.c.Bucket, sourceKey, destinationKey)
+		if err != nil {
+			logError(err)
+			return
+		}
+
+		saved.Name = database.Name
+		saved.Url = database.Url
+		saved.Slug = database.Slug
+		err = s.Update(saved)
+		if err != nil {
+			logError(err)
+			return
+		}
+
+		err = s.repository.UpdateId(saved.ID, database.ID)
+		if err != nil {
+			logError(err)
+			return
+		}
+
+		if database.Lock != nil {
+			_, err := s.repository.Lock(database.ID, database.Lock.InstanceID, database.Lock.UserID)
+			if err != nil {
+				logError(err)
+				return
+			}
+		}
+	})
+
+	return err
+}
+
+func getFormat(database *model.Database) string {
+	if strings.HasSuffix(database.Url, ".pgc") {
+		return "custom"
+	}
+	return "plain"
+}
+
+func (s service) SaveAs(database *model.Database, instance *model.Instance, stack *model.Stack, newName string, format string, done func(saved *model.Database)) (*model.Database, error) {
 	// TODO: Add to config
 	dumpPath := "/mnt/data/"
 
@@ -337,6 +427,8 @@ func (s service) SaveAs(database *model.Database, instance *model.Instance, stac
 			logError(err)
 			return
 		}
+
+		done(newDatabase)
 	}()
 
 	return newDatabase, nil

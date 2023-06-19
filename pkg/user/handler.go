@@ -48,7 +48,7 @@ type SignUpRequest struct {
 }
 
 // SignUp user
-func (h *Handler) SignUp(c *gin.Context) {
+func (h Handler) SignUp(c *gin.Context) {
 	// swagger:route POST /users signUp
 	//
 	// SignUp user
