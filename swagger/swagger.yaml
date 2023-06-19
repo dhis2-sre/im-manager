@@ -182,6 +182,8 @@ definitions:
             ID:
                 format: uint64
                 type: integer
+            Lock:
+                $ref: '#/definitions/Lock'
             Name:
                 type: string
             Preset:
@@ -433,6 +435,10 @@ definitions:
             ID:
                 format: uint64
                 type: integer
+            Locks:
+                items:
+                    $ref: '#/definitions/Lock'
+                type: array
             UpdatedAt:
                 format: date-time
                 type: string
@@ -758,7 +764,7 @@ paths:
             summary: Download database
     /databases/save-as/{instanceId}:
         post:
-            description: Save database under a new name. If you want to simple save, you currently have to delete the old one and rename the new one
+            description: Save database under a new name
             operationId: saveAsDatabase
             parameters:
                 - format: uint64
@@ -787,6 +793,31 @@ paths:
             security:
                 - oauth2: []
             summary: '"Save as" database'
+    /databases/save/{instanceId}:
+        post:
+            description: Saving a database won't affect the instances running the database. However, it should be noted that if two unlocked databases are deployed from the same database they can both overwrite it. It's up to the users to ensure this doesn't happen accidentally.
+            operationId: saveDatabase
+            parameters:
+                - format: uint64
+                  in: path
+                  name: instanceId
+                  required: true
+                  type: integer
+                  x-go-name: InstanceID
+            responses:
+                "202":
+                    description: ""
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Save database
     /groups:
         post:
             description: Create a group...

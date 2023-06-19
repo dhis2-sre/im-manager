@@ -3,6 +3,7 @@ package database
 import (
 	"errors"
 	"io"
+	"log"
 	"mime/multipart"
 	"net/http"
 	"path"
@@ -55,7 +56,8 @@ type Service interface {
 	Update(d *model.Database) error
 	CreateExternalDownload(databaseID uint, expiration time.Time) (*model.ExternalDownload, error)
 	FindExternalDownload(uuid uuid.UUID) (*model.ExternalDownload, error)
-	SaveAs(database *model.Database, instance *model.Instance, stack *model.Stack, newName string, format string) (*model.Database, error)
+	SaveAs(database *model.Database, instance *model.Instance, stack *model.Stack, newName string, format string, done func(saved *model.Database)) (*model.Database, error)
+	Save(userId uint, database *model.Database, instance *model.Instance, stack *model.Stack) error
 }
 
 // Upload database
@@ -151,7 +153,7 @@ func (h Handler) SaveAs(c *gin.Context) {
 	//
 	// "Save as" database
 	//
-	// Save database under a new name. If you want to simple save, you currently have to delete the old one and rename the new one
+	// Save database under a new name
 	//
 	// Security:
 	//	oauth2:
@@ -210,13 +212,89 @@ func (h Handler) SaveAs(c *gin.Context) {
 		return
 	}
 
-	save, err := h.databaseService.SaveAs(database, instance, stack, request.Name, request.Format)
+	save, err := h.databaseService.SaveAs(database, instance, stack, request.Name, request.Format, func(saved *model.Database) {
+		log.Printf("Database %s/%s from instance: %v", saved.GroupName, saved.Name, instance)
+	})
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
 
 	c.JSON(http.StatusCreated, save)
+}
+
+// Save database
+func (h Handler) Save(c *gin.Context) {
+	// swagger:route POST /databases/save/{instanceId} saveDatabase
+	//
+	// Save database
+	//
+	// Saving a database won't affect the instances running the database. However, it should be noted that if two unlocked databases are deployed from the same database they can both overwrite it. It's up to the users to ensure this doesn't happen accidentally.
+	//
+	// Security:
+	//	oauth2:
+	//
+	// Responses:
+	//	202:
+	//	401: Error
+	//	403: Error
+	//	404: Error
+	//	415: Error
+	instanceId, ok := handler.GetPathParameter(c, "instanceId")
+	if !ok {
+		return
+	}
+
+	instance, err := h.instanceService.FindByIdDecrypted(uint(instanceId))
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	stack, err := h.stackService.Find(instance.StackName)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	databaseIdString, err := findParameter("DATABASE_ID", instance, stack)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	databaseId, err := strconv.ParseUint(databaseIdString, 10, 32)
+	if err != nil {
+		badRequest := errdef.NewBadRequest("error parsing databaseId")
+		_ = c.Error(badRequest)
+		return
+	}
+
+	database, err := h.databaseService.FindById(uint(databaseId))
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	err = h.canAccess(c, database)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	user, err := handler.GetUserFromContext(c)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	err = h.databaseService.Save(user.ID, database, instance, stack)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	c.Status(http.StatusAccepted)
 }
 
 type CopyDatabaseRequest struct {
@@ -339,12 +417,6 @@ func (h Handler) Lock(c *gin.Context) {
 
 	var request LockDatabaseRequest
 	if err := handler.DataBinder(c, &request); err != nil {
-		_ = c.Error(err)
-		return
-	}
-
-	_, err := h.instanceService.FindById(request.InstanceId)
-	if err != nil {
 		_ = c.Error(err)
 		return
 	}
