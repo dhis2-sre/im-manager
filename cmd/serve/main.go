@@ -86,15 +86,15 @@ func run() error {
 	groupService := group.NewService(groupRepository, userService)
 	groupHandler := group.NewHandler(groupService)
 
-	stackSvc := stack.NewService(stack.NewRepository(db))
+	stackService := stack.NewService(stack.NewRepository(db))
 
 	instanceRepo := instance.NewRepository(db, cfg)
-	helmfileSvc := instance.NewHelmfileService(stackSvc, cfg)
-	instanceSvc := instance.NewService(cfg, instanceRepo, groupService, stackSvc, helmfileSvc)
+	helmfileService := instance.NewHelmfileService(stackService, cfg)
+	instanceService := instance.NewService(cfg, instanceRepo, groupService, stackService, helmfileService)
 
 	dockerHubClient := integration.NewDockerHubClient(cfg.DockerHub.Username, cfg.DockerHub.Password)
 
-	err = stack.LoadStacks("./stacks", stackSvc)
+	err = stack.LoadStacks("./stacks", stackService)
 	if err != nil {
 		return err
 	}
@@ -108,14 +108,14 @@ func run() error {
 	}
 	defer consumer.Close()
 
-	ttlDestroyConsumer := instance.NewTTLDestroyConsumer(consumer, instanceSvc)
+	ttlDestroyConsumer := instance.NewTTLDestroyConsumer(consumer, instanceService)
 	err = ttlDestroyConsumer.Consume()
 	if err != nil {
 		return err
 	}
 
-	stackHandler := stack.NewHandler(stackSvc)
-	instanceHandler := instance.NewHandler(userService, groupService, instanceSvc, stackSvc, cfg.DefaultTTL)
+	stackHandler := stack.NewHandler(stackService)
+	instanceHandler := instance.NewHandler(userService, groupService, instanceService, stackService, cfg.DefaultTTL)
 
 	// TODO: Database... Move into... Function?
 	s3Config, err := s3config.LoadDefaultConfig(context.TODO(), s3config.WithRegion("eu-west-1"))
@@ -128,7 +128,7 @@ func run() error {
 
 	databaseRepository := database.NewRepository(db)
 	databaseService := database.NewService(cfg.Bucket, s3Client, groupService, databaseRepository)
-	databaseHandler := database.NewHandler(databaseService, groupService, instanceSvc, stackSvc)
+	databaseHandler := database.NewHandler(databaseService, groupService, instanceService, stackService)
 
 	err = handler.RegisterValidation()
 	if err != nil {
