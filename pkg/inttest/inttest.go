@@ -14,6 +14,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/go-redis/redis"
+	gnomockRedis "github.com/orlangure/gnomock/preset/redis"
+
 	amqp "github.com/rabbitmq/amqp091-go"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -33,6 +36,19 @@ import (
 	"github.com/stretchr/testify/require"
 	"gorm.io/gorm"
 )
+
+func SetupRedis(t *testing.T) *redis.Client {
+	container, err := gnomock.Start(gnomockRedis.Preset())
+	require.NoError(t, err, "failed to start Redis")
+	t.Cleanup(func() { require.NoError(t, gnomock.Stop(container), "failed to stop Redis") })
+
+	client := &redis.Options{
+		Addr:     container.DefaultAddress(),
+		Password: "",
+		DB:       0,
+	}
+	return redis.NewClient(client)
+}
 
 // SetupDB creates a PostgreSQL container. Gorm is connected to the DB and runs the migrations.
 func SetupDB(t *testing.T) *gorm.DB {

@@ -8,7 +8,6 @@ import (
 	"strconv"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/dhis2-sre/im-manager/internal/middleware"
 	"github.com/dhis2-sre/im-manager/pkg/group"
@@ -39,11 +38,14 @@ func TestUserHandler(t *testing.T) {
 	// TODO(DEVOPS-259) we should not use a pointer as we do not mutate and should not mutate the
 	// certificate
 	authentication := middleware.NewAuthentication(&privKey.PublicKey, userService)
-	tokenSvc, err := token.NewService(tokenRepository{}, privKey, &privKey.PublicKey, 10, "secret", 10)
+
+	redis := inttest.SetupRedis(t)
+	tokenRepository := token.NewRepository(redis)
+	tokenService, err := token.NewService(tokenRepository, privKey, &privKey.PublicKey, 10, "secret", 10)
 	require.NoError(t, err)
 
 	client := inttest.SetupHTTPServer(t, func(engine *gin.Engine) {
-		userHandler := user.NewHandler(userService, tokenSvc)
+		userHandler := user.NewHandler(userService, tokenService)
 		user.Routes(engine, authentication, authorization, userHandler)
 	})
 
@@ -155,20 +157,6 @@ func TestUserHandler(t *testing.T) {
 			client.Do(t, http.MethodGet, "/users/"+user1ID, nil, http.StatusNotFound, inttest.WithAuthToken(adminToken.AccessToken))
 		}
 	})
-}
-
-type tokenRepository struct{}
-
-func (tr tokenRepository) SetRefreshToken(userId uint, tokenId string, expiresIn time.Duration) error {
-	return nil
-}
-
-func (tr tokenRepository) DeleteRefreshToken(userId uint, previousTokenId string) error {
-	return nil
-}
-
-func (tr tokenRepository) DeleteRefreshTokens(userId uint) error {
-	return nil
 }
 
 type groupService interface {
