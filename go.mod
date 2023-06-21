@@ -27,8 +27,8 @@ require (
 	golang.org/x/exp v0.0.0-20230213192124-5e25df0256eb
 	gorm.io/driver/postgres v1.5.2
 	gorm.io/gorm v1.25.1
-	k8s.io/api v0.28.0-alpha.2
-	k8s.io/apimachinery v0.28.0-alpha.2
+	k8s.io/api v0.28.0-alpha.3
+	k8s.io/apimachinery v0.28.0-alpha.3
 	k8s.io/client-go v0.28.0-alpha.1
 )
 
