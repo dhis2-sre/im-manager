@@ -33,6 +33,15 @@ definitions:
                 x-go-name: Name
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/database
+    CreateExternalDatabaseRequest:
+        properties:
+            expiration:
+                description: Expiration time in seconds
+                format: uint64
+                type: integer
+                x-go-name: Expiration
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/database
     CreateGroupRequest:
         properties:
             hostname:
@@ -111,8 +120,8 @@ definitions:
                 format: uint64
                 type: integer
             Expiration:
-                format: date-time
-                type: string
+                format: uint64
+                type: integer
             UUID:
                 format: uuid
                 type: string
@@ -660,6 +669,12 @@ paths:
                   required: true
                   type: integer
                   x-go-name: ID
+                - description: Create external database download
+                  in: body
+                  name: Body
+                  required: true
+                  schema:
+                    $ref: '#/definitions/CreateExternalDatabaseRequest'
             responses:
                 "200":
                     $ref: '#/responses/CreateExternalDownloadResponse'
@@ -739,7 +754,7 @@ paths:
             summary: Lock database
     /databases/external/{uuid}:
         get:
-            description: Download database...
+            description: Download a given database without authentication
             operationId: externalDownloadDatabase
             parameters:
                 - format: uint64
@@ -761,7 +776,7 @@ paths:
                     $ref: '#/responses/Error'
             security:
                 - oauth2: []
-            summary: Download database
+            summary: Externally download database
     /databases/save-as/{instanceId}:
         post:
             description: Save database under a new name

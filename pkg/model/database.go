@@ -1,8 +1,6 @@
 package model
 
 import (
-	"time"
-
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
@@ -28,6 +26,6 @@ type Lock struct {
 // swagger:model
 type ExternalDownload struct {
 	UUID       uuid.UUID `gorm:"primaryKey;type:uuid"`
-	Expiration time.Time
+	Expiration uint
 	DatabaseID uint
 }

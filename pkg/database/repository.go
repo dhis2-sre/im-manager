@@ -139,10 +139,10 @@ func (r repository) Update(d *model.Database) error {
 	return r.db.Save(d).Error
 }
 
-func (r repository) CreateExternalDownload(databaseID uint, expiration time.Time) (*model.ExternalDownload, error) {
+func (r repository) CreateExternalDownload(databaseID uint, expiration uint) (*model.ExternalDownload, error) {
 	externalDownload := &model.ExternalDownload{
 		UUID:       uuid.New(),
-		Expiration: expiration,
+		Expiration: uint(time.Now().Unix()) + expiration,
 		DatabaseID: databaseID,
 	}
 
@@ -154,7 +154,7 @@ func (r repository) CreateExternalDownload(databaseID uint, expiration time.Time
 func (r repository) FindExternalDownload(uuid uuid.UUID) (*model.ExternalDownload, error) {
 	var d *model.ExternalDownload
 	err := r.db.
-		Where("expiration > ?", time.Now().UTC()).
+		Where("expiration > ?", time.Now().Unix()).
 		First(&d, uuid).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, errdef.NewNotFound("external download not found by id: %q", uuid)
@@ -165,7 +165,7 @@ func (r repository) FindExternalDownload(uuid uuid.UUID) (*model.ExternalDownloa
 func (r repository) PurgeExternalDownload() error {
 	var d *model.ExternalDownload
 	err := r.db.
-		Where("expiration < ?", time.Now().UTC()).
+		Where("expiration < ?", time.Now().Unix()).
 		Delete(&d).Error
 	return err
 }

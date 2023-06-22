@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"path"
 	"strconv"
-	"time"
 
 	"github.com/dhis2-sre/im-manager/internal/errdef"
 
@@ -54,7 +53,7 @@ type Service interface {
 	Delete(id uint) error
 	List(groups []model.Group) ([]model.Database, error)
 	Update(d *model.Database) error
-	CreateExternalDownload(databaseID uint, expiration time.Time) (*model.ExternalDownload, error)
+	CreateExternalDownload(databaseID uint, expiration uint) (*model.ExternalDownload, error)
 	FindExternalDownload(uuid uuid.UUID) (*model.ExternalDownload, error)
 	SaveAs(database *model.Database, instance *model.Instance, stack *model.Stack, newName string, format string, done func(saved *model.Database)) (*model.Database, error)
 	Save(userId uint, database *model.Database, instance *model.Instance, stack *model.Stack) error
@@ -722,7 +721,8 @@ func (h Handler) canAccess(c *gin.Context, d *model.Database) error {
 }
 
 type CreateExternalDatabaseRequest struct {
-	Expiration time.Time `json:"expiration" binding:"required"`
+	// Expiration time in seconds
+	Expiration uint `json:"expiration" binding:"required"`
 }
 
 // CreateExternalDownload database
@@ -778,9 +778,9 @@ func (h Handler) CreateExternalDownload(c *gin.Context) {
 func (h Handler) ExternalDownload(c *gin.Context) {
 	// swagger:route GET /databases/external/{uuid} externalDownloadDatabase
 	//
-	// Download database
+	// Externally download database
 	//
-	// Download database...
+	// Download a given database without authentication
 	//
 	// Security:
 	//	oauth2:

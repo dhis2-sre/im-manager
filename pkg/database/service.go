@@ -12,7 +12,6 @@ import (
 	"path"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/dhis2-sre/im-manager/internal/errdef"
 
@@ -54,7 +53,7 @@ type Repository interface {
 	Delete(id uint) error
 	FindByGroupNames(names []string) ([]model.Database, error)
 	Update(d *model.Database) error
-	CreateExternalDownload(databaseID uint, expiration time.Time) (*model.ExternalDownload, error)
+	CreateExternalDownload(databaseID uint, expiration uint) (*model.ExternalDownload, error)
 	FindExternalDownload(uuid uuid.UUID) (*model.ExternalDownload, error)
 	PurgeExternalDownload() error
 	FindBySlug(slug string) (*model.Database, error)
@@ -205,15 +204,10 @@ func (s service) Update(d *model.Database) error {
 	return s.repository.Update(d)
 }
 
-func (s service) CreateExternalDownload(databaseID uint, expiration time.Time) (*model.ExternalDownload, error) {
+func (s service) CreateExternalDownload(databaseID uint, expiration uint) (*model.ExternalDownload, error) {
 	err := s.repository.PurgeExternalDownload()
 	if err != nil {
 		return nil, err
-	}
-
-	now := time.Now()
-	if expiration.Before(now) {
-		return nil, fmt.Errorf("expiration %s needs to be in the future (current %s)", expiration, now)
 	}
 
 	return s.repository.CreateExternalDownload(databaseID, expiration)
