@@ -1,18 +1,17 @@
 package model
 
-import (
-	"gorm.io/gorm"
-)
+import "time"
 
 // User domain object defining a user
 // swagger:model
 type User struct {
-	gorm.Model
-	Email       string  `gorm:"index;unique"`
-	Password    string  `json:"-"`
-	Groups      []Group `gorm:"many2many:user_groups;constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
-	AdminGroups []Group `gorm:"many2many:user_groups_admin;constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
-	Locks       []*Lock `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
+	ID          uint      `gorm:"primarykey" json:"id"`
+	CreatedAt   time.Time `json:"createdAt"`
+	UpdatedAt   time.Time `json:"updatedAt"`
+	Email       string    `gorm:"index;unique" json:"email"`
+	Password    string    `json:"-"`
+	Groups      []Group   `gorm:"many2many:user_groups;constraint:OnUpdate:CASCADE,OnDelete:CASCADE" json:"groups"`
+	AdminGroups []Group   `gorm:"many2many:user_groups_admin;constraint:OnUpdate:CASCADE,OnDelete:CASCADE" json:"adminGroups"`
 }
 
 func (u *User) IsMemberOf(group string) bool {

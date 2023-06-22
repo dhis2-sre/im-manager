@@ -257,7 +257,7 @@ func (h Handler) FindAll(c *gin.Context) {
 	//	oauth2:
 	//
 	// responses:
-	//	200: []User
+	//	200: UsersResponse
 	//	401: Error
 	//	403: Error
 	//	404: Error

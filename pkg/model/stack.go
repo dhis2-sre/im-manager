@@ -3,23 +3,18 @@ package model
 import (
 	"fmt"
 	"time"
-
-	"gorm.io/gorm"
 )
 
 // swagger:model Stack
 type Stack struct {
+	CreatedAt          time.Time                `json:"createdAt"`
+	UpdatedAt          time.Time                `json:"updatedAt"`
 	Name               string                   `gorm:"primaryKey" json:"name"`
 	RequiredParameters []StackRequiredParameter `gorm:"foreignKey:StackName; references: Name; constraint:OnUpdate:CASCADE,OnDelete:CASCADE" json:"requiredParameters"`
 	OptionalParameters []StackOptionalParameter `gorm:"foreignKey:StackName; references: Name; constraint:OnUpdate:CASCADE,OnDelete:CASCADE" json:"optionalParameters"`
 	Instances          []Instance               `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;" json:"instances"`
-
-	HostnamePattern  string
-	HostnameVariable string
-
-	CreatedAt time.Time
-	UpdatedAt time.Time
-	DeletedAt gorm.DeletedAt `gorm:"index"`
+	HostnamePattern    string                   `json:"hostnamePattern"`
+	HostnameVariable   string                   `json:"hostnameVariable"`
 }
 
 func (s Stack) GetHostname(name, namespace string) string {
@@ -36,14 +31,14 @@ func (s Stack) FindOptionalParameter(name string) (StackOptionalParameter, error
 }
 
 type StackRequiredParameter struct {
-	Name      string `gorm:"primaryKey"`
-	StackName string `gorm:"primaryKey"`
-	Consumed  bool
+	Name      string `gorm:"primaryKey" json:"name"`
+	StackName string `gorm:"primaryKey" json:"stackName"`
+	Consumed  bool   `json:"consumed"`
 }
 
 type StackOptionalParameter struct {
-	Name         string `gorm:"primaryKey"`
-	StackName    string `gorm:"primaryKey"`
-	DefaultValue string
-	Consumed     bool
+	Name         string `gorm:"primaryKey" json:"name"`
+	StackName    string `gorm:"primaryKey" json:"stackName"`
+	DefaultValue string `json:"defaultValue"`
+	Consumed     bool   `json:"consumed"`
 }
