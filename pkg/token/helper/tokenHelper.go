@@ -63,7 +63,7 @@ func ValidateAccessToken(tokenString string, key *rsa.PublicKey) (*AccessTokenCl
 		return nil, errors.New("user not found in claims")
 	}
 
-	userMap, ok := userData.(map[string]interface{})
+	userMap, ok := userData.(map[string]any)
 	if !ok {
 		return nil, errors.New("failed to parse user data")
 	}
