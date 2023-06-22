@@ -123,9 +123,6 @@ definitions:
         x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
     ExternalDownload:
         properties:
-            UUID:
-                format: uuid
-                type: string
             databaseId:
                 format: uint64
                 type: integer
@@ -134,6 +131,10 @@ definitions:
                 format: uint64
                 type: integer
                 x-go-name: Expiration
+            uuid:
+                format: uuid
+                type: string
+                x-go-name: UUID
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/model
     Group:
