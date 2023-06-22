@@ -37,6 +37,6 @@ type Lock struct {
 // swagger:model
 type ExternalDownload struct {
 	UUID       uuid.UUID `gorm:"primaryKey;type:uuid" json:"uuid"`
-	Expiration time.Time `json:"expiration"`
+	Expiration uint      `json:"expiration"`
 	DatabaseID uint      `json:"databaseId"`
 }

@@ -93,6 +93,14 @@ type _ struct {
 	_ []byte
 }
 
+// swagger:parameters createExternalDownloadDatabase
+type _ struct {
+	// Create external database download
+	// in: body
+	// required: true
+	Body CreateExternalDatabaseRequest
+}
+
 // swagger:response CreateExternalDownloadResponse
 type _ struct {
 	//in: body
