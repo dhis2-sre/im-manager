@@ -68,8 +68,8 @@ func ValidateAccessToken(tokenString string, key *rsa.PublicKey) (*AccessTokenCl
 		return nil, errors.New("failed to parse user data")
 	}
 
-	id := userMap["ID"].(float64)
-	email := userMap["Email"].(string)
+	id := userMap["id"].(float64)
+	email := userMap["email"].(string)
 
 	user := &model.User{
 		ID:    uint(id),
