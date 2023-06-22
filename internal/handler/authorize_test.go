@@ -3,8 +3,6 @@ package handler
 import (
 	"testing"
 
-	"gorm.io/gorm"
-
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	"github.com/stretchr/testify/assert"
 )
@@ -14,7 +12,7 @@ func TestCanWriteInstance_isOwnerAndMember(t *testing.T) {
 	var group = "321"
 
 	user := &model.User{
-		Model: gorm.Model{ID: userId},
+		ID: userId,
 		Groups: []model.Group{
 			{
 				Name: group,

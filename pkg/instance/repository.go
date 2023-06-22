@@ -124,9 +124,9 @@ func (r repository) Delete(id uint) error {
 const AdministratorGroupName = "administrators"
 
 type GroupWithInstances struct {
-	Name      string
-	Hostname  string
-	Instances []*model.Instance
+	Name      string            `json:"name"`
+	Hostname  string            `json:"hostname"`
+	Instances []*model.Instance `json:"instances"`
 }
 
 func (r repository) FindByGroups(groups []model.Group, presets bool) ([]GroupWithInstances, error) {

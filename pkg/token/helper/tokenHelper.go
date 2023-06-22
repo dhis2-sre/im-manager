@@ -11,7 +11,6 @@ import (
 	"github.com/gofrs/uuid"
 	"github.com/lestrrat-go/jwx/jwa"
 	"github.com/lestrrat-go/jwx/jwt"
-	"gorm.io/gorm"
 )
 
 func GenerateAccessToken(user *model.User, key *rsa.PrivateKey, expirationInSeconds int) (string, error) {
@@ -69,13 +68,18 @@ func ValidateAccessToken(tokenString string, key *rsa.PublicKey) (*AccessTokenCl
 		return nil, errors.New("failed to parse user data")
 	}
 
-	id := userMap["ID"].(float64)
-	email := userMap["Email"].(string)
+	id, ok := userMap["id"].(float64)
+	if !ok {
+		return nil, errors.New("\"id\" not found in userMap")
+	}
+
+	email, ok := userMap["email"].(string)
+	if !ok {
+		return nil, errors.New("\"email\" not found in userMap")
+	}
 
 	user := &model.User{
-		Model: gorm.Model{
-			ID: uint(id),
-		},
+		ID:    uint(id),
 		Email: email,
 	}
 
