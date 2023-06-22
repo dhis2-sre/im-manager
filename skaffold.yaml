@@ -76,6 +76,7 @@ deploy:
         useHelmSecrets: true
         valuesFiles:
           - helm/data/secrets/{{ .CLASSIFICATION }}/values.yaml
+          - helm/data/values/{{ .CLASSIFICATION }}/values.yaml
 
 profiles:
   - name: dev
