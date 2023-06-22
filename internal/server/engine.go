@@ -15,6 +15,7 @@ func GetEngine(basePath string) *gin.Engine {
 	corsConfig.AllowAllOrigins = true
 	corsConfig.AllowCredentials = true
 	corsConfig.AddAllowHeaders("authorization")
+	corsConfig.AddExposeHeaders("Content-Disposition", "Content-Length")
 	r.Use(cors.New(corsConfig))
 
 	r.Use(middleware.ErrorHandler())
