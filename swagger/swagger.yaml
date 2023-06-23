@@ -188,15 +188,11 @@ definitions:
             hostname:
                 type: string
                 x-go-name: Hostname
-            id:
-                format: uint64
-                type: integer
-                x-go-name: ID
             name:
                 type: string
                 x-go-name: Name
         type: object
-        x-go-package: github.com/dhis2-sre/im-manager/pkg/model
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/database
     Instance:
         properties:
             createdAt:

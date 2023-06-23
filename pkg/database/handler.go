@@ -590,6 +590,13 @@ func (h Handler) Delete(c *gin.Context) {
 	c.Status(http.StatusAccepted)
 }
 
+// swagger:model GroupsWithDatabases
+type GroupsWithDatabases struct {
+	Name      string           `json:"name"`
+	Hostname  string           `json:"hostname"`
+	Databases []model.Database `json:"databases"`
+}
+
 // List databases
 func (h Handler) List(c *gin.Context) {
 	// swagger:route GET /databases listDatabases
@@ -621,8 +628,8 @@ func (h Handler) List(c *gin.Context) {
 	c.JSON(http.StatusOK, groupsWithDatabases(user.Groups, d))
 }
 
-func groupsWithDatabases(groups []model.Group, databases []model.Database) []model.GroupsWithDatabases {
-	groupsWithDatabases := make([]model.GroupsWithDatabases, len(groups))
+func groupsWithDatabases(groups []model.Group, databases []model.Database) []GroupsWithDatabases {
+	groupsWithDatabases := make([]GroupsWithDatabases, len(groups))
 	for i, group := range groups {
 		groupsWithDatabases[i].Name = group.Name
 		groupsWithDatabases[i].Hostname = group.Hostname

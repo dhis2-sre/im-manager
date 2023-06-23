@@ -19,14 +19,6 @@ type Database struct {
 	Slug              string             `gorm:"uniqueIndex" json:"slug"`
 }
 
-// swagger:model GroupsWithDatabases
-type GroupsWithDatabases struct {
-	ID        uint       `json:"id"`
-	Name      string     `json:"name"`
-	Hostname  string     `json:"hostname"`
-	Databases []Database `json:"databases"`
-}
-
 // swagger:model
 type Lock struct {
 	DatabaseID uint `gorm:"primaryKey" json:"databaseId"`
