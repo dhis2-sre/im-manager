@@ -102,7 +102,7 @@ profiles:
             createNamespace: true
             remoteChart: im-group
             repo: https://dhis2-sre.github.io/im-group
-            version: 0.2.0
+            version: 0.3.0
             setValues:
               serviceAccount:
                 name: im-manager-prod
@@ -113,7 +113,7 @@ profiles:
             createNamespace: true
             remoteChart: im-group
             repo: https://dhis2-sre.github.io/im-group
-            version: 0.2.0
+            version: 0.3.0
             setValues:
               serviceAccount:
                 name: im-manager-prod
@@ -124,7 +124,7 @@ profiles:
             createNamespace: true
             remoteChart: im-group
             repo: https://dhis2-sre.github.io/im-group
-            version: 0.2.0
+            version: 0.3.0
             setValues:
               serviceAccount:
                 name: im-manager-prod
@@ -135,7 +135,7 @@ profiles:
             createNamespace: true
             remoteChart: im-group
             repo: https://dhis2-sre.github.io/im-group
-            version: 0.2.0
+            version: 0.3.0
             setValues:
               serviceAccount:
                 name: im-manager-prod
