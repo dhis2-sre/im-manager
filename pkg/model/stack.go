@@ -9,10 +9,10 @@ import (
 type Stack struct {
 	CreatedAt          time.Time                `json:"createdAt"`
 	UpdatedAt          time.Time                `json:"updatedAt"`
-	Name               string                   `gorm:"primaryKey" json:"name"`
-	RequiredParameters []StackRequiredParameter `gorm:"foreignKey:StackName; references: Name; constraint:OnUpdate:CASCADE,OnDelete:CASCADE" json:"requiredParameters"`
-	OptionalParameters []StackOptionalParameter `gorm:"foreignKey:StackName; references: Name; constraint:OnUpdate:CASCADE,OnDelete:CASCADE" json:"optionalParameters"`
-	Instances          []Instance               `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;" json:"instances"`
+	Name               string                   `json:"name" gorm:"primaryKey"`
+	RequiredParameters []StackRequiredParameter `json:"requiredParameters" gorm:"foreignKey:StackName; references: Name; constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
+	OptionalParameters []StackOptionalParameter `json:"optionalParameters" gorm:"foreignKey:StackName; references: Name; constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
+	Instances          []Instance               `json:"instances" gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
 	HostnamePattern    string                   `json:"hostnamePattern"`
 	HostnameVariable   string                   `json:"hostnameVariable"`
 }
@@ -31,14 +31,14 @@ func (s Stack) FindOptionalParameter(name string) (StackOptionalParameter, error
 }
 
 type StackRequiredParameter struct {
-	Name      string `gorm:"primaryKey" json:"name"`
-	StackName string `gorm:"primaryKey" json:"stackName"`
+	Name      string `json:"name" gorm:"primaryKey"`
+	StackName string `json:"stackName" gorm:"primaryKey"`
 	Consumed  bool   `json:"consumed"`
 }
 
 type StackOptionalParameter struct {
-	Name         string `gorm:"primaryKey" json:"name"`
-	StackName    string `gorm:"primaryKey" json:"stackName"`
+	Name         string `json:"name" gorm:"primaryKey"`
+	StackName    string `json:"stackName" gorm:"primaryKey"`
 	DefaultValue string `json:"defaultValue"`
 	Consumed     bool   `json:"consumed"`
 }

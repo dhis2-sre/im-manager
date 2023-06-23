@@ -5,13 +5,13 @@ import "time"
 // User domain object defining a user
 // swagger:model
 type User struct {
-	ID          uint      `gorm:"primarykey" json:"id"`
+	ID          uint      `json:"id" gorm:"primarykey"`
 	CreatedAt   time.Time `json:"createdAt"`
 	UpdatedAt   time.Time `json:"updatedAt"`
-	Email       string    `gorm:"index;unique" json:"email"`
+	Email       string    `json:"email" gorm:"index;unique"`
 	Password    string    `json:"-"`
-	Groups      []Group   `gorm:"many2many:user_groups;constraint:OnUpdate:CASCADE,OnDelete:CASCADE" json:"groups"`
-	AdminGroups []Group   `gorm:"many2many:user_groups_admin;constraint:OnUpdate:CASCADE,OnDelete:CASCADE" json:"adminGroups"`
+	Groups      []Group   `json:"groups" gorm:"many2many:user_groups;constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
+	AdminGroups []Group   `json:"adminGroups" gorm:"many2many:user_groups_admin;constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
 }
 
 func (u *User) IsMemberOf(group string) bool {

@@ -7,26 +7,26 @@ import (
 
 // swagger:model Instance
 type Instance struct {
-	ID                 uint                        `gorm:"primarykey" json:"id"`
+	ID                 uint                        `json:"id" gorm:"primarykey"`
 	CreatedAt          time.Time                   `json:"createdAt"`
 	UpdatedAt          time.Time                   `json:"updatedAt"`
 	UserID             uint                        `json:"userId"`
-	Name               string                      `gorm:"index:idx_name_and_group,unique" json:"name"`
-	GroupName          string                      `gorm:"index:idx_name_and_group,unique" json:"groupName"`
+	Name               string                      `json:"name" gorm:"index:idx_name_and_group,unique"`
+	GroupName          string                      `json:"groupName" gorm:"index:idx_name_and_group,unique"`
 	StackName          string                      `json:"stackName"`
-	RequiredParameters []InstanceRequiredParameter `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;" json:"requiredParameters"`
-	OptionalParameters []InstanceOptionalParameter `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;" json:"optionalParameters"`
-	DeployLog          string                      `gorm:"type:text" json:"deployLog"`
+	RequiredParameters []InstanceRequiredParameter `json:"requiredParameters" gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
+	OptionalParameters []InstanceOptionalParameter `json:"optionalParameters" gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
+	DeployLog          string                      `json:"deployLog" gorm:"type:text"`
 	Preset             bool                        `json:"preset"`
 	PresetID           uint                        `json:"presetId"`
 }
 
 type Linked struct {
-	SourceInstanceID      uint `gorm:"primaryKey"`
-	SourceInstance        Instance
-	DestinationStackName  string `gorm:"primaryKey"`
-	DestinationInstanceID uint   `gorm:"index:idx_linked_second_instance,unique"`
-	DestinationInstance   Instance
+	SourceInstanceID      uint     `json:"sourceInstanceId" gorm:"primaryKey"`
+	SourceInstance        Instance `json:"sourceInstance"`
+	DestinationStackName  string   `json:"destinationStackName" gorm:"primaryKey"`
+	DestinationInstanceID uint     `json:"destinationInstanceId" gorm:"index:idx_linked_second_instance,unique"`
+	DestinationInstance   Instance `json:"destinationInstance"`
 }
 
 func (i Instance) FindRequiredParameter(name string) (InstanceRequiredParameter, error) {
@@ -48,19 +48,19 @@ func (i Instance) FindOptionalParameter(name string) (InstanceOptionalParameter,
 }
 
 type InstanceRequiredParameter struct {
-	InstanceID uint `gorm:"primaryKey" json:"-"`
+	InstanceID uint `json:"-" gorm:"primaryKey"`
 	// TODO: Rename StackRequiredParameterID to Name
-	StackRequiredParameterID string                 `gorm:"primaryKey" json:"name"`
-	StackRequiredParameter   StackRequiredParameter `gorm:"foreignKey:StackRequiredParameterID,StackName; references:Name,StackName; constraint:OnUpdate:CASCADE,OnDelete:CASCADE" json:"-"`
+	StackRequiredParameterID string                 `json:"name" gorm:"primaryKey"`
+	StackRequiredParameter   StackRequiredParameter `json:"-" gorm:"foreignKey:StackRequiredParameterID,StackName; references:Name,StackName; constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
 	StackName                string                 `json:"-"`
 	Value                    string                 `json:"value"`
 }
 
 type InstanceOptionalParameter struct {
-	InstanceID uint `gorm:"primaryKey" json:"-"`
+	InstanceID uint `json:"-" gorm:"primaryKey"`
 	// TODO: Rename StackOptionalParameterID to Name
-	StackOptionalParameterID string                 `gorm:"primaryKey" json:"name"`
-	StackOptionalParameter   StackOptionalParameter `gorm:"foreignKey:StackOptionalParameterID,StackName; references:Name,StackName; constraint:OnUpdate:CASCADE,OnDelete:CASCADE" json:"-"`
+	StackOptionalParameterID string                 `json:"name" gorm:"primaryKey"`
+	StackOptionalParameter   StackOptionalParameter `json:"-" gorm:"foreignKey:StackOptionalParameterID,StackName; references:Name,StackName; constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
 	StackName                string                 `json:"-"`
 	Value                    string                 `json:"value"`
 }
