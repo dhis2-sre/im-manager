@@ -10,6 +10,7 @@ type Instance struct {
 	ID                 uint                        `json:"id" gorm:"primarykey"`
 	CreatedAt          time.Time                   `json:"createdAt"`
 	UpdatedAt          time.Time                   `json:"updatedAt"`
+	User               User                        `json:"user"`
 	UserID             uint                        `json:"userId"`
 	Name               string                      `json:"name" gorm:"index:idx_name_and_group,unique"`
 	GroupName          string                      `json:"groupName" gorm:"index:idx_name_and_group,unique"`

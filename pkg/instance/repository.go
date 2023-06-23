@@ -162,6 +162,7 @@ func (r repository) findInstances(groupNames []string, presets bool) ([]*model.I
 
 	var instances []*model.Instance
 	err := query.
+		Joins("User").
 		Where("preset = ?", presets).
 		Find(&instances).Error
 	return instances, err

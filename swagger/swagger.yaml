@@ -236,6 +236,8 @@ definitions:
                 format: date-time
                 type: string
                 x-go-name: UpdatedAt
+            user:
+                $ref: '#/definitions/User'
             userId:
                 format: uint64
                 type: integer
