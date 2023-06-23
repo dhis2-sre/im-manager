@@ -8,27 +8,27 @@ import (
 
 // swagger:model
 type Database struct {
-	ID                uint               `gorm:"primarykey" json:"id"`
+	ID                uint               `json:"id" gorm:"primarykey"`
 	CreatedAt         time.Time          `json:"createdAt"`
 	UpdatedAt         time.Time          `json:"updatedAt"`
-	Name              string             `gorm:"index:idx_name_and_group,unique" json:"name"`
-	GroupName         string             `gorm:"index:idx_name_and_group,unique" json:"groupName"`
+	Name              string             `json:"name" gorm:"index:idx_name_and_group,unique"`
+	GroupName         string             `json:"groupName" gorm:"index:idx_name_and_group,unique"`
 	Url               string             `json:"url"` // s3... Path?
-	ExternalDownloads []ExternalDownload `json:"externalDownloads"`
+	ExternalDownloads []ExternalDownload `json:"externalDownloads" gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
 	Lock              *Lock              `json:"lock"`
-	Slug              string             `gorm:"uniqueIndex" json:"slug"`
+	Slug              string             `json:"slug" gorm:"uniqueIndex"`
 }
 
 // swagger:model
 type Lock struct {
-	DatabaseID uint `gorm:"primaryKey" json:"databaseId"`
+	DatabaseID uint `json:"databaseId" gorm:"primaryKey"`
 	InstanceID uint `json:"instanceId"`
 	UserID     uint `json:"userId"`
 }
 
 // swagger:model
 type ExternalDownload struct {
-	UUID       uuid.UUID `gorm:"primaryKey;type:uuid" json:"uuid"`
+	UUID       uuid.UUID `json:"uuid" gorm:"primaryKey;type:uuid"`
 	Expiration uint      `json:"expiration"`
 	DatabaseID uint      `json:"databaseId"`
 }
