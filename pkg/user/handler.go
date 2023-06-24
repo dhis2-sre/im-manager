@@ -319,7 +319,7 @@ func (h Handler) Delete(c *gin.Context) {
 	c.Status(http.StatusAccepted)
 }
 
-type UpdateUserRequest struct {
+type updateUserRequest struct {
 	Email    string `json:"email" binding:"omitempty,email"`
 	Password string `json:"password" binding:"omitempty,gte=16,lte=128"`
 }
@@ -346,7 +346,7 @@ func (h *Handler) Update(c *gin.Context) {
 		return
 	}
 
-	var request UpdateUserRequest
+	var request updateUserRequest
 	if err := handler.DataBinder(c, &request); err != nil {
 		_ = c.Error(err)
 		return

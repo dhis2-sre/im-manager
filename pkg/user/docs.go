@@ -40,3 +40,11 @@ type _ struct {
 	//in: body
 	_ *[]model.User
 }
+
+// swagger:parameters updateUser
+type _ struct {
+	// Update user request
+	// in: body
+	// required: true
+	Body updateUserRequest
+}
