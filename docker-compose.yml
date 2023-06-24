@@ -41,11 +41,6 @@ services:
       POSTGRES_PASSWORD: ${DATABASE_PASSWORD}
       POSTGRES_DB: ${DATABASE_NAME}
 
-  jwks:
-    image: nginx:alpine
-    volumes:
-      - ./jwks.json:/usr/share/nginx/html/jwks.json
-
   rabbitmq:
     image: rabbitmq:3-management-alpine
     ports:
