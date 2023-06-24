@@ -31,6 +31,7 @@ type groupService interface {
 	GetClusterConfiguration(groupName string) (*model.ClusterConfiguration, error)
 	Find(name string) (*model.Group, error)
 	FindOrCreate(name string, hostname string) (*model.Group, error)
+	FindAll(user *model.User) ([]model.Group, error)
 }
 
 type CreateGroupRequest struct {
@@ -205,4 +206,34 @@ func (h Handler) Find(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, group)
+}
+
+// FindAll find all groups by user
+func (h Handler) FindAll(c *gin.Context) {
+	// swagger:route GET /groups findAllGroupsByUser
+	//
+	// Find all groups
+	//
+	// Find all groups by user
+	//
+	// responses:
+	//   200: []Group
+	//   401: Error
+	//   415: Error
+	//
+	// security:
+	//   oauth2:
+	user, err := handler.GetUserFromContext(c)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	groups, err := h.groupService.FindAll(user)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	c.JSON(http.StatusOK, groups)
 }

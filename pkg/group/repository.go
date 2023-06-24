@@ -3,6 +3,9 @@ package group
 import (
 	"errors"
 
+	"golang.org/x/exp/maps"
+	"golang.org/x/exp/slices"
+
 	"github.com/dhis2-sre/im-manager/internal/errdef"
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	"gorm.io/gorm"
@@ -27,6 +30,43 @@ func (r repository) find(name string) (*model.Group, error) {
 	}
 
 	return group, err
+}
+
+const AdministratorGroupName = "administrators"
+
+func (r repository) findAll(user *model.User) ([]model.Group, error) {
+	groupsByName := make(map[string]struct{})
+	for _, group := range user.Groups {
+		groupsByName[group.Name] = struct{}{}
+	}
+	groupNames := maps.Keys(groupsByName)
+	isAdmin := slices.Contains(groupNames, AdministratorGroupName)
+
+	if isAdmin {
+		var groups []model.Group
+		err := r.db.Find(&groups).Error
+		return groups, err
+	}
+
+	return findAllGroups(user), nil
+}
+
+func findAllGroups(user *model.User) []model.Group {
+	var allGroups []model.Group
+	allGroups = append(allGroups, user.Groups...)
+	allGroups = append(allGroups, user.AdminGroups...)
+
+	groupsByName := make(map[string]model.Group)
+	for _, group := range allGroups {
+		groupsByName[group.Name] = group
+	}
+
+	groups := make([]model.Group, 0, len(groupsByName))
+	for k := range groupsByName {
+		groups = append(groups, groupsByName[k])
+	}
+
+	return groups
 }
 
 func (r repository) create(group *model.Group) error {
