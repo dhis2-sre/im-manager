@@ -61,12 +61,7 @@ func findAllGroups(user *model.User) []model.Group {
 		groupsByName[group.Name] = group
 	}
 
-	groups := make([]model.Group, 0, len(groupsByName))
-	for k := range groupsByName {
-		groups = append(groups, groupsByName[k])
-	}
-
-	return groups
+	return maps.Values(groupsByName)
 }
 
 func (r repository) create(group *model.Group) error {
