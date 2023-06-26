@@ -466,6 +466,16 @@ definitions:
                 x-go-name: Name
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/database
+    updateUserRequest:
+        properties:
+            email:
+                type: string
+                x-go-name: Email
+            password:
+                type: string
+                x-go-name: Password
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/user
 info:
     contact:
         email: info@dhis2.org
@@ -1557,6 +1567,12 @@ paths:
                   required: true
                   type: integer
                   x-go-name: ID
+                - description: Update user request
+                  in: body
+                  name: Body
+                  required: true
+                  schema:
+                    $ref: '#/definitions/updateUserRequest'
             responses:
                 "200":
                     description: User
