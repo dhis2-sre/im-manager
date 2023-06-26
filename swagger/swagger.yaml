@@ -835,6 +835,23 @@ paths:
                 - oauth2: []
             summary: Save database
     /groups:
+        get:
+            description: Find all groups by user
+            operationId: findAllGroupsByUser
+            responses:
+                "200":
+                    description: Group
+                    schema:
+                        items:
+                            $ref: '#/definitions/Group'
+                        type: array
+                "401":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Find all groups
         post:
             description: Create a group...
             operationId: groupCreate

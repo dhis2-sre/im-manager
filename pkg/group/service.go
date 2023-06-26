@@ -18,6 +18,7 @@ type groupRepository interface {
 	getClusterConfiguration(groupName string) (*model.ClusterConfiguration, error)
 	find(name string) (*model.Group, error)
 	findOrCreate(group *model.Group) (*model.Group, error)
+	findAll(user *model.User) ([]model.Group, error)
 }
 
 type userService interface {
@@ -81,4 +82,8 @@ func (s *service) AddClusterConfiguration(clusterConfiguration *model.ClusterCon
 
 func (s *service) GetClusterConfiguration(groupName string) (*model.ClusterConfiguration, error) {
 	return s.groupRepository.getClusterConfiguration(groupName)
+}
+
+func (s *service) FindAll(user *model.User) ([]model.Group, error) {
+	return s.groupRepository.findAll(user)
 }

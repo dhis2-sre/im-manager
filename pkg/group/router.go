@@ -10,6 +10,7 @@ func Routes(r *gin.Engine, authenticationMiddleware middleware.AuthenticationMid
 	tokenAuthenticationRouter.Use(authenticationMiddleware.TokenAuthentication)
 
 	tokenAuthenticationRouter.GET("/groups/:name", handler.Find)
+	tokenAuthenticationRouter.GET("/groups", handler.FindAll)
 
 	administratorRestrictedRouter := tokenAuthenticationRouter.Group("")
 	administratorRestrictedRouter.Use(authorizationMiddleware.RequireAdministrator)
