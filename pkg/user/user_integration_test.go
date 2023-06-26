@@ -3,7 +3,6 @@ package user_test
 import (
 	"crypto/rand"
 	"crypto/rsa"
-	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -29,7 +28,7 @@ func TestUserHandler(t *testing.T) {
 	groupRepository := group.NewRepository(db)
 	groupService := group.NewService(groupRepository, userService)
 
-	err := createAdminUser("admin", "admin", userService, groupService)
+	err := user.CreateAdminUser("admin", "admin", userService, groupService)
 	require.NoError(t, err, "failed to create admin user and group")
 
 	authorization := middleware.NewAuthorization(userService)
@@ -157,32 +156,4 @@ func TestUserHandler(t *testing.T) {
 			client.Do(t, http.MethodGet, "/users/"+user1ID, nil, http.StatusNotFound, inttest.WithAuthToken(adminToken.AccessToken))
 		}
 	})
-}
-
-type groupService interface {
-	FindOrCreate(name string, hostname string, deployable bool) (*model.Group, error)
-	AddUser(groupName string, userId uint) error
-}
-
-type userService interface {
-	FindOrCreate(email string, password string) (*model.User, error)
-}
-
-func createAdminUser(user string, password string, userService userService, groupService groupService) error {
-	u, err := userService.FindOrCreate(user, password)
-	if err != nil {
-		return fmt.Errorf("error creating admin user: %v", err)
-	}
-
-	g, err := groupService.FindOrCreate(model.AdministratorGroupName, "", false)
-	if err != nil {
-		return fmt.Errorf("error creating admin group: %v", err)
-	}
-
-	err = groupService.AddUser(g.Name, u.ID)
-	if err != nil {
-		return fmt.Errorf("error adding admin user to admin group: %v", err)
-	}
-
-	return nil
 }

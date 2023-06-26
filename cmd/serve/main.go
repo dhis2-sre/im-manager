@@ -137,7 +137,7 @@ func run() error {
 
 	integrationHandler := integration.NewHandler(dockerHubClient, cfg.InstanceService.Host, cfg.DatabaseManagerService.Host)
 
-	err = createAdminUser(cfg, userService, groupService)
+	err = user.CreateAdminUser(cfg.AdminUser.Email, cfg.AdminUser.Password, userService, groupService)
 	if err != nil {
 		return err
 	}
@@ -163,10 +163,6 @@ type groupService interface {
 	AddUser(groupName string, userId uint) error
 }
 
-type userService interface {
-	FindOrCreate(email string, password string) (*model.User, error)
-}
-
 func createGroups(config config.Config, groupService groupService) error {
 	log.Println("Creating groups...")
 	groups := config.Groups
@@ -178,28 +174,6 @@ func createGroups(config config.Config, groupService groupService) error {
 		if newGroup != nil {
 			log.Println("Created:", newGroup.Name)
 		}
-	}
-
-	return nil
-}
-
-func createAdminUser(config config.Config, userService userService, groupService groupService) error {
-	adminUserEmail := config.AdminUser.Email
-	adminUserPassword := config.AdminUser.Password
-
-	u, err := userService.FindOrCreate(adminUserEmail, adminUserPassword)
-	if err != nil {
-		return fmt.Errorf("error creating admin user: %v", err)
-	}
-
-	g, err := groupService.FindOrCreate(model.AdministratorGroupName, "", false)
-	if err != nil {
-		return fmt.Errorf("error creating admin group: %v", err)
-	}
-
-	err = groupService.AddUser(g.Name, u.ID)
-	if err != nil {
-		return fmt.Errorf("error adding admin user to admin group: %v", err)
 	}
 
 	return nil
