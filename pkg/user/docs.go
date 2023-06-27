@@ -10,7 +10,7 @@ type _ struct {
 	// SignUp request body parameter
 	// in: body
 	// required: true
-	Body SignUpRequest
+	Body signUpRequest
 }
 
 // swagger:parameters refreshToken

@@ -42,7 +42,7 @@ type tokenService interface {
 	SignOut(userId uint) error
 }
 
-type SignUpRequest struct {
+type signUpRequest struct {
 	Email    string `json:"email" binding:"required,email"`
 	Password string `json:"password" binding:"required,gte=16,lte=128"`
 }
@@ -59,7 +59,7 @@ func (h Handler) SignUp(c *gin.Context) {
 	//   201: User
 	//   400: Error
 	//   415: Error
-	var request SignUpRequest
+	var request signUpRequest
 
 	if err := handler.DataBinder(c, &request); err != nil {
 		return
