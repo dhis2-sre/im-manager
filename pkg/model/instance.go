@@ -8,18 +8,19 @@ import (
 // swagger:model Instance
 type Instance struct {
 	ID                 uint                        `json:"id" gorm:"primarykey"`
-	CreatedAt          time.Time                   `json:"createdAt"`
-	UpdatedAt          time.Time                   `json:"updatedAt"`
 	User               User                        `json:"user"`
 	UserID             uint                        `json:"userId"`
 	Name               string                      `json:"name" gorm:"index:idx_name_and_group,unique"`
 	GroupName          string                      `json:"groupName" gorm:"index:idx_name_and_group,unique"`
 	StackName          string                      `json:"stackName"`
+	TTL                uint                        `json:"ttl"`
 	RequiredParameters []InstanceRequiredParameter `json:"requiredParameters" gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
 	OptionalParameters []InstanceOptionalParameter `json:"optionalParameters" gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
 	DeployLog          string                      `json:"deployLog" gorm:"type:text"`
 	Preset             bool                        `json:"preset"`
 	PresetID           uint                        `json:"presetId"`
+	CreatedAt          time.Time                   `json:"createdAt"`
+	UpdatedAt          time.Time                   `json:"updatedAt"`
 }
 
 type Linked struct {

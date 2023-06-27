@@ -10,12 +10,12 @@ GROUP=$1
 NAME=$2
 CHART_VERSION=${CHART_VERSION:-0.9.0}
 IMAGE_TAG=${IMAGE_TAG:-0.6.0}
-INSTANCE_TTL=${INSTANCE_TTL:-""}
+INSTANCE_TTL=${INSTANCE_TTL:-0}
 
 echo "{
   \"name\": \"$NAME\",
   \"groupName\": \"$GROUP\",
-  \"stackName\": \"$STACK\",
+  \"ttl\": $INSTANCE_TTL,
   \"optionalParameters\": [
     {
       \"name\": \"CHART_VERSION\",
@@ -24,10 +24,6 @@ echo "{
     {
       \"name\": \"IMAGE_TAG\",
       \"value\": \"$IMAGE_TAG\"
-    },
-    {
-      \"name\": \"INSTANCE_TTL\",
-      \"value\": \"$INSTANCE_TTL\"
     }
   ]
 }" | $HTTP post "$IM_HOST/instances" "Authorization: Bearer $ACCESS_TOKEN"

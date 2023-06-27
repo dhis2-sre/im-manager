@@ -21,7 +21,7 @@ IMAGE_PULL_POLICY=${IMAGE_PULL_POLICY:-IfNotPresent}
 DATABASE_SIZE=${DATABASE_SIZE:-30Gi}
 INSTALL_REDIS=${INSTALL_REDIS:-false}
 DATABASE_ID=${DATABASE_ID:-1}
-INSTANCE_TTL=${INSTANCE_TTL:-""}
+INSTANCE_TTL=${INSTANCE_TTL:-0}
 FLYWAY_MIGRATE_OUT_OF_ORDER=${FLYWAY_MIGRATE_OUT_OF_ORDER:-false}
 FLYWAY_REPAIR_BEFORE_MIGRATION=${FLYWAY_REPAIR_BEFORE_MIGRATION:-false}
 CORE_RESOURCES_REQUESTS_CPU=${CORE_RESOURCES_REQUESTS_CPU:-250m}
@@ -33,6 +33,7 @@ echo "{
   \"name\": \"$NAME\",
   \"groupName\": \"$GROUP\",
   \"stackName\": \"$STACK\",
+  \"ttl\": $INSTANCE_TTL,
   \"optionalParameters\": [
     {
       \"name\": \"STARTUP_PROBE_FAILURE_THRESHOLD\",
@@ -69,10 +70,6 @@ echo "{
     {
       \"name\": \"INSTALL_REDIS\",
       \"value\": \"$INSTALL_REDIS\"
-    },
-    {
-      \"name\": \"INSTANCE_TTL\",
-      \"value\": \"$INSTANCE_TTL\"
     },
     {
       \"name\": \"FLYWAY_MIGRATE_OUT_OF_ORDER\",

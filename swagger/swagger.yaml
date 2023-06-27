@@ -119,6 +119,10 @@ definitions:
             stackName:
                 type: string
                 x-go-name: Stack
+            ttl:
+                format: uint64
+                type: integer
+                x-go-name: TTL
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
     ExternalDownload:
@@ -232,6 +236,10 @@ definitions:
             stackName:
                 type: string
                 x-go-name: StackName
+            ttl:
+                format: uint64
+                type: integer
+                x-go-name: TTL
             updatedAt:
                 format: date-time
                 type: string
@@ -412,6 +420,10 @@ definitions:
                     $ref: '#/definitions/InstanceRequiredParameter'
                 type: array
                 x-go-name: RequiredParameters
+            ttl:
+                format: uint64
+                type: integer
+                x-go-name: TTL
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
     User:

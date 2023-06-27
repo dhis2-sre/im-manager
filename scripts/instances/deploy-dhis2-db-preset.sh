@@ -11,12 +11,13 @@ NAME=$2
 
 DATABASE_ID=${DATABASE_ID:-1}
 DATABASE_SIZE=${DATABASE_SIZE:-10Gi}
-INSTANCE_TTL=${INSTANCE_TTL:-""}
+INSTANCE_TTL=${INSTANCE_TTL:-0}
 
 echo "{
   \"name\": \"$NAME\",
   \"groupName\": \"$GROUP\",
   \"stackName\": \"$STACK\",
+  \"ttl\": $INSTANCE_TTL,
   \"requiredParameters\": [
     {
       \"name\": \"DATABASE_ID\",
@@ -24,10 +25,6 @@ echo "{
     }
   ],
   \"optionalParameters\": [
-    {
-      \"name\": \"INSTANCE_TTL\",
-      \"value\": \"$INSTANCE_TTL\"
-    },
     {
       \"name\": \"DATABASE_SIZE\",
       \"value\": \"$DATABASE_SIZE\"

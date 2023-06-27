@@ -19,7 +19,7 @@ READINESS_PROBE_TIMEOUT_SECONDS=${LIVENESS_PROBE_TIMEOUT_SECONDS:-1}
 IMAGE_REPOSITORY=${IMAGE_REPOSITORY:-core}
 IMAGE_TAG=${IMAGE_TAG:-2.39.0}
 CHART_VERSION=${CHART_VERSION:-0.12.1}
-INSTANCE_TTL=${INSTANCE_TTL:-""}
+INSTANCE_TTL=${INSTANCE_TTL:-0}
 FLYWAY_MIGRATE_OUT_OF_ORDER=${FLYWAY_MIGRATE_OUT_OF_ORDER:-false}
 FLYWAY_REPAIR_BEFORE_MIGRATION=${FLYWAY_REPAIR_BEFORE_MIGRATION:-false}
 RESOURCES_REQUESTS_CPU=${RESOURCES_REQUESTS_CPU:-250m}
@@ -34,6 +34,7 @@ echo "{
   \"name\": \"$NAME\",
   \"groupName\": \"$GROUP\",
   \"stackName\": \"$STACK\",
+  \"ttl\": $INSTANCE_TTL\",
   \"sourceInstance\": $SOURCE_INSTANCE_ID,
   \"optionalParameters\": [
     {
@@ -63,10 +64,6 @@ echo "{
     {
       \"name\": \"IMAGE_TAG\",
       \"value\": \"$IMAGE_TAG\"
-    },
-    {
-      \"name\": \"INSTANCE_TTL\",
-      \"value\": \"$INSTANCE_TTL\"
     },
     {
       \"name\": \"FLYWAY_MIGRATE_OUT_OF_ORDER\",

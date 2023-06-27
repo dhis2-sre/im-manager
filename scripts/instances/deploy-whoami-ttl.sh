@@ -16,6 +16,8 @@ echo "{
   \"name\": \"$NAME\",
   \"groupName\": \"$GROUP\",
   \"stackName\": \"$STACK\",
+  \"ttl\": $INSTANCE_TTL,
+  \"ttl\": $TTL,
   \"optionalParameters\": [
     {
       \"name\": \"CHART_VERSION\",
@@ -24,10 +26,6 @@ echo "{
     {
       \"name\": \"IMAGE_TAG\",
       \"value\": \"$IMAGE_TAG\"
-    },
-    {
-      \"name\": \"INSTANCE_TTL\",
-      \"value\": \"$TTL\"
     }
   ]
 }" | $HTTP post "$IM_HOST/instances" "Authorization: Bearer $ACCESS_TOKEN"

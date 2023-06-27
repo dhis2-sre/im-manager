@@ -16,5 +16,6 @@ echo "{
   \"name\": \"$NAME\",
   \"groupName\": \"$GROUP\",
   \"stackName\": \"$STACK\",
+  \"ttl\": $INSTANCE_TTL,
   \"presetInstance\": $PRESET_ID
 }" | $HTTP post "$IM_HOST/instances" "Authorization: Bearer $ACCESS_TOKEN"
