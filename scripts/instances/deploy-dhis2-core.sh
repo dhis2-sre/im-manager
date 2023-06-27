@@ -34,7 +34,7 @@ echo "{
   \"name\": \"$NAME\",
   \"groupName\": \"$GROUP\",
   \"stackName\": \"$STACK\",
-  \"ttl\": $INSTANCE_TTL\",
+  \"ttl\": $INSTANCE_TTL,
   \"sourceInstance\": $SOURCE_INSTANCE_ID,
   \"optionalParameters\": [
     {

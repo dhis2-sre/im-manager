@@ -16,7 +16,6 @@ echo "{
   \"name\": \"$NAME\",
   \"groupName\": \"$GROUP\",
   \"stackName\": \"$STACK\",
-  \"ttl\": $INSTANCE_TTL,
   \"ttl\": $TTL,
   \"optionalParameters\": [
     {

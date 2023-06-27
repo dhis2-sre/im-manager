@@ -15,6 +15,7 @@ INSTANCE_TTL=${INSTANCE_TTL:-0}
 echo "{
   \"name\": \"$NAME\",
   \"groupName\": \"$GROUP\",
+  \"stackName\": \"$STACK\",
   \"ttl\": $INSTANCE_TTL,
   \"optionalParameters\": [
     {
