@@ -11,7 +11,7 @@ NAME=$2
 
 DATABASE_ID=${DATABASE_ID:-1}
 DATABASE_SIZE=${DATABASE_SIZE:-5Gi}
-INSTANCE_TTL=${INSTANCE_TTL:-""}
+INSTANCE_TTL=${INSTANCE_TTL:-0}
 RESOURCES_REQUESTS_CPU=${RESOURCES_REQUESTS_CPU:-250m}
 RESOURCES_REQUESTS_MEMORY=${RESOURCES_REQUESTS_MEMORY:-256Mi}
 
@@ -19,6 +19,7 @@ echo "{
   \"name\": \"$NAME\",
   \"groupName\": \"$GROUP\",
   \"stackName\": \"$STACK\",
+  \"ttl\": $INSTANCE_TTL,
   \"requiredParameters\": [
     {
       \"name\": \"DATABASE_ID\",
@@ -26,10 +27,6 @@ echo "{
     }
   ],
   \"optionalParameters\": [
-    {
-      \"name\": \"INSTANCE_TTL\",
-      \"value\": \"$INSTANCE_TTL\"
-    },
     {
       \"name\": \"DATABASE_SIZE\",
       \"value\": \"$DATABASE_SIZE\"

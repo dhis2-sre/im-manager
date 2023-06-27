@@ -18,12 +18,13 @@ IMAGE_TAG=${IMAGE_TAG:-2.39.0}
 IMAGE_PULL_POLICY=${IMAGE_PULL_POLICY:-IfNotPresent}
 DATABASE_SIZE=${DATABASE_SIZE:-10Gi}
 DATABASE_ID=${DATABASE_ID:-2}
-INSTANCE_TTL=${INSTANCE_TTL:-""}
+INSTANCE_TTL=${INSTANCE_TTL:-0}
 
 echo "{
   \"name\": \"$NAME\",
   \"groupName\": \"$GROUP\",
   \"stackName\": \"$STACK\",
+  \"ttl\": $INSTANCE_TTL,
   \"optionalParameters\": [
     {
       \"name\": \"STARTUP_PROBE_FAILURE_THRESHOLD\",
@@ -48,10 +49,6 @@ echo "{
     {
       \"name\": \"DATABASE_SIZE\",
       \"value\": \"$DATABASE_SIZE\"
-    },
-    {
-       \"name\": \"INSTANCE_TTL\",
-       \"value\": \"$INSTANCE_TTL\"
     }
   ],
   \"requiredParameters\": [

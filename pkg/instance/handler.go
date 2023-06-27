@@ -16,17 +16,13 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func NewHandler(
-	userService userServiceHandler,
-	groupService groupServiceHandler,
-	instanceService Service,
-	stackService stack.Service,
-) Handler {
+func NewHandler(userService userServiceHandler, groupService groupServiceHandler, instanceService Service, stackService stack.Service, defaultTTL uint) Handler {
 	return Handler{
 		userService,
 		groupService,
 		instanceService,
 		stackService,
+		defaultTTL,
 	}
 }
 
@@ -52,6 +48,7 @@ type Handler struct {
 	groupService    groupServiceHandler
 	instanceService Service
 	stackService    stack.Service
+	defaultTTL      uint
 }
 
 type userServiceHandler interface {
@@ -66,6 +63,7 @@ type DeployInstanceRequest struct {
 	Name               string                            `json:"name" binding:"required,dns_rfc1035_label"`
 	Group              string                            `json:"groupName" binding:"required"`
 	Stack              string                            `json:"stackName" binding:"required"`
+	TTL                uint                              `json:"ttl"`
 	RequiredParameters []model.InstanceRequiredParameter `json:"requiredParameters"`
 	OptionalParameters []model.InstanceOptionalParameter `json:"optionalParameters"`
 	SourceInstance     uint                              `json:"sourceInstance"`
@@ -121,6 +119,10 @@ func (h Handler) Deploy(c *gin.Context) {
 		return
 	}
 
+	if request.TTL == 0 {
+		request.TTL = h.defaultTTL
+	}
+
 	user, err := handler.GetUserFromContext(c)
 	if err != nil {
 		_ = c.Error(err)
@@ -137,6 +139,7 @@ func (h Handler) Deploy(c *gin.Context) {
 		Name:               request.Name,
 		UserID:             user.ID,
 		GroupName:          request.Group,
+		TTL:                request.TTL,
 		StackName:          request.Stack,
 		RequiredParameters: request.RequiredParameters,
 		OptionalParameters: request.OptionalParameters,
@@ -237,6 +240,7 @@ func (h Handler) consumeParameters(user *model.User, sourceInstanceId uint, inst
 }
 
 type UpdateInstanceRequest struct {
+	TTL                uint                              `json:"ttl"`
 	RequiredParameters []model.InstanceRequiredParameter `json:"requiredParameters"`
 	OptionalParameters []model.InstanceOptionalParameter `json:"optionalParameters"`
 }
@@ -269,6 +273,10 @@ func (h Handler) Update(c *gin.Context) {
 		return
 	}
 
+	if request.TTL == 0 {
+		request.TTL = h.defaultTTL
+	}
+
 	user, err := handler.GetUserFromContext(c)
 	if err != nil {
 		_ = c.Error(err)
@@ -294,6 +302,9 @@ func (h Handler) Update(c *gin.Context) {
 		return
 	}
 
+	if instance.TTL != h.defaultTTL {
+		instance.TTL = request.TTL
+	}
 	instance.RequiredParameters = request.RequiredParameters
 	instance.OptionalParameters = request.OptionalParameters
 
