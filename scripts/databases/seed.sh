@@ -26,13 +26,10 @@ function createDatabase() {
 if [[ -z "$*" ]]; then
   VERSIONS=("dev")
 
-  # Filter out all supported versions - current + 2 previous, including patch versions (like 2.40, 2.40.0, 2.39, 2.39.0, etc)
-  DHIS2_RELEASES=$(curl -fsSL "$DHIS2_RELEASES_URL")
-  LATEST_RELEASE=$(echo "$DHIS2_RELEASES" | jq -r '.versions[] | select(.latest == true) | .version')
+  # Filter out all supported versions, including patch versions (like 2.40, 2.40.0, 2.39, 2.39.0, etc)
   # shellcheck disable=SC2207
   VERSIONS+=($(
-    echo "$DHIS2_RELEASES" | jq -r "[.versions[] |
-      select(.version == $LATEST_RELEASE or .version == ($LATEST_RELEASE - 1) or .version == ($LATEST_RELEASE - 2)) |
+    curl -fsSL "$DHIS2_RELEASES_URL" | jq -r "[.versions[] | select(.supported == true) |
       [.name] + [(.patchVersions[] | select(.hotfix != true) | .name)]] | flatten | .[]"
   ))
 fi
