@@ -40,12 +40,12 @@ dev:
 	docker compose up --build dev database rabbitmq redis
 
 test:
-	docker compose up -d database rabbitmq jwks
+	docker compose up -d database rabbitmq
 	docker compose run --no-deps test
 	$(clean-cmd)
 
 test-coverage: clean
-	docker compose up -d database rabbitmq jwks
+	docker compose up -d database rabbitmq
 	docker compose run --no-deps test-coverage
 	$(clean-cmd)
 
