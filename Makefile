@@ -24,7 +24,7 @@ check:
 	pre-commit run --all-files --show-diff-on-failure
 
 smoke-test:
-	docker compose up -d database rabbitmq jwks
+	docker compose up -d database rabbitmq
 	sleep 10
 	IMAGE_TAG=$(tag) docker compose up -d prod
 
