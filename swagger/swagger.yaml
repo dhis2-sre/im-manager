@@ -310,16 +310,6 @@ definitions:
         description: Response depends on the input and can be either a list or a map
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/integration
-    SignUpRequest:
-        properties:
-            email:
-                type: string
-                x-go-name: Email
-            password:
-                type: string
-                x-go-name: Password
-        type: object
-        x-go-package: github.com/dhis2-sre/im-manager/pkg/user
     Stack:
         properties:
             createdAt:
@@ -466,6 +456,16 @@ definitions:
                 x-go-name: Name
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/database
+    signUpRequest:
+        properties:
+            email:
+                type: string
+                x-go-name: Email
+            password:
+                type: string
+                x-go-name: Password
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/user
     updateUserRequest:
         properties:
             email:
@@ -1495,7 +1495,7 @@ paths:
                   name: Body
                   required: true
                   schema:
-                    $ref: '#/definitions/SignUpRequest'
+                    $ref: '#/definitions/signUpRequest'
             responses:
                 "201":
                     description: User
