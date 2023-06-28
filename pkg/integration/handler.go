@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"sort"
 
 	"github.com/dhis2-sre/im-manager/internal/handler"
 	"github.com/gin-gonic/gin"
@@ -71,6 +72,8 @@ func (h Handler) Integrations(c *gin.Context) {
 			_ = c.Error(err)
 			return
 		}
+
+		sort.Strings(images)
 
 		c.JSON(http.StatusOK, images)
 		return
