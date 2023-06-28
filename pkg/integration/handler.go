@@ -110,8 +110,7 @@ func (h Handler) Integrations(c *gin.Context) {
 			return
 		}
 
-		sort.Strings(tags)
-		reverse(tags)
+		sort.Slice(tags, func(i, j int) bool { return tags[i] > tags[j] })
 
 		c.JSON(http.StatusOK, tags)
 		return
@@ -250,11 +249,4 @@ func httpGet(token string, url string) ([]byte, error) {
 		return nil, err
 	}
 	return b, err
-}
-
-func reverse(ss []string) {
-	last := len(ss) - 1
-	for i := 0; i < len(ss)/2; i++ {
-		ss[i], ss[last-i] = ss[last-i], ss[i]
-	}
 }
