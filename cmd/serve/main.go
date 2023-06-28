@@ -107,7 +107,7 @@ func run() error {
 	}
 
 	stackHandler := stack.NewHandler(stackSvc)
-	instanceHandler := instance.NewHandler(userService, groupService, instanceSvc, stackSvc)
+	instanceHandler := instance.NewHandler(userService, groupService, instanceSvc, stackSvc, cfg.DefaultTTL)
 
 	// TODO: Database... Move into... Function?
 	s3Config, err := s3config.LoadDefaultConfig(context.TODO(), s3config.WithRegion("eu-west-1"))

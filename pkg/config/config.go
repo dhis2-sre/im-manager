@@ -18,6 +18,7 @@ type Config struct {
 	Hostname                       string
 	InstanceParameterEncryptionKey string
 	BasePath                       string
+	DefaultTTL                     uint
 	InstanceService                Service
 	DockerHub                      DockerHub
 	DatabaseManagerService         Service
@@ -38,6 +39,7 @@ func New() Config {
 		Hostname:                       requireEnv("HOSTNAME"),
 		BasePath:                       requireEnv("BASE_PATH"),
 		InstanceParameterEncryptionKey: requireEnv("INSTANCE_PARAMETER_ENCRYPTION_KEY"),
+		DefaultTTL:                     uint(requireEnvAsInt("DEFAULT_TTL")),
 		InstanceService: Service{
 			Host:     requireEnv("INSTANCE_SERVICE_HOST"),
 			BasePath: requireEnv("INSTANCE_SERVICE_BASE_PATH"),

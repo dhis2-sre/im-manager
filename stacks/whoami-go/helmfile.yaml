@@ -20,7 +20,7 @@ releases:
           im-id: "{{ requiredEnv "INSTANCE_ID" }}"
           im-type: "whoami"
           im-creation-timestamp: "{{ env "INSTANCE_CREATION_TIMESTAMP" | default "" }}"
-          im-ttl: "{{ env "INSTANCE_TTL" | default "172800" }}"
+          im-ttl: "{{ requiredEnv "INSTANCE_TTL" }}"
 
 repositories:
   - name: tons

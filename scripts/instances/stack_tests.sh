@@ -9,9 +9,9 @@ INSTANCE_POSTFIX=$(tr -dc '[:lower:]' </dev/urandom | head -c 5; echo '')
 
 function cleanup_handler {
   # shellcheck disable=SC2046
-  ./destroy.sh whoami $(./list.sh | jq -r '.[].Instances[]?.Name' | grep $INSTANCE_PREFIX | grep "$INSTANCE_POSTFIX")
+  ./destroy.sh whoami $(./list.sh | jq -r '.[].instances[]?.name' | grep $INSTANCE_PREFIX | grep "$INSTANCE_POSTFIX")
   # shellcheck disable=SC2046
-  ./destroy.sh whoami $(./listPresets.sh | jq -r '.[].Instances[]?.Name' | grep $INSTANCE_PREFIX | grep "$INSTANCE_POSTFIX")
+  ./destroy.sh whoami $(./listPresets.sh | jq -r '.[].instances[]?.name' | grep $INSTANCE_PREFIX | grep "$INSTANCE_POSTFIX")
   trap - EXIT
   exit
 }

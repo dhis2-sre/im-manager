@@ -103,11 +103,12 @@ func configureInstanceEnvironment(accessToken string, instance *model.Instance, 
 	instanceNameEnv := fmt.Sprintf("%s=%s", "INSTANCE_NAME", instance.Name)
 	instanceNamespaceEnv := fmt.Sprintf("%s=%s", "INSTANCE_NAMESPACE", group.Name)
 	instanceIdEnv := fmt.Sprintf("%s=%d", "INSTANCE_ID", instance.ID)
+	instanceTTLEnv := fmt.Sprintf("%s=%d", "INSTANCE_TTL", instance.TTL)
 	instanceHostnameEnv := fmt.Sprintf("%s=%s", "INSTANCE_HOSTNAME", group.Hostname)
 	imTokenEnv := fmt.Sprintf("%s=%s", "IM_ACCESS_TOKEN", accessToken)
 	homeEnv := fmt.Sprintf("%s=%s", "HOME", "/tmp")
 	imCreationTimestamp := fmt.Sprintf("%s=%d", "INSTANCE_CREATION_TIMESTAMP", time.Now().Unix())
-	cmd.Env = append(cmd.Env, instanceNameEnv, instanceNamespaceEnv, instanceIdEnv, instanceHostnameEnv, imTokenEnv, homeEnv, imCreationTimestamp)
+	cmd.Env = append(cmd.Env, instanceNameEnv, instanceNamespaceEnv, instanceIdEnv, instanceTTLEnv, instanceHostnameEnv, imTokenEnv, homeEnv, imCreationTimestamp)
 
 	cmd.Env = injectEnv(cmd.Env, "HOSTNAME")
 	cmd.Env = injectEnv(cmd.Env, "AWS_ACCESS_KEY_ID")
