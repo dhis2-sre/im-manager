@@ -47,6 +47,9 @@ definitions:
         x-go-package: github.com/dhis2-sre/im-manager/pkg/database
     CreateGroupRequest:
         properties:
+            deployable:
+                type: boolean
+                x-go-name: Deployable
             hostname:
                 type: string
                 x-go-name: Hostname

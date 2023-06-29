@@ -26,18 +26,18 @@ type Handler struct {
 }
 
 type groupService interface {
-	Create(name string, hostname string) (*model.Group, error)
+	Create(name string, hostname string, deployable bool) (*model.Group, error)
 	AddUser(groupName string, userId uint) error
 	AddClusterConfiguration(clusterConfiguration *model.ClusterConfiguration) error
 	GetClusterConfiguration(groupName string) (*model.ClusterConfiguration, error)
 	Find(name string) (*model.Group, error)
-	FindOrCreate(name string, hostname string) (*model.Group, error)
 	FindAll(user *model.User, deployable bool) ([]model.Group, error)
 }
 
 type CreateGroupRequest struct {
-	Name     string `json:"name" binding:"required"`
-	Hostname string `json:"hostname" binding:"required"`
+	Name       string `json:"name" binding:"required"`
+	Hostname   string `json:"hostname" binding:"required"`
+	Deployable bool   `json:"deployable" binding:"required"`
 }
 
 // Create group
@@ -63,7 +63,7 @@ func (h Handler) Create(c *gin.Context) {
 		return
 	}
 
-	group, err := h.groupService.Create(request.Name, request.Hostname)
+	group, err := h.groupService.Create(request.Name, request.Hostname, request.Deployable)
 	if err != nil {
 		_ = c.Error(err)
 		return
