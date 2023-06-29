@@ -7,7 +7,6 @@ import (
 	"github.com/dhis2-sre/im-manager/internal/errdef"
 
 	"github.com/dhis2-sre/im-manager/pkg/model"
-	"github.com/jackc/pgconn"
 	"gorm.io/gorm"
 )
 
@@ -21,10 +20,7 @@ type repository struct {
 
 func (r repository) create(u *model.User) error {
 	err := r.db.Create(&u).Error
-
-	var perr *pgconn.PgError
-	const uniqueKeyConstraint = "23505"
-	if errors.As(err, &perr) && perr.Code == uniqueKeyConstraint {
+	if errors.Is(err, gorm.ErrDuplicatedKey) {
 		return errdef.NewDuplicated("user %q already exists", u.Email)
 	}
 

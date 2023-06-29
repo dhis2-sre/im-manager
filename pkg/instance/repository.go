@@ -7,7 +7,6 @@ import (
 	"github.com/dhis2-sre/im-manager/internal/errdef"
 	"github.com/dhis2-sre/im-manager/pkg/config"
 	"github.com/dhis2-sre/im-manager/pkg/model"
-	"github.com/jackc/pgconn"
 	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
 	"gorm.io/gorm"
@@ -39,11 +38,12 @@ func (r repository) Link(source *model.Instance, destination *model.Instance) er
 		DestinationStackName:  destination.StackName,
 		DestinationInstanceID: destination.ID,
 	}
+
 	err := r.db.Create(&link).Error
-	var perr *pgconn.PgError
-	if errors.As(err, &perr) && perr.Code == "23505" {
-		return fmt.Errorf("instance (%d) already linked with a stack of type \"%s\"", source.ID, destination.StackName)
+	if errors.Is(err, gorm.ErrDuplicatedKey) {
+		return errdef.NewDuplicated("instance (%d) already linked with a stack of type \"%s\"", source.ID, destination.StackName)
 	}
+
 	return err
 }
 
@@ -79,7 +79,12 @@ func (r repository) Save(instance *model.Instance) error {
 		return err
 	}
 
-	return r.db.Session(&gorm.Session{FullSaveAssociations: true}).Save(instance).Error
+	err = r.db.Session(&gorm.Session{FullSaveAssociations: true}).Save(instance).Error
+	if errors.Is(err, gorm.ErrDuplicatedKey) {
+		return errdef.NewDuplicated("instance named %q already exists", instance.Name)
+	}
+
+	return err
 }
 
 func (r repository) FindById(id uint) (*model.Instance, error) {
