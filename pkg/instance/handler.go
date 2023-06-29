@@ -119,7 +119,7 @@ func (h Handler) Deploy(c *gin.Context) {
 		return
 	}
 
-	group, err := h.groupService.Find(request.Name)
+	group, err := h.groupService.Find(request.Group)
 	if err != nil {
 		_ = c.Error(err)
 		return
