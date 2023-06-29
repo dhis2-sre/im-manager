@@ -150,7 +150,7 @@ func (h Handler) Deploy(c *gin.Context) {
 	i := &model.Instance{
 		Name:               request.Name,
 		UserID:             user.ID,
-		GroupName:          group.Name,
+		GroupName:          request.Group,
 		TTL:                request.TTL,
 		StackName:          request.Stack,
 		RequiredParameters: request.RequiredParameters,
