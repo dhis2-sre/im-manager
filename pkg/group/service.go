@@ -18,7 +18,7 @@ type groupRepository interface {
 	getClusterConfiguration(groupName string) (*model.ClusterConfiguration, error)
 	find(name string) (*model.Group, error)
 	findOrCreate(group *model.Group) (*model.Group, error)
-	findAll(user *model.User) ([]model.Group, error)
+	findAll(user *model.User, deployable bool) ([]model.Group, error)
 }
 
 type userService interface {
@@ -34,10 +34,11 @@ func (s *service) Find(name string) (*model.Group, error) {
 	return s.groupRepository.find(name)
 }
 
-func (s *service) Create(name string, hostname string) (*model.Group, error) {
+func (s *service) Create(name string, hostname string, deployable bool) (*model.Group, error) {
 	group := &model.Group{
-		Name:     name,
-		Hostname: hostname,
+		Name:       name,
+		Hostname:   hostname,
+		Deployable: deployable,
 	}
 
 	err := s.groupRepository.create(group)
@@ -48,10 +49,11 @@ func (s *service) Create(name string, hostname string) (*model.Group, error) {
 	return group, err
 }
 
-func (s *service) FindOrCreate(name string, hostname string) (*model.Group, error) {
+func (s *service) FindOrCreate(name string, hostname string, deployable bool) (*model.Group, error) {
 	group := &model.Group{
-		Name:     name,
-		Hostname: hostname,
+		Name:       name,
+		Hostname:   hostname,
+		Deployable: deployable,
 	}
 
 	g, err := s.groupRepository.findOrCreate(group)
@@ -84,6 +86,6 @@ func (s *service) GetClusterConfiguration(groupName string) (*model.ClusterConfi
 	return s.groupRepository.getClusterConfiguration(groupName)
 }
 
-func (s *service) FindAll(user *model.User) ([]model.Group, error) {
-	return s.groupRepository.findAll(user)
+func (s *service) FindAll(user *model.User, deployable bool) ([]model.Group, error) {
+	return s.groupRepository.findAll(user, deployable)
 }

@@ -152,7 +152,7 @@ func run() error {
 }
 
 type groupService interface {
-	FindOrCreate(name string, hostname string) (*model.Group, error)
+	FindOrCreate(name string, hostname string, deployable bool) (*model.Group, error)
 	AddUser(groupName string, userId uint) error
 }
 
@@ -164,7 +164,7 @@ func createGroups(config config.Config, groupService groupService) error {
 	log.Println("Creating groups...")
 	groups := config.Groups
 	for _, g := range groups {
-		newGroup, err := groupService.FindOrCreate(g.Name, g.Hostname)
+		newGroup, err := groupService.FindOrCreate(g.Name, g.Hostname, true)
 		if err != nil {
 			return fmt.Errorf("error creating group: %v", err)
 		}
@@ -185,7 +185,7 @@ func createAdminUser(config config.Config, userService userService, groupService
 		return fmt.Errorf("error creating admin user: %v", err)
 	}
 
-	g, err := groupService.FindOrCreate(model.AdministratorGroupName, "")
+	g, err := groupService.FindOrCreate(model.AdministratorGroupName, "", false)
 	if err != nil {
 		return fmt.Errorf("error creating admin group: %v", err)
 	}

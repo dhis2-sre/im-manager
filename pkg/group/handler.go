@@ -5,6 +5,7 @@ import (
 	"io"
 	"mime/multipart"
 	"net/http"
+	"strconv"
 
 	"github.com/dhis2-sre/im-manager/internal/errdef"
 	"github.com/dhis2-sre/im-manager/internal/handler"
@@ -25,18 +26,18 @@ type Handler struct {
 }
 
 type groupService interface {
-	Create(name string, hostname string) (*model.Group, error)
+	Create(name string, hostname string, deployable bool) (*model.Group, error)
 	AddUser(groupName string, userId uint) error
 	AddClusterConfiguration(clusterConfiguration *model.ClusterConfiguration) error
 	GetClusterConfiguration(groupName string) (*model.ClusterConfiguration, error)
 	Find(name string) (*model.Group, error)
-	FindOrCreate(name string, hostname string) (*model.Group, error)
-	FindAll(user *model.User) ([]model.Group, error)
+	FindAll(user *model.User, deployable bool) ([]model.Group, error)
 }
 
 type CreateGroupRequest struct {
-	Name     string `json:"name" binding:"required"`
-	Hostname string `json:"hostname" binding:"required"`
+	Name       string `json:"name" binding:"required"`
+	Hostname   string `json:"hostname" binding:"required"`
+	Deployable bool   `json:"deployable" binding:"required"`
 }
 
 // Create group
@@ -62,7 +63,7 @@ func (h Handler) Create(c *gin.Context) {
 		return
 	}
 
-	group, err := h.groupService.Create(request.Name, request.Hostname)
+	group, err := h.groupService.Create(request.Name, request.Hostname, request.Deployable)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -229,7 +230,18 @@ func (h Handler) FindAll(c *gin.Context) {
 		return
 	}
 
-	groups, err := h.groupService.FindAll(user)
+	deployableParam := c.Query("deployable")
+	var deployable bool
+	if deployableParam != "" {
+		parseBool, err := strconv.ParseBool(deployableParam)
+		if err != nil {
+			_ = c.Error(err)
+			return
+		}
+		deployable = parseBool
+	}
+
+	groups, err := h.groupService.FindAll(user, deployable)
 	if err != nil {
 		_ = c.Error(err)
 		return

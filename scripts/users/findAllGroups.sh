@@ -4,4 +4,6 @@ set -euo pipefail
 
 source ./auth.sh
 
-$HTTP get "$IM_HOST/groups" "Authorization: Bearer $ACCESS_TOKEN"
+DEPLOYABLE=${1:-false}
+
+$HTTP get "$IM_HOST/groups?deployable=$DEPLOYABLE" "Authorization: Bearer $ACCESS_TOKEN"

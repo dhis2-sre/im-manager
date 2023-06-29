@@ -121,8 +121,9 @@ func extractGroups(key string, userMap map[string]any) []model.Group {
 		for i := 0; i < len(groupsData); i++ {
 			group := groupsData[i].(map[string]any)
 			groups[i] = model.Group{
-				Name:     group["name"].(string),
-				Hostname: group["hostname"].(string),
+				Name:       group["name"].(string),
+				Hostname:   group["hostname"].(string),
+				Deployable: group["deployable"].(bool),
 			}
 		}
 		return groups

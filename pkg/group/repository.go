@@ -34,7 +34,7 @@ func (r repository) find(name string) (*model.Group, error) {
 
 const AdministratorGroupName = "administrators"
 
-func (r repository) findAll(user *model.User) ([]model.Group, error) {
+func (r repository) findAll(user *model.User, deployable bool) ([]model.Group, error) {
 	groupsByName := make(map[string]struct{})
 	for _, group := range user.Groups {
 		groupsByName[group.Name] = struct{}{}
@@ -44,17 +44,34 @@ func (r repository) findAll(user *model.User) ([]model.Group, error) {
 
 	if isAdmin {
 		var groups []model.Group
+		if deployable {
+			err := r.db.
+				Where("deployable = true").
+				Find(&groups).Error
+			return groups, err
+		}
 		err := r.db.Find(&groups).Error
 		return groups, err
 	}
 
-	return findAllGroups(user), nil
+	return findAllGroups(user, deployable), nil
 }
 
-func findAllGroups(user *model.User) []model.Group {
+func findAllGroups(user *model.User, deployable bool) []model.Group {
 	var allGroups []model.Group
 	allGroups = append(allGroups, user.Groups...)
 	allGroups = append(allGroups, user.AdminGroups...)
+
+	if deployable {
+		index := 0
+		for _, group := range allGroups {
+			if group.Deployable {
+				allGroups[index] = group
+				index++
+			}
+		}
+		allGroups = allGroups[:index]
+	}
 
 	groupsByName := make(map[string]model.Group)
 	for _, group := range allGroups {

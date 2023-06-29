@@ -119,6 +119,18 @@ func (h Handler) Deploy(c *gin.Context) {
 		return
 	}
 
+	group, err := h.groupService.Find(request.Group)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	if !group.Deployable {
+		forbidden := errdef.NewForbidden("group isn't deployable: %s", group.Name)
+		_ = c.Error(forbidden)
+		return
+	}
+
 	if request.TTL == 0 {
 		request.TTL = h.defaultTTL
 	}
