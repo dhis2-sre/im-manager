@@ -150,6 +150,9 @@ definitions:
                 format: date-time
                 type: string
                 x-go-name: CreatedAt
+            deployable:
+                type: boolean
+                x-go-name: Deployable
             hostname:
                 type: string
                 x-go-name: Hostname
@@ -860,6 +863,12 @@ paths:
         get:
             description: Find all groups by user
             operationId: findAllGroupsByUser
+            parameters:
+                - description: deployable
+                  in: query
+                  name: deployable
+                  type: string
+                  x-go-name: Deployable
             responses:
                 "200":
                     description: Group

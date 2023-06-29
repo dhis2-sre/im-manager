@@ -38,3 +38,13 @@ type _ struct {
 	// required: true
 	Name string `json:"name"`
 }
+
+// swagger:parameters findAllGroupsByUser
+type _ struct {
+	// deployable
+	// in: query
+	// required: false
+	// type: string
+	// description: if true, only deployable groups are returned. Otherwise, all groups are returned
+	Deployable string `json:"deployable"`
+}

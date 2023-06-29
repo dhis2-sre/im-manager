@@ -119,6 +119,18 @@ func (h Handler) Deploy(c *gin.Context) {
 		return
 	}
 
+	group, err := h.groupService.Find(request.Name)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	if !group.Deployable {
+		forbidden := errdef.NewForbidden("group isn't deployable: %s", group.Name)
+		_ = c.Error(forbidden)
+		return
+	}
+
 	if request.TTL == 0 {
 		request.TTL = h.defaultTTL
 	}
@@ -138,7 +150,7 @@ func (h Handler) Deploy(c *gin.Context) {
 	i := &model.Instance{
 		Name:               request.Name,
 		UserID:             user.ID,
-		GroupName:          request.Group,
+		GroupName:          group.Name,
 		TTL:                request.TTL,
 		StackName:          request.Stack,
 		RequiredParameters: request.RequiredParameters,
