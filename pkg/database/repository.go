@@ -31,7 +31,13 @@ func (r repository) Create(d *model.Database) error {
 func (r repository) Save(d *model.Database) error {
 	s := fmt.Sprintf("%s/%s", d.GroupName, d.Name)
 	d.Slug = slug.Make(s)
-	return r.db.Save(&d).Error
+
+	err := r.db.Save(&d).Error
+	if errors.Is(err, gorm.ErrDuplicatedKey) {
+		return errdef.NewDuplicated("database named %q already exists", d.Name)
+	}
+
+	return err
 }
 
 func (r repository) FindById(id uint) (*model.Database, error) {
