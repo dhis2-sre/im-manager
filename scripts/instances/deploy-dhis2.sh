@@ -8,6 +8,9 @@ STACK=dhis2
 
 GROUP=$1
 NAME=$2
+shift
+shift
+DESCRIPTION=${*:-""}
 
 # container(s) in dhis2 pod will be restarted after that due to restartPolicy
 # 5*26=130s
@@ -32,6 +35,7 @@ DB_RESOURCES_REQUESTS_MEMORY=${DB_RESOURCES_REQUESTS_MEMORY:-256Mi}
 echo "{
   \"name\": \"$NAME\",
   \"groupName\": \"$GROUP\",
+  \"description\": \"$DESCRIPTION\",
   \"stackName\": \"$STACK\",
   \"ttl\": $INSTANCE_TTL,
   \"optionalParameters\": [

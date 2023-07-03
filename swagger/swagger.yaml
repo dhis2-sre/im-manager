@@ -95,6 +95,9 @@ definitions:
         x-go-package: github.com/dhis2-sre/im-manager/pkg/model
     DeployInstanceRequest:
         properties:
+            description:
+                type: string
+                x-go-name: Description
             groupName:
                 type: string
                 x-go-name: Group
@@ -212,6 +215,9 @@ definitions:
             deployLog:
                 type: string
                 x-go-name: DeployLog
+            description:
+                type: string
+                x-go-name: Description
             groupName:
                 type: string
                 x-go-name: GroupName

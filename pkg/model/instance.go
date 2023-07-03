@@ -12,6 +12,7 @@ type Instance struct {
 	UserID             uint                        `json:"userId"`
 	Name               string                      `json:"name" gorm:"index:idx_name_and_group,unique"`
 	GroupName          string                      `json:"groupName" gorm:"index:idx_name_and_group,unique"`
+	Description        string                      `json:"description"`
 	StackName          string                      `json:"stackName"`
 	TTL                uint                        `json:"ttl"`
 	RequiredParameters []InstanceRequiredParameter `json:"requiredParameters" gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`

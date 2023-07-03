@@ -62,6 +62,7 @@ type groupServiceHandler interface {
 type DeployInstanceRequest struct {
 	Name               string                            `json:"name" binding:"required,dns_rfc1035_label"`
 	Group              string                            `json:"groupName" binding:"required"`
+	Description        string                            `json:"description"`
 	Stack              string                            `json:"stackName" binding:"required"`
 	TTL                uint                              `json:"ttl"`
 	RequiredParameters []model.InstanceRequiredParameter `json:"requiredParameters"`
@@ -151,8 +152,9 @@ func (h Handler) Deploy(c *gin.Context) {
 		Name:               request.Name,
 		UserID:             user.ID,
 		GroupName:          request.Group,
-		TTL:                request.TTL,
+		Description:        request.Description,
 		StackName:          request.Stack,
+		TTL:                request.TTL,
 		RequiredParameters: request.RequiredParameters,
 		OptionalParameters: request.OptionalParameters,
 		Preset:             preset,
