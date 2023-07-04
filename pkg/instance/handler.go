@@ -37,6 +37,7 @@ type Service interface {
 	FindById(id uint) (*model.Instance, error)
 	FindByIdDecrypted(id uint) (*model.Instance, error)
 	FindByNameAndGroup(instance string, group string) (*model.Instance, error)
+	FindPublicInstances() ([]GroupWithInstances, error)
 	Delete(id uint) error
 	Logs(instance *model.Instance, group *model.Group, typeSelector string) (io.ReadCloser, error)
 	FindInstances(user *model.User, presets bool) ([]GroupWithInstances, error)
@@ -855,6 +856,25 @@ func (h Handler) findInstances(c *gin.Context, presets bool) {
 	}
 
 	instances, err := h.instanceService.FindInstances(user, presets)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	c.JSON(http.StatusOK, instances)
+}
+
+// ListPublicInstances instances
+func (h Handler) ListPublicInstances(c *gin.Context) {
+	// swagger:route GET /public/instances listPublicInstances
+	//
+	// List Public Instances
+	//
+	// List all public instances
+	//
+	// responses:
+	//	200: []GroupWithInstances
+	instances, err := h.instanceService.FindPublicInstances()
 	if err != nil {
 		_ = c.Error(err)
 		return

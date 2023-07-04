@@ -11,6 +11,7 @@ type Instance struct {
 	User               User                        `json:"user"`
 	UserID             uint                        `json:"userId"`
 	Name               string                      `json:"name" gorm:"index:idx_name_and_group,unique"`
+	Group              Group                       `json:"group"`
 	GroupName          string                      `json:"groupName" gorm:"index:idx_name_and_group,unique"`
 	Description        string                      `json:"description"`
 	StackName          string                      `json:"stackName"`
@@ -19,6 +20,7 @@ type Instance struct {
 	OptionalParameters []InstanceOptionalParameter `json:"optionalParameters" gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
 	DeployLog          string                      `json:"deployLog" gorm:"type:text"`
 	Preset             bool                        `json:"preset"`
+	Public             bool                        `json:"public"`
 	PresetID           uint                        `json:"presetId"`
 	CreatedAt          time.Time                   `json:"createdAt"`
 	UpdatedAt          time.Time                   `json:"updatedAt"`

@@ -38,12 +38,14 @@ type Repository interface {
 	FindByIdDecrypted(id uint) (*model.Instance, error)
 	FindByNameAndGroup(instance string, group string) (*model.Instance, error)
 	FindByGroups(groups []model.Group, presets bool) ([]GroupWithInstances, error)
+	FindPublicInstances() ([]GroupWithInstances, error)
 	SaveDeployLog(instance *model.Instance, log string) error
 	Delete(id uint) error
 }
 
 type groupService interface {
 	Find(name string) (*model.Group, error)
+	FindAll(user *model.User, deployable bool) ([]model.Group, error)
 }
 
 type helmfile interface {
@@ -331,6 +333,10 @@ func (s service) FindInstances(user *model.User, presets bool) ([]GroupWithInsta
 	}
 
 	return instances, err
+}
+
+func (s service) FindPublicInstances() ([]GroupWithInstances, error) {
+	return s.instanceRepository.FindPublicInstances()
 }
 
 func (s service) Reset(token string, instance *model.Instance) error {

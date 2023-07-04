@@ -173,6 +173,32 @@ func (r repository) findInstances(groupNames []string, presets bool) ([]*model.I
 	return instances, err
 }
 
+func (r repository) FindPublicInstances() ([]GroupWithInstances, error) {
+	var instances []*model.Instance
+	err := r.db.
+		Joins("Group").
+		Where("preset = false").
+		Where("public = true").
+		Find(&instances).Error
+	if err != nil {
+		return nil, err
+	}
+
+	if len(instances) < 1 {
+		return []GroupWithInstances{}, nil
+	}
+
+	groupsByName := make(map[string]model.Group)
+	for _, instance := range instances {
+		groupsByName[instance.Group.Name] = instance.Group
+	}
+	groupNames := maps.Keys(groupsByName)
+
+	instancesByGroup := mapInstancesByGroup(groupNames, instances)
+
+	return groupWithInstances(instancesByGroup, groupsByName), nil
+}
+
 func mapInstancesByGroup(groupNames []string, result []*model.Instance) map[string][]*model.Instance {
 	instancesByGroup := make(map[string][]*model.Instance, len(groupNames))
 	for _, instance := range result {

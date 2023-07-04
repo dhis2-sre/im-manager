@@ -1,505 +1,27 @@
 consumes:
     - application/json
 definitions:
-    ClusterConfiguration:
-        properties:
-            createdAt:
-                format: date-time
-                type: string
-                x-go-name: CreatedAt
-            groupName:
-                type: string
-                x-go-name: GroupName
-            id:
-                format: uint64
-                type: integer
-                x-go-name: ID
-            kubernetesConfiguration:
-                items:
-                    format: uint8
-                    type: integer
-                type: array
-                x-go-name: KubernetesConfiguration
-            updatedAt:
-                format: date-time
-                type: string
-                x-go-name: UpdatedAt
-        type: object
-        x-go-package: github.com/dhis2-sre/im-manager/pkg/model
-    CopyDatabaseRequest:
-        properties:
-            group:
-                type: string
-                x-go-name: Group
-            name:
-                type: string
-                x-go-name: Name
-        type: object
-        x-go-package: github.com/dhis2-sre/im-manager/pkg/database
-    CreateExternalDatabaseRequest:
-        properties:
-            expiration:
-                description: Expiration time in seconds
-                format: uint64
-                type: integer
-                x-go-name: Expiration
-        type: object
-        x-go-package: github.com/dhis2-sre/im-manager/pkg/database
-    CreateGroupRequest:
-        properties:
-            deployable:
-                type: boolean
-                x-go-name: Deployable
-            hostname:
-                type: string
-                x-go-name: Hostname
-            name:
-                type: string
-                x-go-name: Name
-        type: object
-        x-go-package: github.com/dhis2-sre/im-manager/pkg/group
     Database:
-        properties:
-            createdAt:
-                format: date-time
-                type: string
-                x-go-name: CreatedAt
-            externalDownloads:
-                items:
-                    $ref: '#/definitions/ExternalDownload'
-                type: array
-                x-go-name: ExternalDownloads
-            groupName:
-                type: string
-                x-go-name: GroupName
-            id:
-                format: uint64
-                type: integer
-                x-go-name: ID
-            lock:
-                $ref: '#/definitions/Lock'
-            name:
-                type: string
-                x-go-name: Name
-            slug:
-                type: string
-                x-go-name: Slug
-            updatedAt:
-                format: date-time
-                type: string
-                x-go-name: UpdatedAt
-            url:
-                type: string
-                x-go-name: Url
-        type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/model
-    DeployInstanceRequest:
-        properties:
-            description:
-                type: string
-                x-go-name: Description
-            groupName:
-                type: string
-                x-go-name: Group
-            name:
-                type: string
-                x-go-name: Name
-            optionalParameters:
-                items:
-                    $ref: '#/definitions/InstanceOptionalParameter'
-                type: array
-                x-go-name: OptionalParameters
-            presetInstance:
-                format: uint64
-                type: integer
-                x-go-name: PresetInstance
-            requiredParameters:
-                items:
-                    $ref: '#/definitions/InstanceRequiredParameter'
-                type: array
-                x-go-name: RequiredParameters
-            sourceInstance:
-                format: uint64
-                type: integer
-                x-go-name: SourceInstance
-            stackName:
-                type: string
-                x-go-name: Stack
-            ttl:
-                format: uint64
-                type: integer
-                x-go-name: TTL
-        type: object
-        x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
     ExternalDownload:
-        properties:
-            databaseId:
-                format: uint64
-                type: integer
-                x-go-name: DatabaseID
-            expiration:
-                format: uint64
-                type: integer
-                x-go-name: Expiration
-            uuid:
-                format: uuid
-                type: string
-                x-go-name: UUID
-        type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/model
     Group:
         description: Group domain object defining a group
-        properties:
-            clusterConfiguration:
-                $ref: '#/definitions/ClusterConfiguration'
-            createdAt:
-                format: date-time
-                type: string
-                x-go-name: CreatedAt
-            deployable:
-                type: boolean
-                x-go-name: Deployable
-            hostname:
-                type: string
-                x-go-name: Hostname
-            name:
-                type: string
-                x-go-name: Name
-            updatedAt:
-                format: date-time
-                type: string
-                x-go-name: UpdatedAt
-            users:
-                items:
-                    $ref: '#/definitions/User'
-                type: array
-                x-go-name: Users
-        type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/model
-    GroupWithInstances:
-        properties:
-            hostname:
-                type: string
-                x-go-name: Hostname
-            instances:
-                items:
-                    $ref: '#/definitions/Instance'
-                type: array
-                x-go-name: Instances
-            name:
-                type: string
-                x-go-name: Name
-        type: object
-        x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
     GroupsWithDatabases:
-        properties:
-            databases:
-                items:
-                    $ref: '#/definitions/Database'
-                type: array
-                x-go-name: Databases
-            hostname:
-                type: string
-                x-go-name: Hostname
-            name:
-                type: string
-                x-go-name: Name
-        type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/database
     Instance:
-        properties:
-            createdAt:
-                format: date-time
-                type: string
-                x-go-name: CreatedAt
-            deployLog:
-                type: string
-                x-go-name: DeployLog
-            description:
-                type: string
-                x-go-name: Description
-            groupName:
-                type: string
-                x-go-name: GroupName
-            id:
-                format: uint64
-                type: integer
-                x-go-name: ID
-            name:
-                type: string
-                x-go-name: Name
-            optionalParameters:
-                items:
-                    $ref: '#/definitions/InstanceOptionalParameter'
-                type: array
-                x-go-name: OptionalParameters
-            preset:
-                type: boolean
-                x-go-name: Preset
-            presetId:
-                format: uint64
-                type: integer
-                x-go-name: PresetID
-            requiredParameters:
-                items:
-                    $ref: '#/definitions/InstanceRequiredParameter'
-                type: array
-                x-go-name: RequiredParameters
-            stackName:
-                type: string
-                x-go-name: StackName
-            ttl:
-                format: uint64
-                type: integer
-                x-go-name: TTL
-            updatedAt:
-                format: date-time
-                type: string
-                x-go-name: UpdatedAt
-            user:
-                $ref: '#/definitions/User'
-            userId:
-                format: uint64
-                type: integer
-                x-go-name: UserID
-        type: object
-        x-go-package: github.com/dhis2-sre/im-manager/pkg/model
-    InstanceOptionalParameter:
-        properties:
-            name:
-                description: 'TODO: Rename StackOptionalParameterID to Name'
-                type: string
-                x-go-name: StackOptionalParameterID
-            value:
-                type: string
-                x-go-name: Value
-        type: object
-        x-go-package: github.com/dhis2-sre/im-manager/pkg/model
-    InstanceRequiredParameter:
-        properties:
-            name:
-                description: 'TODO: Rename StackRequiredParameterID to Name'
-                type: string
-                x-go-name: StackRequiredParameterID
-            value:
-                type: string
-                x-go-name: Value
-        type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/model
     Lock:
-        properties:
-            databaseId:
-                format: uint64
-                type: integer
-                x-go-name: DatabaseID
-            instanceId:
-                format: uint64
-                type: integer
-                x-go-name: InstanceID
-            userId:
-                format: uint64
-                type: integer
-                x-go-name: UserID
-        type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/model
-    LockDatabaseRequest:
-        properties:
-            instanceId:
-                format: uint64
-                type: integer
-                x-go-name: InstanceId
-        type: object
-        x-go-package: github.com/dhis2-sre/im-manager/pkg/database
-    RefreshTokenRequest:
-        properties:
-            refreshToken:
-                type: string
-                x-go-name: RefreshToken
-        type: object
-        x-go-package: github.com/dhis2-sre/im-manager/pkg/user
-    Request:
-        properties:
-            key:
-                type: string
-                x-go-name: Key
-            payload:
-                x-go-name: Payload
-        type: object
-        x-go-package: github.com/dhis2-sre/im-manager/pkg/integration
-    Response:
-        description: Response depends on the input and can be either a list or a map
-        type: object
-        x-go-package: github.com/dhis2-sre/im-manager/pkg/integration
     Stack:
-        properties:
-            createdAt:
-                format: date-time
-                type: string
-                x-go-name: CreatedAt
-            hostnamePattern:
-                type: string
-                x-go-name: HostnamePattern
-            hostnameVariable:
-                type: string
-                x-go-name: HostnameVariable
-            instances:
-                items:
-                    $ref: '#/definitions/Instance'
-                type: array
-                x-go-name: Instances
-            name:
-                type: string
-                x-go-name: Name
-            optionalParameters:
-                items:
-                    $ref: '#/definitions/StackOptionalParameter'
-                type: array
-                x-go-name: OptionalParameters
-            requiredParameters:
-                items:
-                    $ref: '#/definitions/StackRequiredParameter'
-                type: array
-                x-go-name: RequiredParameters
-            updatedAt:
-                format: date-time
-                type: string
-                x-go-name: UpdatedAt
-        type: object
-        x-go-package: github.com/dhis2-sre/im-manager/pkg/model
-    StackOptionalParameter:
-        properties:
-            consumed:
-                type: boolean
-                x-go-name: Consumed
-            defaultValue:
-                type: string
-                x-go-name: DefaultValue
-            name:
-                type: string
-                x-go-name: Name
-            stackName:
-                type: string
-                x-go-name: StackName
-        type: object
-        x-go-package: github.com/dhis2-sre/im-manager/pkg/model
-    StackRequiredParameter:
-        properties:
-            consumed:
-                type: boolean
-                x-go-name: Consumed
-            name:
-                type: string
-                x-go-name: Name
-            stackName:
-                type: string
-                x-go-name: StackName
-        type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/model
     Tokens:
         description: Tokens domain object defining user tokens
-        properties:
-            accessToken:
-                type: string
-                x-go-name: AccessToken
-            expiresIn:
-                format: uint64
-                type: integer
-                x-go-name: ExpiresIn
-            refreshToken:
-                type: string
-                x-go-name: RefreshToken
-            tokenType:
-                type: string
-                x-go-name: TokenType
-        type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/token
-    UpdateDatabaseRequest:
-        properties:
-            name:
-                type: string
-                x-go-name: Name
-        type: object
-        x-go-package: github.com/dhis2-sre/im-manager/pkg/database
-    UpdateInstanceRequest:
-        properties:
-            optionalParameters:
-                items:
-                    $ref: '#/definitions/InstanceOptionalParameter'
-                type: array
-                x-go-name: OptionalParameters
-            requiredParameters:
-                items:
-                    $ref: '#/definitions/InstanceRequiredParameter'
-                type: array
-                x-go-name: RequiredParameters
-            ttl:
-                format: uint64
-                type: integer
-                x-go-name: TTL
-        type: object
-        x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
     User:
         description: User domain object defining a user
-        properties:
-            adminGroups:
-                items:
-                    $ref: '#/definitions/Group'
-                type: array
-                x-go-name: AdminGroups
-            createdAt:
-                format: date-time
-                type: string
-                x-go-name: CreatedAt
-            email:
-                type: string
-                x-go-name: Email
-            groups:
-                items:
-                    $ref: '#/definitions/Group'
-                type: array
-                x-go-name: Groups
-            id:
-                format: uint64
-                type: integer
-                x-go-name: ID
-            updatedAt:
-                format: date-time
-                type: string
-                x-go-name: UpdatedAt
-        type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/model
-    saveAsRequest:
-        properties:
-            format:
-                description: Database dump format. Currently plain and custom are support, please see https://www.postgresql.org/docs/current/app-pgdump.html
-                type: string
-                x-go-name: Format
-            name:
-                description: Name of the new database
-                type: string
-                x-go-name: Name
-        type: object
-        x-go-package: github.com/dhis2-sre/im-manager/pkg/database
-    signUpRequest:
-        properties:
-            email:
-                type: string
-                x-go-name: Email
-            password:
-                type: string
-                x-go-name: Password
-        type: object
-        x-go-package: github.com/dhis2-sre/im-manager/pkg/user
-    updateUserRequest:
-        properties:
-            email:
-                type: string
-                x-go-name: Email
-            password:
-                type: string
-                x-go-name: Password
-        type: object
-        x-go-package: github.com/dhis2-sre/im-manager/pkg/user
 info:
     contact:
         email: info@dhis2.org
@@ -625,8 +147,7 @@ paths:
                   in: body
                   name: Body
                   required: true
-                  schema:
-                    $ref: '#/definitions/UpdateDatabaseRequest'
+                  schema: {}
             responses:
                 "200":
                     $ref: '#/responses/Database'
@@ -654,8 +175,7 @@ paths:
                   in: body
                   name: Body
                   required: true
-                  schema:
-                    $ref: '#/definitions/CopyDatabaseRequest'
+                  schema: {}
             responses:
                 "202":
                     $ref: '#/responses/Database'
@@ -708,8 +228,7 @@ paths:
                   in: body
                   name: Body
                   required: true
-                  schema:
-                    $ref: '#/definitions/CreateExternalDatabaseRequest'
+                  schema: {}
             responses:
                 "200":
                     $ref: '#/responses/CreateExternalDownloadResponse'
@@ -739,8 +258,7 @@ paths:
                   in: body
                   name: Body
                   required: true
-                  schema:
-                    $ref: '#/definitions/LockDatabaseRequest'
+                  schema: {}
             responses:
                 "202":
                     description: ""
@@ -769,8 +287,7 @@ paths:
                   in: body
                   name: Body
                   required: true
-                  schema:
-                    $ref: '#/definitions/LockDatabaseRequest'
+                  schema: {}
             responses:
                 "200":
                     $ref: '#/responses/Lock'
@@ -827,8 +344,7 @@ paths:
                   in: body
                   name: Body
                   required: true
-                  schema:
-                    $ref: '#/definitions/saveAsRequest'
+                  schema: {}
             responses:
                 "201":
                     $ref: '#/responses/Database'
@@ -900,8 +416,7 @@ paths:
                   in: body
                   name: Body
                   required: true
-                  schema:
-                    $ref: '#/definitions/CreateGroupRequest'
+                  schema: {}
             responses:
                 "201":
                     description: Group
@@ -1042,8 +557,7 @@ paths:
                   in: body
                   name: Payload
                   required: true
-                  schema:
-                    $ref: '#/definitions/DeployInstanceRequest'
+                  schema: {}
                 - description: preset
                   in: query
                   name: preset
@@ -1163,8 +677,7 @@ paths:
                   in: body
                   name: Payload
                   required: true
-                  schema:
-                    $ref: '#/definitions/UpdateInstanceRequest'
+                  schema: {}
             responses:
                 "204":
                     description: Instance
@@ -1356,8 +869,7 @@ paths:
                   in: body
                   name: Body
                   required: true
-                  schema:
-                    $ref: '#/definitions/Request'
+                  schema: {}
             responses:
                 "200":
                     $ref: '#/responses/Response'
@@ -1406,6 +918,14 @@ paths:
             security:
                 - oauth2: []
             summary: List presets
+    /public/instances:
+        get:
+            description: List all public instances
+            operationId: listPublicInstances
+            responses:
+                "200":
+                    $ref: '#/responses/GroupWithInstances'
+            summary: List Public Instances
     /refresh:
         post:
             description: Refresh user tokens
@@ -1415,8 +935,7 @@ paths:
                   in: body
                   name: Body
                   required: true
-                  schema:
-                    $ref: '#/definitions/RefreshTokenRequest'
+                  schema: {}
             responses:
                 "201":
                     $ref: '#/responses/Tokens'
@@ -1524,8 +1043,7 @@ paths:
                   in: body
                   name: Body
                   required: true
-                  schema:
-                    $ref: '#/definitions/signUpRequest'
+                  schema: {}
             responses:
                 "201":
                     description: User
@@ -1601,8 +1119,7 @@ paths:
                   in: body
                   name: Body
                   required: true
-                  schema:
-                    $ref: '#/definitions/updateUserRequest'
+                  schema: {}
             responses:
                 "200":
                     description: User
@@ -1624,12 +1141,8 @@ produces:
 responses:
     CreateExternalDownloadResponse:
         description: ""
-        schema:
-            $ref: '#/definitions/ExternalDownload'
     Database:
         description: ""
-        schema:
-            $ref: '#/definitions/Database'
     DownloadDatabaseResponse:
         description: ""
         schema:
@@ -1642,38 +1155,27 @@ responses:
     GroupWithInstances:
         description: ""
         schema:
-            items:
-                $ref: '#/definitions/GroupWithInstances'
+            items: {}
             type: array
     InstanceLogsResponse:
         description: ""
     Lock:
         description: ""
-        schema:
-            $ref: '#/definitions/Lock'
     Response:
         description: ""
-        schema:
-            $ref: '#/definitions/Response'
     StackResponse:
         description: ""
-        schema:
-            $ref: '#/definitions/Stack'
     StacksResponse:
         description: ""
         schema:
-            items:
-                $ref: '#/definitions/Stack'
+            items: {}
             type: array
     Tokens:
         description: ""
-        schema:
-            $ref: '#/definitions/Tokens'
     UsersResponse:
         description: ""
         schema:
-            items:
-                $ref: '#/definitions/User'
+            items: {}
             type: array
 securityDefinitions:
     oauth2:

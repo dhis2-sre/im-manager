@@ -6,6 +6,8 @@ import (
 )
 
 func Routes(r *gin.Engine, authenticationMiddleware middleware.AuthenticationMiddleware, handler Handler) {
+	r.GET("/public/instances", handler.ListPublicInstances)
+
 	tokenAuthenticationRouter := r.Group("")
 	tokenAuthenticationRouter.Use(authenticationMiddleware.TokenAuthentication)
 
