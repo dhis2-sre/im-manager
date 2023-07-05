@@ -11,7 +11,7 @@ type Instance struct {
 	User               User                        `json:"user"`
 	UserID             uint                        `json:"userId"`
 	Name               string                      `json:"name" gorm:"index:idx_name_and_group,unique"`
-	Group              Group                       `json:"group" gorm:"index:idx_name_and_group,unique"`
+	Group              Group                       `json:"group"`
 	GroupName          string                      `json:"groupName" gorm:"index:idx_name_and_group,unique"`
 	Description        string                      `json:"description"`
 	StackName          string                      `json:"stackName"`
