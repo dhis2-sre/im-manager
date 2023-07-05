@@ -8,7 +8,7 @@ GROUP=$1
 NAME=$2
 
 function int_handler {
-  ./destroy.sh $GROUP $NAME
+  ./destroy.sh "$GROUP" "$NAME"
   trap - EXIT
   exit
 }
@@ -16,10 +16,10 @@ function int_handler {
 trap int_handler INT
 trap int_handler EXIT
 
-./deploy-whoami.sh $GROUP $NAME
+./deploy-whoami.sh "$GROUP" "$NAME"
 
-./findByName.sh $GROUP $NAME
+./findByName.sh "$GROUP" "$NAME"
 
 sleep 5
 
-./logs.sh $GROUP $NAME
+./logs.sh "$GROUP" "$NAME"

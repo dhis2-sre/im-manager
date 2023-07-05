@@ -11,6 +11,86 @@ definitions:
     GroupsWithDatabases:
         x-go-package: github.com/dhis2-sre/im-manager/pkg/database
     Instance:
+        properties:
+            createdAt:
+                format: date-time
+                type: string
+                x-go-name: CreatedAt
+            deployLog:
+                type: string
+                x-go-name: DeployLog
+            description:
+                type: string
+                x-go-name: Description
+            group:
+                $ref: '#/definitions/Group'
+            groupName:
+                type: string
+                x-go-name: GroupName
+            id:
+                format: uint64
+                type: integer
+                x-go-name: ID
+            name:
+                type: string
+                x-go-name: Name
+            optionalParameters:
+                items:
+                    $ref: '#/definitions/InstanceOptionalParameter'
+                type: array
+                x-go-name: OptionalParameters
+            preset:
+                type: boolean
+                x-go-name: Preset
+            presetId:
+                format: uint64
+                type: integer
+                x-go-name: PresetID
+            requiredParameters:
+                items:
+                    $ref: '#/definitions/InstanceRequiredParameter'
+                type: array
+                x-go-name: RequiredParameters
+            stackName:
+                type: string
+                x-go-name: StackName
+            ttl:
+                format: uint64
+                type: integer
+                x-go-name: TTL
+            updatedAt:
+                format: date-time
+                type: string
+                x-go-name: UpdatedAt
+            user:
+                $ref: '#/definitions/User'
+            userId:
+                format: uint64
+                type: integer
+                x-go-name: UserID
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/model
+    InstanceOptionalParameter:
+        properties:
+            name:
+                description: 'TODO: Rename StackOptionalParameterID to Name'
+                type: string
+                x-go-name: StackOptionalParameterID
+            value:
+                type: string
+                x-go-name: Value
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/model
+    InstanceRequiredParameter:
+        properties:
+            name:
+                description: 'TODO: Rename StackRequiredParameterID to Name'
+                type: string
+                x-go-name: StackRequiredParameterID
+            value:
+                type: string
+                x-go-name: Value
+        type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/model
     Lock:
         x-go-package: github.com/dhis2-sre/im-manager/pkg/model

@@ -17,7 +17,7 @@ delete(){
 }
 
 for INSTANCE in $INSTANCES; do
-  delete $INSTANCE &
+  delete "$INSTANCE" &
 done
 
 # shellcheck disable=SC2046

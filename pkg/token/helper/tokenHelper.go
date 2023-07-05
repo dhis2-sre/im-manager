@@ -96,6 +96,7 @@ type refreshToken struct {
 	ExpiresIn    time.Duration
 }
 
+//goland:noinspection GoExportedFuncWithUnexportedType
 func GenerateRefreshToken(user *model.User, secretKey string, expirationInSeconds int) (*refreshToken, error) {
 	currentTime := time.Now()
 	tokenExpiration := currentTime.Add(time.Duration(expirationInSeconds) * time.Second)
@@ -148,6 +149,7 @@ type refreshTokenClaims struct {
 	IssuedAt  int64         `json:"iat"`
 }
 
+//goland:noinspection GoExportedFuncWithUnexportedType
 func ValidateRefreshToken(tokenString string, secretKey string) (*refreshTokenClaims, error) {
 	token, err := jwt.Parse(
 		[]byte(tokenString),

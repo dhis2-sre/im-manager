@@ -21,6 +21,7 @@ type helmfileService struct {
 	config       config.Config
 }
 
+//goland:noinspection GoExportedFuncWithUnexportedType
 func NewHelmfileService(stackService stack.Service, config config.Config) helmfileService {
 	return helmfileService{
 		stackService,
@@ -43,6 +44,7 @@ func (h helmfileService) destroy(instance *model.Instance, group *model.Group) (
 // * stackPath is concatenated using path.Join which also cleans the path and furthermore it's existence is validated
 // * Binaries are executed using their full path and not from $PATH which would be very difficult to exploit anyway
 func (h helmfileService) executeHelmfileCommand(token string, instance *model.Instance, group *model.Group, operation string) (*exec.Cmd, error) {
+	//goland:noinspection GoImportUsedAsName
 	stack, err := h.stackService.Find(instance.StackName)
 	if err != nil {
 		return nil, err
@@ -74,6 +76,7 @@ type stackParameters map[string]string
 
 func (h helmfileService) loadStackParameters(folder string, name string) (stackParameters, error) {
 	classification := h.config.Classification
+	//goland:noinspection GoImportUsedAsName
 	path := fmt.Sprintf("%s/%s/parameters/%s.yaml", folder, name, classification)
 	data, err := os.ReadFile(path) // #nosec
 	if err != nil {

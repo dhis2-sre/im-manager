@@ -14,6 +14,7 @@ import (
 	"github.com/dhis2-sre/im-manager/pkg/model"
 )
 
+//goland:noinspection GoExportedFuncWithUnexportedType
 func NewService(
 	config config.Config,
 	instanceRepository Repository,

@@ -174,12 +174,14 @@ func (h Handler) SaveAs(c *gin.Context) {
 		return
 	}
 
+	//goland:noinspection GoImportUsedAsName
 	instance, err := h.instanceService.FindByIdDecrypted(instanceId)
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
 
+	//goland:noinspection GoImportUsedAsName
 	stack, err := h.stackService.Find(instance.StackName)
 	if err != nil {
 		_ = c.Error(err)
@@ -244,12 +246,14 @@ func (h Handler) Save(c *gin.Context) {
 		return
 	}
 
-	instance, err := h.instanceService.FindByIdDecrypted(uint(instanceId))
+	//goland:noinspection GoImportUsedAsName
+	instance, err := h.instanceService.FindByIdDecrypted(instanceId)
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
 
+	//goland:noinspection GoImportUsedAsName
 	stack, err := h.stackService.Find(instance.StackName)
 	if err != nil {
 		_ = c.Error(err)

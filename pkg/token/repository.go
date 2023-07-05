@@ -9,6 +9,7 @@ import (
 	"github.com/go-redis/redis"
 )
 
+//goland:noinspection GoExportedFuncWithUnexportedType
 func NewRepository(redisClient *redis.Client) *redisTokenRepository {
 	return &redisTokenRepository{
 		redis: redisClient,

@@ -28,6 +28,7 @@ import (
 	"github.com/google/uuid"
 )
 
+//goland:noinspection GoExportedFuncWithUnexportedType
 func NewService(c config.Config, instanceService instance.Service, groupService groupService, s3Client S3Client, repository Repository) *service {
 	return &service{c, instanceService, groupService, s3Client, repository}
 }

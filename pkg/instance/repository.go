@@ -12,6 +12,7 @@ import (
 	"gorm.io/gorm"
 )
 
+//goland:noinspection GoExportedFuncWithUnexportedType
 func NewRepository(db *gorm.DB, config config.Config) *repository {
 	return &repository{db: db, config: config}
 }
@@ -92,6 +93,7 @@ func (r repository) FindById(id uint) (*model.Instance, error) {
 	err := r.db.
 		Preload("RequiredParameters.StackRequiredParameter").
 		Preload("OptionalParameters.StackOptionalParameter").
+		Joins("Group").
 		First(&instance, id).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, errdef.NewNotFound("instance not found by id: %d", id)

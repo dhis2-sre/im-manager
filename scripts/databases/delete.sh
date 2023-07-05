@@ -13,7 +13,7 @@ delete() {
 }
 
 for DATABASE in $DATABASES; do
-  delete $DATABASE &
+  delete "$DATABASE" &
 done
 
 # shellcheck disable=SC2046

@@ -19,6 +19,7 @@ type deleter interface {
 	Delete(id uint) error
 }
 
+//goland:noinspection GoExportedFuncWithUnexportedType
 func NewTTLDestroyConsumer(consumer *rabbitmq.Consumer, instanceDeleter deleter) *ttlDestroyConsumer {
 	return &ttlDestroyConsumer{
 		consumer:        consumer,
