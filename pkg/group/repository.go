@@ -55,10 +55,10 @@ func (r repository) findAll(user *model.User, deployable bool) ([]model.Group, e
 		return groups, err
 	}
 
-	return findAllGroups(user, deployable), nil
+	return findAllFromUser(user, deployable), nil
 }
 
-func findAllGroups(user *model.User, deployable bool) []model.Group {
+func findAllFromUser(user *model.User, deployable bool) []model.Group {
 	var allGroups []model.Group
 	allGroups = append(allGroups, user.Groups...)
 	allGroups = append(allGroups, user.AdminGroups...)
