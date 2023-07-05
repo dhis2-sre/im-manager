@@ -116,6 +116,13 @@ func (h Handler) Integrations(c *gin.Context) {
 		return
 	}
 
+	if request.Key == "IMAGE_PULL_POLICY" {
+		policies := []string{"Always", "IfNotPresent", "Never"}
+
+		c.JSON(http.StatusOK, policies)
+		return
+	}
+
 	if request.Key == "DATABASE_ID" {
 		token, err := handler.GetTokenFromHttpAuthHeader(c)
 		if err != nil {
