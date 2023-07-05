@@ -218,6 +218,8 @@ definitions:
             description:
                 type: string
                 x-go-name: Description
+            group:
+                $ref: '#/definitions/Group'
             groupName:
                 type: string
                 x-go-name: GroupName
