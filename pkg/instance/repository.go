@@ -12,6 +12,7 @@ import (
 	"gorm.io/gorm"
 )
 
+//goland:noinspection GoExportedFuncWithUnexportedType
 func NewRepository(db *gorm.DB, config config.Config) *repository {
 	return &repository{db: db, config: config}
 }

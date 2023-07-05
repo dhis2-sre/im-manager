@@ -18,6 +18,7 @@ type service struct {
 	repository Repository
 }
 
+//goland:noinspection GoExportedFuncWithUnexportedType
 func NewService(repository Repository) *service {
 	return &service{repository}
 }

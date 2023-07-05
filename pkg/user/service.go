@@ -12,6 +12,7 @@ import (
 	"golang.org/x/crypto/scrypt"
 )
 
+//goland:noinspection GoExportedFuncWithUnexportedType
 func NewService(repository userRepository) *service {
 	return &service{repository}
 }

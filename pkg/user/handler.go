@@ -75,7 +75,7 @@ func (h Handler) SignUp(c *gin.Context) {
 }
 
 // SignIn user
-func (h *Handler) SignIn(c *gin.Context) {
+func (h Handler) SignIn(c *gin.Context) {
 	// swagger:route POST /tokens signIn
 	//
 	// Sign in
@@ -325,7 +325,7 @@ type updateUserRequest struct {
 }
 
 // Update user
-func (h *Handler) Update(c *gin.Context) {
+func (h Handler) Update(c *gin.Context) {
 	// swagger:route PUT /users/{id} updateUser
 	//
 	// Update user

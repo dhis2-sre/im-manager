@@ -4,6 +4,7 @@ import (
 	"github.com/dhis2-sre/im-manager/pkg/model"
 )
 
+//goland:noinspection GoExportedFuncWithUnexportedType
 func NewService(groupRepository groupRepository, userService userService) *service {
 	return &service{
 		groupRepository,

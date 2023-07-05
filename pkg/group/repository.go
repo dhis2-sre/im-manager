@@ -15,6 +15,7 @@ type repository struct {
 	db *gorm.DB
 }
 
+//goland:noinspection GoExportedFuncWithUnexportedType
 func NewRepository(db *gorm.DB) *repository {
 	return &repository{db}
 }

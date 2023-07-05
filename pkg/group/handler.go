@@ -13,12 +13,8 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func NewHandler(
-	groupService groupService,
-) Handler {
-	return Handler{
-		groupService,
-	}
+func NewHandler(groupService groupService) Handler {
+	return Handler{groupService}
 }
 
 type Handler struct {

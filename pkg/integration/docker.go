@@ -8,6 +8,7 @@ import (
 	"net/http"
 )
 
+//goland:noinspection GoExportedFuncWithUnexportedType
 func NewDockerHubClient(username, password string) dockerHubClient {
 	client := http.Client{}
 	return dockerHubClient{username, password, &client}

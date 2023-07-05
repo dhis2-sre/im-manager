@@ -25,6 +25,7 @@ type kubernetesService struct {
 	client *kubernetes.Clientset
 }
 
+//goland:noinspection GoExportedFuncWithUnexportedType
 func NewKubernetesService(config *model.ClusterConfiguration) (*kubernetesService, error) {
 	client, err := newClient(config)
 	if err != nil {
