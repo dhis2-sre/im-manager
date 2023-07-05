@@ -65,6 +65,7 @@ type DeployInstanceRequest struct {
 	Group              string                            `json:"groupName" binding:"required"`
 	Description        string                            `json:"description"`
 	Stack              string                            `json:"stackName" binding:"required"`
+	Public             bool                              `json:"public"`
 	TTL                uint                              `json:"ttl"`
 	RequiredParameters []model.InstanceRequiredParameter `json:"requiredParameters"`
 	OptionalParameters []model.InstanceOptionalParameter `json:"optionalParameters"`
@@ -155,6 +156,7 @@ func (h Handler) Deploy(c *gin.Context) {
 		GroupName:          request.Group,
 		Description:        request.Description,
 		StackName:          request.Stack,
+		Public:             request.Public,
 		TTL:                request.TTL,
 		RequiredParameters: request.RequiredParameters,
 		OptionalParameters: request.OptionalParameters,
