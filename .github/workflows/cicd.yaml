@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - master
-      - feature/**
     tags:
       - v*.*.*
 
@@ -12,9 +11,16 @@ on:
 
   workflow_dispatch:
 
+# Cancel previous runs of the same workflow and PR number or branch/tag
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   call-workflow:
-    uses: dhis2-sre/gha-workflows/.github/workflows/instance-manager.yaml@master
+    # TODO update the branch reference before merging the PR
+    uses: dhis2-sre/gha-workflows/.github/workflows/instance-manager.yaml@DEVOPS-262
+    if: ${{ (github.event_name == 'pull_request' && startsWith(github.head_ref, 'feature/')) || github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
     with:
       PROCESS_NAME: im-manager
       POD_NAME: im-manager
