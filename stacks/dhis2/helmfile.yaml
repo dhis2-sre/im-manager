@@ -8,7 +8,7 @@ releases:
     values:
       - image:
           repository: dhis2/{{ env "IMAGE_REPOSITORY" | default "core" }}
-          tag: "{{ env "IMAGE_TAG" | default "2.39.0" }}"
+          tag: "{{ env "IMAGE_TAG" | default "2.40.0" }}"
           pullPolicy: {{ env "IMAGE_PULL_POLICY" | default "IfNotPresent" }}
       - ingress:
           enabled: true
@@ -69,7 +69,7 @@ releases:
   - name: {{ requiredEnv "INSTANCE_NAME" }}-database
     namespace: "{{ requiredEnv "INSTANCE_NAMESPACE" }}"
     chart: bitnami/postgresql
-    version: 11.9.8
+    version: 12.6.2
     verify: false
     values:
       - commonLabels:

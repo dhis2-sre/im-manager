@@ -3,7 +3,7 @@ releases:
   - name: {{ requiredEnv "INSTANCE_NAME" }}-database
     namespace: "{{ requiredEnv "INSTANCE_NAMESPACE" }}"
     chart: bitnami/postgresql
-    version: "{{ env "CHART_VERSION" | default "11.9.8" }}"
+    version: "{{ env "CHART_VERSION" | default "12.6.2" }}"
     verify: false
     values:
       - commonLabels:
