@@ -13,7 +13,7 @@ deploy:
   helm:
     releases:
       - name: im-rabbitmq-{{ .ENVIRONMENT }}
-        namespace: instance-manager-{{ .ENVIRONMENT }}
+        namespace: instance-manager-{{ .CLASSIFICATION }}
         createNamespace: true
         remoteChart: rabbitmq
         repo: https://charts.bitnami.com/bitnami
@@ -23,7 +23,7 @@ deploy:
           - helm/data/secrets/{{ .CLASSIFICATION }}/rabbitmq.yaml
 
       - name: im-manager-redis-{{ .ENVIRONMENT }}
-        namespace: instance-manager-{{ .ENVIRONMENT }}
+        namespace: instance-manager-{{ .CLASSIFICATION }}
         createNamespace: true
         remoteChart: redis
         repo: https://charts.bitnami.com/bitnami
@@ -34,7 +34,7 @@ deploy:
             enabled: false
 
       - name: im-manager-postgresql-{{ .ENVIRONMENT }}
-        namespace: instance-manager-{{ .ENVIRONMENT }}
+        namespace: instance-manager-{{ .CLASSIFICATION }}
         createNamespace: true
         remoteChart: postgresql
         repo: https://charts.bitnami.com/bitnami
@@ -45,7 +45,7 @@ deploy:
           - helm/data/values/{{ .CLASSIFICATION }}/postgresql.yaml
 
       - name: im-manager-{{ .ENVIRONMENT }}
-        namespace: instance-manager-{{ .ENVIRONMENT }}
+        namespace: instance-manager-{{ .CLASSIFICATION }}
         createNamespace: true
         chartPath: helm/chart
         setValueTemplates:
@@ -53,24 +53,24 @@ deploy:
             repository: dhis2/im-manager
           serviceAccount:
             annotations:
-              "eks\\.amazonaws\\.com\\/role-arn": arn:aws:iam::767224633206:role/instance-cluster-test-im-manager-{{ .ENVIRONMENT }}
+              "eks\\.amazonaws\\.com\\/role-arn": arn:aws:iam::767224633206:role/instance-cluster-test-im-manager-{{ .CLASSIFICATION }}
           ingress:
             enabled: true
             hostname: "{{ .API_HOSTNAME }}"
             certIssuer: cert-issuer-prod
           redis:
-            host: im-manager-redis-{{ .ENVIRONMENT }}-master.instance-manager-{{ .ENVIRONMENT }}.svc
+            host: im-manager-redis-{{ .ENVIRONMENT }}-master.instance-manager-{{ .CLASSIFICATION }}.svc
           environment:
             ENVIRONMENT: "{{ .ENVIRONMENT }}"
             CLASSIFICATION: "{{ .CLASSIFICATION }}"
             HOSTNAME: "https://{{ .API_HOSTNAME }}"
-            INSTANCE_SERVICE_HOST: im-manager-{{ .ENVIRONMENT }}.instance-manager-{{ .ENVIRONMENT }}.svc:8080
+            INSTANCE_SERVICE_HOST: im-manager-{{ .ENVIRONMENT }}.instance-manager-{{ .CLASSIFICATION }}.svc:8080
             INSTANCE_SERVICE_BASE_PATH: /
-            DATABASE_MANAGER_SERVICE_HOST: im-manager-{{ .ENVIRONMENT }}.instance-manager-{{ .ENVIRONMENT }}.svc:8080
+            DATABASE_MANAGER_SERVICE_HOST: im-manager-{{ .ENVIRONMENT }}.instance-manager-{{ .CLASSIFICATION }}.svc:8080
             DATABASE_MANAGER_SERVICE_BASE_PATH: /
-            DATABASE_HOST: im-manager-postgresql-{{ .ENVIRONMENT }}.instance-manager-{{ .ENVIRONMENT }}.svc
+            DATABASE_HOST: im-manager-postgresql-{{ .ENVIRONMENT }}.instance-manager-{{ .CLASSIFICATION }}.svc
             DATABASE_PORT: "5432"
-            RABBITMQ_HOST: im-rabbitmq-{{ .ENVIRONMENT }}.instance-manager-{{ .ENVIRONMENT }}.svc
+            RABBITMQ_HOST: im-rabbitmq-{{ .ENVIRONMENT }}.instance-manager-{{ .CLASSIFICATION }}.svc
             RABBITMQ_PORT: "5672"
             S3_BUCKET: test-db-manager-bucket
             DEFAULT_TTL: "172800"
@@ -93,7 +93,7 @@ profiles:
             setValueTemplates:
               serviceAccount:
                 name: im-manager-{{ .ENVIRONMENT }}
-                namespace: instance-manager-{{ .ENVIRONMENT }}
+                namespace: instance-manager-{{ .CLASSIFICATION }}
 
   - name: prod
     deploy:
