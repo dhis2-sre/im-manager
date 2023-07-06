@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - master
-      - feature/**
     tags:
       - v*.*.*
 
@@ -12,9 +11,23 @@ on:
 
   workflow_dispatch:
 
+# Cancel previous runs of the same workflow and PR number or branch/tag
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
+#  dump-context:
+#    runs-on: ubuntu-latest
+#    steps:
+#      - name: Dump GitHub context
+#        env:
+#          GITHUB_CONTEXT: ${{ toJSON(github) }}
+#        run: echo "$GITHUB_CONTEXT"
+
   call-workflow:
-    uses: dhis2-sre/gha-workflows/.github/workflows/instance-manager.yaml@master
+    uses: dhis2-sre/gha-workflows/.github/workflows/instance-manager.yaml@DEVOPS-262
+    if: ${{ (github.event_name == 'pull_request' && startsWith(github.head_ref, 'feature/')) || github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
     with:
       PROCESS_NAME: im-manager
       POD_NAME: im-manager
