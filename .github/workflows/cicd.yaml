@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - master
-      - feature/**
+#      - feature/**
     tags:
       - v*.*.*
 
@@ -14,7 +14,8 @@ on:
 
 jobs:
   call-workflow:
-    uses: dhis2-sre/gha-workflows/.github/workflows/instance-manager.yaml@master
+    uses: dhis2-sre/gha-workflows/.github/workflows/instance-manager.yaml@DEVOPS-262
+    if: startsWith(github.head_ref, 'refs/heads/feature/')
     with:
       PROCESS_NAME: im-manager
       POD_NAME: im-manager
