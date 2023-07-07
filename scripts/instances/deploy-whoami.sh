@@ -15,6 +15,7 @@ DESCRIPTION=${*:-""}
 CHART_VERSION=${CHART_VERSION:-0.9.0}
 IMAGE_TAG=${IMAGE_TAG:-0.6.0}
 INSTANCE_TTL=${INSTANCE_TTL:-0}
+PUBLIC=${PUBLIC:-false}
 
 echo "{
   \"name\": \"$NAME\",
@@ -22,6 +23,7 @@ echo "{
   \"description\": \"$DESCRIPTION\",
   \"stackName\": \"$STACK\",
   \"ttl\": $INSTANCE_TTL,
+  \"public\": \"$PUBLIC\",
   \"optionalParameters\": [
     {
       \"name\": \"CHART_VERSION\",
