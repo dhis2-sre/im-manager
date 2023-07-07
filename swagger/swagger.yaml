@@ -113,6 +113,9 @@ definitions:
                 format: uint64
                 type: integer
                 x-go-name: PresetInstance
+            public:
+                type: boolean
+                x-go-name: Public
             requiredParameters:
                 items:
                     $ref: '#/definitions/InstanceRequiredParameter'
@@ -242,6 +245,9 @@ definitions:
                 format: uint64
                 type: integer
                 x-go-name: PresetID
+            public:
+                type: boolean
+                x-go-name: Public
             requiredParameters:
                 items:
                     $ref: '#/definitions/InstanceRequiredParameter'
@@ -1408,6 +1414,14 @@ paths:
             security:
                 - oauth2: []
             summary: List presets
+    /public/instances:
+        get:
+            description: List all public instances
+            operationId: listPublicInstances
+            responses:
+                "200":
+                    $ref: '#/responses/GroupWithInstances'
+            summary: List Public Instances
     /refresh:
         post:
             description: Refresh user tokens

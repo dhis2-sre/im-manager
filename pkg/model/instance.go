@@ -20,6 +20,7 @@ type Instance struct {
 	OptionalParameters []InstanceOptionalParameter `json:"optionalParameters" gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
 	DeployLog          string                      `json:"deployLog" gorm:"type:text"`
 	Preset             bool                        `json:"preset"`
+	Public             bool                        `json:"public"`
 	PresetID           uint                        `json:"presetId"`
 	CreatedAt          time.Time                   `json:"createdAt"`
 	UpdatedAt          time.Time                   `json:"updatedAt"`
