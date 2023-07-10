@@ -73,7 +73,12 @@ func run() error {
 
 	userHandler := user.NewHandler(cfg, userService, tokenService)
 
-	authentication := middleware.NewAuthentication(cfg, userService)
+	publicKey, err := cfg.Authentication.Keys.GetPublicKey()
+	if err != nil {
+		return err
+	}
+
+	authentication := middleware.NewAuthentication(userService, publicKey)
 	groupRepository := group.NewRepository(db)
 	groupService := group.NewService(groupRepository, userService)
 	groupHandler := group.NewHandler(groupService)

@@ -7,15 +7,14 @@ import (
 
 	"github.com/dhis2-sre/im-manager/internal/errdef"
 
-	"github.com/dhis2-sre/im-manager/pkg/config"
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	"github.com/gin-gonic/gin"
 	"github.com/lestrrat-go/jwx/jwa"
 	"github.com/lestrrat-go/jwx/jwt"
 )
 
-func NewAuthentication(c config.Config, signInService signInService) AuthenticationMiddleware {
-	return AuthenticationMiddleware{c, signInService}
+func NewAuthentication(signInService signInService, publicKey *rsa.PublicKey) AuthenticationMiddleware {
+	return AuthenticationMiddleware{publicKey, signInService}
 }
 
 type signInService interface {
@@ -23,7 +22,7 @@ type signInService interface {
 }
 
 type AuthenticationMiddleware struct {
-	c             config.Config
+	publicKey     *rsa.PublicKey
 	signInService signInService
 }
 
@@ -52,20 +51,26 @@ func (m AuthenticationMiddleware) handleError(c *gin.Context, e error) {
 }
 
 func (m AuthenticationMiddleware) TokenAuthentication(c *gin.Context) {
-	publicKey, err := m.c.Authentication.Keys.GetPublicKey()
-	if err != nil {
-		_ = c.Error(errors.New("failed to get public key"))
-		c.Abort()
-		return
-	}
-
-	u, err := parseRequest(c.Request, publicKey)
-	if err != nil {
-		// TODO: token could be not valid for lots of reasons, return err or at least log it
-		unauthorized := errdef.NewUnauthorized("token not valid")
-		_ = c.Error(unauthorized)
-		c.Abort()
-		return
+	var user *model.User
+	token, ok := c.GetQuery("token")
+	if ok {
+		var err error
+		user, err = parseToken(token, m.publicKey)
+		if err != nil {
+			// TODO: token could be not valid for lots of reasons, return err or at least log it
+			_ = c.Error(errdef.NewUnauthorized("token not valid"))
+			c.Abort()
+			return
+		}
+	} else {
+		var err error
+		user, err = parseRequest(c.Request, m.publicKey)
+		if err != nil {
+			// TODO: token could be not valid for lots of reasons, return err or at least log it
+			_ = c.Error(errdef.NewUnauthorized("token not valid"))
+			c.Abort()
+			return
+		}
 	}
 
 	// Extra precaution to ensure that no errors has occurred, and it's safe to call c.Next()
@@ -73,9 +78,22 @@ func (m AuthenticationMiddleware) TokenAuthentication(c *gin.Context) {
 		c.Abort()
 		return
 	} else {
-		c.Set("user", u)
+		c.Set("user", user)
 		c.Next()
 	}
+}
+
+func parseToken(token string, key *rsa.PublicKey) (*model.User, error) {
+	parsedToken, err := jwt.Parse(
+		[]byte(token),
+		jwt.WithValidate(true),
+		jwt.WithVerify(jwa.RS256, key),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return extractUser(parsedToken)
 }
 
 func parseRequest(request *http.Request, key *rsa.PublicKey) (*model.User, error) {
@@ -88,15 +106,15 @@ func parseRequest(request *http.Request, key *rsa.PublicKey) (*model.User, error
 		return nil, err
 	}
 
+	return extractUser(token)
+}
+
+func extractUser(token jwt.Token) (*model.User, error) {
 	userData, ok := token.Get("user")
 	if !ok {
 		return nil, errors.New("user not found in claims")
 	}
 
-	return extractUser(userData)
-}
-
-func extractUser(userData any) (*model.User, error) {
 	userMap, ok := userData.(map[string]any)
 	if !ok {
 		return nil, errors.New("failed to parse user data")
