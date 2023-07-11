@@ -1,11 +1,6 @@
-// Package inttest enables writing of integration tests. Setup Docker containers for dependencies
-// like PostgreSQL, RabbitMQ and AWS S3 (using localstack). Every setup function ensures the
-// container is ready before returning, ensures resources are cleaned up after the tests are
-// finished and return a client ready to interact with the container.
 package inttest
 
 import (
-	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -14,118 +9,11 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/go-redis/redis"
-	gnomockRedis "github.com/orlangure/gnomock/preset/redis"
-
-	amqp "github.com/rabbitmq/amqp091-go"
-
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/dhis2-sre/im-manager/internal/handler"
 	"github.com/dhis2-sre/im-manager/internal/server"
-	"github.com/dhis2-sre/im-manager/pkg/storage"
 	"github.com/gin-gonic/gin"
-	_ "github.com/lib/pq" // postgres driver
-	"github.com/orlangure/gnomock"
-	"github.com/orlangure/gnomock/preset/localstack"
-
-	"github.com/dhis2-sre/im-manager/pkg/config"
-	"github.com/orlangure/gnomock/preset/postgres"
-	"github.com/orlangure/gnomock/preset/rabbitmq"
-
 	"github.com/stretchr/testify/require"
-	"gorm.io/gorm"
 )
-
-func SetupRedis(t *testing.T) *redis.Client {
-	container, err := gnomock.Start(gnomockRedis.Preset())
-	require.NoError(t, err, "failed to start Redis")
-	t.Cleanup(func() { require.NoError(t, gnomock.Stop(container), "failed to stop Redis") })
-
-	client := &redis.Options{
-		Addr:     container.DefaultAddress(),
-		Password: "",
-		DB:       0,
-	}
-	return redis.NewClient(client)
-}
-
-// SetupDB creates a PostgreSQL container. Gorm is connected to the DB and runs the migrations.
-func SetupDB(t *testing.T) *gorm.DB {
-	t.Helper()
-
-	container, err := gnomock.Start(
-		postgres.Preset(
-			postgres.WithUser("im", "im"),
-			postgres.WithDatabase("test_im"),
-		),
-	)
-	require.NoError(t, err, "failed to start DB")
-	t.Cleanup(func() { require.NoError(t, gnomock.Stop(container), "failed to stop DB") })
-
-	db, err := storage.NewDatabase(config.Postgresql{
-		Host:         container.Host,
-		Port:         container.DefaultPort(),
-		Username:     "im",
-		Password:     "im",
-		DatabaseName: "test_im",
-	})
-	require.NoError(t, err, "failed to setup DB")
-	return db
-}
-
-// SetupS3 creates an S3 container (using localstack) with all the buckets and files in given path.
-func SetupS3(t *testing.T, path string) *S3Client {
-	t.Helper()
-
-	container, err := gnomock.Start(
-		localstack.Preset(
-			localstack.WithServices(localstack.S3),
-			localstack.WithS3Files(path),
-			localstack.WithVersion("2.1.0"),
-		),
-	)
-	require.NoError(t, err, "failed to start S3")
-	t.Cleanup(func() { require.NoError(t, gnomock.Stop(container), "failed to stop S3") })
-
-	region := "eu-west-1"
-	return &S3Client{
-		Client: s3.NewFromConfig(
-			aws.Config{
-				Region: region,
-				EndpointResolverWithOptions: aws.EndpointResolverWithOptionsFunc(func(service, region string, options ...interface{}) (aws.Endpoint, error) {
-					return aws.Endpoint{
-						URL:           fmt.Sprintf("http://%s/", container.Address(localstack.APIPort)),
-						SigningRegion: region,
-					}, nil
-				}),
-			},
-			func(o *s3.Options) {
-				o.UsePathStyle = true
-			},
-		),
-	}
-}
-
-// S3Client allows making requests to S3. It does so by wrapping an S3.Client. Access the actual
-// S3.Client for specific use cases where our defaults don't work.
-type S3Client struct {
-	Client *s3.Client
-}
-
-func (sc *S3Client) GetObject(t *testing.T, bucket, key string) []byte {
-	t.Helper()
-
-	object, err := sc.Client.GetObject(context.TODO(), &s3.GetObjectInput{
-		Bucket: aws.String(bucket),
-		Key:    aws.String(key),
-	})
-	errMsg := "failed GET from S3 bucket %q and key %q"
-	require.NoErrorf(t, err, errMsg, bucket, key)
-	body, err := io.ReadAll(object.Body)
-	require.NoErrorf(t, err, errMsg+": failed to read body", bucket, key)
-	return body
-}
 
 // SetupHTTPServer creates an HTTP server using Gin. An HTTP client is returned to interact with the
 // created server.
@@ -275,41 +163,4 @@ func (hc *HTTPClient) newRequest(t *testing.T, method, path string, body io.Read
 	}
 
 	return req
-}
-
-// SetupRabbitMQ creates a RabbitMQ container returning an AMQP client ready to send messages to it.
-func SetupRabbitMQ(t *testing.T) *amqpTestClient {
-	t.Helper()
-
-	container, err := gnomock.Start(
-		rabbitmq.Preset(
-			rabbitmq.WithUser("im", "im"),
-		),
-	)
-	require.NoError(t, err, "failed to start RabbitMQ")
-	t.Cleanup(func() { require.NoError(t, gnomock.Stop(container), "failed to stop RabbitMQ") })
-
-	URI := fmt.Sprintf(
-		"amqp://%s:%s@%s",
-		"im", "im",
-		container.DefaultAddress(),
-	)
-	conn, err := amqp.Dial(URI)
-	require.NoErrorf(t, err, "failed to connect to RabbitMQ", URI)
-	t.Cleanup(func() {
-		require.NoErrorf(t, conn.Close(), "failed to close connection to RabbitMQ")
-	})
-
-	ch, err := conn.Channel()
-	require.NoErrorf(t, err, "failed to open channel to RabbitMQ")
-	t.Cleanup(func() {
-		require.NoErrorf(t, ch.Close(), "failed to close channel to RabbitMQ")
-	})
-
-	return &amqpTestClient{Channel: ch, URI: URI}
-}
-
-type amqpTestClient struct {
-	Channel *amqp.Channel
-	URI     string
 }
