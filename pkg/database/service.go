@@ -15,7 +15,6 @@ import (
 
 	"github.com/dhis2-sre/im-manager/internal/errdef"
 
-	"github.com/dhis2-sre/im-manager/pkg/instance"
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	"github.com/dhis2-sre/im-manager/pkg/storage"
 
@@ -41,11 +40,10 @@ type groupService interface {
 }
 
 type service struct {
-	s3Bucket        string
-	s3Client        S3Client
-	instanceService instance.Service
-	groupService    groupService
-	repository      Repository
+	s3Bucket     string
+	s3Client     S3Client
+	groupService groupService
+	repository   Repository
 }
 
 type Repository interface {
