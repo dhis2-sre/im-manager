@@ -56,7 +56,7 @@ func main() {
 func run() error {
 	cfg := config.New()
 
-	db, err := storage.NewDatabase(cfg)
+	db, err := storage.NewDatabase(cfg.Postgresql)
 	if err != nil {
 		return err
 	}
@@ -66,27 +66,35 @@ func run() error {
 	authorization := middleware.NewAuthorization(userService)
 	redis := storage.NewRedis(cfg)
 	tokenRepository := token.NewRepository(redis)
-	tokenService, err := token.NewService(cfg, tokenRepository)
+	privateKey, err := cfg.Authentication.Keys.GetPrivateKey()
+	if err != nil {
+		return err
+	}
+	publicKey, err := cfg.Authentication.Keys.GetPublicKey()
+	if err != nil {
+		return err
+	}
+	tokenService, err := token.NewService(tokenRepository, privateKey, publicKey, cfg.Authentication.AccessTokenExpirationSeconds, cfg.Authentication.RefreshTokenSecretKey, cfg.Authentication.RefreshTokenExpirationSeconds)
 	if err != nil {
 		return err
 	}
 
-	userHandler := user.NewHandler(cfg, userService, tokenService)
+	userHandler := user.NewHandler(userService, tokenService)
 
-	authentication := middleware.NewAuthentication(cfg, userService)
+	authentication := middleware.NewAuthentication(publicKey, userService)
 	groupRepository := group.NewRepository(db)
 	groupService := group.NewService(groupRepository, userService)
 	groupHandler := group.NewHandler(groupService)
 
-	stackSvc := stack.NewService(stack.NewRepository(db))
+	stackService := stack.NewService(stack.NewRepository(db))
 
 	instanceRepo := instance.NewRepository(db, cfg)
-	helmfileSvc := instance.NewHelmfileService(stackSvc, cfg)
-	instanceSvc := instance.NewService(cfg, instanceRepo, groupService, stackSvc, helmfileSvc)
+	helmfileService := instance.NewHelmfileService(stackService, cfg)
+	instanceService := instance.NewService(cfg, instanceRepo, groupService, stackService, helmfileService)
 
 	dockerHubClient := integration.NewDockerHubClient(cfg.DockerHub.Username, cfg.DockerHub.Password)
 
-	err = stack.LoadStacks("./stacks", stackSvc)
+	err = stack.LoadStacks("./stacks", stackService)
 	if err != nil {
 		return err
 	}
@@ -100,14 +108,14 @@ func run() error {
 	}
 	defer consumer.Close()
 
-	ttlDestroyConsumer := instance.NewTTLDestroyConsumer(consumer, instanceSvc)
+	ttlDestroyConsumer := instance.NewTTLDestroyConsumer(consumer, instanceService)
 	err = ttlDestroyConsumer.Consume()
 	if err != nil {
 		return err
 	}
 
-	stackHandler := stack.NewHandler(stackSvc)
-	instanceHandler := instance.NewHandler(userService, groupService, instanceSvc, stackSvc, cfg.DefaultTTL)
+	stackHandler := stack.NewHandler(stackService)
+	instanceHandler := instance.NewHandler(userService, groupService, instanceService, stackService, cfg.DefaultTTL)
 
 	// TODO: Database... Move into... Function?
 	s3Config, err := s3config.LoadDefaultConfig(context.TODO(), s3config.WithRegion("eu-west-1"))
@@ -119,9 +127,8 @@ func run() error {
 	s3Client := storage.NewS3Client(s3AWSClient, uploader)
 
 	databaseRepository := database.NewRepository(db)
-
-	databaseService := database.NewService(cfg, instanceSvc, groupService, s3Client, databaseRepository)
-	databaseHandler := database.New(databaseService, userService, groupService, instanceSvc, stackSvc)
+	databaseService := database.NewService(cfg.Bucket, s3Client, groupService, databaseRepository)
+	databaseHandler := database.NewHandler(databaseService, groupService, instanceService, stackService)
 
 	err = handler.RegisterValidation()
 	if err != nil {
@@ -130,7 +137,7 @@ func run() error {
 
 	integrationHandler := integration.NewHandler(dockerHubClient, cfg.InstanceService.Host, cfg.DatabaseManagerService.Host)
 
-	err = createAdminUser(cfg, userService, groupService)
+	err = user.CreateAdminUser(cfg.AdminUser.Email, cfg.AdminUser.Password, userService, groupService)
 	if err != nil {
 		return err
 	}
@@ -143,9 +150,9 @@ func run() error {
 
 	group.Routes(r, authentication, authorization, groupHandler)
 	user.Routes(r, authentication, authorization, userHandler)
-	stack.Routes(r, authentication, stackHandler)
+	stack.Routes(r, authentication.TokenAuthentication, stackHandler)
 	integration.Routes(r, authentication, integrationHandler)
-	database.Routes(r, authentication, databaseHandler)
+	database.Routes(r, authentication.TokenAuthentication, databaseHandler)
 	instance.Routes(r, authentication, instanceHandler)
 
 	return r.Run()
@@ -154,10 +161,6 @@ func run() error {
 type groupService interface {
 	FindOrCreate(name string, hostname string, deployable bool) (*model.Group, error)
 	AddUser(groupName string, userId uint) error
-}
-
-type userService interface {
-	FindOrCreate(email string, password string) (*model.User, error)
 }
 
 func createGroups(config config.Config, groupService groupService) error {
@@ -171,28 +174,6 @@ func createGroups(config config.Config, groupService groupService) error {
 		if newGroup != nil {
 			log.Println("Created:", newGroup.Name)
 		}
-	}
-
-	return nil
-}
-
-func createAdminUser(config config.Config, userService userService, groupService groupService) error {
-	adminUserEmail := config.AdminUser.Email
-	adminUserPassword := config.AdminUser.Password
-
-	u, err := userService.FindOrCreate(adminUserEmail, adminUserPassword)
-	if err != nil {
-		return fmt.Errorf("error creating admin user: %v", err)
-	}
-
-	g, err := groupService.FindOrCreate(model.AdministratorGroupName, "", false)
-	if err != nil {
-		return fmt.Errorf("error creating admin group: %v", err)
-	}
-
-	err = groupService.AddUser(g.Name, u.ID)
-	if err != nil {
-		return fmt.Errorf("error adding admin user to admin group: %v", err)
 	}
 
 	return nil
