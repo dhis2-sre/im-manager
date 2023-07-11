@@ -81,64 +81,75 @@ deploy:
 
 profiles:
   - name: dev
-    deploy:
-      helm:
-        releases:
-          - name: im-group-whoami-{{ .ENVIRONMENT }}
-            namespace: whoami
-            createNamespace: true
-            remoteChart: im-group
-            repo: https://dhis2-sre.github.io/im-group
-            version: 0.3.0
-            setValueTemplates:
-              serviceAccount:
-                name: im-manager-{{ .ENVIRONMENT }}
-                namespace: instance-manager-{{ .CLASSIFICATION }}
+    patches:
+      - op: add
+        path: /deploy/helm/releases/-
+        value:
+          name: im-group-whoami-{{ .ENVIRONMENT }}
+          namespace: whoami
+          createNamespace: true
+          remoteChart: im-group
+          repo: https://dhis2-sre.github.io/im-group
+          version: 0.3.0
+          setValueTemplates:
+            serviceAccount:
+              name: im-manager-{{ .ENVIRONMENT }}
+              namespace: instance-manager-{{ .CLASSIFICATION }}
 
   - name: prod
-    deploy:
-      helm:
-        releases:
-          - name: im-group-dev
-            namespace: dev
-            createNamespace: true
-            remoteChart: im-group
-            repo: https://dhis2-sre.github.io/im-group
-            version: 0.3.0
-            setValues:
-              serviceAccount:
-                name: im-manager-prod
-                namespace: instance-manager-prod
+    patches:
+      - op: add
+        path: /deploy/helm/releases/-
+        value:
+          name: im-group-dev
+          namespace: dev
+          createNamespace: true
+          remoteChart: im-group
+          repo: https://dhis2-sre.github.io/im-group
+          version: 0.3.0
+          setValues:
+            serviceAccount:
+              name: im-manager-prod
+              namespace: instance-manager-prod
 
-          - name: im-group-play
-            namespace: play
-            createNamespace: true
-            remoteChart: im-group
-            repo: https://dhis2-sre.github.io/im-group
-            version: 0.3.0
-            setValues:
-              serviceAccount:
-                name: im-manager-prod
-                namespace: instance-manager-prod
+      - op: add
+        path: /deploy/helm/releases/-
+        value:
+          name: im-group-play
+          namespace: play
+          createNamespace: true
+          remoteChart: im-group
+          repo: https://dhis2-sre.github.io/im-group
+          version: 0.3.0
+          setValues:
+            serviceAccount:
+              name: im-manager-prod
+              namespace: instance-manager-prod
 
-          - name: im-group-qa
-            namespace: qa
-            createNamespace: true
-            remoteChart: im-group
-            repo: https://dhis2-sre.github.io/im-group
-            version: 0.3.0
-            setValues:
-              serviceAccount:
-                name: im-manager-prod
-                namespace: instance-manager-prod
+      - op: add
+        path: /deploy/helm/releases/-
+        value:
+          name: im-group-qa
+          namespace: qa
+          createNamespace: true
+          remoteChart: im-group
+          repo: https://dhis2-sre.github.io/im-group
+          version: 0.3.0
+          setValues:
+            serviceAccount:
+              name: im-manager-prod
+              namespace: instance-manager-prod
 
-          - name: im-group-meta-packages
-            namespace: meta-packages
-            createNamespace: true
-            remoteChart: im-group
-            repo: https://dhis2-sre.github.io/im-group
-            version: 0.3.0
-            setValues:
-              serviceAccount:
-                name: im-manager-prod
-                namespace: instance-manager-prod
+      - op: add
+        path: /deploy/helm/releases/-
+        value:
+          name: im-group-meta-packages
+          namespace: meta-packages
+          createNamespace: true
+          remoteChart: im-group
+          repo: https://dhis2-sre.github.io/im-group
+          version: 0.3.0
+          setValues:
+            serviceAccount:
+              name: im-manager-prod
+              namespace: instance-manager-prod
