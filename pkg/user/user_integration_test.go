@@ -55,7 +55,7 @@ func TestUserHandler(t *testing.T) {
 		var user1 model.User
 		client.PostJSON(t, "/users", strings.NewReader(`{
 			"email":    "user1@dhis2.org",
-			"password": "oneoneoneoneone1"
+			"password": "oneoneoneoneoneoneone111"
 		}`), &user1)
 
 		require.Equal(t, "user1@dhis2.org", user1.Email)
@@ -65,12 +65,52 @@ func TestUserHandler(t *testing.T) {
 		var user2 model.User
 		client.PostJSON(t, "/users", strings.NewReader(`{
 			"email":    "user2@dhis2.org",
-			"password": "oneoneoneoneone1"
+			"password": "oneoneoneoneoneoneone111"
 		}`), &user2)
 
 		require.Equal(t, "user2@dhis2.org", user2.Email)
 		require.Empty(t, user2.Password)
 	}
+
+	t.Run("SignUpFailure", func(t *testing.T) {
+		t.Parallel()
+
+		t.Run("InvalidEmail", func(t *testing.T) {
+			requestBody := strings.NewReader(`{
+				"email":    "not-a-valid-email",
+				"password": "oneoneoneoneoneoneone111"
+			}`)
+			response := client.Do(t, http.MethodPost, "/users", requestBody, http.StatusBadRequest, inttest.WithHeader("Content-Type", "application/json"))
+			require.Equal(t, "invalid email provided: not-a-valid-email", string(response))
+		})
+
+		t.Run("TooShortPassword", func(t *testing.T) {
+			requestBody := strings.NewReader(`{
+				"email":    "some@email.com",
+				"password": "short-password"
+			}`)
+			response := client.Do(t, http.MethodPost, "/users", requestBody, http.StatusBadRequest, inttest.WithHeader("Content-Type", "application/json"))
+			require.Equal(t, "password must be between 24 and 128 characters", string(response))
+		})
+
+		t.Run("TooLongPassword", func(t *testing.T) {
+			requestBody := strings.NewReader(`{
+				"email":    "some@email.com",
+				"password": "long-password-long-password-long-password-long-password-long-password-long-password-long-password-long-password-long-password-long-password"
+			}`)
+			response := client.Do(t, http.MethodPost, "/users", requestBody, http.StatusBadRequest, inttest.WithHeader("Content-Type", "application/json"))
+			require.Equal(t, "password must be between 24 and 128 characters", string(response))
+		})
+
+		t.Run("BothEmailAndPasswordAreInvalid", func(t *testing.T) {
+			requestBody := strings.NewReader(`{
+				"email":    "not-a-valid-email",
+				"password": "short-password"
+			}`)
+			response := client.Do(t, http.MethodPost, "/users", requestBody, http.StatusBadRequest, inttest.WithHeader("Content-Type", "application/json"))
+			require.Equal(t, "invalid email provided: not-a-valid-email\npassword must be between 24 and 128 characters", string(response))
+		})
+	})
 
 	t.Run("AsNonAdmin", func(t *testing.T) {
 		t.Run("Success", func(t *testing.T) {
@@ -80,7 +120,7 @@ func TestUserHandler(t *testing.T) {
 			{
 				t.Log("SignIn")
 
-				client.PostJSON(t, "/tokens", nil, &user1Token, inttest.WithBasicAuth("user1@dhis2.org", "oneoneoneoneone1"))
+				client.PostJSON(t, "/tokens", nil, &user1Token, inttest.WithBasicAuth("user1@dhis2.org", "oneoneoneoneoneoneone111"))
 
 				require.NotEmpty(t, user1Token.AccessToken, "should return an access token")
 			}
@@ -114,7 +154,7 @@ func TestUserHandler(t *testing.T) {
 			{
 				t.Log("SignIn")
 
-				client.PostJSON(t, "/tokens", nil, &user2Token, inttest.WithBasicAuth("user2@dhis2.org", "oneoneoneoneone1"))
+				client.PostJSON(t, "/tokens", nil, &user2Token, inttest.WithBasicAuth("user2@dhis2.org", "oneoneoneoneoneoneone111"))
 
 				require.NotEmpty(t, user2Token.AccessToken, "should return an access token")
 			}

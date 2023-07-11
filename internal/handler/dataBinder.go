@@ -12,7 +12,7 @@ func DataBinder(c *gin.Context, req interface{}) error {
 	}
 
 	if err := c.ShouldBind(req); err != nil {
-		return errdef.NewBadRequest("Error binding data: %+v", err)
+		return err
 	}
 
 	return nil
