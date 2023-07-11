@@ -23,7 +23,7 @@ echo "{
   \"description\": \"$DESCRIPTION\",
   \"stackName\": \"$STACK\",
   \"ttl\": $INSTANCE_TTL,
-  \"public\": \"$PUBLIC\",
+  \"public\": $PUBLIC,
   \"optionalParameters\": [
     {
       \"name\": \"CHART_VERSION\",

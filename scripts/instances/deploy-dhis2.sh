@@ -39,7 +39,7 @@ echo "{
   \"description\": \"$DESCRIPTION\",
   \"stackName\": \"$STACK\",
   \"ttl\": $INSTANCE_TTL,
-  \"public\": \"$PUBLIC\",
+  \"public\": $PUBLIC,
   \"optionalParameters\": [
     {
       \"name\": \"STARTUP_PROBE_FAILURE_THRESHOLD\",
