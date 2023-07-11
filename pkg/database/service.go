@@ -277,6 +277,7 @@ func (s service) Save(userId uint, database *model.Database, instance *model.Ins
 		saved.Name = database.Name
 		saved.Url = database.Url
 		saved.Slug = database.Slug
+		saved.CreatedAt = database.CreatedAt
 		err = s.Update(saved)
 		if err != nil {
 			logError(err)
