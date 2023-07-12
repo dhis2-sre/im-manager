@@ -20,7 +20,7 @@ require (
 	github.com/gosimple/slug v1.13.1
 	github.com/habx/pg-commands v0.6.1
 	github.com/lestrrat-go/jwx v1.2.26
-	github.com/lib/pq v1.10.8
+	github.com/lib/pq v1.10.9
 	github.com/orlangure/gnomock v0.28.0
 	github.com/rabbitmq/amqp091-go v1.8.1
 	github.com/stretchr/testify v1.8.4
