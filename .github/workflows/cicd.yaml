@@ -8,6 +8,7 @@ on:
       - v*.*.*
 
   pull_request:
+    types: [opened, reopened, synchronize, labeled]
 
   workflow_dispatch:
 
@@ -20,7 +21,7 @@ jobs:
   call-workflow:
     # TODO update the branch reference before merging the PR
     uses: dhis2-sre/gha-workflows/.github/workflows/instance-manager.yaml@DEVOPS-262
-    if: ${{ (github.event_name == 'pull_request' && startsWith(github.head_ref, 'feature/')) || github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
+#    if: ${{ (github.event_name == 'pull_request' && startsWith(github.head_ref, 'feature/')) || github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
     with:
       PROCESS_NAME: im-manager
       POD_NAME: im-manager
