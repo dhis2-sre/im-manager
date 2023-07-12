@@ -1,0 +1,19 @@
+name: Delete deployed environment
+
+on:
+  pull_request:
+    types: [closed]
+
+# Cancel previous runs of the same workflow and PR number or branch/tag
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  call-workflow:
+    # TODO update the branch reference before merging the PR
+    uses: dhis2-sre/gha-workflows/.github/workflows/im-delete-env.yaml@DEVOPS-262
+    secrets:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      KUBECONFIG: ${{ secrets.KUBECONFIG }}
