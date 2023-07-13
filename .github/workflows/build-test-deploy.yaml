@@ -1,4 +1,4 @@
-name: Tests, build and deploy
+name: Build, test and deploy
 
 on:
   push:
@@ -20,8 +20,7 @@ concurrency:
 jobs:
   call-workflow:
     # TODO update the branch reference before merging the PR
-    uses: dhis2-sre/gha-workflows/.github/workflows/im-test-build-deploy.yaml@DEVOPS-262
-#    if: ${{ (github.event_name == 'pull_request' && startsWith(github.head_ref, 'feature/')) || github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
+    uses: dhis2-sre/gha-workflows/.github/workflows/im-build-test-deploy.yaml@DEVOPS-262
     with:
       PROCESS_NAME: im-manager
       POD_NAME: im-manager
