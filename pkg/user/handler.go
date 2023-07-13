@@ -74,23 +74,23 @@ func (h Handler) SignUp(c *gin.Context) {
 
 func handleSignUpErrors(err error) error {
 	validationErrors, ok := err.(validator.ValidationErrors)
-	if ok {
-		var errs error
-		for _, fieldError := range validationErrors {
-			if fieldError.Field() == "Password" && (fieldError.Tag() == "gte" || fieldError.Tag() == "lte") {
-				badRequest := errdef.NewBadRequest("password must be between 24 and 128 characters")
-				errs = errors.Join(errs, badRequest)
-			}
-
-			if fieldError.Field() == "Email" && fieldError.Tag() == "email" {
-				badRequest := errdef.NewBadRequest("invalid email provided: %s", fieldError.Value())
-				errs = errors.Join(errs, badRequest)
-			}
-		}
-		return errs
+	if !ok {
+		return errdef.NewBadRequest("Error binding data: %+v", err)
 	}
 
-	return errdef.NewBadRequest("Error binding data: %+v", err)
+	var errs error
+	for _, fieldError := range validationErrors {
+		if fieldError.Field() == "Password" && (fieldError.Tag() == "gte" || fieldError.Tag() == "lte") {
+			badRequest := errdef.NewBadRequest("password must be between 24 and 128 characters")
+			errs = errors.Join(errs, badRequest)
+		}
+
+		if fieldError.Field() == "Email" && fieldError.Tag() == "email" {
+			badRequest := errdef.NewBadRequest("invalid email provided: %s", fieldError.Value())
+			errs = errors.Join(errs, badRequest)
+		}
+	}
+	return errs
 }
 
 // SignIn user
