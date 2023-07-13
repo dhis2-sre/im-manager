@@ -1,12 +1,13 @@
 package user
 
 import (
+	"errors"
 	"net/http"
-
-	"github.com/dhis2-sre/im-manager/pkg/model"
 
 	"github.com/dhis2-sre/im-manager/internal/errdef"
 	"github.com/dhis2-sre/im-manager/internal/handler"
+	"github.com/dhis2-sre/im-manager/pkg/model"
+	"github.com/go-playground/validator/v10"
 
 	"github.com/dhis2-sre/im-manager/pkg/token"
 	"github.com/gin-gonic/gin"
@@ -41,7 +42,7 @@ type tokenService interface {
 
 type signUpRequest struct {
 	Email    string `json:"email" binding:"required,email"`
-	Password string `json:"password" binding:"required,gte=16,lte=128"`
+	Password string `json:"password" binding:"required,gte=24,lte=128"`
 }
 
 // SignUp user
@@ -57,9 +58,8 @@ func (h Handler) SignUp(c *gin.Context) {
 	//   400: Error
 	//   415: Error
 	var request signUpRequest
-
 	if err := handler.DataBinder(c, &request); err != nil {
-		_ = c.Error(err)
+		_ = c.Error(handleSignUpErrors(err))
 		return
 	}
 
@@ -70,6 +70,27 @@ func (h Handler) SignUp(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusCreated, user)
+}
+
+func handleSignUpErrors(err error) error {
+	validationErrors, ok := err.(validator.ValidationErrors)
+	if !ok {
+		return errdef.NewBadRequest("Error binding data: %+v", err)
+	}
+
+	var errs error
+	for _, fieldError := range validationErrors {
+		if fieldError.Field() == "Password" && (fieldError.Tag() == "gte" || fieldError.Tag() == "lte") {
+			badRequest := errdef.NewBadRequest("password must be between 24 and 128 characters")
+			errs = errors.Join(errs, badRequest)
+		}
+
+		if fieldError.Field() == "Email" && fieldError.Tag() == "email" {
+			badRequest := errdef.NewBadRequest("invalid email provided: %s", fieldError.Value())
+			errs = errors.Join(errs, badRequest)
+		}
+	}
+	return errs
 }
 
 // SignIn user
