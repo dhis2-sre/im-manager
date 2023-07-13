@@ -80,7 +80,9 @@ func TestUserHandler(t *testing.T) {
 				"email":    "not-a-valid-email",
 				"password": "oneoneoneoneoneoneone111"
 			}`)
+
 			response := client.Do(t, http.MethodPost, "/users", requestBody, http.StatusBadRequest, inttest.WithHeader("Content-Type", "application/json"))
+
 			require.Equal(t, "invalid email provided: not-a-valid-email", string(response))
 		})
 
@@ -89,7 +91,9 @@ func TestUserHandler(t *testing.T) {
 				"email":    "some@email.com",
 				"password": "short-password"
 			}`)
+
 			response := client.Do(t, http.MethodPost, "/users", requestBody, http.StatusBadRequest, inttest.WithHeader("Content-Type", "application/json"))
+
 			require.Equal(t, "password must be between 24 and 128 characters", string(response))
 		})
 
@@ -98,7 +102,9 @@ func TestUserHandler(t *testing.T) {
 				"email":    "some@email.com",
 				"password": "long-password-long-password-long-password-long-password-long-password-long-password-long-password-long-password-long-password-long-password"
 			}`)
+
 			response := client.Do(t, http.MethodPost, "/users", requestBody, http.StatusBadRequest, inttest.WithHeader("Content-Type", "application/json"))
+
 			require.Equal(t, "password must be between 24 and 128 characters", string(response))
 		})
 
@@ -107,7 +113,9 @@ func TestUserHandler(t *testing.T) {
 				"email":    "not-a-valid-email",
 				"password": "short-password"
 			}`)
+
 			response := client.Do(t, http.MethodPost, "/users", requestBody, http.StatusBadRequest, inttest.WithHeader("Content-Type", "application/json"))
+
 			require.Equal(t, "invalid email provided: not-a-valid-email\npassword must be between 24 and 128 characters", string(response))
 		})
 	})
