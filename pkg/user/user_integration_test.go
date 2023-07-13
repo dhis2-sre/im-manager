@@ -72,7 +72,7 @@ func TestUserHandler(t *testing.T) {
 		require.Empty(t, user2.Password)
 	}
 
-	t.Run("SignUpFailure", func(t *testing.T) {
+	t.Run("SignUpFailed", func(t *testing.T) {
 		t.Parallel()
 
 		t.Run("InvalidEmail", func(t *testing.T) {
