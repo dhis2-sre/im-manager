@@ -98,9 +98,10 @@ func TestUserHandler(t *testing.T) {
 		})
 
 		t.Run("TooLongPassword", func(t *testing.T) {
+			password := strings.Repeat("a", 129)
 			requestBody := strings.NewReader(`{
 				"email":    "some@email.com",
-				"password": "long-password-long-password-long-password-long-password-long-password-long-password-long-password-long-password-long-password-long-password"
+				"password": \"` + password + `"\"
 			}`)
 
 			response := client.Do(t, http.MethodPost, "/users", requestBody, http.StatusBadRequest, inttest.WithHeader("Content-Type", "application/json"))
