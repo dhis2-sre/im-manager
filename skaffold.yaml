@@ -1,10 +1,10 @@
-.im-group: &chart-config
+.im-group-chart-config: &im-group-chart-config
   createNamespace: true
   remoteChart: im-group
   repo: https://dhis2-sre.github.io/im-group
   version: 0.3.0
 
-.im-group-prod: &service-account-config
+.im-group-prod-service-account-config: &im-group-prod-service-account-config
   setValues:
     serviceAccount:
       name: im-manager-prod
@@ -99,7 +99,7 @@ profiles:
         value:
           name: im-group-whoami-{{ .ENVIRONMENT }}
           namespace: whoami
-          <<: *chart-config
+          <<: *im-group-chart-config
           setValueTemplates:
             serviceAccount:
               name: im-manager-{{ .ENVIRONMENT }}
@@ -112,26 +112,25 @@ profiles:
         value:
           name: im-group-dev
           namespace: dev
-          # TODO use YAML anchor
-          <<: [*chart-config, *service-account-config]
+          <<: [*im-group-chart-config, *im-group-prod-service-account-config]
 
       - op: add
         path: /deploy/helm/releases/-
         value:
           name: im-group-play
           namespace: play
-          <<: [*chart-config, *service-account-config]
+          <<: [*im-group-chart-config, *im-group-prod-service-account-config]
 
       - op: add
         path: /deploy/helm/releases/-
         value:
           name: im-group-qa
           namespace: qa
-          <<: [*chart-config, *service-account-config]
+          <<: [*im-group-chart-config, *im-group-prod-service-account-config]
 
       - op: add
         path: /deploy/helm/releases/-
         value:
           name: im-group-meta-packages
           namespace: meta-packages
-          <<: [*chart-config, *service-account-config]
+          <<: [*im-group-chart-config, *im-group-prod-service-account-config]
