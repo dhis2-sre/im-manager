@@ -19,8 +19,7 @@ concurrency:
 
 jobs:
   call-workflow:
-    # TODO update the branch reference before merging the PR
-    uses: dhis2-sre/gha-workflows/.github/workflows/im-build-test-deploy.yaml@DEVOPS-262
+    uses: dhis2-sre/gha-workflows/.github/workflows/im-build-test-deploy.yaml@master
     with:
       PROCESS_NAME: im-manager
       POD_NAME: im-manager
