@@ -2106,7 +2106,7 @@ paths:
             description: Create a group...
             operationId: groupCreate
             parameters:
-                - description: Refresh token request body parameter
+                - description: Create group request body parameter
                   in: body
                   name: Body
                   required: true
