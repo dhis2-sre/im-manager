@@ -42,7 +42,7 @@ func TestDatabaseHandler(t *testing.T) {
 
 	client := inttest.SetupHTTPServer(t, func(engine *gin.Engine) {
 		databaseHandler := database.NewHandler(databaseService, groupService{groupName: "packages"}, instanceService{}, stackService{})
-		database.Routes(engine, func(ctx *gin.Context) {
+		authenticator := func(ctx *gin.Context) {
 			ctx.Set("user", &model.User{
 				Email: "user1@dhis2.org",
 				Groups: []model.Group{
@@ -51,7 +51,8 @@ func TestDatabaseHandler(t *testing.T) {
 					},
 				},
 			})
-		}, databaseHandler)
+		}
+		database.Routes(engine, authenticator, databaseHandler)
 	})
 
 	var databaseID string

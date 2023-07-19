@@ -390,6 +390,11 @@ definitions:
     Group:
         description: Group domain object defining a group
         properties:
+            adminUsers:
+                items:
+                    $ref: '#/definitions/User'
+                type: array
+                x-go-name: AdminUsers
             clusterConfiguration:
                 $ref: '#/definitions/ClusterConfiguration'
             createdAt:
@@ -2163,6 +2168,35 @@ paths:
                 - oauth2: []
             summary: Add cluster configuration to group
     /groups/{group}/users/{userId}:
+        delete:
+            description: Remove a user from a group...
+            operationId: removeUserFromGroup
+            parameters:
+                - in: path
+                  name: group
+                  required: true
+                  type: string
+                  x-go-name: Group
+                - format: uint64
+                  in: path
+                  name: userId
+                  required: true
+                  type: integer
+                  x-go-name: UserID
+            responses:
+                "204":
+                    description: ""
+                "400":
+                    $ref: '#/responses/Error'
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Remove user from group
         post:
             description: Add a user to a group...
             operationId: addUserToGroup
@@ -2220,6 +2254,32 @@ paths:
             security:
                 - oauth2: []
             summary: Find group
+    /groups/{name}/details:
+        get:
+            description: Find a group by its name with details
+            operationId: findGroupByNameWithDetails
+            parameters:
+                - in: path
+                  name: name
+                  required: true
+                  type: string
+                  x-go-name: Name
+            responses:
+                "200":
+                    description: Group
+                    schema:
+                        $ref: '#/definitions/Group'
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Find group with details
     /health:
         get:
             description: Show service health status

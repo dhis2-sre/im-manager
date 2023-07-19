@@ -8,6 +8,7 @@ import (
 	"strconv"
 
 	"github.com/dhis2-sre/im-manager/internal/errdef"
+
 	"github.com/dhis2-sre/im-manager/internal/handler"
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	"github.com/gin-gonic/gin"
@@ -24,16 +25,18 @@ type Handler struct {
 type groupService interface {
 	Create(name string, hostname string, deployable bool) (*model.Group, error)
 	AddUser(groupName string, userId uint) error
+	RemoveUser(groupName string, userId uint) error
 	AddClusterConfiguration(clusterConfiguration *model.ClusterConfiguration) error
 	GetClusterConfiguration(groupName string) (*model.ClusterConfiguration, error)
 	Find(name string) (*model.Group, error)
+	FindWithDetails(name string) (*model.Group, error)
 	FindAll(user *model.User, deployable bool) ([]model.Group, error)
 }
 
 type CreateGroupRequest struct {
 	Name       string `json:"name" binding:"required"`
 	Hostname   string `json:"hostname" binding:"required"`
-	Deployable bool   `json:"deployable" binding:"required"`
+	Deployable bool   `json:"deployable"`
 }
 
 // Create group
@@ -104,6 +107,39 @@ func (h Handler) AddUserToGroup(c *gin.Context) {
 	}
 
 	c.Status(http.StatusCreated)
+}
+
+// RemoveUserFromGroup group
+func (h Handler) RemoveUserFromGroup(c *gin.Context) {
+	// swagger:route DELETE /groups/{group}/users/{userId} removeUserFromGroup
+	//
+	// Remove user from group
+	//
+	// Remove a user from a group...
+	//
+	// security:
+	//   oauth2:
+	//
+	// responses:
+	//   204:
+	//   400: Error
+	//   401: Error
+	//   403: Error
+	//   415: Error
+	groupName := c.Param("group")
+
+	userId, ok := handler.GetPathParameter(c, "userId")
+	if !ok {
+		return
+	}
+
+	err := h.groupService.RemoveUser(groupName, userId)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	c.Status(http.StatusNoContent)
 }
 
 type CreateClusterConfigurationRequest struct {
@@ -199,6 +235,34 @@ func (h Handler) Find(c *gin.Context) {
 	name := c.Param("name")
 
 	group, err := h.groupService.Find(name)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	c.JSON(http.StatusOK, group)
+}
+
+// FindWithDetails group by name with details
+func (h Handler) FindWithDetails(c *gin.Context) {
+	// swagger:route GET /groups/{name}/details findGroupByNameWithDetails
+	//
+	// Find group with details
+	//
+	// Find a group by its name with details
+	//
+	// responses:
+	//   200: Group
+	//   401: Error
+	//   403: Error
+	//   404: Error
+	//   415: Error
+	//
+	// security:
+	//   oauth2:
+	name := c.Param("name")
+
+	group, err := h.groupService.FindWithDetails(name)
 	if err != nil {
 		_ = c.Error(err)
 		return

@@ -32,15 +32,15 @@ func TestUserHandler(t *testing.T) {
 	require.NoError(t, err, "failed to create admin user and group")
 
 	authorization := middleware.NewAuthorization(userService)
-	privKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
 	require.NoError(t, err, "failed to generate private key")
 	// TODO(DEVOPS-259) we should not use a pointer as we do not mutate and should not mutate the
 	// certificate
-	authentication := middleware.NewAuthentication(&privKey.PublicKey, userService)
+	authentication := middleware.NewAuthentication(&key.PublicKey, userService)
 
 	redis := inttest.SetupRedis(t)
 	tokenRepository := token.NewRepository(redis)
-	tokenService, err := token.NewService(tokenRepository, privKey, &privKey.PublicKey, 10, "secret", 10)
+	tokenService, err := token.NewService(tokenRepository, key, &key.PublicKey, 10, "secret", 10)
 	require.NoError(t, err)
 
 	client := inttest.SetupHTTPServer(t, func(engine *gin.Engine) {

@@ -8,7 +8,7 @@ type _ struct {
 	Body CreateGroupRequest
 }
 
-// swagger:parameters addUserToGroup
+// swagger:parameters addUserToGroup removeUserFromGroup
 type _ struct {
 	// in: path
 	// required: true
@@ -32,7 +32,7 @@ type _ struct {
 	Body CreateClusterConfigurationRequest
 }
 
-// swagger:parameters findGroupByName
+// swagger:parameters findGroupByName findGroupByNameWithDetails
 type _ struct {
 	// in: path
 	// required: true
