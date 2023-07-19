@@ -167,7 +167,7 @@ func TestGroupHandler(t *testing.T) {
 		t.Run("FindGroupFailed", func(t *testing.T) {
 			path := fmt.Sprintf("/groups/%s", "non-existing-group")
 
-			client.Do(t, http.MethodGet, path, nil, http.StatusNotFound)
+			client.Do(t, http.MethodGet, "/groups/non-existing-group", nil, http.StatusNotFound)
 		})
 	})
 
