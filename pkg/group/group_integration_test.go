@@ -15,16 +15,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-type TestAuthenticationMiddleware struct{}
-
-func (t TestAuthenticationMiddleware) TokenAuthentication(c *gin.Context) {}
-
-type TestAuthorizationMiddleware struct{}
-
-func (t TestAuthorizationMiddleware) RequireAdministrator(c *gin.Context) {
-	c.Next()
-}
-
 func TestGroupHandler(t *testing.T) {
 	t.Parallel()
 
@@ -194,4 +184,14 @@ func TestGroupHandler(t *testing.T) {
 			require.Equal(t, "group \"non-existing-group\" doesn't exist", string(response))
 		})
 	})
+}
+
+type TestAuthenticationMiddleware struct{}
+
+func (t TestAuthenticationMiddleware) TokenAuthentication(c *gin.Context) {}
+
+type TestAuthorizationMiddleware struct{}
+
+func (t TestAuthorizationMiddleware) RequireAdministrator(c *gin.Context) {
+	c.Next()
 }
