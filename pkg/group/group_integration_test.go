@@ -95,7 +95,7 @@ func TestGroupHandler(t *testing.T) {
 	t.Run("AddUserToGroup", func(t *testing.T) {
 		t.Parallel()
 
-		t.Run("AddUserToGroup", func(t *testing.T) {
+		t.Run("Success", func(t *testing.T) {
 			path := fmt.Sprintf("/groups/%s/users/%s", groupName, userId)
 
 			client.Do(t, http.MethodPost, path, nil, http.StatusCreated)
