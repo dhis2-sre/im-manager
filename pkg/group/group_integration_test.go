@@ -2,11 +2,12 @@ package group_test
 
 import (
 	"fmt"
-	"github.com/stretchr/testify/assert"
 	"net/http"
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 
 	"github.com/dhis2-sre/im-manager/pkg/group"
 	"github.com/dhis2-sre/im-manager/pkg/inttest"
