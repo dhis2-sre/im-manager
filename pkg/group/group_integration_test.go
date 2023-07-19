@@ -71,6 +71,7 @@ func TestGroupHandler(t *testing.T) {
 
 			var group model.Group
 			client.PostJSON(t, "/groups", requestBody, &group)
+			
 			require.Equal(t, "deployable-test-group", group.Name)
 			require.Equal(t, "deployable-test-hostname.com", group.Hostname)
 			require.Equal(t, true, group.Deployable)
