@@ -2,6 +2,7 @@ package group_test
 
 import (
 	"fmt"
+	"github.com/stretchr/testify/assert"
 	"net/http"
 	"strconv"
 	"strings"
@@ -61,10 +62,10 @@ func TestGroupHandler(t *testing.T) {
 
 			var group model.Group
 			client.PostJSON(t, "/groups", requestBody, &group)
-			
-			require.Equal(t, "deployable-test-group", group.Name)
-			require.Equal(t, "deployable-test-hostname.com", group.Hostname)
-			require.Equal(t, true, group.Deployable)
+
+			assert.Equal(t, "deployable-test-group", group.Name)
+			assert.Equal(t, "deployable-test-hostname.com", group.Hostname)
+			assert.True(t, group.Deployable)
 		})
 
 		t.Run("NonDeployable", func(t *testing.T) {
@@ -76,9 +77,10 @@ func TestGroupHandler(t *testing.T) {
 
 			var group model.Group
 			client.PostJSON(t, "/groups", requestBody, &group)
-			require.Equal(t, "non-deployable-test-group", group.Name)
-			require.Equal(t, "non-deployable-test-hostname.com", group.Hostname)
-			require.Equal(t, false, group.Deployable)
+
+			assert.Equal(t, "non-deployable-test-group", group.Name)
+			assert.Equal(t, "non-deployable-test-hostname.com", group.Hostname)
+			assert.False(t, group.Deployable)
 		})
 	})
 
@@ -100,21 +102,20 @@ func TestGroupHandler(t *testing.T) {
 		})
 
 		t.Run("AddNonExistingUserToGroup", func(t *testing.T) {
-			nonExistingUserId := uint(123)
-			_, err := userService.FindById(nonExistingUserId)
+			_, err := userService.FindById(99999)
 			require.Error(t, err, "user already exists")
-			path := fmt.Sprintf("/groups/%s/users/%s", groupName, fmt.Sprintf("%d", nonExistingUserId))
+			path := fmt.Sprintf("/groups/%s/users/99999", groupName)
 
 			response := client.Do(t, http.MethodPost, path, nil, http.StatusNotFound)
 
-			require.Equal(t, "failed to find user with id 123", string(response))
+			require.Equal(t, "failed to find user with id 99999", string(response))
 		})
 	})
 
 	t.Run("RemoveUserFromGroup", func(t *testing.T) {
 		t.Parallel()
 
-		t.Run("RemoveUserFromGroup", func(t *testing.T) {
+		t.Run("Success", func(t *testing.T) {
 			err := groupService.AddUser(groupName, user.ID)
 			require.NoError(t, err)
 			path := fmt.Sprintf("/groups/%s/users/%s", groupName, userId)
@@ -131,21 +132,20 @@ func TestGroupHandler(t *testing.T) {
 		})
 
 		t.Run("RemoveNonExistingUserFromGroup", func(t *testing.T) {
-			nonExistingUserId := uint(123)
-			_, err := userService.FindById(nonExistingUserId)
+			_, err := userService.FindById(99999)
 			require.Error(t, err, "user already exists")
-			path := fmt.Sprintf("/groups/%s/users/%s", groupName, fmt.Sprintf("%d", nonExistingUserId))
+			path := fmt.Sprintf("/groups/%s/users/99999", groupName)
 
 			response := client.Do(t, http.MethodDelete, path, nil, http.StatusNotFound)
 
-			require.Equal(t, "failed to find user with id 123", string(response))
+			require.Equal(t, "failed to find user with id 99999", string(response))
 		})
 	})
 
 	t.Run("FindGroup", func(t *testing.T) {
 		t.Parallel()
 
-		t.Run("FindGroup", func(t *testing.T) {
+		t.Run("Success", func(t *testing.T) {
 			path := fmt.Sprintf("/groups/%s", groupName)
 
 			var group model.Group
@@ -155,8 +155,6 @@ func TestGroupHandler(t *testing.T) {
 		})
 
 		t.Run("FindGroupFailed", func(t *testing.T) {
-			path := fmt.Sprintf("/groups/%s", "non-existing-group")
-
 			client.Do(t, http.MethodGet, "/groups/non-existing-group", nil, http.StatusNotFound)
 		})
 	})
@@ -164,7 +162,7 @@ func TestGroupHandler(t *testing.T) {
 	t.Run("FindGroupWithDetails", func(t *testing.T) {
 		t.Parallel()
 
-		t.Run("FindGroupWithDetails", func(t *testing.T) {
+		t.Run("Success", func(t *testing.T) {
 			err := groupService.AddUser(groupName, user.ID)
 			require.NoError(t, err)
 			path := fmt.Sprintf("/groups/%s/details", groupName)
