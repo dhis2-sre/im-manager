@@ -33,7 +33,7 @@ type groupService interface {
 type CreateGroupRequest struct {
 	Name       string `json:"name" binding:"required"`
 	Hostname   string `json:"hostname" binding:"required"`
-	Deployable bool   `json:"deployable" binding:"required"`
+	Deployable bool   `json:"deployable"`
 }
 
 // Create group
