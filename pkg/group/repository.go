@@ -32,7 +32,7 @@ func (r repository) find(name string) (*model.Group, error) {
 	}
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to find group with details: %v", err)
+		return nil, fmt.Errorf("failed to find group: %v", err)
 	}
 
 	return group, nil
@@ -50,7 +50,11 @@ func (r repository) findWithDetails(name string) (*model.Group, error) {
 		return nil, errdef.NewNotFound("group %q doesn't exist", name)
 	}
 
-	return group, err
+	if err != nil {
+		return nil, fmt.Errorf("failed to find group with details: %v", err)
+	}
+
+	return group, nil
 }
 
 const AdministratorGroupName = "administrators"
