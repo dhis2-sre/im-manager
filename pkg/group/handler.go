@@ -33,7 +33,7 @@ type groupService interface {
 type CreateGroupRequest struct {
 	Name       string `json:"name" binding:"required"`
 	Hostname   string `json:"hostname" binding:"required"`
-	Deployable bool   `json:"deployable" binding:"required"`
+	Deployable bool   `json:"deployable"`
 }
 
 // Create group
@@ -56,6 +56,7 @@ func (h Handler) Create(c *gin.Context) {
 	var request CreateGroupRequest
 
 	if err := handler.DataBinder(c, &request); err != nil {
+		_ = c.Error(err)
 		return
 	}
 
@@ -130,6 +131,7 @@ func (h Handler) AddClusterConfiguration(c *gin.Context) {
 	//   415: Error
 	var request CreateClusterConfigurationRequest
 	if err := handler.DataBinder(c, &request); err != nil {
+		_ = c.Error(err)
 		return
 	}
 

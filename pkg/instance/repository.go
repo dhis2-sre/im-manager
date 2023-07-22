@@ -171,7 +171,7 @@ func (r repository) findInstances(groupNames []string, presets bool) ([]*model.I
 	err := query.
 		Joins("User").
 		Where("preset = ?", presets).
-		Order("created_at desc").
+		Order("updated_at desc").
 		Find(&instances).Error
 	return instances, err
 }

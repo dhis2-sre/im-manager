@@ -137,6 +137,7 @@ func (r repository) FindByGroupNames(names []string) ([]model.Database, error) {
 
 	err := r.db.
 		Where("group_name IN ?", names).
+		Order("updated_at desc").
 		Find(&databases).Error
 
 	return databases, err

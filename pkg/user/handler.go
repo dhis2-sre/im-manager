@@ -144,6 +144,7 @@ func (h Handler) RefreshToken(c *gin.Context) {
 	var request RefreshTokenRequest
 
 	if err := handler.DataBinder(c, &request); err != nil {
+		_ = c.Error(err)
 		return
 	}
 

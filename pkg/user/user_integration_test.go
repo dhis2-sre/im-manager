@@ -101,7 +101,7 @@ func TestUserHandler(t *testing.T) {
 			password := strings.Repeat("a", 129)
 			requestBody := strings.NewReader(`{
 				"email":    "some@email.com",
-				"password": \"` + password + `"\"
+				"password": "` + password + `"
 			}`)
 
 			response := client.Do(t, http.MethodPost, "/users", requestBody, http.StatusBadRequest, inttest.WithHeader("Content-Type", "application/json"))
