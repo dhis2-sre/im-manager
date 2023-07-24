@@ -2,7 +2,7 @@ package group
 
 // swagger:parameters groupCreate
 type _ struct {
-	// Refresh token request body parameter
+	// Create group request body parameter
 	// in: body
 	// required: true
 	Body CreateGroupRequest

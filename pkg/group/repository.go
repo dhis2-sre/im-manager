@@ -107,7 +107,13 @@ func findAllFromUser(user *model.User, deployable bool) []model.Group {
 }
 
 func (r repository) create(group *model.Group) error {
-	return r.db.Create(&group).Error
+	err := r.db.Create(&group).Error
+	if errors.Is(err, gorm.ErrDuplicatedKey) {
+		// TODO how to check if name or hostname is duplicated?
+		return errdef.NewDuplicated("group name/hostname already exists: %s", err)
+	}
+
+	return err
 }
 
 func (r repository) findOrCreate(group *model.Group) (*model.Group, error) {
