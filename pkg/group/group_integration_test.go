@@ -46,15 +46,59 @@ func TestGroupHandler(t *testing.T) {
 
 	var groupName string
 	{
-		group, err := groupService.Create("test-group", "test-hostname.com", true)
-		require.NoError(t, err)
+		requestBody := strings.NewReader(`{
+			"name": "test-group",
+			"hostname": "test-hostname.com"
+		}`)
+
+		var group model.Group
+		client.PostJSON(t, "/groups", requestBody, &group)
+
+		require.Equal(t, "test-group", group.Name)
+		require.Equal(t, "test-hostname.com", group.Hostname)
+		require.False(t, group.Deployable)
 		groupName = group.Name
 	}
 
-	t.Run("CreateGroup", func(t *testing.T) {
+	t.Run("Success", func(t *testing.T) {
 		t.Parallel()
 
-		t.Run("Deployable", func(t *testing.T) {
+		{
+			t.Log("AddUserToGroup")
+			path := fmt.Sprintf("/groups/%s/users/%s", groupName, userId)
+
+			client.Do(t, http.MethodPost, path, nil, http.StatusCreated)
+		}
+
+		t.Run("FindGroup", func(t *testing.T) {
+			path := fmt.Sprintf("/groups/%s", groupName)
+
+			var group model.Group
+			client.GetJSON(t, path, &group)
+
+			require.Equal(t, groupName, group.Name)
+		})
+
+		t.Run("FindGroupWithDetails", func(t *testing.T) {
+			path := fmt.Sprintf("/groups/%s/details", groupName)
+
+			var group model.Group
+			client.GetJSON(t, path, &group)
+
+			require.Equal(t, groupName, group.Name)
+			require.Equal(t, group.Users[0].ID, user.ID)
+		})
+
+		{
+			t.Log("RemoveUserFromGroup")
+			path := fmt.Sprintf("/groups/%s/users/%s", groupName, userId)
+
+			client.Do(t, http.MethodDelete, path, nil, http.StatusNoContent)
+		}
+
+		t.Run("CreateDeployableGroup", func(t *testing.T) {
+			t.Parallel()
+
 			requestBody := strings.NewReader(`{
 				"name": "deployable-test-group",
 				"hostname": "deployable-test-hostname.com",
@@ -68,33 +112,12 @@ func TestGroupHandler(t *testing.T) {
 			assert.Equal(t, "deployable-test-hostname.com", group.Hostname)
 			assert.True(t, group.Deployable)
 		})
-
-		t.Run("NonDeployable", func(t *testing.T) {
-			requestBody := strings.NewReader(`{
-				"name": "non-deployable-test-group",
-				"hostname": "non-deployable-test-hostname.com",
-				"deployable": false
-			}`)
-
-			var group model.Group
-			client.PostJSON(t, "/groups", requestBody, &group)
-
-			assert.Equal(t, "non-deployable-test-group", group.Name)
-			assert.Equal(t, "non-deployable-test-hostname.com", group.Hostname)
-			assert.False(t, group.Deployable)
-		})
 	})
 
-	t.Run("AddUserToGroup", func(t *testing.T) {
+	t.Run("FailedTo", func(t *testing.T) {
 		t.Parallel()
 
-		t.Run("Success", func(t *testing.T) {
-			path := fmt.Sprintf("/groups/%s/users/%s", groupName, userId)
-
-			client.Do(t, http.MethodPost, path, nil, http.StatusCreated)
-		})
-
-		t.Run("AddUserToGroupNonExistingGroup", func(t *testing.T) {
+		t.Run("AddUserToNonExistingGroup", func(t *testing.T) {
 			path := fmt.Sprintf("/groups/%s/users/%s", "non-existing-group", userId)
 
 			response := client.Do(t, http.MethodPost, path, nil, http.StatusNotFound)
@@ -103,76 +126,32 @@ func TestGroupHandler(t *testing.T) {
 		})
 
 		t.Run("AddNonExistingUserToGroup", func(t *testing.T) {
-			_, err := userService.FindById(99999)
-			require.Error(t, err, "user already exists")
 			path := fmt.Sprintf("/groups/%s/users/99999", groupName)
 
 			response := client.Do(t, http.MethodPost, path, nil, http.StatusNotFound)
 
 			require.Equal(t, "failed to find user with id 99999", string(response))
 		})
-	})
-
-	t.Run("RemoveUserFromGroup", func(t *testing.T) {
-		t.Parallel()
-
-		t.Run("Success", func(t *testing.T) {
-			err := groupService.AddUser(groupName, user.ID)
-			require.NoError(t, err)
-			path := fmt.Sprintf("/groups/%s/users/%s", groupName, userId)
-
-			client.Do(t, http.MethodDelete, path, nil, http.StatusNoContent)
-		})
 
 		t.Run("RemoveUserFromNonExistingGroup", func(t *testing.T) {
 			path := fmt.Sprintf("/groups/%s/users/%s", "non-existing-group", userId)
 
+			// TODO(ivo) why do we use POST here to delete a user from a group?
 			response := client.Do(t, http.MethodPost, path, nil, http.StatusNotFound)
 
 			require.Equal(t, "group \"non-existing-group\" doesn't exist", string(response))
 		})
 
 		t.Run("RemoveNonExistingUserFromGroup", func(t *testing.T) {
-			_, err := userService.FindById(99999)
-			require.Error(t, err, "user already exists")
 			path := fmt.Sprintf("/groups/%s/users/99999", groupName)
 
 			response := client.Do(t, http.MethodDelete, path, nil, http.StatusNotFound)
 
 			require.Equal(t, "failed to find user with id 99999", string(response))
 		})
-	})
 
-	t.Run("FindGroup", func(t *testing.T) {
-		t.Parallel()
-
-		t.Run("Success", func(t *testing.T) {
-			path := fmt.Sprintf("/groups/%s", groupName)
-
-			var group model.Group
-			client.GetJSON(t, path, &group)
-
-			require.Equal(t, groupName, group.Name)
-		})
-
-		t.Run("FindGroupFailed", func(t *testing.T) {
+		t.Run("FindGroup", func(t *testing.T) {
 			client.Do(t, http.MethodGet, "/groups/non-existing-group", nil, http.StatusNotFound)
-		})
-	})
-
-	t.Run("FindGroupWithDetails", func(t *testing.T) {
-		t.Parallel()
-
-		t.Run("Success", func(t *testing.T) {
-			err := groupService.AddUser(groupName, user.ID)
-			require.NoError(t, err)
-			path := fmt.Sprintf("/groups/%s/details", groupName)
-
-			var group model.Group
-			client.GetJSON(t, path, &group)
-
-			require.Equal(t, groupName, group.Name)
-			require.Equal(t, group.Users[0].ID, user.ID)
 		})
 
 		t.Run("FindNonExistingGroupWithDetails", func(t *testing.T) {
