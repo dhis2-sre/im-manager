@@ -84,7 +84,7 @@ deploy:
             DATABASE_PORT: "5432"
             RABBITMQ_HOST: im-rabbitmq-{{ .ENVIRONMENT }}.instance-manager-{{ .CLASSIFICATION }}.svc
             RABBITMQ_PORT: "5672"
-            S3_BUCKET: test-db-manager-bucket
+            S3_BUCKET: im-databases-{{ .CLASSIFICATION }}
             DEFAULT_TTL: "172800"
         useHelmSecrets: true
         valuesFiles:
