@@ -55,16 +55,12 @@ func WithHeader(key string, value string) func(http.Header) {
 
 // WithBasicAuth adds a basic authorization header with the given user and password to HTTP request headers.
 func WithBasicAuth(user string, password string) func(http.Header) {
-	return func(header http.Header) {
-		header.Add("Authorization", "Basic "+base64.StdEncoding.EncodeToString([]byte(user+":"+password)))
-	}
+	return WithHeader("Authorization", "Basic "+base64.StdEncoding.EncodeToString([]byte(user+":"+password)))
 }
 
 // WithAuthToken adds an authorization header with the given bearer token to HTTP request headers.
 func WithAuthToken(token string) func(http.Header) {
-	return func(header http.Header) {
-		header.Add("Authorization", "Bearer "+token)
-	}
+	return WithHeader("Authorization", "Bearer "+token)
 }
 
 // Get sends an HTTP GET request to given path. Optional headers are applied to the request. The
