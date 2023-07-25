@@ -7,7 +7,7 @@ require (
 	github.com/aws/aws-sdk-go v1.44.308
 	github.com/aws/aws-sdk-go-v2 v1.19.0
 	github.com/aws/aws-sdk-go-v2/config v1.18.29
-	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.11.72
+	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.11.73
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.37.0
 	github.com/dhis2-sre/rabbitmq v0.3.0
 	github.com/gin-contrib/cors v1.4.0
