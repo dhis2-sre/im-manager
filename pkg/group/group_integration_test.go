@@ -136,8 +136,7 @@ func TestGroupHandler(t *testing.T) {
 		t.Run("RemoveUserFromNonExistingGroup", func(t *testing.T) {
 			path := fmt.Sprintf("/groups/%s/users/%s", "non-existing-group", userId)
 
-			// TODO(ivo) why do we use POST here to delete a user from a group?
-			response := client.Do(t, http.MethodPost, path, nil, http.StatusNotFound)
+			response := client.Do(t, http.MethodDelete, path, nil, http.StatusNotFound)
 
 			require.Equal(t, "group \"non-existing-group\" doesn't exist", string(response))
 		})
