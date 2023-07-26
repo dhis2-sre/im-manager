@@ -2,6 +2,7 @@ package group
 
 import (
 	"errors"
+	"fmt"
 
 	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
@@ -23,14 +24,37 @@ func NewRepository(db *gorm.DB) *repository {
 func (r repository) find(name string) (*model.Group, error) {
 	var group *model.Group
 	err := r.db.
-		Preload("ClusterConfiguration").
+		Joins("ClusterConfiguration").
 		Where("name = ?", name).
 		First(&group).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, errdef.NewNotFound("group %q doesn't exist", name)
 	}
 
-	return group, err
+	if err != nil {
+		return nil, fmt.Errorf("failed to find group: %v", err)
+	}
+
+	return group, nil
+}
+
+func (r repository) findWithDetails(name string) (*model.Group, error) {
+	var group *model.Group
+	err := r.db.
+		Where("name = ?", name).
+		Joins("ClusterConfiguration").
+		Preload("Users").
+		Preload("AdminUsers").
+		First(&group).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, errdef.NewNotFound("group %q doesn't exist", name)
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to find group with details: %v", err)
+	}
+
+	return group, nil
 }
 
 const AdministratorGroupName = "administrators"
@@ -100,6 +124,10 @@ func (r repository) findOrCreate(group *model.Group) (*model.Group, error) {
 
 func (r repository) addUser(group *model.Group, user *model.User) error {
 	return r.db.Model(&group).Association("Users").Append([]*model.User{user})
+}
+
+func (r repository) removeUser(group *model.Group, user *model.User) error {
+	return r.db.Model(&group).Association("Users").Delete([]*model.User{user})
 }
 
 func (r repository) addClusterConfiguration(configuration *model.ClusterConfiguration) error {

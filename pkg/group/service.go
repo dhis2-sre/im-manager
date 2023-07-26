@@ -15,9 +15,11 @@ func NewService(groupRepository groupRepository, userService userService) *servi
 type groupRepository interface {
 	create(group *model.Group) error
 	addUser(group *model.Group, user *model.User) error
+	removeUser(group *model.Group, user *model.User) error
 	addClusterConfiguration(configuration *model.ClusterConfiguration) error
 	getClusterConfiguration(groupName string) (*model.ClusterConfiguration, error)
 	find(name string) (*model.Group, error)
+	findWithDetails(name string) (*model.Group, error)
 	findOrCreate(group *model.Group) (*model.Group, error)
 	findAll(user *model.User, deployable bool) ([]model.Group, error)
 }
@@ -33,6 +35,10 @@ type service struct {
 
 func (s *service) Find(name string) (*model.Group, error) {
 	return s.groupRepository.find(name)
+}
+
+func (s *service) FindWithDetails(name string) (*model.Group, error) {
+	return s.groupRepository.findWithDetails(name)
 }
 
 func (s *service) Create(name string, hostname string, deployable bool) (*model.Group, error) {
@@ -77,6 +83,20 @@ func (s *service) AddUser(groupName string, userId uint) error {
 	}
 
 	return s.groupRepository.addUser(group, u)
+}
+
+func (s *service) RemoveUser(groupName string, userId uint) error {
+	group, err := s.Find(groupName)
+	if err != nil {
+		return err
+	}
+
+	u, err := s.userService.FindById(userId)
+	if err != nil {
+		return err
+	}
+
+	return s.groupRepository.removeUser(group, u)
 }
 
 func (s *service) AddClusterConfiguration(clusterConfiguration *model.ClusterConfiguration) error {
