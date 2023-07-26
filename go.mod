@@ -30,7 +30,7 @@ require (
 	gorm.io/driver/postgres v1.5.2
 	gorm.io/gorm v1.25.2
 	k8s.io/api v0.28.0-alpha.1
-	k8s.io/apimachinery v0.28.0-beta.0
+	k8s.io/apimachinery v0.28.0-alpha.1
 	k8s.io/client-go v0.28.0-alpha.1
 )
 
@@ -184,7 +184,7 @@ require (
 	go.uber.org/zap v1.24.0 // indirect
 	golang.org/x/arch v0.3.0 // indirect
 	golang.org/x/net v0.12.0 // indirect
-	golang.org/x/oauth2 v0.6.0 // indirect
+	golang.org/x/oauth2 v0.8.0 // indirect
 	golang.org/x/sync v0.1.0 // indirect
 	golang.org/x/sys v0.10.0 // indirect
 	golang.org/x/term v0.10.0 // indirect
