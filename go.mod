@@ -29,9 +29,9 @@ require (
 	golang.org/x/exp v0.0.0-20230213192124-5e25df0256eb
 	gorm.io/driver/postgres v1.5.2
 	gorm.io/gorm v1.25.2
-	k8s.io/api v0.28.0-alpha.1
-	k8s.io/apimachinery v0.28.0-alpha.1
-	k8s.io/client-go v0.28.0-alpha.1
+	k8s.io/api v0.27.4
+	k8s.io/apimachinery v0.27.4
+	k8s.io/client-go v0.27.4
 )
 
 require (
@@ -105,7 +105,6 @@ require (
 	github.com/golang/protobuf v1.5.3 // indirect
 	github.com/google/btree v1.1.2 // indirect
 	github.com/google/gnostic v0.6.9 // indirect
-	github.com/google/gnostic-models v0.6.8 // indirect
 	github.com/google/go-cmp v0.5.9 // indirect
 	github.com/google/gofuzz v1.2.0 // indirect
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510 // indirect
@@ -203,7 +202,7 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	k8s.io/cli-runtime v0.25.2 // indirect
 	k8s.io/klog/v2 v2.100.1 // indirect
-	k8s.io/kube-openapi v0.0.0-20230717233707-2695361300d9 // indirect
+	k8s.io/kube-openapi v0.0.0-20230525220651-2546d827e515 // indirect
 	k8s.io/utils v0.0.0-20230406110748-d93618cff8a2 // indirect
 	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect
 	sigs.k8s.io/kustomize/api v0.12.1 // indirect
