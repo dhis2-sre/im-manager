@@ -38,7 +38,7 @@ echo "{
   \"ttl\": $INSTANCE_TTL,
   \"public\": $PUBLIC,
   \"sourceInstance\": $SOURCE_INSTANCE_ID,
-  \"optionalParameters\": [
+  \"parameters\": [
     {
       \"name\": \"STARTUP_PROBE_FAILURE_THRESHOLD\",
       \"value\": \"$STARTUP_PROBE_FAILURE_THRESHOLD\"

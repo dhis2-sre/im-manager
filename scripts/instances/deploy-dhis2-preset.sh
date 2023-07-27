@@ -25,7 +25,7 @@ echo "{
   \"groupName\": \"$GROUP\",
   \"stackName\": \"$STACK\",
   \"ttl\": $INSTANCE_TTL,
-  \"optionalParameters\": [
+  \"parameters\": [
     {
       \"name\": \"STARTUP_PROBE_FAILURE_THRESHOLD\",
       \"value\": \"$STARTUP_PROBE_FAILURE_THRESHOLD\"
@@ -49,9 +49,7 @@ echo "{
     {
       \"name\": \"DATABASE_SIZE\",
       \"value\": \"$DATABASE_SIZE\"
-    }
-  ],
-  \"requiredParameters\": [
+    },
     {
       \"name\": \"DATABASE_ID\",
       \"value\": \"$DATABASE_ID\"

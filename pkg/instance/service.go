@@ -73,62 +73,42 @@ func (s service) ConsumeParameters(source, destination *model.Instance) error {
 		return fmt.Errorf("error finding stack %q of destination instance: %w", destination.StackName, err)
 	}
 
-	// Consumed required parameters
-	for _, parameter := range destinationStack.RequiredParameters {
+	// Consumed parameters
+	for _, parameter := range destinationStack.Parameters {
 		if (parameter.Consumed || source.Preset) && parameter.Name != destinationStack.HostnameVariable {
 			value, err := s.findParameterValue(parameter.Name, source, sourceStack)
 			if err != nil {
 				return err
 			}
-			parameterRequest := model.InstanceRequiredParameter{
-				StackRequiredParameterID: parameter.Name,
-				Value:                    value,
+			parameterRequest := model.InstanceParameter{
+				StackParameterID: parameter.Name,
+				Value:            value,
 			}
-			destination.RequiredParameters = append(destination.RequiredParameters, parameterRequest)
-		}
-	}
-
-	// Consumed optional parameters
-	for _, parameter := range destinationStack.OptionalParameters {
-		if (parameter.Consumed || source.Preset) && parameter.Name != destinationStack.HostnameVariable {
-			value, err := s.findParameterValue(parameter.Name, source, sourceStack)
-			if err != nil {
-				return err
-			}
-			parameterRequest := model.InstanceOptionalParameter{
-				StackOptionalParameterID: parameter.Name,
-				Value:                    value,
-			}
-			destination.OptionalParameters = append(destination.OptionalParameters, parameterRequest)
+			destination.Parameters = append(destination.Parameters, parameterRequest)
 		}
 	}
 
 	// Hostname parameter
 	if !source.Preset && destinationStack.HostnameVariable != "" {
-		hostnameParameter := model.InstanceRequiredParameter{
-			StackRequiredParameterID: destinationStack.HostnameVariable,
-			Value:                    fmt.Sprintf(sourceStack.HostnamePattern, source.Name, source.GroupName),
+		hostnameParameter := model.InstanceParameter{
+			StackParameterID: destinationStack.HostnameVariable,
+			Value:            fmt.Sprintf(sourceStack.HostnamePattern, source.Name, source.GroupName),
 		}
-		destination.RequiredParameters = append(destination.RequiredParameters, hostnameParameter)
+		destination.Parameters = append(destination.Parameters, hostnameParameter)
 	}
 
 	return nil
 }
 
 func (s service) findParameterValue(parameter string, sourceInstance *model.Instance, sourceStack *model.Stack) (string, error) {
-	requiredParameter, err := sourceInstance.FindRequiredParameter(parameter)
+	instanceParameter, err := sourceInstance.FindParameter(parameter)
 	if err == nil {
-		return requiredParameter.Value, nil
+		return instanceParameter.Value, nil
 	}
 
-	optionalParameter, err := sourceInstance.FindOptionalParameter(parameter)
+	stackParameter, err := sourceStack.FindParameter(parameter)
 	if err == nil {
-		return optionalParameter.Value, nil
-	}
-
-	stackOptionalParameter, err := sourceStack.FindOptionalParameter(parameter)
-	if err == nil {
-		return stackOptionalParameter.DefaultValue, nil
+		return *stackParameter.DefaultValue, nil
 	}
 
 	return "", fmt.Errorf("unable to find value for parameter: %s", parameter)
@@ -187,7 +167,7 @@ func (s service) unlink(id uint) error {
 	return s.instanceRepository.Unlink(instance)
 }
 
-func matchRequiredParameters(stackParameters []model.StackRequiredParameter, instanceParameters []model.InstanceRequiredParameter) []string {
+func matchOptionalParameters(stackParameters []model.StackParameter, instanceParameters []model.InstanceParameter) []string {
 	unmatchedParameters := make([]string, 0)
 	parameterNames := make(map[string]struct{})
 
@@ -196,25 +176,8 @@ func matchRequiredParameters(stackParameters []model.StackRequiredParameter, ins
 	}
 
 	for _, parameter := range instanceParameters {
-		if _, ok := parameterNames[parameter.StackRequiredParameterID]; !ok {
-			unmatchedParameters = append(unmatchedParameters, parameter.StackRequiredParameterID)
-		}
-	}
-
-	return unmatchedParameters
-}
-
-func matchOptionalParameters(stackParameters []model.StackOptionalParameter, instanceParameters []model.InstanceOptionalParameter) []string {
-	unmatchedParameters := make([]string, 0)
-	parameterNames := make(map[string]struct{})
-
-	for _, parameter := range stackParameters {
-		parameterNames[parameter.Name] = struct{}{}
-	}
-
-	for _, parameter := range instanceParameters {
-		if _, ok := parameterNames[parameter.StackOptionalParameterID]; !ok {
-			unmatchedParameters = append(unmatchedParameters, parameter.StackOptionalParameterID)
+		if _, ok := parameterNames[parameter.StackParameterID]; !ok {
+			unmatchedParameters = append(unmatchedParameters, parameter.StackParameterID)
 		}
 	}
 
@@ -222,11 +185,9 @@ func matchOptionalParameters(stackParameters []model.StackOptionalParameter, ins
 }
 
 func validateParameters(stack *model.Stack, instance *model.Instance) error {
-	unmatchedRequiredParameters := matchRequiredParameters(stack.RequiredParameters, instance.RequiredParameters)
-	unmatchedOptionalParameters := matchOptionalParameters(stack.OptionalParameters, instance.OptionalParameters)
+	unmatchedOptionalParameters := matchOptionalParameters(stack.Parameters, instance.Parameters)
 
 	unmatchedParameters := make([]string, 0)
-	unmatchedParameters = append(unmatchedParameters, unmatchedRequiredParameters...)
 	unmatchedParameters = append(unmatchedParameters, unmatchedOptionalParameters...)
 
 	if len(unmatchedParameters) > 0 {

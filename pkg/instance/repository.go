@@ -14,7 +14,7 @@ import (
 
 //goland:noinspection GoExportedFuncWithUnexportedType
 func NewRepository(db *gorm.DB, config config.Config) *repository {
-	return &repository{db: db, config: config}
+	return &repository{db, config}
 }
 
 type repository struct {
@@ -91,8 +91,7 @@ func (r repository) Save(instance *model.Instance) error {
 func (r repository) FindById(id uint) (*model.Instance, error) {
 	var instance *model.Instance
 	err := r.db.
-		Preload("RequiredParameters.StackRequiredParameter").
-		Preload("OptionalParameters.StackOptionalParameter").
+		Preload("Parameters.StackParameter").
 		Joins("Group").
 		First(&instance, id).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -159,8 +158,7 @@ func (r repository) FindByGroups(groups []model.Group, presets bool) ([]GroupWit
 
 func (r repository) findInstances(groupNames []string, presets bool) ([]*model.Instance, error) {
 	query := r.db.
-		Preload("RequiredParameters.StackRequiredParameter").
-		Preload("OptionalParameters.StackOptionalParameter")
+		Preload("Parameters.StackParameter")
 
 	isAdmin := slices.Contains(groupNames, AdministratorGroupName)
 	if !isAdmin {
@@ -229,58 +227,34 @@ func groupWithInstances(instancesMap map[string][]*model.Instance, groupMap map[
 
 // TODO: Rename PopulateRelations? Or something else?
 func enrichParameters(instance *model.Instance) {
-	requiredParameters := instance.RequiredParameters
-	if len(requiredParameters) > 0 {
-		for i := range requiredParameters {
-			requiredParameters[i].InstanceID = instance.ID
-			requiredParameters[i].StackName = instance.StackName
-		}
-	}
-
-	optionalParameters := instance.OptionalParameters
-	if len(optionalParameters) > 0 {
-		for i := range optionalParameters {
-			optionalParameters[i].InstanceID = instance.ID
-			optionalParameters[i].StackName = instance.StackName
+	Parameters := instance.Parameters
+	if len(Parameters) > 0 {
+		for i := range Parameters {
+			Parameters[i].InstanceID = instance.ID
+			Parameters[i].StackName = instance.StackName
 		}
 	}
 }
 
 func encryptParameters(key string, instance *model.Instance) error {
-	for i, parameter := range instance.RequiredParameters {
+	for i, parameter := range instance.Parameters {
 		value, err := encryptText(key, parameter.Value)
 		if err != nil {
 			return err
 		}
-		instance.RequiredParameters[i].Value = value
-	}
-
-	for i, parameter := range instance.OptionalParameters {
-		value, err := encryptText(key, parameter.Value)
-		if err != nil {
-			return err
-		}
-		instance.OptionalParameters[i].Value = value
+		instance.Parameters[i].Value = value
 	}
 
 	return nil
 }
 
 func decryptParameters(key string, instance *model.Instance) error {
-	for i, parameter := range instance.RequiredParameters {
+	for i, parameter := range instance.Parameters {
 		value, err := decryptText(key, parameter.Value)
 		if err != nil {
 			return err
 		}
-		instance.RequiredParameters[i].Value = value
-	}
-
-	for i, parameter := range instance.OptionalParameters {
-		value, err := decryptText(key, parameter.Value)
-		if err != nil {
-			return err
-		}
-		instance.OptionalParameters[i].Value = value
+		instance.Parameters[i].Value = value
 	}
 
 	return nil

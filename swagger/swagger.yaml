@@ -308,11 +308,11 @@ definitions:
             name:
                 type: string
                 x-go-name: Name
-            optionalParameters:
+            parameters:
                 items:
-                    $ref: '#/definitions/InstanceOptionalParameter'
+                    $ref: '#/definitions/InstanceParameter'
                 type: array
-                x-go-name: OptionalParameters
+                x-go-name: Parameters
             presetInstance:
                 format: uint64
                 type: integer
@@ -320,11 +320,6 @@ definitions:
             public:
                 type: boolean
                 x-go-name: Public
-            requiredParameters:
-                items:
-                    $ref: '#/definitions/InstanceRequiredParameter'
-                type: array
-                x-go-name: RequiredParameters
             sourceInstance:
                 format: uint64
                 type: integer
@@ -651,6 +646,10 @@ definitions:
         x-go-package: github.com/docker/docker/api/types/volume
     Instance:
         properties:
+            Parameters:
+                items:
+                    $ref: '#/definitions/InstanceParameter'
+                type: array
             createdAt:
                 format: date-time
                 type: string
@@ -673,11 +672,6 @@ definitions:
             name:
                 type: string
                 x-go-name: Name
-            optionalParameters:
-                items:
-                    $ref: '#/definitions/InstanceOptionalParameter'
-                type: array
-                x-go-name: OptionalParameters
             preset:
                 type: boolean
                 x-go-name: Preset
@@ -688,11 +682,6 @@ definitions:
             public:
                 type: boolean
                 x-go-name: Public
-            requiredParameters:
-                items:
-                    $ref: '#/definitions/InstanceRequiredParameter'
-                type: array
-                x-go-name: RequiredParameters
             stackName:
                 type: string
                 x-go-name: StackName
@@ -712,23 +701,12 @@ definitions:
                 x-go-name: UserID
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/model
-    InstanceOptionalParameter:
+    InstanceParameter:
         properties:
             name:
-                description: 'TODO: Rename StackOptionalParameterID to Name'
+                description: 'TODO: Rename StackParameterID to Name'
                 type: string
-                x-go-name: StackOptionalParameterID
-            value:
-                type: string
-                x-go-name: Value
-        type: object
-        x-go-package: github.com/dhis2-sre/im-manager/pkg/model
-    InstanceRequiredParameter:
-        properties:
-            name:
-                description: 'TODO: Rename StackRequiredParameterID to Name'
-                type: string
-                x-go-name: StackRequiredParameterID
+                x-go-name: StackParameterID
             value:
                 type: string
                 x-go-name: Value
@@ -1246,23 +1224,18 @@ definitions:
             name:
                 type: string
                 x-go-name: Name
-            optionalParameters:
+            parameters:
                 items:
-                    $ref: '#/definitions/StackOptionalParameter'
+                    $ref: '#/definitions/StackParameter'
                 type: array
-                x-go-name: OptionalParameters
-            requiredParameters:
-                items:
-                    $ref: '#/definitions/StackRequiredParameter'
-                type: array
-                x-go-name: RequiredParameters
+                x-go-name: Parameters
             updatedAt:
                 format: date-time
                 type: string
                 x-go-name: UpdatedAt
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/model
-    StackOptionalParameter:
+    StackParameter:
         properties:
             consumed:
                 type: boolean
@@ -1273,22 +1246,6 @@ definitions:
             name:
                 type: string
                 x-go-name: Name
-            stackName:
-                type: string
-                x-go-name: StackName
-        type: object
-        x-go-package: github.com/dhis2-sre/im-manager/pkg/model
-    StackRequiredParameter:
-        properties:
-            consumed:
-                type: boolean
-                x-go-name: Consumed
-            name:
-                type: string
-                x-go-name: Name
-            stackName:
-                type: string
-                x-go-name: StackName
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/model
     Tokens:
@@ -1530,16 +1487,11 @@ definitions:
         x-go-package: github.com/dhis2-sre/im-manager/pkg/database
     UpdateInstanceRequest:
         properties:
-            optionalParameters:
+            parameters:
                 items:
-                    $ref: '#/definitions/InstanceOptionalParameter'
+                    $ref: '#/definitions/InstanceParameter'
                 type: array
-                x-go-name: OptionalParameters
-            requiredParameters:
-                items:
-                    $ref: '#/definitions/InstanceRequiredParameter'
-                type: array
-                x-go-name: RequiredParameters
+                x-go-name: Parameters
             ttl:
                 format: uint64
                 type: integer

@@ -18,16 +18,14 @@ echo "{
   \"groupName\": \"$GROUP\",
   \"stackName\": \"$STACK\",
   \"ttl\": $INSTANCE_TTL,
-  \"requiredParameters\": [
-    {
-      \"name\": \"DATABASE_ID\",
-      \"value\": \"$DATABASE_ID\"
-    }
-  ],
-  \"optionalParameters\": [
+  \"parameters\": [
     {
       \"name\": \"DATABASE_SIZE\",
       \"value\": \"$DATABASE_SIZE\"
+    },
+    {
+      \"name\": \"DATABASE_ID\",
+      \"value\": \"$DATABASE_ID\"
     }
  ]
 }" | $HTTP post "$IM_HOST/instances?preset=true" "Authorization: Bearer $ACCESS_TOKEN"

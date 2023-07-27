@@ -25,7 +25,7 @@ FLYWAY_REPAIR_BEFORE_MIGRATION=${FLYWAY_REPAIR_BEFORE_MIGRATION:-false}
 INSTANCE_ID=$($HTTP get "$IM_HOST/instances-name-to-id/$GROUP/$NAME" "Authorization: Bearer $ACCESS_TOKEN")
 
 echo "{
-  \"optionalParameters\": [
+  \"parameters\": [
     {
       \"name\": \"STARTUP_PROBE_FAILURE_THRESHOLD\",
       \"value\": \"$STARTUP_PROBE_FAILURE_THRESHOLD\"
@@ -65,9 +65,7 @@ echo "{
     {
        \"name\": \"FLYWAY_REPAIR_BEFORE_MIGRATION\",
        \"value\": \"$FLYWAY_REPAIR_BEFORE_MIGRATION\"
-    }
-  ],
-  \"requiredParameters\": [
+    },
     {
       \"name\": \"DATABASE_ID\",
       \"value\": \"$DATABASE_ID\"

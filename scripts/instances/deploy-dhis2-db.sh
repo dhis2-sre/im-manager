@@ -26,7 +26,7 @@ echo "{
       \"value\": \"$DATABASE_ID\"
     }
   ],
-  \"optionalParameters\": [
+  \"parameters\": [
     {
       \"name\": \"DATABASE_SIZE\",
       \"value\": \"$DATABASE_SIZE\"

@@ -60,15 +60,10 @@ func LoadStacks(dir string, stackService Service) error {
 			HostnamePattern:  stackTemplate.hostnamePattern,
 			HostnameVariable: stackTemplate.hostnameVariable,
 		}
-		for _, name := range stackTemplate.requiredParameters {
+		for name, v := range stackTemplate.parameters {
 			isConsumed := isConsumedParameter(name, stackTemplate.consumedParameters)
-			parameter := &model.StackRequiredParameter{Name: name, StackName: stack.Name, Consumed: isConsumed}
-			stack.RequiredParameters = append(stack.RequiredParameters, *parameter)
-		}
-		for name, v := range stackTemplate.optionalParameters {
-			isConsumed := isConsumedParameter(name, stackTemplate.consumedParameters)
-			parameter := &model.StackOptionalParameter{Name: name, StackName: stack.Name, Consumed: isConsumed, DefaultValue: v}
-			stack.OptionalParameters = append(stack.OptionalParameters, *parameter)
+			parameter := &model.StackParameter{Name: name, StackName: stack.Name, Consumed: isConsumed, DefaultValue: v}
+			stack.Parameters = append(stack.Parameters, *parameter)
 		}
 
 		err = stackService.Create(stack)
@@ -87,7 +82,8 @@ type stack struct {
 	consumedParameters []string
 	stackParameters    []string
 	requiredParameters []string
-	optionalParameters map[string]string
+	optionalParameters map[string]*string
+	parameters         map[string]*string
 }
 
 func parseStack(dir, name string) (*stack, error) {
@@ -120,13 +116,16 @@ func parseStack(dir, name string) (*stack, error) {
 	requiredParams := extractRequiredParameters(file, stackParameters)
 	optionalParams := extractOptionalParameters(file, stackParameters)
 
+	for _, parameter := range requiredParams {
+		optionalParams[parameter] = nil
+	}
+
 	return &stack{
 		hostnamePattern:    hostnamePattern,
 		hostnameVariable:   hostnameVariable,
 		consumedParameters: consumedParameters,
 		stackParameters:    stackParameters,
-		requiredParameters: requiredParams,
-		optionalParameters: optionalParams,
+		parameters:         optionalParams,
 	}, nil
 }
 
@@ -149,16 +148,17 @@ func extractRequiredParameters(file []byte, stackParameters []string) []string {
 	return extractParameters(file, regexStr, stackParameters)
 }
 
-func extractOptionalParameters(file []byte, stackParameters []string) map[string]string {
+func extractOptionalParameters(file []byte, stackParameters []string) map[string]*string {
 	regexStr := `{{[ ]env[ ]"(\w+)"[ ]?(\|[ ]?default[ ]["]?(.*)\s+}})?`
 	fileData := string(file)
-	parameterMap := make(map[string]string)
+	parameterMap := make(map[string]*string)
 	re := regexp.MustCompile(regexStr)
 	matches := re.FindAllStringSubmatch(fileData, -1)
 	for _, match := range matches {
 		if !isSystemParameter(match[1]) && !isStackParameter(match[1], stackParameters) {
 			// TODO: Update the regular expression so there's no need to trim
-			parameterMap[match[1]] = strings.TrimSuffix(strings.TrimSpace(match[3]), "\"")
+			value := strings.TrimSuffix(strings.TrimSpace(match[3]), "\"")
+			parameterMap[match[1]] = &value
 		}
 	}
 	return parameterMap
