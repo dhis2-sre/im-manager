@@ -118,7 +118,10 @@ func (r repository) create(group *model.Group) error {
 
 func (r repository) findOrCreate(group *model.Group) (*model.Group, error) {
 	var g *model.Group
-	err := r.db.Where(model.Group{Name: group.Name}).Attrs(model.Group{Hostname: group.Hostname}).FirstOrCreate(&g).Error
+	err := r.db.
+		Where(model.Group{Name: group.Name}).
+		Attrs(model.Group{Hostname: group.Hostname, Deployable: group.Deployable}).
+		FirstOrCreate(&g).Error
 	return g, err
 }
 
