@@ -81,8 +81,6 @@ type stack struct {
 	hostnameVariable   string
 	consumedParameters []string
 	stackParameters    []string
-	requiredParameters []string
-	optionalParameters map[string]*string
 	parameters         map[string]*string
 }
 
