@@ -4,7 +4,7 @@ go 1.20
 
 require (
 	github.com/anthhub/forwarder v1.1.0
-	github.com/aws/aws-sdk-go v1.44.310
+	github.com/aws/aws-sdk-go v1.44.312
 	github.com/aws/aws-sdk-go-v2 v1.19.0
 	github.com/aws/aws-sdk-go-v2/config v1.18.29
 	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.11.73
