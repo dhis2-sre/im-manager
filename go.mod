@@ -5,7 +5,7 @@ go 1.20
 require (
 	github.com/anthhub/forwarder v1.1.0
 	github.com/aws/aws-sdk-go v1.44.312
-	github.com/aws/aws-sdk-go-v2 v1.19.1
+	github.com/aws/aws-sdk-go-v2 v1.20.0
 	github.com/aws/aws-sdk-go-v2/config v1.18.30
 	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.11.74
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.37.1
@@ -68,7 +68,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/sso v1.12.14 // indirect
 	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.14.14 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sts v1.20.1 // indirect
-	github.com/aws/smithy-go v1.13.5 // indirect
+	github.com/aws/smithy-go v1.14.0 // indirect
 	github.com/blang/semver v3.5.1+incompatible // indirect
 	github.com/bytedance/sonic v1.9.1 // indirect
 	github.com/cenkalti/backoff/v3 v3.2.2 // indirect
