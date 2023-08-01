@@ -26,7 +26,7 @@ func (s Stack) FindParameter(name string) (StackParameter, error) {
 			return parameter, nil
 		}
 	}
-	return StackParameter{}, fmt.Errorf("optional parameter not found: %s", name)
+	return StackParameter{}, fmt.Errorf("parameter not found: %s", name)
 }
 
 type StackParameter struct {
