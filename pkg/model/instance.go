@@ -39,7 +39,7 @@ func (i Instance) FindParameter(name string) (InstanceParameter, error) {
 			return parameter, nil
 		}
 	}
-	return InstanceParameter{}, fmt.Errorf("required parameter not found: %s", name)
+	return InstanceParameter{}, fmt.Errorf("parameter not found: %s", name)
 }
 
 type InstanceParameter struct {
