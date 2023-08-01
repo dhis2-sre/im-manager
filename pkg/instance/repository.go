@@ -226,11 +226,11 @@ func groupWithInstances(instancesMap map[string][]*model.Instance, groupMap map[
 }
 
 func populateParameterRelations(instance *model.Instance) {
-	Parameters := instance.Parameters
-	if len(Parameters) > 0 {
-		for i := range Parameters {
-			Parameters[i].InstanceID = instance.ID
-			Parameters[i].StackName = instance.StackName
+	parameters := instance.Parameters
+	if len(parameters) > 0 {
+		for i := range parameters {
+			parameters[i].InstanceID = instance.ID
+			parameters[i].StackName = instance.StackName
 		}
 	}
 }
