@@ -73,7 +73,7 @@ func (r repository) Unlink(instance *model.Instance) error {
 func (r repository) Save(instance *model.Instance) error {
 	key := r.config.InstanceParameterEncryptionKey
 
-	enrichParameters(instance)
+	populateParameterRelations(instance)
 
 	err := encryptParameters(key, instance)
 	if err != nil {
@@ -225,8 +225,7 @@ func groupWithInstances(instancesMap map[string][]*model.Instance, groupMap map[
 	return groupWithInstances
 }
 
-// TODO: Rename PopulateRelations? Or something else?
-func enrichParameters(instance *model.Instance) {
+func populateParameterRelations(instance *model.Instance) {
 	Parameters := instance.Parameters
 	if len(Parameters) > 0 {
 		for i := range Parameters {
