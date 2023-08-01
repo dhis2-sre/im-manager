@@ -8,13 +8,12 @@ import (
 // swagger:model Stack
 type Stack struct {
 	Name             string           `json:"name" gorm:"primaryKey"`
+	CreatedAt        time.Time        `json:"createdAt"`
+	UpdatedAt        time.Time        `json:"updatedAt"`
 	Parameters       []StackParameter `json:"parameters" gorm:"foreignKey:StackName; references: Name; constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
 	Instances        []Instance       `json:"instances" gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
 	HostnamePattern  string           `json:"hostnamePattern"`
 	HostnameVariable string           `json:"hostnameVariable"`
-
-	CreatedAt time.Time `json:"createdAt"`
-	UpdatedAt time.Time `json:"updatedAt"`
 }
 
 func (s Stack) GetHostname(name, namespace string) string {
