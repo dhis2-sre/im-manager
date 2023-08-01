@@ -16,7 +16,7 @@ type Instance struct {
 	Description string              `json:"description"`
 	StackName   string              `json:"stackName"`
 	TTL         uint                `json:"ttl"`
-	Parameters  []InstanceParameter `json:"Parameters" gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
+	Parameters  []InstanceParameter `json:"parameters" gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
 	DeployLog   string              `json:"deployLog" gorm:"type:text"`
 	Preset      bool                `json:"preset"`
 	Public      bool                `json:"public"`
