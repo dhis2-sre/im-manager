@@ -167,7 +167,7 @@ func (s service) unlink(id uint) error {
 	return s.instanceRepository.Unlink(instance)
 }
 
-func matchOptionalParameters(stackParameters []model.StackParameter, instanceParameters []model.InstanceParameter) []string {
+func matchParameters(stackParameters []model.StackParameter, instanceParameters []model.InstanceParameter) []string {
 	unmatchedParameters := make([]string, 0)
 	parameterNames := make(map[string]struct{})
 
@@ -185,7 +185,7 @@ func matchOptionalParameters(stackParameters []model.StackParameter, instancePar
 }
 
 func validateParameters(stack *model.Stack, instance *model.Instance) error {
-	unmatchedOptionalParameters := matchOptionalParameters(stack.Parameters, instance.Parameters)
+	unmatchedOptionalParameters := matchParameters(stack.Parameters, instance.Parameters)
 
 	unmatchedParameters := make([]string, 0)
 	unmatchedParameters = append(unmatchedParameters, unmatchedOptionalParameters...)
