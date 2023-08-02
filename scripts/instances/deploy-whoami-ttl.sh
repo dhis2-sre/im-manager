@@ -17,7 +17,7 @@ echo "{
   \"groupName\": \"$GROUP\",
   \"stackName\": \"$STACK\",
   \"ttl\": $TTL,
-  \"optionalParameters\": [
+  \"parameters\": [
     {
       \"name\": \"CHART_VERSION\",
       \"value\": \"$CHART_VERSION\"

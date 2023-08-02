@@ -20,13 +20,11 @@ echo "{
   \"groupName\": \"$GROUP\",
   \"stackName\": \"$STACK\",
   \"ttl\": $INSTANCE_TTL,
-  \"requiredParameters\": [
+  \"parameters\": [
     {
       \"name\": \"DATABASE_ID\",
       \"value\": \"$DATABASE_ID\"
-    }
-  ],
-  \"optionalParameters\": [
+    },
     {
       \"name\": \"DATABASE_SIZE\",
       \"value\": \"$DATABASE_SIZE\"

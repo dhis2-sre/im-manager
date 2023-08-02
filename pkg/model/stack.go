@@ -7,38 +7,31 @@ import (
 
 // swagger:model Stack
 type Stack struct {
-	CreatedAt          time.Time                `json:"createdAt"`
-	UpdatedAt          time.Time                `json:"updatedAt"`
-	Name               string                   `json:"name" gorm:"primaryKey"`
-	RequiredParameters []StackRequiredParameter `json:"requiredParameters" gorm:"foreignKey:StackName; references: Name; constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
-	OptionalParameters []StackOptionalParameter `json:"optionalParameters" gorm:"foreignKey:StackName; references: Name; constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
-	Instances          []Instance               `json:"instances" gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
-	HostnamePattern    string                   `json:"hostnamePattern"`
-	HostnameVariable   string                   `json:"hostnameVariable"`
+	Name             string           `json:"name" gorm:"primaryKey"`
+	CreatedAt        time.Time        `json:"createdAt"`
+	UpdatedAt        time.Time        `json:"updatedAt"`
+	Parameters       []StackParameter `json:"parameters" gorm:"foreignKey:StackName; references: Name; constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
+	Instances        []Instance       `json:"instances" gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
+	HostnamePattern  string           `json:"hostnamePattern"`
+	HostnameVariable string           `json:"hostnameVariable"`
 }
 
 func (s Stack) GetHostname(name, namespace string) string {
 	return fmt.Sprintf(s.HostnamePattern, name, namespace)
 }
 
-func (s Stack) FindOptionalParameter(name string) (StackOptionalParameter, error) {
-	for _, parameter := range s.OptionalParameters {
+func (s Stack) FindParameter(name string) (StackParameter, error) {
+	for _, parameter := range s.Parameters {
 		if parameter.Name == name {
 			return parameter, nil
 		}
 	}
-	return StackOptionalParameter{}, fmt.Errorf("optional parameter not found: %s", name)
+	return StackParameter{}, fmt.Errorf("parameter not found: %s", name)
 }
 
-type StackRequiredParameter struct {
-	Name      string `json:"name" gorm:"primaryKey"`
-	StackName string `json:"stackName" gorm:"primaryKey"`
-	Consumed  bool   `json:"consumed"`
-}
-
-type StackOptionalParameter struct {
-	Name         string `json:"name" gorm:"primaryKey"`
-	StackName    string `json:"stackName" gorm:"primaryKey"`
-	DefaultValue string `json:"defaultValue"`
-	Consumed     bool   `json:"consumed"`
+type StackParameter struct {
+	Name         string  `json:"name" gorm:"primaryKey"`
+	StackName    string  `json:"-" gorm:"primaryKey"`
+	DefaultValue *string `json:"defaultValue"`
+	Consumed     bool    `json:"consumed"`
 }
