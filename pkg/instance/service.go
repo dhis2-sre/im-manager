@@ -185,11 +185,7 @@ func matchParameters(stackParameters []model.StackParameter, instanceParameters 
 }
 
 func validateParameters(stack *model.Stack, instance *model.Instance) error {
-	unmatchedOptionalParameters := matchParameters(stack.Parameters, instance.Parameters)
-
-	unmatchedParameters := make([]string, 0)
-	unmatchedParameters = append(unmatchedParameters, unmatchedOptionalParameters...)
-
+	unmatchedParameters := matchParameters(stack.Parameters, instance.Parameters)
 	if len(unmatchedParameters) > 0 {
 		return errdef.NewBadRequest("parameters %q are not valid parameters for stack %q", unmatchedParameters, instance.StackName)
 	}
