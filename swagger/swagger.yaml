@@ -51,6 +51,17 @@ definitions:
                 type: integer
         type: object
         x-go-package: github.com/docker/docker/api/types/volume
+    ChangeType:
+        description: |-
+            Can be one of:
+
+            `0`: Modified ("C")
+            `1`: Added ("A")
+            `2`: Deleted ("D")
+        format: uint8
+        title: ChangeType Kind of change
+        type: integer
+        x-go-package: github.com/docker/docker/api/types/container
     ClusterConfiguration:
         properties:
             createdAt:
@@ -137,21 +148,6 @@ definitions:
         title: ClusterVolumeSpec contains the spec used to create this volume.
         type: object
         x-go-package: github.com/docker/docker/api/types/volume
-    ContainerChangeResponseItem:
-        description: ContainerChangeResponseItem change item in response to ContainerChanges operation
-        properties:
-            Kind:
-                description: Kind of change
-                format: uint8
-                type: integer
-            Path:
-                description: Path to file that has changed
-                type: string
-        required:
-            - Kind
-            - Path
-        type: object
-        x-go-package: github.com/docker/docker/api/types/container
     ContainerTopOKBody:
         description: ContainerTopOKBody OK response to ContainerTop operation
         properties:
@@ -360,6 +356,19 @@ definitions:
                 x-go-name: UUID
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/model
+    FilesystemChange:
+        properties:
+            Kind:
+                $ref: '#/definitions/ChangeType'
+            Path:
+                description: Path to file or directory that has changed.
+                type: string
+        required:
+            - Kind
+            - Path
+        title: FilesystemChange Change in the container's filesystem.
+        type: object
+        x-go-package: github.com/docker/docker/api/types/container
     GraphDriverData:
         description: |-
             GraphDriverData Information about the storage driver used to store the container's and
@@ -589,12 +598,11 @@ definitions:
                     Total size of the image including all layers it is composed of.
 
                     In versions of Docker before v1.10, this field was calculated from
-                    the image itself and all of its parent images. Docker v1.10 and up
-                    store images self-contained, and no longer use a parent-chain, making
-                    this field an equivalent of the Size field.
+                    the image itself and all of its parent images. Images are now stored
+                    self-contained, and no longer use a parent-chain, making this field
+                    an equivalent of the Size field.
 
-                    This field is kept for backward compatibility, but may be removed in
-                    a future version of the API.
+                    Deprecated: this field is kept for backward compatibility, and will be removed in API v1.44.
                 format: int64
                 type: integer
         required:
@@ -607,7 +615,6 @@ definitions:
             - RepoTags
             - SharedSize
             - Size
-            - VirtualSize
         type: object
         x-go-package: github.com/docker/docker/api/types
     Info:
