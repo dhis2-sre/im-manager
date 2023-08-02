@@ -646,10 +646,6 @@ definitions:
         x-go-package: github.com/docker/docker/api/types/volume
     Instance:
         properties:
-            Parameters:
-                items:
-                    $ref: '#/definitions/InstanceParameter'
-                type: array
             createdAt:
                 format: date-time
                 type: string
@@ -672,6 +668,11 @@ definitions:
             name:
                 type: string
                 x-go-name: Name
+            parameters:
+                items:
+                    $ref: '#/definitions/InstanceParameter'
+                type: array
+                x-go-name: Parameters
             preset:
                 type: boolean
                 x-go-name: Preset
