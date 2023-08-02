@@ -61,16 +61,15 @@ type groupServiceHandler interface {
 }
 
 type DeployInstanceRequest struct {
-	Name               string                            `json:"name" binding:"required,dns_rfc1035_label"`
-	Group              string                            `json:"groupName" binding:"required"`
-	Description        string                            `json:"description"`
-	Stack              string                            `json:"stackName" binding:"required"`
-	Public             bool                              `json:"public"`
-	TTL                uint                              `json:"ttl"`
-	RequiredParameters []model.InstanceRequiredParameter `json:"requiredParameters"`
-	OptionalParameters []model.InstanceOptionalParameter `json:"optionalParameters"`
-	SourceInstance     uint                              `json:"sourceInstance"`
-	PresetInstance     uint                              `json:"presetInstance"`
+	Name           string                    `json:"name" binding:"required,dns_rfc1035_label"`
+	Group          string                    `json:"groupName" binding:"required"`
+	Description    string                    `json:"description"`
+	Stack          string                    `json:"stackName" binding:"required"`
+	Public         bool                      `json:"public"`
+	TTL            uint                      `json:"ttl"`
+	Parameters     []model.InstanceParameter `json:"parameters"`
+	SourceInstance uint                      `json:"sourceInstance"`
+	PresetInstance uint                      `json:"presetInstance"`
 }
 
 // Deploy instance
@@ -151,17 +150,16 @@ func (h Handler) Deploy(c *gin.Context) {
 	}
 
 	i := &model.Instance{
-		Name:               request.Name,
-		UserID:             user.ID,
-		GroupName:          request.Group,
-		Description:        request.Description,
-		StackName:          request.Stack,
-		Public:             request.Public,
-		TTL:                request.TTL,
-		RequiredParameters: request.RequiredParameters,
-		OptionalParameters: request.OptionalParameters,
-		Preset:             preset,
-		PresetID:           request.PresetInstance,
+		Name:        request.Name,
+		UserID:      user.ID,
+		GroupName:   request.Group,
+		Description: request.Description,
+		StackName:   request.Stack,
+		Public:      request.Public,
+		TTL:         request.TTL,
+		Parameters:  request.Parameters,
+		Preset:      preset,
+		PresetID:    request.PresetInstance,
 	}
 
 	canWrite := handler.CanWriteInstance(user, i)
@@ -257,9 +255,8 @@ func (h Handler) consumeParameters(user *model.User, sourceInstanceId uint, inst
 }
 
 type UpdateInstanceRequest struct {
-	TTL                uint                              `json:"ttl"`
-	RequiredParameters []model.InstanceRequiredParameter `json:"requiredParameters"`
-	OptionalParameters []model.InstanceOptionalParameter `json:"optionalParameters"`
+	TTL        uint                      `json:"ttl"`
+	Parameters []model.InstanceParameter `json:"parameters"`
 }
 
 // Update instance
@@ -322,8 +319,7 @@ func (h Handler) Update(c *gin.Context) {
 	if instance.TTL != h.defaultTTL {
 		instance.TTL = request.TTL
 	}
-	instance.RequiredParameters = request.RequiredParameters
-	instance.OptionalParameters = request.OptionalParameters
+	instance.Parameters = request.Parameters
 
 	err = h.instanceService.Save(instance)
 	if err != nil {

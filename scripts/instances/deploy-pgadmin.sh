@@ -27,7 +27,7 @@ echo "{
   \"stackName\": \"$STACK\",
   \"ttl\": $INSTANCE_TTL,
   \"sourceInstance\": $SOURCE_INSTANCE_ID,
-  \"requiredParameters\": [
+  \"parameters\": [
     {
       \"name\": \"PGADMIN_USERNAME\",
       \"value\": \"$PGADMIN_USERNAME\"

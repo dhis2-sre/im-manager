@@ -11,7 +11,7 @@ REPLICA_COUNT=$3
 INSTANCE_ID=$($HTTP get "$IM_HOST/instances-name-to-id/$GROUP/$NAME" "Authorization: Bearer $ACCESS_TOKEN")
 
 echo "{
-  \"optionalParameters\": [
+  \"parameters\": [
     {
        \"name\": \"REPLICA_COUNT\",
        \"value\": \"$REPLICA_COUNT\"

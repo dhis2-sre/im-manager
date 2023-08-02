@@ -24,7 +24,7 @@ echo "{
   \"stackName\": \"$STACK\",
   \"ttl\": $INSTANCE_TTL,
   \"public\": $PUBLIC,
-  \"optionalParameters\": [
+  \"parameters\": [
     {
       \"name\": \"CHART_VERSION\",
       \"value\": \"$CHART_VERSION\"

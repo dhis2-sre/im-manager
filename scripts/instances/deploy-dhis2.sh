@@ -40,7 +40,7 @@ echo "{
   \"stackName\": \"$STACK\",
   \"ttl\": $INSTANCE_TTL,
   \"public\": $PUBLIC,
-  \"optionalParameters\": [
+  \"parameters\": [
     {
       \"name\": \"STARTUP_PROBE_FAILURE_THRESHOLD\",
       \"value\": \"$STARTUP_PROBE_FAILURE_THRESHOLD\"
@@ -100,9 +100,7 @@ echo "{
     {
       \"name\": \"DB_RESOURCES_REQUESTS_MEMORY\",
       \"value\": \"$DB_RESOURCES_REQUESTS_MEMORY\"
-    }
-  ],
-  \"requiredParameters\": [
+    },
     {
       \"name\": \"DATABASE_ID\",
       \"value\": \"$DATABASE_ID\"
