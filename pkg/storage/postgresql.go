@@ -20,7 +20,7 @@ func NewDatabase(c config.Postgresql) (*gorm.DB, error) {
 	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%d sslmode=disable", host, username, password, name, port)
 
 	databaseConfig := gorm.Config{
-		Logger:         logger.Default.LogMode(logger.Warn),
+		Logger:         logger.Default.LogMode(logger.Info),
 		TranslateError: true,
 	}
 
@@ -30,6 +30,10 @@ func NewDatabase(c config.Postgresql) (*gorm.DB, error) {
 	}
 
 	err = db.AutoMigrate(
+		&model.Chain{},
+		&model.Link{},
+		&model.LinkParameter{},
+
 		&model.User{},
 		&model.Group{},
 		&model.ClusterConfiguration{},

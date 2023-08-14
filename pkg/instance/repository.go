@@ -1,15 +1,16 @@
 package instance
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
-
 	"github.com/dhis2-sre/im-manager/internal/errdef"
 	"github.com/dhis2-sre/im-manager/pkg/config"
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
 	"gorm.io/gorm"
+	"log"
 )
 
 //goland:noinspection GoExportedFuncWithUnexportedType
@@ -20,6 +21,53 @@ func NewRepository(db *gorm.DB, config config.Config) *repository {
 type repository struct {
 	db     *gorm.DB
 	config config.Config
+}
+
+func (r repository) SaveChain(chain *model.Chain) error {
+	// TODO: Do we need the option to save nested entities... Yes, if we create the chain from a preset we need to store all the links as well
+	//err := r.db.Session(&gorm.Session{FullSaveAssociations: true}).Save(chain).Error
+	err := r.db.Create(&chain).Error
+	if errors.Is(err, gorm.ErrDuplicatedKey) {
+		return errdef.NewDuplicated("a chain named %q already exists", chain.Name)
+	}
+
+	return err
+}
+
+func (r repository) FindChainById(id uint) (*model.Chain, error) {
+	var chain *model.Chain
+	err := r.db.
+		Joins("Group").
+		First(&chain, id).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, errdef.NewNotFound("chain not found by id: %d", id)
+	}
+
+	return chain, err
+}
+
+func (r repository) SaveLink(link *model.Link) error {
+	populateLinkParameterRelations(link)
+	indent, _ := json.MarshalIndent(link, "", "  ")
+	log.Println(string(indent))
+
+	err := r.db.Session(&gorm.Session{FullSaveAssociations: true}).Save(link).Error
+	// TODO: When is a link duplicated?
+	if errors.Is(err, gorm.ErrDuplicatedKey) {
+		return errdef.NewDuplicated("link already exists: %v", link)
+	}
+
+	return err
+}
+
+func populateLinkParameterRelations(link *model.Link) {
+	parameters := link.Parameters
+	if len(parameters) > 0 {
+		for i := range parameters {
+			parameters[i].LinkID = link.ID
+			parameters[i].StackName = link.StackName
+		}
+	}
 }
 
 func (r repository) FindByIdDecrypted(id uint) (*model.Instance, error) {

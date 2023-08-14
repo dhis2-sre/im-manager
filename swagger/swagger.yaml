@@ -684,6 +684,7 @@ definitions:
                 type: boolean
                 x-go-name: Preset
             presetId:
+                description: The preset which this instance is created from
                 format: uint64
                 type: integer
                 x-go-name: PresetID
@@ -1254,6 +1255,10 @@ definitions:
             name:
                 type: string
                 x-go-name: Name
+            priority:
+                format: int64
+                type: integer
+                x-go-name: Priority
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/model
     Tokens:

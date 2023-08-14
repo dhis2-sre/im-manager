@@ -1,7 +1,9 @@
 package instance
 
 import (
+	"errors"
 	"fmt"
+	"gorm.io/gorm"
 	"io"
 	"log"
 	"os/exec"
@@ -22,16 +24,13 @@ func NewService(
 	stackService stack.Service,
 	helmfileService helmfile,
 ) *service {
-	return &service{
-		config,
-		instanceRepository,
-		groupService,
-		stackService,
-		helmfileService,
-	}
+	return &service{config, instanceRepository, groupService, stackService, helmfileService}
 }
 
 type Repository interface {
+	SaveChain(chain *model.Chain) error
+	FindChainById(id uint) (*model.Chain, error)
+	SaveLink(*model.Link) error
 	Link(firstInstance, secondInstance *model.Instance) error
 	Unlink(instance *model.Instance) error
 	Save(instance *model.Instance) error
@@ -60,6 +59,30 @@ type service struct {
 	groupService       groupService
 	stackService       stack.Service
 	helmfileService    helmfile
+}
+
+func (s service) SaveChain(chain *model.Chain) error {
+	return s.instanceRepository.SaveChain(chain)
+}
+
+func (s service) FindChainById(id uint) (*model.Chain, error) {
+	return s.instanceRepository.FindChainById(id)
+}
+
+func (s service) SaveLink(link *model.Link) error {
+	chain, err := s.instanceRepository.FindChainById(link.ChainID)
+	if err != nil {
+		// TODO: Do we really care about this check? If the chainID doesn't exist we'll get a FK violation and if that's the case we didn't need to look up the chain
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return errdef.NewNotFound("chain not found by id: %d", link.ChainID)
+		}
+		return err
+	}
+
+	// TODO: Assert chain is valid...
+	log.Println("chain id:", chain.ID)
+
+	return s.instanceRepository.SaveLink(link)
 }
 
 func (s service) ConsumeParameters(source, destination *model.Instance) error {

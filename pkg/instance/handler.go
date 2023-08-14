@@ -2,8 +2,10 @@ package instance
 
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"strconv"
 
@@ -27,6 +29,9 @@ func NewHandler(userService userServiceHandler, groupService groupServiceHandler
 }
 
 type Service interface {
+	SaveChain(chain *model.Chain) error
+	FindChainById(id uint) (*model.Chain, error)
+	SaveLink(link *model.Link) error
 	ConsumeParameters(source, destination *model.Instance) error
 	Pause(instance *model.Instance) error
 	Resume(instance *model.Instance) error
@@ -58,6 +63,110 @@ type userServiceHandler interface {
 
 type groupServiceHandler interface {
 	Find(name string) (*model.Group, error)
+}
+
+type SaveChainRequest struct {
+	Name        string `json:"name" binding:"required,dns_rfc1035_label"`
+	Description string `json:"description"`
+	Group       string `json:"group" binding:"required"`
+	TTL         uint   `json:"ttl"`
+	Source      uint   `json:"source"` // TODO: Create from source eg. other chain
+	Preset      uint   `json:"preset"` // TODO: Create as preset
+}
+
+func (h Handler) SaveChain(c *gin.Context) {
+	var request SaveChainRequest
+	if err := handler.DataBinder(c, &request); err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	group, err := h.groupService.Find(request.Group)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	if !group.Deployable {
+		forbidden := errdef.NewForbidden("group isn't deployable: %s", group.Name)
+		_ = c.Error(forbidden)
+		return
+	}
+
+	if request.TTL == 0 {
+		request.TTL = h.defaultTTL
+	}
+
+	user, err := handler.GetUserFromContext(c)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+	/*
+		token, err := handler.GetTokenFromHttpAuthHeader(c)
+		if err != nil {
+			_ = c.Error(err)
+			return
+		}
+	*/
+	chain := &model.Chain{
+		UserID:      user.ID,
+		Name:        request.Name,
+		Description: request.Description,
+		GroupName:   request.Group,
+		TTL:         request.TTL,
+	}
+
+	// TODO: Assert group is writable
+	// TODO: If request.Source, load chain... Maybe only support
+	err = h.instanceService.SaveChain(chain)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	c.JSON(http.StatusCreated, chain)
+}
+
+type SaveLinkRequest struct {
+	StackName string `json:"stackName" gorm:"references:Name"`
+	Preset    bool   `json:"preset"`
+	PresetID  uint   `json:"presetId"` // The preset id this link is created from
+	//	Public     bool                      `json:"public"`
+	Parameters []*model.LinkParameter `json:"parameters"`
+}
+
+func (h Handler) SaveLink(c *gin.Context) {
+	var request SaveLinkRequest
+	if err := handler.DataBinder(c, &request); err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	chainId, ok := handler.GetPathParameter(c, "id")
+	if !ok {
+		return
+	}
+
+	link := &model.Link{
+		ChainID:    chainId,
+		StackName:  request.StackName,
+		Parameters: request.Parameters,
+		Preset:     request.Preset,
+		//		PresetID:   0,
+		//		Public:     false,
+	}
+	indent, _ := json.MarshalIndent(link, "", "  ")
+	log.Println(string(indent))
+
+	// TODO: If request.Source, load chain... Maybe only support source on links?
+	err := h.instanceService.SaveLink(link)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	c.JSON(http.StatusCreated, link)
 }
 
 type DeployInstanceRequest struct {

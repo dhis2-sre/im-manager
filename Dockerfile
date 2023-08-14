@@ -1,4 +1,4 @@
-FROM golang:1.20.1-alpine3.17 AS build
+FROM golang:1.21-alpine3.18 AS build
 
 ARG KUBECTL_VERSION=v1.23.5
 ARG KUBECTL_CHECKSUM=715da05c56aa4f8df09cb1f9d96a2aa2c33a1232f6fd195e3ffce6e98a50a879

@@ -24,4 +24,7 @@ func Routes(r *gin.Engine, authenticationMiddleware middleware.AuthenticationMid
 	tokenAuthenticationRouter.PUT("/instances/:id/restart", handler.Restart)
 	tokenAuthenticationRouter.GET("/instances/:id/logs", handler.Logs)
 	tokenAuthenticationRouter.GET("/instances-name-to-id/:groupName/:instanceName", handler.NameToId)
+
+	tokenAuthenticationRouter.POST("/chains", handler.SaveChain)
+	tokenAuthenticationRouter.POST("/chains/:id/link", handler.SaveLink)
 }

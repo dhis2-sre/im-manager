@@ -34,4 +34,5 @@ type StackParameter struct {
 	StackName    string  `json:"-" gorm:"primaryKey"`
 	DefaultValue *string `json:"defaultValue"`
 	Consumed     bool    `json:"consumed"`
+	Priority     int     `json:"priority"`
 }
