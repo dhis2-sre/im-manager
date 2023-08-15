@@ -2,7 +2,6 @@ package model
 
 import (
 	"fmt"
-	"log"
 	"time"
 
 	"gorm.io/gorm"
@@ -49,7 +48,6 @@ type Link struct {
 }
 
 func (l *Link) BeforeSave(_ *gorm.DB) error {
-	log.Println("Before save!")
 	l.ParameterList = make([]LinkParameter, 0, len(l.Parameters))
 	for _, parameter := range l.Parameters {
 		parameter.LinkID = l.ID
@@ -60,7 +58,6 @@ func (l *Link) BeforeSave(_ *gorm.DB) error {
 }
 
 func (l *Link) AfterFind(_ *gorm.DB) error {
-	log.Println("After find!")
 	l.Parameters = make(map[string]LinkParameter, len(l.ParameterList))
 	for _, parameter := range l.ParameterList {
 		l.Parameters[parameter.ParameterName] = parameter
