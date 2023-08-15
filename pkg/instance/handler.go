@@ -2,10 +2,8 @@ package instance
 
 import (
 	"bufio"
-	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"strconv"
 
@@ -128,12 +126,16 @@ func (h Handler) SaveChain(c *gin.Context) {
 	c.JSON(http.StatusCreated, chain)
 }
 
+type parameter struct{ Value string }
+
+type parameters map[string]parameter
+
 type SaveLinkRequest struct {
 	StackName string `json:"stackName" gorm:"references:Name"`
 	Preset    bool   `json:"preset"`
 	PresetID  uint   `json:"presetId"` // The preset id this link is created from
 	//	Public     bool                      `json:"public"`
-	Parameters []*model.LinkParameter `json:"parameters"`
+	Parameters parameters `json:"parameters"`
 }
 
 func (h Handler) SaveLink(c *gin.Context) {
@@ -148,16 +150,23 @@ func (h Handler) SaveLink(c *gin.Context) {
 		return
 	}
 
+	// Convert request parameters to LinkParameters
+	params := make(model.Parameters, len(request.Parameters))
+	for k, v := range request.Parameters {
+		params[k] = model.LinkParameter{
+			ParameterName: k,
+			Value:         v.Value,
+		}
+	}
+
 	link := &model.Link{
 		ChainID:    chainId,
 		StackName:  request.StackName,
-		Parameters: request.Parameters,
+		Parameters: params,
 		Preset:     request.Preset,
 		//		PresetID:   0,
 		//		Public:     false,
 	}
-	indent, _ := json.MarshalIndent(link, "", "  ")
-	log.Println(string(indent))
 
 	// TODO: If request.Source, load chain... Maybe only support source on links?
 	err := h.instanceService.SaveLink(link)

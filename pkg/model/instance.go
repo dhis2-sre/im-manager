@@ -2,7 +2,10 @@ package model
 
 import (
 	"fmt"
+	"log"
 	"time"
+
+	"gorm.io/gorm"
 )
 
 type Chain struct {
@@ -22,26 +25,47 @@ type Chain struct {
 	Links []*Link `json:"links"`
 }
 
-// TODO: Is Link just an instance with a reference to a Chain
+type Parameters map[string]LinkParameter
+
 type Link struct {
 	ID        uint      `json:"id" gorm:"primaryKey"`
 	CreatedAt time.Time `json:"createdAt"`
 	UpdatedAt time.Time `json:"updatedAt"`
 
-	ChainID uint  `json:"chainId"`
-	Chain   Chain `json:"chain"`
+	ChainID uint   `json:"chainId"`
+	Chain   *Chain `json:"chain,omitempty"`
 
-	StackName string `json:"stackName"`
-	//StackName  string           `json:"stackName" gorm:"references:Name"`
-	//Stack      Stack            `json:"stack"`
+	StackName string `json:"stackName" gorm:"references:Name"`
+	Stack     *Stack `json:"stack,omitempty"`
 
-	Parameters []*LinkParameter `json:"parameters" gorm:"foreignKey:LinkID; references:ID; constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
+	ParameterList []LinkParameter `json:"-" gorm:"foreignKey:LinkID; constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
+	Parameters    Parameters      `json:"parameters" gorm:"-:all"`
 
 	Preset   bool `json:"preset"`   // Whether this link is a preset
 	PresetID uint `json:"presetId"` // The preset id this link is created from
 	Public   bool `json:"public"`
 
 	DeployLog string `json:"deployLog" gorm:"type:text"`
+}
+
+func (l *Link) BeforeSave(_ *gorm.DB) error {
+	log.Println("Before save!")
+	l.ParameterList = make([]LinkParameter, 0, len(l.Parameters))
+	for _, parameter := range l.Parameters {
+		parameter.LinkID = l.ID
+		parameter.StackName = l.StackName
+		l.ParameterList = append(l.ParameterList, parameter)
+	}
+	return nil
+}
+
+func (l *Link) AfterFind(_ *gorm.DB) error {
+	log.Println("After find!")
+	l.Parameters = make(map[string]LinkParameter, len(l.ParameterList))
+	for _, parameter := range l.ParameterList {
+		l.Parameters[parameter.ParameterName] = parameter
+	}
+	return nil
 }
 
 // swagger:model Instance
@@ -83,11 +107,11 @@ func (i Instance) FindParameter(name string) (InstanceParameter, error) {
 }
 
 type LinkParameter struct {
-	LinkID             uint           `json:"-" gorm:"uniqueIndex:link_param_idx"`
-	StackParameterName string         `json:"name" gorm:"uniqueIndex:link_param_idx"`
-	StackParameter     StackParameter `json:"-" gorm:"foreignKey:StackParameterName,StackName; references:Name,StackName; constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
-	StackName          string         `json:"-"`
-	Value              string         `json:"value"`
+	LinkID         uint           `json:"-" gorm:"primaryKey"`
+	ParameterName  string         `json:"-" gorm:"primaryKey"`
+	StackParameter StackParameter `json:"-" gorm:"foreignKey:ParameterName,StackName; references:Name,StackName; constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
+	StackName      string         `json:"-"`
+	Value          string         `json:"value"`
 }
 
 type InstanceParameter struct {
