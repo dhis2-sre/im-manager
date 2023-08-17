@@ -27,6 +27,8 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/go-mail/mail"
+
 	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/dhis2-sre/im-manager/internal/middleware"
@@ -62,7 +64,8 @@ func run() error {
 	}
 
 	userRepository := user.NewRepository(db)
-	userService := user.NewService(userRepository)
+	dailer := mail.NewDialer(cfg.SMTP.Host, cfg.SMTP.Port, cfg.SMTP.Username, cfg.SMTP.Password)
+	userService := user.NewService(cfg, userRepository, dailer)
 	authorization := middleware.NewAuthorization(userService)
 	redis := storage.NewRedis(cfg)
 	tokenRepository := token.NewRepository(redis)

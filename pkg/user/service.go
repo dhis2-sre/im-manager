@@ -6,15 +6,19 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/dhis2-sre/im-manager/pkg/config"
+	"github.com/google/uuid"
+
 	"github.com/dhis2-sre/im-manager/internal/errdef"
 
 	"github.com/dhis2-sre/im-manager/pkg/model"
+	"github.com/go-mail/mail"
 	"golang.org/x/crypto/scrypt"
 )
 
 //goland:noinspection GoExportedFuncWithUnexportedType
-func NewService(repository userRepository) *service {
-	return &service{repository}
+func NewService(config config.Config, repository userRepository, dailer dailer) *service {
+	return &service{config, repository, dailer}
 }
 
 type userRepository interface {
@@ -25,10 +29,22 @@ type userRepository interface {
 	findAll() ([]*model.User, error)
 	delete(id uint) error
 	update(user *model.User) (*model.User, error)
+	findByEmailToken(token uuid.UUID) (*model.User, error)
+	save(user *model.User) error
+}
+
+type dailer interface {
+	DialAndSend(m ...*mail.Message) error
 }
 
 type service struct {
+	config     config.Config
 	repository userRepository
+	dailer     dailer
+}
+
+func (s service) Save(user *model.User) error {
+	return s.repository.save(user)
 }
 
 func (s service) SignUp(email string, password string) (*model.User, error) {
@@ -38,8 +54,14 @@ func (s service) SignUp(email string, password string) (*model.User, error) {
 	}
 
 	user := &model.User{
-		Email:    email,
-		Password: hashedPassword,
+		Email:      email,
+		EmailToken: uuid.New(),
+		Password:   hashedPassword,
+	}
+
+	err = s.sendValidationEmail(user)
+	if err != nil {
+		return nil, err
 	}
 
 	err = s.repository.create(user)
@@ -48,6 +70,17 @@ func (s service) SignUp(email string, password string) (*model.User, error) {
 	}
 
 	return user, nil
+}
+
+func (s service) sendValidationEmail(user *model.User) error {
+	m := mail.NewMessage()
+	m.SetHeader("From", "DHIS2 Instance Manager <no-reply@dhis2.org>")
+	m.SetHeader("To", user.Email)
+	m.SetHeader("Subject", "Welcome to IM")
+	link := fmt.Sprintf("%s/users/validate/%s", s.config.Hostname, user.EmailToken)
+	body := fmt.Sprintf("Hello, please click the below link to verify your email.<br/>%s", link)
+	m.SetBody("text/html", body)
+	return s.dailer.DialAndSend(m)
 }
 
 func hashPassword(password string) (string, error) {
@@ -69,6 +102,16 @@ func hashPassword(password string) (string, error) {
 	return hashedPassword, nil
 }
 
+func (s service) ValidateEmail(token uuid.UUID) error {
+	user, err := s.repository.findByEmailToken(token)
+	if err != nil {
+		return err
+	}
+
+	user.Validated = true
+	return s.repository.save(user)
+}
+
 func (s service) SignIn(email string, password string) (*model.User, error) {
 	unauthorizedError := "invalid email and password combination"
 
@@ -87,6 +130,10 @@ func (s service) SignIn(email string, password string) (*model.User, error) {
 
 	if !match {
 		return nil, errdef.NewUnauthorized(unauthorizedError)
+	}
+
+	if !user.Validated {
+		return nil, errdef.NewForbidden("account not validated")
 	}
 
 	return user, nil

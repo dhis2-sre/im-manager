@@ -2857,6 +2857,16 @@ paths:
             security:
                 - oauth2: []
             summary: Update user
+    /users/validate/:token:
+        get:
+            description: Validate user email
+            operationId: findByEmailToken
+            responses:
+                "200":
+                    $ref: '#/responses/Tokens'
+                "404":
+                    $ref: '#/responses/Error'
+            summary: Validate email
 produces:
     - application/json
 responses:

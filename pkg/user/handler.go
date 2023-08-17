@@ -4,6 +4,8 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/google/uuid"
+
 	"github.com/dhis2-sre/im-manager/internal/errdef"
 	"github.com/dhis2-sre/im-manager/internal/handler"
 	"github.com/dhis2-sre/im-manager/pkg/model"
@@ -32,6 +34,7 @@ type userService interface {
 	FindAll() ([]*model.User, error)
 	Delete(id uint) error
 	Update(id uint, email, password string) (*model.User, error)
+	ValidateEmail(token uuid.UUID) error
 }
 
 type tokenService interface {
@@ -91,6 +94,39 @@ func handleSignUpErrors(err error) error {
 		}
 	}
 	return errs
+}
+
+// ValidateEmail validate users email
+func (h Handler) ValidateEmail(c *gin.Context) {
+	// swagger:route GET /users/validate/:token findByEmailToken
+	//
+	// Validate email
+	//
+	// Validate user email
+	//
+	// responses:
+	//   200: Tokens
+	//   404: Error
+	uuidParam := c.Param("token")
+	if uuidParam == "" {
+		badRequest := errdef.NewBadRequest("error missing token")
+		_ = c.Error(badRequest)
+		return
+	}
+
+	token, err := uuid.Parse(uuidParam)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	err = h.userService.ValidateEmail(token)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	c.Status(http.StatusOK)
 }
 
 // SignIn user
