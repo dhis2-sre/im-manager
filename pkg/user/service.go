@@ -173,8 +173,9 @@ func (s service) FindOrCreate(email string, password string) (*model.User, error
 	}
 
 	user := &model.User{
-		Email:    email,
-		Password: hashedPassword,
+		Email:      email,
+		EmailToken: uuid.New(),
+		Password:   hashedPassword,
 	}
 
 	return s.repository.findOrCreate(user)
