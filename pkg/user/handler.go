@@ -96,9 +96,13 @@ func handleSignUpErrors(err error) error {
 	return errs
 }
 
+type validateEmailRequest struct {
+	Token string `json:"token" binding:"required"`
+}
+
 // ValidateEmail validate users email
 func (h Handler) ValidateEmail(c *gin.Context) {
-	// swagger:route GET /users/validate/{token} validateEmail
+	// swagger:route GET /users/validate validateEmail
 	//
 	// Validate email
 	//
@@ -107,14 +111,13 @@ func (h Handler) ValidateEmail(c *gin.Context) {
 	// responses:
 	//   200:
 	//   404: Error
-	tokenParam := c.Param("token")
-	if tokenParam == "" {
-		badRequest := errdef.NewBadRequest("error missing token")
-		_ = c.Error(badRequest)
+	var request validateEmailRequest
+	if err := handler.DataBinder(c, &request); err != nil {
+		_ = c.Error(handleSignUpErrors(err))
 		return
 	}
 
-	token, err := uuid.Parse(tokenParam)
+	token, err := uuid.Parse(request.Token)
 	if err != nil {
 		_ = c.Error(err)
 		return

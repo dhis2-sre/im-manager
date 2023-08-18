@@ -30,9 +30,10 @@ type _ struct {
 
 // swagger:parameters validateEmail
 type _ struct {
-	// in: path
+	// Email validation token request body parameter
+	// in: body
 	// required: true
-	Token uint `json:"token"`
+	Body validateEmailRequest
 }
 
 // swagger:response Tokens

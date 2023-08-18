@@ -8,7 +8,7 @@ import (
 func Routes(r *gin.Engine, authenticationMiddleware middleware.AuthenticationMiddleware, authorizationMiddleware middleware.AuthorizationMiddleware, handler Handler) {
 	r.POST("/users", handler.SignUp)
 	r.POST("/refresh", handler.RefreshToken)
-	r.GET("/users/validate/:token", handler.ValidateEmail)
+	r.POST("/users/validate", handler.ValidateEmail)
 
 	basicAuthenticationRouter := r.Group("")
 	basicAuthenticationRouter.Use(authenticationMiddleware.BasicAuthentication)

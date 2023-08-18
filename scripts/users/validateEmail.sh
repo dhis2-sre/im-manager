@@ -4,4 +4,6 @@ set -euo pipefail
 
 TOKEN=$1
 
-$HTTP get "$IM_HOST/users/validate/$TOKEN"
+echo "{
+  \"token\": \"$TOKEN\"
+}" | $HTTP post "$IM_HOST/users/validate"

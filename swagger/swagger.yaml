@@ -1675,6 +1675,13 @@ definitions:
                 x-go-name: Password
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/user
+    validateEmailRequest:
+        properties:
+            token:
+                type: string
+                x-go-name: Token
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/user
 info:
     contact:
         email: info@dhis2.org
@@ -2857,17 +2864,17 @@ paths:
             security:
                 - oauth2: []
             summary: Update user
-    /users/validate/{token}:
+    /users/validate:
         get:
             description: Validate users email
             operationId: validateEmail
             parameters:
-                - format: uint64
-                  in: path
-                  name: token
+                - description: Email validation token request body parameter
+                  in: body
+                  name: Body
                   required: true
-                  type: integer
-                  x-go-name: Token
+                  schema:
+                    $ref: '#/definitions/validateEmailRequest'
             responses:
                 "200":
                     description: ""
