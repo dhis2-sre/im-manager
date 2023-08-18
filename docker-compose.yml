@@ -8,7 +8,7 @@ x-service: &common-dev-test
     - .:/src
   working_dir: /src
 
-version: "3.6"
+version: "3.8"
 services:
   prod:
     image: dhis2/im-manager:${IMAGE_TAG:-latest}
@@ -17,20 +17,37 @@ services:
       - .env
     ports:
       - "8080:8080"
+    profiles:
+      - prod
 
   test:
     <<: *common-dev-test
     command: /bin/sh -c 'go test ./...'
+    profiles:
+      - test
 
   test-coverage:
     <<: *common-dev-test
     command: /bin/sh -c 'go test -coverprofile=./coverage.out ./... && go tool cover -html=./coverage.out -o ./coverage.html'
+    profiles:
+      - test-coverage
 
   dev:
     <<: *common-dev-test
     ports:
       - "8080:8080"
     command: reflex -r "Dockerfile|\.go|\.yml$$" -s -- sh -c "go run ./cmd/serve"
+    depends_on:
+      database:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_started
+      redis:
+        condition: service_started
+      minio:
+        condition: service_started
+    profiles:
+      - dev
 
   database:
     image: postgres:13-alpine
@@ -40,19 +57,73 @@ services:
       POSTGRES_USER: ${DATABASE_USERNAME}
       POSTGRES_PASSWORD: ${DATABASE_PASSWORD}
       POSTGRES_DB: ${DATABASE_NAME}
+    healthcheck:
+      test: [ "CMD-SHELL", "sh -c 'pg_isready -U ${DATABASE_USERNAME} -d ${DATABASE_NAME}'" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    profiles:
+      - dev
 
   rabbitmq:
     image: rabbitmq:3-management-alpine
     ports:
       - "5672:5672"
       - "15672:15672"
+    profiles:
+      - dev
 
   redis:
     image: redis:6.2.5-alpine3.14
     ports:
       - "6379:6379"
+    profiles:
+      - dev
+      - redis
 
   redisinsight:
     image: redislabs/redisinsight:latest
     ports:
       - "8001:8001"
+    profiles:
+      - redis
+
+  minio:
+    image: quay.io/minio/minio:RELEASE.2023-07-21T21-12-44Z
+    command: server --console-address ":9001" /data
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:9000/minio/health/live" ]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+    volumes:
+      - minio-data:/data
+    profiles:
+      - dev
+
+  minio-bucket:
+    image: minio/mc:RELEASE.2023-07-21T20-44-27Z
+    depends_on:
+      minio:
+        condition: service_healthy
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    entrypoint: >
+      /bin/sh -c "
+        mc alias set dev http://minio:9000 ${MINIO_ROOT_USER} ${MINIO_ROOT_PASSWORD}
+        mc admin user add dev ${MINIO_USER} ${MINIO_PASSWORD}
+        mc admin policy attach dev readwrite --user ${MINIO_USER}
+        mc mb dev/${S3_BUCKET}
+        exit 0"
+    profiles:
+      - dev
+
+volumes:
+  minio-data:
