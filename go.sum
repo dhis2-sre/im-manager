@@ -125,6 +125,7 @@ github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2/go.mod h1:W
 github.com/aws/aws-sdk-go v1.15.11/go.mod h1:mFuSZ37Z9YOHbQEwBWztmVzqXrEkub65tZoCYDt7FT0=
 github.com/aws/aws-sdk-go v1.44.325 h1:jF/L99fJSq/BfiLmUOflO/aM+LwcqBm0Fe/qTK5xxuI=
 github.com/aws/aws-sdk-go v1.44.325/go.mod h1:aVsgQcEevwlmQ7qHE9I3h+dtQgpqhFB+i8Phjh7fkwI=
+github.com/aws/aws-sdk-go-v2 v1.20.1/go.mod h1:NU06lETsFm8fUC6ZjhgDpVBcGZTFQ6XM+LZWZxMI4ac=
 github.com/aws/aws-sdk-go-v2 v1.20.2 h1:0Aok9u/HVTk7RtY6M1KDcthbaMKGhhS0eLPxIdSIzRI=
 github.com/aws/aws-sdk-go-v2 v1.20.2/go.mod h1:NU06lETsFm8fUC6ZjhgDpVBcGZTFQ6XM+LZWZxMI4ac=
 github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.4.12 h1:lN6L3LrYHeZ6xCxaIYtoWCx4GMLk4nRknsh29OMSqHY=
@@ -143,6 +144,7 @@ github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.4.33 h1:gcRN6PXAo8w3HYFp2w
 github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.4.33/go.mod h1:S/zgOphghZAIvrbtvsVycoOncfqh1Hc4uGDIHqDLwTU=
 github.com/aws/aws-sdk-go-v2/internal/ini v1.3.40 h1:glWaI8WyeYqQN4zh4zqogzSpNPj8rf11Nj+oE3ghQPw=
 github.com/aws/aws-sdk-go-v2/internal/ini v1.3.40/go.mod h1:OCnFHzgaBY2PuGiHSzLlfqV4j5rJrky7YMfBXcx2Uk0=
+github.com/aws/aws-sdk-go-v2/internal/v4a v1.1.1/go.mod h1:sFMeinkhj/SZKQM8BxtvNtSPjJEo0Xrz+w3g2e4FSKI=
 github.com/aws/aws-sdk-go-v2/internal/v4a v1.1.2 h1:9Np6KOCKYnjMwJd1/17ReLdN21gnloI80LNP3uCKk44=
 github.com/aws/aws-sdk-go-v2/internal/v4a v1.1.2/go.mod h1:0YZJZKZCSSbQYQrXpqv0DpIaOMcZ27+OHFaSJTmN+8o=
 github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.9.13 h1:iV/W5OMBys+66OeXJi/7xIRrKZNsu0ylsLGu+6nbmQE=
