@@ -27,6 +27,7 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/dhis2-sre/im-manager/internal/middleware"
@@ -117,17 +118,30 @@ func run() error {
 	stackHandler := stack.NewHandler(stackService)
 	instanceHandler := instance.NewHandler(userService, groupService, instanceService, stackService, cfg.DefaultTTL)
 
+	s3Endpoint := aws.EndpointResolverWithOptionsFunc(func(service, region string, options ...interface{}) (aws.Endpoint, error) {
+		if cfg.S3Endpoint != "" {
+			return aws.Endpoint{URL: cfg.S3Endpoint}, nil
+		}
+		return aws.Endpoint{}, &aws.EndpointNotFoundError{}
+	})
+
 	// TODO: Database... Move into... Function?
-	s3Config, err := s3config.LoadDefaultConfig(context.TODO(), s3config.WithRegion("eu-west-1"))
+	s3Config, err := s3config.LoadDefaultConfig(
+		context.TODO(),
+		s3config.WithRegion(cfg.S3Region),
+		s3config.WithEndpointResolverWithOptions(aws.EndpointResolverWithOptions(s3Endpoint)),
+	)
 	if err != nil {
 		return err
 	}
-	s3AWSClient := s3.NewFromConfig(s3Config)
+	s3AWSClient := s3.NewFromConfig(s3Config, func(o *s3.Options) {
+		o.UsePathStyle = true
+	})
 	uploader := manager.NewUploader(s3AWSClient)
 	s3Client := storage.NewS3Client(s3AWSClient, uploader)
 
 	databaseRepository := database.NewRepository(db)
-	databaseService := database.NewService(cfg.Bucket, s3Client, groupService, databaseRepository)
+	databaseService := database.NewService(cfg.S3Bucket, s3Client, groupService, databaseRepository)
 	databaseHandler := database.NewHandler(databaseService, groupService, instanceService, stackService)
 
 	err = handler.RegisterValidation()
