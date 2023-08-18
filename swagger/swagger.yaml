@@ -2865,7 +2865,7 @@ paths:
                 - oauth2: []
             summary: Update user
     /users/validate:
-        get:
+        post:
             description: Validate users email
             operationId: validateEmail
             parameters:

@@ -102,7 +102,7 @@ type validateEmailRequest struct {
 
 // ValidateEmail validate users email
 func (h Handler) ValidateEmail(c *gin.Context) {
-	// swagger:route GET /users/validate validateEmail
+	// swagger:route POST /users/validate validateEmail
 	//
 	// Validate email
 	//
