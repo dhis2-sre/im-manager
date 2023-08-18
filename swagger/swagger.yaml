@@ -2857,13 +2857,20 @@ paths:
             security:
                 - oauth2: []
             summary: Update user
-    /users/validate/:token:
+    /users/validate/{token}:
         get:
-            description: Validate user email
-            operationId: findByEmailToken
+            description: Validate users email
+            operationId: validateEmail
+            parameters:
+                - format: uint64
+                  in: path
+                  name: token
+                  required: true
+                  type: integer
+                  x-go-name: Token
             responses:
                 "200":
-                    $ref: '#/responses/Tokens'
+                    description: ""
                 "404":
                     $ref: '#/responses/Error'
             summary: Validate email

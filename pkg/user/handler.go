@@ -98,23 +98,23 @@ func handleSignUpErrors(err error) error {
 
 // ValidateEmail validate users email
 func (h Handler) ValidateEmail(c *gin.Context) {
-	// swagger:route GET /users/validate/:token findByEmailToken
+	// swagger:route GET /users/validate/{token} validateEmail
 	//
 	// Validate email
 	//
-	// Validate user email
+	// Validate users email
 	//
 	// responses:
-	//   200: Tokens
+	//   200:
 	//   404: Error
-	uuidParam := c.Param("token")
-	if uuidParam == "" {
+	tokenParam := c.Param("token")
+	if tokenParam == "" {
 		badRequest := errdef.NewBadRequest("error missing token")
 		_ = c.Error(badRequest)
 		return
 	}
 
-	token, err := uuid.Parse(uuidParam)
+	token, err := uuid.Parse(tokenParam)
 	if err != nil {
 		_ = c.Error(err)
 		return
