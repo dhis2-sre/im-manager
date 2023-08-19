@@ -16,6 +16,7 @@ type Config struct {
 	Environment                    string
 	Classification                 string
 	Hostname                       string
+	UIHostname                     string
 	InstanceParameterEncryptionKey string
 	BasePath                       string
 	DefaultTTL                     uint
@@ -38,6 +39,7 @@ func New() Config {
 		Environment:                    requireEnv("ENVIRONMENT"),
 		Classification:                 requireEnv("CLASSIFICATION"),
 		Hostname:                       requireEnv("HOSTNAME"),
+		UIHostname:                     requireEnv("UI_HOSTNAME"),
 		BasePath:                       requireEnv("BASE_PATH"),
 		InstanceParameterEncryptionKey: requireEnv("INSTANCE_PARAMETER_ENCRYPTION_KEY"),
 		DefaultTTL:                     uint(requireEnvAsInt("DEFAULT_TTL")),

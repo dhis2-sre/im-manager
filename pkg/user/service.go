@@ -77,7 +77,7 @@ func (s service) sendValidationEmail(user *model.User) error {
 	m.SetHeader("From", "DHIS2 Instance Manager <no-reply@dhis2.org>")
 	m.SetHeader("To", user.Email)
 	m.SetHeader("Subject", "Welcome to IM")
-	link := fmt.Sprintf("%s/users/validate/%s", s.config.Hostname, user.EmailToken)
+	link := fmt.Sprintf("https://%s/users/validate/%s", s.config.UIHostname, user.EmailToken)
 	body := fmt.Sprintf("Hello, please click the below link to verify your email.<br/>%s", link)
 	m.SetBody("text/html", body)
 	return s.dailer.DialAndSend(m)
