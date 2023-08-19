@@ -61,13 +61,12 @@ func (r repository) findByEmail(email string) (*model.User, error) {
 }
 
 func (r repository) findByEmailToken(token uuid.UUID) (*model.User, error) {
-	var u *model.User
-	err := r.db.
-		Find(&u, "email_token = ?", token).Error
+	var user *model.User
+	err := r.db.First(&user, "email_token = ?", token.String()).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, errdef.NewNotFound("failed to find user with email token %q", token.String())
 	}
-	return u, err
+	return user, err
 }
 
 func (r repository) findOrCreate(user *model.User) (*model.User, error) {
