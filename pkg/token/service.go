@@ -7,6 +7,8 @@ import (
 	"log"
 	"time"
 
+	"github.com/dhis2-sre/im-manager/internal/errdef"
+
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	"github.com/dhis2-sre/im-manager/pkg/token/helper"
 	"github.com/gofrs/uuid"
@@ -64,7 +66,7 @@ type tokenService struct {
 func (t tokenService) GetTokens(user *model.User, previousRefreshTokenId string) (*Tokens, error) {
 	if previousRefreshTokenId != "" {
 		if err := t.repository.DeleteRefreshToken(user.ID, previousRefreshTokenId); err != nil {
-			return nil, fmt.Errorf("could not delete previous refreshToken for user.Id: %d, tokenId: %s", user.ID, previousRefreshTokenId)
+			return nil, errdef.NewUnauthorized("could not delete previous refreshToken for user.Id: %d, tokenId: %s", user.ID, previousRefreshTokenId)
 		}
 	}
 
