@@ -2878,6 +2878,8 @@ paths:
             responses:
                 "200":
                     description: ""
+                "400":
+                    $ref: '#/responses/Error'
                 "404":
                     $ref: '#/responses/Error'
             summary: Validate email

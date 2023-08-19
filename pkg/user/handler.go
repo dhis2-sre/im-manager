@@ -110,6 +110,7 @@ func (h Handler) ValidateEmail(c *gin.Context) {
 	//
 	// responses:
 	//   200:
+	//   400: Error
 	//   404: Error
 	var request validateEmailRequest
 	if err := handler.DataBinder(c, &request); err != nil {
@@ -119,7 +120,8 @@ func (h Handler) ValidateEmail(c *gin.Context) {
 
 	token, err := uuid.Parse(request.Token)
 	if err != nil {
-		_ = c.Error(err)
+		badRequest := errdef.NewBadRequest("unable to parse token: %v", err.Error())
+		_ = c.Error(badRequest)
 		return
 	}
 
