@@ -1,4 +1,4 @@
-FROM golang:1.20.1-alpine3.17 AS build
+FROM golang:1.21.0-alpine3.17 AS build
 
 ARG KUBECTL_VERSION=v1.23.5
 ARG KUBECTL_CHECKSUM=715da05c56aa4f8df09cb1f9d96a2aa2c33a1232f6fd195e3ffce6e98a50a879
@@ -40,7 +40,7 @@ RUN go mod download -x
 COPY . .
 RUN go build -o /app/im-manager -ldflags "-s -w" ./cmd/serve
 
-FROM alpine:3.17
+FROM alpine:3.18
 RUN apk --no-cache -U upgrade \
     && apk add --no-cache postgresql-client
 COPY --from=build /usr/bin/kubectl /usr/bin/kubectl
