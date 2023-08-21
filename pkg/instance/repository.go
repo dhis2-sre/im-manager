@@ -127,7 +127,7 @@ func (r repository) Delete(id uint) error {
 	return err
 }
 
-const AdministratorGroupName = "administrators"
+const administratorGroupName = "administrators"
 
 type GroupWithInstances struct {
 	Name      string            `json:"name"`
@@ -160,7 +160,7 @@ func (r repository) findInstances(groupNames []string, presets bool) ([]*model.I
 	query := r.db.
 		Preload("Parameters.StackParameter")
 
-	isAdmin := slices.Contains(groupNames, AdministratorGroupName)
+	isAdmin := slices.Contains(groupNames, administratorGroupName)
 	if !isAdmin {
 		query = query.Where("group_name IN ?", groupNames)
 	}
