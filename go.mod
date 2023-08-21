@@ -28,7 +28,7 @@ require (
 	golang.org/x/crypto v0.12.0
 	golang.org/x/exp v0.0.0-20230213192124-5e25df0256eb
 	gorm.io/driver/postgres v1.5.2
-	gorm.io/gorm v1.25.3
+	gorm.io/gorm v1.25.4
 	// It wasn't enough to just downgrade the libraries here
 	// https://github.com/kubernetes/client-go/issues/1269#issuecomment-1613565035
 	k8s.io/api v0.27.4
