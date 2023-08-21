@@ -283,9 +283,9 @@ func (s service) FindByNameAndGroup(instance string, group string) (*model.Insta
 }
 
 func (s service) FindInstances(user *model.User, presets bool) ([]GroupWithInstances, error) {
-	allGroups := append(user.Groups, user.AdminGroups...) //nolint:gocritic
+	groups := append(user.Groups, user.AdminGroups...) //nolint:gocritic
 
-	instances, err := s.instanceRepository.FindByGroups(allGroups, presets)
+	instances, err := s.instanceRepository.FindByGroups(groups, presets)
 	if err != nil {
 		return nil, err
 	}
