@@ -86,8 +86,8 @@ type Error struct {
 	Message string
 }
 
-// swagger:response GroupWithInstances
+// swagger:response GroupsWithInstances
 type _ struct {
 	// in: body
-	_ []GroupWithInstances
+	_ []GroupsWithInstances
 }

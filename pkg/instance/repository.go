@@ -129,13 +129,13 @@ func (r repository) Delete(id uint) error {
 
 const administratorGroupName = "administrators"
 
-type GroupWithInstances struct {
+type GroupsWithInstances struct {
 	Name      string            `json:"name"`
 	Hostname  string            `json:"hostname"`
 	Instances []*model.Instance `json:"instances"`
 }
 
-func (r repository) FindByGroups(groups []model.Group, presets bool) ([]GroupWithInstances, error) {
+func (r repository) FindByGroups(groups []model.Group, presets bool) ([]GroupsWithInstances, error) {
 	groupsByName := make(map[string]model.Group)
 	for _, group := range groups {
 		groupsByName[group.Name] = group
@@ -148,7 +148,7 @@ func (r repository) FindByGroups(groups []model.Group, presets bool) ([]GroupWit
 	}
 
 	if len(instances) < 1 {
-		return []GroupWithInstances{}, nil
+		return []GroupsWithInstances{}, nil
 	}
 
 	instancesByGroup := mapInstancesByGroup(groupNames, instances)
@@ -174,7 +174,7 @@ func (r repository) findInstances(groupNames []string, presets bool) ([]*model.I
 	return instances, err
 }
 
-func (r repository) FindPublicInstances() ([]GroupWithInstances, error) {
+func (r repository) FindPublicInstances() ([]GroupsWithInstances, error) {
 	var instances []*model.Instance
 	err := r.db.
 		Joins("Group").
@@ -186,7 +186,7 @@ func (r repository) FindPublicInstances() ([]GroupWithInstances, error) {
 	}
 
 	if len(instances) < 1 {
-		return []GroupWithInstances{}, nil
+		return []GroupsWithInstances{}, nil
 	}
 
 	groupsByName := make(map[string]model.Group)
@@ -209,14 +209,14 @@ func mapInstancesByGroup(groupNames []string, result []*model.Instance) map[stri
 	return instancesByGroup
 }
 
-func groupWithInstances(instancesMap map[string][]*model.Instance, groupMap map[string]model.Group) []GroupWithInstances {
-	var groupWithInstances []GroupWithInstances
+func groupWithInstances(instancesMap map[string][]*model.Instance, groupMap map[string]model.Group) []GroupsWithInstances {
+	var groupWithInstances []GroupsWithInstances
 	for groupName, instances := range instancesMap {
 		if instances == nil {
 			continue
 		}
 		group := groupMap[groupName]
-		groupWithInstances = append(groupWithInstances, GroupWithInstances{
+		groupWithInstances = append(groupWithInstances, GroupsWithInstances{
 			Name:      groupName,
 			Hostname:  group.Hostname,
 			Instances: instances,

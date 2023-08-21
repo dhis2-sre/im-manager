@@ -37,10 +37,10 @@ type Service interface {
 	FindById(id uint) (*model.Instance, error)
 	FindByIdDecrypted(id uint) (*model.Instance, error)
 	FindByNameAndGroup(instance string, group string) (*model.Instance, error)
-	FindPublicInstances() ([]GroupWithInstances, error)
+	FindPublicInstances() ([]GroupsWithInstances, error)
 	Delete(id uint) error
 	Logs(instance *model.Instance, group *model.Group, typeSelector string) (io.ReadCloser, error)
-	FindInstances(user *model.User, presets bool) ([]GroupWithInstances, error)
+	FindInstances(user *model.User, presets bool) ([]GroupsWithInstances, error)
 	Link(source, destination *model.Instance) error
 }
 
@@ -820,7 +820,7 @@ func (h Handler) ListInstances(c *gin.Context) {
 	//	oauth2:
 	//
 	// responses:
-	//	200: []GroupWithInstances
+	//	200: []GroupsWithInstances
 	//	401: Error
 	//	403: Error
 	//	415: Error
@@ -839,7 +839,7 @@ func (h Handler) ListPresets(c *gin.Context) {
 	//	oauth2:
 	//
 	// responses:
-	//	200: []GroupWithInstances
+	//	200: []GroupsWithInstances
 	//	401: Error
 	//	403: Error
 	//	415: Error
@@ -871,7 +871,7 @@ func (h Handler) ListPublicInstances(c *gin.Context) {
 	// List all public instances
 	//
 	// responses:
-	//	200: []GroupWithInstances
+	//	200: []GroupsWithInstances
 	instances, err := h.instanceService.FindPublicInstances()
 	if err != nil {
 		_ = c.Error(err)

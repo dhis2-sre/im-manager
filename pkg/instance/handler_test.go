@@ -118,7 +118,7 @@ func TestHandler_ListInstances(t *testing.T) {
 	groups := []model.Group{
 		{Name: "group name"},
 	}
-	groupsWithInstances := []GroupWithInstances{
+	groupsWithInstances := []GroupsWithInstances{
 		{
 			Name: "group name",
 			Instances: []*model.Instance{
@@ -173,7 +173,7 @@ func TestHandler_ListPresets(t *testing.T) {
 	groups := []model.Group{
 		{Name: "group name"},
 	}
-	groupsWithInstances := []GroupWithInstances{
+	groupsWithInstances := []GroupsWithInstances{
 		{
 			Name: "group name",
 			Instances: []*model.Instance{
@@ -392,9 +392,9 @@ func (m *mockRepository) FindByNameAndGroup(instance string, group string) (*mod
 	return called.Get(0).(*model.Instance), nil
 }
 
-func (m *mockRepository) FindByGroups(groups []model.Group, presets bool) ([]GroupWithInstances, error) {
+func (m *mockRepository) FindByGroups(groups []model.Group, presets bool) ([]GroupsWithInstances, error) {
 	called := m.Called(groups, presets)
-	groupsWithInstances, ok := called.Get(0).([]GroupWithInstances)
+	groupsWithInstances, ok := called.Get(0).([]GroupsWithInstances)
 	if ok {
 		return groupsWithInstances, nil
 	} else {

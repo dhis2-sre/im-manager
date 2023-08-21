@@ -38,8 +38,8 @@ type Repository interface {
 	FindById(id uint) (*model.Instance, error)
 	FindByIdDecrypted(id uint) (*model.Instance, error)
 	FindByNameAndGroup(instance string, group string) (*model.Instance, error)
-	FindByGroups(groups []model.Group, presets bool) ([]GroupWithInstances, error)
-	FindPublicInstances() ([]GroupWithInstances, error)
+	FindByGroups(groups []model.Group, presets bool) ([]GroupsWithInstances, error)
+	FindPublicInstances() ([]GroupsWithInstances, error)
 	SaveDeployLog(instance *model.Instance, log string) error
 	Delete(id uint) error
 }
@@ -282,7 +282,7 @@ func (s service) FindByNameAndGroup(instance string, group string) (*model.Insta
 	return s.instanceRepository.FindByNameAndGroup(instance, group)
 }
 
-func (s service) FindInstances(user *model.User, presets bool) ([]GroupWithInstances, error) {
+func (s service) FindInstances(user *model.User, presets bool) ([]GroupsWithInstances, error) {
 	groups := append(user.Groups, user.AdminGroups...) //nolint:gocritic
 
 	instances, err := s.instanceRepository.FindByGroups(groups, presets)
@@ -293,7 +293,7 @@ func (s service) FindInstances(user *model.User, presets bool) ([]GroupWithInsta
 	return instances, err
 }
 
-func (s service) FindPublicInstances() ([]GroupWithInstances, error) {
+func (s service) FindPublicInstances() ([]GroupsWithInstances, error) {
 	return s.instanceRepository.FindPublicInstances()
 }
 
