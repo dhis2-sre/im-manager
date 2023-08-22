@@ -13,6 +13,8 @@ import (
 	"strconv"
 	"strings"
 
+	"golang.org/x/exp/maps"
+
 	"github.com/dhis2-sre/im-manager/internal/errdef"
 
 	"github.com/dhis2-sre/im-manager/pkg/model"
@@ -189,17 +191,45 @@ func (s service) Delete(id uint) error {
 	return s.repository.Delete(id)
 }
 
-func (s service) List(groups []model.Group) ([]model.Database, error) {
-	groupNames := make([]string, len(groups))
-	for i, group := range groups {
-		groupNames[i] = group.Name
+func (s service) List(user *model.User) ([]GroupsWithDatabases, error) {
+	groups := append(user.Groups, user.AdminGroups...) //nolint:gocritic
+	groupsByName := make(map[string]model.Group)
+	for _, group := range groups {
+		groupsByName[group.Name] = group
 	}
+	groupNames := maps.Keys(groupsByName)
 
-	instances, err := s.repository.FindByGroupNames(groupNames)
+	databases, err := s.repository.FindByGroupNames(groupNames)
 	if err != nil {
 		return nil, err
 	}
-	return instances, nil
+
+	if len(databases) < 1 {
+		return []GroupsWithDatabases{}, nil
+	}
+
+	return groupsWithDatabases(groups, databases), nil
+}
+
+func groupsWithDatabases(groups []model.Group, databases []model.Database) []GroupsWithDatabases {
+	groupsWithDatabases := make([]GroupsWithDatabases, len(groups))
+	for i, group := range groups {
+		groupsWithDatabases[i].Name = group.Name
+		groupsWithDatabases[i].Hostname = group.Hostname
+		groupsWithDatabases[i].Databases = filterDatabases(databases, func(database *model.Database) bool {
+			return database.GroupName == group.Name
+		})
+	}
+	return groupsWithDatabases
+}
+
+func filterDatabases(databases []model.Database, test func(database *model.Database) bool) (ret []model.Database) {
+	for i := range databases {
+		if test(&databases[i]) {
+			ret = append(ret, databases[i])
+		}
+	}
+	return
 }
 
 func (s service) Update(d *model.Database) error {

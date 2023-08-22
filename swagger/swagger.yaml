@@ -425,21 +425,6 @@ definitions:
                 x-go-name: Users
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/model
-    GroupWithInstances:
-        properties:
-            hostname:
-                type: string
-                x-go-name: Hostname
-            instances:
-                items:
-                    $ref: '#/definitions/Instance'
-                type: array
-                x-go-name: Instances
-            name:
-                type: string
-                x-go-name: Name
-        type: object
-        x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
     GroupsWithDatabases:
         properties:
             databases:
@@ -455,6 +440,21 @@ definitions:
                 x-go-name: Name
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/database
+    GroupsWithInstances:
+        properties:
+            hostname:
+                type: string
+                x-go-name: Hostname
+            instances:
+                items:
+                    $ref: '#/definitions/Instance'
+                type: array
+                x-go-name: Instances
+            name:
+                type: string
+                x-go-name: Name
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
     HistoryResponseItem:
         description: HistoryResponseItem individual image layer information in response to ImageHistory operation
         properties:
@@ -2254,7 +2254,7 @@ paths:
             operationId: listInstances
             responses:
                 "200":
-                    $ref: '#/responses/GroupWithInstances'
+                    $ref: '#/responses/GroupsWithInstances'
                 "401":
                     $ref: '#/responses/Error'
                 "403":
@@ -2626,7 +2626,7 @@ paths:
             operationId: listPresets
             responses:
                 "200":
-                    $ref: '#/responses/GroupWithInstances'
+                    $ref: '#/responses/GroupsWithInstances'
                 "401":
                     $ref: '#/responses/Error'
                 "403":
@@ -2642,7 +2642,7 @@ paths:
             operationId: listPublicInstances
             responses:
                 "200":
-                    $ref: '#/responses/GroupWithInstances'
+                    $ref: '#/responses/GroupsWithInstances'
             summary: List Public Instances
     /refresh:
         post:
@@ -2877,11 +2877,11 @@ responses:
             type: array
     Error:
         description: ""
-    GroupWithInstances:
+    GroupsWithInstances:
         description: ""
         schema:
             items:
-                $ref: '#/definitions/GroupWithInstances'
+                $ref: '#/definitions/GroupsWithInstances'
             type: array
     InstanceLogsResponse:
         description: ""
