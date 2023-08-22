@@ -125,15 +125,11 @@ func run() error {
 		return aws.Endpoint{}, &aws.EndpointNotFoundError{}
 	})
 
-	// TODO: Database... Move into... Function?
-	s3Config, err := s3config.LoadDefaultConfig(
-		context.TODO(),
-		s3config.WithRegion(cfg.S3Region),
-		s3config.WithEndpointResolverWithOptions(aws.EndpointResolverWithOptions(s3Endpoint)),
-	)
+	s3Config, err := newS3Config(cfg.S3Region, s3Endpoint)
 	if err != nil {
 		return err
 	}
+
 	s3AWSClient := s3.NewFromConfig(s3Config, func(o *s3.Options) {
 		o.UsePathStyle = true
 	})
@@ -191,4 +187,18 @@ func createGroups(config config.Config, groupService groupService) error {
 	}
 
 	return nil
+}
+
+func newS3Config(region string, endpoint aws.EndpointResolverWithOptionsFunc) (aws.Config, error) {
+	config, err := s3config.LoadDefaultConfig(
+		context.TODO(),
+		s3config.WithRegion(region),
+		s3config.WithEndpointResolverWithOptions(aws.EndpointResolverWithOptions(endpoint)),
+	)
+
+	if err != nil {
+		return aws.Config{}, err
+	}
+
+	return config, nil
 }
