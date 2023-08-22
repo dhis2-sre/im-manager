@@ -1,5 +1,4 @@
 tag ?= latest
-clean-cmd = docker compose down --remove-orphans --volumes
 
 keys:
 	openssl genpkey -algorithm RSA -out ./rsa_private.pem -pkeyopt rsa_keygen_bits:2048
@@ -35,9 +34,7 @@ push-docker-image:
 	IMAGE_TAG=$(tag) docker compose push prod
 
 dev:
-	docker compose up database rabbitmq redis -d
-	sleep 3
-	docker compose up --build dev database rabbitmq redis
+	docker compose --profile dev up
 
 test:
 	go test -race ./...
@@ -46,7 +43,7 @@ test-coverage:
 	go test -coverprofile=./coverage.out ./... && go tool cover -html=./coverage.out -o ./coverage.html
 
 clean:
-	$(clean-cmd)
+	docker compose --profile dev down --remove-orphans --volumes
 	go clean
 
 swagger-clean:
@@ -58,4 +55,4 @@ swagger-spec:
 
 swagger: swagger-clean swagger-spec
 
-.PHONY: init check docker-image push-docker-image dev test
+.PHONY: keys init check smoke-test docker-image push-docker-image dev cluster-dev test test-coverage clean-dev clean-cluster-dev swagger-clean swagger-spec swagger
