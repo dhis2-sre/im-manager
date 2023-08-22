@@ -118,7 +118,7 @@ func run() error {
 	stackHandler := stack.NewHandler(stackService)
 	instanceHandler := instance.NewHandler(userService, groupService, instanceService, stackService, cfg.DefaultTTL)
 
-	s3Endpoint := aws.EndpointResolverWithOptionsFunc(func(service, region string, options ...interface{}) (aws.Endpoint, error) {
+	s3Endpoint := aws.EndpointResolverWithOptionsFunc(func(service, region string, options ...any) (aws.Endpoint, error) {
 		if cfg.S3Endpoint != "" {
 			return aws.Endpoint{URL: cfg.S3Endpoint}, nil
 		}
