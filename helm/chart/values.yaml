@@ -11,7 +11,7 @@ redis:
 
 groups:
   names: whoami
-  hostnames: whoami.im.test.c.dhis2.org
+  hostnames: dev.whoami.test.c.dhis2.org
 
 tmpfsSizeLimit: 128Mi
 
