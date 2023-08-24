@@ -118,6 +118,7 @@ func (h Handler) ValidateEmail(c *gin.Context) {
 		return
 	}
 
+	//goland:noinspection GoImportUsedAsName
 	token, err := uuid.Parse(request.Token)
 	if err != nil {
 		badRequest := errdef.NewBadRequest("unable to parse token: %v", err.Error())
