@@ -31,8 +31,8 @@ require (
 	gorm.io/gorm v1.25.4
 	// It wasn't enough to just downgrade the libraries here
 	// https://github.com/kubernetes/client-go/issues/1269#issuecomment-1613565035
-	k8s.io/api v0.27.4
-	k8s.io/apimachinery v0.27.4
+	k8s.io/api v0.27.5
+	k8s.io/apimachinery v0.27.5
 	k8s.io/client-go v0.27.4
 )
 
