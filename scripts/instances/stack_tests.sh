@@ -2,7 +2,7 @@
 
 set -xeuo pipefail
 
-INSTANCE_HOST=https://dev.whoami.test.c.dhis2.org
+INSTANCE_HOST=https://dev.whoami.c.dhis2.org
 GROUP=whoami
 INSTANCE_PREFIX=im-e2e
 INSTANCE_POSTFIX=$(tr -dc '[:lower:]' </dev/urandom | head -c 5; echo '')
