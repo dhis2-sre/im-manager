@@ -1,17 +1,22 @@
-FROM golang:1.21.0-alpine3.17 AS build
+FROM golang:1.21.0-alpine3.18 AS build
 
-ARG KUBECTL_VERSION=v1.23.5
-ARG KUBECTL_CHECKSUM=715da05c56aa4f8df09cb1f9d96a2aa2c33a1232f6fd195e3ffce6e98a50a879
+# https://kubernetes.io/docs/tasks/tools/install-kubectl-linux/
+ARG KUBECTL_VERSION=v1.28.0
+ARG KUBECTL_CHECKSUM=4717660fd1466ec72d59000bb1d9f5cdc91fac31d491043ca62b34398e0799ce
 
-ARG HELM_VERSION=v3.8.1
-ARG HELM_CHECKSUM=d643f48fe28eeb47ff68a1a7a26fc5142f348d02c8bc38d699674016716f61cd
+# https://github.com/helm/helm/releases
+ARG HELM_VERSION=v3.12.3
+ARG HELM_CHECKSUM=1b2313cd198d45eab00cc37c38f6b1ca0a948ba279c29e322bdf426d406129b5
 
-ARG HELMFILE_VERSION=v0.143.3
-ARG HELMFILE_CHECKSUM=a30a5c9f64c8eba2123625497913f9ad210a047e997f2363cda3189cbac8f970
+# https://github.com/roboll/helmfile/releases
+ARG HELMFILE_VERSION=v0.144.0
+ARG HELMFILE_CHECKSUM=dcf865a715028d3a61e2fec09f2a0beaeb7ff10cde32e096bf94aeb9a6eb4f02
 
-ARG AWS_IAM_AUTHENTICATOR_VERSION=1.21.2/2021-07-05
-ARG AWS_IAM_AUTHENTICATOR_CHECKSUM=fe958eff955bea1499015b45dc53392a33f737630efd841cd574559cc0f41800
+# https://github.com/kubernetes-sigs/aws-iam-authenticator/releases/
+ARG AWS_IAM_AUTHENTICATOR_VERSION=0.6.11
+ARG AWS_IAM_AUTHENTICATOR_CHECKSUM=8593d0c5125f8fba4589008116adf12519cdafa56e1bfa6b11a277e2886fc3c8
 
+# https://github.com/cespare/reflex/releases
 ARG REFLEX_VERSION=v0.3.1
 
 RUN apk add gcc musl-dev git && \
@@ -29,7 +34,7 @@ RUN apk add gcc musl-dev git && \
     echo "${HELMFILE_CHECKSUM}  helmfile" | sha256sum -c - && \
     install -o root -g root -m 0755 helmfile /usr/bin/helmfile && \
 \
-    wget -O aws-iam-authenticator https://amazon-eks.s3.us-west-2.amazonaws.com/${AWS_IAM_AUTHENTICATOR_VERSION}/bin/linux/amd64/aws-iam-authenticator && \
+    wget -O aws-iam-authenticator https://github.com/kubernetes-sigs/aws-iam-authenticator/releases/download/v${AWS_IAM_AUTHENTICATOR_VERSION}/aws-iam-authenticator_${AWS_IAM_AUTHENTICATOR_VERSION}_linux_amd64 && \
     echo "${AWS_IAM_AUTHENTICATOR_CHECKSUM}  aws-iam-authenticator" | sha256sum -c - && \
     install -o root -g root -m 0755 aws-iam-authenticator /usr/bin/aws-iam-authenticator
 
