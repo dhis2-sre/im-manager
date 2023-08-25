@@ -43,7 +43,7 @@ type Service interface {
 	Upload(d *model.Database, group *model.Group, reader ReadAtSeeker, size int64) (*model.Database, error)
 	Download(id uint, dst io.Writer, headers func(contentLength int64)) error
 	Delete(id uint) error
-	List(groups []model.Group) ([]model.Database, error)
+	List(user *model.User) ([]GroupsWithDatabases, error)
 	Update(d *model.Database) error
 	CreateExternalDownload(databaseID uint, expiration uint) (*model.ExternalDownload, error)
 	FindExternalDownload(uuid uuid.UUID) (*model.ExternalDownload, error)
@@ -624,34 +624,13 @@ func (h Handler) List(c *gin.Context) {
 		return
 	}
 
-	d, err := h.databaseService.List(user.Groups)
+	databases, err := h.databaseService.List(user)
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
 
-	c.JSON(http.StatusOK, groupsWithDatabases(user.Groups, d))
-}
-
-func groupsWithDatabases(groups []model.Group, databases []model.Database) []GroupsWithDatabases {
-	groupsWithDatabases := make([]GroupsWithDatabases, len(groups))
-	for i, group := range groups {
-		groupsWithDatabases[i].Name = group.Name
-		groupsWithDatabases[i].Hostname = group.Hostname
-		groupsWithDatabases[i].Databases = filterDatabases(databases, func(database *model.Database) bool {
-			return database.GroupName == group.Name
-		})
-	}
-	return groupsWithDatabases
-}
-
-func filterDatabases(databases []model.Database, test func(database *model.Database) bool) (ret []model.Database) {
-	for i := range databases {
-		if test(&databases[i]) {
-			ret = append(ret, databases[i])
-		}
-	}
-	return
+	c.JSON(http.StatusOK, databases)
 }
 
 type UpdateDatabaseRequest struct {

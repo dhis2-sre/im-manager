@@ -72,6 +72,7 @@ securityContext:
 # Alpine guest user
   runAsUser: 405
   runAsGroup: 100
+  allowPrivilegeEscalation: false
 
 service:
   type: ClusterIP

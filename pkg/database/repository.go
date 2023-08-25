@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"time"
 
+	"golang.org/x/exp/slices"
+
 	"github.com/dhis2-sre/im-manager/internal/errdef"
 
 	"github.com/dhis2-sre/im-manager/pkg/model"
@@ -132,11 +134,18 @@ func (r repository) Delete(id uint) error {
 	return r.db.Unscoped().Delete(&model.Database{}, id).Error
 }
 
-func (r repository) FindByGroupNames(names []string) ([]model.Database, error) {
+const administratorGroupName = "administrators"
+
+func (r repository) FindByGroupNames(groupNames []string) ([]model.Database, error) {
 	var databases []model.Database
 
-	err := r.db.
-		Where("group_name IN ?", names).
+	query := r.db
+	isAdmin := slices.Contains(groupNames, administratorGroupName)
+	if !isAdmin {
+		query = query.Where("group_name IN ?", groupNames)
+	}
+
+	err := query.
 		Order("updated_at desc").
 		Find(&databases).Error
 

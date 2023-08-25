@@ -31,7 +31,9 @@ type Config struct {
 	Groups                         []group
 	AdminUser                      user
 	DefaultUser                    user
-	Bucket                         string
+	S3Bucket                       string
+	S3Region                       string
+	S3Endpoint                     string
 }
 
 func New() Config {
@@ -92,7 +94,9 @@ func New() Config {
 		Groups:      newGroups(),
 		AdminUser:   newAdminUser(),
 		DefaultUser: user{},
-		Bucket:      requireEnv("S3_BUCKET"),
+		S3Bucket:    requireEnv("S3_BUCKET"),
+		S3Region:    requireEnv("S3_REGION"),
+		S3Endpoint:  os.Getenv("S3_ENDPOINT"),
 	}
 }
 

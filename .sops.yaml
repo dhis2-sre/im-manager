@@ -3,11 +3,11 @@ creation_rules:
   - path_regex: 'helm/data/secrets/prod/.*\.yaml$'
     kms: 'arn:aws:kms:eu-central-1:767224633206:alias/im-helm-prod-secrets'
 
-  - path_regex: 'stacks/.*/parameters/prod\.yaml$'
-    kms: 'arn:aws:kms:eu-central-1:767224633206:alias/im-prod-secrets'
-
   - path_regex: 'helm/data/secrets/.*/.*\.yaml$'
     kms: 'arn:aws:kms:eu-central-1:767224633206:alias/im-helm-nonprod-secrets'
+
+  - path_regex: 'stacks/.*/parameters/prod\.yaml$'
+    kms: 'arn:aws:kms:eu-central-1:767224633206:alias/im-prod-secrets'
 
   - path_regex: 'stacks/.*/parameters/.*\.yaml$'
     kms: 'arn:aws:kms:eu-central-1:767224633206:alias/im-nonprod-secrets'
