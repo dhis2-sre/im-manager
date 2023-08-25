@@ -4,6 +4,8 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/google/uuid"
+
 	"github.com/dhis2-sre/im-manager/internal/errdef"
 	"github.com/dhis2-sre/im-manager/internal/handler"
 	"github.com/dhis2-sre/im-manager/pkg/model"
@@ -32,6 +34,7 @@ type userService interface {
 	FindAll() ([]*model.User, error)
 	Delete(id uint) error
 	Update(id uint, email, password string) (*model.User, error)
+	ValidateEmail(token uuid.UUID) error
 }
 
 type tokenService interface {
@@ -91,6 +94,45 @@ func handleSignUpErrors(err error) error {
 		}
 	}
 	return errs
+}
+
+type validateEmailRequest struct {
+	Token string `json:"token" binding:"required"`
+}
+
+// ValidateEmail validate users email
+func (h Handler) ValidateEmail(c *gin.Context) {
+	// swagger:route POST /users/validate validateEmail
+	//
+	// Validate email
+	//
+	// Validate users email
+	//
+	// responses:
+	//   200:
+	//   400: Error
+	//   404: Error
+	var request validateEmailRequest
+	if err := handler.DataBinder(c, &request); err != nil {
+		_ = c.Error(handleSignUpErrors(err))
+		return
+	}
+
+	//goland:noinspection GoImportUsedAsName
+	token, err := uuid.Parse(request.Token)
+	if err != nil {
+		badRequest := errdef.NewBadRequest("unable to parse token: %v", err.Error())
+		_ = c.Error(badRequest)
+		return
+	}
+
+	err = h.userService.ValidateEmail(token)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	c.Status(http.StatusOK)
 }
 
 // SignIn user

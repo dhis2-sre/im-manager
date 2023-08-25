@@ -28,6 +28,14 @@ type _ struct {
 	ID uint `json:"id"`
 }
 
+// swagger:parameters validateEmail
+type _ struct {
+	// Email validation token request body parameter
+	// in: body
+	// required: true
+	Body validateEmailRequest
+}
+
 // swagger:response Tokens
 type _ struct {
 	//in: body

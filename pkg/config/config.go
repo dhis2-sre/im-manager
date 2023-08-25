@@ -16,6 +16,7 @@ type Config struct {
 	Environment                    string
 	Classification                 string
 	Hostname                       string
+	UIHostname                     string
 	InstanceParameterEncryptionKey string
 	BasePath                       string
 	DefaultTTL                     uint
@@ -24,6 +25,7 @@ type Config struct {
 	DatabaseManagerService         Service
 	Postgresql                     Postgresql
 	RabbitMqURL                    rabbitmq
+	SMTP                           smtp
 	Redis                          redis
 	Authentication                 authentication
 	Groups                         []group
@@ -39,6 +41,7 @@ func New() Config {
 		Environment:                    requireEnv("ENVIRONMENT"),
 		Classification:                 requireEnv("CLASSIFICATION"),
 		Hostname:                       requireEnv("HOSTNAME"),
+		UIHostname:                     requireEnv("UI_HOSTNAME"),
 		BasePath:                       requireEnv("BASE_PATH"),
 		InstanceParameterEncryptionKey: requireEnv("INSTANCE_PARAMETER_ENCRYPTION_KEY"),
 		DefaultTTL:                     uint(requireEnvAsInt("DEFAULT_TTL")),
@@ -62,6 +65,12 @@ func New() Config {
 			Username:     requireEnv("DATABASE_USERNAME"),
 			Password:     requireEnv("DATABASE_PASSWORD"),
 			DatabaseName: requireEnv("DATABASE_NAME"),
+		},
+		SMTP: smtp{
+			Host:     requireEnv("SMTP_HOST"),
+			Port:     requireEnvAsInt("SMTP_PORT"),
+			Username: requireEnv("SMTP_USERNAME"),
+			Password: requireEnv("SMTP_PASSWORD"),
 		},
 		RabbitMqURL: rabbitmq{
 			Host:     requireEnv("RABBITMQ_HOST"),
@@ -112,6 +121,13 @@ type Postgresql struct {
 }
 
 type rabbitmq struct {
+	Host     string
+	Port     int
+	Username string
+	Password string
+}
+
+type smtp struct {
 	Host     string
 	Port     int
 	Username string

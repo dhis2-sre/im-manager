@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/dhis2-sre/im-manager/internal/errdef"
+	"github.com/google/uuid"
 
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	"gorm.io/gorm"
@@ -17,6 +18,10 @@ func NewRepository(db *gorm.DB) *repository {
 
 type repository struct {
 	db *gorm.DB
+}
+
+func (r repository) save(user *model.User) error {
+	return r.db.Save(&user).Error
 }
 
 func (r repository) create(u *model.User) error {
@@ -55,9 +60,21 @@ func (r repository) findByEmail(email string) (*model.User, error) {
 	return u, err
 }
 
+func (r repository) findByEmailToken(token uuid.UUID) (*model.User, error) {
+	var user *model.User
+	err := r.db.First(&user, "email_token = ?", token.String()).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, errdef.NewNotFound("failed to find user with email token %q", token.String())
+	}
+	return user, err
+}
+
 func (r repository) findOrCreate(user *model.User) (*model.User, error) {
 	var u *model.User
-	err := r.db.Where(model.User{Email: user.Email}).Attrs(model.User{Password: user.Password}).FirstOrCreate(&u).Error
+	err := r.db.
+		Where(model.User{Email: user.Email}).
+		Attrs(model.User{EmailToken: user.EmailToken, Password: user.Password}).
+		FirstOrCreate(&u).Error
 	return u, err
 }
 
