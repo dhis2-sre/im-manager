@@ -1,3 +1,3 @@
 groups:
   names: whoami,dev,play,qa,meta-packages
-  hostnames: whoami.c.dhis2.org,dev.c.dhis2.org,play.c.dhis2.org,qa.c.dhis2.org,meta-packages.c.dhis2.org
+  hostnames: whoami.im.dhis2.org,dev.im.dhis2.org,play.im.dhis2.org,qa.im.dhis2.org,meta-packages.im.dhis2.org
