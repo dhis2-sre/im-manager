@@ -33,7 +33,7 @@ jobs:
         run: cd scripts/instances && ./stack_tests.sh
         env:
           HTTP: http --check-status
-          IM_HOST: https://api.im.dev.test.c.dhis2.org
+          IM_HOST: https://dev.api.im.dhis2.org
           USER_EMAIL: ${{ secrets.CI_TEST_USER_USER_EMAIL }}
           PASSWORD: ${{ secrets.CI_TEST_USER_PASSWORD }}
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
