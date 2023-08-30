@@ -12,6 +12,11 @@ updates:
       interval: "daily"
     pull-request-branch-name:
       separator: "-"
+    # Ignoring these dependencies until there's a version that doesn't cause build issues for us, currently @v0.27.4
+    ignore:
+      - dependency-name: "k8s.io/api"
+      - dependency-name: "k8s.io/apimachinery"
+      - dependency-name: "k8s.io/client-go"
   - package-ecosystem: "docker"
     directory: "/"
     schedule:
