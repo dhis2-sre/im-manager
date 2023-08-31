@@ -14,7 +14,7 @@ updates:
       separator: "-"
     # Ignoring these dependencies until there's a version that doesn't cause build issues for us, currently @v0.27.4
     ignore:
-      - dependency-name: "orlangure/gnomock"
+      - dependency-name: "github.com/orlangure/gnomock"
       - dependency-name: "k8s.io/api"
       - dependency-name: "k8s.io/apimachinery"
       - dependency-name: "k8s.io/client-go"
