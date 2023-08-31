@@ -45,3 +45,31 @@ func TestStackHandler(t *testing.T) {
 		assert.NotEmpty(t, stacks)
 	})
 }
+
+func TestStackModelHooksTransformParametersFromAndToMap(t *testing.T) {
+	t.Parallel()
+
+	db := inttest.SetupDB(t)
+	stackRepository := stack.NewRepository(db)
+
+	st := &model.Stack{
+		Name: "example",
+		Parameters: map[string]model.StackParameter{
+			"FIRST": {Consumed: true},
+		},
+	}
+
+	err := stackRepository.Create(st)
+	require.NoError(t, err)
+
+	assert.EqualValues(t,
+		[]model.StackParameter{{Name: "FIRST", StackName: "example", Consumed: true}},
+		st.GormParameters)
+
+	got, err := stackRepository.Find("example")
+	require.NoError(t, err)
+
+	assert.EqualValues(t,
+		map[string]model.StackParameter{"FIRST": {Name: "FIRST", StackName: "example", Consumed: true}},
+		got.Parameters)
+}

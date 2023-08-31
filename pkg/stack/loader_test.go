@@ -18,34 +18,32 @@ func TestStackDefinitionsAreInSyncWithHelmfile(t *testing.T) {
 	entries, err := os.ReadDir(dir)
 	require.NoError(t, err)
 
-	helmfileParameters := make(map[string][]model.StackParameter)
+	helmfileParameters := make(map[string]map[string]model.StackParameter)
 	for _, entry := range entries {
 		if !entry.IsDir() {
 			continue
 		}
 
-		name := entry.Name()
-		t.Logf("parsing stack: %q", name)
-		st, err := parseStack(dir, name)
-		require.NoError(t, err, "failed to parse stack %q", name)
+		stackName := entry.Name()
+		t.Logf("parsing stack: %q", stackName)
+		st, err := parseStack(dir, stackName)
+		require.NoError(t, err, "failed to parse stack %q", stackName)
 
 		consumedParameter := make(map[string]struct{})
 		for _, p := range st.consumedParameters {
 			consumedParameter[p] = struct{}{}
 		}
 
-		t.Logf("stack %q: %#v", name, st)
-		var parameters []model.StackParameter
+		t.Logf("stack %q: %#v", stackName, st)
+		parameters := make(map[string]model.StackParameter)
 		for name, value := range st.parameters {
 			_, consumed := consumedParameter[name]
-			parameter := model.StackParameter{Name: name, DefaultValue: value, Consumed: consumed}
-
-			parameters = append(parameters, parameter)
+			parameters[name] = model.StackParameter{DefaultValue: value, Consumed: consumed}
 		}
-		helmfileParameters[name] = parameters
+		helmfileParameters[stackName] = parameters
 	}
 
-	stackDefinitions := map[string][]model.StackParameter{
+	stackDefinitions := map[string]map[string]model.StackParameter{
 		"dhis2-db":      DHIS2DB.Parameters,
 		"dhis2-core":    DHIS2Core.Parameters,
 		"dhis2":         DHIS2.Parameters,
@@ -57,7 +55,7 @@ func TestStackDefinitionsAreInSyncWithHelmfile(t *testing.T) {
 	for n, p := range helmfileParameters {
 		staticParameters, ok := stackDefinitions[n]
 		require.Truef(t, ok, "stack %q has a helmfile but no static stack definition", n)
-		assert.ElementsMatchf(t, p, staticParameters, "parameters for stack %q don't match", n)
+		assert.Equalf(t, p, staticParameters, "parameters for stack %q don't match", n)
 		delete(stackDefinitions, n)
 	}
 

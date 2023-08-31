@@ -1233,10 +1233,14 @@ definitions:
                 type: string
                 x-go-name: Name
             parameters:
+                description: |-
+                    GormParameters are only used by Gorm to persist parameters as it cannot persist a
+                    map[string]StackParameter. Only use GormParameters within the repository. Otherwise use
+                    Parameters.
                 items:
                     $ref: '#/definitions/StackParameter'
                 type: array
-                x-go-name: Parameters
+                x-go-name: GormParameters
             updatedAt:
                 format: date-time
                 type: string
@@ -1246,6 +1250,7 @@ definitions:
     StackParameter:
         properties:
             consumed:
+                description: Consumed signals that this parameter is provided by another stack i.e. one of the stacks required stacks.
                 type: boolean
                 x-go-name: Consumed
             defaultValue:
