@@ -1,6 +1,7 @@
 package instance
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -167,27 +168,6 @@ func (s service) unlink(id uint) error {
 	return s.instanceRepository.Unlink(instance)
 }
 
-func matchParameters(stackParameters map[string]model.StackParameter, instanceParameters []model.InstanceParameter) []string {
-	unmatchedParameters := make([]string, 0)
-
-	for _, parameter := range instanceParameters {
-		if _, ok := stackParameters[parameter.Name]; !ok {
-			unmatchedParameters = append(unmatchedParameters, parameter.Name)
-		}
-	}
-
-	return unmatchedParameters
-}
-
-func validateParameters(stack *model.Stack, instance *model.Instance) error {
-	unmatchedParameters := matchParameters(stack.Parameters, instance.Parameters)
-	if len(unmatchedParameters) > 0 {
-		return errdef.NewBadRequest("parameters %q are not valid parameters for stack %q", unmatchedParameters, instance.StackName)
-	}
-
-	return nil
-}
-
 func (s service) Save(instance *model.Instance) error {
 	instanceStack, err := s.stackService.Find(instance.StackName)
 	if err != nil {
@@ -200,6 +180,31 @@ func (s service) Save(instance *model.Instance) error {
 	}
 
 	return s.instanceRepository.Save(instance)
+}
+
+func validateParameters(stack *model.Stack, instance *model.Instance) error {
+	var errs []error
+	for _, parameter := range instance.Parameters {
+		stackParameter, ok := stack.Parameters[parameter.Name]
+		if !ok {
+			errs = append(errs, fmt.Errorf("parameter %q: is not a stack parameter", parameter.Name))
+			continue
+		}
+
+		if stackParameter.Validator == nil {
+			continue
+		}
+		err := stackParameter.Validator(parameter.Value)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("parameter %q: %v", parameter.Name, err))
+		}
+	}
+
+	if errs != nil {
+		return errdef.NewBadRequest("invalid parameter(s): %v", errors.Join(errs...))
+	}
+
+	return nil
 }
 
 func (s service) Deploy(token string, instance *model.Instance) error {
