@@ -59,6 +59,19 @@ type StackParameter struct {
 	DefaultValue *string `json:"defaultValue"`
 	// Consumed signals that this parameter is provided by another stack i.e. one of the stacks required stacks.
 	Consumed bool `json:"consumed"`
+	// Validator ensure that actual stack parameters are valid according to its rules.
+	Validator Validator `json:"-" gorm:"-"`
+}
+
+// Validator validates given value returning an error for invalid ones.
+type Validator interface {
+	Validate(value string) error
+}
+
+type ValidatorFunc func(value string) error
+
+func (v ValidatorFunc) Validate(value string) error {
+	return v(value)
 }
 
 type Providers map[string]Provider

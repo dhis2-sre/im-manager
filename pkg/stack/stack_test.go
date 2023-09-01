@@ -252,3 +252,11 @@ func TestNew(t *testing.T) {
 		require.ErrorContains(t, err, `stack "b" requires "a" but does not consume from "a"`)
 	})
 }
+
+func TestValidatorOneOf(t *testing.T) {
+	validator := stack.OneOf("ok", "not_ok")
+
+	assert.NoError(t, validator("ok"))
+	assert.NoError(t, validator("not_ok"))
+	assert.ErrorContains(t, validator("maybe"), `"maybe" is not valid, only "ok", "not_ok" are allowed`)
+}
