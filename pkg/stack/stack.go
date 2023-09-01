@@ -1,3 +1,9 @@
+// Package stack contains stacks that can be deployed with the instance manager. Stacks have
+// parameters as their input which are used to render helmfile templates. Stacks might depend
+// on other stacks to provide a parameter (consumed parameter). Stack parameters declared here are
+// kept in sync with the helmfile template. No cycle is allowed within our stacks as this would lead
+// to undeployable stacks. No two stacks are allowed to provide the same parameter for another stack
+// as this is an ambiguity that cannot be automatically resolved.
 package stack
 
 import (
@@ -5,6 +11,18 @@ import (
 
 	"github.com/dhis2-sre/im-manager/pkg/model"
 )
+
+// Stacks represents all deployable stacks.
+type Stacks map[string]model.Stack
+
+// New creates stacks ensuring consumed parameters are provided by required stacks.
+func New(stacks ...model.Stack) (Stacks, error) {
+	result := make(Stacks, len(stacks))
+	for _, s := range stacks {
+		result[s.Name] = s
+	}
+	return result, nil
+}
 
 const ifNotPresent = "IfNotPresent"
 

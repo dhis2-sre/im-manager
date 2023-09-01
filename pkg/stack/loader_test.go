@@ -52,11 +52,11 @@ func TestStackDefinitionsAreInSyncWithHelmfile(t *testing.T) {
 		"im-job-runner": IMJobRunner.Parameters,
 	}
 
-	for n, p := range helmfileParameters {
-		staticParameters, ok := stackDefinitions[n]
-		require.Truef(t, ok, "stack %q has a helmfile but no static stack definition", n)
-		assert.Equalf(t, p, staticParameters, "parameters for stack %q don't match", n)
-		delete(stackDefinitions, n)
+	for name, parameter := range helmfileParameters {
+		staticParameters, ok := stackDefinitions[name]
+		require.Truef(t, ok, "stack %q has a helmfile but no static stack definition", name)
+		assert.Equalf(t, parameter, staticParameters, "parameters for stack %q don't match", name)
+		delete(stackDefinitions, name)
 	}
 
 	assert.Empty(t, stackDefinitions, "all stack definitions should have a helmfile, these don't")
