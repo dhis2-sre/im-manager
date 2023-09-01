@@ -25,6 +25,16 @@ const (
 // Perhaps upsert using... https://gorm.io/docs/advanced_query.html#FirstOrCreate
 
 func LoadStacks(dir string, stackService Service) error {
+	stacks, _ := New(
+		DHIS2DB,
+		DHIS2Core,
+		DHIS2,
+		PgAdmin,
+		WhoamiGo,
+		IMJobRunner,
+	)
+	_ = stacks
+
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return fmt.Errorf("failed to read stack folder: %s", err)
