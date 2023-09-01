@@ -37,7 +37,7 @@ func (r repository) Delete(name string) error {
 func (r repository) Find(name string) (*model.Stack, error) {
 	var stack *model.Stack
 	err := r.db.
-		Preload("Parameters").
+		Preload("GormParameters").
 		First(&stack, "name = ?", name).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {

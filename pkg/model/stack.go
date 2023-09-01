@@ -3,40 +3,60 @@ package model
 import (
 	"fmt"
 	"time"
+
+	"gorm.io/gorm"
 )
 
 // swagger:model Stack
 type Stack struct {
-	Name             string           `json:"name" gorm:"primaryKey"`
-	CreatedAt        time.Time        `json:"createdAt"`
-	UpdatedAt        time.Time        `json:"updatedAt"`
-	Parameters       []StackParameter `json:"parameters" gorm:"foreignKey:StackName; references: Name; constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
-	Instances        []Instance       `json:"instances" gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
-	HostnamePattern  string           `json:"hostnamePattern"`
-	HostnameVariable string           `json:"hostnameVariable"`
+	Name      string    `json:"name" gorm:"primaryKey"`
+	CreatedAt time.Time `json:"createdAt"`
+	UpdatedAt time.Time `json:"updatedAt"`
+	// GormParameters are only used by Gorm to persist parameters as it cannot persist a
+	// map[string]StackParameter. Only use GormParameters within the repository. Otherwise use
+	// Parameters.
+	GormParameters []StackParameter `json:"parameters" gorm:"foreignKey:StackName; references: Name; constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
+	// Parameters used by the stacks helmfile template.
+	Parameters       map[string]StackParameter `json:"-" gorm:"-"`
+	Instances        []Instance                `json:"instances" gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
+	HostnamePattern  string                    `json:"hostnamePattern"`
+	HostnameVariable string                    `json:"hostnameVariable"`
 	// Providers provide parameters to other stacks.
 	Providers map[string]Provider `json:"-" gorm:"-"`
-	Requires  []Stack             `json:"-" gorm:"-"`
+	// Requires these stacks to deploy an instance of this stack.
+	Requires []Stack `json:"-" gorm:"-"`
 }
 
-func (s Stack) GetHostname(name, namespace string) string {
-	return fmt.Sprintf(s.HostnamePattern, name, namespace)
-}
-
-func (s Stack) FindParameter(name string) (StackParameter, error) {
-	for _, parameter := range s.Parameters {
-		if parameter.Name == name {
-			return parameter, nil
-		}
+// BeforeSave translates Parameters from a map to a slice before persisting the stack in the DB.
+func (s *Stack) BeforeSave(_ *gorm.DB) error {
+	s.GormParameters = make([]StackParameter, 0, len(s.Parameters))
+	for n, parameter := range s.Parameters {
+		parameter.Name = n
+		s.GormParameters = append(s.GormParameters, parameter)
 	}
-	return StackParameter{}, fmt.Errorf("parameter not found: %s", name)
+	return nil
+}
+
+// AfterFind translates GormParameters from a slice to a map in Parameters after fetching the stack
+// from the DB.
+func (s *Stack) AfterFind(_ *gorm.DB) error {
+	s.Parameters = make(map[string]StackParameter, len(s.GormParameters))
+	for _, parameter := range s.GormParameters {
+		s.Parameters[parameter.Name] = parameter
+	}
+	return nil
+}
+
+func (s *Stack) GetHostname(name, namespace string) string {
+	return fmt.Sprintf(s.HostnamePattern, name, namespace)
 }
 
 type StackParameter struct {
 	Name         string  `json:"name" gorm:"primaryKey"`
 	StackName    string  `json:"-" gorm:"primaryKey"`
 	DefaultValue *string `json:"defaultValue"`
-	Consumed     bool    `json:"consumed"`
+	// Consumed signals that this parameter is provided by another stack i.e. one of the stacks required stacks.
+	Consumed bool `json:"consumed"`
 }
 
 // Provides a value that can be consumed by a stack as a stack parameter.

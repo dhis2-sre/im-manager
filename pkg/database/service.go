@@ -545,11 +545,10 @@ func findParameter(parameter string, instance *model.Instance, stack *model.Stac
 		}
 	}
 
-	for _, p := range stack.Parameters {
-		if p.Name == parameter {
-			return *p.DefaultValue, nil
-		}
+	p, ok := stack.Parameters[parameter]
+	if !ok {
+		return "", errors.New("parameter not found: " + parameter)
 	}
 
-	return "", errors.New("parameter not found: " + parameter)
+	return *p.DefaultValue, nil
 }

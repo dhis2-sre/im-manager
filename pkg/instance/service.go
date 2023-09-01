@@ -106,12 +106,12 @@ func (s service) findParameterValue(parameter string, sourceInstance *model.Inst
 		return instanceParameter.Value, nil
 	}
 
-	stackParameter, err := sourceStack.FindParameter(parameter)
-	if err == nil {
-		return *stackParameter.DefaultValue, nil
+	stackParameter, ok := sourceStack.Parameters[parameter]
+	if !ok {
+		return "", fmt.Errorf("unable to find value for parameter: %s", parameter)
 	}
 
-	return "", fmt.Errorf("unable to find value for parameter: %s", parameter)
+	return *stackParameter.DefaultValue, nil
 }
 
 func (s service) Pause(instance *model.Instance) error {
@@ -167,16 +167,11 @@ func (s service) unlink(id uint) error {
 	return s.instanceRepository.Unlink(instance)
 }
 
-func matchParameters(stackParameters []model.StackParameter, instanceParameters []model.InstanceParameter) []string {
+func matchParameters(stackParameters map[string]model.StackParameter, instanceParameters []model.InstanceParameter) []string {
 	unmatchedParameters := make([]string, 0)
-	parameterNames := make(map[string]struct{})
-
-	for _, parameter := range stackParameters {
-		parameterNames[parameter.Name] = struct{}{}
-	}
 
 	for _, parameter := range instanceParameters {
-		if _, ok := parameterNames[parameter.StackParameterID]; !ok {
+		if _, ok := stackParameters[parameter.StackParameterID]; !ok {
 			unmatchedParameters = append(unmatchedParameters, parameter.StackParameterID)
 		}
 	}
