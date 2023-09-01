@@ -101,6 +101,33 @@ func TestNew(t *testing.T) {
 		require.ErrorContains(t, err, `no provider for stack "b" parameter "a_param_provided"`)
 	})
 
+	t.Run("FailGivenStackIfConsumedParameterIsPointingToAnAlreadyConsumedParameter", func(t *testing.T) {
+		a := model.Stack{
+			Name: "a",
+			Parameters: model.StackParameters{
+				"a_param": {},
+			},
+		}
+		b := model.Stack{
+			Name: "b",
+			Parameters: model.StackParameters{
+				"a_param": {Consumed: true},
+			},
+			Requires: []model.Stack{a},
+		}
+		c := model.Stack{
+			Name: "c",
+			Parameters: model.StackParameters{
+				"a_param": {Consumed: true},
+			},
+			Requires: []model.Stack{b},
+		}
+
+		_, err := stack.New(a, c, b)
+
+		require.ErrorContains(t, err, `stack "c" parameter "a_param"`)
+	})
+
 	t.Run("FailGivenStackIfThereAreMultipleStacksProvidingTheSameConsumedParameter", func(t *testing.T) {
 		a := model.Stack{
 			Name: "a",

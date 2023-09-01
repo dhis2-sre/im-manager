@@ -55,17 +55,20 @@ func validateConsumedParams(stacks []model.Stack) error {
 
 		// generate frequency map of provided parameters
 		for _, requiredStack := range stack.Requires {
-			for name := range requiredStack.Parameters {
-				_, ok := consumedParameterProviders[name]
+			for parameterName, parameter := range requiredStack.Parameters {
+				if parameter.Consumed { // consumed parameters cannot be provided
+					continue
+				}
+				_, ok := consumedParameterProviders[parameterName]
 				if ok {
-					consumedParameterProviders[name]++
+					consumedParameterProviders[parameterName]++
 					requiredStacks[requiredStack.Name]++
 				}
 			}
-			for name := range requiredStack.Providers {
-				_, ok := consumedParameterProviders[name]
+			for parameterName := range requiredStack.Providers {
+				_, ok := consumedParameterProviders[parameterName]
 				if ok {
-					consumedParameterProviders[name]++
+					consumedParameterProviders[parameterName]++
 					requiredStacks[requiredStack.Name]++
 				}
 			}
