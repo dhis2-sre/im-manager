@@ -7,6 +7,7 @@
 package stack
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/dhis2-sre/im-manager/pkg/model"
@@ -17,6 +18,11 @@ type Stacks map[string]model.Stack
 
 // New creates stacks ensuring consumed parameters are provided by required stacks.
 func New(stacks ...model.Stack) (Stacks, error) {
+	err := validateConsumedParams(stacks)
+	if err != nil {
+		return nil, err
+	}
+
 	result := make(Stacks, len(stacks))
 	for _, s := range stacks {
 		result[s.Name] = s
@@ -24,12 +30,71 @@ func New(stacks ...model.Stack) (Stacks, error) {
 	return result, nil
 }
 
+// validateConsumedParams validates all consumed parameters are provided by exactly one of the
+// required stacks. Required stacks need to provide at least one consumed parameter.
+func validateConsumedParams(stacks []model.Stack) error {
+	var errs []error
+	for _, stack := range stacks { // validate each stacks consumed parameters are provided by its required stacks
+		requiredStacks := make(map[string]int)
+		for _, requiredStack := range stack.Requires {
+			_, ok := requiredStacks[requiredStack.Name]
+			if ok {
+				return fmt.Errorf("stack %q requires %q more than once", stack.Name, requiredStack.Name)
+			}
+			requiredStacks[requiredStack.Name] = 0
+		}
+
+		// collect all consumed parameters
+		consumedParameterProviders := make(map[string]int)
+		for name, parameter := range stack.Parameters {
+			if !parameter.Consumed {
+				continue
+			}
+			consumedParameterProviders[name] = 0
+		}
+
+		// generate frequency map of provided parameters
+		for _, requiredStack := range stack.Requires {
+			for name := range requiredStack.Parameters {
+				_, ok := consumedParameterProviders[name]
+				if ok {
+					consumedParameterProviders[name]++
+					requiredStacks[requiredStack.Name]++
+				}
+			}
+			for name := range requiredStack.Providers {
+				_, ok := consumedParameterProviders[name]
+				if ok {
+					consumedParameterProviders[name]++
+					requiredStacks[requiredStack.Name]++
+				}
+			}
+		}
+		for parameter, providerCount := range consumedParameterProviders {
+			if providerCount == 0 {
+				errs = append(errs, fmt.Errorf("no provider for stack %q parameter %q", stack.Name, parameter))
+			}
+			if providerCount > 1 {
+				errs = append(errs, fmt.Errorf("every consumed parameter must have exactly one provider. %d provider(s) for stack %q parameter %q", providerCount, stack.Name, parameter))
+			}
+		}
+
+		for requiredStackName, providedCount := range requiredStacks {
+			if providedCount == 0 {
+				errs = append(errs, fmt.Errorf("stack %q requires %q but does not consume from %q", stack.Name, requiredStackName, requiredStackName))
+			}
+		}
+	}
+
+	return errors.Join(errs...)
+}
+
 const ifNotPresent = "IfNotPresent"
 
 // Stack representing ../../stacks/dhis2-db/helmfile.yaml
 var DHIS2DB = model.Stack{
 	Name: "dhis2-db",
-	Parameters: map[string]model.StackParameter{
+	Parameters: model.StackParameters{
 		"CHART_VERSION":             {DefaultValue: &dhis2DBDefaults.chartVersion},
 		"DATABASE_ID":               {},
 		"DATABASE_NAME":             {DefaultValue: &dhis2DBDefaults.dbName},
@@ -40,7 +105,7 @@ var DHIS2DB = model.Stack{
 		"RESOURCES_REQUESTS_CPU":    {DefaultValue: &dhis2DBDefaults.resourcesRequestsCPU},
 		"RESOURCES_REQUESTS_MEMORY": {DefaultValue: &dhis2DBDefaults.resourcesRequestsMemory},
 	},
-	Providers: map[string]model.Provider{
+	Providers: model.Providers{
 		"DATABASE_HOSTNAME": postgresHostnameProvider,
 	},
 }
@@ -69,7 +134,7 @@ var dhis2DBDefaults = struct {
 // Stack representing ../../stacks/dhis2-core/helmfile.yaml
 var DHIS2Core = model.Stack{
 	Name: "dhis2-core",
-	Parameters: map[string]model.StackParameter{
+	Parameters: model.StackParameters{
 		"CHART_VERSION":                   {DefaultValue: &dhis2CoreDefaults.chartVersion},
 		"DATABASE_HOSTNAME":               {Consumed: true},
 		"DATABASE_NAME":                   {Consumed: true},
@@ -129,7 +194,7 @@ var dhis2CoreDefaults = struct {
 // Stack representing ../../stacks/dhis2/helmfile.yaml
 var DHIS2 = model.Stack{
 	Name: "dhis2",
-	Parameters: map[string]model.StackParameter{
+	Parameters: model.StackParameters{
 		"CHART_VERSION":                   {DefaultValue: &dhis2CoreDefaults.chartVersion},
 		"CORE_RESOURCES_REQUESTS_CPU":     {DefaultValue: &dhis2CoreDefaults.resourcesRequestsCPU},
 		"CORE_RESOURCES_REQUESTS_MEMORY":  {DefaultValue: &dhis2CoreDefaults.resourcesRequestsMemory},
@@ -154,7 +219,7 @@ var DHIS2 = model.Stack{
 		"STARTUP_PROBE_FAILURE_THRESHOLD": {DefaultValue: &dhis2CoreDefaults.startupProbeFailureThreshold},
 		"STARTUP_PROBE_PERIOD_SECONDS":    {DefaultValue: &dhis2CoreDefaults.startupProbePeriodSeconds},
 	},
-	Providers: map[string]model.Provider{
+	Providers: model.Providers{
 		"DATABASE_HOSTNAME": postgresHostnameProvider,
 	},
 }
@@ -168,7 +233,7 @@ var dhis2Defaults = struct {
 // Stack representing ../../stacks/pgadmin/helmfile.yaml
 var PgAdmin = model.Stack{
 	Name: "pgadmin",
-	Parameters: map[string]model.StackParameter{
+	Parameters: model.StackParameters{
 		"CHART_VERSION":     {DefaultValue: &pgAdminDefaults.chartVersion},
 		"DATABASE_HOSTNAME": {Consumed: true},
 		"DATABASE_NAME":     {Consumed: true},
@@ -190,7 +255,7 @@ var pgAdminDefaults = struct {
 // Stack representing ../../stacks/whoami-go/helmfile.yaml
 var WhoamiGo = model.Stack{
 	Name: "whoami-go",
-	Parameters: map[string]model.StackParameter{
+	Parameters: model.StackParameters{
 		"CHART_VERSION":     {DefaultValue: &whoamiGoDefaults.chartVersion},
 		"IMAGE_PULL_POLICY": {DefaultValue: &whoamiGoDefaults.imagePullPolicy},
 		"IMAGE_REPOSITORY":  {DefaultValue: &whoamiGoDefaults.imageRepository},
@@ -216,7 +281,7 @@ var whoamiGoDefaults = struct {
 // Stack representing ../../stacks/im-job-runner/helmfile.yaml
 var IMJobRunner = model.Stack{
 	Name: "im-job-runner",
-	Parameters: map[string]model.StackParameter{
+	Parameters: model.StackParameters{
 		"CHART_VERSION":           {DefaultValue: &imJobRunnerDefaults.chartVersion},
 		"COMMAND":                 {},
 		"DHIS2_DATABASE_DATABASE": {DefaultValue: &dhis2DBDefaults.dbName},

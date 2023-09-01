@@ -1235,7 +1235,7 @@ definitions:
             parameters:
                 description: |-
                     GormParameters are only used by Gorm to persist parameters as it cannot persist a
-                    map[string]StackParameter. Only use GormParameters within the repository. Otherwise use
+                    StackParameters. Only use GormParameters within the repository. Otherwise use
                     Parameters.
                 items:
                     $ref: '#/definitions/StackParameter'
