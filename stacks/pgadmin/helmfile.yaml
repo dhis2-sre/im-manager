@@ -1,4 +1,4 @@
-# consumedParameters: DATABASE_USERNAME, DATABASE_PASSWORD, DATABASE_NAME, DATABASE_HOSTNAME
+# consumedParameters: DATABASE_USERNAME, DATABASE_NAME, DATABASE_HOSTNAME
 # hostnameVariable: DATABASE_HOSTNAME
 releases:
   - name: {{ requiredEnv "INSTANCE_NAME" }}

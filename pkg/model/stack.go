@@ -14,6 +14,9 @@ type Stack struct {
 	Instances        []Instance       `json:"instances" gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
 	HostnamePattern  string           `json:"hostnamePattern"`
 	HostnameVariable string           `json:"hostnameVariable"`
+	// Providers provide parameters to other stacks.
+	Providers map[string]Provider `json:"-" gorm:"-"`
+	Requires  []Stack             `json:"-" gorm:"-"`
 }
 
 func (s Stack) GetHostname(name, namespace string) string {
@@ -34,4 +37,15 @@ type StackParameter struct {
 	StackName    string  `json:"-" gorm:"primaryKey"`
 	DefaultValue *string `json:"defaultValue"`
 	Consumed     bool    `json:"consumed"`
+}
+
+// Provides a value that can be consumed by a stack as a stack parameter.
+type Provider interface {
+	Provide(instance Instance) (value string, err error)
+}
+
+type ProviderFunc func(instance Instance) (string, error)
+
+func (p ProviderFunc) Provide(instance Instance) (string, error) {
+	return p(instance)
 }
