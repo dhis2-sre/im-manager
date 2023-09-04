@@ -8,16 +8,14 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/dhis2-sre/im-manager/internal/errdef"
+	"golang.org/x/exp/maps"
 
-	"github.com/dhis2-sre/im-manager/pkg/model"
+	"github.com/dhis2-sre/im-manager/internal/errdef"
 )
 
 const (
 	stackParametersIdentifier    = "# stackParameters: "
 	consumedParametersIdentifier = "# consumedParameters: "
-	hostnamePatternIdentifier    = "# hostnamePattern: "
-	hostnameVariableIdentifier   = "# hostnameVariable: "
 )
 
 // TODO: This is not thread safe
@@ -36,50 +34,44 @@ func LoadStacks(dir string, stackService Service) error {
 	if err != nil {
 		return fmt.Errorf("error in stack config: %v", err)
 	}
-	_ = stacks
 
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		return fmt.Errorf("failed to read stack folder: %s", err)
-	}
+	for name := range stacks {
+		// TODO: If I'm not doing the below I'm getting: G601 (CWE-118): Implicit memory aliasing in for loop. (Confidence: MEDIUM, Severity: MEDIUM)
+		// An alternative to the below would be to ignore the warning, but I'm not sure what's best
+		stack := stacks[name]
 
-	for _, entry := range entries {
-		if !entry.IsDir() {
-			continue
-		}
-
-		name := entry.Name()
-		log.Printf("Parsing stack: %q\n", name)
-		stackTemplate, err := parseStack(dir, name)
-		if err != nil {
-			return fmt.Errorf("error parsing stack %q: %v", name, err)
-		}
-
-		existingStack, err := stackService.Find(name)
+		_, err := stackService.Find(name)
 		if err != nil {
 			if !errdef.IsNotFound(err) {
 				return fmt.Errorf("error searching existing stack %q: %w", name, err)
 			}
 		}
 		if err == nil {
-			log.Printf("Stack exists: %s\n", existingStack.Name)
+			log.Printf("Stack exists: %s\n", name)
 			// TODO: For now just bail if the stack exists. This should probably be done differently so we can reload the stack if it has changed
 			// If we have running instances we can't just change parameters etc. though
 			continue
 		}
 
-		stack := &model.Stack{
-			Name:             name,
-			HostnamePattern:  stackTemplate.hostnamePattern,
-			HostnameVariable: stackTemplate.hostnameVariable,
-			Parameters:       make(map[string]model.StackParameter),
-		}
-		for name, v := range stackTemplate.parameters {
-			isConsumed := isConsumedParameter(name, stackTemplate.consumedParameters)
-			stack.Parameters[name] = model.StackParameter{Consumed: isConsumed, DefaultValue: v}
+		parsedStack, err := parseStack(dir, name)
+		if err != nil {
+			return fmt.Errorf("error parsing stack %q: %w", name, err)
 		}
 
-		err = stackService.Create(stack)
+		parsedParameters := len(maps.Keys(parsedStack.parameters))
+		stackParameters := len(stack.Parameters)
+		if parsedParameters != stackParameters {
+			return fmt.Errorf("number of stack parameters (%d) doesn't match helmfile parameters (%d) for stack: %q", stackParameters, parsedParameters, name)
+		}
+
+		for _, parameter := range maps.Keys(parsedStack.parameters) {
+			_, ok := stack.Parameters[parameter]
+			if !ok {
+				return fmt.Errorf("parameter not found: %q", parameter)
+			}
+		}
+
+		err = stackService.Create(&stack)
 		log.Printf("Stack created: %+v\n", stack)
 		if err != nil {
 			return fmt.Errorf("error creating stack %q: %v", name, err)
@@ -104,24 +96,6 @@ func parseStack(dir, name string) (*stack, error) {
 		return nil, fmt.Errorf("error reading stack %q: %v", name, err)
 	}
 
-	hostnamePatterns := extractMetadataParameters(file, hostnamePatternIdentifier)
-	if len(hostnamePatterns) > 1 {
-		return nil, fmt.Errorf("error parsing stack %q: %q defined more than once", name, hostnamePatternIdentifier)
-	}
-	var hostnamePattern string
-	if len(hostnamePatterns) == 1 {
-		hostnamePattern = hostnamePatterns[0]
-	}
-
-	hostnameVariables := extractMetadataParameters(file, hostnameVariableIdentifier)
-	if len(hostnameVariables) > 1 {
-		return nil, fmt.Errorf("error parsing stack %q: %q defined more than once", name, hostnameVariableIdentifier)
-	}
-	var hostnameVariable string
-	if len(hostnameVariables) == 1 {
-		hostnameVariable = hostnameVariables[0]
-	}
-
 	consumedParameters := extractMetadataParameters(file, consumedParametersIdentifier)
 	stackParameters := extractMetadataParameters(file, stackParametersIdentifier)
 	requiredParams := extractRequiredParameters(file, stackParameters)
@@ -132,8 +106,6 @@ func parseStack(dir, name string) (*stack, error) {
 	}
 
 	return &stack{
-		hostnamePattern:    hostnamePattern,
-		hostnameVariable:   hostnameVariable,
 		consumedParameters: consumedParameters,
 		stackParameters:    stackParameters,
 		parameters:         optionalParams,
@@ -197,10 +169,6 @@ func getKeys(parameterSet map[string]bool) []string {
 	}
 	sort.Strings(keys)
 	return keys
-}
-
-func isConsumedParameter(parameter string, consumedParameters []string) bool {
-	return inSlice(parameter, consumedParameters)
 }
 
 func isStackParameter(parameter string, stackParameters []string) bool {

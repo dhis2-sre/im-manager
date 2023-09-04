@@ -12,33 +12,31 @@ type Stack struct {
 	Name      string    `json:"name" gorm:"primaryKey"`
 	CreatedAt time.Time `json:"createdAt"`
 	UpdatedAt time.Time `json:"updatedAt"`
-	// GormParameters are only used by Gorm to persist parameters as it cannot persist a
-	// StackParameters. Only use GormParameters within the repository. Otherwise use
-	// Parameters.
-	GormParameters []StackParameter `json:"parameters" gorm:"foreignKey:StackName; references: Name; constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
+	// GormParameters are only used by Gorm to persist parameters as it cannot persist a StackParameters.
+	// Only use GormParameters within the repository. Otherwise, use Parameters.
+	GormParameters []StackParameter `json:"parameters" gorm:"foreignKey:StackName; references:Name; constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
 	// Parameters used by the stacks helmfile template.
-	Parameters       StackParameters `json:"-" gorm:"-"`
-	Instances        []Instance      `json:"instances" gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
+	Parameters       StackParameters `json:"-" gorm:"-:all"`
+	Instances        []Instance      `json:"instances" gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
 	HostnamePattern  string          `json:"hostnamePattern"`
 	HostnameVariable string          `json:"hostnameVariable"`
 	// Providers provide parameters to other stacks.
 	Providers Providers `json:"-" gorm:"-"`
 	// Requires these stacks to deploy an instance of this stack.
-	Requires []Stack `json:"-" gorm:"-"`
+	Requires []Stack `json:"requires" gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
 }
 
 // BeforeSave translates Parameters from a map to a slice before persisting the stack in the DB.
 func (s *Stack) BeforeSave(_ *gorm.DB) error {
 	s.GormParameters = make([]StackParameter, 0, len(s.Parameters))
-	for n, parameter := range s.Parameters {
-		parameter.Name = n
+	for name, parameter := range s.Parameters {
+		parameter.Name = name
 		s.GormParameters = append(s.GormParameters, parameter)
 	}
 	return nil
 }
 
-// AfterFind translates GormParameters from a slice to a map in Parameters after fetching the stack
-// from the DB.
+// AfterFind translates GormParameters from a slice to a map in Parameters after fetching the stack from the DB.
 func (s *Stack) AfterFind(_ *gorm.DB) error {
 	s.Parameters = make(StackParameters, len(s.GormParameters))
 	for _, parameter := range s.GormParameters {
@@ -63,7 +61,7 @@ type StackParameter struct {
 
 type Providers map[string]Provider
 
-// Provides a value that can be consumed by a stack as a stack parameter.
+// Provider provides a value that can be consumed by a stack as a stack parameter.
 type Provider interface {
 	Provide(instance Instance) (value string, err error)
 }
