@@ -82,8 +82,6 @@ func LoadStacks(dir string, stackService Service) error {
 }
 
 type stack struct {
-	hostnamePattern    string
-	hostnameVariable   string
 	consumedParameters []string
 	stackParameters    []string
 	parameters         map[string]*string
