@@ -23,7 +23,7 @@ type Stack struct {
 	// Providers provide parameters to other stacks.
 	Providers Providers `json:"-" gorm:"-"`
 	// Requires these stacks to deploy an instance of this stack.
-	Requires []Stack `json:"requires" gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
+	Requires []Stack `json:"-" gorm:"-"`
 }
 
 // BeforeSave translates Parameters from a map to a slice before persisting the stack in the DB.
