@@ -58,12 +58,6 @@ func LoadStacks(dir string, stackService Service) error {
 			return fmt.Errorf("error parsing stack %q: %v", name, err)
 		}
 
-		parsedParameters := len(maps.Keys(parsedStack.parameters))
-		stackParameters := len(stack.Parameters)
-		if parsedParameters != stackParameters {
-			return fmt.Errorf("number of stack parameters (%d) doesn't match helmfile parameters (%d) for stack: %q", stackParameters, parsedParameters, name)
-		}
-
 		for _, parameter := range maps.Keys(parsedStack.parameters) {
 			_, ok := stack.Parameters[parameter]
 			if !ok {
