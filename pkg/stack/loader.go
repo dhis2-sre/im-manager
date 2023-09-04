@@ -55,7 +55,7 @@ func LoadStacks(dir string, stackService Service) error {
 
 		parsedStack, err := parseStack(dir, name)
 		if err != nil {
-			return fmt.Errorf("error parsing stack %q: %w", name, err)
+			return fmt.Errorf("error parsing stack %q: %v", name, err)
 		}
 
 		parsedParameters := len(maps.Keys(parsedStack.parameters))
