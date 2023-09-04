@@ -1240,12 +1240,6 @@ definitions:
                     $ref: '#/definitions/StackParameter'
                 type: array
                 x-go-name: GormParameters
-            requires:
-                description: Requires these stacks to deploy an instance of this stack.
-                items:
-                    $ref: '#/definitions/Stack'
-                type: array
-                x-go-name: Requires
             updatedAt:
                 format: date-time
                 type: string
