@@ -1234,13 +1234,18 @@ definitions:
                 x-go-name: Name
             parameters:
                 description: |-
-                    GormParameters are only used by Gorm to persist parameters as it cannot persist a
-                    StackParameters. Only use GormParameters within the repository. Otherwise use
-                    Parameters.
+                    GormParameters are only used by Gorm to persist parameters as it cannot persist a StackParameters.
+                    Only use GormParameters within the repository. Otherwise, use Parameters.
                 items:
                     $ref: '#/definitions/StackParameter'
                 type: array
                 x-go-name: GormParameters
+            requires:
+                description: Requires these stacks to deploy an instance of this stack.
+                items:
+                    $ref: '#/definitions/Stack'
+                type: array
+                x-go-name: Requires
             updatedAt:
                 format: date-time
                 type: string
