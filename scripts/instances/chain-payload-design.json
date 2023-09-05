@@ -1,0 +1,26 @@
+{
+  "groupName": "whoami",
+  "instances": {
+    "dhis2-core-ivo-1": {
+      "stackName": "dhis2-core",
+      "parameters": {
+        "IMAGE_TAG": "2.40.0"
+      },
+      "linkedInstances": ["dhis2-db-ivo-1"]
+    },
+    "pgadmin-ivo-1": {
+      "stackName": "pgadmin",
+      "parameters": {
+        "PGADMIN_USERNAME": "admin",
+        "PGADMIN_PASSWORD": "secure :)"
+      },
+      "linkedInstances": ["dhis2-db-ivo-1"]
+    },
+    "dhis2-db-ivo-1": {
+      "stackName": "dhis2-db",
+      "parameters": {
+        "DATABASE_ID": "1"
+      }
+    }
+  }
+}
