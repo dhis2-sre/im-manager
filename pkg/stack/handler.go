@@ -2,8 +2,9 @@ package stack
 
 import (
 	"fmt"
-	"github.com/dhis2-sre/im-manager/pkg/model"
 	"net/http"
+
+	"github.com/dhis2-sre/im-manager/pkg/model"
 
 	"github.com/dhis2-sre/im-manager/internal/errdef"
 
