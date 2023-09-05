@@ -7,8 +7,8 @@ type Stack struct {
 	Instances        []Instance      `json:"instances"`
 	HostnamePattern  string          `json:"hostnamePattern"`
 	HostnameVariable string          `json:"hostnameVariable"`
-	// Providers provide parameters to other stacks.
-	Providers Providers `json:"-"`
+	// ParameterProviders provide parameters to other stacks.
+	ParameterProviders ParameterProviders `json:"-"`
 	// Requires these stacks to deploy an instance of this stack.
 	Requires []Stack `json:"-"`
 }
@@ -24,15 +24,15 @@ type StackParameter struct {
 	Validator func(value string) error `json:"-"`
 }
 
-type Providers map[string]Provider
+type ParameterProviders map[string]ParameterProvider
 
-// Provider provides a value that can be consumed by a stack as a stack parameter.
-type Provider interface {
+// ParameterProvider provides a value that can be consumed by a stack as a stack parameter.
+type ParameterProvider interface {
 	Provide(instance Instance) (value string, err error)
 }
 
-type ProviderFunc func(instance Instance) (string, error)
+type ParameterProviderFunc func(instance Instance) (string, error)
 
-func (p ProviderFunc) Provide(instance Instance) (string, error) {
+func (p ParameterProviderFunc) Provide(instance Instance) (string, error) {
 	return p(instance)
 }

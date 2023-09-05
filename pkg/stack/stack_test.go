@@ -10,7 +10,7 @@ import (
 )
 
 func TestNew(t *testing.T) {
-	provider := model.ProviderFunc(func(instance model.Instance) (string, error) {
+	provider := model.ParameterProviderFunc(func(instance model.Instance) (string, error) {
 		return "1", nil
 	})
 
@@ -26,7 +26,7 @@ func TestNew(t *testing.T) {
 			Parameters: model.StackParameters{
 				"b_param": {},
 			},
-			Providers: model.Providers{
+			ParameterProviders: model.ParameterProviders{
 				"b_param_provided": provider,
 			},
 		}
@@ -54,7 +54,7 @@ func TestNew(t *testing.T) {
 	t.Run("FailGivenStackIfConsumedParameterIsNotProvidedByRequiredStack", func(t *testing.T) {
 		a := model.Stack{
 			Name: "a",
-			Providers: model.Providers{
+			ParameterProviders: model.ParameterProviders{
 				"a_param_provided": provider,
 			},
 		}
@@ -131,13 +131,13 @@ func TestNew(t *testing.T) {
 	t.Run("FailGivenStackIfThereAreMultipleStacksProvidingTheSameConsumedParameter", func(t *testing.T) {
 		a := model.Stack{
 			Name: "a",
-			Providers: model.Providers{
+			ParameterProviders: model.ParameterProviders{
 				"a_param_provided": provider,
 			},
 		}
 		b := model.Stack{
 			Name: "b",
-			Providers: model.Providers{
+			ParameterProviders: model.ParameterProviders{
 				"a_param_provided": provider,
 			},
 		}
@@ -190,7 +190,7 @@ func TestNew(t *testing.T) {
 			Parameters: model.StackParameters{
 				"a_param": {},
 			},
-			Providers: model.Providers{
+			ParameterProviders: model.ParameterProviders{
 				"a_param": provider,
 			},
 		}

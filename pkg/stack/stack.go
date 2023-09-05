@@ -69,7 +69,7 @@ func validateConsumedParams(stacks []model.Stack) error {
 					requiredStacks[requiredStack.Name]++
 				}
 			}
-			for parameterName := range requiredStack.Providers {
+			for parameterName := range requiredStack.ParameterProviders {
 				_, ok := consumedParameterProviders[parameterName]
 				if ok {
 					consumedParameterProviders[parameterName]++
@@ -112,7 +112,7 @@ var DHIS2DB = model.Stack{
 		"RESOURCES_REQUESTS_CPU":    {DefaultValue: &dhis2DBDefaults.resourcesRequestsCPU},
 		"RESOURCES_REQUESTS_MEMORY": {DefaultValue: &dhis2DBDefaults.resourcesRequestsMemory},
 	},
-	Providers: model.Providers{
+	ParameterProviders: model.ParameterProviders{
 		"DATABASE_HOSTNAME": postgresHostnameProvider,
 	},
 }
@@ -226,7 +226,7 @@ var DHIS2 = model.Stack{
 		"STARTUP_PROBE_FAILURE_THRESHOLD": {DefaultValue: &dhis2CoreDefaults.startupProbeFailureThreshold},
 		"STARTUP_PROBE_PERIOD_SECONDS":    {DefaultValue: &dhis2CoreDefaults.startupProbePeriodSeconds},
 	},
-	Providers: model.Providers{
+	ParameterProviders: model.ParameterProviders{
 		"DATABASE_HOSTNAME": postgresHostnameProvider,
 	},
 }
@@ -316,7 +316,7 @@ var imJobRunnerDefaults = struct {
 }
 
 // Provides the PostgreSQL hostname of an instance.
-var postgresHostnameProvider = model.ProviderFunc(func(instance model.Instance) (string, error) {
+var postgresHostnameProvider = model.ParameterProviderFunc(func(instance model.Instance) (string, error) {
 	return fmt.Sprintf("%s-database-postgresql.%s.svc", instance.Name, instance.GroupName), nil
 })
 
