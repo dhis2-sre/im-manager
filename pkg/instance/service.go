@@ -81,8 +81,8 @@ func (s service) ConsumeParameters(source, destination *model.Instance) error {
 				return err
 			}
 			parameterRequest := model.InstanceParameter{
-				StackParameterName: parameter.Name,
-				Value:              value,
+				Name:  parameter.Name,
+				Value: value,
 			}
 			destination.Parameters = append(destination.Parameters, parameterRequest)
 		}
@@ -91,8 +91,8 @@ func (s service) ConsumeParameters(source, destination *model.Instance) error {
 	// Hostname parameter
 	if !source.Preset && destinationStack.HostnameVariable != "" {
 		hostnameParameter := model.InstanceParameter{
-			StackParameterName: destinationStack.HostnameVariable,
-			Value:              fmt.Sprintf(sourceStack.HostnamePattern, source.Name, source.GroupName),
+			Name:  destinationStack.HostnameVariable,
+			Value: fmt.Sprintf(sourceStack.HostnamePattern, source.Name, source.GroupName),
 		}
 		destination.Parameters = append(destination.Parameters, hostnameParameter)
 	}
@@ -171,8 +171,8 @@ func matchParameters(stackParameters map[string]model.StackParameter, instancePa
 	unmatchedParameters := make([]string, 0)
 
 	for _, parameter := range instanceParameters {
-		if _, ok := stackParameters[parameter.StackParameterName]; !ok {
-			unmatchedParameters = append(unmatchedParameters, parameter.StackParameterName)
+		if _, ok := stackParameters[parameter.Name]; !ok {
+			unmatchedParameters = append(unmatchedParameters, parameter.Name)
 		}
 	}
 
