@@ -157,7 +157,7 @@ func (r repository) FindByGroups(groups []model.Group, presets bool) ([]GroupsWi
 
 func (r repository) findInstances(groupNames []string, presets bool) ([]*model.Instance, error) {
 	query := r.db.
-		Preload("Parameters.StackParameter")
+		Preload("Parameters")
 
 	isAdmin := slices.Contains(groupNames, administratorGroupName)
 	if !isAdmin {
