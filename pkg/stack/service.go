@@ -2,50 +2,23 @@ package stack
 
 import (
 	"github.com/dhis2-sre/im-manager/pkg/model"
+	"golang.org/x/exp/maps"
 )
 
-type Service interface {
-	Create(stack *model.Stack) error
-	Delete(name string) error
-	CreateParameter(stack *model.Stack, parameterName string, defaultValue *string, consumed bool) (*model.StackParameter, error)
-	Find(name string) (*model.Stack, error)
-	FindAll() (*[]model.Stack, error)
-	Save(stack *model.Stack) error
+//goland:noinspection GoExportedFuncWithUnexportedType
+func NewService(stacks Stacks) *service {
+	return &service{stacks}
 }
 
 type service struct {
-	repository Repository
-}
-
-//goland:noinspection GoExportedFuncWithUnexportedType
-func NewService(repository Repository) *service {
-	return &service{repository}
-}
-
-func (s service) Create(stack *model.Stack) error {
-	return s.repository.Create(stack)
-}
-
-func (s service) Delete(name string) error {
-	return s.repository.Delete(name)
-}
-
-func (s service) CreateParameter(stack *model.Stack, parameterName string, defaultValue *string, consumed bool) (*model.StackParameter, error) {
-	parameter := &model.StackParameter{Name: parameterName, StackName: stack.Name, Consumed: consumed, DefaultValue: defaultValue}
-
-	err := s.repository.CreateParameter(parameter)
-
-	return parameter, err
+	stacks Stacks
 }
 
 func (s service) Find(name string) (*model.Stack, error) {
-	return s.repository.Find(name)
+	stack := s.stacks[name]
+	return &stack, nil
 }
 
-func (s service) FindAll() (*[]model.Stack, error) {
-	return s.repository.FindAll()
-}
-
-func (s service) Save(stack *model.Stack) error {
-	return s.repository.Save(stack)
+func (s service) FindAll() ([]model.Stack, error) {
+	return maps.Values(s.stacks), nil
 }

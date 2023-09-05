@@ -2,15 +2,10 @@ package stack
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"regexp"
 	"sort"
 	"strings"
-
-	"golang.org/x/exp/maps"
-
-	"github.com/dhis2-sre/im-manager/internal/errdef"
 )
 
 const (
@@ -21,59 +16,6 @@ const (
 // TODO: This is not thread safe
 // Deleting the stack on each boot isn't ideal since instance parameters are linked to stack parameters
 // Perhaps upsert using... https://gorm.io/docs/advanced_query.html#FirstOrCreate
-
-func LoadStacks(dir string, stackService Service) error {
-	stacks, err := New(
-		DHIS2DB,
-		DHIS2Core,
-		DHIS2,
-		PgAdmin,
-		WhoamiGo,
-		IMJobRunner,
-	)
-	if err != nil {
-		return fmt.Errorf("error in stack config: %v", err)
-	}
-
-	for name := range stacks {
-		// TODO: If I'm not doing the below I'm getting: G601 (CWE-118): Implicit memory aliasing in for loop. (Confidence: MEDIUM, Severity: MEDIUM)
-		// An alternative to the below would be to ignore the warning, but I'm not sure what's best
-		stack := stacks[name]
-
-		_, err := stackService.Find(name)
-		if err != nil {
-			if !errdef.IsNotFound(err) {
-				return fmt.Errorf("error searching existing stack %q: %w", name, err)
-			}
-		}
-		if err == nil {
-			log.Printf("Stack exists: %s\n", name)
-			// TODO: For now just bail if the stack exists. This should probably be done differently so we can reload the stack if it has changed
-			// If we have running instances we can't just change parameters etc. though
-			continue
-		}
-
-		parsedStack, err := parseStack(dir, name)
-		if err != nil {
-			return fmt.Errorf("error parsing stack %q: %v", name, err)
-		}
-
-		for _, parameter := range maps.Keys(parsedStack.parameters) {
-			_, ok := stack.Parameters[parameter]
-			if !ok {
-				return fmt.Errorf("parameter not found: %q", parameter)
-			}
-		}
-
-		err = stackService.Create(&stack)
-		log.Printf("Stack created: %+v\n", stack)
-		if err != nil {
-			return fmt.Errorf("error creating stack %q: %v", name, err)
-		}
-	}
-
-	return nil
-}
 
 type stack struct {
 	consumedParameters []string

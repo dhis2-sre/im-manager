@@ -133,7 +133,7 @@ func configureInstanceEnvironment(accessToken string, stack *model.Stack, instan
 	for _, parameter := range stack.Parameters {
 		instanceParameter, err := instance.FindParameter(parameter.Name)
 		if err == nil {
-			instanceEnv := fmt.Sprintf("%s=%s", instanceParameter.StackParameter.Name, instanceParameter.Value)
+			instanceEnv := fmt.Sprintf("%s=%s", instanceParameter.StackParameterName, instanceParameter.Value)
 			cmd.Env = append(cmd.Env, instanceEnv)
 			continue
 		}

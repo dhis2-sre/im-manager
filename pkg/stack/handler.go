@@ -2,6 +2,7 @@ package stack
 
 import (
 	"fmt"
+	"github.com/dhis2-sre/im-manager/pkg/model"
 	"net/http"
 
 	"github.com/dhis2-sre/im-manager/internal/errdef"
@@ -9,14 +10,19 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-type Handler struct {
-	service Service
-}
-
 func NewHandler(service Service) Handler {
 	return Handler{
 		service,
 	}
+}
+
+type Service interface {
+	Find(name string) (*model.Stack, error)
+	FindAll() ([]model.Stack, error)
+}
+
+type Handler struct {
+	service Service
 }
 
 // Find stack

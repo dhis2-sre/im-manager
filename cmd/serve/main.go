@@ -90,18 +90,25 @@ func run() error {
 	groupService := group.NewService(groupRepository, userService)
 	groupHandler := group.NewHandler(groupService)
 
-	stackService := stack.NewService(stack.NewRepository(db))
+	stacks, err := stack.New(
+		stack.DHIS2DB,
+		stack.DHIS2Core,
+		stack.DHIS2,
+		stack.PgAdmin,
+		stack.WhoamiGo,
+		stack.IMJobRunner,
+	)
+	if err != nil {
+		return fmt.Errorf("error in stack config: %v", err)
+	}
+
+	stackService := stack.NewService(stacks)
 
 	instanceRepo := instance.NewRepository(db, cfg)
 	helmfileService := instance.NewHelmfileService(stackService, cfg)
 	instanceService := instance.NewService(cfg, instanceRepo, groupService, stackService, helmfileService)
 
 	dockerHubClient := integration.NewDockerHubClient(cfg.DockerHub.Username, cfg.DockerHub.Password)
-
-	err = stack.LoadStacks("./stacks", stackService)
-	if err != nil {
-		return err
-	}
 
 	consumer, err := rabbitmq.NewConsumer(
 		cfg.RabbitMqURL.GetUrl(),

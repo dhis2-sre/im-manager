@@ -230,7 +230,6 @@ func populateParameterRelations(instance *model.Instance) {
 	if len(parameters) > 0 {
 		for i := range parameters {
 			parameters[i].InstanceID = instance.ID
-			parameters[i].StackName = instance.StackName
 		}
 	}
 }
