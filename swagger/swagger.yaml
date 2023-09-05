@@ -713,7 +713,7 @@ definitions:
         properties:
             name:
                 type: string
-                x-go-name: StackParameterName
+                x-go-name: Name
             value:
                 type: string
                 x-go-name: Value
@@ -1213,10 +1213,6 @@ definitions:
         x-go-package: github.com/docker/docker/api/types/volume
     Stack:
         properties:
-            createdAt:
-                format: date-time
-                type: string
-                x-go-name: CreatedAt
             hostnamePattern:
                 type: string
                 x-go-name: HostnamePattern
@@ -1233,10 +1229,6 @@ definitions:
                 x-go-name: Name
             parameters:
                 $ref: '#/definitions/StackParameters'
-            updatedAt:
-                format: date-time
-                type: string
-                x-go-name: UpdatedAt
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/model
     StackParameter:
