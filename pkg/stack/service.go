@@ -1,6 +1,7 @@
 package stack
 
 import (
+	"github.com/dhis2-sre/im-manager/internal/errdef"
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	"golang.org/x/exp/maps"
 )
@@ -15,7 +16,10 @@ type service struct {
 }
 
 func (s service) Find(name string) (*model.Stack, error) {
-	stack := s.stacks[name]
+	stack, ok := s.stacks[name]
+	if !ok {
+		return nil, errdef.NewNotFound("stack not found")
+	}
 	return &stack, nil
 }
 
