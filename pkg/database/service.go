@@ -540,7 +540,7 @@ func newPgDumpConfig(instance *model.Instance, stack *model.Stack) (*pg.Dump, er
 
 func findParameter(parameter string, instance *model.Instance, stack *model.Stack) (string, error) {
 	for _, p := range instance.Parameters {
-		if p.StackParameterID == parameter {
+		if p.Name == parameter {
 			return p.Value, nil
 		}
 	}

@@ -91,7 +91,6 @@ func (r repository) Save(instance *model.Instance) error {
 func (r repository) FindById(id uint) (*model.Instance, error) {
 	var instance *model.Instance
 	err := r.db.
-		Preload("Parameters.StackParameter").
 		Joins("Group").
 		First(&instance, id).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -230,7 +229,6 @@ func populateParameterRelations(instance *model.Instance) {
 	if len(parameters) > 0 {
 		for i := range parameters {
 			parameters[i].InstanceID = instance.ID
-			parameters[i].StackName = instance.StackName
 		}
 	}
 }

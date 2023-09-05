@@ -35,7 +35,7 @@ type Linked struct {
 
 func (i Instance) FindParameter(name string) (InstanceParameter, error) {
 	for _, parameter := range i.Parameters {
-		if parameter.StackParameterID == name {
+		if parameter.Name == name {
 			return parameter, nil
 		}
 	}
@@ -43,10 +43,7 @@ func (i Instance) FindParameter(name string) (InstanceParameter, error) {
 }
 
 type InstanceParameter struct {
-	InstanceID uint `json:"-" gorm:"primaryKey"`
-	// TODO: Rename StackParameterID to Name
-	StackParameterID string         `json:"name" gorm:"primaryKey"`
-	StackParameter   StackParameter `json:"-" gorm:"foreignKey:StackParameterID,StackName; references:Name,StackName; constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
-	StackName        string         `json:"-"`
-	Value            string         `json:"value"`
+	InstanceID uint   `json:"-" gorm:"primaryKey"`
+	Name       string `json:"name" gorm:"primaryKey"`
+	Value      string `json:"value"`
 }

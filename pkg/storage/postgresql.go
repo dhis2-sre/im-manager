@@ -34,9 +34,6 @@ func NewDatabase(c config.Postgresql) (*gorm.DB, error) {
 		&model.Group{},
 		&model.ClusterConfiguration{},
 
-		&model.Stack{},
-		&model.StackParameter{},
-
 		&model.Instance{},
 		&model.Linked{},
 		&model.InstanceParameter{},

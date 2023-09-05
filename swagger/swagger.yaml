@@ -712,9 +712,8 @@ definitions:
     InstanceParameter:
         properties:
             name:
-                description: 'TODO: Rename StackParameterID to Name'
                 type: string
-                x-go-name: StackParameterID
+                x-go-name: Name
             value:
                 type: string
                 x-go-name: Value
@@ -1214,10 +1213,6 @@ definitions:
         x-go-package: github.com/docker/docker/api/types/volume
     Stack:
         properties:
-            createdAt:
-                format: date-time
-                type: string
-                x-go-name: CreatedAt
             hostnamePattern:
                 type: string
                 x-go-name: HostnamePattern
@@ -1233,18 +1228,7 @@ definitions:
                 type: string
                 x-go-name: Name
             parameters:
-                description: |-
-                    GormParameters are only used by Gorm to persist parameters as it cannot persist a
-                    StackParameters. Only use GormParameters within the repository. Otherwise use
-                    Parameters.
-                items:
-                    $ref: '#/definitions/StackParameter'
-                type: array
-                x-go-name: GormParameters
-            updatedAt:
-                format: date-time
-                type: string
-                x-go-name: UpdatedAt
+                $ref: '#/definitions/StackParameters'
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/model
     StackParameter:
@@ -1259,6 +1243,11 @@ definitions:
             name:
                 type: string
                 x-go-name: Name
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/model
+    StackParameters:
+        additionalProperties:
+            $ref: '#/definitions/StackParameter'
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/model
     Tokens:

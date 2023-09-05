@@ -18,5 +18,5 @@ type _ struct {
 // swagger:response StacksResponse
 type _ struct {
 	//in: body
-	_ *[]model.Stack
+	_ []model.Stack
 }
