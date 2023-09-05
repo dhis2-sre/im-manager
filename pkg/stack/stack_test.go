@@ -51,6 +51,47 @@ func TestNew(t *testing.T) {
 		}
 	})
 
+	t.Run("FailGivenStacksIfTheyHaveACycle", func(t *testing.T) {
+		a := model.Stack{
+			Name: "a",
+			Parameters: model.StackParameters{
+				"a_param": {},
+				"b_param": {
+					Consumed: true,
+				},
+			},
+		}
+		b := model.Stack{
+			Name: "b",
+			Parameters: model.StackParameters{
+				"b_param": {},
+				"a_param": {
+					Consumed: true,
+				},
+			},
+			Requires: []model.Stack{a},
+		}
+		a.Requires = []model.Stack{b}
+
+		_, err := stack.New(a, b)
+
+		require.ErrorContains(t, err, `edge from stack "b" to stack "a" creates a cycle`)
+	})
+
+	t.Run("FailGivenStacksIfAStackHasASelfReferenceCycle", func(t *testing.T) {
+		a := model.Stack{
+			Name: "a",
+			Parameters: model.StackParameters{
+				"a_param": {},
+			},
+		}
+		a.Requires = []model.Stack{a}
+
+		_, err := stack.New(a)
+
+		require.ErrorContains(t, err, `edge from stack "a" to stack "a" creates a cycle`)
+	})
+
 	t.Run("FailGivenStackIfConsumedParameterIsNotProvidedByRequiredStack", func(t *testing.T) {
 		a := model.Stack{
 			Name: "a",
