@@ -18,7 +18,7 @@ func TestStackDefinitionsAreInSyncWithHelmfile(t *testing.T) {
 	entries, err := os.ReadDir(dir)
 	require.NoError(t, err)
 
-	helmfileParameters := make(map[string]map[string]model.StackParameter)
+	helmfileParameters := make(map[string]model.StackParameters)
 	for _, entry := range entries {
 		if !entry.IsDir() {
 			continue
@@ -35,7 +35,7 @@ func TestStackDefinitionsAreInSyncWithHelmfile(t *testing.T) {
 		}
 
 		t.Logf("stack %q: %#v", stackName, st)
-		parameters := make(map[string]model.StackParameter)
+		parameters := make(model.StackParameters)
 		for name, value := range st.parameters {
 			_, consumed := consumedParameter[name]
 			parameters[name] = model.StackParameter{DefaultValue: value, Consumed: consumed}
@@ -43,7 +43,10 @@ func TestStackDefinitionsAreInSyncWithHelmfile(t *testing.T) {
 		helmfileParameters[stackName] = parameters
 	}
 
-	stackDefinitions := map[string]map[string]model.StackParameter{
+	// helmfileParameters will not contain Go Validator or Provider functions. We therefore need to
+	// create map of stack name to parameters with parameters only containing. DefaultValue and
+	// Consumed as we cannot ignore fields in the assertions we use.
+	stacks := map[string]model.StackParameters{
 		"dhis2-db":      DHIS2DB.Parameters,
 		"dhis2-core":    DHIS2Core.Parameters,
 		"dhis2":         DHIS2.Parameters,
@@ -51,11 +54,20 @@ func TestStackDefinitionsAreInSyncWithHelmfile(t *testing.T) {
 		"whoami-go":     WhoamiGo.Parameters,
 		"im-job-runner": IMJobRunner.Parameters,
 	}
+	stackDefinitions := make(map[string]model.StackParameters)
+	for stackName, stackParameters := range stacks {
+		stackDefinitionParameters := make(map[string]model.StackParameter, len(stackParameters))
+		for parameterName, parameter := range stackParameters {
+			stackDefinitionParameters[parameterName] = model.StackParameter{DefaultValue: parameter.DefaultValue, Consumed: parameter.Consumed}
+		}
+		stackDefinitions[stackName] = stackDefinitionParameters
+	}
+	require.NoError(t, err)
 
-	for name, parameter := range helmfileParameters {
-		staticParameters, ok := stackDefinitions[name]
+	for name, parameters := range helmfileParameters {
+		stackDefinition, ok := stackDefinitions[name]
 		require.Truef(t, ok, "stack %q has a helmfile but no static stack definition", name)
-		assert.Equalf(t, parameter, staticParameters, "parameters for stack %q don't match", name)
+		assert.Equalf(t, parameters, stackDefinition, "parameters for stack %q don't match", name)
 		delete(stackDefinitions, name)
 	}
 

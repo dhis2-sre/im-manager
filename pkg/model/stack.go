@@ -1,9 +1,5 @@
 package model
 
-import (
-	"fmt"
-)
-
 // swagger:model Stack
 type Stack struct {
 	Name             string          `json:"name"`
@@ -17,10 +13,6 @@ type Stack struct {
 	Requires []Stack `json:"-"`
 }
 
-func (s *Stack) GetHostname(name, namespace string) string {
-	return fmt.Sprintf(s.HostnamePattern, name, namespace)
-}
-
 type StackParameters map[string]StackParameter
 
 type StackParameter struct {
@@ -28,6 +20,8 @@ type StackParameter struct {
 	DefaultValue *string `json:"defaultValue,omitempty"`
 	// Consumed signals that this parameter is provided by another stack i.e. one of the stacks required stacks.
 	Consumed bool `json:"consumed"`
+	// Validator ensures that the actual stack parameters are valid according to its rules.
+	Validator func(value string) error `json:"-"`
 }
 
 type Providers map[string]Provider

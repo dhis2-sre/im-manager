@@ -9,8 +9,12 @@ package stack
 import (
 	"errors"
 	"fmt"
+	"strconv"
+	"strings"
 
 	"github.com/dhis2-sre/im-manager/pkg/model"
+	"golang.org/x/exp/slices"
+	k8s "k8s.io/api/core/v1"
 )
 
 // Stacks represents all deployable stacks.
@@ -146,7 +150,7 @@ var DHIS2Core = model.Stack{
 		"DHIS2_HOME":                      {DefaultValue: &dhis2CoreDefaults.dhis2Home},
 		"FLYWAY_MIGRATE_OUT_OF_ORDER":     {DefaultValue: &dhis2CoreDefaults.flywayMigrateOutOfOrder},
 		"FLYWAY_REPAIR_BEFORE_MIGRATION":  {DefaultValue: &dhis2CoreDefaults.flywayRepairBeforeMigration},
-		"IMAGE_PULL_POLICY":               {DefaultValue: &dhis2CoreDefaults.imagePullPolicy},
+		"IMAGE_PULL_POLICY":               {DefaultValue: &dhis2CoreDefaults.imagePullPolicy, Validator: imagePullPolicy},
 		"IMAGE_REPOSITORY":                {DefaultValue: &dhis2CoreDefaults.imageRepository},
 		"IMAGE_TAG":                       {DefaultValue: &dhis2CoreDefaults.imageTag},
 		"JAVA_OPTS":                       {DefaultValue: &dhis2CoreDefaults.javaOpts},
@@ -212,7 +216,7 @@ var DHIS2 = model.Stack{
 		"DHIS2_HOME":                      {DefaultValue: &dhis2CoreDefaults.dhis2Home},
 		"FLYWAY_MIGRATE_OUT_OF_ORDER":     {DefaultValue: &dhis2CoreDefaults.flywayMigrateOutOfOrder},
 		"FLYWAY_REPAIR_BEFORE_MIGRATION":  {DefaultValue: &dhis2CoreDefaults.flywayRepairBeforeMigration},
-		"IMAGE_PULL_POLICY":               {DefaultValue: &dhis2CoreDefaults.imagePullPolicy},
+		"IMAGE_PULL_POLICY":               {DefaultValue: &dhis2CoreDefaults.imagePullPolicy, Validator: imagePullPolicy},
 		"IMAGE_REPOSITORY":                {DefaultValue: &dhis2CoreDefaults.imageRepository},
 		"IMAGE_TAG":                       {DefaultValue: &dhis2CoreDefaults.imageTag},
 		"INSTALL_REDIS":                   {DefaultValue: &dhis2Defaults.installRedis},
@@ -260,7 +264,7 @@ var WhoamiGo = model.Stack{
 	Name: "whoami-go",
 	Parameters: model.StackParameters{
 		"CHART_VERSION":     {DefaultValue: &whoamiGoDefaults.chartVersion},
-		"IMAGE_PULL_POLICY": {DefaultValue: &whoamiGoDefaults.imagePullPolicy},
+		"IMAGE_PULL_POLICY": {DefaultValue: &whoamiGoDefaults.imagePullPolicy, Validator: imagePullPolicy},
 		"IMAGE_REPOSITORY":  {DefaultValue: &whoamiGoDefaults.imageRepository},
 		"IMAGE_TAG":         {DefaultValue: &whoamiGoDefaults.imageTag},
 		"REPLICA_COUNT":     {DefaultValue: &whoamiGoDefaults.replicaCount},
@@ -315,3 +319,32 @@ var imJobRunnerDefaults = struct {
 var postgresHostnameProvider = model.ProviderFunc(func(instance model.Instance) (string, error) {
 	return fmt.Sprintf("%s-database-postgresql.%s.svc", instance.Name, instance.GroupName), nil
 })
+
+// imagePullPolicy validates a value is a valid Kubernetes image pull policy.
+var imagePullPolicy = OneOf(string(k8s.PullAlways), string(k8s.PullNever), string(k8s.PullIfNotPresent))
+
+// OneOf creates a function returning an error when called with a value that is not any of the given
+// validValues.
+func OneOf(validValues ...string) func(value string) error {
+	fmtErrorArg := quoteStrings(validValues)
+
+	return func(value string) error {
+		if slices.Contains(validValues, value) {
+			return nil
+		}
+
+		return fmt.Errorf("%q is not valid, only %s are allowed", value, fmtErrorArg)
+	}
+}
+
+// qotesStrings quotes values and comma separates them into a joint string.
+func quoteStrings(values []string) string {
+	var result strings.Builder
+	for i, validValue := range values {
+		result.WriteString(strconv.Quote(validValue))
+		if i+1 < len(values) {
+			result.WriteString(", ")
+		}
+	}
+	return result.String()
+}
