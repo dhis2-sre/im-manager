@@ -75,14 +75,14 @@ func (s service) ConsumeParameters(source, destination *model.Instance) error {
 	}
 
 	// Consumed parameters
-	for _, parameter := range destinationStack.Parameters {
-		if (parameter.Consumed || source.Preset) && parameter.Name != destinationStack.HostnameVariable {
-			value, err := s.findParameterValue(parameter.Name, source, sourceStack)
+	for name, parameter := range destinationStack.Parameters {
+		if (parameter.Consumed || source.Preset) && name != destinationStack.HostnameVariable {
+			value, err := s.findParameterValue(name, source, sourceStack)
 			if err != nil {
 				return err
 			}
 			parameterRequest := model.InstanceParameter{
-				Name:  parameter.Name,
+				Name:  name,
 				Value: value,
 			}
 			destination.Parameters = append(destination.Parameters, parameterRequest)

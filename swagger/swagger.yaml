@@ -1213,24 +1213,16 @@ definitions:
         x-go-package: github.com/docker/docker/api/types/volume
     Stack:
         properties:
-            hostnamePattern:
-                type: string
-                x-go-name: HostnamePattern
-            hostnameVariable:
-                type: string
-                x-go-name: HostnameVariable
-            instances:
-                items:
-                    $ref: '#/definitions/Instance'
-                type: array
-                x-go-name: Instances
             name:
                 type: string
                 x-go-name: Name
             parameters:
                 $ref: '#/definitions/StackParameters'
+                items:
+                    $ref: '#/definitions/StackParameter'
+                type: array
         type: object
-        x-go-package: github.com/dhis2-sre/im-manager/pkg/model
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/stack
     StackParameter:
         properties:
             consumed:
@@ -1240,9 +1232,6 @@ definitions:
             defaultValue:
                 type: string
                 x-go-name: DefaultValue
-            name:
-                type: string
-                x-go-name: Name
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/model
     StackParameters:

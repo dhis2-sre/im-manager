@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"net/http"
 
-	"golang.org/x/exp/maps"
-
 	"github.com/dhis2-sre/im-manager/pkg/model"
 
 	"github.com/dhis2-sre/im-manager/internal/errdef"
@@ -59,17 +57,30 @@ func (h Handler) Find(c *gin.Context) {
 	}
 
 	// TODO: Remove this and just return the stack once the front end has caught up
-	s := Stack{
-		Name:       stack.Name,
-		Parameters: maps.Values(stack.Parameters),
+	s := Stack{}
+	s.Name = stack.Name
+	for name, parameter := range stack.Parameters {
+		s.Parameters = append(s.Parameters, StackParameter{
+			Name:         name,
+			DefaultValue: parameter.DefaultValue,
+			Consumed:     parameter.Consumed,
+		})
 	}
 
 	c.JSON(http.StatusOK, s)
 }
 
+// swagger:model StackParameter
+type StackParameter struct {
+	Name         string  `json:"name"`
+	DefaultValue *string `json:"defaultValue,omitempty"`
+	Consumed     bool    `json:"consumed"`
+}
+
+// swagger:model Stack
 type Stack struct {
-	Name       string                 `json:"name"`
-	Parameters []model.StackParameter `json:"parameters"`
+	Name       string           `json:"name"`
+	Parameters []StackParameter `json:"parameters"`
 }
 
 // FindAll stack
