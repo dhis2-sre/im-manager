@@ -35,7 +35,8 @@ func TestStackHandler(t *testing.T) {
 	t.Run("GetStack", func(t *testing.T) {
 		t.Parallel()
 
-		var dhis2 model.Stack
+		// TODO: Don't use dto here... Use model.Stack once we actually return it
+		var dhis2 stack.Stack
 		client.GetJSON(t, "/stacks/dhis2", &dhis2)
 
 		assert.Equal(t, "dhis2", dhis2.Name)
