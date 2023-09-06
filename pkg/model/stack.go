@@ -16,7 +16,6 @@ type Stack struct {
 type StackParameters map[string]StackParameter
 
 type StackParameter struct {
-	Name         string  `json:"name"`
 	DefaultValue *string `json:"defaultValue,omitempty"`
 	// Consumed signals that this parameter is provided by another stack i.e. one of the stacks required stacks.
 	Consumed bool `json:"consumed"`

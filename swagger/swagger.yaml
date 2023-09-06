@@ -1240,9 +1240,6 @@ definitions:
             defaultValue:
                 type: string
                 x-go-name: DefaultValue
-            name:
-                type: string
-                x-go-name: Name
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/model
     StackParameters:
