@@ -6,21 +6,117 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/dhis2-sre/im-manager/pkg/model"
 )
+
+// assert every stack defined in Go has a helmfile
+// assert every stack helmfile has a stack definition in Go
+// assert that the parameters their default value and whether they are consumed are in sync
+func TestStackDefinitionsAreInSyncWithHelmfile(t *testing.T) {
+	helmfileStacks, err := parseStacks("../../stacks")
+	require.NoError(t, err)
+
+	helmfileParameters := make(map[string]model.StackParameters, len(helmfileStacks))
+	for stackName, helmfileStack := range helmfileStacks {
+		consumedParameter := make(map[string]struct{})
+		for _, p := range helmfileStack.consumedParameters {
+			consumedParameter[p] = struct{}{}
+		}
+
+		t.Logf("helmfile stack %q: %#v", stackName, helmfileStack)
+		parameters := make(model.StackParameters)
+		for name, value := range helmfileStack.parameters {
+			_, consumed := consumedParameter[name]
+			parameters[name] = model.StackParameter{DefaultValue: value, Consumed: consumed}
+		}
+		helmfileParameters[stackName] = parameters
+	}
+
+	// helmfileParameters will not contain Go Validator or Provider functions. We therefore need to
+	// create map of stack name to parameters with parameters only containing. DefaultValue and
+	// Consumed as we cannot ignore fields in the assertions we use.
+	stacks := map[string]model.StackParameters{
+		"dhis2-db":      DHIS2DB.Parameters,
+		"dhis2-core":    DHIS2Core.Parameters,
+		"dhis2":         DHIS2.Parameters,
+		"pgadmin":       PgAdmin.Parameters,
+		"whoami-go":     WhoamiGo.Parameters,
+		"im-job-runner": IMJobRunner.Parameters,
+	}
+	stackDefinitions := make(map[string]model.StackParameters)
+	for stackName, stackParameters := range stacks {
+		stackDefinitionParameters := make(map[string]model.StackParameter, len(stackParameters))
+		for parameterName, parameter := range stackParameters {
+			stackDefinitionParameters[parameterName] = model.StackParameter{DefaultValue: parameter.DefaultValue, Consumed: parameter.Consumed}
+		}
+		stackDefinitions[stackName] = stackDefinitionParameters
+	}
+	require.NoError(t, err)
+
+	for name, parameters := range helmfileParameters {
+		stackDefinition, ok := stackDefinitions[name]
+		require.Truef(t, ok, "stack %q has a helmfile but no static stack definition in Go", name)
+		assert.Equalf(t, parameters, stackDefinition, "parameters defined in Go for stack %q don't match its helmfile", name)
+		delete(stackDefinitions, name)
+	}
+
+	assert.Empty(t, stackDefinitions, "all stack definitions should have a helmfile, these don't")
+}
+
+func TestIsSystemParameterPositive(t *testing.T) {
+	const instanceId = "INSTANCE_ID"
+
+	parameter := isSystemParameter(instanceId)
+
+	assert.True(t, parameter)
+}
+
+func TestIsSystemParameterNegative(t *testing.T) {
+	const instanceId = "some-random-parameter-name"
+
+	parameter := isSystemParameter(instanceId)
+
+	assert.False(t, parameter)
+}
 
 const (
 	stackParametersIdentifier    = "# stackParameters: "
 	consumedParametersIdentifier = "# consumedParameters: "
 )
 
-// TODO: This is not thread safe
-// Deleting the stack on each boot isn't ideal since instance parameters are linked to stack parameters
-// Perhaps upsert using... https://gorm.io/docs/advanced_query.html#FirstOrCreate
-
 type stack struct {
 	consumedParameters []string
 	stackParameters    []string
 	parameters         map[string]*string
+}
+
+func parseStacks(dir string) (map[string]*stack, error) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil, err
+	}
+
+	stacks := make(map[string]*stack)
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+
+		stackName := entry.Name()
+		stack, err := parseStack(dir, stackName)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse stack %q: %v", stackName, err)
+		}
+
+		stacks[stackName] = stack
+	}
+
+	return stacks, nil
 }
 
 func parseStack(dir, name string) (*stack, error) {
