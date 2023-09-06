@@ -36,7 +36,10 @@ require (
 	k8s.io/client-go v0.27.5
 )
 
-require github.com/go-mail/mail v2.3.1+incompatible
+require (
+	github.com/dominikbraun/graph v0.23.0
+	github.com/go-mail/mail v2.3.1+incompatible
+)
 
 require (
 	cloud.google.com/go/compute v1.15.1 // indirect

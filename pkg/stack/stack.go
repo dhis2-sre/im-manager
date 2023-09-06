@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/dhis2-sre/im-manager/pkg/model"
+	"github.com/dominikbraun/graph"
 	"golang.org/x/exp/slices"
 	k8s "k8s.io/api/core/v1"
 )
@@ -22,7 +23,12 @@ type Stacks map[string]model.Stack
 
 // New creates stacks ensuring consumed parameters are provided by required stacks.
 func New(stacks ...model.Stack) (Stacks, error) {
-	err := validateConsumedParams(stacks)
+	err := validateNoCycles(stacks)
+	if err != nil {
+		return nil, err
+	}
+
+	err = validateConsumedParameters(stacks)
 	if err != nil {
 		return nil, err
 	}
@@ -34,17 +40,46 @@ func New(stacks ...model.Stack) (Stacks, error) {
 	return result, nil
 }
 
-// validateConsumedParams validates all consumed parameters are provided by exactly one of the
+// validateNoCycles validates that the stacks graph does not contain a cycle. The stacks form a
+// graph via the required stacks forming a directed edge from the stack to the required stack.
+// Stacks with cycles would lead to undeployable instances. There would not be an order (no solution
+// to topological sort) in which we could deploy instances in.
+func validateNoCycles(stacks []model.Stack) error {
+	g := graph.New(func(stack model.Stack) string {
+		return stack.Name
+	}, graph.Directed(), graph.PreventCycles())
+
+	for _, stack := range stacks {
+		err := g.AddVertex(stack)
+		if err != nil {
+			return fmt.Errorf("failed adding vertex for stack %q: %v", stack.Name, err)
+		}
+	}
+
+	for _, src := range stacks {
+		for _, dest := range src.Requires {
+			err := g.AddEdge(src.Name, dest.Name)
+			if err != nil {
+				if errors.Is(err, graph.ErrEdgeAlreadyExists) {
+					return fmt.Errorf("stack %q requires %q more than once", src.Name, dest.Name)
+				} else if errors.Is(err, graph.ErrEdgeCreatesCycle) {
+					return fmt.Errorf("edge from stack %q to stack %q creates a cycle", src.Name, dest.Name)
+				}
+				return fmt.Errorf("failed adding edge from stack %q to stack %q: %v", src.Name, dest.Name, err)
+			}
+		}
+	}
+
+	return nil
+}
+
+// validateConsumedParameters validates all consumed parameters are provided by exactly one of the
 // required stacks. Required stacks need to provide at least one consumed parameter.
-func validateConsumedParams(stacks []model.Stack) error {
+func validateConsumedParameters(stacks []model.Stack) error {
 	var errs []error
 	for _, stack := range stacks { // validate each stacks consumed parameters are provided by its required stacks
 		requiredStacks := make(map[string]int)
 		for _, requiredStack := range stack.Requires {
-			_, ok := requiredStacks[requiredStack.Name]
-			if ok {
-				return fmt.Errorf("stack %q requires %q more than once", stack.Name, requiredStack.Name)
-			}
 			requiredStacks[requiredStack.Name] = 0
 		}
 
