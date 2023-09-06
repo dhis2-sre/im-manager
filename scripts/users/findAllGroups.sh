@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-source ./auth.sh
+source ./auth.sh Admin
 
 DEPLOYABLE=${1:-false}
 

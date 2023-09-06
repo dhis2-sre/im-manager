@@ -2,6 +2,8 @@
 
 set -euo pipefail
 
+source ./auth.sh Admin
+
 echo "{
   \"email\": \"$USER_EMAIL\",
   \"password\": \"$PASSWORD\"
