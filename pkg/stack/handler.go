@@ -60,8 +60,8 @@ func (h Handler) Find(c *gin.Context) {
 
 	// TODO: Remove this and just return the stack once the front end has caught up
 	s := Stack{
-	  Name: stack.Name,
-	  Parameters: maps.Values(stack.Parameters)
+		Name:       stack.Name,
+		Parameters: maps.Values(stack.Parameters),
 	}
 	s.Name = stack.Name
 	s.Parameters = maps.Values(stack.Parameters)
