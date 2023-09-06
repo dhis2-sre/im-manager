@@ -63,8 +63,6 @@ func (h Handler) Find(c *gin.Context) {
 		Name:       stack.Name,
 		Parameters: maps.Values(stack.Parameters),
 	}
-	s.Name = stack.Name
-	s.Parameters = maps.Values(stack.Parameters)
 
 	c.JSON(http.StatusOK, s)
 }
