@@ -92,6 +92,7 @@ func (r repository) FindById(id uint) (*model.Instance, error) {
 	var instance *model.Instance
 	err := r.db.
 		Joins("Group").
+		Preload("Parameters").
 		First(&instance, id).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, errdef.NewNotFound("instance not found by id: %d", id)
