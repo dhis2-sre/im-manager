@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"net/http"
 
+	"golang.org/x/exp/maps"
+
 	"github.com/dhis2-sre/im-manager/pkg/model"
 
 	"github.com/dhis2-sre/im-manager/internal/errdef"
@@ -56,7 +58,17 @@ func (h Handler) Find(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, stack)
+	// TODO: Remove this and just return the stack once the front end has caught up
+	s := Stack{}
+	s.Name = stack.Name
+	s.Parameters = maps.Values(stack.Parameters)
+
+	c.JSON(http.StatusOK, s)
+}
+
+type Stack struct {
+	Name       string                 `json:"name"`
+	Parameters []model.StackParameter `json:"parameters"`
 }
 
 // FindAll stack
