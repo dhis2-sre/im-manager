@@ -27,9 +27,9 @@ func NewService(
 }
 
 type Repository interface {
-	SaveDeployment(chain *model.Deployment) error
+	SaveDeployment(deployment *model.Deployment) error
 	FindDeploymentById(id uint) (*model.Deployment, error)
-	SaveInstance(*model.DeploymentInstance) error
+	SaveInstance(instance *model.DeploymentInstance) error
 	Link(firstInstance, secondInstance *model.Instance) error
 	Unlink(instance *model.Instance) error
 	Save(instance *model.Instance) error
@@ -60,8 +60,8 @@ type service struct {
 	helmfileService    helmfile
 }
 
-func (s service) SaveDeployment(chain *model.Deployment) error {
-	return s.instanceRepository.SaveDeployment(chain)
+func (s service) SaveDeployment(deployment *model.Deployment) error {
+	return s.instanceRepository.SaveDeployment(deployment)
 }
 
 func (s service) FindDeploymentById(id uint) (*model.Deployment, error) {

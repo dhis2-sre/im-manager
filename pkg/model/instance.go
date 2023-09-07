@@ -39,8 +39,8 @@ type DeploymentInstance struct {
 	GormParameters []DeploymentInstanceParameter `json:"-" gorm:"foreignKey:DeploymentInstanceID; constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
 	Parameters     Parameters                    `json:"parameters" gorm:"-:all"`
 
-	Preset   bool `json:"preset"`   // Whether this link is a preset
-	PresetID uint `json:"presetId"` // The preset id this link is created from
+	Preset   bool `json:"preset"`   // Whether this instance is a preset
+	PresetID uint `json:"presetId"` // The preset id this instance is created from
 	Public   bool `json:"public"`
 
 	DeployLog string `json:"deployLog" gorm:"type:text"`

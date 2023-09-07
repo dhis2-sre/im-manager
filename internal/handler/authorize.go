@@ -13,11 +13,17 @@ func CanReadInstance(user *model.User, instance *model.Instance) bool {
 func CanWriteInstance(user *model.User, instance *model.Instance) bool {
 	return isAdministrator(user) ||
 		isMemberOf(instance.GroupName, user.AdminGroups) ||
-		(isOwner(user, instance) && isMemberOf(instance.GroupName, user.Groups))
+		(user.ID == instance.UserID && isMemberOf(instance.GroupName, user.Groups))
 }
 
-func isOwner(user *model.User, instance *model.Instance) bool {
-	return user.ID == instance.UserID
+func CanWriteDeployment(user *model.User, deployment *model.Deployment) bool {
+	return isAdministrator(user) ||
+		isMemberOf(deployment.GroupName, user.AdminGroups) ||
+		(user.ID == deployment.UserID && isMemberOf(deployment.GroupName, user.Groups))
+}
+
+func CanReadDeployment(user *model.User, deployment *model.Deployment) bool {
+	return isAdministrator(user) || isMemberOf(deployment.GroupName, user.Groups)
 }
 
 func isMemberOf(groupName string, groups []model.Group) bool {

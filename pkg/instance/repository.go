@@ -22,12 +22,12 @@ type repository struct {
 	config config.Config
 }
 
-func (r repository) SaveDeployment(chain *model.Deployment) error {
-	// TODO: Do we need the option to save nested entities... Yes, if we create the chain from a preset we need to store all the links as well
-	//err := r.db.Session(&gorm.Session{FullSaveAssociations: true}).Save(chain).Error
-	err := r.db.Create(&chain).Error
+func (r repository) SaveDeployment(deployment *model.Deployment) error {
+	// TODO: Do we need the option to save nested entities... Yes, if we create the deployment from a preset we need to store all the links as well
+	//err := r.db.Session(&gorm.Session{FullSaveAssociations: true}).Save(deployment).Error
+	err := r.db.Create(&deployment).Error
 	if errors.Is(err, gorm.ErrDuplicatedKey) {
-		return errdef.NewDuplicated("a chain named %q already exists", chain.Name)
+		return errdef.NewDuplicated("a deployment named %q already exists", deployment.Name)
 	}
 
 	return err
@@ -46,14 +46,8 @@ func (r repository) FindDeploymentById(id uint) (*model.Deployment, error) {
 	return deployment, err
 }
 
-func (r repository) SaveInstance(link *model.DeploymentInstance) error {
-	err := r.db.Session(&gorm.Session{FullSaveAssociations: true}).Save(link).Error
-	// TODO: When is a link duplicated?
-	if errors.Is(err, gorm.ErrDuplicatedKey) {
-		return errdef.NewDuplicated("link already exists: %v", link)
-	}
-
-	return err
+func (r repository) SaveInstance(instance *model.DeploymentInstance) error {
+	return r.db.Session(&gorm.Session{FullSaveAssociations: true}).Save(instance).Error
 }
 
 func (r repository) FindByIdDecrypted(id uint) (*model.Instance, error) {

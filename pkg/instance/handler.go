@@ -27,9 +27,9 @@ func NewHandler(userService userServiceHandler, groupService groupServiceHandler
 }
 
 type Service interface {
-	SaveDeployment(chain *model.Deployment) error
+	SaveDeployment(deployment *model.Deployment) error
 	FindDeploymentById(id uint) (*model.Deployment, error)
-	SaveInstance(link *model.DeploymentInstance) error
+	SaveInstance(instance *model.DeploymentInstance) error
 	ConsumeParameters(source, destination *model.Instance) error
 	Pause(instance *model.Instance) error
 	Resume(instance *model.Instance) error
@@ -68,11 +68,26 @@ type SaveDeploymentRequest struct {
 	Description string `json:"description"`
 	Group       string `json:"group" binding:"required"`
 	TTL         uint   `json:"ttl"`
-	Source      uint   `json:"source"` // TODO: Create from source eg. other chain
+	Source      uint   `json:"source"` // TODO: Create from source eg. other deployment
 	Preset      uint   `json:"preset"` // TODO: Create as preset
 }
 
 func (h Handler) SaveDeployment(c *gin.Context) {
+	// swagger:route POST /deployments saveDeployment
+	//
+	// Save a deployment
+	//
+	// Save a deployment...
+	//
+	// Security:
+	//	oauth2:
+	//
+	// responses:
+	//	200: Deployment
+	//	401: Error
+	//	403: Error
+	//	404: Error
+	//	415: Error
 	var request SaveDeploymentRequest
 	if err := handler.DataBinder(c, &request); err != nil {
 		_ = c.Error(err)
@@ -100,14 +115,8 @@ func (h Handler) SaveDeployment(c *gin.Context) {
 		_ = c.Error(err)
 		return
 	}
-	/*
-		token, err := handler.GetTokenFromHttpAuthHeader(c)
-		if err != nil {
-			_ = c.Error(err)
-			return
-		}
-	*/
-	chain := &model.Deployment{
+
+	deployment := &model.Deployment{
 		UserID:      user.ID,
 		Name:        request.Name,
 		Description: request.Description,
@@ -115,15 +124,33 @@ func (h Handler) SaveDeployment(c *gin.Context) {
 		TTL:         request.TTL,
 	}
 
-	// TODO: Assert group is writable
-	// TODO: If request.Source, load chain... Maybe only support
-	err = h.instanceService.SaveDeployment(chain)
+	group, err = h.groupService.Find(request.Group)
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
 
-	c.JSON(http.StatusCreated, chain)
+	if !group.Deployable {
+		forbidden := errdef.NewForbidden("group isn't deployable: %s", group.Name)
+		_ = c.Error(forbidden)
+		return
+	}
+
+	canWrite := handler.CanWriteDeployment(user, deployment)
+	if !canWrite {
+		unauthorized := errdef.NewUnauthorized("write access denied")
+		_ = c.Error(unauthorized)
+		return
+	}
+
+	// TODO: If request.Source, load deployment... Maybe only support this for instances
+	err = h.instanceService.SaveDeployment(deployment)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	c.JSON(http.StatusCreated, deployment)
 }
 
 // FindDeploymentById deployment
@@ -138,7 +165,7 @@ func (h Handler) FindDeploymentById(c *gin.Context) {
 	//	oauth2:
 	//
 	// responses:
-	//	200: Instance
+	//	200: Deployment
 	//	401: Error
 	//	403: Error
 	//	404: Error
@@ -147,26 +174,26 @@ func (h Handler) FindDeploymentById(c *gin.Context) {
 	if !ok {
 		return
 	}
-	/*
-		user, err := handler.GetUserFromContext(c)
-		if err != nil {
-			_ = c.Error(err)
-			return
-		}
-	*/
+
+	user, err := handler.GetUserFromContext(c)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
 	deployment, err := h.instanceService.FindDeploymentById(id)
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
-	/*
-		canRead := handler.CanReadInstance(user, instance)
-		if !canRead {
-			unauthorized := errdef.NewUnauthorized("read access denied")
-			_ = c.Error(unauthorized)
-			return
-		}
-	*/
+
+	canRead := handler.CanReadDeployment(user, deployment)
+	if !canRead {
+		unauthorized := errdef.NewUnauthorized("read access denied")
+		_ = c.Error(unauthorized)
+		return
+	}
+
 	c.JSON(http.StatusOK, deployment)
 }
 
@@ -183,6 +210,21 @@ type SaveInstanceRequest struct {
 }
 
 func (h Handler) SaveInstance(c *gin.Context) {
+	// swagger:route POST /deployments/{id}/instance saveInstance
+	//
+	// Save an instance
+	//
+	// Save an instance...
+	//
+	// Security:
+	//	oauth2:
+	//
+	// responses:
+	//	200: Instance
+	//	401: Error
+	//	403: Error
+	//	404: Error
+	//	415: Error
 	var request SaveInstanceRequest
 	if err := handler.DataBinder(c, &request); err != nil {
 		_ = c.Error(err)
@@ -203,7 +245,7 @@ func (h Handler) SaveInstance(c *gin.Context) {
 		}
 	}
 
-	link := &model.DeploymentInstance{
+	instance := &model.DeploymentInstance{
 		DeploymentID: deploymentId,
 		StackName:    request.StackName,
 		Parameters:   params,
@@ -212,14 +254,13 @@ func (h Handler) SaveInstance(c *gin.Context) {
 		//		Public:     false,
 	}
 
-	// TODO: If request.Source, load chain... Maybe only support source on links?
-	err := h.instanceService.SaveInstance(link)
+	err := h.instanceService.SaveInstance(instance)
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
 
-	c.JSON(http.StatusCreated, link)
+	c.JSON(http.StatusCreated, instance)
 }
 
 type DeployInstanceRequest struct {
