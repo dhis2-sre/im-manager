@@ -97,7 +97,7 @@ func (s service) validateDeployment(deployment *model.Deployment) error {
 
 	err = stack.ValidateConsumedParameters(stacks)
 	if err != nil {
-		return err
+		return fmt.Errorf("error saving instance for %q as it is missing a required stack: %v", instance.StackName, err)
 	}
 
 	return nil
