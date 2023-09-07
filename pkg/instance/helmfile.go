@@ -13,20 +13,23 @@ import (
 
 	"github.com/dhis2-sre/im-manager/pkg/config"
 	"github.com/dhis2-sre/im-manager/pkg/model"
-	"github.com/dhis2-sre/im-manager/pkg/stack"
 )
 
-type helmfileService struct {
-	stackService stack.Service
-	config       config.Config
-}
-
 //goland:noinspection GoExportedFuncWithUnexportedType
-func NewHelmfileService(stackService stack.Service, config config.Config) helmfileService {
+func NewHelmfileService(stackService stackService, config config.Config) helmfileService {
 	return helmfileService{
 		stackService,
 		config,
 	}
+}
+
+type helmfileService struct {
+	stackService stackService
+	config       config.Config
+}
+
+type stackService interface {
+	Find(name string) (*model.Stack, error)
 }
 
 func (h helmfileService) sync(token string, instance *model.Instance, group *model.Group) (*exec.Cmd, error) {
@@ -130,14 +133,15 @@ func configureInstanceEnvironment(accessToken string, stack *model.Stack, instan
 	cmd.Env = injectEnv(cmd.Env, "KUBERNETES_SERVICE_PORT_HTTPS")
 	cmd.Env = injectEnv(cmd.Env, "KUBERNETES_SERVICE_HOST")
 
-	for _, parameter := range stack.Parameters {
-		instanceParameter, err := instance.FindParameter(parameter.Name)
+	for name, parameter := range stack.Parameters {
+		instanceParameter, err := instance.FindParameter(name)
 		if err == nil {
-			instanceEnv := fmt.Sprintf("%s=%s", instanceParameter.StackParameter.Name, instanceParameter.Value)
+			instanceEnv := fmt.Sprintf("%s=%s", instanceParameter.Name, instanceParameter.Value)
 			cmd.Env = append(cmd.Env, instanceEnv)
 			continue
 		}
-		instanceEnv := fmt.Sprintf("%s=%s", parameter.Name, *parameter.DefaultValue)
+
+		instanceEnv := fmt.Sprintf("%s=%s", name, *parameter.DefaultValue)
 		cmd.Env = append(cmd.Env, instanceEnv)
 	}
 

@@ -27,9 +27,9 @@ func NewHandler(userService userServiceHandler, groupService groupServiceHandler
 }
 
 type Service interface {
-	SaveChain(chain *model.Chain) error
-	FindChainById(id uint) (*model.Chain, error)
-	SaveLink(link *model.Link) error
+	SaveChain(chain *model.Deployment) error
+	FindChainById(id uint) (*model.Deployment, error)
+	SaveLink(link *model.DeploymentInstance) error
 	ConsumeParameters(source, destination *model.Instance) error
 	Pause(instance *model.Instance) error
 	Resume(instance *model.Instance) error
@@ -40,10 +40,10 @@ type Service interface {
 	FindById(id uint) (*model.Instance, error)
 	FindByIdDecrypted(id uint) (*model.Instance, error)
 	FindByNameAndGroup(instance string, group string) (*model.Instance, error)
-	FindPublicInstances() ([]GroupWithInstances, error)
+	FindPublicInstances() ([]GroupsWithInstances, error)
 	Delete(id uint) error
 	Logs(instance *model.Instance, group *model.Group, typeSelector string) (io.ReadCloser, error)
-	FindInstances(user *model.User, presets bool) ([]GroupWithInstances, error)
+	FindInstances(user *model.User, presets bool) ([]GroupsWithInstances, error)
 	Link(source, destination *model.Instance) error
 }
 
@@ -107,7 +107,7 @@ func (h Handler) SaveChain(c *gin.Context) {
 			return
 		}
 	*/
-	chain := &model.Chain{
+	chain := &model.Deployment{
 		UserID:      user.ID,
 		Name:        request.Name,
 		Description: request.Description,
@@ -153,17 +153,17 @@ func (h Handler) SaveLink(c *gin.Context) {
 	// Convert request parameters to LinkParameters
 	params := make(model.Parameters, len(request.Parameters))
 	for k, v := range request.Parameters {
-		params[k] = model.LinkParameter{
+		params[k] = model.DeploymentInstanceParameter{
 			ParameterName: k,
 			Value:         v.Value,
 		}
 	}
 
-	link := &model.Link{
-		ChainID:    chainId,
-		StackName:  request.StackName,
-		Parameters: params,
-		Preset:     request.Preset,
+	link := &model.DeploymentInstance{
+		DeploymentID: chainId,
+		StackName:    request.StackName,
+		Parameters:   params,
+		Preset:       request.Preset,
 		//		PresetID:   0,
 		//		Public:     false,
 	}
@@ -938,7 +938,7 @@ func (h Handler) ListInstances(c *gin.Context) {
 	//	oauth2:
 	//
 	// responses:
-	//	200: []GroupWithInstances
+	//	200: []GroupsWithInstances
 	//	401: Error
 	//	403: Error
 	//	415: Error
@@ -957,7 +957,7 @@ func (h Handler) ListPresets(c *gin.Context) {
 	//	oauth2:
 	//
 	// responses:
-	//	200: []GroupWithInstances
+	//	200: []GroupsWithInstances
 	//	401: Error
 	//	403: Error
 	//	415: Error
@@ -989,7 +989,7 @@ func (h Handler) ListPublicInstances(c *gin.Context) {
 	// List all public instances
 	//
 	// responses:
-	//	200: []GroupWithInstances
+	//	200: []GroupsWithInstances
 	instances, err := h.instanceService.FindPublicInstances()
 	if err != nil {
 		_ = c.Error(err)

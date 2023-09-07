@@ -3,10 +3,11 @@ package instance
 import (
 	"errors"
 	"fmt"
-	"gorm.io/gorm"
 	"io"
 	"log"
 	"os/exec"
+
+	"gorm.io/gorm"
 
 	"github.com/dhis2-sre/im-manager/internal/errdef"
 
@@ -28,17 +29,17 @@ func NewService(
 }
 
 type Repository interface {
-	SaveChain(chain *model.Chain) error
-	FindChainById(id uint) (*model.Chain, error)
-	SaveLink(*model.Link) error
+	SaveChain(chain *model.Deployment) error
+	FindChainById(id uint) (*model.Deployment, error)
+	SaveLink(*model.DeploymentInstance) error
 	Link(firstInstance, secondInstance *model.Instance) error
 	Unlink(instance *model.Instance) error
 	Save(instance *model.Instance) error
 	FindById(id uint) (*model.Instance, error)
 	FindByIdDecrypted(id uint) (*model.Instance, error)
 	FindByNameAndGroup(instance string, group string) (*model.Instance, error)
-	FindByGroups(groups []model.Group, presets bool) ([]GroupWithInstances, error)
-	FindPublicInstances() ([]GroupWithInstances, error)
+	FindByGroups(groups []model.Group, presets bool) ([]GroupsWithInstances, error)
+	FindPublicInstances() ([]GroupsWithInstances, error)
 	SaveDeployLog(instance *model.Instance, log string) error
 	Delete(id uint) error
 }
@@ -61,20 +62,20 @@ type service struct {
 	helmfileService    helmfile
 }
 
-func (s service) SaveChain(chain *model.Chain) error {
+func (s service) SaveChain(chain *model.Deployment) error {
 	return s.instanceRepository.SaveChain(chain)
 }
 
-func (s service) FindChainById(id uint) (*model.Chain, error) {
+func (s service) FindChainById(id uint) (*model.Deployment, error) {
 	return s.instanceRepository.FindChainById(id)
 }
 
-func (s service) SaveLink(link *model.Link) error {
-	chain, err := s.instanceRepository.FindChainById(link.ChainID)
+func (s service) SaveLink(link *model.DeploymentInstance) error {
+	chain, err := s.instanceRepository.FindChainById(link.DeploymentID)
 	if err != nil {
 		// TODO: Do we really care about this check? If the chainID doesn't exist we'll get a FK violation and if that's the case we didn't need to look up the chain
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return errdef.NewNotFound("chain not found by id: %d", link.ChainID)
+			return errdef.NewNotFound("chain not found by id: %d", link.DeploymentID)
 		}
 		return err
 	}
@@ -97,15 +98,15 @@ func (s service) ConsumeParameters(source, destination *model.Instance) error {
 	}
 
 	// Consumed parameters
-	for _, parameter := range destinationStack.Parameters {
-		if (parameter.Consumed || source.Preset) && parameter.Name != destinationStack.HostnameVariable {
-			value, err := s.findParameterValue(parameter.Name, source, sourceStack)
+	for name, parameter := range destinationStack.Parameters {
+		if (parameter.Consumed || source.Preset) && name != destinationStack.HostnameVariable {
+			value, err := s.findParameterValue(name, source, sourceStack)
 			if err != nil {
 				return err
 			}
 			parameterRequest := model.InstanceParameter{
-				StackParameterID: parameter.Name,
-				Value:            value,
+				Name:  name,
+				Value: value,
 			}
 			destination.Parameters = append(destination.Parameters, parameterRequest)
 		}
@@ -114,8 +115,8 @@ func (s service) ConsumeParameters(source, destination *model.Instance) error {
 	// Hostname parameter
 	if !source.Preset && destinationStack.HostnameVariable != "" {
 		hostnameParameter := model.InstanceParameter{
-			StackParameterID: destinationStack.HostnameVariable,
-			Value:            fmt.Sprintf(sourceStack.HostnamePattern, source.Name, source.GroupName),
+			Name:  destinationStack.HostnameVariable,
+			Value: fmt.Sprintf(sourceStack.HostnamePattern, source.Name, source.GroupName),
 		}
 		destination.Parameters = append(destination.Parameters, hostnameParameter)
 	}
@@ -129,12 +130,12 @@ func (s service) findParameterValue(parameter string, sourceInstance *model.Inst
 		return instanceParameter.Value, nil
 	}
 
-	stackParameter, err := sourceStack.FindParameter(parameter)
-	if err == nil {
-		return *stackParameter.DefaultValue, nil
+	stackParameter, ok := sourceStack.Parameters[parameter]
+	if !ok {
+		return "", fmt.Errorf("unable to find value for parameter: %s", parameter)
 	}
 
-	return "", fmt.Errorf("unable to find value for parameter: %s", parameter)
+	return *stackParameter.DefaultValue, nil
 }
 
 func (s service) Pause(instance *model.Instance) error {
@@ -190,32 +191,6 @@ func (s service) unlink(id uint) error {
 	return s.instanceRepository.Unlink(instance)
 }
 
-func matchParameters(stackParameters []model.StackParameter, instanceParameters []model.InstanceParameter) []string {
-	unmatchedParameters := make([]string, 0)
-	parameterNames := make(map[string]struct{})
-
-	for _, parameter := range stackParameters {
-		parameterNames[parameter.Name] = struct{}{}
-	}
-
-	for _, parameter := range instanceParameters {
-		if _, ok := parameterNames[parameter.StackParameterID]; !ok {
-			unmatchedParameters = append(unmatchedParameters, parameter.StackParameterID)
-		}
-	}
-
-	return unmatchedParameters
-}
-
-func validateParameters(stack *model.Stack, instance *model.Instance) error {
-	unmatchedParameters := matchParameters(stack.Parameters, instance.Parameters)
-	if len(unmatchedParameters) > 0 {
-		return errdef.NewBadRequest("parameters %q are not valid parameters for stack %q", unmatchedParameters, instance.StackName)
-	}
-
-	return nil
-}
-
 func (s service) Save(instance *model.Instance) error {
 	instanceStack, err := s.stackService.Find(instance.StackName)
 	if err != nil {
@@ -228,6 +203,31 @@ func (s service) Save(instance *model.Instance) error {
 	}
 
 	return s.instanceRepository.Save(instance)
+}
+
+func validateParameters(stack *model.Stack, instance *model.Instance) error {
+	var errs []error
+	for _, parameter := range instance.Parameters {
+		stackParameter, ok := stack.Parameters[parameter.Name]
+		if !ok {
+			errs = append(errs, fmt.Errorf("parameter %q: is not a stack parameter", parameter.Name))
+			continue
+		}
+
+		if stackParameter.Validator == nil {
+			continue
+		}
+		err := stackParameter.Validator(parameter.Value)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("parameter %q: %v", parameter.Name, err))
+		}
+	}
+
+	if errs != nil {
+		return errdef.NewBadRequest("invalid parameter(s): %v", errors.Join(errs...))
+	}
+
+	return nil
 }
 
 func (s service) Deploy(token string, instance *model.Instance) error {
@@ -305,10 +305,10 @@ func (s service) FindByNameAndGroup(instance string, group string) (*model.Insta
 	return s.instanceRepository.FindByNameAndGroup(instance, group)
 }
 
-func (s service) FindInstances(user *model.User, presets bool) ([]GroupWithInstances, error) {
-	allGroups := append(user.Groups, user.AdminGroups...) //nolint:gocritic
+func (s service) FindInstances(user *model.User, presets bool) ([]GroupsWithInstances, error) {
+	groups := append(user.Groups, user.AdminGroups...) //nolint:gocritic
 
-	instances, err := s.instanceRepository.FindByGroups(allGroups, presets)
+	instances, err := s.instanceRepository.FindByGroups(groups, presets)
 	if err != nil {
 		return nil, err
 	}
@@ -316,7 +316,7 @@ func (s service) FindInstances(user *model.User, presets bool) ([]GroupWithInsta
 	return instances, err
 }
 
-func (s service) FindPublicInstances() ([]GroupWithInstances, error) {
+func (s service) FindPublicInstances() ([]GroupsWithInstances, error) {
 	return s.instanceRepository.FindPublicInstances()
 }
 

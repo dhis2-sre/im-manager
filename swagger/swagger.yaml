@@ -425,21 +425,6 @@ definitions:
                 x-go-name: Users
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/model
-    GroupWithInstances:
-        properties:
-            hostname:
-                type: string
-                x-go-name: Hostname
-            instances:
-                items:
-                    $ref: '#/definitions/Instance'
-                type: array
-                x-go-name: Instances
-            name:
-                type: string
-                x-go-name: Name
-        type: object
-        x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
     GroupsWithDatabases:
         properties:
             databases:
@@ -455,6 +440,21 @@ definitions:
                 x-go-name: Name
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/database
+    GroupsWithInstances:
+        properties:
+            hostname:
+                type: string
+                x-go-name: Hostname
+            instances:
+                items:
+                    $ref: '#/definitions/Instance'
+                type: array
+                x-go-name: Instances
+            name:
+                type: string
+                x-go-name: Name
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
     HistoryResponseItem:
         description: HistoryResponseItem individual image layer information in response to ImageHistory operation
         properties:
@@ -713,9 +713,8 @@ definitions:
     InstanceParameter:
         properties:
             name:
-                description: 'TODO: Rename StackParameterID to Name'
                 type: string
-                x-go-name: StackParameterID
+                x-go-name: Name
             value:
                 type: string
                 x-go-name: Value
@@ -1215,50 +1214,30 @@ definitions:
         x-go-package: github.com/docker/docker/api/types/volume
     Stack:
         properties:
-            createdAt:
-                format: date-time
-                type: string
-                x-go-name: CreatedAt
-            hostnamePattern:
-                type: string
-                x-go-name: HostnamePattern
-            hostnameVariable:
-                type: string
-                x-go-name: HostnameVariable
-            instances:
-                items:
-                    $ref: '#/definitions/Instance'
-                type: array
-                x-go-name: Instances
             name:
                 type: string
                 x-go-name: Name
             parameters:
+                $ref: '#/definitions/StackParameters'
                 items:
                     $ref: '#/definitions/StackParameter'
                 type: array
-                x-go-name: Parameters
-            updatedAt:
-                format: date-time
-                type: string
-                x-go-name: UpdatedAt
         type: object
-        x-go-package: github.com/dhis2-sre/im-manager/pkg/model
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/stack
     StackParameter:
         properties:
             consumed:
+                description: Consumed signals that this parameter is provided by another stack i.e. one of the stacks required stacks.
                 type: boolean
                 x-go-name: Consumed
             defaultValue:
                 type: string
                 x-go-name: DefaultValue
-            name:
-                type: string
-                x-go-name: Name
-            priority:
-                format: int64
-                type: integer
-                x-go-name: Priority
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/model
+    StackParameters:
+        additionalProperties:
+            $ref: '#/definitions/StackParameter'
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/model
     Tokens:
@@ -1678,6 +1657,13 @@ definitions:
             password:
                 type: string
                 x-go-name: Password
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/user
+    validateEmailRequest:
+        properties:
+            token:
+                type: string
+                x-go-name: Token
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/user
 info:
@@ -2259,7 +2245,7 @@ paths:
             operationId: listInstances
             responses:
                 "200":
-                    $ref: '#/responses/GroupWithInstances'
+                    $ref: '#/responses/GroupsWithInstances'
                 "401":
                     $ref: '#/responses/Error'
                 "403":
@@ -2631,7 +2617,7 @@ paths:
             operationId: listPresets
             responses:
                 "200":
-                    $ref: '#/responses/GroupWithInstances'
+                    $ref: '#/responses/GroupsWithInstances'
                 "401":
                     $ref: '#/responses/Error'
                 "403":
@@ -2647,7 +2633,7 @@ paths:
             operationId: listPublicInstances
             responses:
                 "200":
-                    $ref: '#/responses/GroupWithInstances'
+                    $ref: '#/responses/GroupsWithInstances'
             summary: List Public Instances
     /refresh:
         post:
@@ -2862,6 +2848,25 @@ paths:
             security:
                 - oauth2: []
             summary: Update user
+    /users/validate:
+        post:
+            description: Validate users email
+            operationId: validateEmail
+            parameters:
+                - description: Email validation token request body parameter
+                  in: body
+                  name: Body
+                  required: true
+                  schema:
+                    $ref: '#/definitions/validateEmailRequest'
+            responses:
+                "200":
+                    description: ""
+                "400":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+            summary: Validate email
 produces:
     - application/json
 responses:
@@ -2882,11 +2887,11 @@ responses:
             type: array
     Error:
         description: ""
-    GroupWithInstances:
+    GroupsWithInstances:
         description: ""
         schema:
             items:
-                $ref: '#/definitions/GroupWithInstances'
+                $ref: '#/definitions/GroupsWithInstances'
             type: array
     InstanceLogsResponse:
         description: ""

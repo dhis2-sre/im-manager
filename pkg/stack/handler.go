@@ -4,19 +4,26 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/dhis2-sre/im-manager/pkg/model"
+
 	"github.com/dhis2-sre/im-manager/internal/errdef"
 
 	"github.com/gin-gonic/gin"
 )
 
-type Handler struct {
-	service Service
-}
-
 func NewHandler(service Service) Handler {
 	return Handler{
 		service,
 	}
+}
+
+type Service interface {
+	Find(name string) (*model.Stack, error)
+	FindAll() ([]model.Stack, error)
+}
+
+type Handler struct {
+	service Service
 }
 
 // Find stack
@@ -49,7 +56,31 @@ func (h Handler) Find(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, stack)
+	// TODO: Remove this and just return the stack once the front end has caught up
+	s := Stack{}
+	s.Name = stack.Name
+	for name, parameter := range stack.Parameters {
+		s.Parameters = append(s.Parameters, StackParameter{
+			Name:         name,
+			DefaultValue: parameter.DefaultValue,
+			Consumed:     parameter.Consumed,
+		})
+	}
+
+	c.JSON(http.StatusOK, s)
+}
+
+// swagger:model StackParameter
+type StackParameter struct {
+	Name         string  `json:"name"`
+	DefaultValue *string `json:"defaultValue,omitempty"`
+	Consumed     bool    `json:"consumed"`
+}
+
+// swagger:model Stack
+type Stack struct {
+	Name       string           `json:"name"`
+	Parameters []StackParameter `json:"parameters"`
 }
 
 // FindAll stack

@@ -76,6 +76,7 @@ deploy:
             ENVIRONMENT: "{{ .ENVIRONMENT }}"
             CLASSIFICATION: "{{ .CLASSIFICATION }}"
             HOSTNAME: "https://{{ .API_HOSTNAME }}"
+            UI_HOSTNAME: "https://{{ .UI_HOSTNAME }}"
             INSTANCE_SERVICE_HOST: im-manager-{{ .ENVIRONMENT }}.instance-manager-{{ .CLASSIFICATION }}.svc:8080
             INSTANCE_SERVICE_BASE_PATH: /
             DATABASE_MANAGER_SERVICE_HOST: im-manager-{{ .ENVIRONMENT }}.instance-manager-{{ .CLASSIFICATION }}.svc:8080
@@ -85,6 +86,7 @@ deploy:
             RABBITMQ_HOST: im-rabbitmq-{{ .ENVIRONMENT }}.instance-manager-{{ .CLASSIFICATION }}.svc
             RABBITMQ_PORT: "5672"
             S3_BUCKET: im-databases-{{ .CLASSIFICATION }}
+            S3_REGION: eu-west-1
             DEFAULT_TTL: "172800"
         useHelmSecrets: true
         valuesFiles:

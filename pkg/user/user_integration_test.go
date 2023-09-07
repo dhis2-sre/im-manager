@@ -8,6 +8,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/dhis2-sre/im-manager/pkg/config"
+	"github.com/go-mail/mail"
+
 	"github.com/dhis2-sre/im-manager/internal/middleware"
 	"github.com/dhis2-sre/im-manager/pkg/group"
 	"github.com/dhis2-sre/im-manager/pkg/inttest"
@@ -24,7 +27,7 @@ func TestUserHandler(t *testing.T) {
 
 	db := inttest.SetupDB(t)
 	userRepository := user.NewRepository(db)
-	userService := user.NewService(userRepository)
+	userService := user.NewService(config.Config{}, userRepository, fakeDialer{t})
 	groupRepository := group.NewRepository(db)
 	groupService := group.NewService(groupRepository, userService)
 
@@ -62,6 +65,11 @@ func TestUserHandler(t *testing.T) {
 		require.Empty(t, user1.Password)
 		user1ID = strconv.FormatUint(uint64(user1.ID), 10)
 
+		u1, err := userService.FindById(user1.ID)
+		require.NoError(t, err)
+		err = userService.ValidateEmail(u1.EmailToken)
+		require.NoError(t, err)
+
 		var user2 model.User
 		client.PostJSON(t, "/users", strings.NewReader(`{
 			"email":    "user2@dhis2.org",
@@ -70,6 +78,20 @@ func TestUserHandler(t *testing.T) {
 
 		require.Equal(t, "user2@dhis2.org", user2.Email)
 		require.Empty(t, user2.Password)
+
+		u2, err := userService.FindById(user2.ID)
+		require.NoError(t, err)
+		err = userService.ValidateEmail(u2.EmailToken)
+		require.NoError(t, err)
+
+		var user3 model.User
+		client.PostJSON(t, "/users", strings.NewReader(`{
+			"email":    "user3@dhis2.org",
+			"password": "oneoneoneoneoneoneone111"
+		}`), &user3)
+
+		require.Equal(t, "user3@dhis2.org", user3.Email)
+		require.Empty(t, user3.Password)
 	}
 
 	t.Run("SignUpFailed", func(t *testing.T) {
@@ -153,7 +175,17 @@ func TestUserHandler(t *testing.T) {
 		t.Run("SignInFailed", func(t *testing.T) {
 			t.Parallel()
 
-			client.Do(t, http.MethodPost, "/tokens", nil, http.StatusUnauthorized, inttest.WithBasicAuth("user1@dhis2.org", "wrongpassword"))
+			{
+				t.Log("WrongPassword")
+
+				client.Do(t, http.MethodPost, "/tokens", nil, http.StatusUnauthorized, inttest.WithBasicAuth("user1@dhis2.org", "wrongpassword"))
+			}
+
+			{
+				t.Log("EmailNotValidated")
+
+				client.Do(t, http.MethodPost, "/tokens", nil, http.StatusUnauthorized, inttest.WithBasicAuth("user3@dhis2.org", "oneoneoneoneoneoneone111"))
+			}
 		})
 
 		t.Run("DeleteUserIsUnauthorized", func(t *testing.T) {
@@ -194,7 +226,7 @@ func TestUserHandler(t *testing.T) {
 			var users []model.User
 			client.GetJSON(t, "/users", &users, inttest.WithAuthToken(adminToken.AccessToken))
 
-			assert.Lenf(t, users, 3, "GET /users should return 3 users one of which is an admin")
+			assert.Lenf(t, users, 4, "GET /users should return 4 users one of which is an admin")
 		}
 
 		{
@@ -205,4 +237,13 @@ func TestUserHandler(t *testing.T) {
 			client.Do(t, http.MethodGet, "/users/"+user1ID, nil, http.StatusNotFound, inttest.WithAuthToken(adminToken.AccessToken))
 		}
 	})
+}
+
+type fakeDialer struct {
+	t *testing.T
+}
+
+func (f fakeDialer) DialAndSend(m ...*mail.Message) error {
+	f.t.Log("Fake sending mail...", m[0].GetHeader("To"))
+	return nil
 }

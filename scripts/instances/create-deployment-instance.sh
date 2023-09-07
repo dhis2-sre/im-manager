@@ -4,7 +4,7 @@ set -euo pipefail
 
 source ./auth.sh
 
-CHAIN_ID=$1
+DEPLOYMENT_ID=$1
 STACK_NAME=$2
 PRESET=${3:-false}
 
@@ -19,4 +19,4 @@ echo "{
       \"value\": \"Always\"
     }
   }
-}" | $HTTP post "$IM_HOST/chains/$CHAIN_ID/link" "Authorization: Bearer $ACCESS_TOKEN"
+}" | $HTTP post "$IM_HOST/chains/$DEPLOYMENT_ID/link" "Authorization: Bearer $ACCESS_TOKEN"

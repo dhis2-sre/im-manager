@@ -2,86 +2,121 @@ package stack
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"regexp"
 	"sort"
 	"strings"
+	"testing"
 
-	"github.com/dhis2-sre/im-manager/internal/errdef"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/dhis2-sre/im-manager/pkg/model"
 )
 
+// assert every stack defined in Go has a helmfile
+// assert every stack helmfile has a stack definition in Go
+// assert that the parameters their default value and whether they are consumed are in sync
+func TestStackDefinitionsAreInSyncWithHelmfile(t *testing.T) {
+	helmfileStacks, err := parseStacks("../../stacks")
+	require.NoError(t, err)
+
+	helmfileParameters := make(map[string]model.StackParameters, len(helmfileStacks))
+	for stackName, helmfileStack := range helmfileStacks {
+		consumedParameter := make(map[string]struct{})
+		for _, p := range helmfileStack.consumedParameters {
+			consumedParameter[p] = struct{}{}
+		}
+
+		t.Logf("helmfile stack %q: %#v", stackName, helmfileStack)
+		parameters := make(model.StackParameters)
+		for name, value := range helmfileStack.parameters {
+			_, consumed := consumedParameter[name]
+			parameters[name] = model.StackParameter{DefaultValue: value, Consumed: consumed}
+		}
+		helmfileParameters[stackName] = parameters
+	}
+
+	// helmfileParameters will not contain Go Validator or Provider functions. We therefore need to
+	// create map of stack name to parameters with parameters only containing. DefaultValue and
+	// Consumed as we cannot ignore fields in the assertions we use.
+	stacks := map[string]model.StackParameters{
+		"dhis2-db":      DHIS2DB.Parameters,
+		"dhis2-core":    DHIS2Core.Parameters,
+		"dhis2":         DHIS2.Parameters,
+		"pgadmin":       PgAdmin.Parameters,
+		"whoami-go":     WhoamiGo.Parameters,
+		"im-job-runner": IMJobRunner.Parameters,
+	}
+	stackDefinitions := make(map[string]model.StackParameters)
+	for stackName, stackParameters := range stacks {
+		stackDefinitionParameters := make(map[string]model.StackParameter, len(stackParameters))
+		for parameterName, parameter := range stackParameters {
+			stackDefinitionParameters[parameterName] = model.StackParameter{DefaultValue: parameter.DefaultValue, Consumed: parameter.Consumed}
+		}
+		stackDefinitions[stackName] = stackDefinitionParameters
+	}
+	require.NoError(t, err)
+
+	for name, parameters := range helmfileParameters {
+		stackDefinition, ok := stackDefinitions[name]
+		require.Truef(t, ok, "stack %q has a helmfile but no static stack definition in Go", name)
+		assert.Equalf(t, parameters, stackDefinition, "parameters defined in Go for stack %q don't match its helmfile", name)
+		delete(stackDefinitions, name)
+	}
+
+	assert.Empty(t, stackDefinitions, "all stack definitions should have a helmfile, these don't")
+}
+
+func TestIsSystemParameterPositive(t *testing.T) {
+	const instanceId = "INSTANCE_ID"
+
+	parameter := isSystemParameter(instanceId)
+
+	assert.True(t, parameter)
+}
+
+func TestIsSystemParameterNegative(t *testing.T) {
+	const instanceId = "some-random-parameter-name"
+
+	parameter := isSystemParameter(instanceId)
+
+	assert.False(t, parameter)
+}
+
 const (
 	stackParametersIdentifier    = "# stackParameters: "
 	consumedParametersIdentifier = "# consumedParameters: "
-	hostnamePatternIdentifier    = "# hostnamePattern: "
-	hostnameVariableIdentifier   = "# hostnameVariable: "
 )
 
-// TODO: This is not thread safe
-// Deleting the stack on each boot isn't ideal since instance parameters are linked to stack parameters
-// Perhaps upsert using... https://gorm.io/docs/advanced_query.html#FirstOrCreate
+type stack struct {
+	consumedParameters []string
+	stackParameters    []string
+	parameters         map[string]*string
+}
 
-func LoadStacks(dir string, stackService Service) error {
+func parseStacks(dir string) (map[string]*stack, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
-		return fmt.Errorf("failed to read stack folder: %s", err)
+		return nil, err
 	}
 
+	stacks := make(map[string]*stack)
 	for _, entry := range entries {
 		if !entry.IsDir() {
 			continue
 		}
 
-		name := entry.Name()
-		log.Printf("Parsing stack: %q\n", name)
-		stackTemplate, err := parseStack(dir, name)
+		stackName := entry.Name()
+		stack, err := parseStack(dir, stackName)
 		if err != nil {
-			return fmt.Errorf("error parsing stack %q: %v", name, err)
+			return nil, fmt.Errorf("failed to parse stack %q: %v", stackName, err)
 		}
 
-		existingStack, err := stackService.Find(name)
-		if err != nil {
-			if !errdef.IsNotFound(err) {
-				return fmt.Errorf("error searching existing stack %q: %w", name, err)
-			}
-		}
-		if err == nil {
-			log.Printf("Stack exists: %s\n", existingStack.Name)
-			// TODO: For now just bail if the stack exists. This should probably be done differently so we can reload the stack if it has changed
-			// If we have running instances we can't just change parameters etc. though
-			continue
-		}
-
-		stack := &model.Stack{
-			Name:             name,
-			HostnamePattern:  stackTemplate.hostnamePattern,
-			HostnameVariable: stackTemplate.hostnameVariable,
-		}
-		for name, v := range stackTemplate.parameters {
-			isConsumed := isConsumedParameter(name, stackTemplate.consumedParameters)
-			parameter := &model.StackParameter{Name: name, StackName: stack.Name, Consumed: isConsumed, DefaultValue: v}
-			stack.Parameters = append(stack.Parameters, *parameter)
-		}
-
-		err = stackService.Create(stack)
-		log.Printf("Stack created: %+v\n", stack)
-		if err != nil {
-			return fmt.Errorf("error creating stack %q: %v", name, err)
-		}
+		stacks[stackName] = stack
 	}
 
-	return nil
-}
-
-type stack struct {
-	hostnamePattern    string
-	hostnameVariable   string
-	consumedParameters []string
-	stackParameters    []string
-	parameters         map[string]*string
+	return stacks, nil
 }
 
 func parseStack(dir, name string) (*stack, error) {
@@ -89,24 +124,6 @@ func parseStack(dir, name string) (*stack, error) {
 	file, err := os.ReadFile(path) // #nosec
 	if err != nil {
 		return nil, fmt.Errorf("error reading stack %q: %v", name, err)
-	}
-
-	hostnamePatterns := extractMetadataParameters(file, hostnamePatternIdentifier)
-	if len(hostnamePatterns) > 1 {
-		return nil, fmt.Errorf("error parsing stack %q: %q defined more than once", name, hostnamePatternIdentifier)
-	}
-	var hostnamePattern string
-	if len(hostnamePatterns) == 1 {
-		hostnamePattern = hostnamePatterns[0]
-	}
-
-	hostnameVariables := extractMetadataParameters(file, hostnameVariableIdentifier)
-	if len(hostnameVariables) > 1 {
-		return nil, fmt.Errorf("error parsing stack %q: %q defined more than once", name, hostnameVariableIdentifier)
-	}
-	var hostnameVariable string
-	if len(hostnameVariables) == 1 {
-		hostnameVariable = hostnameVariables[0]
 	}
 
 	consumedParameters := extractMetadataParameters(file, consumedParametersIdentifier)
@@ -119,8 +136,6 @@ func parseStack(dir, name string) (*stack, error) {
 	}
 
 	return &stack{
-		hostnamePattern:    hostnamePattern,
-		hostnameVariable:   hostnameVariable,
 		consumedParameters: consumedParameters,
 		stackParameters:    stackParameters,
 		parameters:         optionalParams,
@@ -184,10 +199,6 @@ func getKeys(parameterSet map[string]bool) []string {
 	}
 	sort.Strings(keys)
 	return keys
-}
-
-func isConsumedParameter(parameter string, consumedParameters []string) bool {
-	return inSlice(parameter, consumedParameters)
 }
 
 func isStackParameter(parameter string, stackParameters []string) bool {

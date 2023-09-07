@@ -1,38 +1,37 @@
 package model
 
-import (
-	"fmt"
-	"time"
-)
-
 // swagger:model Stack
 type Stack struct {
-	Name             string           `json:"name" gorm:"primaryKey"`
-	CreatedAt        time.Time        `json:"createdAt"`
-	UpdatedAt        time.Time        `json:"updatedAt"`
-	Parameters       []StackParameter `json:"parameters" gorm:"foreignKey:StackName; references: Name; constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
-	Instances        []Instance       `json:"instances" gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
-	HostnamePattern  string           `json:"hostnamePattern"`
-	HostnameVariable string           `json:"hostnameVariable"`
+	Name             string          `json:"name"`
+	Parameters       StackParameters `json:"parameters"`
+	Instances        []Instance      `json:"instances"`
+	HostnamePattern  string          `json:"hostnamePattern"`
+	HostnameVariable string          `json:"hostnameVariable"`
+	// ParameterProviders provide parameters to other stacks.
+	ParameterProviders ParameterProviders `json:"-"`
+	// Requires these stacks to deploy an instance of this stack.
+	Requires []Stack `json:"-"`
 }
 
-func (s Stack) GetHostname(name, namespace string) string {
-	return fmt.Sprintf(s.HostnamePattern, name, namespace)
-}
-
-func (s Stack) FindParameter(name string) (StackParameter, error) {
-	for _, parameter := range s.Parameters {
-		if parameter.Name == name {
-			return parameter, nil
-		}
-	}
-	return StackParameter{}, fmt.Errorf("parameter not found: %s", name)
-}
+type StackParameters map[string]StackParameter
 
 type StackParameter struct {
-	Name         string  `json:"name" gorm:"primaryKey"`
-	StackName    string  `json:"-" gorm:"primaryKey"`
-	DefaultValue *string `json:"defaultValue"`
-	Consumed     bool    `json:"consumed"`
-	Priority     int     `json:"priority"`
+	DefaultValue *string `json:"defaultValue,omitempty"`
+	// Consumed signals that this parameter is provided by another stack i.e. one of the stacks required stacks.
+	Consumed bool `json:"consumed"`
+	// Validator ensures that the actual stack parameters are valid according to its rules.
+	Validator func(value string) error `json:"-"`
+}
+
+type ParameterProviders map[string]ParameterProvider
+
+// ParameterProvider provides a value that can be consumed by a stack as a stack parameter.
+type ParameterProvider interface {
+	Provide(instance Instance) (value string, err error)
+}
+
+type ParameterProviderFunc func(instance Instance) (string, error)
+
+func (p ParameterProviderFunc) Provide(instance Instance) (string, error) {
+	return p(instance)
 }

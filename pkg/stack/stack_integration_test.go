@@ -15,12 +15,17 @@ import (
 func TestStackHandler(t *testing.T) {
 	t.Parallel()
 
-	db := inttest.SetupDB(t)
-	stackRepository := stack.NewRepository(db)
-	stackService := stack.NewService(stackRepository)
+	stacks, err := stack.New(
+		stack.DHIS2DB,
+		stack.DHIS2Core,
+		stack.DHIS2,
+		stack.PgAdmin,
+		stack.WhoamiGo,
+		stack.IMJobRunner,
+	)
+	require.NoError(t, err)
 
-	err := stack.LoadStacks("../../stacks", stackService)
-	require.NoError(t, err, "failed to load stacks")
+	stackService := stack.NewService(stacks)
 
 	client := inttest.SetupHTTPServer(t, func(engine *gin.Engine) {
 		stackHandler := stack.NewHandler(stackService)
@@ -30,7 +35,8 @@ func TestStackHandler(t *testing.T) {
 	t.Run("GetStack", func(t *testing.T) {
 		t.Parallel()
 
-		var dhis2 model.Stack
+		// TODO: Don't use dto here... Use model.Stack once we actually return it
+		var dhis2 stack.Stack
 		client.GetJSON(t, "/stacks/dhis2", &dhis2)
 
 		assert.Equal(t, "dhis2", dhis2.Name)

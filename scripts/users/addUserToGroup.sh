@@ -2,6 +2,8 @@
 
 set -euo pipefail
 
+source ./auth.sh Admin
+
 GROUP=$1
 USER=$2
 

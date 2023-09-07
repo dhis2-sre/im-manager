@@ -11,7 +11,7 @@ redis:
 
 groups:
   names: whoami
-  hostnames: whoami.im.test.c.dhis2.org
+  hostnames: whoami.im.dhis2.org
 
 tmpfsSizeLimit: 128Mi
 
@@ -72,6 +72,7 @@ securityContext:
 # Alpine guest user
   runAsUser: 405
   runAsGroup: 100
+  allowPrivilegeEscalation: false
 
 service:
   type: ClusterIP

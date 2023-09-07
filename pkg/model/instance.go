@@ -7,7 +7,7 @@ import (
 	"gorm.io/gorm"
 )
 
-type Chain struct {
+type Deployment struct {
 	ID        uint      `json:"id" gorm:"primaryKey"`
 	CreatedAt time.Time `json:"createdAt"`
 	UpdatedAt time.Time `json:"updatedAt"`
@@ -21,24 +21,23 @@ type Chain struct {
 	Group       *Group `json:"group,omitempty"`
 	TTL         uint   `json:"ttl"`
 
-	Links []*Link `json:"links"`
+	DeploymentInstances []*DeploymentInstance `json:"deployments"`
 }
 
-type Parameters map[string]LinkParameter
+type Parameters map[string]DeploymentInstanceParameter
 
-type Link struct {
+type DeploymentInstance struct {
 	ID        uint      `json:"id" gorm:"primaryKey"`
 	CreatedAt time.Time `json:"createdAt"`
 	UpdatedAt time.Time `json:"updatedAt"`
 
-	ChainID uint   `json:"chainId"`
-	Chain   *Chain `json:"chain,omitempty"`
+	DeploymentID uint        `json:"deploymentId"`
+	Deployment   *Deployment `json:"chain,omitempty"`
 
 	StackName string `json:"stackName" gorm:"references:Name"`
-	Stack     *Stack `json:"stack,omitempty"`
 
-	ParameterList []LinkParameter `json:"-" gorm:"foreignKey:LinkID; constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
-	Parameters    Parameters      `json:"parameters" gorm:"-:all"`
+	GormParameters []DeploymentInstanceParameter `json:"-" gorm:"foreignKey:DeploymentInstanceID; constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
+	Parameters     Parameters                    `json:"parameters" gorm:"-:all"`
 
 	Preset   bool `json:"preset"`   // Whether this link is a preset
 	PresetID uint `json:"presetId"` // The preset id this link is created from
@@ -47,19 +46,26 @@ type Link struct {
 	DeployLog string `json:"deployLog" gorm:"type:text"`
 }
 
-func (l *Link) BeforeSave(_ *gorm.DB) error {
-	l.ParameterList = make([]LinkParameter, 0, len(l.Parameters))
+type DeploymentInstanceParameter struct {
+	DeploymentInstanceID uint   `json:"-" gorm:"primaryKey"`
+	ParameterName        string `json:"-" gorm:"primaryKey"`
+	StackName            string `json:"-"`
+	Value                string `json:"value"`
+}
+
+func (l *DeploymentInstance) BeforeSave(_ *gorm.DB) error {
+	l.GormParameters = make([]DeploymentInstanceParameter, 0, len(l.Parameters))
 	for _, parameter := range l.Parameters {
-		parameter.LinkID = l.ID
+		parameter.DeploymentInstanceID = l.ID
 		parameter.StackName = l.StackName
-		l.ParameterList = append(l.ParameterList, parameter)
+		l.GormParameters = append(l.GormParameters, parameter)
 	}
 	return nil
 }
 
-func (l *Link) AfterFind(_ *gorm.DB) error {
-	l.Parameters = make(map[string]LinkParameter, len(l.ParameterList))
-	for _, parameter := range l.ParameterList {
+func (l *DeploymentInstance) AfterFind(_ *gorm.DB) error {
+	l.Parameters = make(map[string]DeploymentInstanceParameter, len(l.GormParameters))
+	for _, parameter := range l.GormParameters {
 		l.Parameters[parameter.ParameterName] = parameter
 	}
 	return nil
@@ -96,26 +102,15 @@ type Linked struct {
 
 func (i Instance) FindParameter(name string) (InstanceParameter, error) {
 	for _, parameter := range i.Parameters {
-		if parameter.StackParameterID == name {
+		if parameter.Name == name {
 			return parameter, nil
 		}
 	}
 	return InstanceParameter{}, fmt.Errorf("parameter not found: %s", name)
 }
 
-type LinkParameter struct {
-	LinkID         uint           `json:"-" gorm:"primaryKey"`
-	ParameterName  string         `json:"-" gorm:"primaryKey"`
-	StackParameter StackParameter `json:"-" gorm:"foreignKey:ParameterName,StackName; references:Name,StackName; constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
-	StackName      string         `json:"-"`
-	Value          string         `json:"value"`
-}
-
 type InstanceParameter struct {
-	InstanceID uint `json:"-" gorm:"primaryKey"`
-	// TODO: Rename StackParameterID to Name
-	StackParameterID string         `json:"name" gorm:"primaryKey"`
-	StackParameter   StackParameter `json:"-" gorm:"foreignKey:StackParameterID,StackName; references:Name,StackName; constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
-	StackName        string         `json:"-"`
-	Value            string         `json:"value"`
+	InstanceID uint   `json:"-" gorm:"primaryKey"`
+	Name       string `json:"name" gorm:"primaryKey"`
+	Value      string `json:"value"`
 }

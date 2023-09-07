@@ -7,6 +7,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/dhis2-sre/im-manager/pkg/config"
+	"github.com/go-mail/mail"
+
 	"github.com/stretchr/testify/assert"
 
 	"github.com/dhis2-sre/im-manager/pkg/group"
@@ -22,7 +25,7 @@ func TestGroupHandler(t *testing.T) {
 
 	db := inttest.SetupDB(t)
 	userRepository := user.NewRepository(db)
-	userService := user.NewService(userRepository)
+	userService := user.NewService(config.Config{}, userRepository, fakeDialer{})
 	groupRepository := group.NewRepository(db)
 	groupService := group.NewService(groupRepository, userService)
 
@@ -161,6 +164,12 @@ func TestGroupHandler(t *testing.T) {
 			require.Equal(t, "group \"non-existing-group\" doesn't exist", string(response))
 		})
 	})
+}
+
+type fakeDialer struct{}
+
+func (f fakeDialer) DialAndSend(m ...*mail.Message) error {
+	panic("not implemented")
 }
 
 type TestAuthenticationMiddleware struct{}

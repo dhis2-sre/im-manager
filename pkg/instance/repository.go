@@ -22,7 +22,7 @@ type repository struct {
 	config config.Config
 }
 
-func (r repository) SaveChain(chain *model.Chain) error {
+func (r repository) SaveChain(chain *model.Deployment) error {
 	// TODO: Do we need the option to save nested entities... Yes, if we create the chain from a preset we need to store all the links as well
 	//err := r.db.Session(&gorm.Session{FullSaveAssociations: true}).Save(chain).Error
 	err := r.db.Create(&chain).Error
@@ -33,8 +33,8 @@ func (r repository) SaveChain(chain *model.Chain) error {
 	return err
 }
 
-func (r repository) FindChainById(id uint) (*model.Chain, error) {
-	var chain *model.Chain
+func (r repository) FindChainById(id uint) (*model.Deployment, error) {
+	var chain *model.Deployment
 	err := r.db.
 		Joins("Group").
 		First(&chain, id).Error
@@ -45,7 +45,7 @@ func (r repository) FindChainById(id uint) (*model.Chain, error) {
 	return chain, err
 }
 
-func (r repository) SaveLink(link *model.Link) error {
+func (r repository) SaveLink(link *model.DeploymentInstance) error {
 	err := r.db.Session(&gorm.Session{FullSaveAssociations: true}).Save(link).Error
 	// TODO: When is a link duplicated?
 	if errors.Is(err, gorm.ErrDuplicatedKey) {
@@ -124,8 +124,8 @@ func (r repository) Save(instance *model.Instance) error {
 func (r repository) FindById(id uint) (*model.Instance, error) {
 	var instance *model.Instance
 	err := r.db.
-		Preload("Parameters.StackParameter").
 		Joins("Group").
+		Preload("Parameters").
 		First(&instance, id).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, errdef.NewNotFound("instance not found by id: %d", id)
@@ -160,15 +160,15 @@ func (r repository) Delete(id uint) error {
 	return err
 }
 
-const AdministratorGroupName = "administrators"
+const administratorGroupName = "administrators"
 
-type GroupWithInstances struct {
+type GroupsWithInstances struct {
 	Name      string            `json:"name"`
 	Hostname  string            `json:"hostname"`
 	Instances []*model.Instance `json:"instances"`
 }
 
-func (r repository) FindByGroups(groups []model.Group, presets bool) ([]GroupWithInstances, error) {
+func (r repository) FindByGroups(groups []model.Group, presets bool) ([]GroupsWithInstances, error) {
 	groupsByName := make(map[string]model.Group)
 	for _, group := range groups {
 		groupsByName[group.Name] = group
@@ -181,7 +181,7 @@ func (r repository) FindByGroups(groups []model.Group, presets bool) ([]GroupWit
 	}
 
 	if len(instances) < 1 {
-		return []GroupWithInstances{}, nil
+		return []GroupsWithInstances{}, nil
 	}
 
 	instancesByGroup := mapInstancesByGroup(groupNames, instances)
@@ -191,9 +191,9 @@ func (r repository) FindByGroups(groups []model.Group, presets bool) ([]GroupWit
 
 func (r repository) findInstances(groupNames []string, presets bool) ([]*model.Instance, error) {
 	query := r.db.
-		Preload("Parameters.StackParameter")
+		Preload("Parameters")
 
-	isAdmin := slices.Contains(groupNames, AdministratorGroupName)
+	isAdmin := slices.Contains(groupNames, administratorGroupName)
 	if !isAdmin {
 		query = query.Where("group_name IN ?", groupNames)
 	}
@@ -207,7 +207,7 @@ func (r repository) findInstances(groupNames []string, presets bool) ([]*model.I
 	return instances, err
 }
 
-func (r repository) FindPublicInstances() ([]GroupWithInstances, error) {
+func (r repository) FindPublicInstances() ([]GroupsWithInstances, error) {
 	var instances []*model.Instance
 	err := r.db.
 		Joins("Group").
@@ -219,7 +219,7 @@ func (r repository) FindPublicInstances() ([]GroupWithInstances, error) {
 	}
 
 	if len(instances) < 1 {
-		return []GroupWithInstances{}, nil
+		return []GroupsWithInstances{}, nil
 	}
 
 	groupsByName := make(map[string]model.Group)
@@ -242,14 +242,14 @@ func mapInstancesByGroup(groupNames []string, result []*model.Instance) map[stri
 	return instancesByGroup
 }
 
-func groupWithInstances(instancesMap map[string][]*model.Instance, groupMap map[string]model.Group) []GroupWithInstances {
-	var groupWithInstances []GroupWithInstances
+func groupWithInstances(instancesMap map[string][]*model.Instance, groupMap map[string]model.Group) []GroupsWithInstances {
+	var groupWithInstances []GroupsWithInstances
 	for groupName, instances := range instancesMap {
 		if instances == nil {
 			continue
 		}
 		group := groupMap[groupName]
-		groupWithInstances = append(groupWithInstances, GroupWithInstances{
+		groupWithInstances = append(groupWithInstances, GroupsWithInstances{
 			Name:      groupName,
 			Hostname:  group.Hostname,
 			Instances: instances,
@@ -263,7 +263,6 @@ func populateParameterRelations(instance *model.Instance) {
 	if len(parameters) > 0 {
 		for i := range parameters {
 			parameters[i].InstanceID = instance.ID
-			parameters[i].StackName = instance.StackName
 		}
 	}
 }
