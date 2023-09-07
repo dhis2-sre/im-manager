@@ -112,6 +112,7 @@ func ValidateConsumedParameters(stacks []model.Stack) error {
 				}
 			}
 		}
+
 		for parameter, providerCount := range consumedParameterProviders {
 			if providerCount == 0 {
 				errs = append(errs, fmt.Errorf("no provider for stack %q parameter %q", stack.Name, parameter))
