@@ -34,15 +34,16 @@ func (r repository) SaveDeployment(chain *model.Deployment) error {
 }
 
 func (r repository) FindDeploymentById(id uint) (*model.Deployment, error) {
-	var chain *model.Deployment
+	var deployment *model.Deployment
 	err := r.db.
 		Joins("Group").
-		First(&chain, id).Error
+		Preload("Instances.GormParameters").
+		First(&deployment, id).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, errdef.NewNotFound("chain not found by id: %d", id)
+		return nil, errdef.NewNotFound("deployment not found by id: %d", id)
 	}
 
-	return chain, err
+	return deployment, err
 }
 
 func (r repository) SaveInstance(link *model.DeploymentInstance) error {

@@ -21,7 +21,7 @@ type Deployment struct {
 	Group       *Group `json:"group,omitempty"`
 	TTL         uint   `json:"ttl"`
 
-	DeploymentInstances []*DeploymentInstance `json:"deployments"`
+	Instances []*DeploymentInstance `json:"instances"`
 }
 
 type Parameters map[string]DeploymentInstanceParameter
@@ -32,7 +32,7 @@ type DeploymentInstance struct {
 	UpdatedAt time.Time `json:"updatedAt"`
 
 	DeploymentID uint        `json:"deploymentId"`
-	Deployment   *Deployment `json:"chain,omitempty"`
+	Deployment   *Deployment `json:"deployment,omitempty"`
 
 	StackName string `json:"stackName" gorm:"references:Name"`
 
@@ -53,20 +53,20 @@ type DeploymentInstanceParameter struct {
 	Value                string `json:"value"`
 }
 
-func (l *DeploymentInstance) BeforeSave(_ *gorm.DB) error {
-	l.GormParameters = make([]DeploymentInstanceParameter, 0, len(l.Parameters))
-	for _, parameter := range l.Parameters {
-		parameter.DeploymentInstanceID = l.ID
-		parameter.StackName = l.StackName
-		l.GormParameters = append(l.GormParameters, parameter)
+func (i *DeploymentInstance) BeforeSave(_ *gorm.DB) error {
+	i.GormParameters = make([]DeploymentInstanceParameter, 0, len(i.Parameters))
+	for _, parameter := range i.Parameters {
+		parameter.DeploymentInstanceID = i.ID
+		parameter.StackName = i.StackName
+		i.GormParameters = append(i.GormParameters, parameter)
 	}
 	return nil
 }
 
-func (l *DeploymentInstance) AfterFind(_ *gorm.DB) error {
-	l.Parameters = make(map[string]DeploymentInstanceParameter, len(l.GormParameters))
-	for _, parameter := range l.GormParameters {
-		l.Parameters[parameter.ParameterName] = parameter
+func (i *DeploymentInstance) AfterFind(_ *gorm.DB) error {
+	i.Parameters = make(map[string]DeploymentInstanceParameter, len(i.GormParameters))
+	for _, parameter := range i.GormParameters {
+		i.Parameters[parameter.ParameterName] = parameter
 	}
 	return nil
 }

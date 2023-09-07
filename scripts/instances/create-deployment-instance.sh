@@ -19,4 +19,4 @@ echo "{
       \"value\": \"Always\"
     }
   }
-}" | $HTTP post "$IM_HOST/chains/$DEPLOYMENT_ID/link" "Authorization: Bearer $ACCESS_TOKEN"
+}" | $HTTP post "$IM_HOST/deployments/$DEPLOYMENT_ID/instance" "Authorization: Bearer $ACCESS_TOKEN"

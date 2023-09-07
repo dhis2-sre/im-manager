@@ -25,6 +25,7 @@ func Routes(r *gin.Engine, authenticationMiddleware middleware.AuthenticationMid
 	tokenAuthenticationRouter.GET("/instances/:id/logs", handler.Logs)
 	tokenAuthenticationRouter.GET("/instances-name-to-id/:groupName/:instanceName", handler.NameToId)
 
-	tokenAuthenticationRouter.POST("/chains", handler.SaveChain)
-	tokenAuthenticationRouter.POST("/chains/:id/link", handler.SaveLink)
+	tokenAuthenticationRouter.POST("/deployments", handler.SaveDeployment)
+	tokenAuthenticationRouter.GET("/deployments/:id", handler.FindDeploymentById)
+	tokenAuthenticationRouter.POST("/deployments/:id/instance", handler.SaveInstance)
 }

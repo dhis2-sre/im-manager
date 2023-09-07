@@ -20,4 +20,4 @@ echo "{
   \"group\": \"$GROUP\",
   \"description\": \"$DESCRIPTION\",
   \"ttl\": $DEPLOYMENT_TTL
-}" | $HTTP post "$IM_HOST/chains" "Authorization: Bearer $ACCESS_TOKEN"
+}" | $HTTP post "$IM_HOST/deployments" "Authorization: Bearer $ACCESS_TOKEN"

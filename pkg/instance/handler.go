@@ -63,7 +63,7 @@ type groupServiceHandler interface {
 	Find(name string) (*model.Group, error)
 }
 
-type SaveChainRequest struct {
+type SaveDeploymentRequest struct {
 	Name        string `json:"name" binding:"required,dns_rfc1035_label"`
 	Description string `json:"description"`
 	Group       string `json:"group" binding:"required"`
@@ -72,8 +72,8 @@ type SaveChainRequest struct {
 	Preset      uint   `json:"preset"` // TODO: Create as preset
 }
 
-func (h Handler) SaveChain(c *gin.Context) {
-	var request SaveChainRequest
+func (h Handler) SaveDeployment(c *gin.Context) {
+	var request SaveDeploymentRequest
 	if err := handler.DataBinder(c, &request); err != nil {
 		_ = c.Error(err)
 		return
@@ -126,26 +126,70 @@ func (h Handler) SaveChain(c *gin.Context) {
 	c.JSON(http.StatusCreated, chain)
 }
 
+// FindDeploymentById deployment
+func (h Handler) FindDeploymentById(c *gin.Context) {
+	// swagger:route GET /deployments/{id} findDeploymentById
+	//
+	// Find a deployment
+	//
+	// Find a deployment by id
+	//
+	// Security:
+	//	oauth2:
+	//
+	// responses:
+	//	200: Instance
+	//	401: Error
+	//	403: Error
+	//	404: Error
+	//	415: Error
+	id, ok := handler.GetPathParameter(c, "id")
+	if !ok {
+		return
+	}
+	/*
+		user, err := handler.GetUserFromContext(c)
+		if err != nil {
+			_ = c.Error(err)
+			return
+		}
+	*/
+	deployment, err := h.instanceService.FindDeploymentById(id)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+	/*
+		canRead := handler.CanReadInstance(user, instance)
+		if !canRead {
+			unauthorized := errdef.NewUnauthorized("read access denied")
+			_ = c.Error(unauthorized)
+			return
+		}
+	*/
+	c.JSON(http.StatusOK, deployment)
+}
+
 type parameter struct{ Value string }
 
 type parameters map[string]parameter
 
-type SaveLinkRequest struct {
-	StackName string `json:"stackName" gorm:"references:Name"`
+type SaveInstanceRequest struct {
+	StackName string `json:"stackName"`
 	Preset    bool   `json:"preset"`
 	PresetID  uint   `json:"presetId"` // The preset id this link is created from
 	//	Public     bool                      `json:"public"`
 	Parameters parameters `json:"parameters"`
 }
 
-func (h Handler) SaveLink(c *gin.Context) {
-	var request SaveLinkRequest
+func (h Handler) SaveInstance(c *gin.Context) {
+	var request SaveInstanceRequest
 	if err := handler.DataBinder(c, &request); err != nil {
 		_ = c.Error(err)
 		return
 	}
 
-	chainId, ok := handler.GetPathParameter(c, "id")
+	deploymentId, ok := handler.GetPathParameter(c, "id")
 	if !ok {
 		return
 	}
@@ -160,7 +204,7 @@ func (h Handler) SaveLink(c *gin.Context) {
 	}
 
 	link := &model.DeploymentInstance{
-		DeploymentID: chainId,
+		DeploymentID: deploymentId,
 		StackName:    request.StackName,
 		Parameters:   params,
 		Preset:       request.Preset,
