@@ -11,21 +11,23 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/yaml"
 
-	"github.com/dhis2-sre/im-manager/pkg/config"
 	"github.com/dhis2-sre/im-manager/pkg/model"
+	"github.com/dhis2-sre/im-manager/pkg/stack"
 )
 
 //goland:noinspection GoExportedFuncWithUnexportedType
-func NewHelmfileService(stackService stackService, config config.Config) helmfileService {
+func NewHelmfileService(stackFolder string, stackService stack.Service, classification string) helmfileService {
 	return helmfileService{
-		stackService,
-		config,
+		stackFolder:    stackFolder,
+		stackService:   stackService,
+		classification: classification,
 	}
 }
 
 type helmfileService struct {
-	stackService stackService
-	config       config.Config
+	stackFolder    string
+	stackService   stack.Service
+	classification string
 }
 
 type stackService interface {
@@ -53,17 +55,13 @@ func (h helmfileService) executeHelmfileCommand(token string, instance *model.In
 		return nil, err
 	}
 
-	// TODO
-	// stacksFolder := h.config.StacksFolder
-	stacksFolder := "./stacks"
-
-	stackPath := path.Join(stacksFolder, "/", stack.Name, "/helmfile.yaml")
+	stackPath := path.Join(h.stackFolder, "/", stack.Name, "/helmfile.yaml")
 	if _, err = os.Stat(stackPath); err != nil {
 		log.Printf("Stack doesn't exists: %s\n", stackPath)
 		return nil, err
 	}
 
-	stackParameters, err := h.loadStackParameters(stacksFolder, stack.Name)
+	stackParameters, err := h.loadStackParameters(stack.Name)
 	if err != nil {
 		return nil, err
 	}
@@ -77,10 +75,9 @@ func (h helmfileService) executeHelmfileCommand(token string, instance *model.In
 
 type stackParameters map[string]string
 
-func (h helmfileService) loadStackParameters(folder string, name string) (stackParameters, error) {
-	classification := h.config.Classification
+func (h helmfileService) loadStackParameters(stackName string) (stackParameters, error) {
 	//goland:noinspection GoImportUsedAsName
-	path := fmt.Sprintf("%s/%s/parameters/%s.yaml", folder, name, classification)
+	path := fmt.Sprintf("%s/%s/parameters/%s.yaml", h.stackFolder, stackName, h.classification)
 	data, err := os.ReadFile(path) // #nosec
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
