@@ -27,6 +27,7 @@ func NewService(
 		stackService,
 		helmfileService,
 	}
+}
 
 type Repository interface {
 	SaveDeployment(deployment *model.Deployment) error
