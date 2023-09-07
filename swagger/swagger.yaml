@@ -1,0 +1,3171 @@
+consumes:
+    - application/json
+definitions:
+    AccessMode:
+        properties:
+            BlockVolume:
+                $ref: '#/definitions/TypeBlock'
+            MountVolume:
+                $ref: '#/definitions/TypeMount'
+            Scope:
+                $ref: '#/definitions/Scope'
+            Sharing:
+                $ref: '#/definitions/SharingMode'
+        title: AccessMode defines the access mode of a volume.
+        type: object
+        x-go-package: github.com/docker/docker/api/types/volume
+    AuthenticateOKBody:
+        description: AuthenticateOKBody authenticate o k body
+        properties:
+            IdentityToken:
+                description: An opaque token used to authenticate a user after a successful login
+                type: string
+            Status:
+                description: The status of the authentication
+                type: string
+        required:
+            - IdentityToken
+            - Status
+        type: object
+        x-go-package: github.com/docker/docker/api/types/registry
+    Availability:
+        title: Availability specifies the availability of the volume.
+        type: string
+        x-go-package: github.com/docker/docker/api/types/volume
+    CapacityRange:
+        description: |-
+            CapacityRange describes the minimum and maximum capacity a volume should be
+            created with
+        properties:
+            LimitBytes:
+                description: |-
+                    LimitBytes specifies that a volume must not be bigger than this. The
+                    value of 0 indicates an unspecified maximum
+                format: int64
+                type: integer
+            RequiredBytes:
+                description: |-
+                    RequiredBytes specifies that a volume must be at least this big. The
+                    value of 0 indicates an unspecified minimum.
+                format: int64
+                type: integer
+        type: object
+        x-go-package: github.com/docker/docker/api/types/volume
+    ChangeType:
+        description: |-
+            Can be one of:
+
+            `0`: Modified ("C")
+            `1`: Added ("A")
+            `2`: Deleted ("D")
+        format: uint8
+        title: ChangeType Kind of change
+        type: integer
+        x-go-package: github.com/docker/docker/api/types/container
+    ClusterConfiguration:
+        properties:
+            createdAt:
+                format: date-time
+                type: string
+                x-go-name: CreatedAt
+            groupName:
+                type: string
+                x-go-name: GroupName
+            id:
+                format: uint64
+                type: integer
+                x-go-name: ID
+            kubernetesConfiguration:
+                items:
+                    format: uint8
+                    type: integer
+                type: array
+                x-go-name: KubernetesConfiguration
+            updatedAt:
+                format: date-time
+                type: string
+                x-go-name: UpdatedAt
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/model
+    ClusterVolume:
+        description: |-
+            ClusterVolume contains options and information specific to, and only present
+            on, Swarm CSI cluster volumes.
+        properties:
+            CreatedAt:
+                format: date-time
+                type: string
+            ID:
+                description: |-
+                    ID is the Swarm ID of the volume. Because cluster volumes are Swarm
+                    objects, they have an ID, unlike non-cluster volumes, which only have a
+                    Name. This ID can be used to refer to the cluster volume.
+                type: string
+            Info:
+                $ref: '#/definitions/Info'
+            PublishStatus:
+                description: |-
+                    PublishStatus contains the status of the volume as it pertains to its
+                    publishing on Nodes.
+                items:
+                    $ref: '#/definitions/PublishStatus'
+                type: array
+            Spec:
+                $ref: '#/definitions/ClusterVolumeSpec'
+            UpdatedAt:
+                format: date-time
+                type: string
+            Version:
+                $ref: '#/definitions/Version'
+        type: object
+        x-go-package: github.com/docker/docker/api/types/volume
+    ClusterVolumeSpec:
+        properties:
+            AccessMode:
+                $ref: '#/definitions/AccessMode'
+            AccessibilityRequirements:
+                $ref: '#/definitions/TopologyRequirement'
+            Availability:
+                $ref: '#/definitions/Availability'
+            CapacityRange:
+                $ref: '#/definitions/CapacityRange'
+            Group:
+                description: |-
+                    Group defines the volume group of this volume. Volumes belonging to the
+                    same group can be referred to by group name when creating Services.
+                    Referring to a volume by group instructs swarm to treat volumes in that
+                    group interchangeably for the purpose of scheduling. Volumes with an
+                    empty string for a group technically all belong to the same, emptystring
+                    group.
+                type: string
+            Secrets:
+                description: |-
+                    Secrets defines Swarm Secrets that are passed to the CSI storage plugin
+                    when operating on this volume.
+                items:
+                    $ref: '#/definitions/Secret'
+                type: array
+        title: ClusterVolumeSpec contains the spec used to create this volume.
+        type: object
+        x-go-package: github.com/docker/docker/api/types/volume
+    ContainerTopOKBody:
+        description: ContainerTopOKBody OK response to ContainerTop operation
+        properties:
+            Processes:
+                description: |-
+                    Each process running in the container, where each is process
+                    is an array of values corresponding to the titles.
+                items:
+                    items:
+                        type: string
+                    type: array
+                type: array
+            Titles:
+                description: The ps column titles
+                items:
+                    type: string
+                type: array
+        required:
+            - Processes
+            - Titles
+        type: object
+        x-go-package: github.com/docker/docker/api/types/container
+    ContainerUpdateOKBody:
+        description: ContainerUpdateOKBody OK response to ContainerUpdate operation
+        properties:
+            Warnings:
+                description: warnings
+                items:
+                    type: string
+                type: array
+        required:
+            - Warnings
+        type: object
+        x-go-package: github.com/docker/docker/api/types/container
+    CopyDatabaseRequest:
+        properties:
+            group:
+                type: string
+                x-go-name: Group
+            name:
+                type: string
+                x-go-name: Name
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/database
+    CreateExternalDatabaseRequest:
+        properties:
+            expiration:
+                description: Expiration time in seconds
+                format: uint64
+                type: integer
+                x-go-name: Expiration
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/database
+    CreateGroupRequest:
+        properties:
+            deployable:
+                type: boolean
+                x-go-name: Deployable
+            hostname:
+                type: string
+                x-go-name: Hostname
+            name:
+                type: string
+                x-go-name: Name
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/group
+    CreateOptions:
+        description: Volume configuration
+        properties:
+            ClusterVolumeSpec:
+                $ref: '#/definitions/ClusterVolumeSpec'
+            Driver:
+                description: Name of the volume driver to use.
+                type: string
+            DriverOpts:
+                additionalProperties:
+                    type: string
+                description: |-
+                    A mapping of driver options and values. These options are
+                    passed directly to the driver and are driver specific.
+                type: object
+            Labels:
+                additionalProperties:
+                    type: string
+                description: User-defined key/value metadata.
+                type: object
+            Name:
+                description: The new volume's name. If not specified, Docker generates a name.
+                type: string
+        title: CreateOptions VolumeConfig
+        type: object
+        x-go-package: github.com/docker/docker/api/types/volume
+    CreateResponse:
+        description: OK response to ContainerCreate operation
+        properties:
+            Id:
+                description: The ID of the created container
+                type: string
+                x-go-name: ID
+            Warnings:
+                description: Warnings encountered when creating the container
+                items:
+                    type: string
+                type: array
+        required:
+            - Id
+            - Warnings
+        title: CreateResponse ContainerCreateResponse
+        type: object
+        x-go-package: github.com/docker/docker/api/types/container
+    Database:
+        properties:
+            createdAt:
+                format: date-time
+                type: string
+                x-go-name: CreatedAt
+            externalDownloads:
+                items:
+                    $ref: '#/definitions/ExternalDownload'
+                type: array
+                x-go-name: ExternalDownloads
+            groupName:
+                type: string
+                x-go-name: GroupName
+            id:
+                format: uint64
+                type: integer
+                x-go-name: ID
+            lock:
+                $ref: '#/definitions/Lock'
+            name:
+                type: string
+                x-go-name: Name
+            slug:
+                type: string
+                x-go-name: Slug
+            updatedAt:
+                format: date-time
+                type: string
+                x-go-name: UpdatedAt
+            url:
+                type: string
+                x-go-name: Url
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/model
+    DeployInstanceRequest:
+        properties:
+            description:
+                type: string
+                x-go-name: Description
+            groupName:
+                type: string
+                x-go-name: Group
+            name:
+                type: string
+                x-go-name: Name
+            parameters:
+                items:
+                    $ref: '#/definitions/InstanceParameter'
+                type: array
+                x-go-name: Parameters
+            presetInstance:
+                format: uint64
+                type: integer
+                x-go-name: PresetInstance
+            public:
+                type: boolean
+                x-go-name: Public
+            sourceInstance:
+                format: uint64
+                type: integer
+                x-go-name: SourceInstance
+            stackName:
+                type: string
+                x-go-name: Stack
+            ttl:
+                format: uint64
+                type: integer
+                x-go-name: TTL
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
+    Deployment:
+        properties:
+            createdAt:
+                format: date-time
+                type: string
+                x-go-name: CreatedAt
+            description:
+                type: string
+                x-go-name: Description
+            group:
+                $ref: '#/definitions/Group'
+            groupName:
+                type: string
+                x-go-name: GroupName
+            id:
+                format: uint64
+                type: integer
+                x-go-name: ID
+            instances:
+                items:
+                    $ref: '#/definitions/DeploymentInstance'
+                type: array
+                x-go-name: Instances
+            name:
+                type: string
+                x-go-name: Name
+            updatedAt:
+                format: date-time
+                type: string
+                x-go-name: UpdatedAt
+            user:
+                $ref: '#/definitions/User'
+            userId:
+                format: uint64
+                type: integer
+                x-go-name: UserID
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/model
+    DeploymentInstance:
+        properties:
+            createdAt:
+                format: date-time
+                type: string
+                x-go-name: CreatedAt
+            deployLog:
+                type: string
+                x-go-name: DeployLog
+            deployment:
+                $ref: '#/definitions/Deployment'
+            deploymentId:
+                format: uint64
+                type: integer
+                x-go-name: DeploymentID
+            id:
+                format: uint64
+                type: integer
+                x-go-name: ID
+            parameters:
+                $ref: '#/definitions/Parameters'
+            stackName:
+                type: string
+                x-go-name: StackName
+            updatedAt:
+                format: date-time
+                type: string
+                x-go-name: UpdatedAt
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/model
+    DeploymentInstanceParameter:
+        properties:
+            value:
+                type: string
+                x-go-name: Value
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/model
+    ErrorResponse:
+        properties:
+            message:
+                description: The error message.
+                type: string
+                x-go-name: Message
+        required:
+            - message
+        title: ErrorResponse Represents an error.
+        type: object
+        x-go-package: github.com/docker/docker/api/types
+    ExternalDownload:
+        properties:
+            databaseId:
+                format: uint64
+                type: integer
+                x-go-name: DatabaseID
+            expiration:
+                format: uint64
+                type: integer
+                x-go-name: Expiration
+            uuid:
+                format: uuid
+                type: string
+                x-go-name: UUID
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/model
+    FilesystemChange:
+        properties:
+            Kind:
+                $ref: '#/definitions/ChangeType'
+            Path:
+                description: Path to file or directory that has changed.
+                type: string
+        required:
+            - Kind
+            - Path
+        title: FilesystemChange Change in the container's filesystem.
+        type: object
+        x-go-package: github.com/docker/docker/api/types/container
+    GraphDriverData:
+        description: |-
+            GraphDriverData Information about the storage driver used to store the container's and
+            image's filesystem.
+        properties:
+            Data:
+                additionalProperties:
+                    type: string
+                description: |-
+                    Low-level storage metadata, provided as key/value pairs.
+
+                    This information is driver-specific, and depends on the storage-driver
+                    in use, and should be used for informational purposes only.
+                type: object
+            Name:
+                description: Name of the storage driver.
+                type: string
+        required:
+            - Data
+            - Name
+        type: object
+        x-go-package: github.com/docker/docker/api/types
+    Group:
+        description: Group domain object defining a group
+        properties:
+            adminUsers:
+                items:
+                    $ref: '#/definitions/User'
+                type: array
+                x-go-name: AdminUsers
+            clusterConfiguration:
+                $ref: '#/definitions/ClusterConfiguration'
+            createdAt:
+                format: date-time
+                type: string
+                x-go-name: CreatedAt
+            deployable:
+                type: boolean
+                x-go-name: Deployable
+            hostname:
+                type: string
+                x-go-name: Hostname
+            name:
+                type: string
+                x-go-name: Name
+            updatedAt:
+                format: date-time
+                type: string
+                x-go-name: UpdatedAt
+            users:
+                items:
+                    $ref: '#/definitions/User'
+                type: array
+                x-go-name: Users
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/model
+    GroupsWithDatabases:
+        properties:
+            databases:
+                items:
+                    $ref: '#/definitions/Database'
+                type: array
+                x-go-name: Databases
+            hostname:
+                type: string
+                x-go-name: Hostname
+            name:
+                type: string
+                x-go-name: Name
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/database
+    GroupsWithInstances:
+        properties:
+            hostname:
+                type: string
+                x-go-name: Hostname
+            instances:
+                items:
+                    $ref: '#/definitions/Instance'
+                type: array
+                x-go-name: Instances
+            name:
+                type: string
+                x-go-name: Name
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
+    HistoryResponseItem:
+        description: HistoryResponseItem individual image layer information in response to ImageHistory operation
+        properties:
+            Comment:
+                description: comment
+                type: string
+            Created:
+                description: created
+                format: int64
+                type: integer
+            CreatedBy:
+                description: created by
+                type: string
+            Id:
+                description: Id
+                type: string
+                x-go-name: ID
+            Size:
+                description: size
+                format: int64
+                type: integer
+            Tags:
+                description: tags
+                items:
+                    type: string
+                type: array
+        required:
+            - Comment
+            - Created
+            - CreatedBy
+            - Id
+            - Size
+            - Tags
+        type: object
+        x-go-package: github.com/docker/docker/api/types/image
+    IdResponse:
+        description: IDResponse Response to an API call that returns just an Id
+        properties:
+            Id:
+                description: The id of the newly created object.
+                type: string
+                x-go-name: ID
+        required:
+            - Id
+        type: object
+        x-go-name: IDResponse
+        x-go-package: github.com/docker/docker/api/types
+    ImageDeleteResponseItem:
+        description: ImageDeleteResponseItem image delete response item
+        properties:
+            Deleted:
+                description: The image ID of an image that was deleted
+                type: string
+            Untagged:
+                description: The image ID of an image that was untagged
+                type: string
+        type: object
+        x-go-package: github.com/docker/docker/api/types
+    ImageSummary:
+        description: ImageSummary image summary
+        properties:
+            Containers:
+                description: |-
+                    Number of containers using this image. Includes both stopped and running
+                    containers.
+
+                    This size is not calculated by default, and depends on which API endpoint
+                    is used. `-1` indicates that the value has not been set / calculated.
+                format: int64
+                type: integer
+            Created:
+                description: |-
+                    Date and time at which the image was created as a Unix timestamp
+                    (number of seconds sinds EPOCH).
+                format: int64
+                type: integer
+            Id:
+                description: |-
+                    ID is the content-addressable ID of an image.
+
+                    This identifier is a content-addressable digest calculated from the
+                    image's configuration (which includes the digests of layers used by
+                    the image).
+
+                    Note that this digest differs from the `RepoDigests` below, which
+                    holds digests of image manifests that reference the image.
+                type: string
+                x-go-name: ID
+            Labels:
+                additionalProperties:
+                    type: string
+                description: User-defined key/value metadata.
+                type: object
+            ParentId:
+                description: |-
+                    ID of the parent image.
+
+                    Depending on how the image was created, this field may be empty and
+                    is only set for images that were built/created locally. This field
+                    is empty if the image was pulled from an image registry.
+                type: string
+                x-go-name: ParentID
+            RepoDigests:
+                description: |-
+                    List of content-addressable digests of locally available image manifests
+                    that the image is referenced from. Multiple manifests can refer to the
+                    same image.
+
+                    These digests are usually only available if the image was either pulled
+                    from a registry, or if the image was pushed to a registry, which is when
+                    the manifest is generated and its digest calculated.
+                items:
+                    type: string
+                type: array
+            RepoTags:
+                description: |-
+                    List of image names/tags in the local image cache that reference this
+                    image.
+
+                    Multiple image tags can refer to the same image, and this list may be
+                    empty if no tags reference the image, in which case the image is
+                    "untagged", in which case it can still be referenced by its ID.
+                items:
+                    type: string
+                type: array
+            SharedSize:
+                description: |-
+                    Total size of image layers that are shared between this image and other
+                    images.
+
+                    This size is not calculated by default. `-1` indicates that the value
+                    has not been set / calculated.
+                format: int64
+                type: integer
+            Size:
+                description: Total size of the image including all layers it is composed of.
+                format: int64
+                type: integer
+            VirtualSize:
+                description: |-
+                    Total size of the image including all layers it is composed of.
+
+                    In versions of Docker before v1.10, this field was calculated from
+                    the image itself and all of its parent images. Images are now stored
+                    self-contained, and no longer use a parent-chain, making this field
+                    an equivalent of the Size field.
+
+                    Deprecated: this field is kept for backward compatibility, and will be removed in API v1.44.
+                format: int64
+                type: integer
+        required:
+            - Containers
+            - Created
+            - Id
+            - Labels
+            - ParentId
+            - RepoDigests
+            - RepoTags
+            - SharedSize
+            - Size
+        type: object
+        x-go-package: github.com/docker/docker/api/types
+    Info:
+        description: |-
+            Info contains information about the Volume as a whole as provided by
+            the CSI storage plugin.
+        properties:
+            AccessibleTopology:
+                description: |-
+                    AccessibleTopolgoy is the topology this volume is actually accessible
+                    from.
+                items:
+                    $ref: '#/definitions/Topology'
+                type: array
+            CapacityBytes:
+                description: |-
+                    CapacityBytes is the capacity of the volume in bytes. A value of 0
+                    indicates that the capacity is unknown.
+                format: int64
+                type: integer
+            VolumeContext:
+                additionalProperties:
+                    type: string
+                description: |-
+                    VolumeContext is the context originating from the CSI storage plugin
+                    when the Volume is created.
+                type: object
+            VolumeID:
+                description: |-
+                    VolumeID is the ID of the Volume as seen by the CSI storage plugin. This
+                    is distinct from the Volume's Swarm ID, which is the ID used by all of
+                    the Docker Engine to refer to the Volume. If this field is blank, then
+                    the Volume has not been successfully created yet.
+                type: string
+        type: object
+        x-go-package: github.com/docker/docker/api/types/volume
+    Instance:
+        properties:
+            createdAt:
+                format: date-time
+                type: string
+                x-go-name: CreatedAt
+            deployLog:
+                type: string
+                x-go-name: DeployLog
+            description:
+                type: string
+                x-go-name: Description
+            group:
+                $ref: '#/definitions/Group'
+            groupName:
+                type: string
+                x-go-name: GroupName
+            id:
+                format: uint64
+                type: integer
+                x-go-name: ID
+            name:
+                type: string
+                x-go-name: Name
+            parameters:
+                items:
+                    $ref: '#/definitions/InstanceParameter'
+                type: array
+                x-go-name: Parameters
+            preset:
+                type: boolean
+                x-go-name: Preset
+            presetId:
+                description: The preset which this instance is created from
+                format: uint64
+                type: integer
+                x-go-name: PresetID
+            public:
+                type: boolean
+                x-go-name: Public
+            stackName:
+                type: string
+                x-go-name: StackName
+            ttl:
+                format: uint64
+                type: integer
+                x-go-name: TTL
+            updatedAt:
+                format: date-time
+                type: string
+                x-go-name: UpdatedAt
+            user:
+                $ref: '#/definitions/User'
+            userId:
+                format: uint64
+                type: integer
+                x-go-name: UserID
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/model
+    InstanceParameter:
+        properties:
+            name:
+                type: string
+                x-go-name: Name
+            value:
+                type: string
+                x-go-name: Value
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/model
+    ListResponse:
+        description: Volume list response
+        properties:
+            Volumes:
+                description: List of volumes
+                items:
+                    $ref: '#/definitions/Volume'
+                type: array
+            Warnings:
+                description: Warnings that occurred when fetching the list of volumes.
+                items:
+                    type: string
+                type: array
+        title: ListResponse VolumeListResponse
+        type: object
+        x-go-package: github.com/docker/docker/api/types/volume
+    Lock:
+        properties:
+            databaseId:
+                format: uint64
+                type: integer
+                x-go-name: DatabaseID
+            instanceId:
+                format: uint64
+                type: integer
+                x-go-name: InstanceID
+            userId:
+                format: uint64
+                type: integer
+                x-go-name: UserID
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/model
+    LockDatabaseRequest:
+        properties:
+            instanceId:
+                format: uint64
+                type: integer
+                x-go-name: InstanceId
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/database
+    Meta:
+        properties:
+            CreatedAt:
+                format: date-time
+                type: string
+            UpdatedAt:
+                format: date-time
+                type: string
+            Version:
+                $ref: '#/definitions/Version'
+        title: Meta is a base object inherited by most of the other once.
+        type: object
+        x-go-package: github.com/docker/docker/api/types/swarm
+    Parameters:
+        additionalProperties:
+            $ref: '#/definitions/DeploymentInstanceParameter'
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/model
+    Plugin:
+        description: Plugin A plugin for the Engine API
+        properties:
+            Config:
+                $ref: '#/definitions/PluginConfig'
+            Enabled:
+                description: True if the plugin is running. False if the plugin is not running, only installed.
+                type: boolean
+            Id:
+                description: Id
+                type: string
+                x-go-name: ID
+            Name:
+                description: name
+                type: string
+            PluginReference:
+                description: plugin remote reference used to push/pull the plugin
+                type: string
+            Settings:
+                $ref: '#/definitions/PluginSettings'
+        required:
+            - Config
+            - Enabled
+            - Name
+            - Settings
+        type: object
+        x-go-package: github.com/docker/docker/api/types
+    PluginConfig:
+        properties:
+            Args:
+                $ref: '#/definitions/PluginConfigArgs'
+            Description:
+                description: description
+                type: string
+            DockerVersion:
+                description: Docker Version used to create the plugin
+                type: string
+            Documentation:
+                description: documentation
+                type: string
+            Entrypoint:
+                description: entrypoint
+                items:
+                    type: string
+                type: array
+            Env:
+                description: env
+                items:
+                    $ref: '#/definitions/PluginEnv'
+                type: array
+            Interface:
+                $ref: '#/definitions/PluginConfigInterface'
+            IpcHost:
+                description: ipc host
+                type: boolean
+            Linux:
+                $ref: '#/definitions/PluginConfigLinux'
+            Mounts:
+                description: mounts
+                items:
+                    $ref: '#/definitions/PluginMount'
+                type: array
+            Network:
+                $ref: '#/definitions/PluginConfigNetwork'
+            PidHost:
+                description: pid host
+                type: boolean
+            PropagatedMount:
+                description: propagated mount
+                type: string
+            User:
+                $ref: '#/definitions/PluginConfigUser'
+            WorkDir:
+                description: work dir
+                type: string
+            rootfs:
+                $ref: '#/definitions/PluginConfigRootfs'
+        required:
+            - Args
+            - Description
+            - Documentation
+            - Entrypoint
+            - Env
+            - Interface
+            - IpcHost
+            - Linux
+            - Mounts
+            - Network
+            - PidHost
+            - PropagatedMount
+            - WorkDir
+        title: PluginConfig The config of a plugin.
+        type: object
+        x-go-package: github.com/docker/docker/api/types
+    PluginConfigArgs:
+        description: PluginConfigArgs plugin config args
+        properties:
+            Description:
+                description: description
+                type: string
+            Name:
+                description: name
+                type: string
+            Settable:
+                description: settable
+                items:
+                    type: string
+                type: array
+            Value:
+                description: value
+                items:
+                    type: string
+                type: array
+        required:
+            - Description
+            - Name
+            - Settable
+            - Value
+        type: object
+        x-go-package: github.com/docker/docker/api/types
+    PluginConfigInterface:
+        description: PluginConfigInterface The interface between Docker and the plugin
+        properties:
+            ProtocolScheme:
+                description: Protocol to use for clients connecting to the plugin.
+                type: string
+            Socket:
+                description: socket
+                type: string
+            Types:
+                description: types
+                items:
+                    $ref: '#/definitions/PluginInterfaceType'
+                type: array
+        required:
+            - Socket
+            - Types
+        type: object
+        x-go-package: github.com/docker/docker/api/types
+    PluginConfigLinux:
+        description: PluginConfigLinux plugin config linux
+        properties:
+            AllowAllDevices:
+                description: allow all devices
+                type: boolean
+            Capabilities:
+                description: capabilities
+                items:
+                    type: string
+                type: array
+            Devices:
+                description: devices
+                items:
+                    $ref: '#/definitions/PluginDevice'
+                type: array
+        required:
+            - AllowAllDevices
+            - Capabilities
+            - Devices
+        type: object
+        x-go-package: github.com/docker/docker/api/types
+    PluginConfigNetwork:
+        description: PluginConfigNetwork plugin config network
+        properties:
+            Type:
+                description: type
+                type: string
+        required:
+            - Type
+        type: object
+        x-go-package: github.com/docker/docker/api/types
+    PluginConfigRootfs:
+        description: PluginConfigRootfs plugin config rootfs
+        properties:
+            diff_ids:
+                description: diff ids
+                items:
+                    type: string
+                type: array
+                x-go-name: DiffIds
+            type:
+                description: type
+                type: string
+                x-go-name: Type
+        type: object
+        x-go-package: github.com/docker/docker/api/types
+    PluginConfigUser:
+        description: PluginConfigUser plugin config user
+        properties:
+            GID:
+                description: g ID
+                format: uint32
+                type: integer
+            UID:
+                description: UID
+                format: uint32
+                type: integer
+        type: object
+        x-go-package: github.com/docker/docker/api/types
+    PluginDevice:
+        description: PluginDevice plugin device
+        properties:
+            Description:
+                description: description
+                type: string
+            Name:
+                description: name
+                type: string
+            Path:
+                description: path
+                type: string
+            Settable:
+                description: settable
+                items:
+                    type: string
+                type: array
+        required:
+            - Description
+            - Name
+            - Path
+            - Settable
+        type: object
+        x-go-package: github.com/docker/docker/api/types
+    PluginEnv:
+        description: PluginEnv plugin env
+        properties:
+            Description:
+                description: description
+                type: string
+            Name:
+                description: name
+                type: string
+            Settable:
+                description: settable
+                items:
+                    type: string
+                type: array
+            Value:
+                description: value
+                type: string
+        required:
+            - Description
+            - Name
+            - Settable
+            - Value
+        type: object
+        x-go-package: github.com/docker/docker/api/types
+    PluginInterfaceType:
+        description: PluginInterfaceType plugin interface type
+        properties:
+            Capability:
+                description: capability
+                type: string
+            Prefix:
+                description: prefix
+                type: string
+            Version:
+                description: version
+                type: string
+        required:
+            - Capability
+            - Prefix
+            - Version
+        type: object
+        x-go-package: github.com/docker/docker/api/types
+    PluginMount:
+        description: PluginMount plugin mount
+        properties:
+            Description:
+                description: description
+                type: string
+            Destination:
+                description: destination
+                type: string
+            Name:
+                description: name
+                type: string
+            Options:
+                description: options
+                items:
+                    type: string
+                type: array
+            Settable:
+                description: settable
+                items:
+                    type: string
+                type: array
+            Source:
+                description: source
+                type: string
+            Type:
+                description: type
+                type: string
+        required:
+            - Description
+            - Destination
+            - Name
+            - Options
+            - Settable
+            - Source
+            - Type
+        type: object
+        x-go-package: github.com/docker/docker/api/types
+    PluginSettings:
+        properties:
+            Args:
+                description: args
+                items:
+                    type: string
+                type: array
+            Devices:
+                description: devices
+                items:
+                    $ref: '#/definitions/PluginDevice'
+                type: array
+            Env:
+                description: env
+                items:
+                    type: string
+                type: array
+            Mounts:
+                description: mounts
+                items:
+                    $ref: '#/definitions/PluginMount'
+                type: array
+        required:
+            - Args
+            - Devices
+            - Env
+            - Mounts
+        title: PluginSettings Settings that can be modified by users.
+        type: object
+        x-go-package: github.com/docker/docker/api/types
+    Port:
+        description: Port An open port on a container
+        properties:
+            IP:
+                description: Host IP address that the container's port is mapped to
+                type: string
+            PrivatePort:
+                description: Port on the container
+                format: uint16
+                type: integer
+            PublicPort:
+                description: Port exposed on the host
+                format: uint16
+                type: integer
+            Type:
+                description: type
+                type: string
+        required:
+            - PrivatePort
+            - Type
+        type: object
+        x-go-package: github.com/docker/docker/api/types
+    PublishState:
+        description: |-
+            PublishState represents the state of a Volume as it pertains to its
+            use on a particular Node.
+        type: string
+        x-go-package: github.com/docker/docker/api/types/volume
+    PublishStatus:
+        description: |-
+            PublishStatus represents the status of the volume as published to an
+            individual node
+        properties:
+            NodeID:
+                description: NodeID is the ID of the swarm node this Volume is published to.
+                type: string
+            PublishContext:
+                additionalProperties:
+                    type: string
+                description: |-
+                    PublishContext is the PublishContext returned by the CSI plugin when
+                    a volume is published.
+                type: object
+            State:
+                $ref: '#/definitions/PublishState'
+        type: object
+        x-go-package: github.com/docker/docker/api/types/volume
+    RefreshTokenRequest:
+        properties:
+            refreshToken:
+                type: string
+                x-go-name: RefreshToken
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/user
+    Request:
+        properties:
+            key:
+                type: string
+                x-go-name: Key
+            payload:
+                x-go-name: Payload
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/integration
+    Response:
+        description: Response depends on the input and can be either a list or a map
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/integration
+    SaveDeploymentRequest:
+        properties:
+            description:
+                type: string
+                x-go-name: Description
+            group:
+                type: string
+                x-go-name: Group
+            name:
+                type: string
+                x-go-name: Name
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
+    SaveInstanceRequest:
+        properties:
+            parameters:
+                $ref: '#/definitions/parameters'
+            stackName:
+                type: string
+                x-go-name: StackName
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
+    Scope:
+        description: |-
+            Scope defines the Scope of a Cluster Volume. This is how many nodes a
+            Volume can be accessed simultaneously on.
+        type: string
+        x-go-package: github.com/docker/docker/api/types/volume
+    Secret:
+        description: |-
+            Secret represents a Swarm Secret value that must be passed to the CSI
+            storage plugin when operating on this Volume. It represents one key-value
+            pair of possibly many.
+        properties:
+            Key:
+                description: Key is the name of the key of the key-value pair passed to the plugin.
+                type: string
+            Secret:
+                description: |-
+                    Secret is the swarm Secret object from which to read data. This can be a
+                    Secret name or ID. The Secret data is retrieved by Swarm and used as the
+                    value of the key-value pair passed to the plugin.
+                type: string
+        type: object
+        x-go-package: github.com/docker/docker/api/types/volume
+    ServiceUpdateResponse:
+        description: ServiceUpdateResponse service update response
+        properties:
+            Warnings:
+                description: Optional warning messages
+                items:
+                    type: string
+                type: array
+        type: object
+        x-go-package: github.com/docker/docker/api/types
+    SharingMode:
+        description: |-
+            SharingMode defines the Sharing of a Cluster Volume. This is how Tasks using a
+            Volume at the same time can use it.
+        type: string
+        x-go-package: github.com/docker/docker/api/types/volume
+    Stack:
+        properties:
+            name:
+                type: string
+                x-go-name: Name
+            parameters:
+                items:
+                    $ref: '#/definitions/StackParameter'
+                type: array
+                x-go-name: Parameters
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/stack
+    StackDetail:
+        properties:
+            hostnamePattern:
+                type: string
+                x-go-name: HostnamePattern
+            hostnameVariable:
+                type: string
+                x-go-name: HostnameVariable
+            instances:
+                items:
+                    $ref: '#/definitions/Instance'
+                type: array
+                x-go-name: Instances
+            name:
+                type: string
+                x-go-name: Name
+            parameters:
+                $ref: '#/definitions/StackDetailParameters'
+        type: object
+        x-go-name: Stack
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/model
+    StackDetailParameter:
+        properties:
+            consumed:
+                description: Consumed signals that this parameter is provided by another stack i.e. one of the stacks required stacks.
+                type: boolean
+                x-go-name: Consumed
+            defaultValue:
+                type: string
+                x-go-name: DefaultValue
+        type: object
+        x-go-name: StackParameter
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/model
+    StackDetailParameters:
+        additionalProperties:
+            $ref: '#/definitions/StackDetailParameter'
+        type: object
+        x-go-name: StackParameters
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/model
+    StackParameter:
+        properties:
+            consumed:
+                type: boolean
+                x-go-name: Consumed
+            defaultValue:
+                type: string
+                x-go-name: DefaultValue
+            name:
+                type: string
+                x-go-name: Name
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/stack
+    Tokens:
+        description: Tokens domain object defining user tokens
+        properties:
+            accessToken:
+                type: string
+                x-go-name: AccessToken
+            expiresIn:
+                format: uint64
+                type: integer
+                x-go-name: ExpiresIn
+            refreshToken:
+                type: string
+                x-go-name: RefreshToken
+            tokenType:
+                type: string
+                x-go-name: TokenType
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/token
+    Topology:
+        description: |-
+            This description is taken verbatim from the CSI Spec:
+
+            A topological domain is a sub-division of a cluster, like "region",
+            "zone", "rack", etc.
+            A topological segment is a specific instance of a topological domain,
+            like "zone3", "rack3", etc.
+            For example {"com.company/zone": "Z1", "com.company/rack": "R3"}
+            Valid keys have two segments: an OPTIONAL prefix and name, separated
+            by a slash (/), for example: "com.company.example/zone".
+            The key name segment is REQUIRED. The prefix is OPTIONAL.
+            The key name MUST be 63 characters or less, begin and end with an
+            alphanumeric character ([a-z0-9A-Z]), and contain only dashes (-),
+            underscores (_), dots (.), or alphanumerics in between, for example
+            "zone".
+            The key prefix MUST be 63 characters or less, begin and end with a
+            lower-case alphanumeric character ([a-z0-9]), contain only
+            dashes (-), dots (.), or lower-case alphanumerics in between, and
+            follow domain name notation format
+            (https://tools.ietf.org/html/rfc1035#section-2.3.1).
+            The key prefix SHOULD include the plugin's host company name and/or
+            the plugin name, to minimize the possibility of collisions with keys
+            from other plugins.
+            If a key prefix is specified, it MUST be identical across all
+            topology keys returned by the SP (across all RPCs).
+            Keys MUST be case-insensitive. Meaning the keys "Zone" and "zone"
+            MUST not both exist.
+            Each value (topological segment) MUST contain 1 or more strings.
+            Each string MUST be 63 characters or less and begin and end with an
+            alphanumeric character with '-', '_', '.', or alphanumerics in
+            between.
+        properties:
+            Segments:
+                additionalProperties:
+                    type: string
+                type: object
+        title: Topology is a map of topological domains to topological segments.
+        type: object
+        x-go-package: github.com/docker/docker/api/types/volume
+    TopologyRequirement:
+        description: |-
+            TopologyRequirement expresses the user's requirements for a volume's
+            accessible topology.
+        properties:
+            Preferred:
+                description: |-
+                    Preferred is a list of Topologies that the volume should attempt to be
+                    provisioned in.
+
+                    Taken from the CSI spec:
+
+                    Specifies the list of topologies the CO would prefer the volume to
+                    be provisioned in.
+
+                    This field is OPTIONAL. If TopologyRequirement is specified either
+                    requisite or preferred or both MUST be specified.
+
+                    An SP MUST attempt to make the provisioned volume available using
+                    the preferred topologies in order from first to last.
+
+                    If requisite is specified, all topologies in preferred list MUST
+                    also be present in the list of requisite topologies.
+
+                    If the SP is unable to to make the provisioned volume available
+                    from any of the preferred topologies, the SP MAY choose a topology
+                    from the list of requisite topologies.
+                    If the list of requisite topologies is not specified, then the SP
+                    MAY choose from the list of all possible topologies.
+                    If the list of requisite topologies is specified and the SP is
+                    unable to to make the provisioned volume available from any of the
+                    requisite topologies it MUST fail the CreateVolume call.
+
+                    Example 1:
+                    Given a volume should be accessible from a single zone, and
+                    requisite =
+                    {"region": "R1", "zone": "Z2"},
+                    {"region": "R1", "zone": "Z3"}
+                    preferred =
+                    {"region": "R1", "zone": "Z3"}
+                    then the the SP SHOULD first attempt to make the provisioned volume
+                    available from "zone" "Z3" in the "region" "R1" and fall back to
+                    "zone" "Z2" in the "region" "R1" if that is not possible.
+
+                    Example 2:
+                    Given a volume should be accessible from a single zone, and
+                    requisite =
+                    {"region": "R1", "zone": "Z2"},
+                    {"region": "R1", "zone": "Z3"},
+                    {"region": "R1", "zone": "Z4"},
+                    {"region": "R1", "zone": "Z5"}
+                    preferred =
+                    {"region": "R1", "zone": "Z4"},
+                    {"region": "R1", "zone": "Z2"}
+                    then the the SP SHOULD first attempt to make the provisioned volume
+                    accessible from "zone" "Z4" in the "region" "R1" and fall back to
+                    "zone" "Z2" in the "region" "R1" if that is not possible. If that
+                    is not possible, the SP may choose between either the "zone"
+                    "Z3" or "Z5" in the "region" "R1".
+
+                    Example 3:
+                    Given a volume should be accessible from TWO zones (because an
+                    opaque parameter in CreateVolumeRequest, for example, specifies
+                    the volume is accessible from two zones, aka synchronously
+                    replicated), and
+                    requisite =
+                    {"region": "R1", "zone": "Z2"},
+                    {"region": "R1", "zone": "Z3"},
+                    {"region": "R1", "zone": "Z4"},
+                    {"region": "R1", "zone": "Z5"}
+                    preferred =
+                    {"region": "R1", "zone": "Z5"},
+                    {"region": "R1", "zone": "Z3"}
+                    then the the SP SHOULD first attempt to make the provisioned volume
+                    accessible from the combination of the two "zones" "Z5" and "Z3" in
+                    the "region" "R1". If that's not possible, it should fall back to
+                    a combination of "Z5" and other possibilities from the list of
+                    requisite. If that's not possible, it should fall back  to a
+                    combination of "Z3" and other possibilities from the list of
+                    requisite. If that's not possible, it should fall back  to a
+                    combination of other possibilities from the list of requisite.
+                items:
+                    $ref: '#/definitions/Topology'
+                type: array
+            Requisite:
+                description: |-
+                    Requisite specifies a list of Topologies, at least one of which the
+                    volume must be accessible from.
+
+                    Taken verbatim from the CSI Spec:
+
+                    Specifies the list of topologies the provisioned volume MUST be
+                    accessible from.
+                    This field is OPTIONAL. If TopologyRequirement is specified either
+                    requisite or preferred or both MUST be specified.
+
+                    If requisite is specified, the provisioned volume MUST be
+                    accessible from at least one of the requisite topologies.
+
+                    Given
+                    x = number of topologies provisioned volume is accessible from
+                    n = number of requisite topologies
+                    The CO MUST ensure n >= 1. The SP MUST ensure x >= 1
+                    If x==n, then the SP MUST make the provisioned volume available to
+                    all topologies from the list of requisite topologies. If it is
+                    unable to do so, the SP MUST fail the CreateVolume call.
+                    For example, if a volume should be accessible from a single zone,
+                    and requisite =
+                    {"region": "R1", "zone": "Z2"}
+                    then the provisioned volume MUST be accessible from the "region"
+                    "R1" and the "zone" "Z2".
+                    Similarly, if a volume should be accessible from two zones, and
+                    requisite =
+                    {"region": "R1", "zone": "Z2"},
+                    {"region": "R1", "zone": "Z3"}
+                    then the provisioned volume MUST be accessible from the "region"
+                    "R1" and both "zone" "Z2" and "zone" "Z3".
+
+                    If x<n, then the SP SHALL choose x unique topologies from the list
+                    of requisite topologies. If it is unable to do so, the SP MUST fail
+                    the CreateVolume call.
+                    For example, if a volume should be accessible from a single zone,
+                    and requisite =
+                    {"region": "R1", "zone": "Z2"},
+                    {"region": "R1", "zone": "Z3"}
+                    then the SP may choose to make the provisioned volume available in
+                    either the "zone" "Z2" or the "zone" "Z3" in the "region" "R1".
+                    Similarly, if a volume should be accessible from two zones, and
+                    requisite =
+                    {"region": "R1", "zone": "Z2"},
+                    {"region": "R1", "zone": "Z3"},
+                    {"region": "R1", "zone": "Z4"}
+                    then the provisioned volume MUST be accessible from any combination
+                    of two unique topologies: e.g. "R1/Z2" and "R1/Z3", or "R1/Z2" and
+                    "R1/Z4", or "R1/Z3" and "R1/Z4".
+
+                    If x>n, then the SP MUST make the provisioned volume available from
+                    all topologies from the list of requisite topologies and MAY choose
+                    the remaining x-n unique topologies from the list of all possible
+                    topologies. If it is unable to do so, the SP MUST fail the
+                    CreateVolume call.
+                    For example, if a volume should be accessible from two zones, and
+                    requisite =
+                    {"region": "R1", "zone": "Z2"}
+                    then the provisioned volume MUST be accessible from the "region"
+                    "R1" and the "zone" "Z2" and the SP may select the second zone
+                    independently, e.g. "R1/Z4".
+                items:
+                    $ref: '#/definitions/Topology'
+                type: array
+        type: object
+        x-go-package: github.com/docker/docker/api/types/volume
+    TypeBlock:
+        description: Intentionally empty.
+        title: TypeBlock defines options for using a volume as a block-type volume.
+        type: object
+        x-go-package: github.com/docker/docker/api/types/volume
+    TypeMount:
+        description: |-
+            TypeMount contains options for using a volume as a Mount-type
+            volume.
+        properties:
+            FsType:
+                description: FsType specifies the filesystem type for the mount volume. Optional.
+                type: string
+            MountFlags:
+                description: MountFlags defines flags to pass when mounting the volume. Optional.
+                items:
+                    type: string
+                type: array
+        type: object
+        x-go-package: github.com/docker/docker/api/types/volume
+    UpdateDatabaseRequest:
+        properties:
+            name:
+                type: string
+                x-go-name: Name
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/database
+    UpdateInstanceRequest:
+        properties:
+            parameters:
+                items:
+                    $ref: '#/definitions/InstanceParameter'
+                type: array
+                x-go-name: Parameters
+            ttl:
+                format: uint64
+                type: integer
+                x-go-name: TTL
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
+    UsageData:
+        description: |-
+            UsageData Usage details about the volume. This information is used by the
+            `GET /system/df` endpoint, and omitted in other endpoints.
+        properties:
+            RefCount:
+                description: |-
+                    The number of containers referencing this volume. This field
+                    is set to `-1` if the reference-count is not available.
+                format: int64
+                type: integer
+            Size:
+                description: |-
+                    Amount of disk space used by the volume (in bytes). This information
+                    is only available for volumes created with the `"local"` volume
+                    driver. For volumes created with other volume drivers, this field
+                    is set to `-1` ("not available")
+                format: int64
+                type: integer
+        required:
+            - RefCount
+            - Size
+        type: object
+        x-go-package: github.com/docker/docker/api/types/volume
+    User:
+        description: User domain object defining a user
+        properties:
+            adminGroups:
+                items:
+                    $ref: '#/definitions/Group'
+                type: array
+                x-go-name: AdminGroups
+            createdAt:
+                format: date-time
+                type: string
+                x-go-name: CreatedAt
+            email:
+                type: string
+                x-go-name: Email
+            groups:
+                items:
+                    $ref: '#/definitions/Group'
+                type: array
+                x-go-name: Groups
+            id:
+                format: uint64
+                type: integer
+                x-go-name: ID
+            updatedAt:
+                format: date-time
+                type: string
+                x-go-name: UpdatedAt
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/model
+    Version:
+        properties:
+            Index:
+                format: uint64
+                type: integer
+        title: Version represents the internal object version.
+        type: object
+        x-go-package: github.com/docker/docker/api/types/swarm
+    Volume:
+        description: Volume volume
+        properties:
+            ClusterVolume:
+                $ref: '#/definitions/ClusterVolume'
+            CreatedAt:
+                description: Date/Time the volume was created.
+                type: string
+            Driver:
+                description: Name of the volume driver used by the volume.
+                type: string
+            Labels:
+                additionalProperties:
+                    type: string
+                description: User-defined key/value metadata.
+                type: object
+            Mountpoint:
+                description: Mount path of the volume on the host.
+                type: string
+            Name:
+                description: Name of the volume.
+                type: string
+            Options:
+                additionalProperties:
+                    type: string
+                description: The driver specific options used when creating the volume.
+                type: object
+            Scope:
+                description: |-
+                    The level at which the volume exists. Either `global` for cluster-wide,
+                    or `local` for machine level.
+                type: string
+            Status:
+                additionalProperties: {}
+                description: |-
+                    Low-level details about the volume, provided by the volume driver.
+                    Details are returned as a map with key/value pairs:
+                    `{"key":"value","key2":"value2"}`.
+
+                    The `Status` field is optional, and is omitted if the volume driver
+                    does not support this feature.
+                type: object
+            UsageData:
+                $ref: '#/definitions/UsageData'
+        required:
+            - Driver
+            - Labels
+            - Mountpoint
+            - Name
+            - Options
+            - Scope
+        type: object
+        x-go-package: github.com/docker/docker/api/types/volume
+    WaitExitError:
+        description: WaitExitError container waiting error, if any
+        properties:
+            Message:
+                description: Details of an error
+                type: string
+        type: object
+        x-go-package: github.com/docker/docker/api/types/container
+    WaitResponse:
+        description: OK response to ContainerWait operation
+        properties:
+            Error:
+                $ref: '#/definitions/WaitExitError'
+            StatusCode:
+                description: Exit code of the container
+                format: int64
+                type: integer
+        required:
+            - StatusCode
+        title: WaitResponse ContainerWaitResponse
+        type: object
+        x-go-package: github.com/docker/docker/api/types/container
+    parameter:
+        properties:
+            Value:
+                type: string
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
+    parameters:
+        additionalProperties:
+            $ref: '#/definitions/parameter'
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
+    saveAsRequest:
+        properties:
+            format:
+                description: Database dump format. Currently plain and custom are support, please see https://www.postgresql.org/docs/current/app-pgdump.html
+                type: string
+                x-go-name: Format
+            name:
+                description: Name of the new database
+                type: string
+                x-go-name: Name
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/database
+    signUpRequest:
+        properties:
+            email:
+                type: string
+                x-go-name: Email
+            password:
+                type: string
+                x-go-name: Password
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/user
+    updateUserRequest:
+        properties:
+            email:
+                type: string
+                x-go-name: Email
+            password:
+                type: string
+                x-go-name: Password
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/user
+    validateEmailRequest:
+        properties:
+            token:
+                type: string
+                x-go-name: Token
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/user
+info:
+    contact:
+        email: info@dhis2.org
+        url: https://github.com/dhis2-sre/im-manager
+    description: Instance Manager
+    license:
+        name: TODO
+    title: Instance Manager
+    version: 0.1.0
+paths:
+    /databases:
+        get:
+            description: List databases...
+            operationId: listDatabases
+            responses:
+                "200":
+                    description: GroupsWithDatabases
+                    schema:
+                        items:
+                            $ref: '#/definitions/GroupsWithDatabases'
+                        type: array
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: List databases
+        post:
+            description: Upload database...
+            operationId: uploadDatabase
+            parameters:
+                - description: Upload database request body parameter
+                  in: formData
+                  name: Group
+                  required: true
+                  type: string
+                - description: Upload database request body parameter
+                  in: formData
+                  name: File
+                  required: true
+                  type: file
+            responses:
+                "201":
+                    $ref: '#/responses/Database'
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Upload database
+    /databases/{id}:
+        delete:
+            description: Delete database by id...
+            operationId: deleteDatabaseById
+            parameters:
+                - format: uint64
+                  in: path
+                  name: id
+                  required: true
+                  type: integer
+                  x-go-name: ID
+            responses:
+                "202":
+                    description: ""
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Delete database
+        get:
+            description: Find a database by its identifier. The identifier could be either the actual id of the database or the slug associated with it
+            operationId: findDatabase
+            parameters:
+                - format: uint64
+                  in: path
+                  name: id
+                  required: true
+                  type: integer
+                  x-go-name: ID
+            responses:
+                "200":
+                    $ref: '#/responses/Database'
+                "400":
+                    $ref: '#/responses/Error'
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Find database
+        put:
+            description: |-
+                Update database by id
+                TODO: Race condition? If two clients request at the same time... Do we need a transaction between find and update
+            operationId: updateDatabaseById
+            parameters:
+                - format: uint64
+                  in: path
+                  name: id
+                  required: true
+                  type: integer
+                  x-go-name: ID
+                - description: Update database request body parameter
+                  in: body
+                  name: Body
+                  required: true
+                  schema:
+                    $ref: '#/definitions/UpdateDatabaseRequest'
+            responses:
+                "200":
+                    $ref: '#/responses/Database'
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Update database
+    /databases/{id}/copy:
+        post:
+            description: Copy database...
+            operationId: copyDatabase
+            parameters:
+                - format: uint64
+                  in: path
+                  name: id
+                  required: true
+                  type: integer
+                  x-go-name: ID
+                - description: Copy database request body parameter
+                  in: body
+                  name: Body
+                  required: true
+                  schema:
+                    $ref: '#/definitions/CopyDatabaseRequest'
+            responses:
+                "202":
+                    $ref: '#/responses/Database'
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Copy database
+    /databases/{id}/download:
+        get:
+            description: Download a database by its identifier. The identifier could be either the actual id of the database or the slug associated with it
+            operationId: downloadDatabase
+            parameters:
+                - format: uint64
+                  in: path
+                  name: id
+                  required: true
+                  type: integer
+                  x-go-name: ID
+            responses:
+                "200":
+                    $ref: '#/responses/DownloadDatabaseResponse'
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Download database
+    /databases/{id}/external:
+        post:
+            description: Create link so the database can be downloaded without log in
+            operationId: createExternalDownloadDatabase
+            parameters:
+                - format: uint64
+                  in: path
+                  name: id
+                  required: true
+                  type: integer
+                  x-go-name: ID
+                - description: Create external database download
+                  in: body
+                  name: Body
+                  required: true
+                  schema:
+                    $ref: '#/definitions/CreateExternalDatabaseRequest'
+            responses:
+                "200":
+                    $ref: '#/responses/CreateExternalDownloadResponse'
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: External download link
+    /databases/{id}/lock:
+        delete:
+            description: Unlock database by id
+            operationId: unlockDatabaseById
+            parameters:
+                - format: uint64
+                  in: path
+                  name: id
+                  required: true
+                  type: integer
+                  x-go-name: ID
+                - description: Lock/unlock database request body parameter
+                  in: body
+                  name: Body
+                  required: true
+                  schema:
+                    $ref: '#/definitions/LockDatabaseRequest'
+            responses:
+                "202":
+                    description: ""
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Unlock database
+        post:
+            description: Lock database by id...
+            operationId: lockDatabaseById
+            parameters:
+                - format: uint64
+                  in: path
+                  name: id
+                  required: true
+                  type: integer
+                  x-go-name: ID
+                - description: Lock/unlock database request body parameter
+                  in: body
+                  name: Body
+                  required: true
+                  schema:
+                    $ref: '#/definitions/LockDatabaseRequest'
+            responses:
+                "200":
+                    $ref: '#/responses/Lock'
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+                "409":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Lock database
+    /databases/external/{uuid}:
+        get:
+            description: Download a given database without authentication
+            operationId: externalDownloadDatabase
+            parameters:
+                - format: uint64
+                  in: path
+                  name: uuid
+                  required: true
+                  type: integer
+                  x-go-name: UUID
+            responses:
+                "200":
+                    $ref: '#/responses/DownloadDatabaseResponse'
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Externally download database
+    /databases/save-as/{instanceId}:
+        post:
+            description: Save database under a new name
+            operationId: saveAsDatabase
+            parameters:
+                - format: uint64
+                  in: path
+                  name: instanceId
+                  required: true
+                  type: integer
+                  x-go-name: InstanceID
+                - description: SaveAs database request body parameter
+                  in: body
+                  name: Body
+                  required: true
+                  schema:
+                    $ref: '#/definitions/saveAsRequest'
+            responses:
+                "201":
+                    $ref: '#/responses/Database'
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: '"Save as" database'
+    /databases/save/{instanceId}:
+        post:
+            description: Saving a database won't affect the instances running the database. However, it should be noted that if two unlocked databases are deployed from the same database they can both overwrite it. It's up to the users to ensure this doesn't happen accidentally.
+            operationId: saveDatabase
+            parameters:
+                - format: uint64
+                  in: path
+                  name: instanceId
+                  required: true
+                  type: integer
+                  x-go-name: InstanceID
+            responses:
+                "202":
+                    description: ""
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Save database
+    /deployments:
+        post:
+            description: Save a deployment...
+            operationId: saveDeployment
+            parameters:
+                - description: Save deployment request body parameter
+                  in: body
+                  name: Payload
+                  required: true
+                  schema:
+                    $ref: '#/definitions/SaveDeploymentRequest'
+            responses:
+                "200":
+                    description: Deployment
+                    schema:
+                        $ref: '#/definitions/Deployment'
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Save a deployment
+    /deployments/{id}:
+        get:
+            description: Find a deployment by id
+            operationId: findDeploymentById
+            parameters:
+                - format: uint64
+                  in: path
+                  name: id
+                  required: true
+                  type: integer
+                  x-go-name: ID
+            responses:
+                "200":
+                    description: Deployment
+                    schema:
+                        $ref: '#/definitions/Deployment'
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Find a deployment
+    /deployments/{id}/instance:
+        post:
+            description: Save an instance...
+            operationId: saveInstance
+            parameters:
+                - format: uint64
+                  in: path
+                  name: id
+                  required: true
+                  type: integer
+                  x-go-name: ID
+                - description: Save instance request body parameter
+                  in: body
+                  name: Payload
+                  required: true
+                  schema:
+                    $ref: '#/definitions/SaveInstanceRequest'
+            responses:
+                "200":
+                    description: DeploymentInstance
+                    schema:
+                        $ref: '#/definitions/DeploymentInstance'
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Save an instance
+    /groups:
+        get:
+            description: Find all groups by user
+            operationId: findAllGroupsByUser
+            parameters:
+                - description: deployable
+                  in: query
+                  name: deployable
+                  type: string
+                  x-go-name: Deployable
+            responses:
+                "200":
+                    description: Group
+                    schema:
+                        items:
+                            $ref: '#/definitions/Group'
+                        type: array
+                "401":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Find all groups
+        post:
+            description: Create a group...
+            operationId: groupCreate
+            parameters:
+                - description: Create group request body parameter
+                  in: body
+                  name: Body
+                  required: true
+                  schema:
+                    $ref: '#/definitions/CreateGroupRequest'
+            responses:
+                "201":
+                    description: Group
+                    schema:
+                        $ref: '#/definitions/Group'
+                "400":
+                    $ref: '#/responses/Error'
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Create group
+    /groups/{group}/cluster-configuration:
+        post:
+            description: |-
+                Add a cluster configuration to a group. This will allow deploying to a remote cluster.
+                Currently only configurations with embedded access tokens are support.
+                The configuration needs to be encrypted using Mozilla Sops. Please see ./scripts/addClusterConfigToGroup.sh for an example of how this can be done.
+            operationId: addClusterConfigurationToGroup
+            parameters:
+                - in: path
+                  name: group
+                  required: true
+                  type: string
+                  x-go-name: Group
+                - description: SOPS encrypted Kubernetes configuration file
+                  in: formData
+                  name: Body
+                  required: true
+                  type: file
+            responses:
+                "201":
+                    description: Group
+                    schema:
+                        $ref: '#/definitions/Group'
+                "400":
+                    $ref: '#/responses/Error'
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Add cluster configuration to group
+    /groups/{group}/users/{userId}:
+        delete:
+            description: Remove a user from a group...
+            operationId: removeUserFromGroup
+            parameters:
+                - in: path
+                  name: group
+                  required: true
+                  type: string
+                  x-go-name: Group
+                - format: uint64
+                  in: path
+                  name: userId
+                  required: true
+                  type: integer
+                  x-go-name: UserID
+            responses:
+                "204":
+                    description: ""
+                "400":
+                    $ref: '#/responses/Error'
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Remove user from group
+        post:
+            description: Add a user to a group...
+            operationId: addUserToGroup
+            parameters:
+                - in: path
+                  name: group
+                  required: true
+                  type: string
+                  x-go-name: Group
+                - format: uint64
+                  in: path
+                  name: userId
+                  required: true
+                  type: integer
+                  x-go-name: UserID
+            responses:
+                "201":
+                    description: Group
+                    schema:
+                        $ref: '#/definitions/Group'
+                "400":
+                    $ref: '#/responses/Error'
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Add user to group
+    /groups/{name}:
+        get:
+            description: Find a group by its name
+            operationId: findGroupByName
+            parameters:
+                - in: path
+                  name: name
+                  required: true
+                  type: string
+                  x-go-name: Name
+            responses:
+                "200":
+                    description: Group
+                    schema:
+                        $ref: '#/definitions/Group'
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Find group
+    /groups/{name}/details:
+        get:
+            description: Find a group by its name with details
+            operationId: findGroupByNameWithDetails
+            parameters:
+                - in: path
+                  name: name
+                  required: true
+                  type: string
+                  x-go-name: Name
+            responses:
+                "200":
+                    description: Group
+                    schema:
+                        $ref: '#/definitions/Group'
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Find group with details
+    /health:
+        get:
+            description: Show service health status
+            operationId: health
+            responses:
+                "200":
+                    $ref: '#/responses/Response'
+            summary: Health status
+    /instances:
+        get:
+            description: List all instances accessible by the user
+            operationId: listInstances
+            responses:
+                "200":
+                    $ref: '#/responses/GroupsWithInstances'
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: List instances
+        post:
+            description: Deploy an instance...
+            operationId: deployInstance
+            parameters:
+                - description: Deploy instance request body parameter
+                  in: body
+                  name: Payload
+                  required: true
+                  schema:
+                    $ref: '#/definitions/DeployInstanceRequest'
+                - description: preset
+                  in: query
+                  name: preset
+                  type: string
+                  x-go-name: Preset
+            responses:
+                "201":
+                    description: Instance
+                    schema:
+                        $ref: '#/definitions/Instance'
+                "400":
+                    $ref: '#/responses/Error'
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Deploy instance
+    /instances-name-to-id/{groupName}/{instanceName}:
+        get:
+            description: Find instance id by name and group name
+            operationId: instanceNameToId
+            parameters:
+                - in: path
+                  name: groupName
+                  required: true
+                  type: string
+                  x-go-name: GroupName
+                - in: path
+                  name: instanceName
+                  required: true
+                  type: string
+                  x-go-name: InstanceName
+            responses:
+                "200":
+                    description: Instance
+                    schema:
+                        $ref: '#/definitions/Instance'
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Find an instance
+    /instances/{id}:
+        delete:
+            description: Delete an instance by id
+            operationId: deleteInstance
+            parameters:
+                - format: uint64
+                  in: path
+                  name: id
+                  required: true
+                  type: integer
+                  x-go-name: ID
+            responses:
+                "202":
+                    description: ""
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Delete instance
+        get:
+            description: Find an instance by id
+            operationId: findById
+            parameters:
+                - format: uint64
+                  in: path
+                  name: id
+                  required: true
+                  type: integer
+                  x-go-name: ID
+            responses:
+                "200":
+                    description: Instance
+                    schema:
+                        $ref: '#/definitions/Instance'
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Find instance
+        put:
+            description: Update an instance...
+            operationId: updateInstance
+            parameters:
+                - format: uint64
+                  in: path
+                  name: id
+                  required: true
+                  type: integer
+                  x-go-name: ID
+                - description: Update instance request body parameter
+                  in: body
+                  name: Payload
+                  required: true
+                  schema:
+                    $ref: '#/definitions/UpdateInstanceRequest'
+            responses:
+                "204":
+                    description: Instance
+                    schema:
+                        $ref: '#/definitions/Instance'
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Update instance
+    /instances/{id}/logs:
+        get:
+            description: Stream instance logs in real time
+            operationId: instanceLogs
+            parameters:
+                - format: uint64
+                  in: path
+                  name: id
+                  required: true
+                  type: integer
+                  x-go-name: ID
+                - description: selector
+                  in: query
+                  name: selector
+                  type: string
+                  x-go-name: Selector
+            responses:
+                "200":
+                    $ref: '#/responses/InstanceLogsResponse'
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Stream logs
+    /instances/{id}/parameters:
+        get:
+            description: Find instance by id with decrypted parameters
+            operationId: findByIdDecrypted
+            parameters:
+                - format: uint64
+                  in: path
+                  name: id
+                  required: true
+                  type: integer
+                  x-go-name: ID
+            responses:
+                "200":
+                    description: Instance
+                    schema:
+                        $ref: '#/definitions/Instance'
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Find decrypted instance
+    /instances/{id}/pause:
+        put:
+            description: |-
+                Pause an instance. Pause can be called multiple times even on an already paused instance
+                (idempotent).
+            operationId: pauseInstance
+            parameters:
+                - format: uint64
+                  in: path
+                  name: id
+                  required: true
+                  type: integer
+                  x-go-name: ID
+            responses:
+                "202":
+                    description: ""
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Pause instance
+    /instances/{id}/reset:
+        put:
+            description: Resetting an instance will completely destroy it and redeploy using the same parameters
+            operationId: resetInstance
+            parameters:
+                - format: uint64
+                  in: path
+                  name: id
+                  required: true
+                  type: integer
+                  x-go-name: ID
+            responses:
+                "202":
+                    description: ""
+                "400":
+                    $ref: '#/responses/Error'
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Reset instance
+    /instances/{id}/restart:
+        put:
+            description: Restart an instance...
+            operationId: restartInstance
+            parameters:
+                - format: uint64
+                  in: path
+                  name: id
+                  required: true
+                  type: integer
+                  x-go-name: ID
+                - description: selector
+                  in: query
+                  name: selector
+                  type: string
+                  x-go-name: Selector
+            responses:
+                "202":
+                    description: ""
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Restart instance
+    /instances/{id}/resume:
+        put:
+            description: |-
+                Resume a paused instance. Resume can be called multiple times even on an already running
+                instance (idempotent).
+            operationId: resumeInstance
+            parameters:
+                - format: uint64
+                  in: path
+                  name: id
+                  required: true
+                  type: integer
+                  x-go-name: ID
+            responses:
+                "202":
+                    description: ""
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Resume paused instance
+    /integrations:
+        post:
+            description: Return integration for a given key
+            operationId: postIntegration
+            parameters:
+                - description: Integration request body
+                  in: body
+                  name: Body
+                  required: true
+                  schema:
+                    $ref: '#/definitions/Request'
+            responses:
+                "200":
+                    $ref: '#/responses/Response'
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Integration
+    /me:
+        get:
+            description: Current user details
+            operationId: me
+            responses:
+                "200":
+                    description: User
+                    schema:
+                        $ref: '#/definitions/User'
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: User details
+    /presets:
+        get:
+            description: List all presets accessible by the user
+            operationId: listPresets
+            responses:
+                "200":
+                    $ref: '#/responses/GroupsWithInstances'
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: List presets
+    /public/instances:
+        get:
+            description: List all public instances
+            operationId: listPublicInstances
+            responses:
+                "200":
+                    $ref: '#/responses/GroupsWithInstances'
+            summary: List Public Instances
+    /refresh:
+        post:
+            description: Refresh user tokens
+            operationId: refreshToken
+            parameters:
+                - description: Refresh token request body parameter
+                  in: body
+                  name: Body
+                  required: true
+                  schema:
+                    $ref: '#/definitions/RefreshTokenRequest'
+            responses:
+                "201":
+                    $ref: '#/responses/Tokens'
+                "400":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            summary: Refresh tokens
+    /stacks:
+        get:
+            description: Find all stacks...
+            operationId: stacks
+            responses:
+                "200":
+                    $ref: '#/responses/StacksResponse'
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Find all stacks
+    /stacks/{name}:
+        get:
+            description: Find stack by name
+            operationId: stack
+            parameters:
+                - in: path
+                  name: name
+                  required: true
+                  type: string
+                  x-go-name: Name
+            responses:
+                "200":
+                    $ref: '#/responses/StackResponse'
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Find stack
+    /tokens:
+        post:
+            description: Sign in... And get tokens
+            operationId: signIn
+            responses:
+                "201":
+                    $ref: '#/responses/Tokens'
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - basicAuth: []
+            summary: Sign in
+    /users:
+        delete:
+            description: Sign out user... The authentication is done using oauth and JWT. A JWT can't easily be invalidated so even after calling this endpoint a user can still sign in assuming the JWT isn't expired. However, the token can't be refreshed using the refresh token supplied upon signin
+            operationId: signOut
+            responses:
+                "200":
+                    description: ""
+                "401":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Sign out
+        get:
+            description: Find all users with the groups they belong to
+            operationId: findAllUsers
+            responses:
+                "200":
+                    $ref: '#/responses/UsersResponse'
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Find users
+        post:
+            description: Sign up a user. This endpoint is publicly accessible and therefor anyone can sign up. However, before being able to perform any actions, users needs to be a member of a group. And only administrators can add users to groups.
+            operationId: signUp
+            parameters:
+                - description: SignUp request body parameter
+                  in: body
+                  name: Body
+                  required: true
+                  schema:
+                    $ref: '#/definitions/signUpRequest'
+            responses:
+                "201":
+                    description: User
+                    schema:
+                        $ref: '#/definitions/User'
+                "400":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            summary: SignUp user
+    /users/{id}:
+        delete:
+            description: Delete user by id
+            operationId: deleteUser
+            parameters:
+                - format: uint64
+                  in: path
+                  name: id
+                  required: true
+                  type: integer
+                  x-go-name: ID
+            responses:
+                "202":
+                    description: ""
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Delete user
+        get:
+            description: Find a user by its id
+            operationId: findUserById
+            parameters:
+                - format: uint64
+                  in: path
+                  name: id
+                  required: true
+                  type: integer
+                  x-go-name: ID
+            responses:
+                "200":
+                    description: User
+                    schema:
+                        $ref: '#/definitions/User'
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Find user
+        put:
+            description: Update user's email and/or password
+            operationId: updateUser
+            parameters:
+                - format: uint64
+                  in: path
+                  name: id
+                  required: true
+                  type: integer
+                  x-go-name: ID
+                - description: Update user request
+                  in: body
+                  name: Body
+                  required: true
+                  schema:
+                    $ref: '#/definitions/updateUserRequest'
+            responses:
+                "200":
+                    description: User
+                    schema:
+                        $ref: '#/definitions/User'
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Update user
+    /users/validate:
+        post:
+            description: Validate users email
+            operationId: validateEmail
+            parameters:
+                - description: Email validation token request body parameter
+                  in: body
+                  name: Body
+                  required: true
+                  schema:
+                    $ref: '#/definitions/validateEmailRequest'
+            responses:
+                "200":
+                    description: ""
+                "400":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+            summary: Validate email
+produces:
+    - application/json
+responses:
+    CreateExternalDownloadResponse:
+        description: ""
+        schema:
+            $ref: '#/definitions/ExternalDownload'
+    Database:
+        description: ""
+        schema:
+            $ref: '#/definitions/Database'
+    DownloadDatabaseResponse:
+        description: ""
+        schema:
+            items:
+                format: uint8
+                type: integer
+            type: array
+    Error:
+        description: ""
+    GroupsWithInstances:
+        description: ""
+        schema:
+            items:
+                $ref: '#/definitions/GroupsWithInstances'
+            type: array
+    InstanceLogsResponse:
+        description: ""
+    Lock:
+        description: ""
+        schema:
+            $ref: '#/definitions/Lock'
+    Response:
+        description: ""
+        schema:
+            $ref: '#/definitions/Response'
+    StackResponse:
+        description: ""
+        schema:
+            $ref: '#/definitions/StackDetail'
+    StacksResponse:
+        description: ""
+        schema:
+            items:
+                $ref: '#/definitions/StackDetail'
+            type: array
+    Tokens:
+        description: ""
+        schema:
+            $ref: '#/definitions/Tokens'
+    UsersResponse:
+        description: ""
+        schema:
+            items:
+                $ref: '#/definitions/User'
+            type: array
+    saveInstance:
+        description: ""
+        schema:
+            $ref: '#/definitions/DeploymentInstance'
+securityDefinitions:
+    oauth2:
+        flow: password
+        tokenUrl: /tokens
+        type: oauth2
+swagger: "2.0"
