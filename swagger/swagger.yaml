@@ -387,7 +387,7 @@ definitions:
                 type: integer
                 x-go-name: ID
             parameters:
-                $ref: '#/definitions/Parameters'
+                $ref: '#/definitions/DeploymentInstanceParameters'
             stackName:
                 type: string
                 x-go-name: StackName
@@ -402,6 +402,11 @@ definitions:
             value:
                 type: string
                 x-go-name: Value
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/model
+    DeploymentInstanceParameters:
+        additionalProperties:
+            $ref: '#/definitions/DeploymentInstanceParameter'
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/model
     ErrorResponse:
@@ -848,11 +853,6 @@ definitions:
         title: Meta is a base object inherited by most of the other once.
         type: object
         x-go-package: github.com/docker/docker/api/types/swarm
-    Parameters:
-        additionalProperties:
-            $ref: '#/definitions/DeploymentInstanceParameter'
-        type: object
-        x-go-package: github.com/dhis2-sre/im-manager/pkg/model
     Plugin:
         description: Plugin A plugin for the Engine API
         properties:
