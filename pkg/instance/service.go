@@ -92,7 +92,7 @@ func (s service) validateDeployment(deployment *model.Deployment) error {
 
 	err = stack.ValidateNoCycles(stacks)
 	if err != nil {
-		return err
+		return fmt.Errorf("error saving instance for %q as it adds a cycle which cannot be deployed: %v", instance.StackName, err)
 	}
 
 	err = stack.ValidateConsumedParameters(stacks)
