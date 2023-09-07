@@ -11,20 +11,17 @@ import (
 
 	"github.com/dhis2-sre/im-manager/pkg/stack"
 
-	"github.com/dhis2-sre/im-manager/pkg/config"
 	"github.com/dhis2-sre/im-manager/pkg/model"
 )
 
 //goland:noinspection GoExportedFuncWithUnexportedType
 func NewService(
-	config config.Config,
 	instanceRepository Repository,
 	groupService groupService,
 	stackService stack.Service,
 	helmfileService helmfile,
 ) *service {
 	return &service{
-		config,
 		instanceRepository,
 		groupService,
 		stackService,
@@ -47,7 +44,6 @@ type Repository interface {
 
 type groupService interface {
 	Find(name string) (*model.Group, error)
-	FindAll(user *model.User, deployable bool) ([]model.Group, error)
 }
 
 type helmfile interface {
@@ -56,7 +52,6 @@ type helmfile interface {
 }
 
 type service struct {
-	config             config.Config
 	instanceRepository Repository
 	groupService       groupService
 	stackService       stack.Service

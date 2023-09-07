@@ -87,7 +87,7 @@ deploy:
             RABBITMQ_PORT: "5672"
             S3_BUCKET: im-databases-{{ .CLASSIFICATION }}
             S3_REGION: eu-west-1
-            DEFAULT_TTL: "172800"
+            DEFAULT_TTL: "172800" # 48 hours
         useHelmSecrets: true
         valuesFiles:
           - helm/data/secrets/{{ .CLASSIFICATION }}/values.yaml
