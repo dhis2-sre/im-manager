@@ -1217,13 +1217,34 @@ definitions:
                 type: string
                 x-go-name: Name
             parameters:
-                $ref: '#/definitions/StackParameters'
                 items:
                     $ref: '#/definitions/StackParameter'
                 type: array
+                x-go-name: Parameters
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/stack
-    StackParameter:
+    StackDetail:
+        properties:
+            hostnamePattern:
+                type: string
+                x-go-name: HostnamePattern
+            hostnameVariable:
+                type: string
+                x-go-name: HostnameVariable
+            instances:
+                items:
+                    $ref: '#/definitions/Instance'
+                type: array
+                x-go-name: Instances
+            name:
+                type: string
+                x-go-name: Name
+            parameters:
+                $ref: '#/definitions/StackDetailParameters'
+        type: object
+        x-go-name: Stack
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/model
+    StackDetailParameter:
         properties:
             consumed:
                 description: Consumed signals that this parameter is provided by another stack i.e. one of the stacks required stacks.
@@ -1233,12 +1254,27 @@ definitions:
                 type: string
                 x-go-name: DefaultValue
         type: object
+        x-go-name: StackParameter
         x-go-package: github.com/dhis2-sre/im-manager/pkg/model
-    StackParameters:
+    StackDetailParameters:
         additionalProperties:
-            $ref: '#/definitions/StackParameter'
+            $ref: '#/definitions/StackDetailParameter'
         type: object
+        x-go-name: StackParameters
         x-go-package: github.com/dhis2-sre/im-manager/pkg/model
+    StackParameter:
+        properties:
+            consumed:
+                type: boolean
+                x-go-name: Consumed
+            defaultValue:
+                type: string
+                x-go-name: DefaultValue
+            name:
+                type: string
+                x-go-name: Name
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/stack
     Tokens:
         description: Tokens domain object defining user tokens
         properties:
@@ -2905,12 +2941,12 @@ responses:
     StackResponse:
         description: ""
         schema:
-            $ref: '#/definitions/Stack'
+            $ref: '#/definitions/StackDetail'
     StacksResponse:
         description: ""
         schema:
             items:
-                $ref: '#/definitions/Stack'
+                $ref: '#/definitions/StackDetail'
             type: array
     Tokens:
         description: ""
