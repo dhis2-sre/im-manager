@@ -28,7 +28,7 @@ func New(stacks ...model.Stack) (Stacks, error) {
 		return nil, err
 	}
 
-	err = validateConsumedParameters(stacks)
+	err = ValidateConsumedParameters(stacks)
 	if err != nil {
 		return nil, err
 	}
@@ -73,9 +73,9 @@ func validateNoCycles(stacks []model.Stack) error {
 	return nil
 }
 
-// validateConsumedParameters validates all consumed parameters are provided by exactly one of the
+// ValidateConsumedParameters validates all consumed parameters are provided by exactly one of the
 // required stacks. Required stacks need to provide at least one consumed parameter.
-func validateConsumedParameters(stacks []model.Stack) error {
+func ValidateConsumedParameters(stacks []model.Stack) error {
 	var errs []error
 	for _, stack := range stacks { // validate each stacks consumed parameters are provided by its required stacks
 		requiredStacks := make(map[string]int)

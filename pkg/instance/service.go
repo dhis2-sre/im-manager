@@ -91,7 +91,29 @@ func (s service) validateDeployment(deployment *model.Deployment) error {
 		return err
 	}
 
+	stacks, err := s.collectStacks(deployment)
+	if err != nil {
+		return err
+	}
+
+	err = stack.ValidateConsumedParameters(stacks)
+	if err != nil {
+		return err
+	}
+
 	return nil
+}
+
+func (s service) collectStacks(deployment *model.Deployment) ([]model.Stack, error) {
+	stacks := make([]model.Stack, len(deployment.Instances))
+	for i, instance := range deployment.Instances {
+		stack, err := s.stackService.Find(instance.StackName)
+		if err != nil {
+			return nil, err
+		}
+		stacks[i] = *stack
+	}
+	return stacks, nil
 }
 
 func (s service) validateNoCycles(deployment *model.Deployment) error {
