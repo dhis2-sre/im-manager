@@ -36,9 +36,6 @@ type SaveDeploymentRequest struct {
 	Name        string `json:"name" binding:"required,dns_rfc1035_label"`
 	Description string `json:"description"`
 	Group       string `json:"group" binding:"required"`
-	TTL         uint   `json:"ttl"`
-	Source      uint   `json:"source"` // TODO: Create from source eg. other deployment
-	Preset      uint   `json:"preset"` // TODO: Create as preset
 }
 
 func (h Handler) SaveDeployment(c *gin.Context) {
@@ -75,10 +72,6 @@ func (h Handler) SaveDeployment(c *gin.Context) {
 		return
 	}
 
-	if request.TTL == 0 {
-		request.TTL = h.defaultTTL
-	}
-
 	user, err := handler.GetUserFromContext(c)
 	if err != nil {
 		_ = c.Error(err)
@@ -90,19 +83,6 @@ func (h Handler) SaveDeployment(c *gin.Context) {
 		Name:        request.Name,
 		Description: request.Description,
 		GroupName:   request.Group,
-		TTL:         request.TTL,
-	}
-
-	group, err = h.groupService.Find(request.Group)
-	if err != nil {
-		_ = c.Error(err)
-		return
-	}
-
-	if !group.Deployable {
-		forbidden := errdef.NewForbidden("group isn't deployable: %s", group.Name)
-		_ = c.Error(forbidden)
-		return
 	}
 
 	canWrite := handler.CanWriteDeployment(user, deployment)
@@ -171,10 +151,7 @@ type parameter struct{ Value string }
 type parameters map[string]parameter
 
 type SaveInstanceRequest struct {
-	StackName string `json:"stackName"`
-	Preset    bool   `json:"preset"`
-	PresetID  uint   `json:"presetId"` // The preset id this link is created from
-	//	Public     bool                      `json:"public"`
+	StackName  string     `json:"stackName"`
 	Parameters parameters `json:"parameters"`
 }
 
@@ -205,12 +182,11 @@ func (h Handler) SaveInstance(c *gin.Context) {
 		return
 	}
 
-	// Convert request parameters to LinkParameters
 	params := make(model.Parameters, len(request.Parameters))
-	for k, v := range request.Parameters {
-		params[k] = model.DeploymentInstanceParameter{
-			ParameterName: k,
-			Value:         v.Value,
+	for name, parameter := range request.Parameters {
+		params[name] = model.DeploymentInstanceParameter{
+			ParameterName: name,
+			Value:         parameter.Value,
 		}
 	}
 
@@ -218,9 +194,6 @@ func (h Handler) SaveInstance(c *gin.Context) {
 		DeploymentID: deploymentId,
 		StackName:    request.StackName,
 		Parameters:   params,
-		Preset:       request.Preset,
-		//		PresetID:   0,
-		//		Public:     false,
 	}
 
 	err := h.instanceService.SaveInstance(instance)

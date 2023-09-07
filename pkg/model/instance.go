@@ -19,7 +19,6 @@ type Deployment struct {
 	Description string `json:"description"`
 	GroupName   string `json:"groupName" gorm:"index:idx_name_and_group,unique; references:Name"`
 	Group       *Group `json:"group,omitempty"`
-	TTL         uint   `json:"ttl"`
 
 	Instances []*DeploymentInstance `json:"instances"`
 }
@@ -39,10 +38,6 @@ type DeploymentInstance struct {
 	GormParameters []DeploymentInstanceParameter `json:"-" gorm:"foreignKey:DeploymentInstanceID; constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
 	Parameters     Parameters                    `json:"parameters" gorm:"-:all"`
 
-	Preset   bool `json:"preset"`   // Whether this instance is a preset
-	PresetID uint `json:"presetId"` // The preset id this instance is created from
-	Public   bool `json:"public"`
-
 	DeployLog string `json:"deployLog" gorm:"type:text"`
 }
 
@@ -55,7 +50,8 @@ type DeploymentInstanceParameter struct {
 
 func (i *DeploymentInstance) BeforeSave(_ *gorm.DB) error {
 	i.GormParameters = make([]DeploymentInstanceParameter, 0, len(i.Parameters))
-	for _, parameter := range i.Parameters {
+	for name, parameter := range i.Parameters {
+		parameter.ParameterName = name
 		parameter.DeploymentInstanceID = i.ID
 		parameter.StackName = i.StackName
 		i.GormParameters = append(i.GormParameters, parameter)

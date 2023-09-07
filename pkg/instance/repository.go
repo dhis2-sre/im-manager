@@ -29,7 +29,7 @@ func (r repository) SaveDeployment(deployment *model.Deployment) error {
 		return errdef.NewDuplicated("a deployment named %q already exists", deployment.Name)
 	}
 
-	return err
+	return fmt.Errorf("failed to save deployment: %v", err)
 }
 
 func (r repository) FindDeploymentById(id uint) (*model.Deployment, error) {
