@@ -27,9 +27,9 @@ func NewHandler(userService userServiceHandler, groupService groupServiceHandler
 }
 
 type Service interface {
-	SaveChain(chain *model.Deployment) error
-	FindChainById(id uint) (*model.Deployment, error)
-	SaveLink(link *model.DeploymentInstance) error
+	SaveDeployment(chain *model.Deployment) error
+	FindDeploymentById(id uint) (*model.Deployment, error)
+	SaveInstance(link *model.DeploymentInstance) error
 	ConsumeParameters(source, destination *model.Instance) error
 	Pause(instance *model.Instance) error
 	Resume(instance *model.Instance) error
@@ -117,7 +117,7 @@ func (h Handler) SaveChain(c *gin.Context) {
 
 	// TODO: Assert group is writable
 	// TODO: If request.Source, load chain... Maybe only support
-	err = h.instanceService.SaveChain(chain)
+	err = h.instanceService.SaveDeployment(chain)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -169,7 +169,7 @@ func (h Handler) SaveLink(c *gin.Context) {
 	}
 
 	// TODO: If request.Source, load chain... Maybe only support source on links?
-	err := h.instanceService.SaveLink(link)
+	err := h.instanceService.SaveInstance(link)
 	if err != nil {
 		_ = c.Error(err)
 		return

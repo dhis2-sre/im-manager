@@ -29,9 +29,9 @@ func NewService(
 }
 
 type Repository interface {
-	SaveChain(chain *model.Deployment) error
-	FindChainById(id uint) (*model.Deployment, error)
-	SaveLink(*model.DeploymentInstance) error
+	SaveDeployment(chain *model.Deployment) error
+	FindDeploymentById(id uint) (*model.Deployment, error)
+	SaveInstance(*model.DeploymentInstance) error
 	Link(firstInstance, secondInstance *model.Instance) error
 	Unlink(instance *model.Instance) error
 	Save(instance *model.Instance) error
@@ -62,20 +62,20 @@ type service struct {
 	helmfileService    helmfile
 }
 
-func (s service) SaveChain(chain *model.Deployment) error {
-	return s.instanceRepository.SaveChain(chain)
+func (s service) SaveDeployment(chain *model.Deployment) error {
+	return s.instanceRepository.SaveDeployment(chain)
 }
 
-func (s service) FindChainById(id uint) (*model.Deployment, error) {
-	return s.instanceRepository.FindChainById(id)
+func (s service) FindDeploymentById(id uint) (*model.Deployment, error) {
+	return s.instanceRepository.FindDeploymentById(id)
 }
 
-func (s service) SaveLink(link *model.DeploymentInstance) error {
-	chain, err := s.instanceRepository.FindChainById(link.DeploymentID)
+func (s service) SaveInstance(instance *model.DeploymentInstance) error {
+	chain, err := s.instanceRepository.FindDeploymentById(instance.DeploymentID)
 	if err != nil {
 		// TODO: Do we really care about this check? If the chainID doesn't exist we'll get a FK violation and if that's the case we didn't need to look up the chain
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return errdef.NewNotFound("chain not found by id: %d", link.DeploymentID)
+			return errdef.NewNotFound("chain not found by id: %d", instance.DeploymentID)
 		}
 		return err
 	}
@@ -83,7 +83,7 @@ func (s service) SaveLink(link *model.DeploymentInstance) error {
 	// TODO: Assert chain is valid...
 	log.Println("chain id:", chain.ID)
 
-	return s.instanceRepository.SaveLink(link)
+	return s.instanceRepository.SaveInstance(instance)
 }
 
 func (s service) ConsumeParameters(source, destination *model.Instance) error {

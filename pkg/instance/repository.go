@@ -22,7 +22,7 @@ type repository struct {
 	config config.Config
 }
 
-func (r repository) SaveChain(chain *model.Deployment) error {
+func (r repository) SaveDeployment(chain *model.Deployment) error {
 	// TODO: Do we need the option to save nested entities... Yes, if we create the chain from a preset we need to store all the links as well
 	//err := r.db.Session(&gorm.Session{FullSaveAssociations: true}).Save(chain).Error
 	err := r.db.Create(&chain).Error
@@ -33,7 +33,7 @@ func (r repository) SaveChain(chain *model.Deployment) error {
 	return err
 }
 
-func (r repository) FindChainById(id uint) (*model.Deployment, error) {
+func (r repository) FindDeploymentById(id uint) (*model.Deployment, error) {
 	var chain *model.Deployment
 	err := r.db.
 		Joins("Group").
@@ -45,7 +45,7 @@ func (r repository) FindChainById(id uint) (*model.Deployment, error) {
 	return chain, err
 }
 
-func (r repository) SaveLink(link *model.DeploymentInstance) error {
+func (r repository) SaveInstance(link *model.DeploymentInstance) error {
 	err := r.db.Session(&gorm.Session{FullSaveAssociations: true}).Save(link).Error
 	// TODO: When is a link duplicated?
 	if errors.Is(err, gorm.ErrDuplicatedKey) {
