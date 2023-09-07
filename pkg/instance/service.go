@@ -7,8 +7,6 @@ import (
 	"log"
 	"os/exec"
 
-	"github.com/dominikbraun/graph"
-
 	"github.com/dhis2-sre/im-manager/internal/errdef"
 
 	"github.com/dhis2-sre/im-manager/pkg/stack"
@@ -86,12 +84,12 @@ func (s service) SaveInstance(instance *model.DeploymentInstance) error {
 }
 
 func (s service) validateDeployment(deployment *model.Deployment) error {
-	err := s.validateNoCycles(deployment)
+	stacks, err := s.collectStacks(deployment)
 	if err != nil {
 		return err
 	}
 
-	stacks, err := s.collectStacks(deployment)
+	err = stack.ValidateNoCycles(stacks)
 	if err != nil {
 		return err
 	}
@@ -114,41 +112,6 @@ func (s service) collectStacks(deployment *model.Deployment) ([]model.Stack, err
 		stacks[i] = *stack
 	}
 	return stacks, nil
-}
-
-func (s service) validateNoCycles(deployment *model.Deployment) error {
-	g := graph.New(func(instance *model.DeploymentInstance) string {
-		return instance.StackName
-	}, graph.Directed(), graph.PreventCycles())
-
-	instances := deployment.Instances
-	for _, instance := range instances {
-		err := g.AddVertex(instance)
-		if err != nil {
-			return fmt.Errorf("failed adding vertex for instance with stack %q: %v", instance.StackName, err)
-		}
-	}
-
-	for _, instance := range instances {
-		src, err := s.stackService.Find(instance.StackName)
-		if err != nil {
-			return err
-		}
-
-		for _, dest := range src.Requires {
-			err := g.AddEdge(src.Name, dest.Name)
-			if err != nil {
-				if errors.Is(err, graph.ErrEdgeAlreadyExists) {
-					return fmt.Errorf("instance %q requires %q more than once", src.Name, dest.Name)
-				} else if errors.Is(err, graph.ErrEdgeCreatesCycle) {
-					return fmt.Errorf("edge from instance %q to instance %q creates a cycle", src.Name, dest.Name)
-				}
-				return fmt.Errorf("failed adding edge from instance %q to instance %q: %v", src.Name, dest.Name, err)
-			}
-		}
-	}
-
-	return nil
 }
 
 func (s service) ConsumeParameters(source, destination *model.Instance) error {

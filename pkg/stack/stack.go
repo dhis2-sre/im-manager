@@ -23,7 +23,7 @@ type Stacks map[string]model.Stack
 
 // New creates stacks ensuring consumed parameters are provided by required stacks.
 func New(stacks ...model.Stack) (Stacks, error) {
-	err := validateNoCycles(stacks)
+	err := ValidateNoCycles(stacks)
 	if err != nil {
 		return nil, err
 	}
@@ -40,11 +40,11 @@ func New(stacks ...model.Stack) (Stacks, error) {
 	return result, nil
 }
 
-// validateNoCycles validates that the stacks graph does not contain a cycle. The stacks form a
+// ValidateNoCycles validates that the stacks graph does not contain a cycle. The stacks form a
 // graph via the required stacks forming a directed edge from the stack to the required stack.
 // Stacks with cycles would lead to undeployable instances. There would not be an order (no solution
 // to topological sort) in which we could deploy instances in.
-func validateNoCycles(stacks []model.Stack) error {
+func ValidateNoCycles(stacks []model.Stack) error {
 	g := graph.New(func(stack model.Stack) string {
 		return stack.Name
 	}, graph.Directed(), graph.PreventCycles())
