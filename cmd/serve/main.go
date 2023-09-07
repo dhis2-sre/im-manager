@@ -104,9 +104,9 @@ func run() error {
 
 	stackService := stack.NewService(stacks)
 
-	instanceRepo := instance.NewRepository(db, cfg)
-	helmfileService := instance.NewHelmfileService(stackService, cfg)
-	instanceService := instance.NewService(cfg, instanceRepo, groupService, stackService, helmfileService)
+	instanceRepo := instance.NewRepository(db, cfg.InstanceParameterEncryptionKey)
+	helmfileService := instance.NewHelmfileService("./stacks", stackService, cfg.Classification)
+	instanceService := instance.NewService(instanceRepo, groupService, stackService, helmfileService)
 
 	dockerHubClient := integration.NewDockerHubClient(cfg.DockerHub.Username, cfg.DockerHub.Password)
 
@@ -126,7 +126,7 @@ func run() error {
 	}
 
 	stackHandler := stack.NewHandler(stackService)
-	instanceHandler := instance.NewHandler(userService, groupService, instanceService, stackService, cfg.DefaultTTL)
+	instanceHandler := instance.NewHandler(groupService, instanceService, cfg.DefaultTTL)
 
 	s3Endpoint := aws.EndpointResolverWithOptionsFunc(func(service, region string, options ...any) (aws.Endpoint, error) {
 		if cfg.S3Endpoint != "" {
@@ -173,7 +173,7 @@ func run() error {
 	stack.Routes(r, authentication.TokenAuthentication, stackHandler)
 	integration.Routes(r, authentication, integrationHandler)
 	database.Routes(r, authentication.TokenAuthentication, databaseHandler)
-	instance.Routes(r, authentication, instanceHandler)
+	instance.Routes(r, authentication.TokenAuthentication, instanceHandler)
 
 	return r.Run()
 }
@@ -205,7 +205,6 @@ func newS3Config(region string, endpoint aws.EndpointResolverWithOptionsFunc) (a
 		s3config.WithRegion(region),
 		s3config.WithEndpointResolverWithOptions(aws.EndpointResolverWithOptions(endpoint)),
 	)
-
 	if err != nil {
 		return aws.Config{}, err
 	}
