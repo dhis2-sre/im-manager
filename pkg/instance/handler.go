@@ -9,54 +9,23 @@ import (
 
 	"github.com/dhis2-sre/im-manager/internal/errdef"
 
-	"github.com/dhis2-sre/im-manager/pkg/stack"
-
 	"github.com/dhis2-sre/im-manager/internal/handler"
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	"github.com/gin-gonic/gin"
 )
 
-func NewHandler(userService userServiceHandler, groupService groupServiceHandler, instanceService Service, stackService stack.Service, defaultTTL uint) Handler {
+func NewHandler(groupService groupServiceHandler, instanceService *service, defaultTTL uint) Handler {
 	return Handler{
-		userService,
 		groupService,
 		instanceService,
-		stackService,
 		defaultTTL,
 	}
 }
 
-type Service interface {
-	SaveDeployment(deployment *model.Deployment) error
-	FindDeploymentById(id uint) (*model.Deployment, error)
-	SaveInstance(instance *model.DeploymentInstance) error
-	ConsumeParameters(source, destination *model.Instance) error
-	Pause(instance *model.Instance) error
-	Resume(instance *model.Instance) error
-	Restart(instance *model.Instance, typeSelector string) error
-	Reset(token string, instance *model.Instance) error
-	Save(instance *model.Instance) error
-	Deploy(token string, instance *model.Instance) error
-	FindById(id uint) (*model.Instance, error)
-	FindByIdDecrypted(id uint) (*model.Instance, error)
-	FindByNameAndGroup(instance string, group string) (*model.Instance, error)
-	FindPublicInstances() ([]GroupsWithInstances, error)
-	Delete(id uint) error
-	Logs(instance *model.Instance, group *model.Group, typeSelector string) (io.ReadCloser, error)
-	FindInstances(user *model.User, presets bool) ([]GroupsWithInstances, error)
-	Link(source, destination *model.Instance) error
-}
-
 type Handler struct {
-	userService     userServiceHandler
 	groupService    groupServiceHandler
-	instanceService Service
-	stackService    stack.Service
+	instanceService *service
 	defaultTTL      uint
-}
-
-type userServiceHandler interface {
-	FindById(id uint) (*model.User, error)
 }
 
 type groupServiceHandler interface {

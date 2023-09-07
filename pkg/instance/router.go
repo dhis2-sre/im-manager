@@ -1,15 +1,14 @@
 package instance
 
 import (
-	"github.com/dhis2-sre/im-manager/internal/middleware"
 	"github.com/gin-gonic/gin"
 )
 
-func Routes(r *gin.Engine, authenticationMiddleware middleware.AuthenticationMiddleware, handler Handler) {
+func Routes(r *gin.Engine, authenticator gin.HandlerFunc, handler Handler) {
 	r.GET("/public/instances", handler.ListPublicInstances)
 
 	tokenAuthenticationRouter := r.Group("")
-	tokenAuthenticationRouter.Use(authenticationMiddleware.TokenAuthentication)
+	tokenAuthenticationRouter.Use(authenticator)
 
 	tokenAuthenticationRouter.POST("/instances", handler.Deploy)
 	tokenAuthenticationRouter.GET("/instances", handler.ListInstances)
