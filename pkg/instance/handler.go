@@ -189,7 +189,7 @@ func (h Handler) SaveInstance(c *gin.Context) {
 	//	oauth2:
 	//
 	// responses:
-	//	200: Instance
+	//	200: DeploymentInstance
 	//	401: Error
 	//	403: Error
 	//	404: Error

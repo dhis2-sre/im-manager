@@ -329,6 +329,95 @@ definitions:
                 x-go-name: TTL
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
+    Deployment:
+        properties:
+            createdAt:
+                format: date-time
+                type: string
+                x-go-name: CreatedAt
+            description:
+                type: string
+                x-go-name: Description
+            group:
+                $ref: '#/definitions/Group'
+            groupName:
+                type: string
+                x-go-name: GroupName
+            id:
+                format: uint64
+                type: integer
+                x-go-name: ID
+            instances:
+                items:
+                    $ref: '#/definitions/DeploymentInstance'
+                type: array
+                x-go-name: Instances
+            name:
+                type: string
+                x-go-name: Name
+            ttl:
+                format: uint64
+                type: integer
+                x-go-name: TTL
+            updatedAt:
+                format: date-time
+                type: string
+                x-go-name: UpdatedAt
+            user:
+                $ref: '#/definitions/User'
+            userId:
+                format: uint64
+                type: integer
+                x-go-name: UserID
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/model
+    DeploymentInstance:
+        properties:
+            createdAt:
+                format: date-time
+                type: string
+                x-go-name: CreatedAt
+            deployLog:
+                type: string
+                x-go-name: DeployLog
+            deployment:
+                $ref: '#/definitions/Deployment'
+            deploymentId:
+                format: uint64
+                type: integer
+                x-go-name: DeploymentID
+            id:
+                format: uint64
+                type: integer
+                x-go-name: ID
+            parameters:
+                $ref: '#/definitions/Parameters'
+            preset:
+                type: boolean
+                x-go-name: Preset
+            presetId:
+                format: uint64
+                type: integer
+                x-go-name: PresetID
+            public:
+                type: boolean
+                x-go-name: Public
+            stackName:
+                type: string
+                x-go-name: StackName
+            updatedAt:
+                format: date-time
+                type: string
+                x-go-name: UpdatedAt
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/model
+    DeploymentInstanceParameter:
+        properties:
+            value:
+                type: string
+                x-go-name: Value
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/model
     ErrorResponse:
         properties:
             message:
@@ -773,6 +862,11 @@ definitions:
         title: Meta is a base object inherited by most of the other once.
         type: object
         x-go-package: github.com/docker/docker/api/types/swarm
+    Parameters:
+        additionalProperties:
+            $ref: '#/definitions/DeploymentInstanceParameter'
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/model
     Plugin:
         description: Plugin A plugin for the Engine API
         properties:
@@ -1173,6 +1267,47 @@ definitions:
         description: Response depends on the input and can be either a list or a map
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/integration
+    SaveDeploymentRequest:
+        properties:
+            description:
+                type: string
+                x-go-name: Description
+            group:
+                type: string
+                x-go-name: Group
+            name:
+                type: string
+                x-go-name: Name
+            preset:
+                format: uint64
+                type: integer
+                x-go-name: Preset
+            source:
+                format: uint64
+                type: integer
+                x-go-name: Source
+            ttl:
+                format: uint64
+                type: integer
+                x-go-name: TTL
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
+    SaveInstanceRequest:
+        properties:
+            parameters:
+                $ref: '#/definitions/parameters'
+            preset:
+                type: boolean
+                x-go-name: Preset
+            presetId:
+                format: uint64
+                type: integer
+                x-go-name: PresetID
+            stackName:
+                type: string
+                x-go-name: StackName
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
     Scope:
         description: |-
             Scope defines the Scope of a Cluster Volume. This is how many nodes a
@@ -1214,17 +1349,6 @@ definitions:
         x-go-package: github.com/docker/docker/api/types/volume
     Stack:
         properties:
-            hostnamePattern:
-                type: string
-                x-go-name: HostnamePattern
-            hostnameVariable:
-                type: string
-                x-go-name: HostnameVariable
-            instances:
-                items:
-                    $ref: '#/definitions/Instance'
-                type: array
-                x-go-name: Instances
             name:
                 type: string
                 x-go-name: Name
@@ -1674,6 +1798,17 @@ definitions:
         title: WaitResponse ContainerWaitResponse
         type: object
         x-go-package: github.com/docker/docker/api/types/container
+    parameter:
+        properties:
+            Value:
+                type: string
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
+    parameters:
+        additionalProperties:
+            $ref: '#/definitions/parameter'
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
     saveAsRequest:
         properties:
             format:
@@ -2081,6 +2216,33 @@ paths:
             security:
                 - oauth2: []
             summary: Save database
+    /deployments:
+        post:
+            description: Save a deployment...
+            operationId: saveDeployment
+            parameters:
+                - description: Save deployment request body parameter
+                  in: body
+                  name: Payload
+                  required: true
+                  schema:
+                    $ref: '#/definitions/SaveDeploymentRequest'
+            responses:
+                "200":
+                    description: Deployment
+                    schema:
+                        $ref: '#/definitions/Deployment'
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Save a deployment
     /deployments/{id}:
         get:
             description: Find a deployment by id
@@ -2094,9 +2256,9 @@ paths:
                   x-go-name: ID
             responses:
                 "200":
-                    description: Instance
+                    description: Deployment
                     schema:
-                        $ref: '#/definitions/Instance'
+                        $ref: '#/definitions/Deployment'
                 "401":
                     $ref: '#/responses/Error'
                 "403":
@@ -2108,6 +2270,39 @@ paths:
             security:
                 - oauth2: []
             summary: Find a deployment
+    /deployments/{id}/instance:
+        post:
+            description: Save an instance...
+            operationId: saveInstance
+            parameters:
+                - format: uint64
+                  in: path
+                  name: id
+                  required: true
+                  type: integer
+                  x-go-name: ID
+                - description: Save instance request body parameter
+                  in: body
+                  name: Payload
+                  required: true
+                  schema:
+                    $ref: '#/definitions/SaveInstanceRequest'
+            responses:
+                "200":
+                    description: DeploymentInstance
+                    schema:
+                        $ref: '#/definitions/DeploymentInstance'
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Save an instance
     /groups:
         get:
             description: Find all groups by user
@@ -2997,6 +3192,10 @@ responses:
             items:
                 $ref: '#/definitions/User'
             type: array
+    saveInstance:
+        description: ""
+        schema:
+            $ref: '#/definitions/DeploymentInstance'
 securityDefinitions:
     oauth2:
         flow: password
