@@ -182,7 +182,7 @@ func (h Handler) SaveInstance(c *gin.Context) {
 		return
 	}
 
-	params := make(model.Parameters, len(request.Parameters))
+	params := make(model.DeploymentInstanceParameters, len(request.Parameters))
 	for name, parameter := range request.Parameters {
 		params[name] = model.DeploymentInstanceParameter{
 			ParameterName: name,

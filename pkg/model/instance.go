@@ -23,7 +23,7 @@ type Deployment struct {
 	Instances []*DeploymentInstance `json:"instances"`
 }
 
-type Parameters map[string]DeploymentInstanceParameter
+type DeploymentInstanceParameters map[string]DeploymentInstanceParameter
 
 type DeploymentInstance struct {
 	ID        uint      `json:"id" gorm:"primaryKey"`
@@ -36,7 +36,7 @@ type DeploymentInstance struct {
 	StackName string `json:"stackName" gorm:"references:Name"`
 
 	GormParameters []DeploymentInstanceParameter `json:"-" gorm:"foreignKey:DeploymentInstanceID; constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
-	Parameters     Parameters                    `json:"parameters" gorm:"-:all"`
+	Parameters     DeploymentInstanceParameters  `json:"parameters" gorm:"-:all"`
 
 	DeployLog string `json:"deployLog" gorm:"type:text"`
 }
