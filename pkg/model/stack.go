@@ -1,26 +1,25 @@
 package model
 
-// swagger:model Stack
 type Stack struct {
-	Name             string          `json:"name"`
-	Parameters       StackParameters `json:"parameters"`
-	Instances        []Instance      `json:"instances"`
-	HostnamePattern  string          `json:"hostnamePattern"`
-	HostnameVariable string          `json:"hostnameVariable"`
+	Name             string
+	Parameters       StackParameters
+	Instances        []Instance
+	HostnamePattern  string
+	HostnameVariable string
 	// ParameterProviders provide parameters to other stacks.
-	ParameterProviders ParameterProviders `json:"-"`
+	ParameterProviders ParameterProviders
 	// Requires these stacks to deploy an instance of this stack.
-	Requires []Stack `json:"-"`
+	Requires []Stack
 }
 
 type StackParameters map[string]StackParameter
 
 type StackParameter struct {
-	DefaultValue *string `json:"defaultValue,omitempty"`
+	DefaultValue *string
 	// Consumed signals that this parameter is provided by another stack i.e. one of the stacks required stacks.
-	Consumed bool `json:"consumed"`
+	Consumed bool
 	// Validator ensures that the actual stack parameters are valid according to its rules.
-	Validator func(value string) error `json:"-"`
+	Validator func(value string) error
 }
 
 type ParameterProviders map[string]ParameterProvider
