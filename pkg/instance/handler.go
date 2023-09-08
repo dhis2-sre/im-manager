@@ -92,7 +92,6 @@ func (h Handler) SaveDeployment(c *gin.Context) {
 		return
 	}
 
-	// TODO: If request.Source, load deployment... Maybe only support this for instances
 	err = h.instanceService.SaveDeployment(deployment)
 	if err != nil {
 		_ = c.Error(err)
