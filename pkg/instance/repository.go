@@ -22,8 +22,6 @@ type repository struct {
 }
 
 func (r repository) SaveDeployment(deployment *model.Deployment) error {
-	// TODO: Do we need the option to save nested entities... Yes, if we create the deployment from a preset we need to store all the links as well
-	//err := r.db.Session(&gorm.Session{FullSaveAssociations: true}).Save(deployment).Error
 	err := r.db.Create(&deployment).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrDuplicatedKey) {
