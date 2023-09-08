@@ -329,6 +329,86 @@ definitions:
                 x-go-name: TTL
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
+    Deployment:
+        properties:
+            createdAt:
+                format: date-time
+                type: string
+                x-go-name: CreatedAt
+            description:
+                type: string
+                x-go-name: Description
+            group:
+                $ref: '#/definitions/Group'
+            groupName:
+                type: string
+                x-go-name: GroupName
+            id:
+                format: uint64
+                type: integer
+                x-go-name: ID
+            instances:
+                items:
+                    $ref: '#/definitions/DeploymentInstance'
+                type: array
+                x-go-name: Instances
+            name:
+                type: string
+                x-go-name: Name
+            updatedAt:
+                format: date-time
+                type: string
+                x-go-name: UpdatedAt
+            user:
+                $ref: '#/definitions/User'
+            userId:
+                format: uint64
+                type: integer
+                x-go-name: UserID
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/model
+    DeploymentInstance:
+        properties:
+            createdAt:
+                format: date-time
+                type: string
+                x-go-name: CreatedAt
+            deployLog:
+                type: string
+                x-go-name: DeployLog
+            deployment:
+                $ref: '#/definitions/Deployment'
+            deploymentId:
+                format: uint64
+                type: integer
+                x-go-name: DeploymentID
+            id:
+                format: uint64
+                type: integer
+                x-go-name: ID
+            parameters:
+                $ref: '#/definitions/DeploymentInstanceParameters'
+            stackName:
+                type: string
+                x-go-name: StackName
+            updatedAt:
+                format: date-time
+                type: string
+                x-go-name: UpdatedAt
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/model
+    DeploymentInstanceParameter:
+        properties:
+            value:
+                type: string
+                x-go-name: Value
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/model
+    DeploymentInstanceParameters:
+        additionalProperties:
+            $ref: '#/definitions/DeploymentInstanceParameter'
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/model
     ErrorResponse:
         properties:
             message:
@@ -684,6 +764,7 @@ definitions:
                 type: boolean
                 x-go-name: Preset
             presetId:
+                description: The preset which this instance is created from
                 format: uint64
                 type: integer
                 x-go-name: PresetID
@@ -1172,6 +1253,28 @@ definitions:
         description: Response depends on the input and can be either a list or a map
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/integration
+    SaveDeploymentRequest:
+        properties:
+            description:
+                type: string
+                x-go-name: Description
+            group:
+                type: string
+                x-go-name: Group
+            name:
+                type: string
+                x-go-name: Name
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
+    SaveInstanceRequest:
+        properties:
+            parameters:
+                $ref: '#/definitions/parameters'
+            stackName:
+                type: string
+                x-go-name: StackName
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
     Scope:
         description: |-
             Scope defines the Scope of a Cluster Volume. This is how many nodes a
@@ -1662,6 +1765,17 @@ definitions:
         title: WaitResponse ContainerWaitResponse
         type: object
         x-go-package: github.com/docker/docker/api/types/container
+    parameter:
+        properties:
+            Value:
+                type: string
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
+    parameters:
+        additionalProperties:
+            $ref: '#/definitions/parameter'
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
     saveAsRequest:
         properties:
             format:
@@ -2069,6 +2183,93 @@ paths:
             security:
                 - oauth2: []
             summary: Save database
+    /deployments:
+        post:
+            description: Save a deployment...
+            operationId: saveDeployment
+            parameters:
+                - description: Save deployment request body parameter
+                  in: body
+                  name: Payload
+                  required: true
+                  schema:
+                    $ref: '#/definitions/SaveDeploymentRequest'
+            responses:
+                "200":
+                    description: Deployment
+                    schema:
+                        $ref: '#/definitions/Deployment'
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Save a deployment
+    /deployments/{id}:
+        get:
+            description: Find a deployment by id
+            operationId: findDeploymentById
+            parameters:
+                - format: uint64
+                  in: path
+                  name: id
+                  required: true
+                  type: integer
+                  x-go-name: ID
+            responses:
+                "200":
+                    description: Deployment
+                    schema:
+                        $ref: '#/definitions/Deployment'
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Find a deployment
+    /deployments/{id}/instance:
+        post:
+            description: Save an instance...
+            operationId: saveInstance
+            parameters:
+                - format: uint64
+                  in: path
+                  name: id
+                  required: true
+                  type: integer
+                  x-go-name: ID
+                - description: Save instance request body parameter
+                  in: body
+                  name: Payload
+                  required: true
+                  schema:
+                    $ref: '#/definitions/SaveInstanceRequest'
+            responses:
+                "200":
+                    description: DeploymentInstance
+                    schema:
+                        $ref: '#/definitions/DeploymentInstance'
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Save an instance
     /groups:
         get:
             description: Find all groups by user
@@ -2958,6 +3159,10 @@ responses:
             items:
                 $ref: '#/definitions/User'
             type: array
+    saveInstance:
+        description: ""
+        schema:
+            $ref: '#/definitions/DeploymentInstance'
 securityDefinitions:
     oauth2:
         flow: password

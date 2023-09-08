@@ -30,6 +30,10 @@ func NewDatabase(c config.Postgresql) (*gorm.DB, error) {
 	}
 
 	err = db.AutoMigrate(
+		&model.Deployment{},
+		&model.DeploymentInstance{},
+		&model.DeploymentInstanceParameter{},
+
 		&model.User{},
 		&model.Group{},
 		&model.ClusterConfiguration{},

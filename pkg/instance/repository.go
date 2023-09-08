@@ -21,6 +21,35 @@ type repository struct {
 	instanceParameterEncryptionKey string
 }
 
+func (r repository) SaveDeployment(deployment *model.Deployment) error {
+	err := r.db.Create(&deployment).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrDuplicatedKey) {
+			return errdef.NewDuplicated("a deployment named %q already exists", deployment.Name)
+		}
+		return fmt.Errorf("failed to save deployment: %v", err)
+	}
+
+	return nil
+}
+
+func (r repository) FindDeploymentById(id uint) (*model.Deployment, error) {
+	var deployment *model.Deployment
+	err := r.db.
+		Joins("Group").
+		Preload("Instances.GormParameters").
+		First(&deployment, id).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, errdef.NewNotFound("deployment not found by id: %d", id)
+	}
+
+	return deployment, err
+}
+
+func (r repository) SaveInstance(instance *model.DeploymentInstance) error {
+	return r.db.Session(&gorm.Session{FullSaveAssociations: true}).Save(instance).Error
+}
+
 func (r repository) FindByIdDecrypted(id uint) (*model.Instance, error) {
 	instance, err := r.FindById(id)
 	if err != nil {

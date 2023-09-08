@@ -1,5 +1,7 @@
 package instance
 
+import "github.com/dhis2-sre/im-manager/pkg/model"
+
 // swagger:parameters deployInstance
 type _ struct {
 	// Deploy instance request body parameter
@@ -55,7 +57,7 @@ type _ struct {
 	Selector string `json:"selector"`
 }
 
-// swagger:parameters deleteInstance findById findByIdDecrypted saveInstance pauseInstance resumeInstance resetInstance
+// swagger:parameters deleteInstance findById findByIdDecrypted saveInstance pauseInstance resumeInstance resetInstance findDeploymentById
 type _ struct {
 	// in: path
 	// required: true
@@ -90,4 +92,26 @@ type Error struct {
 type _ struct {
 	// in: body
 	_ []GroupsWithInstances
+}
+
+// swagger:parameters saveDeployment
+type _ struct {
+	// Save deployment request body parameter
+	// in: body
+	// required: true
+	Payload SaveDeploymentRequest
+}
+
+// swagger:parameters saveInstance
+type _ struct {
+	// Save instance request body parameter
+	// in: body
+	// required: true
+	Payload SaveInstanceRequest
+}
+
+// swagger:response saveInstance
+type _ struct {
+	// in: body
+	_ model.DeploymentInstance
 }

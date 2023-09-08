@@ -32,6 +32,178 @@ type groupServiceHandler interface {
 	Find(name string) (*model.Group, error)
 }
 
+type SaveDeploymentRequest struct {
+	Name        string `json:"name" binding:"required,dns_rfc1035_label"`
+	Description string `json:"description"`
+	Group       string `json:"group" binding:"required"`
+}
+
+func (h Handler) SaveDeployment(c *gin.Context) {
+	// swagger:route POST /deployments saveDeployment
+	//
+	// Save a deployment
+	//
+	// Save a deployment...
+	//
+	// Security:
+	//	oauth2:
+	//
+	// responses:
+	//	200: Deployment
+	//	401: Error
+	//	403: Error
+	//	404: Error
+	//	415: Error
+	var request SaveDeploymentRequest
+	if err := handler.DataBinder(c, &request); err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	group, err := h.groupService.Find(request.Group)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	if !group.Deployable {
+		forbidden := errdef.NewForbidden("group isn't deployable: %s", group.Name)
+		_ = c.Error(forbidden)
+		return
+	}
+
+	user, err := handler.GetUserFromContext(c)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	deployment := &model.Deployment{
+		UserID:      user.ID,
+		Name:        request.Name,
+		Description: request.Description,
+		GroupName:   request.Group,
+	}
+
+	canWrite := handler.CanWriteDeployment(user, deployment)
+	if !canWrite {
+		unauthorized := errdef.NewUnauthorized("write access denied")
+		_ = c.Error(unauthorized)
+		return
+	}
+
+	err = h.instanceService.SaveDeployment(deployment)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	c.JSON(http.StatusCreated, deployment)
+}
+
+// FindDeploymentById deployment
+func (h Handler) FindDeploymentById(c *gin.Context) {
+	// swagger:route GET /deployments/{id} findDeploymentById
+	//
+	// Find a deployment
+	//
+	// Find a deployment by id
+	//
+	// Security:
+	//	oauth2:
+	//
+	// responses:
+	//	200: Deployment
+	//	401: Error
+	//	403: Error
+	//	404: Error
+	//	415: Error
+	id, ok := handler.GetPathParameter(c, "id")
+	if !ok {
+		return
+	}
+
+	user, err := handler.GetUserFromContext(c)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	deployment, err := h.instanceService.FindDeploymentById(id)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	canRead := handler.CanReadDeployment(user, deployment)
+	if !canRead {
+		unauthorized := errdef.NewUnauthorized("read access denied")
+		_ = c.Error(unauthorized)
+		return
+	}
+
+	c.JSON(http.StatusOK, deployment)
+}
+
+type parameter struct{ Value string }
+
+type parameters map[string]parameter
+
+type SaveInstanceRequest struct {
+	StackName  string     `json:"stackName"`
+	Parameters parameters `json:"parameters"`
+}
+
+func (h Handler) SaveInstance(c *gin.Context) {
+	// swagger:route POST /deployments/{id}/instance saveInstance
+	//
+	// Save an instance
+	//
+	// Save an instance...
+	//
+	// Security:
+	//	oauth2:
+	//
+	// responses:
+	//	200: DeploymentInstance
+	//	401: Error
+	//	403: Error
+	//	404: Error
+	//	415: Error
+	var request SaveInstanceRequest
+	if err := handler.DataBinder(c, &request); err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	deploymentId, ok := handler.GetPathParameter(c, "id")
+	if !ok {
+		return
+	}
+
+	params := make(model.DeploymentInstanceParameters, len(request.Parameters))
+	for name, parameter := range request.Parameters {
+		params[name] = model.DeploymentInstanceParameter{
+			ParameterName: name,
+			Value:         parameter.Value,
+		}
+	}
+
+	instance := &model.DeploymentInstance{
+		DeploymentID: deploymentId,
+		StackName:    request.StackName,
+		Parameters:   params,
+	}
+
+	err := h.instanceService.SaveInstance(instance)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	c.JSON(http.StatusCreated, instance)
+}
+
 type DeployInstanceRequest struct {
 	Name           string                    `json:"name" binding:"required,dns_rfc1035_label"`
 	Group          string                    `json:"groupName" binding:"required"`

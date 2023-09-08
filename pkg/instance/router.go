@@ -23,4 +23,8 @@ func Routes(r *gin.Engine, authenticator gin.HandlerFunc, handler Handler) {
 	tokenAuthenticationRouter.PUT("/instances/:id/restart", handler.Restart)
 	tokenAuthenticationRouter.GET("/instances/:id/logs", handler.Logs)
 	tokenAuthenticationRouter.GET("/instances-name-to-id/:groupName/:instanceName", handler.NameToId)
+
+	tokenAuthenticationRouter.POST("/deployments", handler.SaveDeployment)
+	tokenAuthenticationRouter.GET("/deployments/:id", handler.FindDeploymentById)
+	tokenAuthenticationRouter.POST("/deployments/:id/instance", handler.SaveInstance)
 }

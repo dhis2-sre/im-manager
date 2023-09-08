@@ -30,6 +30,9 @@ func NewService(
 }
 
 type Repository interface {
+	SaveDeployment(deployment *model.Deployment) error
+	FindDeploymentById(id uint) (*model.Deployment, error)
+	SaveInstance(instance *model.DeploymentInstance) error
 	Link(firstInstance, secondInstance *model.Instance) error
 	Unlink(instance *model.Instance) error
 	Save(instance *model.Instance) error
@@ -56,6 +59,60 @@ type service struct {
 	groupService       groupService
 	stackService       stack.Service
 	helmfileService    helmfile
+}
+
+func (s service) SaveDeployment(deployment *model.Deployment) error {
+	return s.instanceRepository.SaveDeployment(deployment)
+}
+
+func (s service) FindDeploymentById(id uint) (*model.Deployment, error) {
+	return s.instanceRepository.FindDeploymentById(id)
+}
+
+func (s service) SaveInstance(instance *model.DeploymentInstance) error {
+	deployment, err := s.instanceRepository.FindDeploymentById(instance.DeploymentID)
+	if err != nil {
+		return err
+	}
+
+	deployment.Instances = append(deployment.Instances, instance)
+	err = s.validateDeployment(deployment)
+	if err != nil {
+		return err
+	}
+
+	return s.instanceRepository.SaveInstance(instance)
+}
+
+func (s service) validateDeployment(deployment *model.Deployment) error {
+	stacks, err := s.collectStacks(deployment)
+	if err != nil {
+		return err
+	}
+
+	err = stack.ValidateNoCycles(stacks)
+	if err != nil {
+		return err
+	}
+
+	err = stack.ValidateConsumedParameters(stacks)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (s service) collectStacks(deployment *model.Deployment) ([]model.Stack, error) {
+	stacks := make([]model.Stack, len(deployment.Instances))
+	for i, instance := range deployment.Instances {
+		stack, err := s.stackService.Find(instance.StackName)
+		if err != nil {
+			return nil, err
+		}
+		stacks[i] = *stack
+	}
+	return stacks, nil
 }
 
 func (s service) ConsumeParameters(source, destination *model.Instance) error {

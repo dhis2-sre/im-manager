@@ -18,6 +18,8 @@ function cleanup_handler {
 
 trap cleanup_handler INT EXIT
 
+./../users/me.sh
+
 # Whoami
 INSTANCE_NAME="$INSTANCE_PREFIX-whoami-$INSTANCE_POSTFIX"
 ./deploy-whoami.sh $GROUP "$INSTANCE_NAME"
