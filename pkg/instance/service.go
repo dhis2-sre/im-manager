@@ -419,7 +419,7 @@ func (s service) DeployDeployment(deployment *model.Deployment) error {
 
 		instance := deployment.FindInstanceByStackName(stackName)
 		if instance == nil {
-			return errdef.NewNotFound("instance not found by stackName name %q", stackName)
+			return errdef.NewNotFound("failed to find instance for stack %q", stackName)
 		}
 
 		for name, parameter := range instance.Parameters {
