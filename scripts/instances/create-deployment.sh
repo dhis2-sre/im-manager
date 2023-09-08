@@ -13,5 +13,5 @@ DESCRIPTION=${*:-""}
 echo "{
   \"name\": \"$NAME\",
   \"group\": \"$GROUP\",
-  \"description\": \"$DESCRIPTION\",
+  \"description\": \"$DESCRIPTION\"
 }" | $HTTP post "$IM_HOST/deployments" "Authorization: Bearer $ACCESS_TOKEN"
