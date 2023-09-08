@@ -25,11 +25,14 @@ func (r repository) SaveDeployment(deployment *model.Deployment) error {
 	// TODO: Do we need the option to save nested entities... Yes, if we create the deployment from a preset we need to store all the links as well
 	//err := r.db.Session(&gorm.Session{FullSaveAssociations: true}).Save(deployment).Error
 	err := r.db.Create(&deployment).Error
-	if errors.Is(err, gorm.ErrDuplicatedKey) {
-		return errdef.NewDuplicated("a deployment named %q already exists", deployment.Name)
+	if err != nil {
+		if errors.Is(err, gorm.ErrDuplicatedKey) {
+			return errdef.NewDuplicated("a deployment named %q already exists", deployment.Name)
+		}
+		return fmt.Errorf("failed to save deployment: %v", err)
 	}
 
-	return fmt.Errorf("failed to save deployment: %v", err)
+	return nil
 }
 
 func (r repository) FindDeploymentById(id uint) (*model.Deployment, error) {
