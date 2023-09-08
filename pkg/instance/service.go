@@ -430,7 +430,7 @@ func (s service) DeployDeployment(deployment *model.Deployment) error {
 					if ok {
 						value, err := provider.Provide(*instance)
 						if err != nil {
-							return fmt.Errorf("failed to provide value for instance %q parameter %q: %v, instance.Name, name, err)
+							return fmt.Errorf("failed to provide value for instance %q parameter %q: %v", instance.Name, name, err)
 						}
 						parameter.Value = value
 						continue
