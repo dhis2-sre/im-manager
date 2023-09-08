@@ -446,7 +446,7 @@ func (s service) DeployDeployment(deployment *model.Deployment) error {
 			}
 		}
 
-		// Deploy instance here... Or maybe outside the loop so we're sure all parameters are resolved before we attempts to deploy
+		// Deploy instance here... Or maybe outside the loop, so we're sure all parameters are resolved before we attempt to deploy
 		indent, _ := json.MarshalIndent(instance, "", "  ")
 		log.Println(string(indent))
 	}
