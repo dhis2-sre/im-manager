@@ -439,7 +439,7 @@ func (s service) DeployDeployment(deployment *model.Deployment) error {
 					// consume from instance parameters
 					src := deployment.FindInstanceByStackName(requiredStack.Name)
 					if src == nil {
-						return errdef.NewNotFound("instance not found by stackName name %q", stackName)
+						return errdef.NewNotFound("failed to find required instance %q of instance %q", src.Name, instance.Name)
 					}
 					parameter.Value = src.Parameters[name].Value
 				}
