@@ -23,7 +23,7 @@ type Stacks map[string]model.Stack
 
 // New creates stacks ensuring consumed parameters are provided by required stacks.
 func New(stacks ...model.Stack) (Stacks, error) {
-	err := ValidateNoCycles(stacks)
+	_, err := ValidateNoCycles(stacks)
 	if err != nil {
 		return nil, err
 	}
@@ -44,7 +44,7 @@ func New(stacks ...model.Stack) (Stacks, error) {
 // graph via the required stacks forming a directed edge from the stack to the required stack.
 // Stacks with cycles would lead to undeployable instances. There would not be an order (no solution
 // to topological sort) in which we could deploy instances in.
-func ValidateNoCycles(stacks []model.Stack) error {
+func ValidateNoCycles(stacks []model.Stack) (graph.Graph[string, model.Stack], error) {
 	g := graph.New(func(stack model.Stack) string {
 		return stack.Name
 	}, graph.Directed(), graph.PreventCycles())
@@ -52,7 +52,7 @@ func ValidateNoCycles(stacks []model.Stack) error {
 	for _, stack := range stacks {
 		err := g.AddVertex(stack)
 		if err != nil {
-			return fmt.Errorf("failed adding vertex for stack %q: %v", stack.Name, err)
+			return nil, fmt.Errorf("failed adding vertex for stack %q: %v", stack.Name, err)
 		}
 	}
 
@@ -61,16 +61,16 @@ func ValidateNoCycles(stacks []model.Stack) error {
 			err := g.AddEdge(src.Name, dest.Name)
 			if err != nil {
 				if errors.Is(err, graph.ErrEdgeAlreadyExists) {
-					return fmt.Errorf("stack %q requires %q more than once", src.Name, dest.Name)
+					return nil, fmt.Errorf("stack %q requires %q more than once", src.Name, dest.Name)
 				} else if errors.Is(err, graph.ErrEdgeCreatesCycle) {
-					return fmt.Errorf("edge from stack %q to stack %q creates a cycle", src.Name, dest.Name)
+					return nil, fmt.Errorf("edge from stack %q to stack %q creates a cycle", src.Name, dest.Name)
 				}
-				return fmt.Errorf("failed adding edge from stack %q to stack %q: %v", src.Name, dest.Name, err)
+				return nil, fmt.Errorf("failed adding edge from stack %q to stack %q: %v", src.Name, dest.Name, err)
 			}
 		}
 	}
 
-	return nil
+	return g, nil
 }
 
 // ValidateConsumedParameters validates all consumed parameters are provided by exactly one of the
@@ -352,7 +352,7 @@ var imJobRunnerDefaults = struct {
 }
 
 // Provides the PostgreSQL hostname of an instance.
-var postgresHostnameProvider = model.ParameterProviderFunc(func(instance model.Instance) (string, error) {
+var postgresHostnameProvider = model.ParameterProviderFunc(func(instance model.DeploymentInstance) (string, error) {
 	return fmt.Sprintf("%s-database-postgresql.%s.svc", instance.Name, instance.GroupName), nil
 })
 

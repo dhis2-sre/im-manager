@@ -38,6 +38,40 @@ type SaveDeploymentRequest struct {
 	Group       string `json:"group" binding:"required"`
 }
 
+func (h Handler) DeployDeployment(c *gin.Context) {
+	// swagger:route POST /deployments/{id}/deploy deployDeployment
+	//
+	// Deploy a deployment
+	//
+	// Deploy a deployment...
+	//
+	// Security:
+	//	oauth2:
+	//
+	// responses:
+	//	200: Deployment
+	//	401: Error
+	//	403: Error
+	//	404: Error
+	//	415: Error
+	id, ok := handler.GetPathParameter(c, "id")
+	if !ok {
+		return
+	}
+
+	deployment, err := h.instanceService.FindDeploymentById(id)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	// TODO assert authority
+
+	err = h.instanceService.DeployDeployment(deployment)
+
+	c.JSON(http.StatusOK, deployment)
+}
+
 func (h Handler) SaveDeployment(c *gin.Context) {
 	// swagger:route POST /deployments saveDeployment
 	//
@@ -181,9 +215,15 @@ func (h Handler) SaveInstance(c *gin.Context) {
 		return
 	}
 
-	params := make(model.DeploymentInstanceParameters, len(request.Parameters))
+	deployment, err := h.instanceService.FindDeploymentById(deploymentId)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	parameters := make(model.DeploymentInstanceParameters, len(request.Parameters))
 	for name, parameter := range request.Parameters {
-		params[name] = model.DeploymentInstanceParameter{
+		parameters[name] = model.DeploymentInstanceParameter{
 			ParameterName: name,
 			Value:         parameter.Value,
 		}
@@ -191,11 +231,14 @@ func (h Handler) SaveInstance(c *gin.Context) {
 
 	instance := &model.DeploymentInstance{
 		DeploymentID: deploymentId,
+		Name:         deployment.Name,
+		Group:        deployment.Group,
+		GroupName:    deployment.GroupName,
 		StackName:    request.StackName,
-		Parameters:   params,
+		Parameters:   parameters,
 	}
 
-	err := h.instanceService.SaveInstance(instance)
+	err = h.instanceService.SaveInstance(instance)
 	if err != nil {
 		_ = c.Error(err)
 		return

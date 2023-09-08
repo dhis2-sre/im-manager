@@ -382,10 +382,18 @@ definitions:
                 format: uint64
                 type: integer
                 x-go-name: DeploymentID
+            group:
+                $ref: '#/definitions/Group'
+            groupName:
+                type: string
+                x-go-name: GroupName
             id:
                 format: uint64
                 type: integer
                 x-go-name: ID
+            name:
+                type: string
+                x-go-name: Name
             parameters:
                 $ref: '#/definitions/DeploymentInstanceParameters'
             stackName:
@@ -2237,6 +2245,33 @@ paths:
             security:
                 - oauth2: []
             summary: Find a deployment
+    /deployments/{id}/deploy:
+        post:
+            description: Deploy a deployment...
+            operationId: deployDeployment
+            parameters:
+                - format: uint64
+                  in: path
+                  name: id
+                  required: true
+                  type: integer
+                  x-go-name: ID
+            responses:
+                "200":
+                    description: Deployment
+                    schema:
+                        $ref: '#/definitions/Deployment'
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Deploy a deployment
     /deployments/{id}/instance:
         post:
             description: Save an instance...

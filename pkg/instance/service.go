@@ -1,13 +1,16 @@
 package instance
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"log"
 	"os/exec"
+	"slices"
 
 	"github.com/dhis2-sre/im-manager/internal/errdef"
+	"github.com/dominikbraun/graph"
 
 	"github.com/dhis2-sre/im-manager/pkg/stack"
 
@@ -90,7 +93,7 @@ func (s service) validateDeployment(deployment *model.Deployment) error {
 		return err
 	}
 
-	err = stack.ValidateNoCycles(stacks)
+	_, err = stack.ValidateNoCycles(stacks)
 	if err != nil {
 		return err
 	}
@@ -387,5 +390,66 @@ func (s service) destroy(instance *model.Instance) error {
 			return err
 		}
 	}
+	return nil
+}
+
+func (s service) DeployDeployment(deployment *model.Deployment) error {
+	stacks, err := s.collectStacks(deployment)
+	if err != nil {
+		return err
+	}
+
+	g, err := stack.ValidateNoCycles(stacks)
+	if err != nil {
+		return err
+	}
+
+	stackNames, err := graph.TopologicalSort(g)
+	if err != nil {
+		return err
+	}
+
+	slices.Reverse(stackNames)
+
+	for _, stackName := range stackNames {
+		stack, err := s.stackService.Find(stackName)
+		if err != nil {
+			return err
+		}
+
+		instance := deployment.FindInstanceByStackName(stackName)
+		if instance == nil {
+			return errdef.NewNotFound("instance not found by stackName name %q", stackName)
+		}
+
+		for name, parameter := range instance.Parameters {
+			if stack.Parameters[name].Consumed {
+				for _, requiredStack := range stack.Requires {
+					// consume from provider
+					provider, ok := requiredStack.ParameterProviders[name]
+					if ok {
+						value, err := provider.Provide(*instance)
+						if err != nil {
+							return err
+						}
+						parameter.Value = value
+						continue
+					}
+
+					// consume from instance parameters
+					src := deployment.FindInstanceByStackName(requiredStack.Name)
+					if src == nil {
+						return errdef.NewNotFound("instance not found by stackName name %q", stackName)
+					}
+					parameter.Value = src.Parameters[name].Value
+				}
+			}
+		}
+
+		// Deploy instance here... Or maybe outside the loop so we're sure all parameters are resolved before we attempts to deploy
+		indent, _ := json.MarshalIndent(instance, "", "  ")
+		log.Println(string(indent))
+	}
+
 	return nil
 }

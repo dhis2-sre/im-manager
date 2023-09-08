@@ -23,12 +23,25 @@ type Deployment struct {
 	Instances []*DeploymentInstance `json:"instances"`
 }
 
+func (d Deployment) FindInstanceByStackName(name string) *DeploymentInstance {
+	for _, instance := range d.Instances {
+		if instance.StackName == name {
+			return instance
+		}
+	}
+	return nil
+}
+
 type DeploymentInstanceParameters map[string]DeploymentInstanceParameter
 
 type DeploymentInstance struct {
 	ID        uint      `json:"id" gorm:"primaryKey"`
 	CreatedAt time.Time `json:"createdAt"`
 	UpdatedAt time.Time `json:"updatedAt"`
+
+	Name      string `json:"name" gorm:"index:idx_name_and_group,unique"`
+	Group     *Group `json:"group"`
+	GroupName string `json:"groupName" gorm:"index:idx_name_and_group,unique"`
 
 	DeploymentID uint        `json:"deploymentId"`
 	Deployment   *Deployment `json:"deployment,omitempty"`
