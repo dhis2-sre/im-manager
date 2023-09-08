@@ -404,12 +404,10 @@ func (s service) DeployDeployment(deployment *model.Deployment) error {
 		return err
 	}
 
-	stackNames, err := graph.TopologicalSort(g)
+	stackNames, err := deploymentOrder(deploymentGraph)
 	if err != nil {
 		return err
 	}
-
-	slices.Reverse(stackNames)
 
 	for _, stackName := range stackNames {
 		stack, err := s.stackService.Find(stackName)
@@ -452,4 +450,15 @@ func (s service) DeployDeployment(deployment *model.Deployment) error {
 	}
 
 	return nil
+}
+
+func deploymentOrder(g graph.Graph[string, model.Stack]) ([]string, error) {
+	stackNames, err := graph.TopologicalSort(g)
+	if err != nil {
+		return nil, err
+	}
+
+	slices.Reverse(stackNames)
+
+	return stackNames, nil
 }
