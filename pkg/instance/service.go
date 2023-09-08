@@ -399,7 +399,7 @@ func (s service) DeployDeployment(deployment *model.Deployment) error {
 		return err
 	}
 
-	g, err := stack.ValidateNoCycles(stacks)
+	deploymentGraph, err := stack.ValidateNoCycles(stacks)
 	if err != nil {
 		return err
 	}
