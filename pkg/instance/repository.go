@@ -39,15 +39,23 @@ func (r repository) FindDeploymentById(id uint) (*model.Deployment, error) {
 		Joins("Group").
 		Preload("Instances.GormParameters").
 		First(&deployment, id).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, errdef.NewNotFound("deployment not found by id: %d", id)
+
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errdef.NewNotFound("deployment not found by id: %d", id)
+		}
+		return nil, fmt.Errorf("failed to find deployment: %v", err)
 	}
 
-	return deployment, err
+	return deployment, nil
 }
 
 func (r repository) SaveInstance(instance *model.DeploymentInstance) error {
-	return r.db.Session(&gorm.Session{FullSaveAssociations: true}).Save(instance).Error
+	err := r.db.Session(&gorm.Session{FullSaveAssociations: true}).Save(instance).Error
+	if err != nil {
+		return fmt.Errorf("failed to save instance: %v", err)
+	}
+	return nil
 }
 
 func (r repository) FindByIdDecrypted(id uint) (*model.Instance, error) {

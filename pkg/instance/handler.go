@@ -67,7 +67,17 @@ func (h Handler) DeployDeployment(c *gin.Context) {
 
 	// TODO assert authority
 
-	err = h.instanceService.DeployDeployment(deployment)
+	token, err := handler.GetTokenFromHttpAuthHeader(c)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	err = h.instanceService.DeployDeployment(token, deployment)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
 
 	c.JSON(http.StatusOK, deployment)
 }

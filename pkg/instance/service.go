@@ -1,7 +1,6 @@
 package instance
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -53,6 +52,7 @@ type groupService interface {
 }
 
 type helmfile interface {
+	sync_deployment(token string, instance *model.DeploymentInstance, group *model.Group) (*exec.Cmd, error)
 	sync(token string, instance *model.Instance, group *model.Group) (*exec.Cmd, error)
 	destroy(instance *model.Instance, group *model.Group) (*exec.Cmd, error)
 }
@@ -393,7 +393,7 @@ func (s service) destroy(instance *model.Instance) error {
 	return nil
 }
 
-func (s service) DeployDeployment(deployment *model.Deployment) error {
+func (s service) DeployDeployment(token string, deployment *model.Deployment) error {
 	stacks, err := s.collectStacks(deployment)
 	if err != nil {
 		return err
@@ -420,35 +420,98 @@ func (s service) DeployDeployment(deployment *model.Deployment) error {
 			return errdef.NewNotFound("failed to find instance for stack %q", stackName)
 		}
 
-		for name, parameter := range instance.Parameters {
-			if stack.Parameters[name].Consumed {
-				for _, requiredStack := range stack.Requires {
-					// consume from provider
-					provider, ok := requiredStack.ParameterProviders[name]
-					if ok {
-						value, err := provider.Provide(*instance)
-						if err != nil {
-							return fmt.Errorf("failed to provide value for instance %q parameter %q: %v", instance.Name, name, err)
-						}
-						parameter.Value = value
-						continue
-					}
+		instanceParameters := instance.Parameters
 
-					// consume from instance parameters
-					src := deployment.FindInstanceByStackName(requiredStack.Name)
-					if src == nil {
-						return errdef.NewNotFound("failed to find required instance %q of instance %q", src.Name, instance.Name)
-					}
-					parameter.Value = src.Parameters[name].Value
+		// Add parameters not supplied by user
+		for name, stackParameter := range stack.Parameters {
+			if _, ok := instanceParameters[name]; !ok {
+				instanceParameter := model.DeploymentInstanceParameter{
+					ParameterName: name,
+					StackName:     stack.Name,
 				}
+
+				if stackParameter.DefaultValue != nil {
+					instanceParameter.Value = *stackParameter.DefaultValue
+				}
+
+				instanceParameters[name] = instanceParameter
 			}
 		}
 
-		// Deploy instance here... Or maybe outside the loop, so we're sure all parameters are resolved before we attempt to deploy
-		indent, _ := json.MarshalIndent(instance, "", "  ")
-		log.Println(string(indent))
+		for name, parameter := range instanceParameters {
+			if !stack.Parameters[name].Consumed {
+				continue
+			}
+
+			for _, requiredStack := range stack.Requires {
+				// consume from instance parameters
+				sourceInstance := deployment.FindInstanceByStackName(requiredStack.Name)
+				if sourceInstance == nil {
+					return errdef.NewNotFound("failed to find required instance %q of instance %q", sourceInstance.Name, instance.Name)
+				}
+
+				if sourceInstanceParameter, ok := sourceInstance.Parameters[name]; ok {
+					parameter.Value = sourceInstanceParameter.Value
+				}
+
+				// consume from provider
+				if provider, ok := requiredStack.ParameterProviders[name]; ok {
+					value, err := provider.Provide(*instance)
+					if err != nil {
+						return fmt.Errorf("failed to provide value for instance %q parameter %q: %v", instance.Name, name, err)
+					}
+					parameter.Value = value
+				}
+
+				instanceParameters[name] = parameter
+			}
+		}
 	}
 
+	// Deploy instances
+	for _, instance := range deployment.Instances {
+		err := s.DeployDeploymentInstance(token, instance)
+		if err != nil {
+			return fmt.Errorf("failed to depliy instance(%s) %q: %v", instance.StackName, instance.Name, err)
+		}
+	}
+
+	return nil
+}
+
+func (s service) DeployDeploymentInstance(token string, instance *model.DeploymentInstance) error {
+	group, err := s.groupService.Find(instance.GroupName)
+	if err != nil {
+		return err
+	}
+
+	syncCmd, err := s.helmfileService.sync_deployment(token, instance, group)
+	if err != nil {
+		return err
+	}
+
+	deployLog, deployErrorLog, err := commandExecutor(syncCmd, group.ClusterConfiguration)
+	log.Printf("Deploy log: %s\n", deployLog)
+	log.Printf("Deploy error log: %s\n", deployErrorLog)
+	/* TODO: return error log if relevant
+	if len(deployErrorLog) > 0 {
+		return errors.New(string(deployErrorLog))
+	}
+	*/
+	if err != nil {
+		return err
+	}
+
+	// TODO: Encrypt before saving? Yes...
+	/*
+		err = s.instanceRepository.SaveDeployLog(instance, string(deployLog))
+		instance.DeployLog = string(deployLog)
+		if err != nil {
+			// TODO
+			log.Printf("Store error log: %s", deployErrorLog)
+			return err
+		}
+	*/
 	return nil
 }
 

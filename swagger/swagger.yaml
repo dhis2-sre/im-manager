@@ -392,11 +392,13 @@ definitions:
                 type: integer
                 x-go-name: ID
             name:
+                description: 'TODO: FK to name of Deployment?'
                 type: string
                 x-go-name: Name
             parameters:
                 $ref: '#/definitions/DeploymentInstanceParameters'
             stackName:
+                description: Stack     *Stack `json:"stack,omitempty"`
                 type: string
                 x-go-name: StackName
             updatedAt:
