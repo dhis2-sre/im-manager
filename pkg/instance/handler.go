@@ -59,13 +59,24 @@ func (h Handler) DeployDeployment(c *gin.Context) {
 		return
 	}
 
+	user, err := handler.GetUserFromContext(c)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
 	deployment, err := h.instanceService.FindDeploymentById(id)
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
 
-	// TODO assert authority
+	canRead := handler.CanReadDeployment(user, deployment)
+	if !canRead {
+		unauthorized := errdef.NewUnauthorized("read access denied")
+		_ = c.Error(unauthorized)
+		return
+	}
 
 	token, err := handler.GetTokenFromHttpAuthHeader(c)
 	if err != nil {
