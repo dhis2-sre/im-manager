@@ -473,7 +473,7 @@ func (s service) DeployDeployment(token string, deployment *model.Deployment) er
 	for _, instance := range deployment.Instances {
 		err := s.DeployDeploymentInstance(token, instance)
 		if err != nil {
-			return fmt.Errorf("failed to depliy instance(%s) %q: %v", instance.StackName, instance.Name, err)
+			return fmt.Errorf("failed to deploy instance(%s) %q: %v", instance.StackName, instance.Name, err)
 		}
 	}
 
