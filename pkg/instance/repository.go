@@ -156,7 +156,11 @@ func (r repository) SaveDeployLog(instance *model.Instance, log string) error {
 }
 
 func (r repository) SaveDeployLog_deployment(instance *model.DeploymentInstance, log string) error {
-	return r.db.Model(&instance).Update("DeployLog", log).Error
+	err := r.db.Model(&instance).Update("DeployLog", log).Error
+	if err != nil {
+		return fmt.Errorf("failed to save deploy log: %v", err)
+	}
+	return nil
 }
 
 func (r repository) Delete(id uint) error {
