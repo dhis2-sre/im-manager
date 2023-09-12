@@ -155,6 +155,10 @@ func (r repository) SaveDeployLog(instance *model.Instance, log string) error {
 	return r.db.Model(&instance).Update("DeployLog", log).Error
 }
 
+func (r repository) SaveDeployLog_deployment(instance *model.DeploymentInstance, log string) error {
+	return r.db.Model(&instance).Update("DeployLog", log).Error
+}
+
 func (r repository) Delete(id uint) error {
 	err := r.db.Unscoped().Delete(&model.Instance{}, id).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {

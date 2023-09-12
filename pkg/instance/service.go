@@ -44,6 +44,7 @@ type Repository interface {
 	FindByGroups(groups []model.Group, presets bool) ([]GroupsWithInstances, error)
 	FindPublicInstances() ([]GroupsWithInstances, error)
 	SaveDeployLog(instance *model.Instance, log string) error
+	SaveDeployLog_deployment(instance *model.DeploymentInstance, log string) error
 	Delete(id uint) error
 }
 
@@ -503,15 +504,13 @@ func (s service) DeployDeploymentInstance(token string, instance *model.Deployme
 	}
 
 	// TODO: Encrypt before saving? Yes...
-	/*
-		err = s.instanceRepository.SaveDeployLog(instance, string(deployLog))
-		instance.DeployLog = string(deployLog)
-		if err != nil {
-			// TODO
-			log.Printf("Store error log: %s", deployErrorLog)
-			return err
-		}
-	*/
+	err = s.instanceRepository.SaveDeployLog_deployment(instance, string(deployLog))
+	instance.DeployLog = string(deployLog)
+	if err != nil {
+		// TODO
+		log.Printf("Store error log: %s", deployErrorLog)
+		return err
+	}
 	return nil
 }
 
