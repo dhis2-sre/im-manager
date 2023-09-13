@@ -469,7 +469,6 @@ func (s service) DeployDeployment(token string, deployment *model.Deployment) er
 		}
 	}
 
-	// Deploy instances
 	for _, instance := range deployment.Instances {
 		err := s.DeployDeploymentInstance(token, instance)
 		if err != nil {
