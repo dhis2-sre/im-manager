@@ -97,7 +97,7 @@ func (h helmfileService) executeHelmfileCommand_deployment(token string, instanc
 
 	cmd := exec.Command("/usr/bin/helmfile", "--helm-binary", "/usr/bin/helm", "-f", stackPath, operation) // #nosec
 	log.Printf("Command: %s\n", cmd.String())
-	configureInstanceEnvironment_deployment(token, stack, instance, group, stackParameters, cmd)
+	configureInstanceEnvironment_deployment(token, instance, group, stackParameters, cmd)
 
 	return cmd, nil
 }
@@ -129,7 +129,7 @@ func (h helmfileService) loadStackParameters(stackName string) (stackParameters,
 	return params, nil
 }
 
-func configureInstanceEnvironment_deployment(accessToken string, stack *model.Stack, instance *model.DeploymentInstance, group *model.Group, stackParameters stackParameters, cmd *exec.Cmd) {
+func configureInstanceEnvironment_deployment(accessToken string, instance *model.DeploymentInstance, group *model.Group, stackParameters stackParameters, cmd *exec.Cmd) {
 	// TODO: We should only inject what the stack require, currently we just blindly inject IM_ACCESS_TOKEN and others which may not be required by the stack
 	// We could probably list the required system parameters in the stacks helmfile and parse those as well as other parameters
 	instanceNameEnv := fmt.Sprintf("%s=%s", "INSTANCE_NAME", instance.Name)
@@ -160,15 +160,8 @@ func configureInstanceEnvironment_deployment(accessToken string, stack *model.St
 	cmd.Env = injectEnv(cmd.Env, "KUBERNETES_SERVICE_PORT_HTTPS")
 	cmd.Env = injectEnv(cmd.Env, "KUBERNETES_SERVICE_HOST")
 
-	for name, parameter := range stack.Parameters {
-		instanceParameter, ok := instance.Parameters[name]
-		if ok {
-			instanceEnv := fmt.Sprintf("%s=%s", name, instanceParameter.Value)
-			cmd.Env = append(cmd.Env, instanceEnv)
-			continue
-		}
-
-		instanceEnv := fmt.Sprintf("%s=%s", name, *parameter.DefaultValue)
+	for name, parameter := range instance.Parameters {
+		instanceEnv := fmt.Sprintf("%s=%s", name, parameter.Value)
 		cmd.Env = append(cmd.Env, instanceEnv)
 	}
 
