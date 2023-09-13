@@ -89,12 +89,12 @@ func (s service) SaveInstance(instance *model.DeploymentInstance) error {
 }
 
 func (s service) validateDeployment(deployment *model.Deployment) error {
-	stacks, err := s.collectStacks(deployment)
+	_, err := s.validateNoCycles(deployment.Instances)
 	if err != nil {
 		return err
 	}
 
-	_, err = stack.ValidateNoCycles(stacks)
+	stacks, err := s.collectStacks(deployment)
 	if err != nil {
 		return err
 	}
@@ -395,36 +395,28 @@ func (s service) destroy(instance *model.Instance) error {
 }
 
 func (s service) DeployDeployment(token string, deployment *model.Deployment) error {
-	stacks, err := s.collectStacks(deployment)
+	deploymentGraph, err := s.validateNoCycles(deployment.Instances)
 	if err != nil {
 		return err
 	}
 
-	deploymentGraph, err := stack.ValidateNoCycles(stacks)
+	instances, err := deploymentOrder(deployment, deploymentGraph)
 	if err != nil {
 		return err
 	}
 
-	stackNames, err := deploymentOrder(deploymentGraph)
-	if err != nil {
-		return err
-	}
+	for _, instance := range instances {
+		instanceParameters := instance.Parameters
 
-	for _, stackName := range stackNames {
-		stack, err := s.stackService.Find(stackName)
+		stack, err := s.stackService.Find(instance.StackName)
 		if err != nil {
 			return err
 		}
 
-		instance := deployment.FindInstanceByStackName(stackName)
-		if instance == nil {
-			return errdef.NewNotFound("failed to find instance for stack %q", stackName)
-		}
-
-		instanceParameters := instance.Parameters
-
 		// Add parameters not supplied by user
 		for name, stackParameter := range stack.Parameters {
+			log.Println("name:", name)
+			log.Println("stack parameter:", stackParameter)
 			if _, ok := instanceParameters[name]; !ok && stackParameter.DefaultValue == nil {
 				return fmt.Errorf("required parameter missing: %s", name)
 			}
@@ -471,9 +463,8 @@ func (s service) DeployDeployment(token string, deployment *model.Deployment) er
 		}
 	}
 
-	for _, stack := range stackNames {
-		instance := deployment.FindInstanceByStackName(stack)
-		err := s.DeployDeploymentInstance(token, instance)
+	for _, instance := range instances {
+		err := s.deployDeploymentInstance(token, instance)
 		if err != nil {
 			return fmt.Errorf("failed to deploy instance(%s) %q: %v", instance.StackName, instance.Name, err)
 		}
@@ -482,7 +473,7 @@ func (s service) DeployDeployment(token string, deployment *model.Deployment) er
 	return nil
 }
 
-func (s service) DeployDeploymentInstance(token string, instance *model.DeploymentInstance) error {
+func (s service) deployDeploymentInstance(token string, instance *model.DeploymentInstance) error {
 	group, err := s.groupService.Find(instance.GroupName)
 	if err != nil {
 		return err
@@ -516,13 +507,51 @@ func (s service) DeployDeploymentInstance(token string, instance *model.Deployme
 	return nil
 }
 
-func deploymentOrder(g graph.Graph[string, model.Stack]) ([]string, error) {
-	stackNames, err := graph.TopologicalSort(g)
+func deploymentOrder(deployment *model.Deployment, g graph.Graph[string, *model.DeploymentInstance]) ([]*model.DeploymentInstance, error) {
+	instances, err := graph.TopologicalSort(g)
 	if err != nil {
 		return nil, fmt.Errorf("failed to order the deployment: %v", err)
 	}
 
-	slices.Reverse(stackNames)
+	slices.Reverse(instances)
 
-	return stackNames, nil
+	orderedInstances := make([]*model.DeploymentInstance, len(instances))
+	for i, name := range instances {
+		orderedInstances[i] = deployment.FindInstanceByStackName(name)
+	}
+
+	return orderedInstances, nil
+}
+
+func (s service) validateNoCycles(instances []*model.DeploymentInstance) (graph.Graph[string, *model.DeploymentInstance], error) {
+	g := graph.New(func(instance *model.DeploymentInstance) string {
+		return instance.StackName
+	}, graph.Directed(), graph.PreventCycles())
+
+	for _, instance := range instances {
+		err := g.AddVertex(instance)
+		if err != nil {
+			return nil, fmt.Errorf("failed adding vertex for instance %q: %v", instance.Name, err)
+		}
+	}
+
+	for _, src := range instances {
+		stack, err := s.stackService.Find(src.StackName)
+		if err != nil {
+			return nil, err
+		}
+		for _, requiredStack := range stack.Requires {
+			err := g.AddEdge(src.StackName, requiredStack.Name)
+			if err != nil {
+				if errors.Is(err, graph.ErrEdgeAlreadyExists) {
+					return nil, fmt.Errorf("instance %q requires %q more than once", src.Name, requiredStack.Name)
+				} else if errors.Is(err, graph.ErrEdgeCreatesCycle) {
+					return nil, fmt.Errorf("edge from instance %q to instance %q creates a cycle", src.Name, requiredStack.Name)
+				}
+				return nil, fmt.Errorf("failed adding edge from instance %q to instance %q: %v", src.Name, requiredStack.Name, err)
+			}
+		}
+	}
+
+	return g, nil
 }
