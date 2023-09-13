@@ -425,18 +425,20 @@ func (s service) DeployDeployment(token string, deployment *model.Deployment) er
 
 		// Add parameters not supplied by user
 		for name, stackParameter := range stack.Parameters {
-			if _, ok := instanceParameters[name]; !ok {
-				instanceParameter := model.DeploymentInstanceParameter{
-					ParameterName: name,
-					StackName:     stack.Name,
-				}
-
-				if stackParameter.DefaultValue != nil {
-					instanceParameter.Value = *stackParameter.DefaultValue
-				}
-
-				instanceParameters[name] = instanceParameter
+			if _, ok := instanceParameters[name]; !ok && stackParameter.DefaultValue == nil {
+				return fmt.Errorf("required parameter missing: %s", name)
 			}
+
+			instanceParameter := model.DeploymentInstanceParameter{
+				ParameterName: name,
+				StackName:     stack.Name,
+			}
+
+			if stackParameter.DefaultValue != nil {
+				instanceParameter.Value = *stackParameter.DefaultValue
+			}
+
+			instanceParameters[name] = instanceParameter
 		}
 
 		for name, parameter := range instanceParameters {
