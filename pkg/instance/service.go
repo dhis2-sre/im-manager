@@ -517,7 +517,7 @@ func (s service) DeployDeploymentInstance(token string, instance *model.Deployme
 func deploymentOrder(g graph.Graph[string, model.Stack]) ([]string, error) {
 	stackNames, err := graph.TopologicalSort(g)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to order the deployment: %v", err)
 	}
 
 	slices.Reverse(stackNames)
