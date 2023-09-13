@@ -27,4 +27,3 @@ echo "{
     }
   }
 }" | $HTTP post "$IM_HOST/deployments/$DEPLOYMENT_ID/instance" "Authorization: Bearer $ACCESS_TOKEN"
-
