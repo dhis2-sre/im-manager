@@ -15,7 +15,40 @@ import (
 )
 
 func TestResolveParameters(t *testing.T) {
-	t.Run("ResolveParameter", func(t *testing.T) {
+	t.Run("PreventUserFromOverwritingConsumedParameters", func(t *testing.T) {
+		s := model.Stack{
+			Name: "stack",
+			Parameters: map[string]model.StackParameter{
+				"parameter": {
+					Consumed: true,
+				},
+			},
+		}
+		stacks := stack.Stacks{
+			"stack": s,
+		}
+		stackService := stack.NewService(stacks)
+		service := NewService(nil, nil, stackService, nil)
+		deployment := &model.Deployment{
+			Instances: []*model.DeploymentInstance{
+				{
+					StackName: "stack",
+					Parameters: map[string]model.DeploymentInstanceParameter{
+						"parameter": {
+							ParameterName: "parameter",
+							Value:         "user overwrite",
+						},
+					},
+				},
+			},
+		}
+
+		err := service.resolveParameters(deployment)
+
+		require.ErrorContains(t, err, "consumed parameters can't be supplied by the user: parameter")
+	})
+
+	t.Run("ResolveParameters", func(t *testing.T) {
 		defaultValue1 := "default value used"
 		defaultValue2 := "default value not user"
 		stackA := model.Stack{

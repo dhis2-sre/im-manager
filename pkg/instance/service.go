@@ -141,6 +141,13 @@ func (s service) resolveParameters(deployment *model.Deployment) error {
 			return err
 		}
 
+		// reject user supplied parameters which are consumed
+		for name := range instanceParameters {
+			if stack.Parameters[name].Consumed {
+				return fmt.Errorf("consumed parameters can't be supplied by the user: %s", name)
+			}
+		}
+
 		// Add parameters not supplied by user
 		for name, stackParameter := range stack.Parameters {
 			if _, ok := instanceParameters[name]; !ok {
