@@ -81,21 +81,12 @@ func (s service) SaveInstance(instance *model.DeploymentInstance) error {
 
 	deployment.Instances = append(deployment.Instances, instance)
 
+	_, err = s.validateNoCycles(deployment.Instances)
+	if err != nil {
+		return err
+	}
+
 	err = s.resolveParameters(deployment)
-	if err != nil {
-		return err
-	}
-
-	err = s.validateDeployment(deployment)
-	if err != nil {
-		return err
-	}
-
-	return s.instanceRepository.SaveInstance(instance)
-}
-
-func (s service) validateDeployment(deployment *model.Deployment) error {
-	_, err := s.validateNoCycles(deployment.Instances)
 	if err != nil {
 		return err
 	}
@@ -105,51 +96,7 @@ func (s service) validateDeployment(deployment *model.Deployment) error {
 		return err
 	}
 
-	return nil
-}
-
-func (s service) validateDeploymentParameters(deployment *model.Deployment) error {
-	var errs []error
-	for _, instance := range deployment.Instances {
-		stack, err := s.stackService.Find(instance.StackName)
-		if err != nil {
-			errs = append(errs, fmt.Errorf("stack (%s) not found for instance: %s", instance.StackName, instance.Name))
-		}
-
-		for name, stackParameter := range stack.Parameters {
-			var found bool
-			parameterName := name
-			// have a user provided value
-			if _, ok := instance.Parameters[name]; ok {
-				found = true
-			}
-
-			// have a default value
-			if _, ok := instance.Parameters[name]; !ok && stackParameter.DefaultValue != nil {
-				found = true
-			}
-
-			for _, requiredStack := range stack.Requires {
-				// have a provider
-				if _, ok := requiredStack.ParameterProviders[name]; ok {
-					found = true
-				}
-
-				// can be consumed from another stack
-				if _, ok := requiredStack.Parameters[name]; ok {
-					consumableStack := deployment.FindInstanceByStackName(requiredStack.Name)
-					if consumableStack != nil {
-						found = true
-					}
-				}
-			}
-			if !found {
-				errs = append(errs, errdef.NewBadRequest("missing value for parameter: %s", parameterName))
-			}
-		}
-
-	}
-	return errors.Join(errs...)
+	return s.instanceRepository.SaveInstance(instance)
 }
 
 func (s service) validateNoCycles(instances []*model.DeploymentInstance) (graph.Graph[string, *model.DeploymentInstance], error) {
@@ -183,34 +130,6 @@ func (s service) validateNoCycles(instances []*model.DeploymentInstance) (graph.
 	}
 
 	return g, nil
-}
-
-func (s service) DeployDeployment(token string, deployment *model.Deployment) error {
-	deploymentGraph, err := s.validateNoCycles(deployment.Instances)
-	if err != nil {
-		return err
-	}
-
-	instances, err := deploymentOrder(deployment, deploymentGraph)
-	if err != nil {
-		return err
-	}
-
-	deployment.Instances = instances
-
-	err = s.resolveParameters(deployment)
-	if err != nil {
-		return err
-	}
-
-	for _, instance := range instances {
-		err := s.deployDeploymentInstance(token, instance)
-		if err != nil {
-			return fmt.Errorf("failed to deploy instance(%s) %q: %v", instance.StackName, instance.Name, err)
-		}
-	}
-
-	return nil
 }
 
 func (s service) resolveParameters(deployment *model.Deployment) error {
@@ -267,6 +186,78 @@ func (s service) resolveParameters(deployment *model.Deployment) error {
 			}
 		}
 	}
+	return nil
+}
+
+func (s service) validateDeploymentParameters(deployment *model.Deployment) error {
+	var errs []error
+	for _, instance := range deployment.Instances {
+		stack, err := s.stackService.Find(instance.StackName)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("stack (%s) not found for instance: %s", instance.StackName, instance.Name))
+		}
+
+		for name, stackParameter := range stack.Parameters {
+			var found bool
+			parameterName := name
+			// have a user provided value
+			if _, ok := instance.Parameters[name]; ok {
+				found = true
+			}
+
+			// have a default value
+			if _, ok := instance.Parameters[name]; !ok && stackParameter.DefaultValue != nil {
+				found = true
+			}
+
+			for _, requiredStack := range stack.Requires {
+				// have a provider
+				if _, ok := requiredStack.ParameterProviders[name]; ok {
+					found = true
+				}
+
+				// can be consumed from another stack
+				if _, ok := requiredStack.Parameters[name]; ok {
+					consumableStack := deployment.FindInstanceByStackName(requiredStack.Name)
+					if consumableStack != nil {
+						found = true
+					}
+				}
+			}
+			if !found {
+				errs = append(errs, errdef.NewBadRequest("missing value for parameter: %s", parameterName))
+			}
+		}
+
+	}
+	return errors.Join(errs...)
+}
+
+func (s service) DeployDeployment(token string, deployment *model.Deployment) error {
+	deploymentGraph, err := s.validateNoCycles(deployment.Instances)
+	if err != nil {
+		return err
+	}
+
+	instances, err := deploymentOrder(deployment, deploymentGraph)
+	if err != nil {
+		return err
+	}
+
+	deployment.Instances = instances
+
+	err = s.resolveParameters(deployment)
+	if err != nil {
+		return err
+	}
+
+	for _, instance := range instances {
+		err := s.deployDeploymentInstance(token, instance)
+		if err != nil {
+			return fmt.Errorf("failed to deploy instance(%s) %q: %v", instance.StackName, instance.Name, err)
+		}
+	}
+
 	return nil
 }
 
