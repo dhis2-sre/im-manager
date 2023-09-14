@@ -2,15 +2,200 @@ package instance
 
 import (
 	"errors"
+	"fmt"
 	"strconv"
 	"strings"
 	"testing"
 
 	"github.com/dhis2-sre/im-manager/internal/errdef"
 	"github.com/dhis2-sre/im-manager/pkg/model"
+	"github.com/dhis2-sre/im-manager/pkg/stack"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestResolveParameters(t *testing.T) {
+	t.Run("ResolveDefaultParameter", func(t *testing.T) {
+		defaultValue := "value 1"
+		stackA := model.Stack{
+			Name: "stack-a",
+			Parameters: map[string]model.StackParameter{
+				"PARAMETER-A": {
+					DefaultValue: &defaultValue,
+				},
+				"PARAMETER-B": {},
+			},
+		}
+		stacks := stack.Stacks{
+			"stack-a": stackA,
+		}
+		stackService := stack.NewService(stacks)
+		service := NewService(nil, nil, stackService, nil)
+		deployment := &model.Deployment{
+			Instances: []*model.DeploymentInstance{
+				{
+					StackName: "stack-a",
+					Parameters: map[string]model.DeploymentInstanceParameter{
+						"PARAMETER-B": {
+							ParameterName: "PARAMETER-B",
+							Value:         "value 2",
+						},
+					},
+				},
+			},
+		}
+
+		err := service.resolveParameters(deployment)
+
+		require.NoError(t, err)
+		assert.Len(t, deployment.Instances, 1)
+		assert.Len(t, deployment.Instances[0].Parameters, 2)
+		assert.Equal(t, "value 1", deployment.Instances[0].Parameters["PARAMETER-A"].Value)
+		assert.Equal(t, "value 2", deployment.Instances[0].Parameters["PARAMETER-B"].Value)
+	})
+
+	t.Run("ResolveParameterUsingProvider", func(t *testing.T) {
+		stackA := model.Stack{
+			Name: "stack-a",
+			ParameterProviders: model.ParameterProviders{
+				"PROVIDER-PARAMETER": model.ParameterProviderFunc(func(instance model.DeploymentInstance) (string, error) {
+					return fmt.Sprintf("%s-%s", instance.Name, instance.GroupName), nil
+				}),
+			},
+		}
+		stackB := model.Stack{
+			Name: "stack-b",
+			Parameters: map[string]model.StackParameter{
+				"PROVIDER-PARAMETER": {
+					Consumed: true,
+				},
+			},
+			Requires: []model.Stack{stackA},
+		}
+		stacks := stack.Stacks{
+			"stack-a": stackA,
+			"stack-b": stackB,
+		}
+		stackService := stack.NewService(stacks)
+		service := NewService(nil, nil, stackService, nil)
+		deployment := &model.Deployment{
+			Instances: []*model.DeploymentInstance{
+				{
+					Name:       "name",
+					GroupName:  "group",
+					StackName:  "stack-a",
+					Parameters: map[string]model.DeploymentInstanceParameter{},
+				},
+				{
+					StackName:  "stack-b",
+					Parameters: map[string]model.DeploymentInstanceParameter{},
+				},
+			},
+		}
+
+		err := service.resolveParameters(deployment)
+
+		require.NoError(t, err)
+		assert.Equal(t, "name-group", deployment.Instances[1].Parameters["PROVIDER-PARAMETER"].Value)
+	})
+}
+
+func TestValidateDeploymentParameters(t *testing.T) {
+	t.Run("Success", func(t *testing.T) {
+		defaultValue := "value"
+		stackA := model.Stack{
+			Name: "stack",
+			Parameters: map[string]model.StackParameter{
+				"PARAMETER-A": {
+					DefaultValue: &defaultValue,
+				},
+				"PARAMETER-B": {},
+			},
+			ParameterProviders: model.ParameterProviders{
+				"PROVIDER-PARAMETER": model.ParameterProviderFunc(func(instance model.DeploymentInstance) (string, error) {
+					return fmt.Sprintf("%s-%s", instance.Name, instance.GroupName), nil
+				}),
+			},
+		}
+		stackB := model.Stack{
+			Name: "stack-b",
+			Parameters: map[string]model.StackParameter{
+				"PROVIDER-PARAMETER": {
+					Consumed: true,
+				},
+			},
+			Requires: []model.Stack{stackA},
+		}
+		stacks := stack.Stacks{
+			"stack-a": stackA,
+			"stack-b": stackB,
+		}
+		stackService := stack.NewService(stacks)
+		service := NewService(nil, nil, stackService, nil)
+		deployment := &model.Deployment{
+			Instances: []*model.DeploymentInstance{
+				{
+					StackName: "stack-a",
+					Parameters: map[string]model.DeploymentInstanceParameter{
+						"PARAMETER-A": {
+							ParameterName: "PARAMETER-A",
+						},
+						"PARAMETER-B": {
+							ParameterName: "PARAMETER-B",
+							Value:         "1",
+						},
+					},
+				},
+				{
+					StackName:  "stack-b",
+					Parameters: map[string]model.DeploymentInstanceParameter{},
+				},
+			},
+		}
+
+		err := service.validateDeploymentParameters(deployment)
+
+		require.NoError(t, err)
+	})
+
+	t.Run("MissingProvider", func(t *testing.T) {
+		stackA := model.Stack{
+			Name:       "stack-a",
+			Parameters: map[string]model.StackParameter{},
+		}
+		stackB := model.Stack{
+			Name: "stack-b",
+			Parameters: map[string]model.StackParameter{
+				"PROVIDER-PARAMETER": {
+					Consumed: true,
+				},
+			},
+			Requires: []model.Stack{stackA},
+		}
+		stacks := stack.Stacks{
+			"stack-a": stackA,
+			"stack-b": stackB,
+		}
+		stackService := stack.NewService(stacks)
+		service := NewService(nil, nil, stackService, nil)
+		deployment := &model.Deployment{
+			Instances: []*model.DeploymentInstance{
+				{
+					StackName:  "stack-a",
+					Parameters: map[string]model.DeploymentInstanceParameter{},
+				},
+				{
+					StackName:  "stack-b",
+					Parameters: map[string]model.DeploymentInstanceParameter{},
+				},
+			},
+		}
+
+		err := service.validateDeploymentParameters(deployment)
+
+		require.ErrorContains(t, err, `missing value for parameter: PROVIDER-PARAMETER`)
+	})
+}
 
 func TestValidateParameters(t *testing.T) {
 	defaultPort := "8000"
