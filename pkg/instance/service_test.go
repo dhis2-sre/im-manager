@@ -82,7 +82,7 @@ func TestResolveParameters(t *testing.T) {
 		stackA := model.Stack{
 			Name: "stack-a",
 			ParameterProviders: model.ParameterProviders{
-				"PROVIDER-PARAMETER": model.ParameterProviderFunc(func(instance model.DeploymentInstance) (string, error) {
+				"provider-parameter": model.ParameterProviderFunc(func(instance model.DeploymentInstance) (string, error) {
 					return fmt.Sprintf("%s-%s", instance.Name, instance.GroupName), nil
 				}),
 			},
@@ -90,7 +90,7 @@ func TestResolveParameters(t *testing.T) {
 		stackB := model.Stack{
 			Name: "stack-b",
 			Parameters: map[string]model.StackParameter{
-				"PROVIDER-PARAMETER": {
+				"provider-parameter": {
 					Consumed: true,
 				},
 			},
@@ -120,7 +120,24 @@ func TestResolveParameters(t *testing.T) {
 		err := service.resolveParameters(deployment)
 
 		require.NoError(t, err)
-		assert.Equal(t, "name-group", deployment.Instances[1].Parameters["PROVIDER-PARAMETER"].Value)
+		want := []*model.DeploymentInstance{
+			{
+				Name:       "name",
+				GroupName:  "group",
+				StackName:  "stack-a",
+				Parameters: map[string]model.DeploymentInstanceParameter{},
+			},
+			{
+				StackName: "stack-b",
+				Parameters: map[string]model.DeploymentInstanceParameter{
+					"provider-parameter": {
+						ParameterName: "provider-parameter",
+						Value:         "name-group",
+					},
+				},
+			},
+		}
+		assert.ElementsMatch(t, want, deployment.Instances)
 	})
 }
 
@@ -136,7 +153,7 @@ func TestValidateDeploymentParameters(t *testing.T) {
 				"parameter-b": {},
 			},
 			ParameterProviders: model.ParameterProviders{
-				"PROVIDER-PARAMETER": model.ParameterProviderFunc(func(instance model.DeploymentInstance) (string, error) {
+				"provider-parameter": model.ParameterProviderFunc(func(instance model.DeploymentInstance) (string, error) {
 					return fmt.Sprintf("%s-%s", instance.Name, instance.GroupName), nil
 				}),
 			},
@@ -144,7 +161,7 @@ func TestValidateDeploymentParameters(t *testing.T) {
 		stackB := model.Stack{
 			Name: "stack-b",
 			Parameters: map[string]model.StackParameter{
-				"PROVIDER-PARAMETER": {
+				"provider-parameter": {
 					Consumed: true,
 				},
 			},
@@ -191,7 +208,7 @@ func TestValidateDeploymentParameters(t *testing.T) {
 		stackB := model.Stack{
 			Name: "stack-b",
 			Parameters: map[string]model.StackParameter{
-				"PROVIDER-PARAMETER": {
+				"provider-parameter": {
 					Consumed: true,
 				},
 			},
@@ -218,7 +235,7 @@ func TestValidateDeploymentParameters(t *testing.T) {
 
 		err := service.validateDeploymentParameters(deployment)
 
-		require.ErrorContains(t, err, `missing value for parameter: PROVIDER-PARAMETER`)
+		require.ErrorContains(t, err, `missing value for parameter: provider-parameter`)
 	})
 }
 
