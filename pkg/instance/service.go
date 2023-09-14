@@ -146,6 +146,11 @@ func (s service) resolveParameters(deployment *model.Deployment) error {
 			return err
 		}
 
+		err = rejectNonExistingParameters(instanceParameters, stack)
+		if err != nil {
+			return err
+		}
+
 		addUnsuppliedParameters(stack, instanceParameters)
 
 		for name, parameter := range instanceParameters {
@@ -177,6 +182,7 @@ func (s service) resolveParameters(deployment *model.Deployment) error {
 			}
 		}
 	}
+
 	return nil
 }
 
@@ -185,6 +191,16 @@ func rejectConsumedParameters(instanceParameters model.DeploymentInstanceParamet
 	for name := range instanceParameters {
 		if stack.Parameters[name].Consumed {
 			errs = append(errs, fmt.Errorf("consumed parameters can't be supplied by the user: %s", name))
+		}
+	}
+	return errors.Join(errs...)
+}
+
+func rejectNonExistingParameters(instanceParameters model.DeploymentInstanceParameters, stack *model.Stack) error {
+	var errs []error
+	for name := range instanceParameters {
+		if _, ok := stack.Parameters[name]; !ok {
+			errs = append(errs, fmt.Errorf("parameter not found on stack: %s", name))
 		}
 	}
 	return errors.Join(errs...)

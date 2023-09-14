@@ -48,6 +48,34 @@ func TestResolveParameters(t *testing.T) {
 		require.ErrorContains(t, err, "consumed parameters can't be supplied by the user: parameter")
 	})
 
+	t.Run("RejectNonExistingParameter", func(t *testing.T) {
+		s := model.Stack{
+			Name:       "name",
+			Parameters: map[string]model.StackParameter{},
+		}
+		stacks := stack.Stacks{
+			"name": s,
+		}
+		stackService := stack.NewService(stacks)
+		service := NewService(nil, nil, stackService, nil)
+		deployment := &model.Deployment{
+			Instances: []*model.DeploymentInstance{
+				{
+					StackName: "name",
+					Parameters: map[string]model.DeploymentInstanceParameter{
+						"parameter": {
+							ParameterName: "parameter",
+						},
+					},
+				},
+			},
+		}
+
+		err := service.resolveParameters(deployment)
+
+		require.ErrorContains(t, err, "parameter not found on stack: parameter")
+	})
+
 	t.Run("ResolveParameters", func(t *testing.T) {
 		defaultValue1 := "default value used"
 		defaultValue2 := "default value not user"
