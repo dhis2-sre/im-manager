@@ -199,7 +199,6 @@ func (s service) validateDeploymentParameters(deployment *model.Deployment) erro
 
 		for name, stackParameter := range stack.Parameters {
 			var found bool
-			parameterName := name
 			// have a user provided value
 			if _, ok := instance.Parameters[name]; ok {
 				found = true
@@ -225,7 +224,7 @@ func (s service) validateDeploymentParameters(deployment *model.Deployment) erro
 				}
 			}
 			if !found {
-				errs = append(errs, errdef.NewBadRequest("missing value for parameter: %s", parameterName))
+				errs = append(errs, errdef.NewBadRequest("missing value for parameter: %s", name))
 			}
 		}
 
