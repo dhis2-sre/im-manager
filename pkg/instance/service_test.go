@@ -16,14 +16,18 @@ import (
 
 func TestResolveParameters(t *testing.T) {
 	t.Run("ResolveDefaultParameter", func(t *testing.T) {
-		defaultValue := "value 1"
+		defaultValue1 := "value 1"
+		defaultValue2 := "value 2"
 		stackA := model.Stack{
 			Name: "stack-a",
 			Parameters: map[string]model.StackParameter{
 				"parameter-a": {
-					DefaultValue: &defaultValue,
+					DefaultValue: &defaultValue1,
 				},
-				"parameter-b": {},
+				"parameter-b": {
+					DefaultValue: &defaultValue2,
+				},
+				"parameter-c": {},
 			},
 		}
 		stacks := stack.Stacks{
@@ -38,7 +42,11 @@ func TestResolveParameters(t *testing.T) {
 					Parameters: map[string]model.DeploymentInstanceParameter{
 						"parameter-b": {
 							ParameterName: "parameter-b",
-							Value:         "value 2",
+							Value:         "user provided value",
+						},
+						"parameter-c": {
+							ParameterName: "parameter-c",
+							Value:         "value 3",
 						},
 					},
 				},
@@ -49,9 +57,10 @@ func TestResolveParameters(t *testing.T) {
 
 		require.NoError(t, err)
 		assert.Len(t, deployment.Instances, 1)
-		assert.Len(t, deployment.Instances[0].Parameters, 2)
+		assert.Len(t, deployment.Instances[0].Parameters, 3)
 		assert.Equal(t, "value 1", deployment.Instances[0].Parameters["parameter-a"].Value)
-		assert.Equal(t, "value 2", deployment.Instances[0].Parameters["parameter-b"].Value)
+		assert.Equal(t, "user provided value", deployment.Instances[0].Parameters["parameter-b"].Value)
+		assert.Equal(t, "value 3", deployment.Instances[0].Parameters["parameter-c"].Value)
 	})
 
 	t.Run("ResolveParameterUsingProvider", func(t *testing.T) {
