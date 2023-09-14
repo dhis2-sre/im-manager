@@ -20,10 +20,10 @@ func TestResolveParameters(t *testing.T) {
 		stackA := model.Stack{
 			Name: "stack-a",
 			Parameters: map[string]model.StackParameter{
-				"PARAMETER-A": {
+				"parameter-a": {
 					DefaultValue: &defaultValue,
 				},
-				"PARAMETER-B": {},
+				"parameter-b": {},
 			},
 		}
 		stacks := stack.Stacks{
@@ -36,8 +36,8 @@ func TestResolveParameters(t *testing.T) {
 				{
 					StackName: "stack-a",
 					Parameters: map[string]model.DeploymentInstanceParameter{
-						"PARAMETER-B": {
-							ParameterName: "PARAMETER-B",
+						"parameter-b": {
+							ParameterName: "parameter-b",
 							Value:         "value 2",
 						},
 					},
@@ -50,8 +50,8 @@ func TestResolveParameters(t *testing.T) {
 		require.NoError(t, err)
 		assert.Len(t, deployment.Instances, 1)
 		assert.Len(t, deployment.Instances[0].Parameters, 2)
-		assert.Equal(t, "value 1", deployment.Instances[0].Parameters["PARAMETER-A"].Value)
-		assert.Equal(t, "value 2", deployment.Instances[0].Parameters["PARAMETER-B"].Value)
+		assert.Equal(t, "value 1", deployment.Instances[0].Parameters["parameter-a"].Value)
+		assert.Equal(t, "value 2", deployment.Instances[0].Parameters["parameter-b"].Value)
 	})
 
 	t.Run("ResolveParameterUsingProvider", func(t *testing.T) {
@@ -106,10 +106,10 @@ func TestValidateDeploymentParameters(t *testing.T) {
 		stackA := model.Stack{
 			Name: "stack",
 			Parameters: map[string]model.StackParameter{
-				"PARAMETER-A": {
+				"parameter-a": {
 					DefaultValue: &defaultValue,
 				},
-				"PARAMETER-B": {},
+				"parameter-b": {},
 			},
 			ParameterProviders: model.ParameterProviders{
 				"PROVIDER-PARAMETER": model.ParameterProviderFunc(func(instance model.DeploymentInstance) (string, error) {
@@ -137,11 +137,11 @@ func TestValidateDeploymentParameters(t *testing.T) {
 				{
 					StackName: "stack-a",
 					Parameters: map[string]model.DeploymentInstanceParameter{
-						"PARAMETER-A": {
-							ParameterName: "PARAMETER-A",
+						"parameter-a": {
+							ParameterName: "parameter-a",
 						},
-						"PARAMETER-B": {
-							ParameterName: "PARAMETER-B",
+						"parameter-b": {
+							ParameterName: "parameter-b",
 							Value:         "1",
 						},
 					},
