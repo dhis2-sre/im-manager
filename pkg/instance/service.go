@@ -146,7 +146,6 @@ func (s service) resolveParameters(deployment *model.Deployment) error {
 			if _, ok := instanceParameters[name]; !ok {
 				instanceParameter := model.DeploymentInstanceParameter{
 					ParameterName: name,
-					StackName:     stack.Name,
 				}
 
 				if stackParameter.DefaultValue != nil {

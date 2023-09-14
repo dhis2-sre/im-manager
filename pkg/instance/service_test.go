@@ -15,9 +15,9 @@ import (
 )
 
 func TestResolveParameters(t *testing.T) {
-	t.Run("ResolveDefaultParameter", func(t *testing.T) {
-		defaultValue1 := "value 1"
-		defaultValue2 := "value 2"
+	t.Run("ResolveParameter", func(t *testing.T) {
+		defaultValue1 := "default value used"
+		defaultValue2 := "default value not user"
 		stackA := model.Stack{
 			Name: "stack-a",
 			Parameters: map[string]model.StackParameter{
@@ -42,11 +42,11 @@ func TestResolveParameters(t *testing.T) {
 					Parameters: map[string]model.DeploymentInstanceParameter{
 						"parameter-b": {
 							ParameterName: "parameter-b",
-							Value:         "user provided value",
+							Value:         "default value overwritten by user",
 						},
 						"parameter-c": {
 							ParameterName: "parameter-c",
-							Value:         "value 3",
+							Value:         "some value",
 						},
 					},
 				},
@@ -56,11 +56,26 @@ func TestResolveParameters(t *testing.T) {
 		err := service.resolveParameters(deployment)
 
 		require.NoError(t, err)
-		assert.Len(t, deployment.Instances, 1)
-		assert.Len(t, deployment.Instances[0].Parameters, 3)
-		assert.Equal(t, "value 1", deployment.Instances[0].Parameters["parameter-a"].Value)
-		assert.Equal(t, "user provided value", deployment.Instances[0].Parameters["parameter-b"].Value)
-		assert.Equal(t, "value 3", deployment.Instances[0].Parameters["parameter-c"].Value)
+		want := []*model.DeploymentInstance{
+			{
+				StackName: "stack-a",
+				Parameters: map[string]model.DeploymentInstanceParameter{
+					"parameter-a": {
+						ParameterName: "parameter-a",
+						Value:         "default value used",
+					},
+					"parameter-b": {
+						ParameterName: "parameter-b",
+						Value:         "default value overwritten by user",
+					},
+					"parameter-c": {
+						ParameterName: "parameter-c",
+						Value:         "some value",
+					},
+				},
+			},
+		}
+		assert.ElementsMatch(t, want, deployment.Instances)
 	})
 
 	t.Run("ResolveParameterUsingProvider", func(t *testing.T) {
@@ -165,6 +180,7 @@ func TestValidateDeploymentParameters(t *testing.T) {
 		err := service.validateDeploymentParameters(deployment)
 
 		require.NoError(t, err)
+
 	})
 
 	t.Run("MissingProvider", func(t *testing.T) {
