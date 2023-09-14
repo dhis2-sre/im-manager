@@ -141,27 +141,12 @@ func (s service) resolveParameters(deployment *model.Deployment) error {
 			return err
 		}
 
-		// reject user supplied parameters which are consumed
-		for name := range instanceParameters {
-			if stack.Parameters[name].Consumed {
-				return fmt.Errorf("consumed parameters can't be supplied by the user: %s", name)
-			}
+		err = rejectConsumedParameters(instanceParameters, stack)
+		if err != nil {
+			return err
 		}
 
-		// Add parameters not supplied by user
-		for name, stackParameter := range stack.Parameters {
-			if _, ok := instanceParameters[name]; !ok {
-				instanceParameter := model.DeploymentInstanceParameter{
-					ParameterName: name,
-				}
-
-				if stackParameter.DefaultValue != nil {
-					instanceParameter.Value = *stackParameter.DefaultValue
-				}
-
-				instanceParameters[name] = instanceParameter
-			}
-		}
+		addUnsuppliedParameters(stack, instanceParameters)
 
 		for name, parameter := range instanceParameters {
 			if !stack.Parameters[name].Consumed {
@@ -193,6 +178,32 @@ func (s service) resolveParameters(deployment *model.Deployment) error {
 		}
 	}
 	return nil
+}
+
+func rejectConsumedParameters(instanceParameters model.DeploymentInstanceParameters, stack *model.Stack) error {
+	var errs []error
+	for name := range instanceParameters {
+		if stack.Parameters[name].Consumed {
+			errs = append(errs, fmt.Errorf("consumed parameters can't be supplied by the user: %s", name))
+		}
+	}
+	return errors.Join(errs...)
+}
+
+func addUnsuppliedParameters(stack *model.Stack, instanceParameters model.DeploymentInstanceParameters) {
+	for name, stackParameter := range stack.Parameters {
+		if _, ok := instanceParameters[name]; !ok {
+			instanceParameter := model.DeploymentInstanceParameter{
+				ParameterName: name,
+			}
+
+			if stackParameter.DefaultValue != nil {
+				instanceParameter.Value = *stackParameter.DefaultValue
+			}
+
+			instanceParameters[name] = instanceParameter
+		}
+	}
 }
 
 func (s service) validateDeploymentParameters(deployment *model.Deployment) error {
