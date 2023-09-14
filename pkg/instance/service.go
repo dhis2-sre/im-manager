@@ -185,6 +185,141 @@ func (s service) validateNoCycles(instances []*model.DeploymentInstance) (graph.
 	return g, nil
 }
 
+func (s service) DeployDeployment(token string, deployment *model.Deployment) error {
+	deploymentGraph, err := s.validateNoCycles(deployment.Instances)
+	if err != nil {
+		return err
+	}
+
+	instances, err := deploymentOrder(deployment, deploymentGraph)
+	if err != nil {
+		return err
+	}
+
+	deployment.Instances = instances
+
+	err = s.resolveParameters(deployment)
+	if err != nil {
+		return err
+	}
+
+	for _, instance := range instances {
+		err := s.deployDeploymentInstance(token, instance)
+		if err != nil {
+			return fmt.Errorf("failed to deploy instance(%s) %q: %v", instance.StackName, instance.Name, err)
+		}
+	}
+
+	return nil
+}
+
+func (s service) resolveParameters(deployment *model.Deployment) error {
+	for _, instance := range deployment.Instances {
+		instanceParameters := instance.Parameters
+
+		stack, err := s.stackService.Find(instance.StackName)
+		if err != nil {
+			return err
+		}
+
+		// Add parameters not supplied by user
+		for name, stackParameter := range stack.Parameters {
+			if _, ok := instanceParameters[name]; !ok {
+				instanceParameter := model.DeploymentInstanceParameter{
+					ParameterName: name,
+					StackName:     stack.Name,
+				}
+
+				if stackParameter.DefaultValue != nil {
+					instanceParameter.Value = *stackParameter.DefaultValue
+				}
+
+				instanceParameters[name] = instanceParameter
+			}
+		}
+
+		for name, parameter := range instanceParameters {
+			if !stack.Parameters[name].Consumed {
+				continue
+			}
+
+			for _, requiredStack := range stack.Requires {
+				// consume from instance parameters
+				sourceInstance := deployment.FindInstanceByStackName(requiredStack.Name)
+				if sourceInstance == nil {
+					return errdef.NewNotFound("failed to find required instance %q of instance %q", sourceInstance.Name, instance.Name)
+				}
+
+				if sourceInstanceParameter, ok := sourceInstance.Parameters[name]; ok {
+					parameter.Value = sourceInstanceParameter.Value
+				}
+
+				// consume from provider
+				if provider, ok := requiredStack.ParameterProviders[name]; ok {
+					value, err := provider.Provide(*sourceInstance)
+					if err != nil {
+						return fmt.Errorf("failed to provide value for instance %q parameter %q: %v", instance.Name, name, err)
+					}
+					parameter.Value = value
+				}
+
+				instanceParameters[name] = parameter
+			}
+		}
+	}
+	return nil
+}
+
+func (s service) deployDeploymentInstance(token string, instance *model.DeploymentInstance) error {
+	group, err := s.groupService.Find(instance.GroupName)
+	if err != nil {
+		return err
+	}
+
+	syncCmd, err := s.helmfileService.sync_deployment(token, instance, group)
+	if err != nil {
+		return err
+	}
+
+	deployLog, deployErrorLog, err := commandExecutor(syncCmd, group.ClusterConfiguration)
+	log.Printf("Deploy log: %s\n", deployLog)
+	log.Printf("Deploy error log: %s\n", deployErrorLog)
+	/* TODO: return error log if relevant
+	if len(deployErrorLog) > 0 {
+		return errors.New(string(deployErrorLog))
+	}
+	*/
+	if err != nil {
+		return err
+	}
+
+	// TODO: Encrypt before saving? Yes...
+	err = s.instanceRepository.SaveDeployLog_deployment(instance, string(deployLog))
+	instance.DeployLog = string(deployLog)
+	if err != nil {
+		// TODO
+		log.Printf("Store error log: %s", deployErrorLog)
+		return err
+	}
+	return nil
+}
+
+func deploymentOrder(deployment *model.Deployment, g graph.Graph[string, *model.DeploymentInstance]) ([]*model.DeploymentInstance, error) {
+	instances, err := graph.TopologicalSort(g)
+	if err != nil {
+		return nil, fmt.Errorf("failed to order the deployment: %v", err)
+	}
+
+	slices.Reverse(instances)
+
+	orderedInstances := make([]*model.DeploymentInstance, len(instances))
+	for i, name := range instances {
+		orderedInstances[i] = deployment.FindInstanceByStackName(name)
+	}
+
+	return orderedInstances, nil
+}
+
 func (s service) ConsumeParameters(source, destination *model.Instance) error {
 	sourceStack, err := s.stackService.Find(source.StackName)
 	if err != nil {
@@ -458,139 +593,4 @@ func (s service) destroy(instance *model.Instance) error {
 		}
 	}
 	return nil
-}
-
-func (s service) DeployDeployment(token string, deployment *model.Deployment) error {
-	deploymentGraph, err := s.validateNoCycles(deployment.Instances)
-	if err != nil {
-		return err
-	}
-
-	instances, err := deploymentOrder(deployment, deploymentGraph)
-	if err != nil {
-		return err
-	}
-
-	deployment.Instances = instances
-
-	err = s.resolveParameters(deployment)
-	if err != nil {
-		return err
-	}
-
-	for _, instance := range instances {
-		err := s.deployDeploymentInstance(token, instance)
-		if err != nil {
-			return fmt.Errorf("failed to deploy instance(%s) %q: %v", instance.StackName, instance.Name, err)
-		}
-	}
-
-	return nil
-}
-
-func (s service) resolveParameters(deployment *model.Deployment) error {
-	for _, instance := range deployment.Instances {
-		instanceParameters := instance.Parameters
-
-		stack, err := s.stackService.Find(instance.StackName)
-		if err != nil {
-			return err
-		}
-
-		// Add parameters not supplied by user
-		for name, stackParameter := range stack.Parameters {
-			if _, ok := instanceParameters[name]; !ok {
-				instanceParameter := model.DeploymentInstanceParameter{
-					ParameterName: name,
-					StackName:     stack.Name,
-				}
-
-				if stackParameter.DefaultValue != nil {
-					instanceParameter.Value = *stackParameter.DefaultValue
-				}
-
-				instanceParameters[name] = instanceParameter
-			}
-		}
-
-		for name, parameter := range instanceParameters {
-			if !stack.Parameters[name].Consumed {
-				continue
-			}
-
-			for _, requiredStack := range stack.Requires {
-				// consume from instance parameters
-				sourceInstance := deployment.FindInstanceByStackName(requiredStack.Name)
-				if sourceInstance == nil {
-					return errdef.NewNotFound("failed to find required instance %q of instance %q", sourceInstance.Name, instance.Name)
-				}
-
-				if sourceInstanceParameter, ok := sourceInstance.Parameters[name]; ok {
-					parameter.Value = sourceInstanceParameter.Value
-				}
-
-				// consume from provider
-				if provider, ok := requiredStack.ParameterProviders[name]; ok {
-					value, err := provider.Provide(*sourceInstance)
-					if err != nil {
-						return fmt.Errorf("failed to provide value for instance %q parameter %q: %v", instance.Name, name, err)
-					}
-					parameter.Value = value
-				}
-
-				instanceParameters[name] = parameter
-			}
-		}
-	}
-	return nil
-}
-
-func (s service) deployDeploymentInstance(token string, instance *model.DeploymentInstance) error {
-	group, err := s.groupService.Find(instance.GroupName)
-	if err != nil {
-		return err
-	}
-
-	syncCmd, err := s.helmfileService.sync_deployment(token, instance, group)
-	if err != nil {
-		return err
-	}
-
-	deployLog, deployErrorLog, err := commandExecutor(syncCmd, group.ClusterConfiguration)
-	log.Printf("Deploy log: %s\n", deployLog)
-	log.Printf("Deploy error log: %s\n", deployErrorLog)
-	/* TODO: return error log if relevant
-	if len(deployErrorLog) > 0 {
-		return errors.New(string(deployErrorLog))
-	}
-	*/
-	if err != nil {
-		return err
-	}
-
-	// TODO: Encrypt before saving? Yes...
-	err = s.instanceRepository.SaveDeployLog_deployment(instance, string(deployLog))
-	instance.DeployLog = string(deployLog)
-	if err != nil {
-		// TODO
-		log.Printf("Store error log: %s", deployErrorLog)
-		return err
-	}
-	return nil
-}
-
-func deploymentOrder(deployment *model.Deployment, g graph.Graph[string, *model.DeploymentInstance]) ([]*model.DeploymentInstance, error) {
-	instances, err := graph.TopologicalSort(g)
-	if err != nil {
-		return nil, fmt.Errorf("failed to order the deployment: %v", err)
-	}
-
-	slices.Reverse(instances)
-
-	orderedInstances := make([]*model.DeploymentInstance, len(instances))
-	for i, name := range instances {
-		orderedInstances[i] = deployment.FindInstanceByStackName(name)
-	}
-
-	return orderedInstances, nil
 }
