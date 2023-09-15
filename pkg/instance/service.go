@@ -278,11 +278,6 @@ func (s service) DeployDeployment(token string, deployment *model.Deployment) er
 
 	deployment.Instances = instances
 
-	err = s.resolveParameters(deployment)
-	if err != nil {
-		return err
-	}
-
 	err = s.validateDeploymentParameters(deployment)
 	if err != nil {
 		return err
