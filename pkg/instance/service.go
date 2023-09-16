@@ -154,7 +154,13 @@ func (s service) resolveParameters(deployment *model.Deployment) error {
 		addDefaultParameterValues(stack, instanceParameters)
 
 		for name, parameter := range instanceParameters {
-			if !stack.Parameters[name].Consumed {
+			stackParameter := stack.Parameters[name]
+			err := stackParameter.Validator(parameter.Value)
+			if err != nil {
+				return fmt.Errorf("parameter validation failed: %v", err)
+			}
+
+			if !stackParameter.Consumed {
 				continue
 			}
 
