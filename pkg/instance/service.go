@@ -122,7 +122,7 @@ func (s service) validateNoCycles(instances []*model.DeploymentInstance) (graph.
 				if errors.Is(err, graph.ErrEdgeAlreadyExists) {
 					return nil, fmt.Errorf("instance %q requires %q more than once", src.Name, requiredStack.Name)
 				} else if errors.Is(err, graph.ErrEdgeCreatesCycle) {
-					return nil, fmt.Errorf("edge from instance %q to instance %q creates a cycle", src.Name, requiredStack.Name)
+					return nil, fmt.Errorf("link from instance %q to instance %q creates a cycle", src.Name, requiredStack.Name)
 				}
 				return nil, fmt.Errorf("failed adding edge from instance %q to instance %q: %v", src.Name, requiredStack.Name, err)
 			}
