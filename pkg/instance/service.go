@@ -151,7 +151,7 @@ func (s service) resolveParameters(deployment *model.Deployment) error {
 			return err
 		}
 
-		addUnsuppliedParameters(stack, instanceParameters)
+		addDefaultParameterValues(stack, instanceParameters)
 
 		for name, parameter := range instanceParameters {
 			if !stack.Parameters[name].Consumed {
@@ -206,7 +206,7 @@ func rejectNonExistingParameters(instanceParameters model.DeploymentInstancePara
 	return errors.Join(errs...)
 }
 
-func addUnsuppliedParameters(stack *model.Stack, instanceParameters model.DeploymentInstanceParameters) {
+func addDefaultParameterValues(stack *model.Stack, instanceParameters model.DeploymentInstanceParameters) {
 	for name, stackParameter := range stack.Parameters {
 		if _, ok := instanceParameters[name]; !ok {
 			instanceParameter := model.DeploymentInstanceParameter{
