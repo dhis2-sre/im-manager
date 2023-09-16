@@ -107,6 +107,9 @@ func (s service) validateNoCycles(instances []*model.DeploymentInstance) (graph.
 	for _, instance := range instances {
 		err := g.AddVertex(instance)
 		if err != nil {
+			if errors.Is(err, graph.ErrVertexAlreadyExists) {
+				return nil, fmt.Errorf("failed adding instance for stack %q as one already exists", instance.StackName)
+			}
 			return nil, fmt.Errorf("failed adding vertex for instance %q: %v", instance.Name, err)
 		}
 	}
