@@ -134,13 +134,12 @@ func (s service) validateNoCycles(instances []*model.DeploymentInstance) (graph.
 
 func (s service) resolveParameters(deployment *model.Deployment) error {
 	for _, instance := range deployment.Instances {
-		instanceParameters := instance.Parameters
-
 		stack, err := s.stackService.Find(instance.StackName)
 		if err != nil {
 			return err
 		}
 
+		instanceParameters := instance.Parameters
 		err = rejectNonExistingParameters(instanceParameters, stack)
 		if err != nil {
 			return err
