@@ -37,7 +37,7 @@ require (
 )
 
 require (
-	filippo.io/age v1.0.0
+	filippo.io/age v1.1.1
 	github.com/dominikbraun/graph v0.23.0
 	github.com/go-mail/mail v2.3.1+incompatible
 )
