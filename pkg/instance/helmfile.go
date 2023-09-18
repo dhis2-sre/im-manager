@@ -117,7 +117,7 @@ func (h helmfileService) loadStackParameters(stackName string) (stackParameters,
 
 	b, err := decryptYaml(data)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to decrypt stack parameters: %v", err)
 	}
 
 	var params stackParameters

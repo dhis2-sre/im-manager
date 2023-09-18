@@ -42,7 +42,7 @@ func commandExecutor(cmd *exec.Cmd, configuration *model.ClusterConfiguration) (
 
 	kubeCfg, err := decryptYaml(configuration.KubernetesConfiguration)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("failed to decrypt kubernetes config: %v", err)
 	}
 
 	file, err := os.CreateTemp("", "kubectl")

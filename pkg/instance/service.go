@@ -452,7 +452,7 @@ func (s service) Deploy(token string, instance *model.Instance) error {
 
 	syncCmd, err := s.helmfileService.sync(token, instance, group)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to execute helmfile sync: %v", err)
 	}
 
 	deployLog, deployErrorLog, err := commandExecutor(syncCmd, group.ClusterConfiguration)
