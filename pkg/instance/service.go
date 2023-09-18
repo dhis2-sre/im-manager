@@ -91,11 +91,6 @@ func (s service) SaveInstance(instance *model.DeploymentInstance) error {
 		return err
 	}
 
-	err = s.validateDeploymentParameters(deployment)
-	if err != nil {
-		return err
-	}
-
 	return s.instanceRepository.SaveInstance(instance)
 }
 
@@ -232,49 +227,6 @@ func addDefaultParameterValues(stack *model.Stack, instanceParameters model.Depl
 	}
 }
 
-func (s service) validateDeploymentParameters(deployment *model.Deployment) error {
-	var errs []error
-	for _, instance := range deployment.Instances {
-		stack, err := s.stackService.Find(instance.StackName)
-		if err != nil {
-			errs = append(errs, fmt.Errorf("stack (%s) not found for instance: %s", instance.StackName, instance.Name))
-		}
-
-		for name, stackParameter := range stack.Parameters {
-			var found bool
-			// have a user provided value
-			if _, ok := instance.Parameters[name]; ok {
-				found = true
-			}
-
-			// have a default value
-			if _, ok := instance.Parameters[name]; !ok && stackParameter.DefaultValue != nil {
-				found = true
-			}
-
-			for _, requiredStack := range stack.Requires {
-				// have a provider
-				if _, ok := requiredStack.ParameterProviders[name]; ok {
-					found = true
-				}
-
-				// can be consumed from another stack
-				if _, ok := requiredStack.Parameters[name]; ok {
-					consumableStack := deployment.FindInstanceByStackName(requiredStack.Name)
-					if consumableStack != nil {
-						found = true
-					}
-				}
-			}
-			if !found {
-				errs = append(errs, errdef.NewBadRequest("missing value for parameter: %s", name))
-			}
-		}
-
-	}
-	return errors.Join(errs...)
-}
-
 func (s service) DeployDeployment(token string, deployment *model.Deployment) error {
 	deploymentGraph, err := s.validateNoCycles(deployment.Instances)
 	if err != nil {
@@ -287,11 +239,6 @@ func (s service) DeployDeployment(token string, deployment *model.Deployment) er
 	}
 
 	deployment.Instances = instances
-
-	err = s.validateDeploymentParameters(deployment)
-	if err != nil {
-		return err
-	}
 
 	for _, instance := range instances {
 		err := s.deployDeploymentInstance(token, instance)
