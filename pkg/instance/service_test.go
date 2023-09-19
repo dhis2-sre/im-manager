@@ -50,18 +50,18 @@ func TestResolveParameters(t *testing.T) {
 
 	t.Run("RejectNonExistingParameter", func(t *testing.T) {
 		s := model.Stack{
-			Name:       "name",
+			Name:       "name-a",
 			Parameters: map[string]model.StackParameter{},
 		}
 		stacks := stack.Stacks{
-			"name": s,
+			"name-a": s,
 		}
 		stackService := stack.NewService(stacks)
 		service := NewService(nil, nil, stackService, nil)
 		deployment := &model.Deployment{
 			Instances: []*model.DeploymentInstance{
 				{
-					StackName: "name",
+					StackName: "name-a",
 					Parameters: map[string]model.DeploymentInstanceParameter{
 						"parameter": {
 							ParameterName: "parameter",
@@ -166,8 +166,8 @@ func TestResolveParameters(t *testing.T) {
 		deployment := &model.Deployment{
 			Instances: []*model.DeploymentInstance{
 				{
-					Name:       "name",
-					GroupName:  "group",
+					Name:       "name-a",
+					GroupName:  "group-a",
 					StackName:  "stack-a",
 					Parameters: map[string]model.DeploymentInstanceParameter{},
 				},
@@ -183,8 +183,8 @@ func TestResolveParameters(t *testing.T) {
 		require.NoError(t, err)
 		want := []*model.DeploymentInstance{
 			{
-				Name:       "name",
-				GroupName:  "group",
+				Name:       "name-a",
+				GroupName:  "group-a",
 				StackName:  "stack-a",
 				Parameters: map[string]model.DeploymentInstanceParameter{},
 			},
@@ -193,7 +193,7 @@ func TestResolveParameters(t *testing.T) {
 				Parameters: map[string]model.DeploymentInstanceParameter{
 					"provider-parameter": {
 						ParameterName: "provider-parameter",
-						Value:         "name-group",
+						Value:         "name-a-group-a",
 					},
 				},
 			},
@@ -241,7 +241,7 @@ func TestValidateParameters(t *testing.T) {
 			},
 		}
 
-		err := validateParameters(stack, instance)
+		err := validateInstanceParameters(instance, stack)
 
 		require.NoError(t, err)
 	})
@@ -261,7 +261,7 @@ func TestValidateParameters(t *testing.T) {
 			},
 		}
 
-		err := validateParameters(stack, instance)
+		err := validateInstanceParameters(instance, stack)
 
 		assert.True(t, errdef.IsBadRequest(err), "should be a bad request error")
 		assert.ErrorContains(t, err, `parameter "ADDITIONAL": is not a stack parameter`)
@@ -280,7 +280,7 @@ func TestValidateParameters(t *testing.T) {
 			},
 		}
 
-		err := validateParameters(stack, instance)
+		err := validateInstanceParameters(instance, stack)
 
 		assert.True(t, errdef.IsBadRequest(err), "should be a bad request error")
 		assert.ErrorContains(t, err, "invalid parameter(s)")
@@ -302,7 +302,7 @@ func TestValidateParameters(t *testing.T) {
 			},
 		}
 
-		err := validateParameters(stack, instance)
+		err := validateInstanceParameters(instance, stack)
 
 		assert.True(t, errdef.IsBadRequest(err), "should be a bad request error")
 		assert.ErrorContains(t, err, "invalid parameter(s)")

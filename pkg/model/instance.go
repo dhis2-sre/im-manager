@@ -23,15 +23,6 @@ type Deployment struct {
 	Instances []*DeploymentInstance `json:"instances"`
 }
 
-func (d Deployment) FindInstanceByStackName(name string) *DeploymentInstance {
-	for _, instance := range d.Instances {
-		if instance.StackName == name {
-			return instance
-		}
-	}
-	return nil
-}
-
 type DeploymentInstanceParameters map[string]DeploymentInstanceParameter
 
 type DeploymentInstance struct {

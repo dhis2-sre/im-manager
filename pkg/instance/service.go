@@ -148,46 +148,75 @@ func (s service) resolveParameters(deployment *model.Deployment) error {
 			return err
 		}
 
-		addDefaultParameterValues(stack, instanceParameters)
+		addDefaultParameterValues(instanceParameters, stack)
 
-		for name, parameter := range instanceParameters {
-			stackParameter := stack.Parameters[name]
-			if stackParameter.Validator != nil {
-				err := stackParameter.Validator(parameter.Value)
-				if err != nil {
-					return fmt.Errorf("parameter validation failed: %v", err)
-				}
-			}
+		err = validateParameters(instanceParameters, stack)
+		if err != nil {
+			return err
+		}
 
-			if !stackParameter.Consumed {
-				continue
-			}
-
-			for _, requiredStack := range stack.Requires {
-				// consume from instance parameters
-				sourceInstance := deployment.FindInstanceByStackName(requiredStack.Name)
-				if sourceInstance == nil {
-					return errdef.NewNotFound("failed to find required instance %q of instance %q", sourceInstance.Name, instance.Name)
-				}
-
-				if sourceInstanceParameter, ok := sourceInstance.Parameters[name]; ok {
-					parameter.Value = sourceInstanceParameter.Value
-				}
-
-				// consume from provider
-				if provider, ok := requiredStack.ParameterProviders[name]; ok {
-					value, err := provider.Provide(*sourceInstance)
-					if err != nil {
-						return fmt.Errorf("failed to provide value for instance %q parameter %q: %v", instance.Name, name, err)
-					}
-					parameter.Value = value
-				}
-
-				instanceParameters[name] = parameter
-			}
+		err = resolveConsumedParameters(deployment, instance, stack)
+		if err != nil {
+			return err
 		}
 	}
 
+	return nil
+}
+
+func validateParameters(instanceParameters model.DeploymentInstanceParameters, stack *model.Stack) error {
+	var errs []error
+	for name, parameter := range instanceParameters {
+		stackParameter := stack.Parameters[name]
+		if stackParameter.Validator != nil {
+			err := stackParameter.Validator(parameter.Value)
+			if err != nil {
+				errs = append(errs, fmt.Errorf("validation failed for parameter %s: %v", name, err))
+			}
+		}
+	}
+	return errors.Join(errs...)
+}
+
+func resolveConsumedParameters(deployment *model.Deployment, instance *model.DeploymentInstance, stack *model.Stack) error {
+	for name, parameter := range instance.Parameters {
+		stackParameter := stack.Parameters[name]
+		if !stackParameter.Consumed {
+			continue
+		}
+
+		for _, requiredStack := range stack.Requires {
+			// consume from instance parameters
+			sourceInstance := findInstanceByStackName(requiredStack.Name, deployment)
+			if sourceInstance == nil {
+				return errdef.NewNotFound("failed to find required instance %q of instance %q", sourceInstance.Name, instance.Name)
+			}
+
+			if sourceInstanceParameter, ok := sourceInstance.Parameters[name]; ok {
+				parameter.Value = sourceInstanceParameter.Value
+			}
+
+			// consume from provider
+			if provider, ok := requiredStack.ParameterProviders[name]; ok {
+				value, err := provider.Provide(*sourceInstance)
+				if err != nil {
+					return fmt.Errorf("failed to provide value for instance %q parameter %q: %v", instance.Name, name, err)
+				}
+				parameter.Value = value
+			}
+
+			instance.Parameters[name] = parameter
+		}
+	}
+	return nil
+}
+
+func findInstanceByStackName(name string, deployment *model.Deployment) *model.DeploymentInstance {
+	for _, instance := range deployment.Instances {
+		if instance.StackName == name {
+			return instance
+		}
+	}
 	return nil
 }
 
@@ -201,7 +230,7 @@ func rejectNonExistingParameters(instanceParameters model.DeploymentInstancePara
 	return errors.Join(errs...)
 }
 
-func rejectUserProvidedConsumedParameters(instanceParameters model.DeploymentInstanceParameters, stack *model.Stack) error {
+func rejectConsumedParameters(instanceParameters model.DeploymentInstanceParameters, stack *model.Stack) error {
 	var errs []error
 	for name := range instanceParameters {
 		if stack.Parameters[name].Consumed {
@@ -211,7 +240,7 @@ func rejectUserProvidedConsumedParameters(instanceParameters model.DeploymentIns
 	return errors.Join(errs...)
 }
 
-func addDefaultParameterValues(stack *model.Stack, instanceParameters model.DeploymentInstanceParameters) {
+func addDefaultParameterValues(instanceParameters model.DeploymentInstanceParameters, stack *model.Stack) {
 	for name, stackParameter := range stack.Parameters {
 		if _, ok := instanceParameters[name]; !ok {
 			instanceParameter := model.DeploymentInstanceParameter{
@@ -294,7 +323,7 @@ func deploymentOrder(deployment *model.Deployment, g graph.Graph[string, *model.
 
 	orderedInstances := make([]*model.DeploymentInstance, len(instances))
 	for i, name := range instances {
-		orderedInstances[i] = deployment.FindInstanceByStackName(name)
+		orderedInstances[i] = findInstanceByStackName(name, deployment)
 	}
 
 	return orderedInstances, nil
@@ -406,12 +435,12 @@ func (s service) unlink(id uint) error {
 }
 
 func (s service) Save(instance *model.Instance) error {
-	instanceStack, err := s.stackService.Find(instance.StackName)
+	stack, err := s.stackService.Find(instance.StackName)
 	if err != nil {
 		return err
 	}
 
-	err = validateParameters(instanceStack, instance)
+	err = validateInstanceParameters(instance, stack)
 	if err != nil {
 		return err
 	}
@@ -419,7 +448,7 @@ func (s service) Save(instance *model.Instance) error {
 	return s.instanceRepository.Save(instance)
 }
 
-func validateParameters(stack *model.Stack, instance *model.Instance) error {
+func validateInstanceParameters(instance *model.Instance, stack *model.Stack) error {
 	var errs []error
 	for _, parameter := range instance.Parameters {
 		stackParameter, ok := stack.Parameters[parameter.Name]
