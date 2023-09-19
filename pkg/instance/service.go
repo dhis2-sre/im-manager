@@ -6,8 +6,10 @@ import (
 	"io"
 	"log"
 	"os/exec"
+	"slices"
 
 	"github.com/dhis2-sre/im-manager/internal/errdef"
+	"github.com/dominikbraun/graph"
 
 	"github.com/dhis2-sre/im-manager/pkg/stack"
 
@@ -42,6 +44,7 @@ type Repository interface {
 	FindByGroups(groups []model.Group, presets bool) ([]GroupsWithInstances, error)
 	FindPublicInstances() ([]GroupsWithInstances, error)
 	SaveDeployLog(instance *model.Instance, log string) error
+	SaveDeployLog_deployment(instance *model.DeploymentInstance, log string) error
 	Delete(id uint) error
 }
 
@@ -50,6 +53,7 @@ type groupService interface {
 }
 
 type helmfile interface {
+	sync_deployment(token string, instance *model.DeploymentInstance, group *model.Group) (*exec.Cmd, error)
 	sync(token string, instance *model.Instance, group *model.Group) (*exec.Cmd, error)
 	destroy(instance *model.Instance, group *model.Group) (*exec.Cmd, error)
 }
@@ -76,7 +80,13 @@ func (s service) SaveInstance(instance *model.DeploymentInstance) error {
 	}
 
 	deployment.Instances = append(deployment.Instances, instance)
-	err = s.validateDeployment(deployment)
+
+	_, err = s.validateNoCycles(deployment.Instances)
+	if err != nil {
+		return err
+	}
+
+	err = s.resolveParameters(deployment)
 	if err != nil {
 		return err
 	}
@@ -84,35 +94,239 @@ func (s service) SaveInstance(instance *model.DeploymentInstance) error {
 	return s.instanceRepository.SaveInstance(instance)
 }
 
-func (s service) validateDeployment(deployment *model.Deployment) error {
-	stacks, err := s.collectStacks(deployment)
-	if err != nil {
-		return err
+func (s service) validateNoCycles(instances []*model.DeploymentInstance) (graph.Graph[string, *model.DeploymentInstance], error) {
+	g := graph.New(func(instance *model.DeploymentInstance) string {
+		return instance.StackName
+	}, graph.Directed(), graph.PreventCycles())
+
+	for _, instance := range instances {
+		err := g.AddVertex(instance)
+		if err != nil {
+			if errors.Is(err, graph.ErrVertexAlreadyExists) {
+				return nil, fmt.Errorf("failed adding instance for stack %q as one already exists", instance.StackName)
+			}
+			return nil, fmt.Errorf("failed adding instance %q: %v", instance.Name, err)
+		}
 	}
 
-	err = stack.ValidateNoCycles(stacks)
-	if err != nil {
-		return err
+	for _, src := range instances {
+		stack, err := s.stackService.Find(src.StackName)
+		if err != nil {
+			return nil, err
+		}
+		for _, requiredStack := range stack.Requires {
+			err := g.AddEdge(src.StackName, requiredStack.Name)
+			if err != nil {
+				if errors.Is(err, graph.ErrEdgeAlreadyExists) {
+					return nil, fmt.Errorf("instance %q requires %q more than once", src.Name, requiredStack.Name)
+				} else if errors.Is(err, graph.ErrEdgeCreatesCycle) {
+					return nil, fmt.Errorf("link from instance %q to stack %q creates a cycle", src.Name, requiredStack.Name)
+				}
+				return nil, fmt.Errorf("failed linking instance %q with instance %q: %v", src.Name, requiredStack.Name, err)
+			}
+		}
 	}
 
-	err = stack.ValidateConsumedParameters(stacks)
-	if err != nil {
-		return err
+	return g, nil
+}
+
+func (s service) resolveParameters(deployment *model.Deployment) error {
+	for _, instance := range deployment.Instances {
+		stack, err := s.stackService.Find(instance.StackName)
+		if err != nil {
+			return err
+		}
+
+		instanceParameters := instance.Parameters
+		err = rejectNonExistingParameters(instanceParameters, stack)
+		if err != nil {
+			return err
+		}
+
+		err = rejectConsumedParameters(instanceParameters, stack)
+		if err != nil {
+			return err
+		}
+
+		addDefaultParameterValues(instanceParameters, stack)
+
+		err = validateParameters(instanceParameters, stack)
+		if err != nil {
+			return err
+		}
+
+		err = resolveConsumedParameters(deployment, instance, stack)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
 }
 
-func (s service) collectStacks(deployment *model.Deployment) ([]model.Stack, error) {
-	stacks := make([]model.Stack, len(deployment.Instances))
-	for i, instance := range deployment.Instances {
-		stack, err := s.stackService.Find(instance.StackName)
-		if err != nil {
-			return nil, err
+func validateParameters(instanceParameters model.DeploymentInstanceParameters, stack *model.Stack) error {
+	var errs []error
+	for name, parameter := range instanceParameters {
+		stackParameter := stack.Parameters[name]
+		if stackParameter.Validator != nil {
+			err := stackParameter.Validator(parameter.Value)
+			if err != nil {
+				errs = append(errs, fmt.Errorf("validation failed for parameter %s: %v", name, err))
+			}
 		}
-		stacks[i] = *stack
 	}
-	return stacks, nil
+	return errors.Join(errs...)
+}
+
+func resolveConsumedParameters(deployment *model.Deployment, instance *model.DeploymentInstance, stack *model.Stack) error {
+	for name, parameter := range instance.Parameters {
+		stackParameter := stack.Parameters[name]
+		if !stackParameter.Consumed {
+			continue
+		}
+
+		for _, requiredStack := range stack.Requires {
+			// consume from instance parameters
+			sourceInstance := findInstanceByStackName(requiredStack.Name, deployment)
+			if sourceInstance == nil {
+				return errdef.NewNotFound("failed to find required instance %q of instance %q", sourceInstance.Name, instance.Name)
+			}
+
+			if sourceInstanceParameter, ok := sourceInstance.Parameters[name]; ok {
+				parameter.Value = sourceInstanceParameter.Value
+			}
+
+			// consume from provider
+			if provider, ok := requiredStack.ParameterProviders[name]; ok {
+				value, err := provider.Provide(*sourceInstance)
+				if err != nil {
+					return fmt.Errorf("failed to provide value for instance %q parameter %q: %v", instance.Name, name, err)
+				}
+				parameter.Value = value
+			}
+
+			instance.Parameters[name] = parameter
+		}
+	}
+	return nil
+}
+
+func findInstanceByStackName(name string, deployment *model.Deployment) *model.DeploymentInstance {
+	for _, instance := range deployment.Instances {
+		if instance.StackName == name {
+			return instance
+		}
+	}
+	return nil
+}
+
+func rejectNonExistingParameters(instanceParameters model.DeploymentInstanceParameters, stack *model.Stack) error {
+	var errs []error
+	for name := range instanceParameters {
+		if _, ok := stack.Parameters[name]; !ok {
+			errs = append(errs, fmt.Errorf("parameter not found on stack: %s", name))
+		}
+	}
+	return errors.Join(errs...)
+}
+
+func rejectConsumedParameters(instanceParameters model.DeploymentInstanceParameters, stack *model.Stack) error {
+	var errs []error
+	for name := range instanceParameters {
+		if stack.Parameters[name].Consumed {
+			errs = append(errs, fmt.Errorf("consumed parameters can't be supplied by the user: %s", name))
+		}
+	}
+	return errors.Join(errs...)
+}
+
+func addDefaultParameterValues(instanceParameters model.DeploymentInstanceParameters, stack *model.Stack) {
+	for name, stackParameter := range stack.Parameters {
+		if _, ok := instanceParameters[name]; !ok {
+			instanceParameter := model.DeploymentInstanceParameter{
+				ParameterName: name,
+			}
+
+			if stackParameter.DefaultValue != nil {
+				instanceParameter.Value = *stackParameter.DefaultValue
+			}
+
+			instanceParameters[name] = instanceParameter
+		}
+	}
+}
+
+func (s service) DeployDeployment(token string, deployment *model.Deployment) error {
+	deploymentGraph, err := s.validateNoCycles(deployment.Instances)
+	if err != nil {
+		return err
+	}
+
+	instances, err := deploymentOrder(deployment, deploymentGraph)
+	if err != nil {
+		return err
+	}
+
+	deployment.Instances = instances
+
+	for _, instance := range instances {
+		err := s.deployDeploymentInstance(token, instance)
+		if err != nil {
+			return fmt.Errorf("failed to deploy instance(%s) %q: %v", instance.StackName, instance.Name, err)
+		}
+	}
+
+	return nil
+}
+
+func (s service) deployDeploymentInstance(token string, instance *model.DeploymentInstance) error {
+	group, err := s.groupService.Find(instance.GroupName)
+	if err != nil {
+		return err
+	}
+
+	syncCmd, err := s.helmfileService.sync_deployment(token, instance, group)
+	if err != nil {
+		return err
+	}
+
+	deployLog, deployErrorLog, err := commandExecutor(syncCmd, group.ClusterConfiguration)
+	log.Printf("Deploy log: %s\n", deployLog)
+	log.Printf("Deploy error log: %s\n", deployErrorLog)
+	/* TODO: return error log if relevant
+	if len(deployErrorLog) > 0 {
+		return errors.New(string(deployErrorLog))
+	}
+	*/
+	if err != nil {
+		return err
+	}
+
+	// TODO: Encrypt before saving? Yes...
+	err = s.instanceRepository.SaveDeployLog_deployment(instance, string(deployLog))
+	instance.DeployLog = string(deployLog)
+	if err != nil {
+		// TODO
+		log.Printf("Store error log: %s", deployErrorLog)
+		return err
+	}
+	return nil
+}
+
+func deploymentOrder(deployment *model.Deployment, g graph.Graph[string, *model.DeploymentInstance]) ([]*model.DeploymentInstance, error) {
+	instances, err := graph.TopologicalSort(g)
+	if err != nil {
+		return nil, fmt.Errorf("failed to order the deployment: %v", err)
+	}
+
+	slices.Reverse(instances)
+
+	orderedInstances := make([]*model.DeploymentInstance, len(instances))
+	for i, name := range instances {
+		orderedInstances[i] = findInstanceByStackName(name, deployment)
+	}
+
+	return orderedInstances, nil
 }
 
 func (s service) ConsumeParameters(source, destination *model.Instance) error {
@@ -221,12 +435,12 @@ func (s service) unlink(id uint) error {
 }
 
 func (s service) Save(instance *model.Instance) error {
-	instanceStack, err := s.stackService.Find(instance.StackName)
+	stack, err := s.stackService.Find(instance.StackName)
 	if err != nil {
 		return err
 	}
 
-	err = validateParameters(instanceStack, instance)
+	err = validateInstanceParameters(instance, stack)
 	if err != nil {
 		return err
 	}
@@ -234,7 +448,7 @@ func (s service) Save(instance *model.Instance) error {
 	return s.instanceRepository.Save(instance)
 }
 
-func validateParameters(stack *model.Stack, instance *model.Instance) error {
+func validateInstanceParameters(instance *model.Instance, stack *model.Stack) error {
 	var errs []error
 	for _, parameter := range instance.Parameters {
 		stackParameter, ok := stack.Parameters[parameter.Name]

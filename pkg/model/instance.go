@@ -30,10 +30,15 @@ type DeploymentInstance struct {
 	CreatedAt time.Time `json:"createdAt"`
 	UpdatedAt time.Time `json:"updatedAt"`
 
+	// TODO: FK to name of Deployment?
+	Name      string `json:"name" gorm:"index:idx_name_and_group,unique"`
+	Group     *Group `json:"group,omitempty"`
+	GroupName string `json:"groupName" gorm:"index:idx_name_and_group,unique; references:Name"`
+	//	Stack     *Stack `json:"stack,omitempty"`
+	StackName string `json:"stackName" gorm:"index:idx_name_and_group,unique"`
+
 	DeploymentID uint        `json:"deploymentId"`
 	Deployment   *Deployment `json:"deployment,omitempty"`
-
-	StackName string `json:"stackName" gorm:"references:Name"`
 
 	GormParameters []DeploymentInstanceParameter `json:"-" gorm:"foreignKey:DeploymentInstanceID; constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
 	Parameters     DeploymentInstanceParameters  `json:"parameters" gorm:"-:all"`

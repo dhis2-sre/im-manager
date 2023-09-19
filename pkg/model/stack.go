@@ -29,11 +29,11 @@ type ParameterProviders map[string]ParameterProvider
 
 // ParameterProvider provides a value that can be consumed by a stack as a stack parameter.
 type ParameterProvider interface {
-	Provide(instance Instance) (value string, err error)
+	Provide(instance DeploymentInstance) (value string, err error)
 }
 
-type ParameterProviderFunc func(instance Instance) (string, error)
+type ParameterProviderFunc func(instance DeploymentInstance) (string, error)
 
-func (p ParameterProviderFunc) Provide(instance Instance) (string, error) {
+func (p ParameterProviderFunc) Provide(instance DeploymentInstance) (string, error) {
 	return p(instance)
 }
