@@ -10,7 +10,7 @@ import (
 )
 
 func TestNew(t *testing.T) {
-	provider := model.ParameterProviderFunc(func(instance model.Instance) (string, error) {
+	provider := model.ParameterProviderFunc(func(instance model.DeploymentInstance) (string, error) {
 		return "1", nil
 	})
 

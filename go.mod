@@ -4,7 +4,7 @@ go 1.21
 
 require (
 	github.com/anthhub/forwarder v1.1.0
-	github.com/aws/aws-sdk-go v1.45.5
+	github.com/aws/aws-sdk-go v1.45.12
 	github.com/aws/aws-sdk-go-v2 v1.21.0
 	github.com/aws/aws-sdk-go-v2/config v1.18.40
 	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.11.84
@@ -13,7 +13,7 @@ require (
 	github.com/gin-contrib/cors v1.4.0
 	github.com/gin-gonic/gin v1.9.1
 	github.com/go-openapi/runtime v0.26.0
-	github.com/go-playground/validator/v10 v10.15.3
+	github.com/go-playground/validator/v10 v10.15.4
 	github.com/go-redis/redis v6.15.9+incompatible
 	github.com/gofrs/uuid v4.4.0+incompatible
 	github.com/google/uuid v1.3.1
@@ -37,7 +37,7 @@ require (
 )
 
 require (
-	filippo.io/age v1.0.0
+	filippo.io/age v1.1.1
 	github.com/dominikbraun/graph v0.23.0
 	github.com/go-mail/mail v2.3.1+incompatible
 )
