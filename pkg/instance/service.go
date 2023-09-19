@@ -201,7 +201,7 @@ func rejectNonExistingParameters(instanceParameters model.DeploymentInstancePara
 	return errors.Join(errs...)
 }
 
-func rejectConsumedParameters(instanceParameters model.DeploymentInstanceParameters, stack *model.Stack) error {
+func rejectUserProvidedConsumedParameters(instanceParameters model.DeploymentInstanceParameters, stack *model.Stack) error {
 	var errs []error
 	for name := range instanceParameters {
 		if stack.Parameters[name].Consumed {
