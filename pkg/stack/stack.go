@@ -136,7 +136,9 @@ const ifNotPresent = "IfNotPresent"
 
 // Stack representing ../../stacks/dhis2-db/helmfile.yaml
 var DHIS2DB = model.Stack{
-	Name: "dhis2-db",
+	// TODO: Remove HostnamePattern once stacks 2.0 are the default
+	HostnamePattern: "%s-database-postgresql.%s.svc",
+	Name:            "dhis2-db",
 	Parameters: model.StackParameters{
 		"CHART_VERSION":             {DefaultValue: &dhis2DBDefaults.chartVersion},
 		"DATABASE_ID":               {},
