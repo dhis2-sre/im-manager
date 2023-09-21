@@ -1088,3 +1088,53 @@ func (h Handler) ListPublicInstances(c *gin.Context) {
 
 	c.JSON(http.StatusOK, instances)
 }
+
+// DeleteDeployment deployment by id
+func (h Handler) DeleteDeployment(c *gin.Context) {
+	// swagger:route DELETE /deployment/{id} deleteDeployment
+	//
+	// Delete deployment
+	//
+	// Delete an deployment by id
+	//
+	// Security:
+	//	oauth2:
+	//
+	// responses:
+	//	202:
+	//	401: Error
+	//	403: Error
+	//	404: Error
+	//	415: Error
+	id, ok := handler.GetPathParameter(c, "id")
+	if !ok {
+		return
+	}
+
+	user, err := handler.GetUserFromContext(c)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	deployment, err := h.instanceService.FindDeploymentById(id)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	canWrite := handler.CanWriteDeployment(user, deployment)
+	if !canWrite {
+		unauthorized := errdef.NewUnauthorized("write access denied")
+		_ = c.Error(unauthorized)
+		return
+	}
+
+	err = h.instanceService.DeleteDeployment(deployment.ID)
+	if err != nil {
+		_ = c.Error(fmt.Errorf("unable to delete instance: %v", err))
+		return
+	}
+
+	c.Status(http.StatusAccepted)
+}

@@ -239,6 +239,44 @@ func (ks kubernetesService) resume(instance *model.Instance) error {
 	return nil
 }
 
+func (ks kubernetesService) deletePersistentVolumeClaim_deployment(instance *model.DeploymentInstance) error {
+	// TODO: This should be stack metadata
+	labelMap := map[string][]string{
+		"dhis2":    {"app.kubernetes.io/instance=%s-database", "app.kubernetes.io/instance=%s-redis"},
+		"dhis2-db": {"app.kubernetes.io/instance=%s-database"},
+	}
+
+	labelPatterns := labelMap[instance.StackName]
+	if labelPatterns == nil {
+		return nil
+	}
+
+	pvcs := ks.client.CoreV1().PersistentVolumeClaims(instance.GroupName)
+
+	for _, pattern := range labelPatterns {
+		selector := fmt.Sprintf(pattern, instance.Name)
+		listOptions := metav1.ListOptions{LabelSelector: selector}
+		list, err := pvcs.List(context.TODO(), listOptions)
+		if err != nil {
+			return fmt.Errorf("error finding pvcs using selector %q: %v", selector, err)
+		}
+
+		if len(list.Items) > 1 {
+			return fmt.Errorf("multiple pvcs found using the selector: %q", selector)
+		}
+
+		if len(list.Items) == 1 {
+			name := list.Items[0].Name
+			err := pvcs.Delete(context.TODO(), name, metav1.DeleteOptions{})
+			if err != nil {
+				return fmt.Errorf("failed to delete pvc: %v", err)
+			}
+		}
+	}
+
+	return nil
+}
+
 func (ks kubernetesService) deletePersistentVolumeClaim(instance *model.Instance) error {
 	// TODO: This should be stack metadata
 	labelMap := map[string][]string{

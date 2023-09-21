@@ -10,9 +10,6 @@ STACK_NAME=dhis2-core
 echo "{
   \"stackName\": \"$STACK_NAME\",
   \"parameters\": {
-    \"REPLICA_COUNT\": {
-      \"value\": \"1\"
-    },
     \"IMAGE_PULL_POLICY\": {
       \"value\": \"Always\"
     }

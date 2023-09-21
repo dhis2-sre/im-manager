@@ -42,6 +42,10 @@ func (h helmfileService) sync(token string, instance *model.Instance, group *mod
 	return h.executeHelmfileCommand(token, instance, group, "sync")
 }
 
+func (h helmfileService) destroy_deployment(instance *model.DeploymentInstance, group *model.Group) (*exec.Cmd, error) {
+	return h.executeHelmfileCommand_deployment("token", instance, group, "destroy")
+}
+
 func (h helmfileService) destroy(instance *model.Instance, group *model.Group) (*exec.Cmd, error) {
 	return h.executeHelmfileCommand("token", instance, group, "destroy")
 }
