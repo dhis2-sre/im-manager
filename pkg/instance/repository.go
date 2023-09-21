@@ -9,6 +9,7 @@ import (
 	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 //goland:noinspection GoExportedFuncWithUnexportedType
@@ -19,6 +20,45 @@ func NewRepository(db *gorm.DB, instanceParameterEncryptionKey string) *reposito
 type repository struct {
 	db                             *gorm.DB
 	instanceParameterEncryptionKey string
+}
+
+func (r repository) DeleteDeploymentInstance(id uint) error {
+	err := r.db.Unscoped().Delete(&model.DeploymentInstance{}, id).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return errdef.NewNotFound("deployment not found by id: %d", id)
+		}
+		return fmt.Errorf("failed to delete instance: %v", err)
+	}
+	return nil
+}
+
+func (r repository) DeleteDeployment(id uint) error {
+	deployment, err := r.FindDeploymentById(id)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return errdef.NewNotFound("deployment not found by id: %d", id)
+		}
+		return fmt.Errorf("failed to delete deployment: %v", err)
+	}
+
+	for _, instance := range deployment.Instances {
+		err := r.db.Unscoped().Delete(&model.DeploymentInstance{}, instance.ID).Error
+		if err != nil {
+			return fmt.Errorf("failed to delete instance: %v", err)
+		}
+	}
+
+	// TODO: The below is suppose to delete the instances as well but I can't make it work. So the above is needed...
+	err = r.db.Select(clause.Associations).Unscoped().Delete(&model.Deployment{}, id).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return errdef.NewNotFound("deployment not found by id: %d", id)
+		}
+		return fmt.Errorf("failed to delete deployment: %v", err)
+	}
+
+	return nil
 }
 
 func (r repository) SaveDeployment(deployment *model.Deployment) error {

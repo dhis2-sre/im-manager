@@ -64,6 +64,16 @@ type _ struct {
 	ID uint `json:"id"`
 }
 
+// swagger:parameters deleteDeploymentInstance
+type _ struct {
+	// in: path
+	// required: true
+	ID uint `json:"id"`
+	// in: path
+	// required: true
+	InstanceID uint `json:"instanceId"`
+}
+
 // swagger:response InstanceLogsResponse
 type _ struct {
 	// in: body

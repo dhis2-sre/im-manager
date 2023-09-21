@@ -46,6 +46,8 @@ type Repository interface {
 	SaveDeployLog(instance *model.Instance, log string) error
 	SaveDeployLog_deployment(instance *model.DeploymentInstance, log string) error
 	Delete(id uint) error
+	DeleteDeployment(id uint) error
+	DeleteDeploymentInstance(id uint) error
 }
 
 type groupService interface {
@@ -94,6 +96,31 @@ func (s service) SaveInstance(instance *model.DeploymentInstance) error {
 	return s.instanceRepository.SaveInstance(instance)
 }
 
+func (s service) DeleteInstance(deploymentId, instanceId uint) error {
+	deployment, err := s.FindDeploymentById(deploymentId)
+	if err != nil {
+		return err
+	}
+
+	found := slices.ContainsFunc(deployment.Instances, func(instance *model.DeploymentInstance) bool {
+		return instanceId == instance.ID
+	})
+	if !found {
+		return errdef.NewNotFound("instance not found on deployment(%d) by id: %d", deployment.ID, instanceId)
+	}
+
+	deployment.Instances = slices.DeleteFunc(deployment.Instances, func(instance *model.DeploymentInstance) bool {
+		return instanceId == instance.ID
+	})
+
+	_, err = s.validateNoCycles(deployment.Instances)
+	if err != nil {
+		return errdef.NewBadRequest("failed deleting instance: %v", err)
+	}
+
+	return s.instanceRepository.DeleteDeploymentInstance(instanceId)
+}
+
 func (s service) validateNoCycles(instances []*model.DeploymentInstance) (graph.Graph[string, *model.DeploymentInstance], error) {
 	g := graph.New(func(instance *model.DeploymentInstance) string {
 		return instance.StackName
@@ -121,6 +148,8 @@ func (s service) validateNoCycles(instances []*model.DeploymentInstance) (graph.
 					return nil, fmt.Errorf("instance %q requires %q more than once", src.Name, requiredStack.Name)
 				} else if errors.Is(err, graph.ErrEdgeCreatesCycle) {
 					return nil, fmt.Errorf("link from instance %q to stack %q creates a cycle", src.Name, requiredStack.Name)
+				} else if errors.Is(err, graph.ErrVertexNotFound) {
+					return nil, fmt.Errorf("can't remove %q since at least one other instance depends on it: %s", requiredStack.Name, src.StackName)
 				}
 				return nil, fmt.Errorf("failed linking instance %q with instance %q: %v", src.Name, requiredStack.Name, err)
 			}

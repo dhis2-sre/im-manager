@@ -2307,6 +2307,37 @@ paths:
             security:
                 - oauth2: []
             summary: Save an instance
+    /deployments/{id}/instance/{instanceId}:
+        delete:
+            description: Delete a deployment instance by id
+            operationId: deleteDeploymentInstance
+            parameters:
+                - format: uint64
+                  in: path
+                  name: id
+                  required: true
+                  type: integer
+                  x-go-name: ID
+                - format: uint64
+                  in: path
+                  name: instanceId
+                  required: true
+                  type: integer
+                  x-go-name: InstanceID
+            responses:
+                "202":
+                    description: ""
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Delete deployment instance
     /groups:
         get:
             description: Find all groups by user

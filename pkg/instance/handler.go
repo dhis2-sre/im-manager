@@ -805,6 +805,61 @@ func (h Handler) Delete(c *gin.Context) {
 	c.Status(http.StatusAccepted)
 }
 
+// DeleteDeploymentInstance delete deployment instance by id
+func (h Handler) DeleteDeploymentInstance(c *gin.Context) {
+	// swagger:route DELETE /deployments/{id}/instance/{instanceId} deleteDeploymentInstance
+	//
+	// Delete deployment instance
+	//
+	// Delete a deployment instance by id
+	//
+	// Security:
+	//	oauth2:
+	//
+	// responses:
+	//	202:
+	//	401: Error
+	//	403: Error
+	//	404: Error
+	//	415: Error
+	deploymentId, ok := handler.GetPathParameter(c, "id")
+	if !ok {
+		return
+	}
+
+	instanceId, ok := handler.GetPathParameter(c, "instanceId")
+	if !ok {
+		return
+	}
+
+	user, err := handler.GetUserFromContext(c)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	deployment, err := h.instanceService.FindDeploymentById(deploymentId)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	canWrite := handler.CanWriteDeployment(user, deployment)
+	if !canWrite {
+		unauthorized := errdef.NewUnauthorized("write access denied")
+		_ = c.Error(unauthorized)
+		return
+	}
+
+	err = h.instanceService.DeleteInstance(deploymentId, instanceId)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	c.Status(http.StatusAccepted)
+}
+
 // FindById instance
 func (h Handler) FindById(c *gin.Context) {
 	// swagger:route GET /instances/{id} findById
