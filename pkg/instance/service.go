@@ -118,6 +118,10 @@ func (s service) DeleteInstance(deploymentId, instanceId uint) error {
 		return errdef.NewBadRequest("failed deleting instance: %v", err)
 	}
 
+	// TODO: delete in cluster
+	// Use... func (s service) destroyDeploymentInstance(instance *model.DeploymentInstance) error
+	// From https://github.com/dhis2-sre/im-manager/pull/478/files#diff-61861f18b6590831f09bb1a529528aecc218995e4f896f568dec815cb3828ef2R352
+
 	return s.instanceRepository.DeleteDeploymentInstance(instanceId)
 }
 
