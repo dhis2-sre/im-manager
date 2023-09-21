@@ -374,11 +374,16 @@ func (s service) findParameterValue(parameter string, sourceInstance *model.Inst
 	}
 
 	stackParameter, ok := sourceStack.Parameters[parameter]
-	if !ok {
-		return "", fmt.Errorf("unable to find value for parameter: %s", parameter)
+	if ok {
+		return *stackParameter.DefaultValue, nil
 	}
 
-	return *stackParameter.DefaultValue, nil
+	// TODO: Remove HostnamePattern once stacks 2.0 are the default
+	if parameter == "DATABASE_HOSTNAME" {
+		return fmt.Sprintf(sourceStack.HostnamePattern, sourceInstance.Name, sourceInstance.GroupName), nil
+	}
+
+	return "", fmt.Errorf("unable to find value for parameter: %s", parameter)
 }
 
 func (s service) Pause(instance *model.Instance) error {
