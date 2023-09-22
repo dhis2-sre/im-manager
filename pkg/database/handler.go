@@ -189,20 +189,13 @@ func (h Handler) SaveAs(c *gin.Context) {
 		return
 	}
 
-	databaseIdString, err := findParameter("DATABASE_ID", instance, stack)
+	databaseId, err := findParameter("DATABASE_ID", instance, stack)
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
 
-	databaseId, err := strconv.ParseUint(databaseIdString, 10, 32)
-	if err != nil {
-		badRequest := errdef.NewBadRequest("error parsing databaseId: %s", databaseIdString)
-		_ = c.Error(badRequest)
-		return
-	}
-
-	database, err := h.databaseService.FindById(uint(databaseId))
+	database, err := h.databaseService.FindByIdentifier(databaseId)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -261,20 +254,13 @@ func (h Handler) Save(c *gin.Context) {
 		return
 	}
 
-	databaseIdString, err := findParameter("DATABASE_ID", instance, stack)
+	databaseId, err := findParameter("DATABASE_ID", instance, stack)
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
 
-	databaseId, err := strconv.ParseUint(databaseIdString, 10, 32)
-	if err != nil {
-		badRequest := errdef.NewBadRequest("error parsing databaseId")
-		_ = c.Error(badRequest)
-		return
-	}
-
-	database, err := h.databaseService.FindById(uint(databaseId))
+	database, err := h.databaseService.FindByIdentifier(databaseId)
 	if err != nil {
 		_ = c.Error(err)
 		return
