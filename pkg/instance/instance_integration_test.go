@@ -115,45 +115,7 @@ func TestInstanceHandler(t *testing.T) {
 			"stackName": "whoami-go"
 		}`), &instance, inttest.WithAuthToken("sometoken"))
 
-		ctx, cancel := context.WithCancel(context.Background())
-		watch, err := k8sClient.Client.CoreV1().Pods(group.Name).Watch(ctx, metav1.ListOptions{
-			LabelSelector: "app.kubernetes.io/instance=" + instance.Name,
-		})
-		require.NoErrorf(t, err, "failed to find pod for instance %q", instance.Name)
-
-		timeout := 20 * time.Second
-		tm := time.NewTimer(timeout)
-		defer tm.Stop()
-		for {
-			select {
-			case <-tm.C:
-				assert.Fail(t, "timed out waiting on pod")
-				cancel()
-				return
-			case event := <-watch.ResultChan():
-				pod, ok := event.Object.(*v1.Pod)
-				if !ok {
-					assert.Failf(t, "failed to get pod event", "want pod event instead got %T", event.Object)
-					if !tm.Stop() {
-						<-tm.C
-					}
-					cancel()
-					return
-				}
-
-				t.Logf("watching pod conditions: %#v\n", pod.Status.Conditions)
-				for _, condition := range pod.Status.Conditions {
-					if condition.Type == v1.PodReady {
-						t.Logf("pod for instance %q is ready", instance.Name)
-						if !tm.Stop() {
-							<-tm.C
-						}
-						cancel()
-						return
-					}
-				}
-			}
-		}
+		assertPodIsReady(t, k8sClient, group.Name, instance.Name)
 	})
 
 	var databaseID string
@@ -165,6 +127,7 @@ func TestInstanceHandler(t *testing.T) {
 		require.NoError(t, err, "failed to write form field")
 		f, err := w.CreateFormFile("database", "mydb")
 		require.NoError(t, err, "failed to create form file")
+		// TODO: Why does this work?
 		_, err = io.WriteString(f, "file contents")
 		require.NoError(t, err, "failed to write file")
 		_ = w.Close()
@@ -199,46 +162,51 @@ func TestInstanceHandler(t *testing.T) {
 			]
 		}`), &instance, inttest.WithAuthToken("sometoken"))
 
-		ctx, cancel := context.WithCancel(context.Background())
-		watch, err := k8sClient.Client.CoreV1().Pods(group.Name).Watch(ctx, metav1.ListOptions{
-			LabelSelector: "app.kubernetes.io/instance=" + instance.Name,
-		})
-		require.NoErrorf(t, err, "failed to find pod for instance %q", instance.Name)
+		assertPodIsReady(t, k8sClient, group.Name, instance.Name+"-database")
+		assertPodIsReady(t, k8sClient, group.Name, instance.Name)
+	})
+}
 
-		timeout := 20 * time.Second
-		tm := time.NewTimer(timeout)
-		defer tm.Stop()
-		for {
-			select {
-			case <-tm.C:
-				assert.Fail(t, "timed out waiting on pod")
+func assertPodIsReady(t *testing.T, k8sClient *inttest.K8sClient, group string, instance string) {
+	ctx, cancel := context.WithCancel(context.Background())
+	watch, err := k8sClient.Client.CoreV1().Pods(group).Watch(ctx, metav1.ListOptions{
+		LabelSelector: "app.kubernetes.io/instance=" + instance,
+	})
+	require.NoErrorf(t, err, "failed to find pod for instance %q", instance)
+
+	timeout := 20 * time.Second
+	tm := time.NewTimer(timeout)
+	defer tm.Stop()
+	for {
+		select {
+		case <-tm.C:
+			assert.Fail(t, "timed out waiting on pod")
+			cancel()
+			return
+		case event := <-watch.ResultChan():
+			pod, ok := event.Object.(*v1.Pod)
+			if !ok {
+				assert.Failf(t, "failed to get pod event", "want pod event instead got %T", event.Object)
+				if !tm.Stop() {
+					<-tm.C
+				}
 				cancel()
 				return
-			case event := <-watch.ResultChan():
-				pod, ok := event.Object.(*v1.Pod)
-				if !ok {
-					assert.Failf(t, "failed to get pod event", "want pod event instead got %T", event.Object)
+			}
+
+			t.Logf("watching pod conditions: %#v\n", pod.Status.Conditions)
+			for _, condition := range pod.Status.Conditions {
+				if condition.Type == v1.PodReady {
+					t.Logf("pod for instance %q is ready", instance)
 					if !tm.Stop() {
 						<-tm.C
 					}
 					cancel()
 					return
 				}
-
-				t.Logf("watching pod conditions: %#v\n", pod.Status.Conditions)
-				for _, condition := range pod.Status.Conditions {
-					if condition.Type == v1.PodReady {
-						t.Logf("pod for instance %q is ready", instance.Name)
-						if !tm.Stop() {
-							<-tm.C
-						}
-						cancel()
-						return
-					}
-				}
 			}
 		}
-	})
+	}
 }
 
 func encryptUsingAge(t *testing.T, identity *age.X25519Identity, yamlData []byte) []byte {
