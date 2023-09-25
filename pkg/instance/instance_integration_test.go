@@ -5,9 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
-	"github.com/dhis2-sre/im-manager/pkg/database"
-	"github.com/dhis2-sre/im-manager/pkg/storage"
 	"io"
 	"mime/multipart"
 	"os"
@@ -15,6 +12,10 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
+	"github.com/dhis2-sre/im-manager/pkg/database"
+	"github.com/dhis2-sre/im-manager/pkg/storage"
 
 	"filippo.io/age"
 	"go.mozilla.org/sops/v3"
