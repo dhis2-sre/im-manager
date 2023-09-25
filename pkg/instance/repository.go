@@ -24,9 +24,10 @@ type repository struct {
 func (r repository) DeleteDeployment(deployment *model.Deployment) error {
 	for _, instance := range deployment.Instances {
 		err := r.db.Unscoped().Delete(&model.DeploymentInstance{}, instance.ID).Error
-		if err != nil {
-			return fmt.Errorf("failed to delete instance %q: %v", instance.Name, err)
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return errdef.NewNotFound("instance not found by id: %d", instance.ID)
 		}
+		return fmt.Errorf("failed to delete instance %q: %v", instance.Name, err)
 	}
 
 	err := r.db.Unscoped().Delete(&model.Deployment{}, deployment).Error
