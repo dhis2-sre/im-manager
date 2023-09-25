@@ -1132,7 +1132,7 @@ func (h Handler) DeleteDeployment(c *gin.Context) {
 
 	err = h.instanceService.DeleteDeployment(deployment.ID)
 	if err != nil {
-		_ = c.Error(fmt.Errorf("unable to delete instance: %v", err))
+		_ = c.Error(fmt.Errorf("unable to delete deployment: %v", err))
 		return
 	}
 
