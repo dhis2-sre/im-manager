@@ -26,6 +26,7 @@ func Routes(r *gin.Engine, authenticator gin.HandlerFunc, handler Handler) {
 
 	tokenAuthenticationRouter.POST("/deployments", handler.SaveDeployment)
 	tokenAuthenticationRouter.GET("/deployments/:id", handler.FindDeploymentById)
+	tokenAuthenticationRouter.DELETE("/deployments/:id", handler.DeleteDeployment)
 	tokenAuthenticationRouter.POST("/deployments/:id/instance", handler.SaveInstance)
 	tokenAuthenticationRouter.DELETE("/deployments/:id/instance/:instanceId", handler.DeleteDeploymentInstance)
 	tokenAuthenticationRouter.POST("/deployments/:id/deploy", handler.DeployDeployment)

@@ -9,7 +9,6 @@ import (
 	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
 	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
 )
 
 //goland:noinspection GoExportedFuncWithUnexportedType
@@ -22,38 +21,23 @@ type repository struct {
 	instanceParameterEncryptionKey string
 }
 
-func (r repository) DeleteDeploymentInstance(id uint) error {
-	err := r.db.Unscoped().Delete(&model.DeploymentInstance{}, id).Error
+func (r repository) DeleteDeploymentInstance(instance *model.DeploymentInstance) error {
+	err := r.db.Unscoped().Delete(&model.DeploymentInstance{}, instance.ID).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return errdef.NewNotFound("deployment not found by id: %d", id)
+			return errdef.NewNotFound("instance not found by id: %d", instance.ID)
 		}
-		return fmt.Errorf("failed to delete instance: %v", err)
+		return fmt.Errorf("failed to delete instance %q: %v", instance.Name, err)
 	}
+
 	return nil
 }
 
-func (r repository) DeleteDeployment(id uint) error {
-	deployment, err := r.FindDeploymentById(id)
+func (r repository) DeleteDeployment(deployment *model.Deployment) error {
+	err := r.db.Unscoped().Delete(&model.Deployment{}, deployment).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return errdef.NewNotFound("deployment not found by id: %d", id)
-		}
-		return fmt.Errorf("failed to delete deployment: %v", err)
-	}
-
-	for _, instance := range deployment.Instances {
-		err := r.db.Unscoped().Delete(&model.DeploymentInstance{}, instance.ID).Error
-		if err != nil {
-			return fmt.Errorf("failed to delete instance: %v", err)
-		}
-	}
-
-	// TODO: The below is suppose to delete the instances as well but I can't make it work. So the above is needed...
-	err = r.db.Select(clause.Associations).Unscoped().Delete(&model.Deployment{}, id).Error
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return errdef.NewNotFound("deployment not found by id: %d", id)
+			return errdef.NewNotFound("deployment not found by id: %d", deployment.ID)
 		}
 		return fmt.Errorf("failed to delete deployment: %v", err)
 	}

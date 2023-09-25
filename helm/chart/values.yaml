@@ -13,7 +13,7 @@ groups:
   names: whoami
   hostnames: whoami.im.dhis2.org
 
-tmpfsSizeLimit: 128Mi
+tmpfsSizeLimit: 512Mi
 
 dataSizeLimit: 30Gi
 dataMountPath: /mnt/data
@@ -86,7 +86,7 @@ ingress:
     # certIssuer: cert-issuer
     # kubernetes.io/ingress.class: nginx
     # kubernetes.io/tls-acme: "true"
-    nginx.ingress.kubernetes.io/proxy-body-size: 128m
+    nginx.ingress.kubernetes.io/proxy-body-size: 512m
 
 resources: {}
   # We usually recommend not to specify default resources and to leave this as a conscious
