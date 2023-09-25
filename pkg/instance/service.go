@@ -269,7 +269,6 @@ func (s service) DeployDeployment(token string, deployment *model.Deployment) er
 		return err
 	}
 
-	// TODO: Delete?
 	deployment.Instances = instances
 
 	for _, instance := range instances {
