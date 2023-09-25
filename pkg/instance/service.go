@@ -334,7 +334,6 @@ func (s service) DeleteDeployment(deployment *model.Deployment) error {
 			errs = errors.Join(errs, fmt.Errorf("failed to destroy instance(%s) %q: %v", instance.StackName, instance.Name, err))
 		}
 	}
-
 	if errs != nil {
 		return errs
 	}
