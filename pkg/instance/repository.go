@@ -4,8 +4,6 @@ import (
 	"errors"
 	"fmt"
 
-	"gorm.io/gorm/clause"
-
 	"github.com/dhis2-sre/im-manager/internal/errdef"
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	"golang.org/x/exp/maps"
@@ -36,8 +34,7 @@ func (r repository) DeleteDeployment(id uint) error {
 		}
 	}
 
-	// TODO: The below is suppose to delete the instances as well but I can't make it work. So the above is needed...
-	err = r.db.Select(clause.Associations).Unscoped().Delete(&model.Deployment{}, id).Error
+	err = r.db.Unscoped().Delete(&model.Deployment{}, id).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return errdef.NewNotFound("deployment not found by id: %d", id)
