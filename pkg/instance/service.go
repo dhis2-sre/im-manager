@@ -343,35 +343,33 @@ func (s service) DeleteDeployment(deployment *model.Deployment) error {
 }
 
 func (s service) destroyDeploymentInstance(instance *model.DeploymentInstance) error {
-	if instance.DeployLog != "" {
-		group, err := s.groupService.Find(instance.GroupName)
-		if err != nil {
-			return err
-		}
-
-		destroyCmd, err := s.helmfileService.destroy_deployment(instance, group)
-		if err != nil {
-			return err
-		}
-
-		destroyLog, destroyErrorLog, err := commandExecutor(destroyCmd, group.ClusterConfiguration)
-		log.Printf("Destroy log: %s\n", destroyLog)
-		log.Printf("Destroy error log: %s\n", destroyErrorLog)
-		if err != nil {
-			return err
-		}
-
-		ks, err := NewKubernetesService(group.ClusterConfiguration)
-		if err != nil {
-			return err
-		}
-
-		err = ks.deletePersistentVolumeClaim_deployment(instance)
-		if err != nil {
-			return err
-		}
+	if instance.DeployLog == "" {
+		return nil
 	}
-	return nil
+
+	group, err := s.groupService.Find(instance.GroupName)
+	if err != nil {
+		return err
+	}
+
+	destroyCmd, err := s.helmfileService.destroy_deployment(instance, group)
+	if err != nil {
+		return err
+	}
+
+	destroyLog, destroyErrorLog, err := commandExecutor(destroyCmd, group.ClusterConfiguration)
+	log.Printf("Destroy log: %s\n", destroyLog)
+	log.Printf("Destroy error log: %s\n", destroyErrorLog)
+	if err != nil {
+		return err
+	}
+
+	ks, err := NewKubernetesService(group.ClusterConfiguration)
+	if err != nil {
+		return err
+	}
+
+	return ks.deletePersistentVolumeClaim_deployment(instance)
 }
 
 func deploymentOrder(deployment *model.Deployment, g graph.Graph[string, *model.DeploymentInstance]) ([]*model.DeploymentInstance, error) {
