@@ -21,12 +21,7 @@ type repository struct {
 	instanceParameterEncryptionKey string
 }
 
-func (r repository) DeleteDeployment(id uint) error {
-	deployment, err := r.FindDeploymentById(id)
-	if err != nil {
-		return err
-	}
-
+func (r repository) DeleteDeployment(deployment *model.Deployment) error {
 	for _, instance := range deployment.Instances {
 		err := r.db.Unscoped().Delete(&model.DeploymentInstance{}, instance.ID).Error
 		if err != nil {
@@ -34,10 +29,10 @@ func (r repository) DeleteDeployment(id uint) error {
 		}
 	}
 
-	err = r.db.Unscoped().Delete(&model.Deployment{}, id).Error
+	err := r.db.Unscoped().Delete(&model.Deployment{}, deployment).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return errdef.NewNotFound("deployment not found by id: %d", id)
+			return errdef.NewNotFound("deployment not found by id: %d", deployment)
 		}
 		return fmt.Errorf("failed to delete deployment: %v", err)
 	}

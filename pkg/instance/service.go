@@ -46,7 +46,7 @@ type Repository interface {
 	SaveDeployLog(instance *model.Instance, log string) error
 	SaveDeployLog_deployment(instance *model.DeploymentInstance, log string) error
 	Delete(id uint) error
-	DeleteDeployment(id uint) error
+	DeleteDeployment(deployment *model.Deployment) error
 }
 
 type groupService interface {
@@ -315,12 +315,7 @@ func (s service) deployDeploymentInstance(token string, instance *model.Deployme
 	return nil
 }
 
-func (s service) DeleteDeployment(id uint) error {
-	deployment, err := s.FindDeploymentById(id)
-	if err != nil {
-		return err
-	}
-
+func (s service) DeleteDeployment(deployment *model.Deployment) error {
 	deploymentGraph, err := s.validateNoCycles(deployment.Instances)
 	if err != nil {
 		return err
@@ -345,7 +340,7 @@ func (s service) DeleteDeployment(id uint) error {
 		return errs
 	}
 
-	return s.instanceRepository.DeleteDeployment(id)
+	return s.instanceRepository.DeleteDeployment(deployment)
 }
 
 func (s service) destroyDeploymentInstance(instance *model.DeploymentInstance) error {
