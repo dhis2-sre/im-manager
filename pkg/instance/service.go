@@ -46,6 +46,7 @@ type Repository interface {
 	SaveDeployLog(instance *model.Instance, log string) error
 	SaveDeployLog_deployment(instance *model.DeploymentInstance, log string) error
 	Delete(id uint) error
+	DeleteDeploymentInstance(instance *model.DeploymentInstance) error
 	DeleteDeployment(deployment *model.Deployment) error
 }
 
@@ -332,6 +333,11 @@ func (s service) DeleteDeployment(deployment *model.Deployment) error {
 		err := s.destroyDeploymentInstance(instance)
 		if err != nil {
 			errs = errors.Join(errs, fmt.Errorf("failed to destroy instance(%s) %q: %v", instance.StackName, instance.Name, err))
+		}
+
+		err = s.instanceRepository.DeleteDeploymentInstance(instance)
+		if err != nil {
+			errs = errors.Join(errs, fmt.Errorf("failed to delete instance(%s) %q: %v", instance.StackName, instance.Name, err))
 		}
 	}
 	if errs != nil {
