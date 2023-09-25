@@ -26,10 +26,7 @@ type repository struct {
 func (r repository) DeleteDeployment(id uint) error {
 	deployment, err := r.FindDeploymentById(id)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return errdef.NewNotFound("deployment not found by id: %d", id)
-		}
-		return fmt.Errorf("failed to delete deployment: %v", err)
+		return err
 	}
 
 	for _, instance := range deployment.Instances {
