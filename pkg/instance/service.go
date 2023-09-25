@@ -325,7 +325,6 @@ func (s service) DeleteDeployment(deployment *model.Deployment) error {
 	if err != nil {
 		return err
 	}
-
 	slices.Reverse(instances)
 
 	var errs error
