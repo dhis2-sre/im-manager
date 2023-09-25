@@ -32,7 +32,7 @@ func (r repository) DeleteDeployment(deployment *model.Deployment) error {
 	err := r.db.Unscoped().Delete(&model.Deployment{}, deployment).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return errdef.NewNotFound("deployment not found by id: %d", deployment)
+			return errdef.NewNotFound("deployment not found by id: %d", deployment.ID)
 		}
 		return fmt.Errorf("failed to delete deployment: %v", err)
 	}
