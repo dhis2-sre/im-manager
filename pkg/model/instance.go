@@ -20,7 +20,7 @@ type Deployment struct {
 	GroupName   string `json:"groupName" gorm:"index:idx_name_and_group,unique; references:Name"`
 	Group       *Group `json:"group,omitempty"`
 
-	Instances []*DeploymentInstance `json:"instances"`
+	Instances []*DeploymentInstance `json:"instances" gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
 }
 
 type DeploymentInstanceParameters map[string]DeploymentInstanceParameter
