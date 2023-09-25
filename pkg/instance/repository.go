@@ -35,7 +35,7 @@ func (r repository) DeleteDeployment(id uint) error {
 	for _, instance := range deployment.Instances {
 		err := r.db.Unscoped().Delete(&model.DeploymentInstance{}, instance.ID).Error
 		if err != nil {
-			return fmt.Errorf("failed to delete instance: %v", err)
+			return fmt.Errorf("failed to delete instance %q: %v", instance.Name, err)
 		}
 	}
 
