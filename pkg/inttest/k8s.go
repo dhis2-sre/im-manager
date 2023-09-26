@@ -2,11 +2,12 @@ package inttest
 
 import (
 	"context"
+	"testing"
+	"time"
+
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"testing"
-	"time"
 
 	"github.com/orlangure/gnomock/preset/k3s"
 	"k8s.io/client-go/kubernetes"
