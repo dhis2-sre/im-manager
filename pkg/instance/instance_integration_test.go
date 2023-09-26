@@ -90,7 +90,7 @@ func TestInstanceHandler(t *testing.T) {
 
 	authenticator := func(ctx *gin.Context) {
 		ctx.Set("user", &model.User{
-			ID:    user.ID, // TODO: Why is this necessary all of a sudden?
+			ID:    user.ID,
 			Email: "user1@dhis2.org",
 			Groups: []model.Group{
 				{
