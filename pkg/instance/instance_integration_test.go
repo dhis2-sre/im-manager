@@ -83,15 +83,7 @@ func TestInstanceHandler(t *testing.T) {
 	databaseService := database.NewService(s3Bucket, s3Client, groupService, databaseRepository)
 
 	authenticator := func(ctx *gin.Context) {
-		ctx.Set("user", &model.User{
-			ID:    user.ID,
-			Email: "user1@dhis2.org",
-			Groups: []model.Group{
-				{
-					Name: "group-name",
-				},
-			},
-		})
+		ctx.Set("user", user)
 	}
 	client := inttest.SetupHTTPServer(t, func(engine *gin.Engine) {
 		var twoDayTTL uint = 172800
