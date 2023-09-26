@@ -2,40 +2,33 @@ package instance_test
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"errors"
+	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
+	"github.com/dhis2-sre/im-manager/pkg/database"
+	"github.com/dhis2-sre/im-manager/pkg/storage"
 	"io"
 	"mime/multipart"
 	"os"
 	"strconv"
 	"strings"
 	"testing"
-	"time"
-
-	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
-	"github.com/dhis2-sre/im-manager/pkg/database"
-	"github.com/dhis2-sre/im-manager/pkg/storage"
 
 	"filippo.io/age"
 	"go.mozilla.org/sops/v3"
 	"go.mozilla.org/sops/v3/aes"
+	sops_age "go.mozilla.org/sops/v3/age"
 	"go.mozilla.org/sops/v3/cmd/sops/common"
 	"go.mozilla.org/sops/v3/keys"
 	"go.mozilla.org/sops/v3/keyservice"
 	"go.mozilla.org/sops/v3/stores/yaml"
 	"go.mozilla.org/sops/v3/version"
-	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	sops_age "go.mozilla.org/sops/v3/age"
 
 	"github.com/dhis2-sre/im-manager/pkg/instance"
 	"github.com/dhis2-sre/im-manager/pkg/inttest"
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	"github.com/dhis2-sre/im-manager/pkg/stack"
 	"github.com/gin-gonic/gin"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -116,7 +109,7 @@ func TestInstanceHandler(t *testing.T) {
 			"stackName": "whoami-go"
 		}`), &instance, inttest.WithAuthToken("sometoken"))
 
-		assertPodIsReady(t, k8sClient, group.Name, instance.Name)
+		k8sClient.AssertPodIsReady(t, group.Name, instance.Name)
 	})
 
 	var databaseID string
@@ -163,51 +156,9 @@ func TestInstanceHandler(t *testing.T) {
 			]
 		}`), &instance, inttest.WithAuthToken("sometoken"))
 
-		assertPodIsReady(t, k8sClient, group.Name, instance.Name+"-database")
-		assertPodIsReady(t, k8sClient, group.Name, instance.Name)
+		k8sClient.AssertPodIsReady(t, group.Name, instance.Name+"-database")
+		k8sClient.AssertPodIsReady(t, group.Name, instance.Name)
 	})
-}
-
-func assertPodIsReady(t *testing.T, k8sClient *inttest.K8sClient, group string, instance string) {
-	ctx, cancel := context.WithCancel(context.Background())
-	watch, err := k8sClient.Client.CoreV1().Pods(group).Watch(ctx, metav1.ListOptions{
-		LabelSelector: "app.kubernetes.io/instance=" + instance,
-	})
-	require.NoErrorf(t, err, "failed to find pod for instance %q", instance)
-
-	timeout := 20 * time.Second
-	tm := time.NewTimer(timeout)
-	defer tm.Stop()
-	for {
-		select {
-		case <-tm.C:
-			assert.Fail(t, "timed out waiting on pod")
-			cancel()
-			return
-		case event := <-watch.ResultChan():
-			pod, ok := event.Object.(*v1.Pod)
-			if !ok {
-				assert.Failf(t, "failed to get pod event", "want pod event instead got %T", event.Object)
-				if !tm.Stop() {
-					<-tm.C
-				}
-				cancel()
-				return
-			}
-
-			t.Logf("watching pod conditions: %#v\n", pod.Status.Conditions)
-			for _, condition := range pod.Status.Conditions {
-				if condition.Type == v1.PodReady {
-					t.Logf("pod for instance %q is ready", instance)
-					if !tm.Stop() {
-						<-tm.C
-					}
-					cancel()
-					return
-				}
-			}
-		}
-	}
 }
 
 func encryptUsingAge(t *testing.T, identity *age.X25519Identity, yamlData []byte) []byte {

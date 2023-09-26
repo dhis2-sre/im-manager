@@ -1,7 +1,12 @@
 package inttest
 
 import (
+	"context"
+	"github.com/stretchr/testify/assert"
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"testing"
+	"time"
 
 	"github.com/orlangure/gnomock/preset/k3s"
 	"k8s.io/client-go/kubernetes"
@@ -45,4 +50,46 @@ func SetupK8s(t *testing.T) *K8sClient {
 type K8sClient struct {
 	Client *kubernetes.Clientset
 	Config []byte
+}
+
+func (k K8sClient) AssertPodIsReady(t *testing.T, group string, instance string) {
+	ctx, cancel := context.WithCancel(context.Background())
+	watch, err := k.Client.CoreV1().Pods(group).Watch(ctx, metav1.ListOptions{
+		LabelSelector: "app.kubernetes.io/instance=" + instance,
+	})
+	require.NoErrorf(t, err, "failed to find pod for instance %q", instance)
+
+	timeout := 20 * time.Second
+	tm := time.NewTimer(timeout)
+	defer tm.Stop()
+	for {
+		select {
+		case <-tm.C:
+			assert.Fail(t, "timed out waiting on pod")
+			cancel()
+			return
+		case event := <-watch.ResultChan():
+			pod, ok := event.Object.(*v1.Pod)
+			if !ok {
+				assert.Failf(t, "failed to get pod event", "want pod event instead got %T", event.Object)
+				if !tm.Stop() {
+					<-tm.C
+				}
+				cancel()
+				return
+			}
+
+			t.Logf("watching pod conditions: %#v\n", pod.Status.Conditions)
+			for _, condition := range pod.Status.Conditions {
+				if condition.Type == v1.PodReady {
+					t.Logf("pod for instance %q is ready", instance)
+					if !tm.Stop() {
+						<-tm.C
+					}
+					cancel()
+					return
+				}
+			}
+		}
+	}
 }
