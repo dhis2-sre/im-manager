@@ -46,6 +46,8 @@ type Repository interface {
 	SaveDeployLog(instance *model.Instance, log string) error
 	SaveDeployLog_deployment(instance *model.DeploymentInstance, log string) error
 	Delete(id uint) error
+	DeleteDeploymentInstance(instance *model.DeploymentInstance) error
+	DeleteDeployment(deployment *model.Deployment) error
 }
 
 type groupService interface {
@@ -55,6 +57,7 @@ type groupService interface {
 type helmfile interface {
 	sync_deployment(token string, instance *model.DeploymentInstance, group *model.Group) (*exec.Cmd, error)
 	sync(token string, instance *model.Instance, group *model.Group) (*exec.Cmd, error)
+	destroy_deployment(instance *model.DeploymentInstance, group *model.Group) (*exec.Cmd, error)
 	destroy(instance *model.Instance, group *model.Group) (*exec.Cmd, error)
 }
 
@@ -311,6 +314,67 @@ func (s service) deployDeploymentInstance(token string, instance *model.Deployme
 		return err
 	}
 	return nil
+}
+
+func (s service) DeleteDeployment(deployment *model.Deployment) error {
+	deploymentGraph, err := s.validateNoCycles(deployment.Instances)
+	if err != nil {
+		return err
+	}
+
+	instances, err := deploymentOrder(deployment, deploymentGraph)
+	if err != nil {
+		return err
+	}
+	slices.Reverse(instances)
+
+	var errs error
+	for _, instance := range instances {
+		err := s.destroyDeploymentInstance(instance)
+		if err != nil {
+			errs = errors.Join(errs, fmt.Errorf("failed to destroy instance(%s) %q: %v", instance.StackName, instance.Name, err))
+		}
+
+		err = s.instanceRepository.DeleteDeploymentInstance(instance)
+		if err != nil {
+			errs = errors.Join(errs, fmt.Errorf("failed to delete instance(%s) %q: %v", instance.StackName, instance.Name, err))
+		}
+	}
+	if errs != nil {
+		return errs
+	}
+
+	return s.instanceRepository.DeleteDeployment(deployment)
+}
+
+func (s service) destroyDeploymentInstance(instance *model.DeploymentInstance) error {
+	if instance.DeployLog == "" {
+		return nil
+	}
+
+	group, err := s.groupService.Find(instance.GroupName)
+	if err != nil {
+		return err
+	}
+
+	destroyCmd, err := s.helmfileService.destroy_deployment(instance, group)
+	if err != nil {
+		return err
+	}
+
+	destroyLog, destroyErrorLog, err := commandExecutor(destroyCmd, group.ClusterConfiguration)
+	log.Printf("Destroy log: %s\n", destroyLog)
+	log.Printf("Destroy error log: %s\n", destroyErrorLog)
+	if err != nil {
+		return err
+	}
+
+	ks, err := NewKubernetesService(group.ClusterConfiguration)
+	if err != nil {
+		return err
+	}
+
+	return ks.deletePersistentVolumeClaim_deployment(instance)
 }
 
 func deploymentOrder(deployment *model.Deployment, g graph.Graph[string, *model.DeploymentInstance]) ([]*model.DeploymentInstance, error) {

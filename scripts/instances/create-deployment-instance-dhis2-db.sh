@@ -13,12 +13,6 @@ DATABASE_SIZE=${DATABASE_SIZE:-5Gi}
 echo "{
   \"stackName\": \"$STACK_NAME\",
   \"parameters\": {
-    \"REPLICA_COUNT\": {
-      \"value\": \"1\"
-    },
-    \"IMAGE_PULL_POLICY\": {
-      \"value\": \"Always\"
-    },
     \"DATABASE_ID\": {
       \"value\": \"$DATABASE_ID\"
     },
