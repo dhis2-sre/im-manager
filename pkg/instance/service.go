@@ -109,7 +109,6 @@ func (s service) DeleteInstance(deploymentId, instanceId uint) error {
 	if index == -1 {
 		return errdef.NewNotFound("instance %d not found in deployment %d", instanceId, deployment.ID)
 	}
-
 	instance := deployment.Instances[index]
 
 	deployment.Instances = slices.DeleteFunc(deployment.Instances, func(instance *model.DeploymentInstance) bool {
