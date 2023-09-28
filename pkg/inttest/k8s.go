@@ -71,6 +71,7 @@ func (k K8sClient) AssertPodIsReady(t *testing.T, group string, instance string)
 			return
 		case event := <-watch.ResultChan():
 			pod, ok := event.Object.(*v1.Pod)
+			t.Log("Received pod updated event...")
 			if !ok {
 				assert.Failf(t, "failed to get pod event", "want pod event instead got %T", event.Object)
 				if !tm.Stop() {
@@ -80,16 +81,13 @@ func (k K8sClient) AssertPodIsReady(t *testing.T, group string, instance string)
 				return
 			}
 
-			t.Logf("watching pod conditions: %#v\n", pod.Status.Conditions)
-			for _, condition := range pod.Status.Conditions {
-				if condition.Type == v1.PodReady {
-					t.Logf("pod for instance %q is ready", instance)
-					if !tm.Stop() {
-						<-tm.C
-					}
-					cancel()
-					return
+			if pod.Status.Phase == v1.PodRunning {
+				t.Logf("pod for instance %q is running", instance)
+				if !tm.Stop() {
+					<-tm.C
 				}
+				cancel()
+				return
 			}
 		}
 	}
