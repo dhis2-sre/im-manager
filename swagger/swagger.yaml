@@ -1690,6 +1690,9 @@ definitions:
                 format: date-time
                 type: string
                 x-go-name: UpdatedAt
+            validated:
+                type: boolean
+                x-go-name: Validated
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/model
     Version:

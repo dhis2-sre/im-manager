@@ -14,7 +14,7 @@ type User struct {
 	UpdatedAt   time.Time `json:"updatedAt"`
 	Email       string    `json:"email" gorm:"index;unique"`
 	EmailToken  uuid.UUID `json:"-" gorm:"unique;type:uuid"`
-	Validated   bool      `json:"-"`
+	Validated   bool      `json:"validated"`
 	Password    string    `json:"-"`
 	Groups      []Group   `json:"groups" gorm:"many2many:user_groups;constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
 	AdminGroups []Group   `json:"adminGroups" gorm:"many2many:user_groups_admin;constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
