@@ -4,11 +4,11 @@ go 1.21
 
 require (
 	github.com/anthhub/forwarder v1.1.0
-	github.com/aws/aws-sdk-go v1.45.16
+	github.com/aws/aws-sdk-go v1.45.18
 	github.com/aws/aws-sdk-go-v2 v1.21.0
 	github.com/aws/aws-sdk-go-v2/config v1.18.42
-	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.11.86
-	github.com/aws/aws-sdk-go-v2/service/s3 v1.39.0
+	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.11.87
+	github.com/aws/aws-sdk-go-v2/service/s3 v1.40.0
 	github.com/dhis2-sre/rabbitmq v0.3.0
 	github.com/gin-contrib/cors v1.4.0
 	github.com/gin-gonic/gin v1.9.1
