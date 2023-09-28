@@ -97,7 +97,7 @@ func TestInstanceHandler(t *testing.T) {
 		database.Routes(engine, authenticator, databaseHandler)
 	})
 
-	t.Run("Deploy", func(t *testing.T) {
+	t.Run("DeployWhoAmI", func(t *testing.T) {
 		var instance model.Instance
 		client.PostJSON(t, "/instances", strings.NewReader(`{
 			"name": "test-whoami",
