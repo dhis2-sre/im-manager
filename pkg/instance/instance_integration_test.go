@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"mime/multipart"
+	"net/http"
 	"os"
 	"strconv"
 	"strings"
@@ -30,6 +32,7 @@ import (
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	"github.com/dhis2-sre/im-manager/pkg/stack"
 	"github.com/gin-gonic/gin"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -151,6 +154,28 @@ func TestInstanceHandler(t *testing.T) {
 
 		k8sClient.AssertPodIsReady(t, group.Name, instance.Name+"-database")
 		k8sClient.AssertPodIsReady(t, group.Name, instance.Name)
+	})
+
+	t.Run("DeploymentWithoutInstances", func(t *testing.T) {
+		t.Log("Create deployment")
+		var deployment model.Deployment
+		body := strings.NewReader(`{
+			"name": "test-deployment",
+			"group": "group-name",
+			"description": "some description"
+		}`)
+
+		client.PostJSON(t, "/deployments", body, &deployment, inttest.WithAuthToken("sometoken"))
+
+		assert.Equal(t, "test-deployment", deployment.Name)
+		assert.Equal(t, "group-name", deployment.GroupName)
+		assert.Equal(t, "some description", deployment.Description)
+
+		t.Log("Deploy deployment")
+		path := fmt.Sprintf("/deployments/%d/deploy", deployment.ID)
+		response := client.Do(t, http.MethodPost, path, nil, http.StatusBadRequest, inttest.WithAuthToken("sometoken"))
+
+		assert.Contains(t, "deployment contains no instances", string(response))
 	})
 }
 
