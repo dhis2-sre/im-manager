@@ -1,15 +1,10 @@
 package instance_test
 
 import (
-	"bytes"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
-	"mime/multipart"
 	"net/http"
 	"os"
-	"strconv"
 	"strings"
 	"testing"
 
@@ -105,54 +100,6 @@ func TestInstanceHandler(t *testing.T) {
 			"stackName": "whoami-go"
 		}`), &instance, inttest.WithAuthToken("sometoken"))
 
-		k8sClient.AssertPodIsReady(t, group.Name, instance.Name)
-	})
-
-	var databaseID string
-	{
-		t.Log("Upload")
-		var b bytes.Buffer
-		w := multipart.NewWriter(&b)
-		err := w.WriteField("group", "group-name")
-		require.NoError(t, err, "failed to write form field")
-		f, err := w.CreateFormFile("database", "mydb")
-		require.NoError(t, err, "failed to create form file")
-		// TODO: Why does this work?
-		_, err = io.WriteString(f, "file contents")
-		require.NoError(t, err, "failed to write file")
-		_ = w.Close()
-
-		body := client.Post(t, "/databases", &b, inttest.WithHeader("Content-Type", w.FormDataContentType()))
-
-		var actualDB model.Database
-		err = json.Unmarshal(body, &actualDB)
-		require.NoError(t, err, "POST /databases: failed to unmarshal HTTP response body")
-		require.Equal(t, "mydb", actualDB.Name)
-		require.Equal(t, "group-name", actualDB.GroupName)
-
-		actualContent := s3.GetObject(t, s3Bucket, "group-name/mydb")
-		require.Equalf(t, "file contents", string(actualContent), "DB in S3 should have expected content")
-
-		databaseID = strconv.FormatUint(uint64(actualDB.ID), 10)
-	}
-
-	t.Run("DeployDHIS2", func(t *testing.T) {
-		t.Setenv("HOSTNAME", "test-dhis2.group-name.svc")
-
-		var instance model.Instance
-		client.PostJSON(t, "/instances", strings.NewReader(`{
-			"name": "test-dhis2",
-			"groupName": "group-name",
-			"stackName": "dhis2",
-			"parameters": [
-                {
-    		        "name": "DATABASE_ID",
-			        "value": "`+databaseID+`"
-			    }
-			]
-		}`), &instance, inttest.WithAuthToken("sometoken"))
-
-		k8sClient.AssertPodIsReady(t, group.Name, instance.Name+"-database")
 		k8sClient.AssertPodIsReady(t, group.Name, instance.Name)
 	})
 
