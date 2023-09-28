@@ -107,7 +107,7 @@ func (s service) DeleteInstance(deploymentId, instanceId uint) error {
 		return instanceId == instance.ID
 	})
 	if index == -1 {
-		return errdef.NewNotFound("instance not found on deployment(%d) by id: %d", deployment.ID, instanceId)
+		return errdef.NewNotFound("instance %d not found in deployment %d", instanceId, deployment.ID)
 	}
 
 	instance := deployment.Instances[index]
