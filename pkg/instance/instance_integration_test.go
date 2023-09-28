@@ -124,6 +124,42 @@ func TestInstanceHandler(t *testing.T) {
 
 		assert.Contains(t, "deployment contains no instances", string(response))
 	})
+
+	t.Run("Deployment", func(t *testing.T) {
+		t.Log("Create deployment")
+		var deployment model.Deployment
+		body := strings.NewReader(`{
+			"name": "test-deployment-whoami",
+			"group": "group-name",
+			"description": "some description"
+		}`)
+
+		client.PostJSON(t, "/deployments", body, &deployment, inttest.WithAuthToken("sometoken"))
+
+		assert.Equal(t, "test-deployment-whoami", deployment.Name)
+		assert.Equal(t, "group-name", deployment.GroupName)
+		assert.Equal(t, "some description", deployment.Description)
+
+		t.Log("Create deployment instance")
+		var deploymentInstance model.DeploymentInstance
+		body = strings.NewReader(`{
+			"stackName": "whoami-go"
+		}`)
+
+		path := fmt.Sprintf("/deployments/%d/instance", deployment.ID)
+		client.PostJSON(t, path, body, &deploymentInstance, inttest.WithAuthToken("sometoken"))
+		assert.Equal(t, deployment.ID, deploymentInstance.DeploymentID)
+		assert.Equal(t, "group-name", deploymentInstance.GroupName)
+		assert.Equal(t, "whoami-go", deploymentInstance.StackName)
+
+		t.Log("Deploy deployment")
+		path = fmt.Sprintf("/deployments/%d/deploy", deployment.ID)
+		client.Do(t, http.MethodPost, path, nil, http.StatusOK, inttest.WithAuthToken("sometoken"))
+		k8sClient.AssertPodIsReady(t, deploymentInstance.GroupName, deploymentInstance.Name)
+
+		// TODO: Delete instances
+		// TODO: Delete deployment
+	})
 }
 
 func encryptUsingAge(t *testing.T, identity *age.X25519Identity, yamlData []byte) []byte {
