@@ -22,7 +22,7 @@ require (
 	github.com/lestrrat-go/jwx v1.2.26
 	github.com/lib/pq v1.10.9
 	github.com/orlangure/gnomock v0.29.0
-	github.com/rabbitmq/amqp091-go v1.8.1
+	github.com/rabbitmq/amqp091-go v1.9.0
 	github.com/stretchr/testify v1.8.4
 	go.mozilla.org/sops/v3 v3.7.3
 	golang.org/x/crypto v0.13.0
