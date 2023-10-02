@@ -103,7 +103,7 @@ func TestInstanceHandler(t *testing.T) {
 		k8sClient.AssertPodIsReady(t, group.Name, instance.Name)
 	})
 
-	t.Run("DeploymentWithoutInstances", func(t *testing.T) {
+	t.Run("DeployDeploymentWithoutInstances", func(t *testing.T) {
 		t.Log("Create deployment")
 		var deployment model.Deployment
 		body := strings.NewReader(`{
