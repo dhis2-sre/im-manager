@@ -2,6 +2,7 @@ package inttest
 
 import (
 	"context"
+	"slices"
 	"testing"
 	"time"
 
@@ -83,12 +84,19 @@ func (k K8sClient) AssertPodIsReady(t *testing.T, group string, instance string,
 			}
 
 			if pod.Status.Phase == v1.PodRunning {
-				t.Logf("pod for instance %q is running", instance)
-				if !tm.Stop() {
-					<-tm.C
+				conditions := pod.Status.Conditions
+				index := slices.IndexFunc(conditions, func(condition v1.PodCondition) bool {
+					return condition.Type == "Ready"
+				})
+				readyCondition := conditions[index]
+				if readyCondition.Status == "True" {
+					t.Logf("pod for instance %q is running", instance)
+					if !tm.Stop() {
+						<-tm.C
+					}
+					cancel()
+					return
 				}
-				cancel()
-				return
 			}
 		}
 	}
