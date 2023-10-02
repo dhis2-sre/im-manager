@@ -16,7 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// SetupK8s creates an K8s container (using k3s).
+// SetupK8s creates a K8s container (using k3s).
 func SetupK8s(t *testing.T) *K8sClient {
 	t.Helper()
 
@@ -53,14 +53,15 @@ type K8sClient struct {
 	Config []byte
 }
 
-func (k K8sClient) AssertPodIsReady(t *testing.T, group string, instance string) {
+func (k K8sClient) AssertPodIsReady(t *testing.T, group string, instance string, timeoutInSeconds time.Duration) {
 	ctx, cancel := context.WithCancel(context.Background())
 	watch, err := k.Client.CoreV1().Pods(group).Watch(ctx, metav1.ListOptions{
 		LabelSelector: "app.kubernetes.io/instance=" + instance,
 	})
 	require.NoErrorf(t, err, "failed to find pod for instance %q", instance)
 
-	timeout := 20 * time.Second
+	t.Log("Waiting for:", instance)
+	timeout := timeoutInSeconds * time.Second
 	tm := time.NewTimer(timeout)
 	defer tm.Stop()
 	for {

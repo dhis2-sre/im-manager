@@ -100,7 +100,7 @@ func TestInstanceHandler(t *testing.T) {
 			"stackName": "whoami-go"
 		}`), &instance, inttest.WithAuthToken("sometoken"))
 
-		k8sClient.AssertPodIsReady(t, group.Name, instance.Name)
+		k8sClient.AssertPodIsReady(t, group.Name, instance.Name, 60)
 	})
 
 	t.Run("DeployDeploymentWithoutInstances", func(t *testing.T) {
@@ -155,7 +155,7 @@ func TestInstanceHandler(t *testing.T) {
 		t.Log("Deploy deployment")
 		path = fmt.Sprintf("/deployments/%d/deploy", deployment.ID)
 		client.Do(t, http.MethodPost, path, nil, http.StatusOK, inttest.WithAuthToken("sometoken"))
-		k8sClient.AssertPodIsReady(t, deploymentInstance.GroupName, deploymentInstance.Name)
+		k8sClient.AssertPodIsReady(t, deploymentInstance.GroupName, deploymentInstance.Name, 60)
 
 		// TODO: Delete instances
 		// TODO: Delete deployment
