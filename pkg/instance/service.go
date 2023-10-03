@@ -122,7 +122,7 @@ func (s service) DeleteInstance(deploymentId, instanceId uint) error {
 
 	err = s.destroyDeploymentInstance(instance)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to destroy instance %d in deployment %d: %v", instanceId, deployment.ID, err)
 	}
 
 	return s.instanceRepository.DeleteDeploymentInstance(instance)
