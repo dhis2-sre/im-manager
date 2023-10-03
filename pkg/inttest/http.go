@@ -59,18 +59,19 @@ func (hc *HTTPClient) GetHostname(t *testing.T) string {
 
 	addrs, err := net.InterfaceAddrs()
 	require.NoError(t, err)
+	var ip string
 	for _, address := range addrs {
 		indent, _ := json.MarshalIndent(address, "", "  ")
 		t.Log("address:", string(indent))
 		// check the address type and if it is not a loopback
 		if ipnet, ok := address.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
 			if ipnet.IP.To4() != nil {
-				return ipnet.IP.String() + ":" + parsedUrl.Port()
+				ip = ipnet.IP.String() + ":" + parsedUrl.Port()
+				t.Log("ip:", ip)
 			}
 		}
 	}
-	t.Error("failed getting ip")
-	return ""
+	return ip
 }
 
 // WithHeader adds a header with the given key and value to HTTP request headers.
