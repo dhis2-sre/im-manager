@@ -117,7 +117,7 @@ func (s service) DeleteInstance(deploymentId, instanceId uint) error {
 
 	_, err = s.validateNoCycles(deployment.Instances)
 	if err != nil {
-		return errdef.NewBadRequest("failed deleting instance: %v", err)
+		return errdef.NewBadRequest("failed to delete instance: %v", err)
 	}
 
 	err = s.destroyDeploymentInstance(instance)
