@@ -60,6 +60,8 @@ func (hc *HTTPClient) GetHostname(t *testing.T) string {
 	addrs, err := net.InterfaceAddrs()
 	require.NoError(t, err)
 	for _, address := range addrs {
+		indent, _ := json.MarshalIndent(address, "", "  ")
+		t.Log("address:", string(indent))
 		// check the address type and if it is not a loopback
 		if ipnet, ok := address.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
 			if ipnet.IP.To4() != nil {
