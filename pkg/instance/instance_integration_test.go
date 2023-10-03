@@ -135,7 +135,7 @@ func TestInstanceHandler(t *testing.T) {
 
 	t.Run("DeployDHIS2", func(t *testing.T) {
 		hostname := client.GetHostname(t)
-		t.Log(hostname)
+		t.Log("hostname:", hostname)
 		t.Setenv("HOSTNAME", hostname)
 
 		var instance model.Instance
