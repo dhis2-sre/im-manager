@@ -4,16 +4,16 @@ go 1.21
 
 require (
 	github.com/anthhub/forwarder v1.1.0
-	github.com/aws/aws-sdk-go v1.45.18
+	github.com/aws/aws-sdk-go v1.45.21
 	github.com/aws/aws-sdk-go-v2 v1.21.0
-	github.com/aws/aws-sdk-go-v2/config v1.18.42
-	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.11.87
+	github.com/aws/aws-sdk-go-v2/config v1.18.43
+	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.11.88
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.40.0
 	github.com/dhis2-sre/rabbitmq v0.3.0
 	github.com/gin-contrib/cors v1.4.0
 	github.com/gin-gonic/gin v1.9.1
 	github.com/go-openapi/runtime v0.26.0
-	github.com/go-playground/validator/v10 v10.15.4
+	github.com/go-playground/validator/v10 v10.15.5
 	github.com/go-redis/redis v6.15.9+incompatible
 	github.com/gofrs/uuid v4.4.0+incompatible
 	github.com/google/uuid v1.3.1
@@ -22,7 +22,7 @@ require (
 	github.com/lestrrat-go/jwx v1.2.26
 	github.com/lib/pq v1.10.9
 	github.com/orlangure/gnomock v0.29.0
-	github.com/rabbitmq/amqp091-go v1.8.1
+	github.com/rabbitmq/amqp091-go v1.9.0
 	github.com/stretchr/testify v1.8.4
 	go.mozilla.org/sops/v3 v3.7.3
 	golang.org/x/crypto v0.13.0
@@ -60,7 +60,7 @@ require (
 	github.com/ProtonMail/go-crypto v0.0.0-20220930113650-c6815a8c17ad // indirect
 	github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2 // indirect
 	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.4.13 // indirect
-	github.com/aws/aws-sdk-go-v2/credentials v1.13.40 // indirect
+	github.com/aws/aws-sdk-go-v2/credentials v1.13.41 // indirect
 	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.13.11 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/configsources v1.1.41 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.4.35 // indirect
@@ -70,9 +70,9 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/internal/checksum v1.1.36 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.9.35 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/s3shared v1.15.4 // indirect
-	github.com/aws/aws-sdk-go-v2/service/sso v1.14.1 // indirect
+	github.com/aws/aws-sdk-go-v2/service/sso v1.15.0 // indirect
 	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.17.1 // indirect
-	github.com/aws/aws-sdk-go-v2/service/sts v1.22.0 // indirect
+	github.com/aws/aws-sdk-go-v2/service/sts v1.23.0 // indirect
 	github.com/aws/smithy-go v1.14.2 // indirect
 	github.com/blang/semver v3.5.1+incompatible // indirect
 	github.com/bytedance/sonic v1.9.1 // indirect
