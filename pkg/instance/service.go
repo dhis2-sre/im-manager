@@ -86,12 +86,12 @@ func (s service) SaveInstance(instance *model.DeploymentInstance) error {
 
 	_, err = s.validateNoCycles(deployment.Instances)
 	if err != nil {
-		return err
+		return errdef.NewBadRequest("failed to validate instance: %v", err)
 	}
 
 	err = s.resolveParameters(deployment)
 	if err != nil {
-		return err
+		return errdef.NewBadRequest("failed to resolve parameters: %v", err)
 	}
 
 	return s.instanceRepository.SaveInstance(instance)
@@ -156,7 +156,7 @@ func (s service) validateNoCycles(instances []*model.DeploymentInstance) (graph.
 				} else if errors.Is(err, graph.ErrEdgeCreatesCycle) {
 					return nil, fmt.Errorf("link from instance %q to stack %q creates a cycle", src.Name, requiredStack.Name)
 				} else if errors.Is(err, graph.ErrVertexNotFound) {
-					return nil, fmt.Errorf("link from %q to stack %q required", requiredStack.Name, src.StackName)
+					return nil, fmt.Errorf("%q is required by %q", requiredStack.Name, src.StackName)
 				}
 				return nil, fmt.Errorf("failed linking instance %q with instance %q: %v", src.Name, requiredStack.Name, err)
 			}
