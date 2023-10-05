@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"testing"
 
 	"github.com/dhis2-sre/im-manager/internal/handler"
@@ -28,7 +30,12 @@ func SetupHTTPServer(t *testing.T, f func(engine *gin.Engine)) *HTTPClient {
 	f(engine)
 
 	//goland:noinspection GoImportUsedAsName
-	server := httptest.NewServer(engine.Handler())
+	server := httptest.NewUnstartedServer(engine.Handler())
+	listen, err := net.Listen("tcp", "0.0.0.0:0") // #nosec
+	require.NoError(t, err)
+	server.Listener = listen
+	server.Start()
+
 	client := server.Client()
 	t.Cleanup(func() {
 		client.CloseIdleConnections()
@@ -44,6 +51,24 @@ func SetupHTTPServer(t *testing.T, f func(engine *gin.Engine)) *HTTPClient {
 type HTTPClient struct {
 	Client    *http.Client
 	ServerURL string
+}
+
+func (hc *HTTPClient) GetHostname(t *testing.T) string {
+	parsedUrl, err := url.Parse(hc.ServerURL)
+	require.NoError(t, err)
+
+	addrs, err := net.InterfaceAddrs()
+	require.NoError(t, err)
+	for _, address := range addrs {
+		// check the address type and if it is not a loopback
+		if ipnet, ok := address.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
+			if ipnet.IP.To4() != nil {
+				return ipnet.IP.String() + ":" + parsedUrl.Port()
+			}
+		}
+	}
+	t.Error("failed getting ip")
+	return ""
 }
 
 // WithHeader adds a header with the given key and value to HTTP request headers.

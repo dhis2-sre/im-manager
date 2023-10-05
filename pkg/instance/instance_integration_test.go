@@ -1,24 +1,27 @@
 package instance_test
 
 import (
-	"context"
 	"errors"
+	"fmt"
+	"net/http"
+	"os"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
+	"github.com/dhis2-sre/im-manager/pkg/database"
+	"github.com/dhis2-sre/im-manager/pkg/storage"
+
 	"filippo.io/age"
 	"go.mozilla.org/sops/v3"
 	"go.mozilla.org/sops/v3/aes"
+	sops_age "go.mozilla.org/sops/v3/age"
 	"go.mozilla.org/sops/v3/cmd/sops/common"
 	"go.mozilla.org/sops/v3/keys"
 	"go.mozilla.org/sops/v3/keyservice"
 	"go.mozilla.org/sops/v3/stores/yaml"
 	"go.mozilla.org/sops/v3/version"
-	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	sops_age "go.mozilla.org/sops/v3/age"
 
 	"github.com/dhis2-sre/im-manager/pkg/instance"
 	"github.com/dhis2-sre/im-manager/pkg/inttest"
@@ -40,11 +43,11 @@ func TestInstanceHandler(t *testing.T) {
 	k8sConfig := encryptUsingAge(t, identity, k8sClient.Config)
 
 	group := &model.Group{
-		Name:       "test",
+		Name:       "group-name",
 		Hostname:   "some",
 		Deployable: true,
 		ClusterConfiguration: &model.ClusterConfiguration{
-			GroupName:               "test",
+			GroupName:               "group-name",
 			KubernetesConfiguration: k8sConfig,
 		},
 	}
@@ -61,67 +64,107 @@ func TestInstanceHandler(t *testing.T) {
 	groupService := groupService{group: group}
 	stacks := stack.Stacks{
 		"whoami-go": stack.WhoamiGo,
+		"dhis2":     stack.DHIS2,
 	}
 	stackService := stack.NewService(stacks)
 	// classification 'test' does not actually exist, this is used to decrypt the stack parameters
 	helmfileService := instance.NewHelmfileService("../../stacks", stackService, "test")
 	instanceService := instance.NewService(instanceRepo, groupService, stackService, helmfileService)
 
+	s3Dir := t.TempDir()
+	s3Bucket := "database-bucket"
+	err = os.Mkdir(s3Dir+"/"+s3Bucket, 0o755)
+	require.NoError(t, err, "failed to create S3 output bucket")
+	s3 := inttest.SetupS3(t, s3Dir)
+	uploader := manager.NewUploader(s3.Client)
+	s3Client := storage.NewS3Client(s3.Client, uploader)
+	databaseRepository := database.NewRepository(db)
+	databaseService := database.NewService(s3Bucket, s3Client, groupService, databaseRepository)
+
+	authenticator := func(ctx *gin.Context) {
+		ctx.Set("user", user)
+	}
 	client := inttest.SetupHTTPServer(t, func(engine *gin.Engine) {
 		var twoDayTTL uint = 172800
 		instanceHandler := instance.NewHandler(groupService, instanceService, twoDayTTL)
-		instance.Routes(engine, func(ctx *gin.Context) {
-			ctx.Set("user", user)
-		}, instanceHandler)
+		instance.Routes(engine, authenticator, instanceHandler)
+
+		databaseHandler := database.NewHandler(databaseService, groupService, instanceService, stackService)
+		database.Routes(engine, authenticator, databaseHandler)
 	})
 
-	t.Run("Deploy", func(t *testing.T) {
+	t.Run("DeployWhoAmI", func(t *testing.T) {
 		var instance model.Instance
-		client.PostJSON(t, "/instances", strings.NewReader(`{
+		body := strings.NewReader(`{
 			"name": "test-whoami",
-			"groupName": "test",
+			"groupName": "group-name",
 			"stackName": "whoami-go"
-		}`), &instance, inttest.WithAuthToken("sometoken"))
+		}`)
+		client.PostJSON(t, "/instances", body, &instance, inttest.WithAuthToken("sometoken"))
 
-		ctx, cancel := context.WithCancel(context.Background())
-		watch, err := k8sClient.Client.CoreV1().Pods(group.Name).Watch(ctx, metav1.ListOptions{
-			LabelSelector: "app.kubernetes.io/instance=" + instance.Name,
-		})
-		require.NoErrorf(t, err, "failed to find pod for instance %q", instance.Name)
+		k8sClient.AssertPodIsReady(t, group.Name, instance.Name, 60)
+	})
 
-		timeout := 20 * time.Second
-		tm := time.NewTimer(timeout)
-		defer tm.Stop()
-		for {
-			select {
-			case <-tm.C:
-				assert.Fail(t, "timed out waiting on pod")
-				cancel()
-				return
-			case event := <-watch.ResultChan():
-				pod, ok := event.Object.(*v1.Pod)
-				if !ok {
-					assert.Failf(t, "failed to get pod event", "want pod event instead got %T", event.Object)
-					if !tm.Stop() {
-						<-tm.C
-					}
-					cancel()
-					return
-				}
+	t.Run("DeployDeploymentWithoutInstances", func(t *testing.T) {
+		t.Log("Create deployment")
+		var deployment model.Deployment
+		body := strings.NewReader(`{
+			"name": "test-deployment",
+			"group": "group-name",
+			"description": "some description"
+		}`)
 
-				t.Logf("watching pod conditions: %#v\n", pod.Status.Conditions)
-				for _, condition := range pod.Status.Conditions {
-					if condition.Type == v1.PodReady {
-						t.Logf("pod for instance %q is ready", instance.Name)
-						if !tm.Stop() {
-							<-tm.C
-						}
-						cancel()
-						return
-					}
-				}
-			}
-		}
+		client.PostJSON(t, "/deployments", body, &deployment, inttest.WithAuthToken("sometoken"))
+
+		assert.Equal(t, "test-deployment", deployment.Name)
+		assert.Equal(t, "group-name", deployment.GroupName)
+		assert.Equal(t, "some description", deployment.Description)
+
+		t.Log("Deploy deployment")
+		path := fmt.Sprintf("/deployments/%d/deploy", deployment.ID)
+		response := client.Do(t, http.MethodPost, path, nil, http.StatusBadRequest, inttest.WithAuthToken("sometoken"))
+
+		assert.Contains(t, "deployment contains no instances", string(response))
+	})
+
+	t.Run("Deployment", func(t *testing.T) {
+		t.Log("Create deployment")
+		var deployment model.Deployment
+		body := strings.NewReader(`{
+			"name": "test-deployment-whoami",
+			"group": "group-name",
+			"description": "some description"
+		}`)
+
+		client.PostJSON(t, "/deployments", body, &deployment, inttest.WithAuthToken("sometoken"))
+
+		assert.Equal(t, "test-deployment-whoami", deployment.Name)
+		assert.Equal(t, "group-name", deployment.GroupName)
+		assert.Equal(t, "some description", deployment.Description)
+
+		t.Log("Create deployment instance")
+		var deploymentInstance model.DeploymentInstance
+		body = strings.NewReader(`{
+			"stackName": "whoami-go"
+		}`)
+
+		path := fmt.Sprintf("/deployments/%d/instance", deployment.ID)
+		client.PostJSON(t, path, body, &deploymentInstance, inttest.WithAuthToken("sometoken"))
+		assert.Equal(t, deployment.ID, deploymentInstance.DeploymentID)
+		assert.Equal(t, "group-name", deploymentInstance.GroupName)
+		assert.Equal(t, "whoami-go", deploymentInstance.StackName)
+
+		t.Log("Deploy deployment")
+		path = fmt.Sprintf("/deployments/%d/deploy", deployment.ID)
+		client.Do(t, http.MethodPost, path, nil, http.StatusOK, inttest.WithAuthToken("sometoken"))
+		k8sClient.AssertPodIsReady(t, deploymentInstance.GroupName, deploymentInstance.Name, 60)
+
+		t.Log("Destroy deployment")
+		path = fmt.Sprintf("/deployments/%d", deployment.ID)
+		client.Do(t, http.MethodDelete, path, nil, http.StatusAccepted, inttest.WithAuthToken("sometoken"))
+		// TODO: Ideally we shouldn't use sleep here but rather watch the pod until it disappears or a timeout is reached
+		time.Sleep(3 * time.Second)
+		k8sClient.AssertPodIsNotRunning(t, deploymentInstance.GroupName, deploymentInstance.Name)
 	})
 }
 

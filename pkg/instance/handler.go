@@ -78,6 +78,12 @@ func (h Handler) DeployDeployment(c *gin.Context) {
 		return
 	}
 
+	if len(deployment.Instances) == 0 {
+		badRequest := errdef.NewBadRequest("deployment contains no instances")
+		_ = c.Error(badRequest)
+		return
+	}
+
 	token, err := handler.GetTokenFromHttpAuthHeader(c)
 	if err != nil {
 		_ = c.Error(err)

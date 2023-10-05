@@ -1,7 +1,14 @@
 package inttest
 
 import (
+	"context"
+	"slices"
 	"testing"
+	"time"
+
+	"github.com/stretchr/testify/assert"
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/orlangure/gnomock/preset/k3s"
 	"k8s.io/client-go/kubernetes"
@@ -10,7 +17,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// SetupK8s creates an K8s container (using k3s).
+// SetupK8s creates a K8s container (using k3s).
 func SetupK8s(t *testing.T) *K8sClient {
 	t.Helper()
 
@@ -45,4 +52,61 @@ func SetupK8s(t *testing.T) *K8sClient {
 type K8sClient struct {
 	Client *kubernetes.Clientset
 	Config []byte
+}
+
+func (k K8sClient) AssertPodIsNotRunning(t *testing.T, group string, instance string) {
+	pods, err := k.Client.CoreV1().Pods(group).List(context.TODO(), metav1.ListOptions{
+		LabelSelector: "app.kubernetes.io/instance=" + instance,
+	})
+	require.NoError(t, err)
+
+	require.Len(t, pods.Items, 0)
+}
+
+func (k K8sClient) AssertPodIsReady(t *testing.T, group string, instance string, timeoutInSeconds time.Duration) {
+	ctx, cancel := context.WithCancel(context.Background())
+	watch, err := k.Client.CoreV1().Pods(group).Watch(ctx, metav1.ListOptions{
+		LabelSelector: "app.kubernetes.io/instance=" + instance,
+	})
+	require.NoErrorf(t, err, "failed to find pod for instance %q", instance)
+
+	t.Log("Waiting for:", instance)
+	timeout := timeoutInSeconds * time.Second
+	tm := time.NewTimer(timeout)
+	defer tm.Stop()
+	for {
+		select {
+		case <-tm.C:
+			assert.Fail(t, "timed out waiting on pod")
+			cancel()
+			return
+		case event := <-watch.ResultChan():
+			pod, ok := event.Object.(*v1.Pod)
+			t.Log("Received pod updated event...")
+			if !ok {
+				assert.Failf(t, "failed to get pod event", "want pod event instead got %T", event.Object)
+				if !tm.Stop() {
+					<-tm.C
+				}
+				cancel()
+				return
+			}
+
+			if pod.Status.Phase == v1.PodRunning {
+				conditions := pod.Status.Conditions
+				index := slices.IndexFunc(conditions, func(condition v1.PodCondition) bool {
+					return condition.Type == "Ready"
+				})
+				readyCondition := conditions[index]
+				if readyCondition.Status == "True" {
+					t.Logf("pod for instance %q is running", instance)
+					if !tm.Stop() {
+						<-tm.C
+					}
+					cancel()
+					return
+				}
+			}
+		}
+	}
 }
