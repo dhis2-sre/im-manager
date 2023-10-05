@@ -162,6 +162,7 @@ func TestInstanceHandler(t *testing.T) {
 		t.Log("Destroy deployment")
 		path = fmt.Sprintf("/deployments/%d", deployment.ID)
 		client.Do(t, http.MethodDelete, path, nil, http.StatusAccepted, inttest.WithAuthToken("sometoken"))
+		// TODO: Ideally we shouldn't use sleep here but rather watch the pod until it disappears or a timeout is reached
 		time.Sleep(3 * time.Second)
 		k8sClient.AssertPodIsNotRunning(t, deploymentInstance.GroupName, deploymentInstance.Name)
 	})
