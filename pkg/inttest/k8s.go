@@ -54,6 +54,15 @@ type K8sClient struct {
 	Config []byte
 }
 
+func (k K8sClient) AssertPodIsNotRunning(t *testing.T, group string, instance string) {
+	pods, err := k.Client.CoreV1().Pods(group).List(context.TODO(), metav1.ListOptions{
+		LabelSelector: "app.kubernetes.io/instance=" + instance,
+	})
+	require.NoError(t, err)
+
+	require.Len(t, pods.Items, 0)
+}
+
 func (k K8sClient) AssertPodIsReady(t *testing.T, group string, instance string, timeoutInSeconds time.Duration) {
 	ctx, cancel := context.WithCancel(context.Background())
 	watch, err := k.Client.CoreV1().Pods(group).Watch(ctx, metav1.ListOptions{

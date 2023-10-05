@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
 	"github.com/dhis2-sre/im-manager/pkg/database"
@@ -158,8 +159,11 @@ func TestInstanceHandler(t *testing.T) {
 		client.Do(t, http.MethodPost, path, nil, http.StatusOK, inttest.WithAuthToken("sometoken"))
 		k8sClient.AssertPodIsReady(t, deploymentInstance.GroupName, deploymentInstance.Name, 60)
 
-		// TODO: Delete instances
-		// TODO: Delete deployment
+		t.Log("Destroy deployment")
+		path = fmt.Sprintf("/deployments/%d", deployment.ID)
+		client.Do(t, http.MethodDelete, path, nil, http.StatusAccepted, inttest.WithAuthToken("sometoken"))
+		time.Sleep(3 * time.Second)
+		k8sClient.AssertPodIsNotRunning(t, deploymentInstance.GroupName, deploymentInstance.Name)
 	})
 }
 
