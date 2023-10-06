@@ -946,7 +946,7 @@ func (h Handler) FindByIdDecrypted(c *gin.Context) {
 
 	canRead := handler.CanWriteInstance(user, instance)
 	if !canRead {
-		unauthorized := errdef.NewUnauthorized("read access denied")
+		unauthorized := errdef.NewUnauthorized("write access denied")
 		_ = c.Error(unauthorized)
 		return
 	}
