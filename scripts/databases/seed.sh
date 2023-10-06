@@ -19,7 +19,7 @@ function createDatabase() {
   source ./auth.sh
 
   echo "Uploading database $1 ..."
-  ./upload.sh "$GROUP" "$HOME/Downloads/$1.sql.gz"
+  ./upload.sh "$GROUP" "$HOME/Downloads/$1.sql.gz" sierra-leone
   echo # empty line to improve output readability
 }
 
@@ -38,5 +38,5 @@ fi
 echo "Seeding the following databases: ${VERSIONS[@]}"
 
 for VERSION in "${VERSIONS[@]}"; do
-  createDatabase "Sierra Leone - $VERSION" "https://databases.dhis2.org/sierra-leone/$VERSION/dhis2-db-sierra-leone.sql.gz"
+  createDatabase "$VERSION" "https://databases.dhis2.org/sierra-leone/$VERSION/dhis2-db-sierra-leone.sql.gz"
 done

@@ -1,8 +1,6 @@
 package database
 
 import (
-	"mime/multipart"
-
 	"github.com/dhis2-sre/im-manager/pkg/model"
 )
 
@@ -61,15 +59,10 @@ type _ struct {
 
 // swagger:parameters uploadDatabase
 type _ struct {
-	// Upload database request body parameter
-	// in: formData
+	// Update database request body parameter
+	// in: body
 	// required: true
-	Group string
-	// Upload database request body parameter
-	// in: formData
-	// required: true
-	// swagger:file
-	File multipart.File
+	Body uploadDatabaseRequest
 }
 
 // swagger:parameters updateDatabaseById
