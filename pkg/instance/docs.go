@@ -120,7 +120,7 @@ type _ struct {
 	Payload SaveInstanceRequest
 }
 
-// swagger:response saveInstance
+// swagger:response DeploymentInstance
 type _ struct {
 	// in: body
 	_ model.DeploymentInstance
