@@ -1050,9 +1050,7 @@ paths:
                   x-go-name: ID
             responses:
                 "200":
-                    description: Deployment
-                    schema:
-                        $ref: '#/definitions/Deployment'
+                    $ref: '#/responses/DeploymentInstance'
                 "401":
                     $ref: '#/responses/Error'
                 "403":
