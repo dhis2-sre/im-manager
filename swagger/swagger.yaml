@@ -434,45 +434,31 @@ definitions:
                 x-go-name: StackName
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
-    StackDetail:
+    Stack:
         properties:
-            hostnamePattern:
-                type: string
-                x-go-name: HostnamePattern
-            hostnameVariable:
-                type: string
-                x-go-name: HostnameVariable
-            instances:
-                items:
-                    $ref: '#/definitions/Instance'
-                type: array
-                x-go-name: Instances
             name:
                 type: string
                 x-go-name: Name
             parameters:
-                $ref: '#/definitions/StackDetailParameters'
+                items:
+                    $ref: '#/definitions/StackParameter'
+                type: array
+                x-go-name: Parameters
         type: object
-        x-go-name: Stack
-        x-go-package: github.com/dhis2-sre/im-manager/pkg/model
-    StackDetailParameter:
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/stack
+    StackParameter:
         properties:
             consumed:
-                description: Consumed signals that this parameter is provided by another stack i.e. one of the stacks required stacks.
                 type: boolean
                 x-go-name: Consumed
             defaultValue:
                 type: string
                 x-go-name: DefaultValue
+            name:
+                type: string
+                x-go-name: Name
         type: object
-        x-go-name: StackParameter
-        x-go-package: github.com/dhis2-sre/im-manager/pkg/model
-    StackDetailParameters:
-        additionalProperties:
-            $ref: '#/definitions/StackDetailParameter'
-        type: object
-        x-go-name: StackParameters
-        x-go-package: github.com/dhis2-sre/im-manager/pkg/model
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/stack
     Tokens:
         description: Tokens domain object defining user tokens
         properties:
@@ -1750,7 +1736,7 @@ paths:
             operationId: stacks
             responses:
                 "200":
-                    $ref: '#/responses/StacksResponse'
+                    $ref: '#/responses/Stacks'
                 "401":
                     $ref: '#/responses/Error'
                 "403":
@@ -1774,7 +1760,7 @@ paths:
                   x-go-name: Name
             responses:
                 "200":
-                    $ref: '#/responses/StackResponse'
+                    $ref: '#/responses/Stack'
                 "401":
                     $ref: '#/responses/Error'
                 "403":
@@ -2001,15 +1987,15 @@ responses:
         description: ""
         schema:
             $ref: '#/definitions/Response'
-    StackResponse:
+    Stack:
         description: ""
         schema:
-            $ref: '#/definitions/StackDetail'
-    StacksResponse:
+            $ref: '#/definitions/Stack'
+    Stacks:
         description: ""
         schema:
             items:
-                $ref: '#/definitions/StackDetail'
+                $ref: '#/definitions/Stack'
             type: array
     Tokens:
         description: ""
