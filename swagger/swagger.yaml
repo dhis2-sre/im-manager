@@ -2900,6 +2900,31 @@ paths:
             security:
                 - oauth2: []
             summary: Resume paused instance
+    /instances/{id}/status:
+        get:
+            description: Get instance status...
+            operationId: status
+            parameters:
+                - format: uint64
+                  in: path
+                  name: id
+                  required: true
+                  type: integer
+                  x-go-name: ID
+            responses:
+                "200":
+                    $ref: '#/responses/Status'
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Get instance status
     /integrations:
         post:
             description: Return integration for a given key
@@ -3202,6 +3227,8 @@ paths:
 produces:
     - application/json
 responses:
+    _:
+        description: ""
     CreateExternalDownloadResponse:
         description: ""
         schema:
@@ -3245,6 +3272,8 @@ responses:
             items:
                 $ref: '#/definitions/StackDetail'
             type: array
+    Status:
+        description: ""
     Tokens:
         description: ""
         schema:

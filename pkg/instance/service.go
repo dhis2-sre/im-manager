@@ -4,9 +4,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	v1 "k8s.io/api/core/v1"
 	"log"
 	"os/exec"
 	"slices"
+	"strings"
 
 	"github.com/dhis2-sre/im-manager/internal/errdef"
 	"github.com/dominikbraun/graph"
@@ -659,6 +661,79 @@ func (s service) FindInstances(user *model.User, presets bool) ([]GroupsWithInst
 	}
 
 	return instances, err
+}
+
+type InstanceStatus string
+
+const (
+	NotDeployed        InstanceStatus = "NotDeployed"
+	Pending            InstanceStatus = "Pending"
+	Booting            InstanceStatus = "Booting"
+	BootingWithRestart InstanceStatus = "Booting (%d)"
+	Running            InstanceStatus = "Running"
+	Error              InstanceStatus = "Error"
+)
+
+func (s service) GetStatus(instance *model.Instance) (InstanceStatus, error) {
+	ks, err := NewKubernetesService(instance.Group.ClusterConfiguration)
+	if err != nil {
+		return "", err
+	}
+
+	pod, err := ks.getPod(instance, "")
+	if err != nil {
+		if strings.HasPrefix(err.Error(), "no pod found using the selector: ") {
+			return NotDeployed, nil
+		}
+		return "", err
+	}
+
+	if pod.Status.Phase == v1.PodPending {
+		// TODO: Should check init container here as well
+		containerErrorIndex := slices.IndexFunc(pod.Status.ContainerStatuses, func(status v1.ContainerStatus) bool {
+			return status.State.Waiting != nil && status.State.Waiting.Reason == "ImagePullBackOff"
+		})
+		if containerErrorIndex != -1 {
+			status := pod.Status.ContainerStatuses[containerErrorIndex]
+			return InstanceStatus(string(Error) + ": " + status.State.Waiting.Message), nil
+		}
+
+		return Pending, nil
+	}
+
+	if pod.Status.Phase == v1.PodFailed {
+		return Error, nil
+	}
+
+	if pod.Status.Phase == v1.PodRunning {
+		booting := slices.ContainsFunc(pod.Status.Conditions, func(condition v1.PodCondition) bool {
+			return condition.Status == v1.ConditionFalse
+		})
+		if booting {
+			initContainerStatuses := pod.Status.InitContainerStatuses
+			if initContainerStatuses != nil {
+				initContainerError := slices.ContainsFunc(initContainerStatuses, func(status v1.ContainerStatus) bool {
+					return status.LastTerminationState.Terminated != nil && status.LastTerminationState.Terminated.Reason == "Error"
+				})
+				if initContainerError {
+					status := fmt.Sprintf(string(BootingWithRestart), initContainerStatuses[0].RestartCount)
+					return InstanceStatus(status), nil
+				}
+			}
+			containerError := slices.ContainsFunc(pod.Status.ContainerStatuses, func(status v1.ContainerStatus) bool {
+				return status.LastTerminationState.Terminated != nil && status.LastTerminationState.Terminated.Reason == "Error"
+			})
+			if containerError {
+				status := fmt.Sprintf(string(BootingWithRestart), pod.Status.ContainerStatuses[0].RestartCount)
+				return InstanceStatus(status), nil
+			}
+
+			return Booting, nil
+		}
+		return Running, nil
+	}
+
+	return "", fmt.Errorf("somethings wrong")
 }
 
 func (s service) FindPublicInstances() ([]GroupsWithInstances, error) {
