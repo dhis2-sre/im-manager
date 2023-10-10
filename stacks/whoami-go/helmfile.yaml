@@ -24,4 +24,4 @@ releases:
 
 repositories:
   - name: tons
-    url: https://helm-charts.fitfit.dk
+    url: https://dhis2-sre.github.io/whoami-go
