@@ -38,7 +38,7 @@ func (h Handler) Find(c *gin.Context) {
 	//  oauth2:
 	//
 	// Responses:
-	//   200: StackResponse
+	//   200: Stack
 	//   401: Error
 	//   403: Error
 	//   404: Error
@@ -95,7 +95,7 @@ func (h Handler) FindAll(c *gin.Context) {
 	//  oauth2:
 	//
 	// Responses:
-	//   200: StacksResponse
+	//   200: Stacks
 	//   401: Error
 	//   403: Error
 	//   404: Error

@@ -1,7 +1,5 @@
 package stack
 
-import "github.com/dhis2-sre/im-manager/pkg/model"
-
 // swagger:parameters stack
 type _ struct {
 	// in: path
@@ -9,14 +7,14 @@ type _ struct {
 	Name string `json:"name"`
 }
 
-// swagger:response StackResponse
+// swagger:response Stack
 type _ struct {
 	//in: body
-	_ model.Stack
+	_ Stack
 }
 
-// swagger:response StacksResponse
+// swagger:response Stacks
 type _ struct {
 	//in: body
-	_ []model.Stack
+	_ []Stack
 }
