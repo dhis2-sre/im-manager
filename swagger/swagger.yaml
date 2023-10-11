@@ -368,6 +368,9 @@ definitions:
                 x-go-name: Value
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/model
+    InstanceStatus:
+        type: string
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
     Lock:
         properties:
             databaseId:
@@ -2024,6 +2027,8 @@ responses:
             type: array
     Status:
         description: ""
+        schema:
+            $ref: '#/definitions/InstanceStatus'
     Tokens:
         description: ""
         schema:

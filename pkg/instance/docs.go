@@ -83,7 +83,7 @@ type _ struct {
 // swagger:response Status
 type _ struct {
 	// in: body
-	_ string
+	_ InstanceStatus
 }
 
 // swagger:parameters instanceNameToId
