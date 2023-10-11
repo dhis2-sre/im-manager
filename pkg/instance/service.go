@@ -4,11 +4,12 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	v1 "k8s.io/api/core/v1"
 	"log"
 	"os/exec"
 	"slices"
 	"strings"
+
+	v1 "k8s.io/api/core/v1"
 
 	"github.com/dhis2-sre/im-manager/internal/errdef"
 	"github.com/dominikbraun/graph"
