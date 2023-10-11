@@ -97,7 +97,7 @@ type _ struct {
 	InstanceName string `json:"instanceName"`
 }
 
-// swagger:response
+// swagger:response Error
 type _ struct {
 	// The error message
 	// in: body
