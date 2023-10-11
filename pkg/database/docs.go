@@ -113,6 +113,12 @@ type _ struct {
 	_ model.Database
 }
 
+// swagger:response GroupsWithDatabases
+type _ struct {
+	//in: body
+	_ GroupsWithDatabases
+}
+
 // swagger:response Lock
 type _ struct {
 	//in: body

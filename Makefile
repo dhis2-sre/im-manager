@@ -50,7 +50,7 @@ swagger-clean:
 	rm -f swagger/swagger.yaml
 
 swagger-spec:
-	swagger generate spec -o swagger/swagger.yaml --scan-models
+	swagger generate spec -o swagger/swagger.yaml
 	swagger validate swagger/swagger.yaml
 
 swagger: swagger-clean swagger-spec

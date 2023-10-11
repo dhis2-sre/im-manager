@@ -1,67 +1,6 @@
 consumes:
     - application/json
 definitions:
-    AccessMode:
-        properties:
-            BlockVolume:
-                $ref: '#/definitions/TypeBlock'
-            MountVolume:
-                $ref: '#/definitions/TypeMount'
-            Scope:
-                $ref: '#/definitions/Scope'
-            Sharing:
-                $ref: '#/definitions/SharingMode'
-        title: AccessMode defines the access mode of a volume.
-        type: object
-        x-go-package: github.com/docker/docker/api/types/volume
-    AuthenticateOKBody:
-        description: AuthenticateOKBody authenticate o k body
-        properties:
-            IdentityToken:
-                description: An opaque token used to authenticate a user after a successful login
-                type: string
-            Status:
-                description: The status of the authentication
-                type: string
-        required:
-            - IdentityToken
-            - Status
-        type: object
-        x-go-package: github.com/docker/docker/api/types/registry
-    Availability:
-        title: Availability specifies the availability of the volume.
-        type: string
-        x-go-package: github.com/docker/docker/api/types/volume
-    CapacityRange:
-        description: |-
-            CapacityRange describes the minimum and maximum capacity a volume should be
-            created with
-        properties:
-            LimitBytes:
-                description: |-
-                    LimitBytes specifies that a volume must not be bigger than this. The
-                    value of 0 indicates an unspecified maximum
-                format: int64
-                type: integer
-            RequiredBytes:
-                description: |-
-                    RequiredBytes specifies that a volume must be at least this big. The
-                    value of 0 indicates an unspecified minimum.
-                format: int64
-                type: integer
-        type: object
-        x-go-package: github.com/docker/docker/api/types/volume
-    ChangeType:
-        description: |-
-            Can be one of:
-
-            `0`: Modified ("C")
-            `1`: Added ("A")
-            `2`: Deleted ("D")
-        format: uint8
-        title: ChangeType Kind of change
-        type: integer
-        x-go-package: github.com/docker/docker/api/types/container
     ClusterConfiguration:
         properties:
             createdAt:
@@ -87,101 +26,6 @@ definitions:
                 x-go-name: UpdatedAt
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/model
-    ClusterVolume:
-        description: |-
-            ClusterVolume contains options and information specific to, and only present
-            on, Swarm CSI cluster volumes.
-        properties:
-            CreatedAt:
-                format: date-time
-                type: string
-            ID:
-                description: |-
-                    ID is the Swarm ID of the volume. Because cluster volumes are Swarm
-                    objects, they have an ID, unlike non-cluster volumes, which only have a
-                    Name. This ID can be used to refer to the cluster volume.
-                type: string
-            Info:
-                $ref: '#/definitions/Info'
-            PublishStatus:
-                description: |-
-                    PublishStatus contains the status of the volume as it pertains to its
-                    publishing on Nodes.
-                items:
-                    $ref: '#/definitions/PublishStatus'
-                type: array
-            Spec:
-                $ref: '#/definitions/ClusterVolumeSpec'
-            UpdatedAt:
-                format: date-time
-                type: string
-            Version:
-                $ref: '#/definitions/Version'
-        type: object
-        x-go-package: github.com/docker/docker/api/types/volume
-    ClusterVolumeSpec:
-        properties:
-            AccessMode:
-                $ref: '#/definitions/AccessMode'
-            AccessibilityRequirements:
-                $ref: '#/definitions/TopologyRequirement'
-            Availability:
-                $ref: '#/definitions/Availability'
-            CapacityRange:
-                $ref: '#/definitions/CapacityRange'
-            Group:
-                description: |-
-                    Group defines the volume group of this volume. Volumes belonging to the
-                    same group can be referred to by group name when creating Services.
-                    Referring to a volume by group instructs swarm to treat volumes in that
-                    group interchangeably for the purpose of scheduling. Volumes with an
-                    empty string for a group technically all belong to the same, emptystring
-                    group.
-                type: string
-            Secrets:
-                description: |-
-                    Secrets defines Swarm Secrets that are passed to the CSI storage plugin
-                    when operating on this volume.
-                items:
-                    $ref: '#/definitions/Secret'
-                type: array
-        title: ClusterVolumeSpec contains the spec used to create this volume.
-        type: object
-        x-go-package: github.com/docker/docker/api/types/volume
-    ContainerTopOKBody:
-        description: ContainerTopOKBody OK response to ContainerTop operation
-        properties:
-            Processes:
-                description: |-
-                    Each process running in the container, where each is process
-                    is an array of values corresponding to the titles.
-                items:
-                    items:
-                        type: string
-                    type: array
-                type: array
-            Titles:
-                description: The ps column titles
-                items:
-                    type: string
-                type: array
-        required:
-            - Processes
-            - Titles
-        type: object
-        x-go-package: github.com/docker/docker/api/types/container
-    ContainerUpdateOKBody:
-        description: ContainerUpdateOKBody OK response to ContainerUpdate operation
-        properties:
-            Warnings:
-                description: warnings
-                items:
-                    type: string
-                type: array
-        required:
-            - Warnings
-        type: object
-        x-go-package: github.com/docker/docker/api/types/container
     CopyDatabaseRequest:
         properties:
             group:
@@ -214,50 +58,6 @@ definitions:
                 x-go-name: Name
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/group
-    CreateOptions:
-        description: Volume configuration
-        properties:
-            ClusterVolumeSpec:
-                $ref: '#/definitions/ClusterVolumeSpec'
-            Driver:
-                description: Name of the volume driver to use.
-                type: string
-            DriverOpts:
-                additionalProperties:
-                    type: string
-                description: |-
-                    A mapping of driver options and values. These options are
-                    passed directly to the driver and are driver specific.
-                type: object
-            Labels:
-                additionalProperties:
-                    type: string
-                description: User-defined key/value metadata.
-                type: object
-            Name:
-                description: The new volume's name. If not specified, Docker generates a name.
-                type: string
-        title: CreateOptions VolumeConfig
-        type: object
-        x-go-package: github.com/docker/docker/api/types/volume
-    CreateResponse:
-        description: OK response to ContainerCreate operation
-        properties:
-            Id:
-                description: The ID of the created container
-                type: string
-                x-go-name: ID
-            Warnings:
-                description: Warnings encountered when creating the container
-                items:
-                    type: string
-                type: array
-        required:
-            - Id
-            - Warnings
-        title: CreateResponse ContainerCreateResponse
-        type: object
-        x-go-package: github.com/docker/docker/api/types/container
     Database:
         properties:
             createdAt:
@@ -419,17 +219,6 @@ definitions:
             $ref: '#/definitions/DeploymentInstanceParameter'
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/model
-    ErrorResponse:
-        properties:
-            message:
-                description: The error message.
-                type: string
-                x-go-name: Message
-        required:
-            - message
-        title: ErrorResponse Represents an error.
-        type: object
-        x-go-package: github.com/docker/docker/api/types
     ExternalDownload:
         properties:
             databaseId:
@@ -446,41 +235,6 @@ definitions:
                 x-go-name: UUID
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/model
-    FilesystemChange:
-        properties:
-            Kind:
-                $ref: '#/definitions/ChangeType'
-            Path:
-                description: Path to file or directory that has changed.
-                type: string
-        required:
-            - Kind
-            - Path
-        title: FilesystemChange Change in the container's filesystem.
-        type: object
-        x-go-package: github.com/docker/docker/api/types/container
-    GraphDriverData:
-        description: |-
-            GraphDriverData Information about the storage driver used to store the container's and
-            image's filesystem.
-        properties:
-            Data:
-                additionalProperties:
-                    type: string
-                description: |-
-                    Low-level storage metadata, provided as key/value pairs.
-
-                    This information is driver-specific, and depends on the storage-driver
-                    in use, and should be used for informational purposes only.
-                type: object
-            Name:
-                description: Name of the storage driver.
-                type: string
-        required:
-            - Data
-            - Name
-        type: object
-        x-go-package: github.com/docker/docker/api/types
     Group:
         description: Group domain object defining a group
         properties:
@@ -545,202 +299,6 @@ definitions:
                 x-go-name: Name
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
-    HistoryResponseItem:
-        description: HistoryResponseItem individual image layer information in response to ImageHistory operation
-        properties:
-            Comment:
-                description: comment
-                type: string
-            Created:
-                description: created
-                format: int64
-                type: integer
-            CreatedBy:
-                description: created by
-                type: string
-            Id:
-                description: Id
-                type: string
-                x-go-name: ID
-            Size:
-                description: size
-                format: int64
-                type: integer
-            Tags:
-                description: tags
-                items:
-                    type: string
-                type: array
-        required:
-            - Comment
-            - Created
-            - CreatedBy
-            - Id
-            - Size
-            - Tags
-        type: object
-        x-go-package: github.com/docker/docker/api/types/image
-    IdResponse:
-        description: IDResponse Response to an API call that returns just an Id
-        properties:
-            Id:
-                description: The id of the newly created object.
-                type: string
-                x-go-name: ID
-        required:
-            - Id
-        type: object
-        x-go-name: IDResponse
-        x-go-package: github.com/docker/docker/api/types
-    ImageDeleteResponseItem:
-        description: ImageDeleteResponseItem image delete response item
-        properties:
-            Deleted:
-                description: The image ID of an image that was deleted
-                type: string
-            Untagged:
-                description: The image ID of an image that was untagged
-                type: string
-        type: object
-        x-go-package: github.com/docker/docker/api/types
-    ImageSummary:
-        description: ImageSummary image summary
-        properties:
-            Containers:
-                description: |-
-                    Number of containers using this image. Includes both stopped and running
-                    containers.
-
-                    This size is not calculated by default, and depends on which API endpoint
-                    is used. `-1` indicates that the value has not been set / calculated.
-                format: int64
-                type: integer
-            Created:
-                description: |-
-                    Date and time at which the image was created as a Unix timestamp
-                    (number of seconds sinds EPOCH).
-                format: int64
-                type: integer
-            Id:
-                description: |-
-                    ID is the content-addressable ID of an image.
-
-                    This identifier is a content-addressable digest calculated from the
-                    image's configuration (which includes the digests of layers used by
-                    the image).
-
-                    Note that this digest differs from the `RepoDigests` below, which
-                    holds digests of image manifests that reference the image.
-                type: string
-                x-go-name: ID
-            Labels:
-                additionalProperties:
-                    type: string
-                description: User-defined key/value metadata.
-                type: object
-            ParentId:
-                description: |-
-                    ID of the parent image.
-
-                    Depending on how the image was created, this field may be empty and
-                    is only set for images that were built/created locally. This field
-                    is empty if the image was pulled from an image registry.
-                type: string
-                x-go-name: ParentID
-            RepoDigests:
-                description: |-
-                    List of content-addressable digests of locally available image manifests
-                    that the image is referenced from. Multiple manifests can refer to the
-                    same image.
-
-                    These digests are usually only available if the image was either pulled
-                    from a registry, or if the image was pushed to a registry, which is when
-                    the manifest is generated and its digest calculated.
-                items:
-                    type: string
-                type: array
-            RepoTags:
-                description: |-
-                    List of image names/tags in the local image cache that reference this
-                    image.
-
-                    Multiple image tags can refer to the same image, and this list may be
-                    empty if no tags reference the image, in which case the image is
-                    "untagged", in which case it can still be referenced by its ID.
-                items:
-                    type: string
-                type: array
-            SharedSize:
-                description: |-
-                    Total size of image layers that are shared between this image and other
-                    images.
-
-                    This size is not calculated by default. `-1` indicates that the value
-                    has not been set / calculated.
-                format: int64
-                type: integer
-            Size:
-                description: Total size of the image including all layers it is composed of.
-                format: int64
-                type: integer
-            VirtualSize:
-                description: |-
-                    Total size of the image including all layers it is composed of.
-
-                    In versions of Docker before v1.10, this field was calculated from
-                    the image itself and all of its parent images. Images are now stored
-                    self-contained, and no longer use a parent-chain, making this field
-                    an equivalent of the Size field.
-
-                    Deprecated: this field is kept for backward compatibility, and will be removed in API v1.44.
-                format: int64
-                type: integer
-        required:
-            - Containers
-            - Created
-            - Id
-            - Labels
-            - ParentId
-            - RepoDigests
-            - RepoTags
-            - SharedSize
-            - Size
-        type: object
-        x-go-package: github.com/docker/docker/api/types
-    Info:
-        description: |-
-            Info contains information about the Volume as a whole as provided by
-            the CSI storage plugin.
-        properties:
-            AccessibleTopology:
-                description: |-
-                    AccessibleTopolgoy is the topology this volume is actually accessible
-                    from.
-                items:
-                    $ref: '#/definitions/Topology'
-                type: array
-            CapacityBytes:
-                description: |-
-                    CapacityBytes is the capacity of the volume in bytes. A value of 0
-                    indicates that the capacity is unknown.
-                format: int64
-                type: integer
-            VolumeContext:
-                additionalProperties:
-                    type: string
-                description: |-
-                    VolumeContext is the context originating from the CSI storage plugin
-                    when the Volume is created.
-                type: object
-            VolumeID:
-                description: |-
-                    VolumeID is the ID of the Volume as seen by the CSI storage plugin. This
-                    is distinct from the Volume's Swarm ID, which is the ID used by all of
-                    the Docker Engine to refer to the Volume. If this field is blank, then
-                    the Volume has not been successfully created yet.
-                type: string
-        type: object
-        x-go-package: github.com/docker/docker/api/types/volume
     Instance:
         properties:
             createdAt:
@@ -810,22 +368,6 @@ definitions:
                 x-go-name: Value
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/model
-    ListResponse:
-        description: Volume list response
-        properties:
-            Volumes:
-                description: List of volumes
-                items:
-                    $ref: '#/definitions/Volume'
-                type: array
-            Warnings:
-                description: Warnings that occurred when fetching the list of volumes.
-                items:
-                    type: string
-                type: array
-        title: ListResponse VolumeListResponse
-        type: object
-        x-go-package: github.com/docker/docker/api/types/volume
     Lock:
         properties:
             databaseId:
@@ -850,399 +392,6 @@ definitions:
                 x-go-name: InstanceId
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/database
-    Meta:
-        properties:
-            CreatedAt:
-                format: date-time
-                type: string
-            UpdatedAt:
-                format: date-time
-                type: string
-            Version:
-                $ref: '#/definitions/Version'
-        title: Meta is a base object inherited by most of the other once.
-        type: object
-        x-go-package: github.com/docker/docker/api/types/swarm
-    Plugin:
-        description: Plugin A plugin for the Engine API
-        properties:
-            Config:
-                $ref: '#/definitions/PluginConfig'
-            Enabled:
-                description: True if the plugin is running. False if the plugin is not running, only installed.
-                type: boolean
-            Id:
-                description: Id
-                type: string
-                x-go-name: ID
-            Name:
-                description: name
-                type: string
-            PluginReference:
-                description: plugin remote reference used to push/pull the plugin
-                type: string
-            Settings:
-                $ref: '#/definitions/PluginSettings'
-        required:
-            - Config
-            - Enabled
-            - Name
-            - Settings
-        type: object
-        x-go-package: github.com/docker/docker/api/types
-    PluginConfig:
-        properties:
-            Args:
-                $ref: '#/definitions/PluginConfigArgs'
-            Description:
-                description: description
-                type: string
-            DockerVersion:
-                description: Docker Version used to create the plugin
-                type: string
-            Documentation:
-                description: documentation
-                type: string
-            Entrypoint:
-                description: entrypoint
-                items:
-                    type: string
-                type: array
-            Env:
-                description: env
-                items:
-                    $ref: '#/definitions/PluginEnv'
-                type: array
-            Interface:
-                $ref: '#/definitions/PluginConfigInterface'
-            IpcHost:
-                description: ipc host
-                type: boolean
-            Linux:
-                $ref: '#/definitions/PluginConfigLinux'
-            Mounts:
-                description: mounts
-                items:
-                    $ref: '#/definitions/PluginMount'
-                type: array
-            Network:
-                $ref: '#/definitions/PluginConfigNetwork'
-            PidHost:
-                description: pid host
-                type: boolean
-            PropagatedMount:
-                description: propagated mount
-                type: string
-            User:
-                $ref: '#/definitions/PluginConfigUser'
-            WorkDir:
-                description: work dir
-                type: string
-            rootfs:
-                $ref: '#/definitions/PluginConfigRootfs'
-        required:
-            - Args
-            - Description
-            - Documentation
-            - Entrypoint
-            - Env
-            - Interface
-            - IpcHost
-            - Linux
-            - Mounts
-            - Network
-            - PidHost
-            - PropagatedMount
-            - WorkDir
-        title: PluginConfig The config of a plugin.
-        type: object
-        x-go-package: github.com/docker/docker/api/types
-    PluginConfigArgs:
-        description: PluginConfigArgs plugin config args
-        properties:
-            Description:
-                description: description
-                type: string
-            Name:
-                description: name
-                type: string
-            Settable:
-                description: settable
-                items:
-                    type: string
-                type: array
-            Value:
-                description: value
-                items:
-                    type: string
-                type: array
-        required:
-            - Description
-            - Name
-            - Settable
-            - Value
-        type: object
-        x-go-package: github.com/docker/docker/api/types
-    PluginConfigInterface:
-        description: PluginConfigInterface The interface between Docker and the plugin
-        properties:
-            ProtocolScheme:
-                description: Protocol to use for clients connecting to the plugin.
-                type: string
-            Socket:
-                description: socket
-                type: string
-            Types:
-                description: types
-                items:
-                    $ref: '#/definitions/PluginInterfaceType'
-                type: array
-        required:
-            - Socket
-            - Types
-        type: object
-        x-go-package: github.com/docker/docker/api/types
-    PluginConfigLinux:
-        description: PluginConfigLinux plugin config linux
-        properties:
-            AllowAllDevices:
-                description: allow all devices
-                type: boolean
-            Capabilities:
-                description: capabilities
-                items:
-                    type: string
-                type: array
-            Devices:
-                description: devices
-                items:
-                    $ref: '#/definitions/PluginDevice'
-                type: array
-        required:
-            - AllowAllDevices
-            - Capabilities
-            - Devices
-        type: object
-        x-go-package: github.com/docker/docker/api/types
-    PluginConfigNetwork:
-        description: PluginConfigNetwork plugin config network
-        properties:
-            Type:
-                description: type
-                type: string
-        required:
-            - Type
-        type: object
-        x-go-package: github.com/docker/docker/api/types
-    PluginConfigRootfs:
-        description: PluginConfigRootfs plugin config rootfs
-        properties:
-            diff_ids:
-                description: diff ids
-                items:
-                    type: string
-                type: array
-                x-go-name: DiffIds
-            type:
-                description: type
-                type: string
-                x-go-name: Type
-        type: object
-        x-go-package: github.com/docker/docker/api/types
-    PluginConfigUser:
-        description: PluginConfigUser plugin config user
-        properties:
-            GID:
-                description: g ID
-                format: uint32
-                type: integer
-            UID:
-                description: UID
-                format: uint32
-                type: integer
-        type: object
-        x-go-package: github.com/docker/docker/api/types
-    PluginDevice:
-        description: PluginDevice plugin device
-        properties:
-            Description:
-                description: description
-                type: string
-            Name:
-                description: name
-                type: string
-            Path:
-                description: path
-                type: string
-            Settable:
-                description: settable
-                items:
-                    type: string
-                type: array
-        required:
-            - Description
-            - Name
-            - Path
-            - Settable
-        type: object
-        x-go-package: github.com/docker/docker/api/types
-    PluginEnv:
-        description: PluginEnv plugin env
-        properties:
-            Description:
-                description: description
-                type: string
-            Name:
-                description: name
-                type: string
-            Settable:
-                description: settable
-                items:
-                    type: string
-                type: array
-            Value:
-                description: value
-                type: string
-        required:
-            - Description
-            - Name
-            - Settable
-            - Value
-        type: object
-        x-go-package: github.com/docker/docker/api/types
-    PluginInterfaceType:
-        description: PluginInterfaceType plugin interface type
-        properties:
-            Capability:
-                description: capability
-                type: string
-            Prefix:
-                description: prefix
-                type: string
-            Version:
-                description: version
-                type: string
-        required:
-            - Capability
-            - Prefix
-            - Version
-        type: object
-        x-go-package: github.com/docker/docker/api/types
-    PluginMount:
-        description: PluginMount plugin mount
-        properties:
-            Description:
-                description: description
-                type: string
-            Destination:
-                description: destination
-                type: string
-            Name:
-                description: name
-                type: string
-            Options:
-                description: options
-                items:
-                    type: string
-                type: array
-            Settable:
-                description: settable
-                items:
-                    type: string
-                type: array
-            Source:
-                description: source
-                type: string
-            Type:
-                description: type
-                type: string
-        required:
-            - Description
-            - Destination
-            - Name
-            - Options
-            - Settable
-            - Source
-            - Type
-        type: object
-        x-go-package: github.com/docker/docker/api/types
-    PluginSettings:
-        properties:
-            Args:
-                description: args
-                items:
-                    type: string
-                type: array
-            Devices:
-                description: devices
-                items:
-                    $ref: '#/definitions/PluginDevice'
-                type: array
-            Env:
-                description: env
-                items:
-                    type: string
-                type: array
-            Mounts:
-                description: mounts
-                items:
-                    $ref: '#/definitions/PluginMount'
-                type: array
-        required:
-            - Args
-            - Devices
-            - Env
-            - Mounts
-        title: PluginSettings Settings that can be modified by users.
-        type: object
-        x-go-package: github.com/docker/docker/api/types
-    Port:
-        description: Port An open port on a container
-        properties:
-            IP:
-                description: Host IP address that the container's port is mapped to
-                type: string
-            PrivatePort:
-                description: Port on the container
-                format: uint16
-                type: integer
-            PublicPort:
-                description: Port exposed on the host
-                format: uint16
-                type: integer
-            Type:
-                description: type
-                type: string
-        required:
-            - PrivatePort
-            - Type
-        type: object
-        x-go-package: github.com/docker/docker/api/types
-    PublishState:
-        description: |-
-            PublishState represents the state of a Volume as it pertains to its
-            use on a particular Node.
-        type: string
-        x-go-package: github.com/docker/docker/api/types/volume
-    PublishStatus:
-        description: |-
-            PublishStatus represents the status of the volume as published to an
-            individual node
-        properties:
-            NodeID:
-                description: NodeID is the ID of the swarm node this Volume is published to.
-                type: string
-            PublishContext:
-                additionalProperties:
-                    type: string
-                description: |-
-                    PublishContext is the PublishContext returned by the CSI plugin when
-                    a volume is published.
-                type: object
-            State:
-                $ref: '#/definitions/PublishState'
-        type: object
-        x-go-package: github.com/docker/docker/api/types/volume
     RefreshTokenRequest:
         properties:
             refreshToken:
@@ -1285,45 +434,6 @@ definitions:
                 x-go-name: StackName
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
-    Scope:
-        description: |-
-            Scope defines the Scope of a Cluster Volume. This is how many nodes a
-            Volume can be accessed simultaneously on.
-        type: string
-        x-go-package: github.com/docker/docker/api/types/volume
-    Secret:
-        description: |-
-            Secret represents a Swarm Secret value that must be passed to the CSI
-            storage plugin when operating on this Volume. It represents one key-value
-            pair of possibly many.
-        properties:
-            Key:
-                description: Key is the name of the key of the key-value pair passed to the plugin.
-                type: string
-            Secret:
-                description: |-
-                    Secret is the swarm Secret object from which to read data. This can be a
-                    Secret name or ID. The Secret data is retrieved by Swarm and used as the
-                    value of the key-value pair passed to the plugin.
-                type: string
-        type: object
-        x-go-package: github.com/docker/docker/api/types/volume
-    ServiceUpdateResponse:
-        description: ServiceUpdateResponse service update response
-        properties:
-            Warnings:
-                description: Optional warning messages
-                items:
-                    type: string
-                type: array
-        type: object
-        x-go-package: github.com/docker/docker/api/types
-    SharingMode:
-        description: |-
-            SharingMode defines the Sharing of a Cluster Volume. This is how Tasks using a
-            Volume at the same time can use it.
-        type: string
-        x-go-package: github.com/docker/docker/api/types/volume
     Stack:
         properties:
             name:
@@ -1336,45 +446,6 @@ definitions:
                 x-go-name: Parameters
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/stack
-    StackDetail:
-        properties:
-            hostnamePattern:
-                type: string
-                x-go-name: HostnamePattern
-            hostnameVariable:
-                type: string
-                x-go-name: HostnameVariable
-            instances:
-                items:
-                    $ref: '#/definitions/Instance'
-                type: array
-                x-go-name: Instances
-            name:
-                type: string
-                x-go-name: Name
-            parameters:
-                $ref: '#/definitions/StackDetailParameters'
-        type: object
-        x-go-name: Stack
-        x-go-package: github.com/dhis2-sre/im-manager/pkg/model
-    StackDetailParameter:
-        properties:
-            consumed:
-                description: Consumed signals that this parameter is provided by another stack i.e. one of the stacks required stacks.
-                type: boolean
-                x-go-name: Consumed
-            defaultValue:
-                type: string
-                x-go-name: DefaultValue
-        type: object
-        x-go-name: StackParameter
-        x-go-package: github.com/dhis2-sre/im-manager/pkg/model
-    StackDetailParameters:
-        additionalProperties:
-            $ref: '#/definitions/StackDetailParameter'
-        type: object
-        x-go-name: StackParameters
-        x-go-package: github.com/dhis2-sre/im-manager/pkg/model
     StackParameter:
         properties:
             consumed:
@@ -1406,218 +477,6 @@ definitions:
                 x-go-name: TokenType
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/token
-    Topology:
-        description: |-
-            This description is taken verbatim from the CSI Spec:
-
-            A topological domain is a sub-division of a cluster, like "region",
-            "zone", "rack", etc.
-            A topological segment is a specific instance of a topological domain,
-            like "zone3", "rack3", etc.
-            For example {"com.company/zone": "Z1", "com.company/rack": "R3"}
-            Valid keys have two segments: an OPTIONAL prefix and name, separated
-            by a slash (/), for example: "com.company.example/zone".
-            The key name segment is REQUIRED. The prefix is OPTIONAL.
-            The key name MUST be 63 characters or less, begin and end with an
-            alphanumeric character ([a-z0-9A-Z]), and contain only dashes (-),
-            underscores (_), dots (.), or alphanumerics in between, for example
-            "zone".
-            The key prefix MUST be 63 characters or less, begin and end with a
-            lower-case alphanumeric character ([a-z0-9]), contain only
-            dashes (-), dots (.), or lower-case alphanumerics in between, and
-            follow domain name notation format
-            (https://tools.ietf.org/html/rfc1035#section-2.3.1).
-            The key prefix SHOULD include the plugin's host company name and/or
-            the plugin name, to minimize the possibility of collisions with keys
-            from other plugins.
-            If a key prefix is specified, it MUST be identical across all
-            topology keys returned by the SP (across all RPCs).
-            Keys MUST be case-insensitive. Meaning the keys "Zone" and "zone"
-            MUST not both exist.
-            Each value (topological segment) MUST contain 1 or more strings.
-            Each string MUST be 63 characters or less and begin and end with an
-            alphanumeric character with '-', '_', '.', or alphanumerics in
-            between.
-        properties:
-            Segments:
-                additionalProperties:
-                    type: string
-                type: object
-        title: Topology is a map of topological domains to topological segments.
-        type: object
-        x-go-package: github.com/docker/docker/api/types/volume
-    TopologyRequirement:
-        description: |-
-            TopologyRequirement expresses the user's requirements for a volume's
-            accessible topology.
-        properties:
-            Preferred:
-                description: |-
-                    Preferred is a list of Topologies that the volume should attempt to be
-                    provisioned in.
-
-                    Taken from the CSI spec:
-
-                    Specifies the list of topologies the CO would prefer the volume to
-                    be provisioned in.
-
-                    This field is OPTIONAL. If TopologyRequirement is specified either
-                    requisite or preferred or both MUST be specified.
-
-                    An SP MUST attempt to make the provisioned volume available using
-                    the preferred topologies in order from first to last.
-
-                    If requisite is specified, all topologies in preferred list MUST
-                    also be present in the list of requisite topologies.
-
-                    If the SP is unable to to make the provisioned volume available
-                    from any of the preferred topologies, the SP MAY choose a topology
-                    from the list of requisite topologies.
-                    If the list of requisite topologies is not specified, then the SP
-                    MAY choose from the list of all possible topologies.
-                    If the list of requisite topologies is specified and the SP is
-                    unable to to make the provisioned volume available from any of the
-                    requisite topologies it MUST fail the CreateVolume call.
-
-                    Example 1:
-                    Given a volume should be accessible from a single zone, and
-                    requisite =
-                    {"region": "R1", "zone": "Z2"},
-                    {"region": "R1", "zone": "Z3"}
-                    preferred =
-                    {"region": "R1", "zone": "Z3"}
-                    then the the SP SHOULD first attempt to make the provisioned volume
-                    available from "zone" "Z3" in the "region" "R1" and fall back to
-                    "zone" "Z2" in the "region" "R1" if that is not possible.
-
-                    Example 2:
-                    Given a volume should be accessible from a single zone, and
-                    requisite =
-                    {"region": "R1", "zone": "Z2"},
-                    {"region": "R1", "zone": "Z3"},
-                    {"region": "R1", "zone": "Z4"},
-                    {"region": "R1", "zone": "Z5"}
-                    preferred =
-                    {"region": "R1", "zone": "Z4"},
-                    {"region": "R1", "zone": "Z2"}
-                    then the the SP SHOULD first attempt to make the provisioned volume
-                    accessible from "zone" "Z4" in the "region" "R1" and fall back to
-                    "zone" "Z2" in the "region" "R1" if that is not possible. If that
-                    is not possible, the SP may choose between either the "zone"
-                    "Z3" or "Z5" in the "region" "R1".
-
-                    Example 3:
-                    Given a volume should be accessible from TWO zones (because an
-                    opaque parameter in CreateVolumeRequest, for example, specifies
-                    the volume is accessible from two zones, aka synchronously
-                    replicated), and
-                    requisite =
-                    {"region": "R1", "zone": "Z2"},
-                    {"region": "R1", "zone": "Z3"},
-                    {"region": "R1", "zone": "Z4"},
-                    {"region": "R1", "zone": "Z5"}
-                    preferred =
-                    {"region": "R1", "zone": "Z5"},
-                    {"region": "R1", "zone": "Z3"}
-                    then the the SP SHOULD first attempt to make the provisioned volume
-                    accessible from the combination of the two "zones" "Z5" and "Z3" in
-                    the "region" "R1". If that's not possible, it should fall back to
-                    a combination of "Z5" and other possibilities from the list of
-                    requisite. If that's not possible, it should fall back  to a
-                    combination of "Z3" and other possibilities from the list of
-                    requisite. If that's not possible, it should fall back  to a
-                    combination of other possibilities from the list of requisite.
-                items:
-                    $ref: '#/definitions/Topology'
-                type: array
-            Requisite:
-                description: |-
-                    Requisite specifies a list of Topologies, at least one of which the
-                    volume must be accessible from.
-
-                    Taken verbatim from the CSI Spec:
-
-                    Specifies the list of topologies the provisioned volume MUST be
-                    accessible from.
-                    This field is OPTIONAL. If TopologyRequirement is specified either
-                    requisite or preferred or both MUST be specified.
-
-                    If requisite is specified, the provisioned volume MUST be
-                    accessible from at least one of the requisite topologies.
-
-                    Given
-                    x = number of topologies provisioned volume is accessible from
-                    n = number of requisite topologies
-                    The CO MUST ensure n >= 1. The SP MUST ensure x >= 1
-                    If x==n, then the SP MUST make the provisioned volume available to
-                    all topologies from the list of requisite topologies. If it is
-                    unable to do so, the SP MUST fail the CreateVolume call.
-                    For example, if a volume should be accessible from a single zone,
-                    and requisite =
-                    {"region": "R1", "zone": "Z2"}
-                    then the provisioned volume MUST be accessible from the "region"
-                    "R1" and the "zone" "Z2".
-                    Similarly, if a volume should be accessible from two zones, and
-                    requisite =
-                    {"region": "R1", "zone": "Z2"},
-                    {"region": "R1", "zone": "Z3"}
-                    then the provisioned volume MUST be accessible from the "region"
-                    "R1" and both "zone" "Z2" and "zone" "Z3".
-
-                    If x<n, then the SP SHALL choose x unique topologies from the list
-                    of requisite topologies. If it is unable to do so, the SP MUST fail
-                    the CreateVolume call.
-                    For example, if a volume should be accessible from a single zone,
-                    and requisite =
-                    {"region": "R1", "zone": "Z2"},
-                    {"region": "R1", "zone": "Z3"}
-                    then the SP may choose to make the provisioned volume available in
-                    either the "zone" "Z2" or the "zone" "Z3" in the "region" "R1".
-                    Similarly, if a volume should be accessible from two zones, and
-                    requisite =
-                    {"region": "R1", "zone": "Z2"},
-                    {"region": "R1", "zone": "Z3"},
-                    {"region": "R1", "zone": "Z4"}
-                    then the provisioned volume MUST be accessible from any combination
-                    of two unique topologies: e.g. "R1/Z2" and "R1/Z3", or "R1/Z2" and
-                    "R1/Z4", or "R1/Z3" and "R1/Z4".
-
-                    If x>n, then the SP MUST make the provisioned volume available from
-                    all topologies from the list of requisite topologies and MAY choose
-                    the remaining x-n unique topologies from the list of all possible
-                    topologies. If it is unable to do so, the SP MUST fail the
-                    CreateVolume call.
-                    For example, if a volume should be accessible from two zones, and
-                    requisite =
-                    {"region": "R1", "zone": "Z2"}
-                    then the provisioned volume MUST be accessible from the "region"
-                    "R1" and the "zone" "Z2" and the SP may select the second zone
-                    independently, e.g. "R1/Z4".
-                items:
-                    $ref: '#/definitions/Topology'
-                type: array
-        type: object
-        x-go-package: github.com/docker/docker/api/types/volume
-    TypeBlock:
-        description: Intentionally empty.
-        title: TypeBlock defines options for using a volume as a block-type volume.
-        type: object
-        x-go-package: github.com/docker/docker/api/types/volume
-    TypeMount:
-        description: |-
-            TypeMount contains options for using a volume as a Mount-type
-            volume.
-        properties:
-            FsType:
-                description: FsType specifies the filesystem type for the mount volume. Optional.
-                type: string
-            MountFlags:
-                description: MountFlags defines flags to pass when mounting the volume. Optional.
-                items:
-                    type: string
-                type: array
-        type: object
-        x-go-package: github.com/docker/docker/api/types/volume
     UpdateDatabaseRequest:
         properties:
             name:
@@ -1638,30 +497,6 @@ definitions:
                 x-go-name: TTL
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
-    UsageData:
-        description: |-
-            UsageData Usage details about the volume. This information is used by the
-            `GET /system/df` endpoint, and omitted in other endpoints.
-        properties:
-            RefCount:
-                description: |-
-                    The number of containers referencing this volume. This field
-                    is set to `-1` if the reference-count is not available.
-                format: int64
-                type: integer
-            Size:
-                description: |-
-                    Amount of disk space used by the volume (in bytes). This information
-                    is only available for volumes created with the `"local"` volume
-                    driver. For volumes created with other volume drivers, this field
-                    is set to `-1` ("not available")
-                format: int64
-                type: integer
-        required:
-            - RefCount
-            - Size
-        type: object
-        x-go-package: github.com/docker/docker/api/types/volume
     User:
         description: User domain object defining a user
         properties:
@@ -1695,89 +530,6 @@ definitions:
                 x-go-name: Validated
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/model
-    Version:
-        properties:
-            Index:
-                format: uint64
-                type: integer
-        title: Version represents the internal object version.
-        type: object
-        x-go-package: github.com/docker/docker/api/types/swarm
-    Volume:
-        description: Volume volume
-        properties:
-            ClusterVolume:
-                $ref: '#/definitions/ClusterVolume'
-            CreatedAt:
-                description: Date/Time the volume was created.
-                type: string
-            Driver:
-                description: Name of the volume driver used by the volume.
-                type: string
-            Labels:
-                additionalProperties:
-                    type: string
-                description: User-defined key/value metadata.
-                type: object
-            Mountpoint:
-                description: Mount path of the volume on the host.
-                type: string
-            Name:
-                description: Name of the volume.
-                type: string
-            Options:
-                additionalProperties:
-                    type: string
-                description: The driver specific options used when creating the volume.
-                type: object
-            Scope:
-                description: |-
-                    The level at which the volume exists. Either `global` for cluster-wide,
-                    or `local` for machine level.
-                type: string
-            Status:
-                additionalProperties: {}
-                description: |-
-                    Low-level details about the volume, provided by the volume driver.
-                    Details are returned as a map with key/value pairs:
-                    `{"key":"value","key2":"value2"}`.
-
-                    The `Status` field is optional, and is omitted if the volume driver
-                    does not support this feature.
-                type: object
-            UsageData:
-                $ref: '#/definitions/UsageData'
-        required:
-            - Driver
-            - Labels
-            - Mountpoint
-            - Name
-            - Options
-            - Scope
-        type: object
-        x-go-package: github.com/docker/docker/api/types/volume
-    WaitExitError:
-        description: WaitExitError container waiting error, if any
-        properties:
-            Message:
-                description: Details of an error
-                type: string
-        type: object
-        x-go-package: github.com/docker/docker/api/types/container
-    WaitResponse:
-        description: OK response to ContainerWait operation
-        properties:
-            Error:
-                $ref: '#/definitions/WaitExitError'
-            StatusCode:
-                description: Exit code of the container
-                format: int64
-                type: integer
-        required:
-            - StatusCode
-        title: WaitResponse ContainerWaitResponse
-        type: object
-        x-go-package: github.com/docker/docker/api/types/container
     parameter:
         properties:
             Value:
@@ -1844,11 +596,7 @@ paths:
             operationId: listDatabases
             responses:
                 "200":
-                    description: GroupsWithDatabases
-                    schema:
-                        items:
-                            $ref: '#/definitions/GroupsWithDatabases'
-                        type: array
+                    $ref: '#/responses/GroupsWithDatabases'
                 "401":
                     $ref: '#/responses/Error'
                 "403":
@@ -2288,9 +1036,7 @@ paths:
                   x-go-name: ID
             responses:
                 "200":
-                    description: Deployment
-                    schema:
-                        $ref: '#/definitions/Deployment'
+                    $ref: '#/responses/DeploymentInstance'
                 "401":
                     $ref: '#/responses/Error'
                 "403":
@@ -2321,9 +1067,7 @@ paths:
                     $ref: '#/definitions/SaveInstanceRequest'
             responses:
                 "200":
-                    description: DeploymentInstance
-                    schema:
-                        $ref: '#/definitions/DeploymentInstance'
+                    $ref: '#/responses/DeploymentInstance'
                 "401":
                     $ref: '#/responses/Error'
                 "403":
@@ -3017,7 +1761,7 @@ paths:
             operationId: stacks
             responses:
                 "200":
-                    $ref: '#/responses/StacksResponse'
+                    $ref: '#/responses/Stacks'
                 "401":
                     $ref: '#/responses/Error'
                 "403":
@@ -3041,7 +1785,7 @@ paths:
                   x-go-name: Name
             responses:
                 "200":
-                    $ref: '#/responses/StackResponse'
+                    $ref: '#/responses/Stack'
                 "401":
                     $ref: '#/responses/Error'
                 "403":
@@ -3237,6 +1981,10 @@ responses:
         description: ""
         schema:
             $ref: '#/definitions/Database'
+    DeploymentInstance:
+        description: ""
+        schema:
+            $ref: '#/definitions/DeploymentInstance'
     DownloadDatabaseResponse:
         description: ""
         schema:
@@ -3246,6 +1994,10 @@ responses:
             type: array
     Error:
         description: ""
+    GroupsWithDatabases:
+        description: ""
+        schema:
+            $ref: '#/definitions/GroupsWithDatabases'
     GroupsWithInstances:
         description: ""
         schema:
@@ -3262,15 +2014,15 @@ responses:
         description: ""
         schema:
             $ref: '#/definitions/Response'
-    StackResponse:
+    Stack:
         description: ""
         schema:
-            $ref: '#/definitions/StackDetail'
-    StacksResponse:
+            $ref: '#/definitions/Stack'
+    Stacks:
         description: ""
         schema:
             items:
-                $ref: '#/definitions/StackDetail'
+                $ref: '#/definitions/Stack'
             type: array
     Status:
         description: ""
@@ -3284,10 +2036,6 @@ responses:
             items:
                 $ref: '#/definitions/User'
             type: array
-    saveInstance:
-        description: ""
-        schema:
-            $ref: '#/definitions/DeploymentInstance'
 securityDefinitions:
     oauth2:
         flow: password

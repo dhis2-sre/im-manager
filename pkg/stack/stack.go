@@ -318,7 +318,7 @@ var whoamiGoDefaults = struct {
 	imageTag        string
 	replicaCount    string
 }{
-	chartVersion:    "0.9.0",
+	chartVersion:    "0.6.0",
 	imagePullPolicy: ifNotPresent,
 	imageRepository: "core",
 	imageTag:        "0.6.0",
