@@ -1971,8 +1971,6 @@ paths:
 produces:
     - application/json
 responses:
-    _:
-        description: ""
     CreateExternalDownloadResponse:
         description: ""
         schema:
