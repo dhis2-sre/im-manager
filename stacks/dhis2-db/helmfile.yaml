@@ -30,7 +30,7 @@ releases:
               value: {{ env "DATABASE_NAME" | default "dhis2" }}
 
           persistence:
-            size: {{ env "DATABASE_SIZE" | default "5Gi" }}
+            size: {{ env "DATABASE_SIZE" | default "20Gi" }}
 
           initdb:
             scripts:

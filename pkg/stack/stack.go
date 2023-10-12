@@ -169,7 +169,7 @@ var dhis2DBDefaults = struct {
 	chartVersion:            "12.6.2",
 	dbName:                  "dhis2",
 	dbPassword:              "dhis",
-	dbSize:                  "5Gi",
+	dbSize:                  "20Gi",
 	dbUsername:              "dhis",
 	dbVersion:               "13",
 	resourcesRequestsCPU:    "250m",
