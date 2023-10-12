@@ -2,7 +2,6 @@ package database
 
 import (
 	"errors"
-	"fmt"
 	"io"
 	"log"
 	"mime/multipart"
@@ -65,7 +64,7 @@ type stackService interface {
 type uploadDatabaseRequest struct {
 	Database *multipart.FileHeader `form:"database"`
 	Group    string                `form:"group"`
-	Prefix   string                `form:"prefix,omitempty"`
+	Name     string                `form:"name"`
 }
 
 // Upload database
@@ -100,10 +99,7 @@ func (h Handler) Upload(c *gin.Context) {
 		return
 	}
 
-	databaseName := file.Filename
-	if request.Prefix != "" {
-		databaseName = fmt.Sprintf("%s/%s", strings.Trim(request.Prefix, "/"), file.Filename)
-	}
+	databaseName := strings.Trim(request.Name, "/")
 
 	d := &model.Database{
 		Name:      databaseName,

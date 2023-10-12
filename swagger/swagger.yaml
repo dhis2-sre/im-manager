@@ -601,7 +601,7 @@ definitions:
                 $ref: '#/definitions/FileHeader'
             Group:
                 type: string
-            Prefix:
+            Name:
                 type: string
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/database

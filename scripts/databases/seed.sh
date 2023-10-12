@@ -7,19 +7,22 @@ shift
 VERSIONS=$*
 
 DHIS2_RELEASES_URL="https://releases.dhis2.org/v1/versions/stable.json"
+DB_DUMP_FORMAT='.sql.gz'
 
 function createDatabase() {
-  echo "Downloading database $1 ..."
+  local db_name=${1}${DB_DUMP_FORMAT}
+
+  echo "Downloading database $db_name ..."
 
   mkdir -p "$HOME/Downloads"
-  curl -C - "$2" -o "$HOME/Downloads/$1.sql.gz"
+  curl -C - "$2" -o "$HOME/Downloads/$db_name"
 
   echo "Login ..."
   rm .access_token_cache # to make sure we're not using an expired token if we're seeding a lot of databases
   source ./auth.sh
 
-  echo "Uploading database $1 ..."
-  ./upload.sh "$GROUP" "$HOME/Downloads/$1.sql.gz" sierra-leone
+  echo "Uploading database $db_name ..."
+  ./upload.sh "$GROUP" "sierra-leone/$db_name" "$HOME/Downloads/$db_name"
   echo # empty line to improve output readability
 }
 
@@ -35,7 +38,7 @@ if [[ -z "$*" ]]; then
 fi
 
 # shellcheck disable=SC2145
-echo "Seeding the following databases: ${VERSIONS[@]}"
+echo "Seeding the following database versions: ${VERSIONS[@]}"
 
 for VERSION in "${VERSIONS[@]}"; do
   createDatabase "$VERSION" "https://databases.dhis2.org/sierra-leone/$VERSION/dhis2-db-sierra-leone.sql.gz"
