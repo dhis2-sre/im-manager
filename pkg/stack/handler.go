@@ -64,6 +64,7 @@ func (h Handler) Find(c *gin.Context) {
 			Name:         name,
 			DefaultValue: parameter.DefaultValue,
 			Consumed:     parameter.Consumed,
+			Priority:     parameter.Priority,
 		})
 	}
 
@@ -75,6 +76,7 @@ type StackParameter struct {
 	Name         string  `json:"name"`
 	DefaultValue *string `json:"defaultValue,omitempty"`
 	Consumed     bool    `json:"consumed"`
+	Priority     uint    `json:"priority"`
 }
 
 // swagger:model Stack
