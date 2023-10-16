@@ -63,6 +63,8 @@ func TestDatabaseHandler(t *testing.T) {
 		w := multipart.NewWriter(&b)
 		err := w.WriteField("group", "packages")
 		require.NoError(t, err, "failed to write form field")
+		err = w.WriteField("name", "path/name.extension")
+		require.NoError(t, err, "failed to write form field")
 		f, err := w.CreateFormFile("database", "mydb")
 		require.NoError(t, err, "failed to create form file")
 		_, err = io.WriteString(f, "file contents")
@@ -74,10 +76,11 @@ func TestDatabaseHandler(t *testing.T) {
 		var actualDB model.Database
 		err = json.Unmarshal(body, &actualDB)
 		require.NoError(t, err, "POST /databases: failed to unmarshal HTTP response body")
-		require.Equal(t, "mydb", actualDB.Name)
+		require.Equal(t, "path/name.extension", actualDB.Name)
 		require.Equal(t, "packages", actualDB.GroupName)
+		require.Equal(t, "s3://database-bucket/packages/path/name.extension", actualDB.Url)
 
-		actualContent := s3.GetObject(t, s3Bucket, "packages/mydb")
+		actualContent := s3.GetObject(t, s3Bucket, "packages/path/name.extension")
 		require.Equalf(t, "file contents", string(actualContent), "DB in S3 should have expected content")
 
 		databaseID = strconv.FormatUint(uint64(actualDB.ID), 10)
@@ -87,7 +90,7 @@ func TestDatabaseHandler(t *testing.T) {
 		var actualDB model.Database
 		client.GetJSON(t, "/databases/"+databaseID, &actualDB)
 
-		assert.Equal(t, "mydb", actualDB.Name)
+		assert.Equal(t, "path/name.extension", actualDB.Name)
 		assert.Equal(t, "packages", actualDB.GroupName)
 	})
 
@@ -103,14 +106,14 @@ func TestDatabaseHandler(t *testing.T) {
 
 			var actualDB model.Database
 			client.PostJSON(t, "/databases/"+databaseID+"/copy", strings.NewReader(`{
-				"name":  "mydbcopy",
+				"name":  "path/copy.extension",
 				"group": "packages"
 			}`), &actualDB)
 
-			require.Equal(t, "mydbcopy", actualDB.Name)
+			require.Equal(t, "path/copy.extension", actualDB.Name)
 			require.Equal(t, "packages", actualDB.GroupName)
 
-			actualContent := s3.GetObject(t, s3Bucket, "packages/mydbcopy")
+			actualContent := s3.GetObject(t, s3Bucket, "packages/path/copy.extension")
 			require.Equalf(t, "file contents", string(actualContent), "DB in S3 should have expected content")
 		}
 
@@ -127,7 +130,7 @@ func TestDatabaseHandler(t *testing.T) {
 			for _, d := range groupDB.Databases {
 				names = append(names, d.Name)
 			}
-			assert.ElementsMatchf(t, []string{"mydb", "mydbcopy"}, names, "GET /databases failed: should return original and copied DB")
+			assert.ElementsMatchf(t, []string{"path/name.extension", "path/copy.extension"}, names, "GET /databases failed: should return original and copied DB")
 		}
 	})
 
@@ -138,7 +141,7 @@ func TestDatabaseHandler(t *testing.T) {
 
 		_, err = s3.Client.GetObject(context.TODO(), &awss3.GetObjectInput{
 			Bucket: aws.String(s3Bucket),
-			Key:    aws.String("packages/mydb"),
+			Key:    aws.String("packages/path/name.extension"),
 		})
 		var e *types.NoSuchKey
 		require.ErrorAsf(t, err, &e, "DELETE \"/databases/%s\" failed: DB should be deleted from S3", databaseID)

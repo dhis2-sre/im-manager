@@ -117,6 +117,8 @@ func TestInstanceHandler(t *testing.T) {
 		w := multipart.NewWriter(&b)
 		err := w.WriteField("group", "group-name")
 		require.NoError(t, err, "failed to write form field")
+		err = w.WriteField("name", "path/name.extension")
+		require.NoError(t, err, "failed to write form field")
 		f, err := w.CreateFormFile("database", "mydb")
 		require.NoError(t, err, "failed to create form file")
 		_, err = io.WriteString(f, "select now();")
@@ -128,7 +130,7 @@ func TestInstanceHandler(t *testing.T) {
 		var actualDB model.Database
 		err = json.Unmarshal(body, &actualDB)
 		require.NoError(t, err, "POST /databases: failed to unmarshal HTTP response body")
-		require.Equal(t, "mydb", actualDB.Name)
+		require.Equal(t, "path/name.extension", actualDB.Name)
 		require.Equal(t, "group-name", actualDB.GroupName)
 
 		databaseID = strconv.FormatUint(uint64(actualDB.ID), 10)
