@@ -7,22 +7,22 @@ shift
 VERSIONS=$*
 
 DHIS2_RELEASES_URL="https://releases.dhis2.org/v1/versions/stable.json"
-DB_DUMP_FORMAT='.sql.gz'
+FORMAT='.sql.gz'
 
 function createDatabase() {
-  local db_name=${1}${DB_DUMP_FORMAT}
+  local name=${1}${FORMAT}
 
-  echo "Downloading database $db_name ..."
+  echo "Downloading database $name ..."
 
   mkdir -p "$HOME/Downloads"
-  curl -C - "$2" -o "$HOME/Downloads/$db_name"
+  curl -C - "$2" -o "$HOME/Downloads/$name"
 
   echo "Login ..."
   rm .access_token_cache # to make sure we're not using an expired token if we're seeding a lot of databases
   source ./auth.sh
 
-  echo "Uploading database $db_name ..."
-  ./upload.sh "$GROUP" "sierra-leone/$db_name" "$HOME/Downloads/$db_name"
+  echo "Uploading database $name ..."
+  ./upload.sh "$GROUP" "sierra-leone/$name" "$HOME/Downloads/$name"
   echo # empty line to improve output readability
 }
 
