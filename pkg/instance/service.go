@@ -689,7 +689,8 @@ func (s service) GetStatus(instance *model.Instance) (InstanceStatus, error) {
 		return "", err
 	}
 
-	if pod.Status.Phase == v1.PodPending {
+	switch pod.Status.Phase {
+	case v1.PodPending:
 		// TODO: Should check init container here as well
 		containerErrorIndex := slices.IndexFunc(pod.Status.ContainerStatuses, func(status v1.ContainerStatus) bool {
 			return status.State.Waiting != nil && status.State.Waiting.Reason == "ImagePullBackOff"
@@ -700,13 +701,9 @@ func (s service) GetStatus(instance *model.Instance) (InstanceStatus, error) {
 		}
 
 		return Pending, nil
-	}
-
-	if pod.Status.Phase == v1.PodFailed {
+	case v1.PodFailed:
 		return Error, nil
-	}
-
-	if pod.Status.Phase == v1.PodRunning {
+	case v1.PodRunning:
 		booting := slices.ContainsFunc(pod.Status.Conditions, func(condition v1.PodCondition) bool {
 			return condition.Status == v1.ConditionFalse
 		})
@@ -733,7 +730,6 @@ func (s service) GetStatus(instance *model.Instance) (InstanceStatus, error) {
 		}
 		return Running, nil
 	}
-
 	return "", fmt.Errorf("somethings wrong")
 }
 
