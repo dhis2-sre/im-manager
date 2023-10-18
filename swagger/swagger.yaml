@@ -368,6 +368,9 @@ definitions:
                 x-go-name: Value
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/model
+    InstanceStatus:
+        type: string
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
     Lock:
         properties:
             databaseId:
@@ -1648,6 +1651,31 @@ paths:
             security:
                 - oauth2: []
             summary: Resume paused instance
+    /instances/{id}/status:
+        get:
+            description: Get instance status...
+            operationId: status
+            parameters:
+                - format: uint64
+                  in: path
+                  name: id
+                  required: true
+                  type: integer
+                  x-go-name: ID
+            responses:
+                "200":
+                    $ref: '#/responses/Status'
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Get instance status
     /integrations:
         post:
             description: Return integration for a given key
@@ -2001,6 +2029,10 @@ responses:
             items:
                 $ref: '#/definitions/Stack'
             type: array
+    Status:
+        description: ""
+        schema:
+            $ref: '#/definitions/InstanceStatus'
     Tokens:
         description: ""
         schema:

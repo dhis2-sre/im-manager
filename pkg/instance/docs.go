@@ -57,7 +57,7 @@ type _ struct {
 	Selector string `json:"selector"`
 }
 
-// swagger:parameters deleteInstance findById findByIdDecrypted saveInstance pauseInstance resumeInstance resetInstance findDeploymentById deployDeployment deleteDeployment
+// swagger:parameters deleteInstance findById findByIdDecrypted saveInstance pauseInstance resumeInstance resetInstance findDeploymentById deployDeployment deleteDeployment status
 type _ struct {
 	// in: path
 	// required: true
@@ -80,6 +80,12 @@ type _ struct {
 	_ string
 }
 
+// swagger:response Status
+type _ struct {
+	// in: body
+	_ InstanceStatus
+}
+
 // swagger:parameters instanceNameToId
 type _ struct {
 	// in: path
@@ -91,8 +97,8 @@ type _ struct {
 	InstanceName string `json:"instanceName"`
 }
 
-// swagger:response
-type Error struct {
+// swagger:response Error
+type _ struct {
 	// The error message
 	// in: body
 	Message string

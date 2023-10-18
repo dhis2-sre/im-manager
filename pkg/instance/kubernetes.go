@@ -10,6 +10,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/dhis2-sre/im-manager/internal/errdef"
+
 	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/dhis2-sre/im-manager/pkg/model"
@@ -158,7 +160,7 @@ func (ks kubernetesService) getPod(instance *model.Instance, typeSelector string
 	}
 
 	if len(pods.Items) == 0 {
-		return v1.Pod{}, fmt.Errorf("no pod found using the selector: %q", selector)
+		return v1.Pod{}, errdef.NewNotFound("failed to find pod using the selector: %q", selector)
 	}
 	if len(pods.Items) > 1 {
 		return v1.Pod{}, fmt.Errorf("multiple pods found using the selector: %q", selector)
