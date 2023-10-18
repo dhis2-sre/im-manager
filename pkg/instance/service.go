@@ -736,7 +736,7 @@ func (s service) GetStatus(instance *model.Instance) (InstanceStatus, error) {
 		}
 		return Running, nil
 	}
-	return "", fmt.Errorf("unable to get instance status")
+	return "", fmt.Errorf("failed to get instance status")
 }
 
 func (s service) FindPublicInstances() ([]GroupsWithInstances, error) {
