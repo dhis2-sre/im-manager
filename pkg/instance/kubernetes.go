@@ -10,6 +10,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/dhis2-sre/im-manager/internal/errdef"
+
 	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/dhis2-sre/im-manager/pkg/model"
@@ -154,7 +156,7 @@ func (ks kubernetesService) getPod(instance *model.Instance, typeSelector string
 
 	pods, err := ks.client.CoreV1().Pods("").List(context.TODO(), listOptions)
 	if err != nil {
-		return v1.Pod{}, fmt.Errorf("error getting pod for instance %d and selector %q: %v", instance.ID, selector, err)
+		return v1.Pod{}, errdef.NewNotFound("error getting pod for instance %d and selector %q: %v", instance.ID, selector, err)
 	}
 
 	if len(pods.Items) == 0 {

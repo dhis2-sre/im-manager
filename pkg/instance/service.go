@@ -7,7 +7,6 @@ import (
 	"log"
 	"os/exec"
 	"slices"
-	"strings"
 
 	v1 "k8s.io/api/core/v1"
 
@@ -683,7 +682,7 @@ func (s service) GetStatus(instance *model.Instance) (InstanceStatus, error) {
 
 	pod, err := ks.getPod(instance, "")
 	if err != nil {
-		if strings.HasPrefix(err.Error(), "no pod found using the selector: ") {
+		if errdef.IsNotFound(err) {
 			return NotDeployed, nil
 		}
 		return "", err
@@ -699,7 +698,6 @@ func (s service) GetStatus(instance *model.Instance) (InstanceStatus, error) {
 			status := pod.Status.ContainerStatuses[containerErrorIndex]
 			return InstanceStatus(string(Error) + ": " + status.State.Waiting.Message), nil
 		}
-
 		return Pending, nil
 	case v1.PodFailed:
 		return Error, nil
