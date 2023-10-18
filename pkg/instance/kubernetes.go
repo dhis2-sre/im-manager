@@ -4,12 +4,13 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/dhis2-sre/im-manager/internal/errdef"
 	"io"
 	"os"
 	"os/exec"
 	"strings"
 	"time"
+
+	"github.com/dhis2-sre/im-manager/internal/errdef"
 
 	"k8s.io/apimachinery/pkg/types"
 
