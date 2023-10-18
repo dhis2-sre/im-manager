@@ -4,13 +4,12 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/dhis2-sre/im-manager/internal/errdef"
 	"io"
 	"os"
 	"os/exec"
 	"strings"
 	"time"
-
-	"github.com/dhis2-sre/im-manager/internal/errdef"
 
 	"k8s.io/apimachinery/pkg/types"
 
@@ -156,11 +155,11 @@ func (ks kubernetesService) getPod(instance *model.Instance, typeSelector string
 
 	pods, err := ks.client.CoreV1().Pods("").List(context.TODO(), listOptions)
 	if err != nil {
-		return v1.Pod{}, errdef.NewNotFound("error getting pod for instance %d and selector %q: %v", instance.ID, selector, err)
+		return v1.Pod{}, fmt.Errorf("error getting pod for instance %d and selector %q: %v", instance.ID, selector, err)
 	}
 
 	if len(pods.Items) == 0 {
-		return v1.Pod{}, fmt.Errorf("no pod found using the selector: %q", selector)
+		return v1.Pod{}, errdef.NewNotFound("no pod found using the selector: %q", selector)
 	}
 	if len(pods.Items) > 1 {
 		return v1.Pod{}, fmt.Errorf("multiple pods found using the selector: %q", selector)
