@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"path"
 	"strconv"
+	"strings"
 
 	"github.com/dhis2-sre/im-manager/internal/errdef"
 
@@ -60,6 +61,12 @@ type stackService interface {
 	Find(name string) (*model.Stack, error)
 }
 
+type uploadDatabaseRequest struct {
+	Database *multipart.FileHeader `form:"database"`
+	Group    string                `form:"group"`
+	Name     string                `form:"name"`
+}
+
 // Upload database
 func (h Handler) Upload(c *gin.Context) {
 	// swagger:route POST /databases uploadDatabase
@@ -77,24 +84,29 @@ func (h Handler) Upload(c *gin.Context) {
 	//	403: Error
 	//	404: Error
 	//	415: Error
-	file, err := c.FormFile("database")
-	if err != nil {
+
+	var request uploadDatabaseRequest
+	if err := handler.DataBinder(c, &request); err != nil {
 		_ = c.Error(err)
 		return
 	}
 
-	groupName := c.PostForm("group")
+	file := request.Database
+
+	groupName := request.Group
 	if groupName == "" {
 		_ = c.Error(errors.New("group name not found"))
 		return
 	}
 
+	databaseName := strings.Trim(request.Name, "/")
+
 	d := &model.Database{
-		Name:      file.Filename,
+		Name:      databaseName,
 		GroupName: groupName,
 	}
 
-	err = h.canAccess(c, d)
+	err := h.canAccess(c, d)
 	if err != nil {
 		_ = c.Error(err)
 		return
