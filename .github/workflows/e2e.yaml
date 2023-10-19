@@ -2,9 +2,7 @@ name: e2e tests
 
 on:
   push:
-    branches: [master]
-# TODO: This might run on a PR but it's not running against the PR. In order for this to work, we need the PR running the cluster
-#  pull_request:
+    branches: [ master ]
   workflow_dispatch:
 
 jobs:
@@ -38,3 +36,15 @@ jobs:
           PASSWORD: ${{ secrets.CI_TEST_USER_PASSWORD }}
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+  send-slack-message:
+    runs-on: ubuntu-latest
+    if: always() && contains(needs.*.result, 'failure') && github.ref == 'refs/heads/master'
+    needs: [ e2e ]
+    steps:
+      - uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+          SLACK_CHANNEL: 'team-backend'
+          SLACK_MESSAGE: "Latest test run on master failed and needs investigation :detective-duck:. \n Commit message: ${{ github.event.head_commit.message }}"
+          SLACK_COLOR: '#ff0000'
