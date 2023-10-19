@@ -17,7 +17,7 @@ releases:
           path: /{{ requiredEnv "INSTANCE_NAME" }}
           certIssuer: cert-issuer-prod
           annotations:
-            nginx.ingress.kubernetes.io/proxy-body-size: 8m
+            nginx.ingress.kubernetes.io/proxy-body-size: 128m
       - dhis2Home: "{{ env "DHIS2_HOME" | default "/opt/dhis2" }}"
       - catalinaOpts: "-Dcontext.path=/{{ requiredEnv "INSTANCE_NAME" }}"
       - javaOpts: "{{ env "JAVA_OPTS" | default "" }}"
