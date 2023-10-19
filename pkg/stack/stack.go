@@ -320,7 +320,7 @@ var whoamiGoDefaults = struct {
 }{
 	chartVersion:    "0.9.0",
 	imagePullPolicy: ifNotPresent,
-	imageRepository: "core",
+	imageRepository: "whoami-go",
 	imageTag:        "0.6.0",
 	replicaCount:    "1",
 }

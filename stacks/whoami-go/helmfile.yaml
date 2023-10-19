@@ -1,12 +1,12 @@
 releases:
   - name: "{{ requiredEnv "INSTANCE_NAME" }}"
     namespace: "{{ requiredEnv "INSTANCE_NAMESPACE" }}"
-    chart: tons/whoami-go
+    chart: dhis2-whoami-go/whoami-go
     version: "{{ env "CHART_VERSION" | default "0.9.0" }}"
     values:
       - replicaCount: {{ env "REPLICA_COUNT" | default "1" }}
       - image:
-          #repository: tons/{{ env "IMAGE_REPOSITORY" | default "core" }}
+          repository: dhis2/{{ env "IMAGE_REPOSITORY" | default "whoami-go" }}
           tag: "{{ env "IMAGE_TAG" | default "0.6.0" }}"
           pullPolicy: {{ env "IMAGE_PULL_POLICY" | default "IfNotPresent" }}
       - ingress:
@@ -23,5 +23,5 @@ releases:
           im-ttl: "{{ requiredEnv "INSTANCE_TTL" }}"
 
 repositories:
-  - name: tons
+  - name: dhis2-whoami-go
     url: https://dhis2-sre.github.io/whoami-go
