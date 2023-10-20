@@ -55,4 +55,7 @@ swagger-spec:
 
 swagger: swagger-clean swagger-spec
 
+change-log:
+	git-chglog -o CHANGELOG.md
+
 .PHONY: keys init check smoke-test docker-image push-docker-image dev cluster-dev test test-coverage clean-dev clean-cluster-dev swagger-clean swagger-spec swagger
