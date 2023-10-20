@@ -19,6 +19,10 @@ init:
 	go install github.com/go-swagger/go-swagger/cmd/swagger@latest
 	swagger version
 
+	go install github.com/git-chglog/git-chglog/cmd/git-chglog@latest
+	# Print version once it works... Currently just prints the change log to stdout
+	#git-chglog --version
+
 check:
 	pre-commit run --all-files --show-diff-on-failure
 
