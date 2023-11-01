@@ -5,7 +5,7 @@ go 1.21
 require (
 	github.com/anthhub/forwarder v1.1.0
 	github.com/aws/aws-sdk-go v1.46.7
-	github.com/aws/aws-sdk-go-v2 v1.22.0
+	github.com/aws/aws-sdk-go-v2 v1.22.1
 	github.com/aws/aws-sdk-go-v2/config v1.20.0
 	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.11.92
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.40.2
