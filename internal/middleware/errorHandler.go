@@ -34,6 +34,8 @@ func ErrorHandler() gin.HandlerFunc {
 			c.String(http.StatusNotFound, err.Error())
 		} else if errdef.IsUnauthorized(err) {
 			c.String(http.StatusUnauthorized, err.Error())
+		} else if errdef.IsConflict(err) {
+			c.String(http.StatusConflict, err.Error())
 		} else {
 			id := uuid.New()
 			log.Printf("unhandled error: %q, log id: %s\n", err, id)

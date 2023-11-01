@@ -61,3 +61,16 @@ func IsNotFound(err error) bool {
 	var e notFound
 	return errors.As(err, &e)
 }
+
+// NewConflict creates an error representing a conflicting state.
+func NewConflict(format string, a ...any) error {
+	return conflict{fmt.Errorf(format, a...)}
+}
+
+type conflict struct{ error }
+
+// IsConflict returns true if err is an error representing a conflict and false otherwise.
+func IsConflict(err error) bool {
+	var e conflict
+	return errors.As(err, &e)
+}
