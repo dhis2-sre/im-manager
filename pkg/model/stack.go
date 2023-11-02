@@ -10,7 +10,7 @@ type Stack struct {
 	// ParameterProviders provide parameters to other stacks.
 	ParameterProviders ParameterProviders `json:"-"`
 	// Requires these stacks to deploy an instance of this stack.
-	Requires []Stack `json:"-"`
+	Requires []Stack `json:"requires"`
 }
 
 // swagger:model StackDetailParameters
