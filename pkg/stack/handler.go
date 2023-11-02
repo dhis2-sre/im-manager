@@ -59,6 +59,15 @@ func (h Handler) Find(c *gin.Context) {
 	// TODO: Remove this and just return the stack once the front end has caught up
 	s := Stack{}
 	s.Name = stack.Name
+
+	requires := make([]Stack, len(stack.Requires))
+	for i, require := range stack.Requires {
+		requires[i] = Stack{
+			Name: require.Name,
+		}
+	}
+	s.Requires = requires
+
 	for name, parameter := range stack.Parameters {
 		s.Parameters = append(s.Parameters, StackParameter{
 			Name:         name,
@@ -82,7 +91,8 @@ type StackParameter struct {
 // swagger:model Stack
 type Stack struct {
 	Name       string           `json:"name"`
-	Parameters []StackParameter `json:"parameters"`
+	Parameters []StackParameter `json:"parameters,omitempty"`
+	Requires   []Stack          `json:"requires,omitempty"`
 }
 
 // FindAll stack
