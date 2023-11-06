@@ -163,7 +163,7 @@ func (ks kubernetesService) getPod(instance *model.Instance, typeSelector string
 		return v1.Pod{}, errdef.NewNotFound("failed to find pod using the selector: %q", selector)
 	}
 	if len(pods.Items) > 1 {
-		return v1.Pod{}, fmt.Errorf("multiple pods found using the selector: %q", selector)
+		return v1.Pod{}, errdef.NewConflict("multiple pods found using the selector: %q", selector)
 	}
 
 	return pods.Items[0], nil

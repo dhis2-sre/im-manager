@@ -1704,6 +1704,8 @@ paths:
                     $ref: '#/responses/Error'
                 "404":
                     $ref: '#/responses/Error'
+                "409":
+                    $ref: '#/responses/Error'
                 "415":
                     $ref: '#/responses/Error'
             security:
