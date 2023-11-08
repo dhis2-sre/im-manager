@@ -1,9 +1,10 @@
 package instance
 
 import (
+	"testing"
+
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func TestGroupWithInstances_Order(t *testing.T) {
