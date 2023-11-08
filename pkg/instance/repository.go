@@ -292,7 +292,7 @@ func groupWithInstances(instancesMap map[string][]*model.Instance, groupMap map[
 	}
 
 	slices.SortFunc(groupWithInstances, func(a, b GroupsWithInstances) bool {
-		return a.Name > b.Name
+		return a.Name < b.Name
 	})
 
 	return groupWithInstances
