@@ -29,7 +29,7 @@ deploy:
         createNamespace: true
         remoteChart: rabbitmq
         repo: https://charts.bitnami.com/bitnami
-        version: 10.3.9
+        version: 12.2.5
         useHelmSecrets: true
         valuesFiles:
           - helm/data/secrets/{{ .CLASSIFICATION }}/rabbitmq.yaml
@@ -39,7 +39,7 @@ deploy:
         createNamespace: true
         remoteChart: redis
         repo: https://charts.bitnami.com/bitnami
-        version: 17.6.0
+        version: 18.2.1
         setValues:
           architecture: standalone
           auth:
