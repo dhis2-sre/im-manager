@@ -1,6 +1,6 @@
 module github.com/dhis2-sre/im-manager
 
-go 1.21.4
+go 1.21
 
 require (
 	github.com/anthhub/forwarder v1.1.0
