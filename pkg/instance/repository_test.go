@@ -26,4 +26,5 @@ func TestGroupWithInstances_Order(t *testing.T) {
 		{Name: "b", Instances: []*model.Instance{instancesB}},
 	}
 	assert.Equal(t, expected, actual)
+
 }
