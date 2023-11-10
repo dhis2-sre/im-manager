@@ -143,3 +143,10 @@ profiles:
           name: im-group-design
           namespace: design
           <<: [ *im-group-chart-config, *im-group-prod-service-account-config ]
+
+      - op: add
+        path: /deploy/helm/releases/-
+        value:
+          name: im-group-research
+          namespace: research
+          <<: [ *im-group-chart-config, *im-group-prod-service-account-config ]
