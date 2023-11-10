@@ -1,13 +1,14 @@
 package instance
 
 import (
+	"cmp"
 	"errors"
 	"fmt"
+	"slices"
 
 	"github.com/dhis2-sre/im-manager/internal/errdef"
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	"golang.org/x/exp/maps"
-	"golang.org/x/exp/slices"
 	"gorm.io/gorm"
 )
 
@@ -291,8 +292,8 @@ func groupWithInstances(instancesMap map[string][]*model.Instance, groupMap map[
 		})
 	}
 
-	slices.SortFunc(groupWithInstances, func(a, b GroupsWithInstances) bool {
-		return a.Name < b.Name
+	slices.SortFunc(groupWithInstances, func(a, b GroupsWithInstances) int {
+		return cmp.Compare(a.Name, b.Name)
 	})
 
 	return groupWithInstances
