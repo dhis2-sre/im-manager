@@ -231,7 +231,7 @@ var dhis2CoreDefaults = struct {
 	livenessProbeTimeoutSeconds:  "1",
 	readinessProbeTimeoutSeconds: "1",
 	resourcesRequestsCPU:         "250m",
-	resourcesRequestsMemory:      "256Mi",
+	resourcesRequestsMemory:      "1500Mi",
 	startupProbeFailureThreshold: "26",
 	startupProbePeriodSeconds:    "5",
 }
