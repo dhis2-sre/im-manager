@@ -11,10 +11,11 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
+
 	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
 	awss3 "github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
-	"github.com/aws/aws-sdk-go/aws"
 	"github.com/dhis2-sre/im-manager/pkg/database"
 	"github.com/dhis2-sre/im-manager/pkg/inttest"
 	"github.com/dhis2-sre/im-manager/pkg/model"
