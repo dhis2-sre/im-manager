@@ -12,7 +12,7 @@ func DataBinder(c *gin.Context, req interface{}) error {
 	}
 
 	if err := c.ShouldBind(req); err != nil {
-		return err
+		return errdef.NewBadRequest("unable to parse request body: %v", err)
 	}
 
 	return nil
