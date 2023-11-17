@@ -59,7 +59,7 @@ releases:
       - resources:
           requests:
             cpu: {{ env "RESOURCES_REQUESTS_CPU" | default "250m" }}
-            memory: {{ env "RESOURCES_REQUESTS_MEMORY" | default "256Mi" }}
+            memory: {{ env "RESOURCES_REQUESTS_MEMORY" | default "1500Mi" }}
 
 repositories:
   - name: dhis2

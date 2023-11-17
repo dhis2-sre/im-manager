@@ -64,7 +64,7 @@ releases:
       - resources:
           requests:
             cpu: {{ env "CORE_RESOURCES_REQUESTS_CPU" | default "250m" }}
-            memory: {{ env "CORE_RESOURCES_REQUESTS_MEMORY" | default "256Mi" }}
+            memory: {{ env "CORE_RESOURCES_REQUESTS_MEMORY" | default "1500Mi" }}
 
   - name: {{ requiredEnv "INSTANCE_NAME" }}-database
     namespace: "{{ requiredEnv "INSTANCE_NAMESPACE" }}"
