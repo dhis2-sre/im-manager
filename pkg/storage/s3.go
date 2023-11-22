@@ -104,7 +104,7 @@ func (s S3Client) Download(bucket string, key string, dst io.Writer, cb func(con
 		return fmt.Errorf("error downloading object from bucket %q using key %q: %s", bucket, key, err)
 	}
 
-	cb(object.ContentLength)
+	cb(*object.ContentLength)
 
 	_, err = io.Copy(dst, object.Body)
 
