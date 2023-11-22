@@ -1,8 +1,8 @@
 package database
 
 import (
-	"github.com/getsops/sops/v3/cmd/sops/formats"
-	"github.com/getsops/sops/v3/decrypt"
+	"go.mozilla.org/sops/v3/cmd/sops/formats"
+	"go.mozilla.org/sops/v3/decrypt"
 )
 
 func decryptYaml(data []byte) ([]byte, error) {
