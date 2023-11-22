@@ -111,6 +111,7 @@ type stackParameters map[string]string
 func (h helmfileService) loadStackParameters(stackName string) (stackParameters, error) {
 	//goland:noinspection GoImportUsedAsName
 	path := fmt.Sprintf("%s/%s/parameters/%s.yaml", h.stackFolder, stackName, h.classification)
+	log.Println("path: ", path)
 	data, err := os.ReadFile(path) // #nosec
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
