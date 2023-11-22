@@ -14,6 +14,8 @@ import (
 	"testing"
 	"time"
 
+	"go.mozilla.org/sops/v3"
+
 	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
 	"github.com/dhis2-sre/im-manager/pkg/database"
 	"github.com/dhis2-sre/im-manager/pkg/storage"
