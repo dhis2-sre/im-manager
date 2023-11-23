@@ -12,11 +12,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/yaml"
 
 	"github.com/dhis2-sre/im-manager/pkg/model"
-	"github.com/dhis2-sre/im-manager/pkg/stack"
 )
 
 //goland:noinspection GoExportedFuncWithUnexportedType
-func NewHelmfileService(stackFolder string, stackService stack.Service, classification string) helmfileService {
+func NewHelmfileService(stackFolder string, stackService stackService, classification string) helmfileService {
 	return helmfileService{
 		stackFolder:    stackFolder,
 		stackService:   stackService,
@@ -26,7 +25,7 @@ func NewHelmfileService(stackFolder string, stackService stack.Service, classifi
 
 type helmfileService struct {
 	stackFolder    string
-	stackService   stack.Service
+	stackService   stackService
 	classification string
 }
 
