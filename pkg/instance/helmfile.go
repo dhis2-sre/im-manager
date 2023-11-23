@@ -16,11 +16,7 @@ import (
 
 //goland:noinspection GoExportedFuncWithUnexportedType
 func NewHelmfileService(stackFolder string, stackService stackService, classification string) helmfileService {
-	return helmfileService{
-		stackFolder:    stackFolder,
-		stackService:   stackService,
-		classification: classification,
-	}
+	return helmfileService{stackFolder, stackService, classification}
 }
 
 type helmfileService struct {
