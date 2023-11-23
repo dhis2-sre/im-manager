@@ -7,7 +7,7 @@ source ./auth.sh
 DEPLOYMENT_ID=$1
 STACK_NAME=dhis2-db
 
-DATABASE_ID=${DATABASE_ID:-whoami-sierra-leone-2-40-0-sql-gz}
+DATABASE_ID=${DATABASE_ID:-test-dbs-sierra-leone-2-40-2-sql-gz}
 DATABASE_SIZE=${DATABASE_SIZE:-20Gi}
 
 echo "{

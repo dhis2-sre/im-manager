@@ -226,7 +226,7 @@ var dhis2CoreDefaults = struct {
 	flywayRepairBeforeMigration:  "false",
 	imagePullPolicy:              ifNotPresent,
 	imageRepository:              "core",
-	imageTag:                     "2.40.0",
+	imageTag:                     "2.40.2",
 	javaOpts:                     "",
 	livenessProbeTimeoutSeconds:  "1",
 	readinessProbeTimeoutSeconds: "1",
