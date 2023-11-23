@@ -7,6 +7,9 @@ GROUP=whoami
 INSTANCE_PREFIX=im-e2e
 INSTANCE_POSTFIX=$(tr -dc '[:lower:]' </dev/urandom | head -c 5; echo '')
 
+# Use whoami group DB slug, as tests are targeting the dev environment.
+export DATABASE_ID=whoami-sierra-leone-2-40-2-sql-gz
+
 function cleanup_handler {
   # shellcheck disable=SC2046
   ./destroy.sh whoami $(./list.sh | jq -r '.[].instances[]?.name' | grep $INSTANCE_PREFIX | grep "$INSTANCE_POSTFIX")
