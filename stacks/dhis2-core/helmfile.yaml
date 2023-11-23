@@ -9,7 +9,7 @@ releases:
     values:
       - image:
           repository: dhis2/{{ env "IMAGE_REPOSITORY" | default "core" }}
-          tag: "{{ env "IMAGE_TAG" | default "2.40.0" }}"
+          tag: "{{ env "IMAGE_TAG" | default "2.40.2" }}"
           pullPolicy: {{ env "IMAGE_PULL_POLICY" | default "IfNotPresent" }}
       - ingress:
           enabled: true
