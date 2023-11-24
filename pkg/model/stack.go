@@ -25,8 +25,8 @@ type StackParameter struct {
 	Consumed bool `json:"consumed"`
 	// Validator ensures that the actual stack parameters are valid according to its rules.
 	Validator func(value string) error `json:"-"`
-	// Priority determines the order in which the parameter is shown
-	Priority uint
+	// Priority determines the order in which the parameter is shown.
+	Priority uint `json:"priority"`
 }
 
 type ParameterProviders map[string]ParameterProvider
