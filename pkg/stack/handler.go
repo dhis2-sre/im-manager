@@ -68,9 +68,9 @@ func (h Handler) Find(c *gin.Context) {
 	}
 	s.Requires = requires
 
-	for name, parameter := range stack.Parameters {
+	for _, parameter := range stack.Parameters {
 		s.Parameters = append(s.Parameters, StackParameter{
-			Name:         name,
+			Name:         parameter.Name,
 			DefaultValue: parameter.DefaultValue,
 			Consumed:     parameter.Consumed,
 			Priority:     parameter.Priority,
