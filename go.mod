@@ -11,7 +11,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.44.0
 	github.com/dhis2-sre/rabbitmq v0.3.1-0.20231106051247-d45d1d39d012
 	github.com/dominikbraun/graph v0.23.0
-	github.com/gin-contrib/cors v1.4.0
+	github.com/gin-contrib/cors v1.5.0
 	github.com/gin-gonic/gin v1.9.1
 	github.com/go-mail/mail v2.3.1+incompatible
 	github.com/go-openapi/runtime v0.26.0
