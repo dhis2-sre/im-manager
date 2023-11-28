@@ -140,7 +140,7 @@ var DHIS2DB = model.Stack{
 	HostnamePattern: "%s-database-postgresql.%s.svc",
 	Name:            "dhis2-db",
 	Parameters: model.StackParameters{
-		"DATABASE_ID":               {Priority: 1, Name: "Database ID"},
+		"DATABASE_ID":               {Priority: 1, Name: "Database"},
 		"DATABASE_SIZE":             {Priority: 2, Name: "Database Size", DefaultValue: &dhis2DBDefaults.dbSize},
 		"DATABASE_NAME":             {Priority: 3, Name: "Database Name", DefaultValue: &dhis2DBDefaults.dbName},
 		"DATABASE_PASSWORD":         {Priority: 4, Name: "Database Password", DefaultValue: &dhis2DBDefaults.dbPassword},
@@ -176,7 +176,6 @@ var dhis2DBDefaults = struct {
 	resourcesRequestsMemory: "256Mi",
 }
 
-// TODO Use DHIS2Core stack in DHIS2 stack to eliminate having to list same parameters twice
 // Stack representing ../../stacks/dhis2-core/helmfile.yaml
 var DHIS2Core = model.Stack{
 	Name: "dhis2-core",
@@ -184,7 +183,7 @@ var DHIS2Core = model.Stack{
 		"IMAGE_TAG":                       {Priority: 1, Name: "Image Tag", DefaultValue: &dhis2CoreDefaults.imageTag},
 		"IMAGE_REPOSITORY":                {Priority: 2, Name: "Image Repository", DefaultValue: &dhis2CoreDefaults.imageRepository},
 		"IMAGE_PULL_POLICY":               {Priority: 3, Name: "Image Pull Policy", DefaultValue: &dhis2CoreDefaults.imagePullPolicy, Validator: imagePullPolicy},
-		"DHIS2_HOME":                      {Priority: 4, Name: "DHIS2 Home", DefaultValue: &dhis2CoreDefaults.dhis2Home},
+		"DHIS2_HOME":                      {Priority: 4, Name: "DHIS2 Home Directory", DefaultValue: &dhis2CoreDefaults.dhis2Home},
 		"FLYWAY_MIGRATE_OUT_OF_ORDER":     {Priority: 5, Name: "Flyway Migrate Out Of Order", DefaultValue: &dhis2CoreDefaults.flywayMigrateOutOfOrder},
 		"FLYWAY_REPAIR_BEFORE_MIGRATION":  {Priority: 6, Name: "Flyway Repair Before Migration", DefaultValue: &dhis2CoreDefaults.flywayRepairBeforeMigration},
 		"RESOURCES_REQUESTS_CPU":          {Priority: 7, Name: "Resources Requests CPU", DefaultValue: &dhis2CoreDefaults.resourcesRequestsCPU},
@@ -246,14 +245,14 @@ var DHIS2 = model.Stack{
 		"IMAGE_TAG":                       {Priority: 1, Name: "Image Tag", DefaultValue: &dhis2CoreDefaults.imageTag},
 		"IMAGE_REPOSITORY":                {Priority: 2, Name: "Image Repository", DefaultValue: &dhis2CoreDefaults.imageRepository},
 		"IMAGE_PULL_POLICY":               {Priority: 3, Name: "Image Pull Policy", DefaultValue: &dhis2CoreDefaults.imagePullPolicy, Validator: imagePullPolicy},
-		"DATABASE_ID":                     {Priority: 4, Name: "Database ID"},
+		"DATABASE_ID":                     {Priority: 4, Name: "Database"},
 		"DATABASE_NAME":                   {Priority: 5, Name: "Database Name", DefaultValue: &dhis2DBDefaults.dbName},
 		"DATABASE_PASSWORD":               {Priority: 6, Name: "Database Password", DefaultValue: &dhis2DBDefaults.dbPassword},
 		"DATABASE_SIZE":                   {Priority: 7, Name: "Database Size", DefaultValue: &dhis2DBDefaults.dbSize},
 		"DATABASE_USERNAME":               {Priority: 8, Name: "Database Username", DefaultValue: &dhis2DBDefaults.dbUsername},
 		"DATABASE_VERSION":                {Priority: 9, Name: "Database Version", DefaultValue: &dhis2DBDefaults.dbVersion},
 		"INSTALL_REDIS":                   {Priority: 10, Name: "Install Redis", DefaultValue: &dhis2Defaults.installRedis},
-		"DHIS2_HOME":                      {Priority: 11, Name: "DHIS2 Home", DefaultValue: &dhis2CoreDefaults.dhis2Home},
+		"DHIS2_HOME":                      {Priority: 11, Name: "DHIS2 Home Directory", DefaultValue: &dhis2CoreDefaults.dhis2Home},
 		"FLYWAY_MIGRATE_OUT_OF_ORDER":     {Priority: 12, Name: "Flyway Migrate Out Of Order", DefaultValue: &dhis2CoreDefaults.flywayMigrateOutOfOrder},
 		"FLYWAY_REPAIR_BEFORE_MIGRATION":  {Priority: 13, Name: "Flyway Repair Before Migration", DefaultValue: &dhis2CoreDefaults.flywayRepairBeforeMigration},
 		"CORE_RESOURCES_REQUESTS_CPU":     {Priority: 14, Name: "Core Resources Requests CPU", DefaultValue: &dhis2CoreDefaults.resourcesRequestsCPU},
