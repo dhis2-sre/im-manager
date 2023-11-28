@@ -18,7 +18,7 @@ type StackParameters map[string]StackParameter
 
 // swagger:model StackDetailParameter
 type StackParameter struct {
-	// Name is the user friendly name of the parameter.
+	// Name is the user-friendly name of the parameter.
 	Name         string  `json:"name"`
 	DefaultValue *string `json:"defaultValue,omitempty"`
 	// Consumed signals that this parameter is provided by another stack i.e. one of the stacks required stacks.

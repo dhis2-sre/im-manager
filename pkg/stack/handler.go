@@ -68,12 +68,13 @@ func (h Handler) Find(c *gin.Context) {
 	}
 	s.Requires = requires
 
-	for _, parameter := range stack.Parameters {
+	for parameterName, parameter := range stack.Parameters {
 		s.Parameters = append(s.Parameters, StackParameter{
-			Name:         parameter.Name,
-			DefaultValue: parameter.DefaultValue,
-			Consumed:     parameter.Consumed,
-			Priority:     parameter.Priority,
+			ParameterName: parameterName,
+			Name:          parameter.Name,
+			DefaultValue:  parameter.DefaultValue,
+			Consumed:      parameter.Consumed,
+			Priority:      parameter.Priority,
 		})
 	}
 
@@ -82,10 +83,11 @@ func (h Handler) Find(c *gin.Context) {
 
 // swagger:model StackParameter
 type StackParameter struct {
-	Name         string  `json:"name"`
-	DefaultValue *string `json:"defaultValue,omitempty"`
-	Consumed     bool    `json:"consumed"`
-	Priority     uint    `json:"priority"`
+	ParameterName string  `json:"parameterName"`
+	Name          string  `json:"name"`
+	DefaultValue  *string `json:"defaultValue,omitempty"`
+	Consumed      bool    `json:"consumed"`
+	Priority      uint    `json:"priority"`
 }
 
 // swagger:model Stack
