@@ -487,6 +487,9 @@ definitions:
             name:
                 type: string
                 x-go-name: Name
+            parameterName:
+                type: string
+                x-go-name: ParameterName
             priority:
                 format: uint64
                 type: integer

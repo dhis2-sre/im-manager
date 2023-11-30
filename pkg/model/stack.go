@@ -18,13 +18,15 @@ type StackParameters map[string]StackParameter
 
 // swagger:model StackDetailParameter
 type StackParameter struct {
+	// Name is the user-friendly name of the parameter.
+	Name         string  `json:"name"`
 	DefaultValue *string `json:"defaultValue,omitempty"`
 	// Consumed signals that this parameter is provided by another stack i.e. one of the stacks required stacks.
 	Consumed bool `json:"consumed"`
 	// Validator ensures that the actual stack parameters are valid according to its rules.
 	Validator func(value string) error `json:"-"`
-	// Priority determines the order in which the parameter is shown
-	Priority uint
+	// Priority determines the order in which the parameter is shown.
+	Priority uint `json:"priority"`
 }
 
 type ParameterProviders map[string]ParameterProvider
