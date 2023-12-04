@@ -15,7 +15,7 @@ type Database struct {
 	GroupName         string             `json:"groupName" gorm:"index:idx_name_and_group,unique"`
 	Url               string             `json:"url"` // s3... Path?
 	ExternalDownloads []ExternalDownload `json:"externalDownloads" gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
-	Lock              *Lock              `json:"lock"`
+	Lock              *Lock              `json:"lock" gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
 	Slug              string             `json:"slug" gorm:"uniqueIndex"`
 }
 

@@ -118,20 +118,43 @@ func (r repository) Unlock(databaseId uint) error {
 }
 
 func (r repository) Delete(id uint) error {
-	// TODO: Why do I manually have to delete the lock when I've configured cascading on the database struct?
 	database, err := r.FindById(id)
 	if err != nil {
 		return err
 	}
 
-	if database.Lock != nil {
-		err := r.db.Unscoped().Delete(&model.Lock{}, database.ID).Error
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		// Delete lock
+		if database.Lock != nil {
+			err := tx.Unscoped().Delete(&model.Lock{}, database.ID).Error
+			if err != nil {
+				return err
+			}
+		}
+
+		// Delete external downloads
+		var downloads []model.ExternalDownload
+		err := tx.
+			Where("database_id = ?", id).
+			Find(&downloads).Error
 		if err != nil {
 			return err
 		}
-	}
 
-	return r.db.Unscoped().Delete(&model.Database{}, id).Error
+		for _, download := range downloads {
+			err := tx.Unscoped().Delete(&model.ExternalDownload{}, download.UUID).Error
+			if err != nil {
+				return err
+			}
+		}
+
+		// Delete database
+		err = tx.Unscoped().Delete(&model.Database{}, id).Error
+		if err != nil {
+			return err
+		}
+		return nil
+	})
 }
 
 const administratorGroupName = "administrators"
