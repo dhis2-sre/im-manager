@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
 	awss3 "github.com/aws/aws-sdk-go-v2/service/s3"
@@ -152,6 +153,22 @@ func TestDatabaseHandler(t *testing.T) {
 		{
 			t.Log("Unlock")
 			client.Delete(t, "/databases/"+databaseID+"/lock")
+		}
+	})
+
+	t.Run("ExternalDownload", func(t *testing.T) {
+		{
+			t.Log("ExternalDownload")
+
+			body := strings.NewReader(`{
+				"expiration":  60
+			}`)
+			var externalDownload model.ExternalDownload
+			client.PostJSON(t, "/databases/"+databaseID+"/external", body, &externalDownload)
+
+			require.Equal(t, uint(1), externalDownload.DatabaseID)
+			diff := int64(externalDownload.Expiration) - time.Now().Unix() - 60
+			require.Zero(t, diff)
 		}
 	})
 
