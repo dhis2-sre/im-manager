@@ -153,7 +153,12 @@ func TestDatabaseHandler(t *testing.T) {
 		}
 		{
 			t.Log("Unlock")
+
 			client.Delete(t, "/databases/"+databaseID+"/lock")
+
+			var database model.Database
+			client.GetJSON(t, "/databases/"+databaseID, &database)
+			require.Nil(t, database.Lock)
 		}
 	})
 
