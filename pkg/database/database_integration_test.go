@@ -4,14 +4,13 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"io"
 	"mime/multipart"
 	"os"
 	"strconv"
 	"strings"
 	"testing"
-
-	"github.com/aws/aws-sdk-go-v2/aws"
 
 	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
 	awss3 "github.com/aws/aws-sdk-go-v2/service/s3"
@@ -45,6 +44,7 @@ func TestDatabaseHandler(t *testing.T) {
 		databaseHandler := database.NewHandler(databaseService, groupService{groupName: "packages"}, instanceService{}, stackService{})
 		authenticator := func(ctx *gin.Context) {
 			ctx.Set("user", &model.User{
+				ID:    1,
 				Email: "user1@dhis2.org",
 				Groups: []model.Group{
 					{
@@ -132,6 +132,26 @@ func TestDatabaseHandler(t *testing.T) {
 				names = append(names, d.Name)
 			}
 			assert.ElementsMatchf(t, []string{"path/name.extension", "path/copy.extension"}, names, "GET /databases failed: should return original and copied DB")
+		}
+	})
+
+	t.Run("Lock/Unlock", func(t *testing.T) {
+		{
+			t.Log("Lock")
+
+			body := strings.NewReader(`{
+				"instanceId":  123
+			}`)
+			var lock model.Lock
+			client.PostJSON(t, "/databases/"+databaseID+"/lock", body, &lock)
+
+			require.Equal(t, uint(1), lock.DatabaseID)
+			require.Equal(t, uint(123), lock.InstanceID)
+			require.Equal(t, uint(1), lock.UserID)
+		}
+		{
+			t.Log("Unlock")
+			client.Delete(t, "/databases/"+databaseID+"/lock")
 		}
 	})
 
