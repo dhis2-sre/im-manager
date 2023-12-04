@@ -12,6 +12,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dhis2-sre/im-manager/pkg/instance"
+
 	"github.com/aws/aws-sdk-go-v2/aws"
 
 	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
@@ -41,6 +43,8 @@ func TestDatabaseHandler(t *testing.T) {
 
 	databaseRepository := database.NewRepository(db)
 	databaseService := database.NewService(s3Bucket, s3Client, groupService{}, databaseRepository)
+
+	instanceRepository := instance.NewRepository(db, "whatever")
 
 	client := inttest.SetupHTTPServer(t, func(engine *gin.Engine) {
 		databaseHandler := database.NewHandler(databaseService, groupService{groupName: "packages"}, instanceService{}, stackService{})
@@ -87,6 +91,30 @@ func TestDatabaseHandler(t *testing.T) {
 		require.Equalf(t, "file contents", string(actualContent), "DB in S3 should have expected content")
 
 		databaseID = strconv.FormatUint(uint64(database.ID), 10)
+	}
+
+	var instanceID string
+	{
+		group := &model.Group{
+			Name:     "group-name",
+			Hostname: "some",
+		}
+		user := &model.User{
+			Email: "user1@dhis2.org",
+			Groups: []model.Group{
+				*group,
+			},
+		}
+		db.Create(user)
+
+		instance := &model.Instance{
+			UserID:    user.ID,
+			Name:      "name",
+			GroupName: "group-name",
+		}
+		err := instanceRepository.Save(instance)
+		require.NoError(t, err)
+		instanceID = strconv.FormatUint(uint64(instance.ID), 10)
 	}
 
 	t.Run("Get", func(t *testing.T) {
@@ -142,15 +170,16 @@ func TestDatabaseHandler(t *testing.T) {
 			t.Log("Lock")
 
 			body := strings.NewReader(`{
-				"instanceId":  123
+				"instanceId":  ` + instanceID + `
 			}`)
 			var lock model.Lock
 			client.PostJSON(t, "/databases/"+databaseID+"/lock", body, &lock)
 
 			require.Equal(t, uint(1), lock.DatabaseID)
-			require.Equal(t, uint(123), lock.InstanceID)
+			require.Equal(t, uint(1), lock.InstanceID)
 			require.Equal(t, uint(1), lock.UserID)
 		}
+
 		{
 			t.Log("Unlock")
 
