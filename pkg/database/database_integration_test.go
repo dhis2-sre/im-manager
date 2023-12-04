@@ -167,7 +167,7 @@ func TestDatabaseHandler(t *testing.T) {
 			t.Log("ExternalDownload")
 
 			body := strings.NewReader(`{
-				"expiration":  60
+				"expiration": 60
 			}`)
 			var externalDownload model.ExternalDownload
 			client.PostJSON(t, "/databases/"+databaseID+"/external", body, &externalDownload)
