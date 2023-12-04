@@ -7,11 +7,11 @@ require (
 	github.com/anthhub/forwarder v1.1.0
 	github.com/aws/aws-sdk-go-v2 v1.23.1
 	github.com/aws/aws-sdk-go-v2/config v1.25.5
-	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.14.2
-	github.com/aws/aws-sdk-go-v2/service/s3 v1.44.0
+	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.14.3
+	github.com/aws/aws-sdk-go-v2/service/s3 v1.45.0
 	github.com/dhis2-sre/rabbitmq v0.3.1-0.20231106051247-d45d1d39d012
 	github.com/dominikbraun/graph v0.23.0
-	github.com/gin-contrib/cors v1.4.0
+	github.com/gin-contrib/cors v1.5.0
 	github.com/gin-gonic/gin v1.9.1
 	github.com/go-mail/mail v2.3.1+incompatible
 	github.com/go-openapi/runtime v0.26.0
@@ -27,7 +27,7 @@ require (
 	github.com/rabbitmq/amqp091-go v1.9.0
 	github.com/stretchr/testify v1.8.4
 	go.mozilla.org/sops/v3 v3.7.3
-	golang.org/x/crypto v0.15.0
+	golang.org/x/crypto v0.16.0
 	golang.org/x/exp v0.0.0-20231108232855-2478ac86f678
 	gorm.io/driver/postgres v1.5.4
 	gorm.io/gorm v1.25.5
@@ -187,8 +187,8 @@ require (
 	golang.org/x/net v0.18.0 // indirect
 	golang.org/x/oauth2 v0.14.0 // indirect
 	golang.org/x/sync v0.5.0 // indirect
-	golang.org/x/sys v0.14.0 // indirect
-	golang.org/x/term v0.14.0 // indirect
+	golang.org/x/sys v0.15.0 // indirect
+	golang.org/x/term v0.15.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
 	golang.org/x/time v0.4.0 // indirect
 	golang.org/x/tools v0.15.0 // indirect
