@@ -76,17 +76,17 @@ func TestDatabaseHandler(t *testing.T) {
 
 		body := client.Post(t, "/databases", &b, inttest.WithHeader("Content-Type", w.FormDataContentType()))
 
-		var actualDB model.Database
-		err = json.Unmarshal(body, &actualDB)
+		var database model.Database
+		err = json.Unmarshal(body, &database)
 		require.NoError(t, err, "POST /databases: failed to unmarshal HTTP response body")
-		require.Equal(t, "path/name.extension", actualDB.Name)
-		require.Equal(t, "packages", actualDB.GroupName)
-		require.Equal(t, "s3://database-bucket/packages/path/name.extension", actualDB.Url)
+		require.Equal(t, "path/name.extension", database.Name)
+		require.Equal(t, "packages", database.GroupName)
+		require.Equal(t, "s3://database-bucket/packages/path/name.extension", database.Url)
 
 		actualContent := s3.GetObject(t, s3Bucket, "packages/path/name.extension")
 		require.Equalf(t, "file contents", string(actualContent), "DB in S3 should have expected content")
 
-		databaseID = strconv.FormatUint(uint64(actualDB.ID), 10)
+		databaseID = strconv.FormatUint(uint64(database.ID), 10)
 	}
 
 	t.Run("Get", func(t *testing.T) {
