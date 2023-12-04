@@ -123,15 +123,11 @@ func (r repository) Delete(id uint) error {
 		return err
 	}
 
-	return r.db.Transaction(func(tx *gorm.DB) error {
-		// Delete lock
-		if database.Lock != nil {
-			err := tx.Unscoped().Delete(&model.Lock{}, database.ID).Error
-			if err != nil {
-				return err
-			}
-		}
+	if database.Lock != nil {
+		return errdef.NewBadRequest("database is locked")
+	}
 
+	return r.db.Transaction(func(tx *gorm.DB) error {
 		// Delete external downloads
 		var downloads []model.ExternalDownload
 		err := tx.
