@@ -179,10 +179,10 @@ func (r repository) Update(d *model.Database) error {
 	return r.db.Save(d).Error
 }
 
-func (r repository) CreateExternalDownload(databaseID uint, expiration uint) (*model.ExternalDownload, error) {
+func (r repository) CreateExternalDownload(databaseID uint, expirationInSeconds uint) (*model.ExternalDownload, error) {
 	externalDownload := &model.ExternalDownload{
 		UUID:       uuid.New(),
-		Expiration: uint(time.Now().Unix()) + expiration,
+		Expiration: uint(time.Now().Unix()) + expirationInSeconds,
 		DatabaseID: databaseID,
 	}
 
