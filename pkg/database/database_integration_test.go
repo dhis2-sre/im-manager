@@ -6,10 +6,14 @@ import (
 	"encoding/json"
 	"io"
 	"mime/multipart"
+	"net/http"
 	"os"
 	"strconv"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/dhis2-sre/im-manager/pkg/instance"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 
@@ -41,10 +45,13 @@ func TestDatabaseHandler(t *testing.T) {
 	databaseRepository := database.NewRepository(db)
 	databaseService := database.NewService(s3Bucket, s3Client, groupService{}, databaseRepository)
 
+	instanceRepository := instance.NewRepository(db, "whatever")
+
 	client := inttest.SetupHTTPServer(t, func(engine *gin.Engine) {
 		databaseHandler := database.NewHandler(databaseService, groupService{groupName: "packages"}, instanceService{}, stackService{})
 		authenticator := func(ctx *gin.Context) {
 			ctx.Set("user", &model.User{
+				ID:    1,
 				Email: "user1@dhis2.org",
 				Groups: []model.Group{
 					{
@@ -74,17 +81,41 @@ func TestDatabaseHandler(t *testing.T) {
 
 		body := client.Post(t, "/databases", &b, inttest.WithHeader("Content-Type", w.FormDataContentType()))
 
-		var actualDB model.Database
-		err = json.Unmarshal(body, &actualDB)
+		var database model.Database
+		err = json.Unmarshal(body, &database)
 		require.NoError(t, err, "POST /databases: failed to unmarshal HTTP response body")
-		require.Equal(t, "path/name.extension", actualDB.Name)
-		require.Equal(t, "packages", actualDB.GroupName)
-		require.Equal(t, "s3://database-bucket/packages/path/name.extension", actualDB.Url)
+		require.Equal(t, "path/name.extension", database.Name)
+		require.Equal(t, "packages", database.GroupName)
+		require.Equal(t, "s3://database-bucket/packages/path/name.extension", database.Url)
 
 		actualContent := s3.GetObject(t, s3Bucket, "packages/path/name.extension")
 		require.Equalf(t, "file contents", string(actualContent), "DB in S3 should have expected content")
 
-		databaseID = strconv.FormatUint(uint64(actualDB.ID), 10)
+		databaseID = strconv.FormatUint(uint64(database.ID), 10)
+	}
+
+	var instanceID string
+	{
+		group := &model.Group{
+			Name:     "group-name",
+			Hostname: "some",
+		}
+		user := &model.User{
+			Email: "user1@dhis2.org",
+			Groups: []model.Group{
+				*group,
+			},
+		}
+		db.Create(user)
+
+		instance := &model.Instance{
+			UserID:    user.ID,
+			Name:      "name",
+			GroupName: "group-name",
+		}
+		err := instanceRepository.Save(instance)
+		require.NoError(t, err)
+		instanceID = strconv.FormatUint(uint64(instance.ID), 10)
 	}
 
 	t.Run("Get", func(t *testing.T) {
@@ -135,8 +166,63 @@ func TestDatabaseHandler(t *testing.T) {
 		}
 	})
 
+	t.Run("Lock/Unlock", func(t *testing.T) {
+		{
+			t.Log("Lock")
+
+			body := strings.NewReader(`{
+				"instanceId":  ` + instanceID + `
+			}`)
+			var lock model.Lock
+			client.PostJSON(t, "/databases/"+databaseID+"/lock", body, &lock)
+
+			require.Equal(t, uint(1), lock.DatabaseID)
+			require.Equal(t, uint(1), lock.InstanceID)
+			require.Equal(t, uint(1), lock.UserID)
+		}
+
+		{
+			t.Log("Unlock")
+
+			client.Delete(t, "/databases/"+databaseID+"/lock")
+
+			var database model.Database
+			client.GetJSON(t, "/databases/"+databaseID, &database)
+			require.Nil(t, database.Lock)
+		}
+	})
+
+	t.Run("ExternalDownload", func(t *testing.T) {
+		{
+			t.Log("ExternalDownload")
+
+			body := strings.NewReader(`{
+				"expiration": 60
+			}`)
+			var externalDownload model.ExternalDownload
+			client.PostJSON(t, "/databases/"+databaseID+"/external", body, &externalDownload)
+
+			require.Equal(t, uint(1), externalDownload.DatabaseID)
+			diff := int64(externalDownload.Expiration) - time.Now().Unix() - 60
+			require.Zero(t, diff)
+		}
+	})
+
 	{
 		t.Log("Delete")
+
+		// Lock database
+		body := strings.NewReader(`{"instanceId":  ` + instanceID + `}`)
+		client.PostJSON(t, "/databases/"+databaseID+"/lock", body, &model.Lock{})
+		// Attempt delete but expect a bad request response
+		client.Do(t, http.MethodDelete, "/databases/"+databaseID, nil, http.StatusBadRequest, inttest.WithAuthToken("sometoken"))
+		// Unlock database
+		client.Delete(t, "/databases/"+databaseID+"/lock")
+
+		// Create external download to ensure the database can still be deleted
+		client.PostJSON(t, "/databases/"+databaseID+"/external", strings.NewReader(`{
+				"expiration": 60
+			}`), &model.ExternalDownload{})
 
 		client.Delete(t, "/databases/"+databaseID)
 
