@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"io"
 	"mime/multipart"
+	"net/http"
 	"os"
 	"strconv"
 	"strings"
@@ -209,6 +210,19 @@ func TestDatabaseHandler(t *testing.T) {
 
 	{
 		t.Log("Delete")
+
+		// Lock database
+		body := strings.NewReader(`{"instanceId":  ` + instanceID + `}`)
+		client.PostJSON(t, "/databases/"+databaseID+"/lock", body, &model.Lock{})
+		// Attempt delete but expect a bad request response
+		client.Do(t, http.MethodDelete, "/databases/"+databaseID, nil, http.StatusBadRequest, inttest.WithAuthToken("sometoken"))
+		// Unlock database
+		client.Delete(t, "/databases/"+databaseID+"/lock")
+
+		// Create external download to ensure the database can still be deleted
+		client.PostJSON(t, "/databases/"+databaseID+"/external", strings.NewReader(`{
+				"expiration": 60
+			}`), &model.ExternalDownload{})
 
 		client.Delete(t, "/databases/"+databaseID)
 
