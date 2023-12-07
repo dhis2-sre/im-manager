@@ -35,7 +35,6 @@ func NewService(
 
 type Repository interface {
 	SaveDeployment(deployment *model.Deployment) error
-	FindDeploymentById(id uint) (*model.Deployment, error)
 	SaveInstance(instance *model.DeploymentInstance) error
 	Link(firstInstance, secondInstance *model.Instance) error
 	Unlink(instance *model.Instance) error
@@ -50,6 +49,9 @@ type Repository interface {
 	Delete(id uint) error
 	DeleteDeploymentInstance(instance *model.DeploymentInstance) error
 	DeleteDeployment(deployment *model.Deployment) error
+	FindDeploymentById(id uint) (*model.Deployment, error)
+	FindDeploymentInstanceById(id uint) (*model.DeploymentInstance, error)
+	FindDecryptedDeploymentInstanceById(id uint) (*model.DeploymentInstance, error)
 }
 
 type groupService interface {
@@ -76,6 +78,14 @@ func (s service) SaveDeployment(deployment *model.Deployment) error {
 
 func (s service) FindDeploymentById(id uint) (*model.Deployment, error) {
 	return s.instanceRepository.FindDeploymentById(id)
+}
+
+func (s service) FindDeploymentInstanceById(id uint) (*model.DeploymentInstance, error) {
+	return s.instanceRepository.FindDeploymentInstanceById(id)
+}
+
+func (s service) FindDecryptedDeploymentInstanceById(id uint) (*model.DeploymentInstance, error) {
+	return s.instanceRepository.FindDecryptedDeploymentInstanceById(id)
 }
 
 func (s service) SaveInstance(instance *model.DeploymentInstance) error {
