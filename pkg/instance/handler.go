@@ -65,7 +65,7 @@ func (h Handler) DeployDeployment(c *gin.Context) {
 		return
 	}
 
-	deployment, err := h.instanceService.FindDeploymentById(id)
+	deployment, err := h.instanceService.FindDecryptedDeploymentById(id)
 	if err != nil {
 		_ = c.Error(err)
 		return

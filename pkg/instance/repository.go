@@ -105,6 +105,22 @@ func (r repository) FindDecryptedDeploymentInstanceById(id uint) (*model.Deploym
 	return instance, nil
 }
 
+func (r repository) FindDecryptedDeploymentById(id uint) (*model.Deployment, error) {
+	deployment, err := r.FindDeploymentById(id)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, instance := range deployment.Instances {
+		err := decryptParameters(r.instanceParameterEncryptionKey, instance)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return deployment, nil
+}
+
 func (r repository) SaveInstance(instance *model.DeploymentInstance) error {
 	key := r.instanceParameterEncryptionKey
 

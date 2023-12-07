@@ -50,6 +50,7 @@ type Repository interface {
 	DeleteDeploymentInstance(instance *model.DeploymentInstance) error
 	DeleteDeployment(deployment *model.Deployment) error
 	FindDeploymentById(id uint) (*model.Deployment, error)
+	FindDecryptedDeploymentById(id uint) (*model.Deployment, error)
 	FindDeploymentInstanceById(id uint) (*model.DeploymentInstance, error)
 	FindDecryptedDeploymentInstanceById(id uint) (*model.DeploymentInstance, error)
 }
@@ -80,6 +81,10 @@ func (s service) FindDeploymentById(id uint) (*model.Deployment, error) {
 	return s.instanceRepository.FindDeploymentById(id)
 }
 
+func (s service) FindDecryptedDeploymentById(id uint) (*model.Deployment, error) {
+	return s.instanceRepository.FindDecryptedDeploymentById(id)
+}
+
 func (s service) FindDeploymentInstanceById(id uint) (*model.DeploymentInstance, error) {
 	return s.instanceRepository.FindDeploymentInstanceById(id)
 }
@@ -89,7 +94,7 @@ func (s service) FindDecryptedDeploymentInstanceById(id uint) (*model.Deployment
 }
 
 func (s service) SaveInstance(instance *model.DeploymentInstance) error {
-	deployment, err := s.instanceRepository.FindDeploymentById(instance.DeploymentID)
+	deployment, err := s.instanceRepository.FindDecryptedDeploymentById(instance.DeploymentID)
 	if err != nil {
 		return err
 	}
