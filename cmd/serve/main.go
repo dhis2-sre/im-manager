@@ -165,6 +165,10 @@ func run() error {
 	if err != nil {
 		return err
 	}
+	err = user.CreateDefaultUser(cfg.DefaultUser.Email, cfg.DefaultUser.Password, userService, groupService)
+	if err != nil {
+		return err
+	}
 
 	r := server.GetEngine(cfg.BasePath)
 

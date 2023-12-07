@@ -41,3 +41,29 @@ func CreateAdminUser(email, password string, userService userServiceUtil, groupS
 
 	return nil
 }
+
+func CreateDefaultUser(email, password string, userService userServiceUtil, groupService groupService) error {
+	u, err := userService.FindOrCreate(email, password)
+	if err != nil {
+		return fmt.Errorf("error creating default user: %v", err)
+	}
+
+	u.Validated = true
+
+	err = userService.Save(u)
+	if err != nil {
+		return fmt.Errorf("error saving default user: %v", err)
+	}
+
+	g, err := groupService.FindOrCreate(model.DefaultGroupName, "", false)
+	if err != nil {
+		return fmt.Errorf("error creating admin group: %v", err)
+	}
+
+	err = groupService.AddUser(g.Name, u.ID)
+	if err != nil {
+		return fmt.Errorf("error adding default user to default group: %v", err)
+	}
+
+	return nil
+}

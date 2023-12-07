@@ -93,7 +93,7 @@ func New() Config {
 		},
 		Groups:      newGroups(),
 		AdminUser:   newAdminUser(),
-		DefaultUser: user{},
+		DefaultUser: newDefaultUser(),
 		S3Bucket:    requireEnv("S3_BUCKET"),
 		S3Region:    requireEnv("S3_REGION"),
 		S3Endpoint:  os.Getenv("S3_ENDPOINT"),
@@ -224,6 +224,16 @@ type user struct {
 func newAdminUser() user {
 	email := requireEnv("ADMIN_USER_EMAIL")
 	pw := requireEnv("ADMIN_USER_PASSWORD")
+
+	return user{
+		Email:    email,
+		Password: pw,
+	}
+}
+
+func newDefaultUser() user {
+	email := requireEnv("DEFAULT_USER_EMAIL")
+	pw := requireEnv("DEFAULT_USER_PASSWORD")
 
 	return user{
 		Email:    email,
