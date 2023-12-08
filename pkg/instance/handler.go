@@ -71,9 +71,9 @@ func (h Handler) DeployDeployment(c *gin.Context) {
 		return
 	}
 
-	canRead := handler.CanReadDeployment(user, deployment)
+	canRead := handler.CanWriteDeployment(user, deployment)
 	if !canRead {
-		unauthorized := errdef.NewUnauthorized("read access denied")
+		unauthorized := errdef.NewUnauthorized("write access denied")
 		_ = c.Error(unauthorized)
 		return
 	}
