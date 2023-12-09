@@ -4,11 +4,12 @@ import (
 	"cmp"
 	"errors"
 	"fmt"
-	"golang.org/x/exp/maps"
 	"io"
 	"log"
 	"os/exec"
 	"slices"
+
+	"golang.org/x/exp/maps"
 
 	v1 "k8s.io/api/core/v1"
 
