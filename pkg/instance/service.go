@@ -1,8 +1,10 @@
 package instance
 
 import (
+	"cmp"
 	"errors"
 	"fmt"
+	"golang.org/x/exp/maps"
 	"io"
 	"log"
 	"os/exec"
@@ -53,6 +55,7 @@ type Repository interface {
 	FindDecryptedDeploymentById(id uint) (*model.Deployment, error)
 	FindDeploymentInstanceById(id uint) (*model.DeploymentInstance, error)
 	FindDecryptedDeploymentInstanceById(id uint) (*model.DeploymentInstance, error)
+	FindDeployments(groupNames []string) ([]*model.Deployment, error)
 }
 
 type groupService interface {
@@ -681,6 +684,63 @@ func (s service) FindInstances(user *model.User, presets bool) ([]GroupsWithInst
 	}
 
 	return instances, err
+}
+
+type GroupsWithDeployments struct {
+	Name        string              `json:"name"`
+	Hostname    string              `json:"hostname"`
+	Deployments []*model.Deployment `json:"deployments"`
+}
+
+func (s service) FindDeployments(user *model.User) ([]GroupsWithDeployments, error) {
+	groups := append(user.Groups, user.AdminGroups...) //nolint:gocritic
+
+	groupsByName := make(map[string]model.Group)
+	for _, group := range groups {
+		groupsByName[group.Name] = group
+	}
+	groupNames := maps.Keys(groupsByName)
+
+	deployments, err := s.instanceRepository.FindDeployments(groupNames)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(deployments) < 1 {
+		return []GroupsWithDeployments{}, nil
+	}
+
+	groupsWithDeployments := groupDeployments(groupsByName, deployments)
+
+	return groupsWithDeployments, nil
+}
+
+func groupDeployments(groupsByName map[string]model.Group, deployments []*model.Deployment) []GroupsWithDeployments {
+	groupNames := maps.Keys(groupsByName)
+
+	groupsWithDeployments := make([]GroupsWithDeployments, len(groupNames))
+	for i, name := range groupNames {
+		groupWithDeployments := groupsWithDeployments[i]
+		groupWithDeployments.Name = name
+		groupWithDeployments.Hostname = groupsByName[name].Hostname
+		for _, deployment := range deployments {
+			if name == deployment.GroupName {
+				groupWithDeployments.Deployments = append(groupWithDeployments.Deployments, deployment)
+			}
+		}
+
+		slices.SortFunc(groupWithDeployments.Deployments, func(a, b *model.Deployment) int {
+			return cmp.Compare(a.Name, b.Name)
+		})
+
+		groupsWithDeployments[i] = groupWithDeployments
+	}
+
+	slices.SortFunc(groupsWithDeployments, func(a, b GroupsWithDeployments) int {
+		return cmp.Compare(a.Name, b.Name)
+	})
+
+	return groupsWithDeployments
 }
 
 type InstanceStatus string
