@@ -75,8 +75,61 @@ func (r repository) FindDeploymentById(id uint) (*model.Deployment, error) {
 	return deployment, nil
 }
 
+func (r repository) FindDeploymentInstanceById(id uint) (*model.DeploymentInstance, error) {
+	var instance *model.DeploymentInstance
+	err := r.db.
+		Preload("GormParameters").
+		First(&instance, id).Error
+
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errdef.NewNotFound("instance not found by id: %d", id)
+		}
+		return nil, fmt.Errorf("failed to find instance: %v", err)
+	}
+
+	return instance, nil
+}
+
+func (r repository) FindDecryptedDeploymentInstanceById(id uint) (*model.DeploymentInstance, error) {
+	instance, err := r.FindDeploymentInstanceById(id)
+	if err != nil {
+		return nil, err
+	}
+
+	err = decryptParameters(r.instanceParameterEncryptionKey, instance)
+	if err != nil {
+		return nil, err
+	}
+
+	return instance, nil
+}
+
+func (r repository) FindDecryptedDeploymentById(id uint) (*model.Deployment, error) {
+	deployment, err := r.FindDeploymentById(id)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, instance := range deployment.Instances {
+		err := decryptParameters(r.instanceParameterEncryptionKey, instance)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return deployment, nil
+}
+
 func (r repository) SaveInstance(instance *model.DeploymentInstance) error {
-	err := r.db.Session(&gorm.Session{FullSaveAssociations: true}).Save(instance).Error
+	key := r.instanceParameterEncryptionKey
+
+	err := encryptParameters(key, instance)
+	if err != nil {
+		return err
+	}
+
+	err = r.db.Session(&gorm.Session{FullSaveAssociations: true}).Save(instance).Error
 	if err != nil {
 		return fmt.Errorf("failed to save instance: %v", err)
 	}
@@ -88,8 +141,6 @@ func (r repository) FindByIdDecrypted(id uint) (*model.Instance, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	err = decryptParameters(r.instanceParameterEncryptionKey, instance)
 
 	return instance, err
 }
@@ -132,16 +183,16 @@ func (r repository) Unlink(instance *model.Instance) error {
 }
 
 func (r repository) Save(instance *model.Instance) error {
-	key := r.instanceParameterEncryptionKey
+	//key := r.instanceParameterEncryptionKey
 
 	populateParameterRelations(instance)
-
-	err := encryptParameters(key, instance)
-	if err != nil {
-		return err
-	}
-
-	err = r.db.Session(&gorm.Session{FullSaveAssociations: true}).Save(instance).Error
+	/*
+		err := encryptParameters(key, instance)
+		if err != nil {
+			return err
+		}
+	*/
+	err := r.db.Session(&gorm.Session{FullSaveAssociations: true}).Save(instance).Error
 	if errors.Is(err, gorm.ErrDuplicatedKey) {
 		return errdef.NewDuplicated("instance named %q already exists", instance.Name)
 	}
@@ -308,25 +359,27 @@ func populateParameterRelations(instance *model.Instance) {
 	}
 }
 
-func encryptParameters(key string, instance *model.Instance) error {
+func encryptParameters(key string, instance *model.DeploymentInstance) error {
 	for i, parameter := range instance.Parameters {
 		value, err := encryptText(key, parameter.Value)
 		if err != nil {
 			return err
 		}
-		instance.Parameters[i].Value = value
+		parameter.Value = value
+		instance.Parameters[i] = parameter
 	}
 
 	return nil
 }
 
-func decryptParameters(key string, instance *model.Instance) error {
+func decryptParameters(key string, instance *model.DeploymentInstance) error {
 	for i, parameter := range instance.Parameters {
 		value, err := decryptText(key, parameter.Value)
 		if err != nil {
 			return err
 		}
-		instance.Parameters[i].Value = value
+		parameter.Value = value
+		instance.Parameters[i] = parameter
 	}
 
 	return nil

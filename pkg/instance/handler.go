@@ -65,15 +65,15 @@ func (h Handler) DeployDeployment(c *gin.Context) {
 		return
 	}
 
-	deployment, err := h.instanceService.FindDeploymentById(id)
+	deployment, err := h.instanceService.FindDecryptedDeploymentById(id)
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
 
-	canRead := handler.CanReadDeployment(user, deployment)
-	if !canRead {
-		unauthorized := errdef.NewUnauthorized("read access denied")
+	canWrite := handler.CanWriteDeployment(user, deployment)
+	if !canWrite {
+		unauthorized := errdef.NewUnauthorized("write access denied")
 		_ = c.Error(unauthorized)
 		return
 	}
