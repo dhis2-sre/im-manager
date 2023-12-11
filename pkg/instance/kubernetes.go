@@ -128,8 +128,8 @@ func newClient(configuration *model.ClusterConfiguration) (*kubernetes.Clientset
 	return client, nil
 }
 
-func (ks kubernetesService) getLogs(instance *model.Instance, typeSelector string) (io.ReadCloser, error) {
-	pod, err := ks.getPod(instance, typeSelector)
+func (ks kubernetesService) getLogs(instance *model.DeploymentInstance, typeSelector string) (io.ReadCloser, error) {
+	pod, err := ks.getPod(instance.ID, typeSelector)
 	if err != nil {
 		return nil, err
 	}
@@ -145,8 +145,8 @@ func (ks kubernetesService) getLogs(instance *model.Instance, typeSelector strin
 		Stream(context.TODO())
 }
 
-func (ks kubernetesService) getPod(instance *model.Instance, typeSelector string) (v1.Pod, error) {
-	selector, err := labelSelector(instance.ID, typeSelector)
+func (ks kubernetesService) getPod(instanceID uint, typeSelector string) (v1.Pod, error) {
+	selector, err := labelSelector(instanceID, typeSelector)
 	if err != nil {
 		return v1.Pod{}, err
 	}
@@ -156,7 +156,7 @@ func (ks kubernetesService) getPod(instance *model.Instance, typeSelector string
 
 	pods, err := ks.client.CoreV1().Pods("").List(context.TODO(), listOptions)
 	if err != nil {
-		return v1.Pod{}, fmt.Errorf("error getting pod for instance %d and selector %q: %v", instance.ID, selector, err)
+		return v1.Pod{}, fmt.Errorf("error getting pod for instance %d and selector %q: %v", instanceID, selector, err)
 	}
 
 	if len(pods.Items) == 0 {

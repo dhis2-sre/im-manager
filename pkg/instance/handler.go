@@ -994,13 +994,19 @@ func (h Handler) Logs(c *gin.Context) {
 		return
 	}
 
-	instance, err := h.instanceService.FindById(id)
+	instance, err := h.instanceService.FindDeploymentInstanceById(id)
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
 
-	canRead := handler.CanReadInstance(user, instance)
+	deployment, err := h.instanceService.FindDeploymentById(instance.DeploymentID)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	canRead := handler.CanReadDeployment(user, deployment)
 	if !canRead {
 		unauthorized := errdef.NewUnauthorized("read access denied")
 		_ = c.Error(unauthorized)
