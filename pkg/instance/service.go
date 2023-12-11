@@ -763,13 +763,13 @@ func (s service) FindPublicInstances() ([]GroupsWithInstances, error) {
 	return s.instanceRepository.FindPublicInstances()
 }
 
-func (s service) Reset(token string, instance *model.Instance) error {
-	err := s.destroy(instance)
+func (s service) Reset(token string, instance *model.DeploymentInstance) error {
+	err := s.destroyDeploymentInstance(instance)
 	if err != nil {
 		return err
 	}
 
-	return s.Deploy(token, instance)
+	return s.deployDeploymentInstance(token, instance)
 }
 
 func (s service) destroy(instance *model.Instance) error {
