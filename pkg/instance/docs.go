@@ -110,6 +110,12 @@ type _ struct {
 	_ []GroupsWithInstances
 }
 
+// swagger:response GroupsWithDeployments
+type _ struct {
+	// in: body
+	_ []GroupsWithDeployments
+}
+
 // swagger:parameters saveDeployment
 type _ struct {
 	// Save deployment request body parameter

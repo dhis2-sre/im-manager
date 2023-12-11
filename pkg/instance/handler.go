@@ -1108,6 +1108,37 @@ func (h Handler) ListInstances(c *gin.Context) {
 	h.findInstances(c, false)
 }
 
+// FindDeployments deployments
+func (h Handler) FindDeployments(c *gin.Context) {
+	// swagger:route GET /deployments listDeployments
+	//
+	// Find deployments
+	//
+	// Find all deployments accessible by the user
+	//
+	// Security:
+	//	oauth2:
+	//
+	// responses:
+	//	200: []GroupsWithDeployments
+	//	401: Error
+	//	403: Error
+	//	415: Error
+	user, err := handler.GetUserFromContext(c)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	groupsWithDeployments, err := h.instanceService.FindDeployments(user)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	c.JSON(http.StatusOK, groupsWithDeployments)
+}
+
 // ListPresets presets
 func (h Handler) ListPresets(c *gin.Context) {
 	// swagger:route GET /presets listPresets

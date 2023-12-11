@@ -294,6 +294,24 @@ func (r repository) findInstances(groupNames []string, presets bool) ([]*model.I
 	return instances, err
 }
 
+func (r repository) FindDeployments(groupNames []string) ([]*model.Deployment, error) {
+	db := r.db
+
+	isAdmin := slices.Contains(groupNames, administratorGroupName)
+	if !isAdmin {
+		db = db.Where("group_name IN ?", groupNames)
+	}
+
+	var deployments []*model.Deployment
+	err := db.
+		Joins("User").
+		Preload("Instances").
+		Order("updated_at desc").
+		Find(&deployments).Error
+
+	return deployments, err
+}
+
 func (r repository) FindPublicInstances() ([]GroupsWithInstances, error) {
 	var instances []*model.Instance
 	err := r.db.

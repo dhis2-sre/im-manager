@@ -296,6 +296,21 @@ definitions:
                 x-go-name: Name
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/database
+    GroupsWithDeployments:
+        properties:
+            deployments:
+                items:
+                    $ref: '#/definitions/Deployment'
+                type: array
+                x-go-name: Deployments
+            hostname:
+                type: string
+                x-go-name: Hostname
+            name:
+                type: string
+                x-go-name: Name
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
     GroupsWithInstances:
         properties:
             hostname:
@@ -1013,6 +1028,21 @@ paths:
                 - oauth2: []
             summary: Delete deployment
     /deployments:
+        get:
+            description: Find all deployments accessible by the user
+            operationId: listDeployments
+            responses:
+                "200":
+                    $ref: '#/responses/GroupsWithDeployments'
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Find deployments
         post:
             description: Save a deployment...
             operationId: saveDeployment
@@ -2041,6 +2071,12 @@ responses:
         description: ""
         schema:
             $ref: '#/definitions/GroupsWithDatabases'
+    GroupsWithDeployments:
+        description: ""
+        schema:
+            items:
+                $ref: '#/definitions/GroupsWithDeployments'
+            type: array
     GroupsWithInstances:
         description: ""
         schema:
