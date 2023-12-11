@@ -655,7 +655,7 @@ func (s service) Delete(id uint) error {
 	return s.instanceRepository.Delete(id)
 }
 
-func (s service) Logs(instance *model.Instance, group *model.Group, typeSelector string) (io.ReadCloser, error) {
+func (s service) Logs(instance *model.DeploymentInstance, group *model.Group, typeSelector string) (io.ReadCloser, error) {
 	ks, err := NewKubernetesService(group.ClusterConfiguration)
 	if err != nil {
 		return nil, err
@@ -761,7 +761,7 @@ func (s service) GetStatus(instance *model.Instance) (InstanceStatus, error) {
 		return "", err
 	}
 
-	pod, err := ks.getPod(instance, "")
+	pod, err := ks.getPod(instance.ID, "")
 	if err != nil {
 		if errdef.IsNotFound(err) {
 			return NotDeployed, nil
