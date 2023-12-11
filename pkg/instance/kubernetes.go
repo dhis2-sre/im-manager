@@ -146,7 +146,7 @@ func (ks kubernetesService) getLogs(instance *model.Instance, typeSelector strin
 }
 
 func (ks kubernetesService) getPod(instance *model.Instance, typeSelector string) (v1.Pod, error) {
-	selector, err := labelSelector(instance, typeSelector)
+	selector, err := labelSelector(instance.ID, typeSelector)
 	if err != nil {
 		return v1.Pod{}, err
 	}
@@ -171,10 +171,10 @@ func (ks kubernetesService) getPod(instance *model.Instance, typeSelector string
 
 // labelSelector returns a selector with requirements for im-id=instanceId and either the im-default
 // or im-type=typeSelector.
-func labelSelector(instance *model.Instance, typeSelector string) (string, error) {
+func labelSelector(instanceID uint, typeSelector string) (string, error) {
 	labels := &metav1.LabelSelector{
 		MatchLabels: map[string]string{
-			"im-id": fmt.Sprint(instance.ID),
+			"im-id": fmt.Sprint(instanceID),
 		},
 	}
 	if typeSelector == "" {
@@ -191,8 +191,8 @@ func labelSelector(instance *model.Instance, typeSelector string) (string, error
 	return sl.String(), nil
 }
 
-func (ks kubernetesService) restart(instance *model.Instance, typeSelector string) error {
-	selector, err := labelSelector(instance, typeSelector)
+func (ks kubernetesService) restart(instance *model.DeploymentInstance, typeSelector string, instanceStack *model.Stack) error {
+	selector, err := labelSelector(instance.ID, typeSelector)
 	if err != nil {
 		return err
 	}
@@ -200,27 +200,57 @@ func (ks kubernetesService) restart(instance *model.Instance, typeSelector strin
 		LabelSelector: selector,
 	}
 
-	deployments := ks.client.AppsV1().Deployments(instance.GroupName)
-	deploymentList, err := deployments.List(context.TODO(), listOptions)
-	if err != nil {
-		return err
+	if instanceStack.KubernetesResource == model.StatefulSetResource {
+		statefulSets := ks.client.AppsV1().StatefulSets(instance.GroupName)
+		statefulSetsList, err := statefulSets.List(context.TODO(), listOptions)
+		if err != nil {
+			return err
+		}
+
+		statefulSetsItems := statefulSetsList.Items
+		if len(statefulSetsItems) == 0 {
+			return fmt.Errorf("no deployment found using the selector: %q", selector)
+		}
+		if len(statefulSetsItems) > 1 {
+			return fmt.Errorf("multiple deployments found using the selector: %q", selector)
+		}
+
+		statefulSet := statefulSetsItems[0]
+		data := fmt.Sprintf(`{"spec": {"template": {"metadata": {"annotations": {"kubectl.kubernetes.io/restartedAt": "%s"}}}}}`, time.Now().Format(time.RFC3339))
+		_, err = statefulSets.Patch(context.TODO(), statefulSet.Name, types.StrategicMergePatchType, []byte(data), metav1.PatchOptions{})
+		if err != nil {
+			return fmt.Errorf("error restarting %q: %v", statefulSet.Name, err)
+		}
+
+		return nil
 	}
 
-	items := deploymentList.Items
-	if len(items) == 0 {
-		return fmt.Errorf("no deployment found using the selector: %q", selector)
-	}
-	if len(items) > 1 {
-		return fmt.Errorf("multiple deployments found using the selector: %q", selector)
+	if instanceStack.KubernetesResource == model.DeploymentResource {
+		deployments := ks.client.AppsV1().Deployments(instance.GroupName)
+		deploymentList, err := deployments.List(context.TODO(), listOptions)
+		if err != nil {
+			return err
+		}
+
+		deploymentItems := deploymentList.Items
+		if len(deploymentItems) == 0 {
+			return fmt.Errorf("no deployment found using the selector: %q", selector)
+		}
+		if len(deploymentItems) > 1 {
+			return fmt.Errorf("multiple deployments found using the selector: %q", selector)
+		}
+
+		deployment := deploymentItems[0]
+		data := fmt.Sprintf(`{"spec": {"template": {"metadata": {"annotations": {"kubectl.kubernetes.io/restartedAt": "%s"}}}}}`, time.Now().Format(time.RFC3339))
+		_, err = deployments.Patch(context.TODO(), deployment.Name, types.StrategicMergePatchType, []byte(data), metav1.PatchOptions{})
+		if err != nil {
+			return fmt.Errorf("error restarting %q: %v", deployment.Name, err)
+		}
+
+		return nil
 	}
 
-	deployment := items[0]
-	data := fmt.Sprintf(`{"spec": {"template": {"metadata": {"annotations": {"kubectl.kubernetes.io/restartedAt": "%s"}}}}}`, time.Now().Format(time.RFC3339))
-	_, err = deployments.Patch(context.TODO(), deployment.Name, types.StrategicMergePatchType, []byte(data), metav1.PatchOptions{})
-	if err != nil {
-		return fmt.Errorf("error restarting %q: %v", deployment.Name, err)
-	}
-	return nil
+	return fmt.Errorf("kubernetes resource not supported: %s", instanceStack.KubernetesResource)
 }
 
 func (ks kubernetesService) pause(instance *model.Instance) error {

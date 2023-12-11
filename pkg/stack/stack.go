@@ -153,6 +153,7 @@ var DHIS2DB = model.Stack{
 	ParameterProviders: model.ParameterProviders{
 		"DATABASE_HOSTNAME": postgresHostnameProvider,
 	},
+	KubernetesResource: model.StatefulSetResource,
 }
 
 var dhis2DBDefaults = struct {
@@ -202,6 +203,7 @@ var DHIS2Core = model.Stack{
 	Requires: []model.Stack{
 		DHIS2DB,
 	},
+	KubernetesResource: model.DeploymentResource,
 }
 
 var dhis2CoreDefaults = struct {
@@ -291,6 +293,7 @@ var PgAdmin = model.Stack{
 	Requires: []model.Stack{
 		DHIS2DB,
 	},
+	KubernetesResource: model.StatefulSetResource,
 }
 
 var pgAdminDefaults = struct {
@@ -309,6 +312,7 @@ var WhoamiGo = model.Stack{
 		"REPLICA_COUNT":     {Priority: 4, Name: "Replica Count", DefaultValue: &whoamiGoDefaults.replicaCount},
 		"CHART_VERSION":     {Priority: 5, Name: "Chart Version", DefaultValue: &whoamiGoDefaults.chartVersion},
 	},
+	KubernetesResource: model.DeploymentResource,
 }
 
 var whoamiGoDefaults = struct {

@@ -528,7 +528,7 @@ func (s service) Resume(instance *model.Instance) error {
 	return ks.resume(instance)
 }
 
-func (s service) Restart(instance *model.Instance, typeSelector string) error {
+func (s service) Restart(instance *model.DeploymentInstance, typeSelector string) error {
 	group, err := s.groupService.Find(instance.GroupName)
 	if err != nil {
 		return err
@@ -539,7 +539,12 @@ func (s service) Restart(instance *model.Instance, typeSelector string) error {
 		return err
 	}
 
-	return ks.restart(instance, typeSelector)
+	stack, err := s.stackService.Find(instance.StackName)
+	if err != nil {
+		return err
+	}
+
+	return ks.restart(instance, typeSelector, stack)
 }
 
 func (s service) Link(source, destination *model.Instance) error {

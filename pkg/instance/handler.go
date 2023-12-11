@@ -739,13 +739,19 @@ func (h Handler) Restart(c *gin.Context) {
 		return
 	}
 
-	instance, err := h.instanceService.FindById(id)
+	instance, err := h.instanceService.FindDeploymentInstanceById(id)
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
 
-	canWrite := handler.CanWriteInstance(user, instance)
+	deployment, err := h.instanceService.FindDeploymentById(instance.DeploymentID)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	canWrite := handler.CanWriteDeployment(user, deployment)
 	if !canWrite {
 		_ = c.AbortWithError(http.StatusUnauthorized, fmt.Errorf("write access denied"))
 		return

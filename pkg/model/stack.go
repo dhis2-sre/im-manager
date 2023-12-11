@@ -1,5 +1,12 @@
 package model
 
+type KubernetesResource string
+
+const (
+	DeploymentResource  = KubernetesResource("deployment")
+	StatefulSetResource = KubernetesResource("statefulSet")
+)
+
 // swagger:model StackDetail
 type Stack struct {
 	Name             string          `json:"name"`
@@ -10,7 +17,8 @@ type Stack struct {
 	// ParameterProviders provide parameters to other stacks.
 	ParameterProviders ParameterProviders `json:"-"`
 	// Requires these stacks to deploy an instance of this stack.
-	Requires []Stack `json:"requires"`
+	Requires           []Stack `json:"requires"`
+	KubernetesResource KubernetesResource
 }
 
 // swagger:model StackDetailParameters
