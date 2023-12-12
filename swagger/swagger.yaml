@@ -499,9 +499,9 @@ definitions:
             defaultValue:
                 type: string
                 x-go-name: DefaultValue
-            name:
+            displayName:
                 type: string
-                x-go-name: Name
+                x-go-name: DisplayName
             parameterName:
                 type: string
                 x-go-name: ParameterName
