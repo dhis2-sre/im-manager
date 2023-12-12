@@ -4,10 +4,7 @@ set -euo pipefail
 
 source ./auth.sh
 
-GROUP=$1
-NAME=$2
-SELECTOR=${3:-""}
-
-INSTANCE_ID=$($HTTP get "$IM_HOST/instances-name-to-id/$GROUP/$NAME" "Authorization: Bearer $ACCESS_TOKEN")
+INSTANCE_ID=$1
+SELECTOR=${2:-""}
 
 curl -N "$IM_HOST/instances/$INSTANCE_ID/logs?selector=$SELECTOR" -H "Authorization: Bearer $ACCESS_TOKEN"
