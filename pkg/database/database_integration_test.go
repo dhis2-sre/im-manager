@@ -247,6 +247,11 @@ func (gs groupService) Find(name string) (*model.Group, error) {
 
 type instanceService struct{}
 
+func (is instanceService) FindDecryptedDeploymentInstanceById(id uint) (*model.DeploymentInstance, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
 func (is instanceService) FindById(id uint) (*model.Instance, error) {
 	return nil, nil
 }
