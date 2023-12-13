@@ -3,7 +3,6 @@ package database
 import (
 	"compress/gzip"
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -253,7 +252,7 @@ func (s service) FindExternalDownload(uuid uuid.UUID) (*model.ExternalDownload, 
 	return s.repository.FindExternalDownload(uuid)
 }
 
-func (s service) Save(userId uint, database *model.Database, instance *model.Instance, stack *model.Stack) error {
+func (s service) Save(userId uint, database *model.Database, instance *model.DeploymentInstance, stack *model.Stack) error {
 	lock := database.Lock
 	isLocked := lock != nil
 	if isLocked && (lock.InstanceID != instance.ID || lock.UserID != userId) {
@@ -340,7 +339,7 @@ func getFormat(database *model.Database) string {
 	return "plain"
 }
 
-func (s service) SaveAs(database *model.Database, instance *model.Instance, stack *model.Stack, newName string, format string, done func(saved *model.Database)) (*model.Database, error) {
+func (s service) SaveAs(database *model.Database, instance *model.DeploymentInstance, stack *model.Stack, newName string, format string, done func(saved *model.Database)) (*model.Database, error) {
 	// TODO: Add to config
 	dumpPath := "/mnt/data/"
 
@@ -505,28 +504,30 @@ func gz(gzFile string, database *model.Database, src *os.File) (*os.File, error)
 	return outFile, nil
 }
 
-func newPgDumpConfig(instance *model.Instance, stack *model.Stack) (*pg.Dump, error) {
-	databaseName, err := findParameter("DATABASE_NAME", instance, stack)
-	if err != nil {
-		return nil, err
+func newPgDumpConfig(instance *model.DeploymentInstance, stack *model.Stack) (*pg.Dump, error) {
+	errorMessage := "can't find parameter: %s"
+
+	databaseName, exists := instance.Parameters["DATABASE_NAME"]
+	if !exists {
+		return nil, fmt.Errorf(errorMessage, "DATABASE_NAME")
 	}
 
-	databaseUsername, err := findParameter("DATABASE_USERNAME", instance, stack)
-	if err != nil {
-		return nil, err
+	databaseUsername, exists := instance.Parameters["DATABASE_USERNAME"]
+	if !exists {
+		return nil, fmt.Errorf(errorMessage, "DATABASE_USERNAME")
 	}
 
-	databasePassword, err := findParameter("DATABASE_PASSWORD", instance, stack)
-	if err != nil {
-		return nil, err
+	databasePassword, exists := instance.Parameters["DATABASE_PASSWORD"]
+	if !exists {
+		return nil, fmt.Errorf(errorMessage, "DATABASE_PASSWORD")
 	}
 
 	dump, err := pg.NewDump(&pg.Postgres{
 		Host:     fmt.Sprintf(stack.HostnamePattern, instance.Name, instance.GroupName),
 		Port:     5432,
-		DB:       databaseName,
-		Username: databaseUsername,
-		Password: databasePassword,
+		DB:       databaseName.Value,
+		Username: databaseUsername.Value,
+		Password: databasePassword.Value,
 	})
 	if err != nil {
 		return nil, err
@@ -536,19 +537,4 @@ func newPgDumpConfig(instance *model.Instance, stack *model.Stack) (*pg.Dump, er
 	dump.IgnoreTableData = []string{"analytics*", "_*"}
 
 	return dump, nil
-}
-
-func findParameter(parameter string, instance *model.Instance, stack *model.Stack) (string, error) {
-	for _, p := range instance.Parameters {
-		if p.Name == parameter {
-			return p.Value, nil
-		}
-	}
-
-	p, ok := stack.Parameters[parameter]
-	if !ok {
-		return "", errors.New("parameter not found: " + parameter)
-	}
-
-	return *p.DefaultValue, nil
 }

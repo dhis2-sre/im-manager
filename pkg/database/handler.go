@@ -2,6 +2,7 @@ package database
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"log"
 	"mime/multipart"
@@ -48,13 +49,14 @@ type Service interface {
 	Update(d *model.Database) error
 	CreateExternalDownload(databaseID uint, expiration uint) (*model.ExternalDownload, error)
 	FindExternalDownload(uuid uuid.UUID) (*model.ExternalDownload, error)
-	SaveAs(database *model.Database, instance *model.Instance, stack *model.Stack, newName string, format string, done func(saved *model.Database)) (*model.Database, error)
-	Save(userId uint, database *model.Database, instance *model.Instance, stack *model.Stack) error
+	SaveAs(database *model.Database, instance *model.DeploymentInstance, stack *model.Stack, newName string, format string, done func(saved *model.Database)) (*model.Database, error)
+	Save(userId uint, database *model.Database, instance *model.DeploymentInstance, stack *model.Stack) error
 }
 
 type instanceService interface {
 	FindById(id uint) (*model.Instance, error)
 	FindByIdDecrypted(id uint) (*model.Instance, error)
+	FindDecryptedDeploymentInstanceById(id uint) (*model.DeploymentInstance, error)
 }
 
 type stackService interface {
@@ -188,7 +190,7 @@ func (h Handler) SaveAs(c *gin.Context) {
 	}
 
 	//goland:noinspection GoImportUsedAsName
-	instance, err := h.instanceService.FindByIdDecrypted(instanceId)
+	instance, err := h.instanceService.FindDecryptedDeploymentInstanceById(instanceId)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -201,13 +203,13 @@ func (h Handler) SaveAs(c *gin.Context) {
 		return
 	}
 
-	databaseId, err := findParameter("DATABASE_ID", instance, stack)
-	if err != nil {
-		_ = c.Error(err)
-		return
+	parameter := "DATABASE_ID"
+	databaseId, exists := instance.Parameters[parameter]
+	if !exists {
+		_ = c.Error(fmt.Errorf("parameter %q not found", parameter))
 	}
 
-	database, err := h.databaseService.FindByIdentifier(databaseId)
+	database, err := h.databaseService.FindByIdentifier(databaseId.Value)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -253,7 +255,7 @@ func (h Handler) Save(c *gin.Context) {
 	}
 
 	//goland:noinspection GoImportUsedAsName
-	instance, err := h.instanceService.FindByIdDecrypted(instanceId)
+	instance, err := h.instanceService.FindDecryptedDeploymentInstanceById(instanceId)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -266,13 +268,13 @@ func (h Handler) Save(c *gin.Context) {
 		return
 	}
 
-	databaseId, err := findParameter("DATABASE_ID", instance, stack)
-	if err != nil {
-		_ = c.Error(err)
-		return
+	parameter := "DATABASE_ID"
+	databaseId, exists := instance.Parameters[parameter]
+	if !exists {
+		_ = c.Error(fmt.Errorf("parameter %q not found", parameter))
 	}
 
-	database, err := h.databaseService.FindByIdentifier(databaseId)
+	database, err := h.databaseService.FindByIdentifier(databaseId.Value)
 	if err != nil {
 		_ = c.Error(err)
 		return
