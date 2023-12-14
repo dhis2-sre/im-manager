@@ -31,7 +31,7 @@ func TestUserHandler(t *testing.T) {
 	groupRepository := group.NewRepository(db)
 	groupService := group.NewService(groupRepository, userService)
 
-	err := user.CreateAdminUser("admin", "admin", userService, groupService)
+	err := user.CreateUser("admin", "admin", userService, groupService, model.AdministratorGroupName, "admin")
 	require.NoError(t, err, "failed to create admin user and group")
 
 	authorization := middleware.NewAuthorization(userService)

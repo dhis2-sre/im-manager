@@ -16,53 +16,27 @@ type userServiceUtil interface {
 	Save(user *model.User) error
 }
 
-func CreateAdminUser(email, password string, userService userServiceUtil, groupService groupService) error {
+func CreateUser(email, password string, userService userServiceUtil, groupService groupService, groupName, userType string) error {
 	u, err := userService.FindOrCreate(email, password)
 	if err != nil {
-		return fmt.Errorf("error creating admin user: %v", err)
+		return fmt.Errorf("error creating %s user: %v", userType, err)
 	}
 
 	u.Validated = true
 
 	err = userService.Save(u)
 	if err != nil {
-		return fmt.Errorf("error saving admin user: %v", err)
+		return fmt.Errorf("error saving %s user: %v", userType, err)
 	}
 
-	g, err := groupService.FindOrCreate(model.AdministratorGroupName, "", false)
+	g, err := groupService.FindOrCreate(groupName, "", false)
 	if err != nil {
-		return fmt.Errorf("error creating admin group: %v", err)
-	}
-
-	err = groupService.AddUser(g.Name, u.ID)
-	if err != nil {
-		return fmt.Errorf("error adding admin user to admin group: %v", err)
-	}
-
-	return nil
-}
-
-func CreateDefaultUser(email, password string, userService userServiceUtil, groupService groupService) error {
-	u, err := userService.FindOrCreate(email, password)
-	if err != nil {
-		return fmt.Errorf("error creating default user: %v", err)
-	}
-
-	u.Validated = true
-
-	err = userService.Save(u)
-	if err != nil {
-		return fmt.Errorf("error saving default user: %v", err)
-	}
-
-	g, err := groupService.FindOrCreate(model.DefaultGroupName, "", false)
-	if err != nil {
-		return fmt.Errorf("error creating admin group: %v", err)
+		return fmt.Errorf("error creating %s group: %v", groupName, err)
 	}
 
 	err = groupService.AddUser(g.Name, u.ID)
 	if err != nil {
-		return fmt.Errorf("error adding default user to default group: %v", err)
+		return fmt.Errorf("error adding %s user to %s group: %v", userType, groupName, err)
 	}
 
 	return nil
