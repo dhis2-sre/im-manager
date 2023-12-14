@@ -13,8 +13,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dhis2-sre/im-manager/pkg/instance"
-
 	"github.com/aws/aws-sdk-go-v2/aws"
 
 	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
@@ -44,8 +42,6 @@ func TestDatabaseHandler(t *testing.T) {
 
 	databaseRepository := database.NewRepository(db)
 	databaseService := database.NewService(s3Bucket, s3Client, groupService{}, databaseRepository)
-
-	instanceRepository := instance.NewRepository(db, "whatever")
 
 	client := inttest.SetupHTTPServer(t, func(engine *gin.Engine) {
 		databaseHandler := database.NewHandler(databaseService, groupService{groupName: "packages"}, instanceService{}, stackService{})
@@ -108,13 +104,22 @@ func TestDatabaseHandler(t *testing.T) {
 		}
 		db.Create(user)
 
-		instance := &model.Instance{
+		deployment := &model.Deployment{
 			UserID:    user.ID,
 			Name:      "name",
-			GroupName: "group-name",
+			GroupName: group.Name,
 		}
-		err := instanceRepository.Save(instance)
-		require.NoError(t, err)
+		db.Create(deployment)
+
+		instance := &model.DeploymentInstance{
+			ID:           0,
+			Name:         "name",
+			GroupName:    group.Name,
+			StackName:    "dhis2",
+			DeploymentID: deployment.ID,
+		}
+		db.Create(instance)
+
 		instanceID = strconv.FormatUint(uint64(instance.ID), 10)
 	}
 
