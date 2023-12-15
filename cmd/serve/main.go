@@ -157,7 +157,6 @@ func run() error {
 
 	integrationHandler := integration.NewHandler(dockerHubClient, cfg.InstanceService.Host, cfg.DatabaseManagerService.Host)
 
-	//err = user.CreateAdminUser(cfg.AdminUser.Email, cfg.AdminUser.Password, userService, groupService)
 	err = user.CreateUser(cfg.AdminUser.Email, cfg.AdminUser.Password, userService, groupService, model.AdministratorGroupName, "admin")
 	if err != nil {
 		return err
@@ -166,7 +165,6 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	//err = user.CreateDefaultUser(cfg.DefaultUser.Email, cfg.DefaultUser.Password, userService, groupService)
 	err = user.CreateUser(cfg.AdminUser.Email, cfg.AdminUser.Password, userService, groupService, model.DefaultGroupName, "default")
 	if err != nil {
 		return err
