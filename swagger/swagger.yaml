@@ -155,6 +155,13 @@ definitions:
             name:
                 type: string
                 x-go-name: Name
+            public:
+                type: boolean
+                x-go-name: Public
+            ttl:
+                format: uint64
+                type: integer
+                x-go-name: TTL
             updatedAt:
                 format: date-time
                 type: string
@@ -463,6 +470,13 @@ definitions:
             name:
                 type: string
                 x-go-name: Name
+            public:
+                type: boolean
+                x-go-name: Public
+            ttl:
+                format: uint64
+                type: integer
+                x-go-name: TTL
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
     SaveInstanceRequest:
