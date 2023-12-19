@@ -206,7 +206,9 @@ func (h Handler) FindDeploymentById(c *gin.Context) {
 	c.JSON(http.StatusOK, deployment)
 }
 
-type parameter struct{ Value string }
+type parameter struct {
+	Value string `json:"value"`
+}
 
 type parameters map[string]parameter
 
