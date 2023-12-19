@@ -33,6 +33,8 @@ releases:
       - commonLabels:
           im: "true"
           im-default: "true"
+          im-deployment-id: "{{ requiredEnv "DEPLOYMENT_ID" }}"
+          im-instance-id: "{{ requiredEnv "INSTANCE_ID" }}"
           im-id: "{{ requiredEnv "INSTANCE_ID" }}"
           im-type: "dhis2"
           im-creation-timestamp: "{{ env "INSTANCE_CREATION_TIMESTAMP" | default "" }}"
@@ -43,6 +45,8 @@ releases:
           connection.url = jdbc:postgresql://{{ requiredEnv "INSTANCE_NAME" }}-database-postgresql.{{ requiredEnv "INSTANCE_NAMESPACE" }}.svc/{{ env "DATABASE_NAME" | default "dhis2" }}
           connection.username = {{ env "DATABASE_USERNAME" | default "dhis" }}
           connection.password = {{ env "DATABASE_PASSWORD" | default "dhis" }}
+          connection.pool.acquire_retry_attempts = 1000
+          connection.pool.acquire_retry_delay = 5000
           # Database schema behavior, can be validate, update, create, create-drop
           connection.schema = update
           # Server base URL
@@ -73,6 +77,8 @@ releases:
     verify: false
     values:
       - commonLabels:
+          im-deployment-id: "{{ requiredEnv "DEPLOYMENT_ID" }}"
+          im-instance-id: "{{ requiredEnv "INSTANCE_ID" }}"
           im-id: "{{ requiredEnv "INSTANCE_ID" }}"
           im-type: "db"
 
