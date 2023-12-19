@@ -20,6 +20,9 @@ type Deployment struct {
 	GroupName   string `json:"groupName" gorm:"index:idx_name_and_group,unique; references:Name"`
 	Group       *Group `json:"group,omitempty"`
 
+	Public bool `json:"public"`
+	TTL    uint `json:"ttl"`
+
 	Instances []*DeploymentInstance `json:"instances" gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
 }
 
