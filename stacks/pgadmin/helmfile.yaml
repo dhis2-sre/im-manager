@@ -1,7 +1,7 @@
 # consumedParameters: DATABASE_USERNAME, DATABASE_NAME, DATABASE_HOSTNAME
 # hostnameVariable: DATABASE_HOSTNAME
 releases:
-  - name: {{ requiredEnv "INSTANCE_NAME" }}
+  - name: {{ requiredEnv "INSTANCE_NAME" }}-pgadmin
     namespace: "{{ requiredEnv "INSTANCE_NAMESPACE" }}"
     chart: runix/pgadmin4
     version: "{{ env "CHART_VERSION" | default "1.11.0" }}"
@@ -19,7 +19,7 @@ releases:
           hosts:
             - host: {{ requiredEnv "INSTANCE_HOSTNAME" }}
               paths:
-                - path: /{{ requiredEnv "INSTANCE_NAME" }}
+                - path: /{{ requiredEnv "INSTANCE_NAME" }}-pgadmin
                   pathType: Prefix
           annotations:
             cert-manager.io/cluster-issuer: cert-issuer-prod
