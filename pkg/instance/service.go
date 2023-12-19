@@ -98,6 +98,11 @@ func (s service) FindDecryptedDeploymentInstanceById(id uint) (*model.Deployment
 }
 
 func (s service) SaveInstance(instance *model.DeploymentInstance) error {
+	err := s.rejectConsumedParameters(instance)
+	if err != nil {
+		return err
+	}
+
 	deployment, err := s.instanceRepository.FindDecryptedDeploymentById(instance.DeploymentID)
 	if err != nil {
 		return err
@@ -116,6 +121,21 @@ func (s service) SaveInstance(instance *model.DeploymentInstance) error {
 	}
 
 	return s.instanceRepository.SaveInstance(instance)
+}
+
+func (s service) rejectConsumedParameters(instance *model.DeploymentInstance) error {
+	stack, err := s.stackService.Find(instance.StackName)
+	if err != nil {
+		return err
+	}
+
+	var errs []error
+	for name := range instance.Parameters {
+		if stack.Parameters[name].Consumed {
+			errs = append(errs, fmt.Errorf("consumed parameters can't be supplied by the user: %s", name))
+		}
+	}
+	return errors.Join(errs...)
 }
 
 func (s service) DeleteInstance(deploymentId, instanceId uint) error {
@@ -200,11 +220,6 @@ func (s service) resolveParameters(deployment *model.Deployment) error {
 			return err
 		}
 
-		err = rejectConsumedParameters(instanceParameters, stack)
-		if err != nil {
-			return err
-		}
-
 		addDefaultParameterValues(instanceParameters, stack)
 
 		err = validateParameters(instanceParameters, stack)
@@ -282,16 +297,6 @@ func rejectNonExistingParameters(instanceParameters model.DeploymentInstancePara
 	for name := range instanceParameters {
 		if _, ok := stack.Parameters[name]; !ok {
 			errs = append(errs, fmt.Errorf("parameter not found on stack: %s", name))
-		}
-	}
-	return errors.Join(errs...)
-}
-
-func rejectConsumedParameters(instanceParameters model.DeploymentInstanceParameters, stack *model.Stack) error {
-	var errs []error
-	for name := range instanceParameters {
-		if stack.Parameters[name].Consumed {
-			errs = append(errs, fmt.Errorf("consumed parameters can't be supplied by the user: %s", name))
 		}
 	}
 	return errors.Join(errs...)
