@@ -141,6 +141,10 @@ func (h Handler) SaveDeployment(c *gin.Context) {
 		return
 	}
 
+	if request.TTL == 0 {
+		request.TTL = h.defaultTTL
+	}
+
 	deployment := &model.Deployment{
 		UserID:      user.ID,
 		Name:        request.Name,
