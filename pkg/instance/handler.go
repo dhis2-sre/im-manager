@@ -36,6 +36,8 @@ type SaveDeploymentRequest struct {
 	Name        string `json:"name" binding:"required,dns_rfc1035_label"`
 	Description string `json:"description"`
 	Group       string `json:"group" binding:"required"`
+	Public      bool   `json:"public"`
+	TTL         uint   `json:"ttl"`
 }
 
 func (h Handler) DeployDeployment(c *gin.Context) {
@@ -144,6 +146,8 @@ func (h Handler) SaveDeployment(c *gin.Context) {
 		Name:        request.Name,
 		Description: request.Description,
 		GroupName:   request.Group,
+		Public:      request.Public,
+		TTL:         request.TTL,
 	}
 
 	canWrite := handler.CanWriteDeployment(user, deployment)
@@ -660,7 +664,7 @@ func (h Handler) Reset(c *gin.Context) {
 		return
 	}
 
-	err = h.instanceService.Reset(token, instance)
+	err = h.instanceService.Reset(token, instance, deployment.TTL)
 	if err != nil {
 		_ = c.Error(err)
 		return

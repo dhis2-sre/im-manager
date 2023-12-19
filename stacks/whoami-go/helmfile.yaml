@@ -17,6 +17,8 @@ releases:
       - commonLabels:
           im: "true"
           im-default: "true"
+          im-deployment-id: "{{ requiredEnv "DEPLOYMENT_ID" }}"
+          im-instance-id: "{{ requiredEnv "INSTANCE_ID" }}"
           im-id: "{{ requiredEnv "INSTANCE_ID" }}"
           im-type: "whoami"
           im-creation-timestamp: "{{ env "INSTANCE_CREATION_TIMESTAMP" | default "" }}"

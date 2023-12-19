@@ -64,7 +64,7 @@ type groupService interface {
 }
 
 type helmfile interface {
-	sync_deployment(token string, instance *model.DeploymentInstance, group *model.Group) (*exec.Cmd, error)
+	sync_deployment(token string, instance *model.DeploymentInstance, group *model.Group, ttl uint) (*exec.Cmd, error)
 	sync(token string, instance *model.Instance, group *model.Group) (*exec.Cmd, error)
 	destroy_deployment(instance *model.DeploymentInstance, group *model.Group) (*exec.Cmd, error)
 	destroy(instance *model.Instance, group *model.Group) (*exec.Cmd, error)
@@ -332,7 +332,7 @@ func (s service) DeployDeployment(token string, deployment *model.Deployment) er
 	deployment.Instances = instances
 
 	for _, instance := range instances {
-		err := s.deployDeploymentInstance(token, instance)
+		err := s.deployDeploymentInstance(token, instance, deployment.TTL)
 		if err != nil {
 			return fmt.Errorf("failed to deploy instance(%s) %q: %v", instance.StackName, instance.Name, err)
 		}
@@ -341,13 +341,13 @@ func (s service) DeployDeployment(token string, deployment *model.Deployment) er
 	return nil
 }
 
-func (s service) deployDeploymentInstance(token string, instance *model.DeploymentInstance) error {
+func (s service) deployDeploymentInstance(token string, instance *model.DeploymentInstance, ttl uint) error {
 	group, err := s.groupService.Find(instance.GroupName)
 	if err != nil {
 		return err
 	}
 
-	syncCmd, err := s.helmfileService.sync_deployment(token, instance, group)
+	syncCmd, err := s.helmfileService.sync_deployment(token, instance, group, ttl)
 	if err != nil {
 		return err
 	}
@@ -829,13 +829,13 @@ func (s service) FindPublicInstances() ([]GroupsWithInstances, error) {
 	return s.instanceRepository.FindPublicInstances()
 }
 
-func (s service) Reset(token string, instance *model.DeploymentInstance) error {
+func (s service) Reset(token string, instance *model.DeploymentInstance, ttl uint) error {
 	err := s.destroyDeploymentInstance(instance)
 	if err != nil {
 		return err
 	}
 
-	return s.deployDeploymentInstance(token, instance)
+	return s.deployDeploymentInstance(token, instance, ttl)
 }
 
 func (s service) destroy(instance *model.Instance) error {
