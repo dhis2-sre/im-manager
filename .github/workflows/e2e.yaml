@@ -54,8 +54,7 @@ jobs:
         with:
           owner: dhis2-sre
           repo: im-web-client
-          # TODO update bot user PAT
-          github_token: ${{ secrets.DHIS2_BOT_GITHUB_TOKEN }}
+          github_token: ${{ secrets.DHIS2_SRE_BOT_GITHUB_TOKEN }}
           workflow_file_name: playwright.yml
           ref: DEVOPS-291
           client_payload: '{"api_url": "${{ env.TARGET_URL }}"}'
