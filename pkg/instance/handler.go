@@ -1211,7 +1211,7 @@ func (h Handler) ListPublicInstances(c *gin.Context) {
 
 // DeleteDeployment deployment by id
 func (h Handler) DeleteDeployment(c *gin.Context) {
-	// swagger:route DELETE /deployment/{id} deleteDeployment
+	// swagger:route DELETE /deployments/{id} deleteDeployment
 	//
 	// Delete deployment
 	//

@@ -1017,31 +1017,6 @@ paths:
             security:
                 - oauth2: []
             summary: Save database
-    /deployment/{id}:
-        delete:
-            description: Delete an deployment by id
-            operationId: deleteDeployment
-            parameters:
-                - format: uint64
-                  in: path
-                  name: id
-                  required: true
-                  type: integer
-                  x-go-name: ID
-            responses:
-                "202":
-                    description: ""
-                "401":
-                    $ref: '#/responses/Error'
-                "403":
-                    $ref: '#/responses/Error'
-                "404":
-                    $ref: '#/responses/Error'
-                "415":
-                    $ref: '#/responses/Error'
-            security:
-                - oauth2: []
-            summary: Delete deployment
     /deployments:
         get:
             description: Find all deployments accessible by the user
@@ -1085,6 +1060,30 @@ paths:
                 - oauth2: []
             summary: Save a deployment
     /deployments/{id}:
+        delete:
+            description: Delete an deployment by id
+            operationId: deleteDeployment
+            parameters:
+                - format: uint64
+                  in: path
+                  name: id
+                  required: true
+                  type: integer
+                  x-go-name: ID
+            responses:
+                "202":
+                    description: ""
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Delete deployment
         get:
             description: Find a deployment by id
             operationId: findDeploymentById
