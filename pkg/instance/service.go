@@ -760,7 +760,7 @@ const (
 	Error              InstanceStatus = "Error"
 )
 
-func (s service) GetStatus(instance *model.Instance) (InstanceStatus, error) {
+func (s service) GetStatus(instance *model.DeploymentInstance) (InstanceStatus, error) {
 	ks, err := NewKubernetesService(instance.Group.ClusterConfiguration)
 	if err != nil {
 		return "", err

@@ -1288,13 +1288,19 @@ func (h Handler) Status(c *gin.Context) {
 		return
 	}
 
-	instance, err := h.instanceService.FindByIdDecrypted(id)
+	instance, err := h.instanceService.FindDeploymentInstanceById(id)
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
 
-	canRead := handler.CanReadInstance(user, instance)
+	deployment, err := h.instanceService.FindDeploymentById(instance.ID)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	canRead := handler.CanReadDeployment(user, deployment)
 	if !canRead {
 		unauthorized := errdef.NewUnauthorized("read access denied")
 		_ = c.Error(unauthorized)
