@@ -1294,7 +1294,7 @@ func (h Handler) Status(c *gin.Context) {
 		return
 	}
 
-	deployment, err := h.instanceService.FindDeploymentById(instance.ID)
+	deployment, err := h.instanceService.FindDeploymentById(instance.DeploymentID)
 	if err != nil {
 		_ = c.Error(err)
 		return
