@@ -36,6 +36,8 @@ type SaveDeploymentRequest struct {
 	Name        string `json:"name" binding:"required,dns_rfc1035_label"`
 	Description string `json:"description"`
 	Group       string `json:"group" binding:"required"`
+	Public      bool   `json:"public"`
+	TTL         uint   `json:"ttl"`
 }
 
 func (h Handler) DeployDeployment(c *gin.Context) {
@@ -139,11 +141,17 @@ func (h Handler) SaveDeployment(c *gin.Context) {
 		return
 	}
 
+	if request.TTL == 0 {
+		request.TTL = h.defaultTTL
+	}
+
 	deployment := &model.Deployment{
 		UserID:      user.ID,
 		Name:        request.Name,
 		Description: request.Description,
 		GroupName:   request.Group,
+		Public:      request.Public,
+		TTL:         request.TTL,
 	}
 
 	canWrite := handler.CanWriteDeployment(user, deployment)
@@ -206,7 +214,9 @@ func (h Handler) FindDeploymentById(c *gin.Context) {
 	c.JSON(http.StatusOK, deployment)
 }
 
-type parameter struct{ Value string }
+type parameter struct {
+	Value string `json:"value"`
+}
 
 type parameters map[string]parameter
 
@@ -658,7 +668,7 @@ func (h Handler) Reset(c *gin.Context) {
 		return
 	}
 
-	err = h.instanceService.Reset(token, instance)
+	err = h.instanceService.Reset(token, instance, deployment.TTL)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -1201,7 +1211,7 @@ func (h Handler) ListPublicInstances(c *gin.Context) {
 
 // DeleteDeployment deployment by id
 func (h Handler) DeleteDeployment(c *gin.Context) {
-	// swagger:route DELETE /deployment/{id} deleteDeployment
+	// swagger:route DELETE /deployments/{id} deleteDeployment
 	//
 	// Delete deployment
 	//
@@ -1278,13 +1288,19 @@ func (h Handler) Status(c *gin.Context) {
 		return
 	}
 
-	instance, err := h.instanceService.FindByIdDecrypted(id)
+	instance, err := h.instanceService.FindDeploymentInstanceById(id)
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
 
-	canRead := handler.CanReadInstance(user, instance)
+	deployment, err := h.instanceService.FindDeploymentById(instance.DeploymentID)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	canRead := handler.CanReadDeployment(user, deployment)
 	if !canRead {
 		unauthorized := errdef.NewUnauthorized("read access denied")
 		_ = c.Error(unauthorized)

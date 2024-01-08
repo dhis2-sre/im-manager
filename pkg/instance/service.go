@@ -64,7 +64,7 @@ type groupService interface {
 }
 
 type helmfile interface {
-	sync_deployment(token string, instance *model.DeploymentInstance, group *model.Group) (*exec.Cmd, error)
+	sync_deployment(token string, instance *model.DeploymentInstance, group *model.Group, ttl uint) (*exec.Cmd, error)
 	sync(token string, instance *model.Instance, group *model.Group) (*exec.Cmd, error)
 	destroy_deployment(instance *model.DeploymentInstance, group *model.Group) (*exec.Cmd, error)
 	destroy(instance *model.Instance, group *model.Group) (*exec.Cmd, error)
@@ -98,6 +98,11 @@ func (s service) FindDecryptedDeploymentInstanceById(id uint) (*model.Deployment
 }
 
 func (s service) SaveInstance(instance *model.DeploymentInstance) error {
+	err := s.rejectConsumedParameters(instance)
+	if err != nil {
+		return err
+	}
+
 	deployment, err := s.instanceRepository.FindDecryptedDeploymentById(instance.DeploymentID)
 	if err != nil {
 		return err
@@ -116,6 +121,21 @@ func (s service) SaveInstance(instance *model.DeploymentInstance) error {
 	}
 
 	return s.instanceRepository.SaveInstance(instance)
+}
+
+func (s service) rejectConsumedParameters(instance *model.DeploymentInstance) error {
+	stack, err := s.stackService.Find(instance.StackName)
+	if err != nil {
+		return err
+	}
+
+	var errs []error
+	for name := range instance.Parameters {
+		if stack.Parameters[name].Consumed {
+			errs = append(errs, fmt.Errorf("consumed parameters can't be supplied by the user: %s", name))
+		}
+	}
+	return errors.Join(errs...)
 }
 
 func (s service) DeleteInstance(deploymentId, instanceId uint) error {
@@ -196,11 +216,6 @@ func (s service) resolveParameters(deployment *model.Deployment) error {
 
 		instanceParameters := instance.Parameters
 		err = rejectNonExistingParameters(instanceParameters, stack)
-		if err != nil {
-			return err
-		}
-
-		err = rejectConsumedParameters(instanceParameters, stack)
 		if err != nil {
 			return err
 		}
@@ -287,16 +302,6 @@ func rejectNonExistingParameters(instanceParameters model.DeploymentInstancePara
 	return errors.Join(errs...)
 }
 
-func rejectConsumedParameters(instanceParameters model.DeploymentInstanceParameters, stack *model.Stack) error {
-	var errs []error
-	for name := range instanceParameters {
-		if stack.Parameters[name].Consumed {
-			errs = append(errs, fmt.Errorf("consumed parameters can't be supplied by the user: %s", name))
-		}
-	}
-	return errors.Join(errs...)
-}
-
 func addDefaultParameterValues(instanceParameters model.DeploymentInstanceParameters, stack *model.Stack) {
 	for name, stackParameter := range stack.Parameters {
 		if _, ok := instanceParameters[name]; !ok {
@@ -327,7 +332,7 @@ func (s service) DeployDeployment(token string, deployment *model.Deployment) er
 	deployment.Instances = instances
 
 	for _, instance := range instances {
-		err := s.deployDeploymentInstance(token, instance)
+		err := s.deployDeploymentInstance(token, instance, deployment.TTL)
 		if err != nil {
 			return fmt.Errorf("failed to deploy instance(%s) %q: %v", instance.StackName, instance.Name, err)
 		}
@@ -336,13 +341,13 @@ func (s service) DeployDeployment(token string, deployment *model.Deployment) er
 	return nil
 }
 
-func (s service) deployDeploymentInstance(token string, instance *model.DeploymentInstance) error {
+func (s service) deployDeploymentInstance(token string, instance *model.DeploymentInstance, ttl uint) error {
 	group, err := s.groupService.Find(instance.GroupName)
 	if err != nil {
 		return err
 	}
 
-	syncCmd, err := s.helmfileService.sync_deployment(token, instance, group)
+	syncCmd, err := s.helmfileService.sync_deployment(token, instance, group, ttl)
 	if err != nil {
 		return err
 	}
@@ -755,7 +760,7 @@ const (
 	Error              InstanceStatus = "Error"
 )
 
-func (s service) GetStatus(instance *model.Instance) (InstanceStatus, error) {
+func (s service) GetStatus(instance *model.DeploymentInstance) (InstanceStatus, error) {
 	ks, err := NewKubernetesService(instance.Group.ClusterConfiguration)
 	if err != nil {
 		return "", err
@@ -824,13 +829,13 @@ func (s service) FindPublicInstances() ([]GroupsWithInstances, error) {
 	return s.instanceRepository.FindPublicInstances()
 }
 
-func (s service) Reset(token string, instance *model.DeploymentInstance) error {
+func (s service) Reset(token string, instance *model.DeploymentInstance, ttl uint) error {
 	err := s.destroyDeploymentInstance(instance)
 	if err != nil {
 		return err
 	}
 
-	return s.deployDeploymentInstance(token, instance)
+	return s.deployDeploymentInstance(token, instance, ttl)
 }
 
 func (s service) destroy(instance *model.Instance) error {

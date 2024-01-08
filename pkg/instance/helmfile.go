@@ -29,8 +29,8 @@ type stackService interface {
 	Find(name string) (*model.Stack, error)
 }
 
-func (h helmfileService) sync_deployment(token string, instance *model.DeploymentInstance, group *model.Group) (*exec.Cmd, error) {
-	return h.executeHelmfileCommand_deployment(token, instance, group, "sync")
+func (h helmfileService) sync_deployment(token string, instance *model.DeploymentInstance, group *model.Group, ttl uint) (*exec.Cmd, error) {
+	return h.executeHelmfileCommand_deployment(token, instance, group, ttl, "sync")
 }
 
 func (h helmfileService) sync(token string, instance *model.Instance, group *model.Group) (*exec.Cmd, error) {
@@ -38,7 +38,7 @@ func (h helmfileService) sync(token string, instance *model.Instance, group *mod
 }
 
 func (h helmfileService) destroy_deployment(instance *model.DeploymentInstance, group *model.Group) (*exec.Cmd, error) {
-	return h.executeHelmfileCommand_deployment("token", instance, group, "destroy")
+	return h.executeHelmfileCommand_deployment("token", instance, group, 0, "destroy")
 }
 
 func (h helmfileService) destroy(instance *model.Instance, group *model.Group) (*exec.Cmd, error) {
@@ -76,7 +76,7 @@ func (h helmfileService) executeHelmfileCommand(token string, instance *model.In
 	return cmd, nil
 }
 
-func (h helmfileService) executeHelmfileCommand_deployment(token string, instance *model.DeploymentInstance, group *model.Group, operation string) (*exec.Cmd, error) {
+func (h helmfileService) executeHelmfileCommand_deployment(token string, instance *model.DeploymentInstance, group *model.Group, ttl uint, operation string) (*exec.Cmd, error) {
 	//goland:noinspection GoImportUsedAsName
 	stack, err := h.stackService.Find(instance.StackName)
 	if err != nil {
@@ -96,7 +96,7 @@ func (h helmfileService) executeHelmfileCommand_deployment(token string, instanc
 
 	cmd := exec.Command("/usr/bin/helmfile", "--helm-binary", "/usr/bin/helm", "-f", stackPath, operation) // #nosec
 	log.Printf("Command: %s\n", cmd.String())
-	configureInstanceEnvironment_deployment(token, instance, group, stackParameters, cmd)
+	configureInstanceEnvironment_deployment(token, instance, group, ttl, stackParameters, cmd)
 
 	return cmd, nil
 }
@@ -128,19 +128,19 @@ func (h helmfileService) loadStackParameters(stackName string) (stackParameters,
 	return params, nil
 }
 
-func configureInstanceEnvironment_deployment(accessToken string, instance *model.DeploymentInstance, group *model.Group, stackParameters stackParameters, cmd *exec.Cmd) {
+func configureInstanceEnvironment_deployment(accessToken string, instance *model.DeploymentInstance, group *model.Group, ttl uint, stackParameters stackParameters, cmd *exec.Cmd) {
 	// TODO: We should only inject what the stack require, currently we just blindly inject IM_ACCESS_TOKEN and others which may not be required by the stack
 	// We could probably list the required system parameters in the stacks helmfile and parse those as well as other parameters
 	instanceNameEnv := fmt.Sprintf("%s=%s", "INSTANCE_NAME", instance.Name)
 	instanceNamespaceEnv := fmt.Sprintf("%s=%s", "INSTANCE_NAMESPACE", group.Name)
 	instanceIdEnv := fmt.Sprintf("%s=%d", "INSTANCE_ID", instance.ID)
-	// instanceTTLEnv := fmt.Sprintf("%s=%d", "INSTANCE_TTL", instance.TTL)
-	instanceTTLEnv := fmt.Sprintf("%s=%d", "INSTANCE_TTL", 3800)
+	deploymentIdEnv := fmt.Sprintf("%s=%d", "DEPLOYMENT_ID", instance.DeploymentID)
+	instanceTTLEnv := fmt.Sprintf("%s=%d", "INSTANCE_TTL", ttl)
 	instanceHostnameEnv := fmt.Sprintf("%s=%s", "INSTANCE_HOSTNAME", group.Hostname)
 	imTokenEnv := fmt.Sprintf("%s=%s", "IM_ACCESS_TOKEN", accessToken)
 	homeEnv := fmt.Sprintf("%s=%s", "HOME", "/tmp")
 	imCreationTimestamp := fmt.Sprintf("%s=%d", "INSTANCE_CREATION_TIMESTAMP", time.Now().Unix())
-	cmd.Env = append(cmd.Env, instanceNameEnv, instanceNamespaceEnv, instanceIdEnv, instanceTTLEnv, instanceHostnameEnv, imTokenEnv, homeEnv, imCreationTimestamp)
+	cmd.Env = append(cmd.Env, instanceNameEnv, instanceNamespaceEnv, instanceIdEnv, deploymentIdEnv, instanceTTLEnv, instanceHostnameEnv, imTokenEnv, homeEnv, imCreationTimestamp)
 
 	cmd.Env = injectEnv(cmd.Env, "HOSTNAME")
 	cmd.Env = injectEnv(cmd.Env, "AWS_ACCESS_KEY_ID")
@@ -175,13 +175,14 @@ func configureInstanceEnvironment(accessToken string, stack *model.Stack, instan
 	// We could probably list the required system parameters in the stacks helmfile and parse those as well as other parameters
 	instanceNameEnv := fmt.Sprintf("%s=%s", "INSTANCE_NAME", instance.Name)
 	instanceNamespaceEnv := fmt.Sprintf("%s=%s", "INSTANCE_NAMESPACE", group.Name)
+	deploymentIdEnv := fmt.Sprintf("%s=%d", "DEPLOYMENT_ID", 0)
 	instanceIdEnv := fmt.Sprintf("%s=%d", "INSTANCE_ID", instance.ID)
 	instanceTTLEnv := fmt.Sprintf("%s=%d", "INSTANCE_TTL", instance.TTL)
 	instanceHostnameEnv := fmt.Sprintf("%s=%s", "INSTANCE_HOSTNAME", group.Hostname)
 	imTokenEnv := fmt.Sprintf("%s=%s", "IM_ACCESS_TOKEN", accessToken)
 	homeEnv := fmt.Sprintf("%s=%s", "HOME", "/tmp")
 	imCreationTimestamp := fmt.Sprintf("%s=%d", "INSTANCE_CREATION_TIMESTAMP", time.Now().Unix())
-	cmd.Env = append(cmd.Env, instanceNameEnv, instanceNamespaceEnv, instanceIdEnv, instanceTTLEnv, instanceHostnameEnv, imTokenEnv, homeEnv, imCreationTimestamp)
+	cmd.Env = append(cmd.Env, instanceNameEnv, instanceNamespaceEnv, deploymentIdEnv, instanceIdEnv, instanceTTLEnv, instanceHostnameEnv, imTokenEnv, homeEnv, imCreationTimestamp)
 
 	cmd.Env = injectEnv(cmd.Env, "HOSTNAME")
 	cmd.Env = injectEnv(cmd.Env, "AWS_ACCESS_KEY_ID")

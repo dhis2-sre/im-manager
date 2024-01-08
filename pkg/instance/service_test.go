@@ -29,21 +29,17 @@ func TestResolveParameters(t *testing.T) {
 		}
 		stackService := stack.NewService(stacks)
 		service := NewService(nil, nil, stackService, nil)
-		deployment := &model.Deployment{
-			Instances: []*model.DeploymentInstance{
-				{
-					StackName: "stack",
-					Parameters: map[string]model.DeploymentInstanceParameter{
-						"parameter": {
-							ParameterName: "parameter",
-							Value:         "user overwrite",
-						},
-					},
+		instance := &model.DeploymentInstance{
+			StackName: "stack",
+			Parameters: map[string]model.DeploymentInstanceParameter{
+				"parameter": {
+					ParameterName: "parameter",
+					Value:         "user overwrite",
 				},
 			},
 		}
 
-		err := service.resolveParameters(deployment)
+		err := service.SaveInstance(instance)
 
 		require.ErrorContains(t, err, "consumed parameters can't be supplied by the user: parameter")
 	})

@@ -62,6 +62,7 @@ func (r repository) FindDeploymentById(id uint) (*model.Deployment, error) {
 	var deployment *model.Deployment
 	err := r.db.
 		Joins("Group").
+		Joins("User").
 		Preload("Instances.GormParameters").
 		First(&deployment, id).Error
 
@@ -78,6 +79,7 @@ func (r repository) FindDeploymentById(id uint) (*model.Deployment, error) {
 func (r repository) FindDeploymentInstanceById(id uint) (*model.DeploymentInstance, error) {
 	var instance *model.DeploymentInstance
 	err := r.db.
+		Joins("Group").
 		Preload("GormParameters").
 		First(&instance, id).Error
 
