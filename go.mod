@@ -18,7 +18,7 @@ require (
 	github.com/go-playground/validator/v10 v10.16.0
 	github.com/go-redis/redis v6.15.9+incompatible
 	github.com/gofrs/uuid v4.4.0+incompatible
-	github.com/google/uuid v1.4.0
+	github.com/google/uuid v1.5.0
 	github.com/gosimple/slug v1.13.1
 	github.com/habx/pg-commands v0.6.1
 	github.com/lestrrat-go/jwx v1.2.26
