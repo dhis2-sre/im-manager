@@ -25,29 +25,27 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
-
-	"github.com/go-mail/mail"
-
 	"github.com/aws/aws-sdk-go-v2/aws"
+	s3config "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
-	"github.com/dhis2-sre/im-manager/internal/middleware"
-	"github.com/dhis2-sre/im-manager/pkg/database"
-	"github.com/dhis2-sre/im-manager/pkg/group"
-	"github.com/dhis2-sre/im-manager/pkg/model"
-	"github.com/dhis2-sre/im-manager/pkg/token"
-	"github.com/dhis2-sre/im-manager/pkg/user"
-
-	s3config "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/dhis2-sre/im-manager/internal/handler"
+	"github.com/dhis2-sre/im-manager/internal/middleware"
 	"github.com/dhis2-sre/im-manager/internal/server"
 	"github.com/dhis2-sre/im-manager/pkg/config"
+	"github.com/dhis2-sre/im-manager/pkg/database"
+	"github.com/dhis2-sre/im-manager/pkg/group"
 	"github.com/dhis2-sre/im-manager/pkg/instance"
 	"github.com/dhis2-sre/im-manager/pkg/integration"
+	"github.com/dhis2-sre/im-manager/pkg/model"
 	"github.com/dhis2-sre/im-manager/pkg/stack"
+	"github.com/dhis2-sre/im-manager/pkg/status"
 	"github.com/dhis2-sre/im-manager/pkg/storage"
+	"github.com/dhis2-sre/im-manager/pkg/token"
+	"github.com/dhis2-sre/im-manager/pkg/user"
 	"github.com/dhis2-sre/rabbitmq"
+	"github.com/go-mail/mail"
+	"log"
 )
 
 func main() {
@@ -175,6 +173,13 @@ func run() error {
 	database.Routes(r, authentication.TokenAuthentication, databaseHandler)
 	instance.Routes(r, authentication.TokenAuthentication, instanceHandler)
 
+	// Create status service with the below property
+	// Fire off a go routine from one method
+	// Return a filtered list of status' from a handler
+	// Seed sse to each subscriber when one of their instances update
+	go func() {
+		instanceStatus.Listen()
+	}()
 	return r.Run()
 }
 

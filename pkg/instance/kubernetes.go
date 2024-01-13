@@ -37,6 +37,10 @@ func NewKubernetesService(config *model.ClusterConfiguration) (*kubernetesServic
 	return &kubernetesService{client: client}, nil
 }
 
+func (ks kubernetesService) GetClient() *kubernetes.Clientset {
+	return ks.client
+}
+
 func commandExecutor(cmd *exec.Cmd, configuration *model.ClusterConfiguration) (stdout []byte, stderr []byte, err error) {
 	if configuration == nil {
 		return runCommand(cmd)

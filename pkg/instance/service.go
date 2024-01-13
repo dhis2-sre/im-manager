@@ -774,6 +774,10 @@ func (s service) GetStatus(instance *model.DeploymentInstance) (InstanceStatus, 
 		return "", err
 	}
 
+	return PodStatus(&pod)
+}
+
+func PodStatus(pod *v1.Pod) (InstanceStatus, error) {
 	switch pod.Status.Phase {
 	case v1.PodPending:
 		initContainerErrorIndex := slices.IndexFunc(pod.Status.InitContainerStatuses, func(status v1.ContainerStatus) bool {

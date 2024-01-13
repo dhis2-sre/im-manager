@@ -47,6 +47,8 @@ type DeploymentInstance struct {
 	Parameters     DeploymentInstanceParameters  `json:"parameters" gorm:"-:all"`
 
 	DeployLog string `json:"deployLog" gorm:"type:text"`
+
+	Status string `json:"status" gorm:"-:all"`
 }
 
 type DeploymentInstanceParameter struct {
