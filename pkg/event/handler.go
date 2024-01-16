@@ -1,11 +1,12 @@
 package event
 
 import (
+	"io"
+	"log"
+
 	"github.com/dhis2-sre/im-manager/internal/handler"
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	"github.com/gin-gonic/gin"
-	"io"
-	"log"
 )
 
 func NewHandler(broker broker) Handler {

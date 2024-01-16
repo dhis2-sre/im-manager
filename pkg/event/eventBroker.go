@@ -1,9 +1,10 @@
 package event
 
 import (
+	"sync"
+
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	"golang.org/x/exp/maps"
-	"sync"
 )
 
 func NewEventBroker() *Broker {

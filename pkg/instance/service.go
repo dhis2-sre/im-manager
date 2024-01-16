@@ -6,14 +6,15 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/dhis2-sre/im-manager/pkg/event"
 	"io"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/watch"
 	"log"
 	"os/exec"
 	"slices"
 	"strconv"
+
+	"github.com/dhis2-sre/im-manager/pkg/event"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/watch"
 
 	"golang.org/x/exp/maps"
 

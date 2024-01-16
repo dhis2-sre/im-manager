@@ -25,6 +25,8 @@ package main
 import (
 	"context"
 	"fmt"
+	"log"
+
 	"github.com/aws/aws-sdk-go-v2/aws"
 	s3config "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
@@ -45,7 +47,6 @@ import (
 	"github.com/dhis2-sre/im-manager/pkg/user"
 	"github.com/dhis2-sre/rabbitmq"
 	"github.com/go-mail/mail"
-	"log"
 )
 
 func main() {
