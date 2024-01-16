@@ -75,7 +75,7 @@ func TestInstanceHandler(t *testing.T) {
 	stackService := stack.NewService(stacks)
 	// classification 'test' does not actually exist, this is used to decrypt the stack parameters
 	helmfileService := instance.NewHelmfileService("../../stacks", stackService, "test")
-	instanceService := instance.NewService(instanceRepo, groupService, stackService, helmfileService)
+	instanceService := instance.NewService(nil, instanceRepo, groupService, stackService, helmfileService)
 
 	s3Dir := t.TempDir()
 	s3Bucket := "database-bucket"
@@ -269,6 +269,11 @@ func encryptUsingAge(t *testing.T, identity *age.X25519Identity, yamlData []byte
 
 type groupService struct {
 	group *model.Group
+}
+
+func (gs groupService) FindAll(user *model.User, deployable bool) ([]model.Group, error) {
+	//TODO implement me
+	panic("implement me")
 }
 
 func (gs groupService) Find(name string) (*model.Group, error) {
