@@ -53,6 +53,44 @@ func (m AuthenticationMiddleware) handleError(c *gin.Context, e error) {
 	_ = c.AbortWithError(http.StatusUnauthorized, e)
 }
 
+func (m AuthenticationMiddleware) QueryStringAuthentication(c *gin.Context) {
+	token, ok := c.GetQuery("token")
+	if !ok {
+		_ = c.Error(errdef.NewUnauthorized("token not valid"))
+		c.Abort()
+		return
+	}
+
+	user, err := parseToken(token, m.publicKey)
+	if err != nil {
+		_ = c.Error(errdef.NewUnauthorized("token not valid: %s", err.Error()))
+		c.Abort()
+		return
+	}
+
+	// Extra precaution to ensure that no errors has occurred, and it's safe to call c.Next()
+	if len(c.Errors.Errors()) > 0 {
+		c.Abort()
+		return
+	} else {
+		c.Set("user", user)
+		c.Next()
+	}
+}
+
+func parseToken(token string, key *rsa.PublicKey) (*model.User, error) {
+	parsedToken, err := jwt.Parse(
+		[]byte(token),
+		jwt.WithValidate(true),
+		jwt.WithVerify(jwa.RS256, key),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return extractUser(parsedToken)
+}
+
 func (m AuthenticationMiddleware) TokenAuthentication(c *gin.Context) {
 	u, err := parseRequest(c.Request, m.publicKey)
 	if err != nil {
@@ -82,22 +120,29 @@ func parseRequest(request *http.Request, key *rsa.PublicKey) (*model.User, error
 		return nil, err
 	}
 
+	return extractUser(token)
+}
+
+func extractUser(token jwt.Token) (*model.User, error) {
 	userData, ok := token.Get("user")
 	if !ok {
 		return nil, errors.New("user not found in claims")
 	}
 
-	return extractUser(userData)
-}
-
-func extractUser(userData any) (*model.User, error) {
 	userMap, ok := userData.(map[string]any)
 	if !ok {
 		return nil, errors.New("failed to parse user data")
 	}
 
-	id := userMap["id"].(float64)
-	email := userMap["email"].(string)
+	id, ok := userMap["id"].(float64)
+	if !ok {
+		return nil, errors.New("failed to extract user id")
+	}
+
+	email, ok := userMap["email"].(string)
+	if !ok {
+		return nil, errors.New("failed to extract user email")
+	}
 
 	user := &model.User{
 		ID:          uint(id),

@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"slices"
 	"strings"
 	"time"
 
@@ -408,4 +409,68 @@ func scale(sc scaler, name string, replicas int32) (int32, error) {
 	}
 
 	return prevReplicas, nil
+}
+
+type Status string
+
+const (
+	NotDeployed        Status = "NotDeployed"
+	Pending            Status = "Pending"
+	Booting            Status = "Booting"
+	BootingWithRestart Status = "Booting (%d)"
+	Running            Status = "Running"
+	Error              Status = "Error"
+	Terminating        Status = "Terminating"
+)
+
+func PodStatus(pod *v1.Pod) (Status, error) {
+	switch pod.Status.Phase {
+	case v1.PodPending:
+		initContainerErrorIndex := slices.IndexFunc(pod.Status.InitContainerStatuses, func(status v1.ContainerStatus) bool {
+			return status.State.Waiting != nil && status.State.Waiting.Reason == "ImagePullBackOff"
+		})
+		if initContainerErrorIndex != -1 {
+			status := pod.Status.InitContainerStatuses[initContainerErrorIndex]
+			return Status(string(Error) + ": " + status.State.Waiting.Message), nil
+		}
+
+		containerErrorIndex := slices.IndexFunc(pod.Status.ContainerStatuses, func(status v1.ContainerStatus) bool {
+			return status.State.Waiting != nil && status.State.Waiting.Reason == "ImagePullBackOff"
+		})
+		if containerErrorIndex != -1 {
+			status := pod.Status.ContainerStatuses[containerErrorIndex]
+			return Status(string(Error) + ": " + status.State.Waiting.Message), nil
+		}
+		return Pending, nil
+	case v1.PodFailed:
+		return Error, nil
+	case v1.PodRunning:
+		booting := slices.ContainsFunc(pod.Status.Conditions, func(condition v1.PodCondition) bool {
+			return condition.Status == v1.ConditionFalse
+		})
+		if booting {
+			initContainerStatuses := pod.Status.InitContainerStatuses
+			if initContainerStatuses != nil {
+				initContainerError := slices.ContainsFunc(initContainerStatuses, func(status v1.ContainerStatus) bool {
+					return status.LastTerminationState.Terminated != nil && status.LastTerminationState.Terminated.Reason == "Error"
+				})
+				if initContainerError {
+					status := fmt.Sprintf(string(BootingWithRestart), initContainerStatuses[0].RestartCount)
+					return Status(status), nil
+				}
+			}
+
+			containerError := slices.ContainsFunc(pod.Status.ContainerStatuses, func(status v1.ContainerStatus) bool {
+				return status.LastTerminationState.Terminated != nil && status.LastTerminationState.Terminated.Reason == "Error"
+			})
+			if containerError {
+				status := fmt.Sprintf(string(BootingWithRestart), pod.Status.ContainerStatuses[0].RestartCount)
+				return Status(status), nil
+			}
+
+			return Booting, nil
+		}
+		return Running, nil
+	}
+	return "", fmt.Errorf("failed to get instance status")
 }
