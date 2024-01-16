@@ -3,6 +3,7 @@ package model
 import "time"
 
 const AdministratorGroupName = "administrators"
+const DefaultGroupName = "whoami"
 
 // Group domain object defining a group
 // swagger:model

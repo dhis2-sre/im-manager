@@ -3,39 +3,61 @@ name: e2e tests
 on:
   push:
     branches: [ master ]
+  pull_request:
+    branches: [ master ]
   workflow_dispatch:
+
+env:
+  DEPLOY_ENVIRONMENT: ${{ (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'deploy')) }}
 
 jobs:
   e2e:
+    if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'deploy')) }}
     runs-on: ubuntu-20.04
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - name: Wait for deploy
+        if: ${{ env.DEPLOY_ENVIRONMENT == 'true' }}
+        # Using fork of the upstream https://github.com/lewagon/wait-on-check-action,
+        # see https://github.com/lewagon/wait-on-check-action/issues/85 for more info.
+        uses: t3chguy/wait-on-check-action@master
+        with:
+          ref: ${{ github.head_ref }}
+          check-name: 'call-workflow / build'
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          allowed-conclusions: success
 
-      - name: Install prerequisites
-        run: sudo apt install httpie
-
-      - name: Pin kubectl to version v1.23.6 (https://github.com/aws/aws-cli/issues/6920)
+      - name: Construct tests target URL
         run: |
-          curl -LO https://storage.googleapis.com/kubernetes-release/release/v1.23.6/bin/linux/amd64/kubectl
-          chmod +x ./kubectl
-          sudo mv ./kubectl /usr/local/bin/kubectl
+          BASE_HOSTNAME="api.im.dhis2.org"
 
-      - name: Configure kubectl
-        run: |
-          mkdir $PWD/.kube
-          echo "${{ secrets.KUBECONFIG }}" > $PWD/.kube/config
-          echo "KUBECONFIG=$PWD/.kube/config" >> $GITHUB_ENV
+          if [[ "$DEPLOY_ENVIRONMENT" == 'true' ]]; then
+            # convert to lower case
+            HEAD_BRANCH_LOWERCASE=${GITHUB_HEAD_REF,,}
 
-      - name: Run e2e
-        run: cd scripts/instances && ./stack_tests.sh
-        env:
-          HTTP: http --check-status
-          IM_HOST: https://dev.api.im.dhis2.org
-          USER_EMAIL: ${{ secrets.CI_TEST_USER_USER_EMAIL }}
-          PASSWORD: ${{ secrets.CI_TEST_USER_PASSWORD }}
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+            # substitute all non-alphanumeric chars with hyphens "-"
+            HEAD_BRANCH_LOWERCASE_NO_NONALPHANUMERIC=${HEAD_BRANCH_LOWERCASE//[^[:alnum:]]/-}
+
+            # trim to 25 chars, in order to fit into the 53 char Helm release name limit
+            # the rest of the chars up to the limit are saved for the static part of the release names
+            SANITIZED_HEAD_BRANCH=${HEAD_BRANCH_LOWERCASE_NO_NONALPHANUMERIC::25}
+
+            echo "TARGET_URL=https://$SANITIZED_HEAD_BRANCH.$BASE_HOSTNAME" >> $GITHUB_ENV
+          else
+            echo "TARGET_URL=https://dev.$BASE_HOSTNAME" >> $GITHUB_ENV
+          fi
+
+      # Don't set environment variable "API_URL" in this workflow with the action below.
+      # See https://github.com/convictional/trigger-workflow-and-wait/issues/62#issuecomment-1843267732
+      - name: Trigger E2E Playwright tests
+        uses: convictional/trigger-workflow-and-wait@v1.6.5
+        with:
+          owner: dhis2-sre
+          repo: im-web-client
+          github_token: ${{ secrets.DHIS2_SRE_BOT_GITHUB_TOKEN }}
+          workflow_file_name: playwright.yml
+          ref: DEVOPS-291
+          client_payload: '{"api_url": "${{ env.TARGET_URL }}"}'
 
   send-slack-message:
     runs-on: ubuntu-latest

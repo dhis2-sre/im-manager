@@ -161,11 +161,15 @@ func run() error {
 
 	integrationHandler := integration.NewHandler(dockerHubClient, cfg.InstanceService.Host, cfg.DatabaseManagerService.Host)
 
-	err = user.CreateAdminUser(cfg.AdminUser.Email, cfg.AdminUser.Password, userService, groupService)
+	err = user.CreateUser(cfg.AdminUser.Email, cfg.AdminUser.Password, userService, groupService, model.AdministratorGroupName, "admin")
 	if err != nil {
 		return err
 	}
 	err = createGroups(cfg, groupService)
+	if err != nil {
+		return err
+	}
+	err = user.CreateUser(cfg.E2eTestUser.Email, cfg.E2eTestUser.Password, userService, groupService, model.DefaultGroupName, "e2e test")
 	if err != nil {
 		return err
 	}

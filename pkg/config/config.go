@@ -30,7 +30,7 @@ type Config struct {
 	Authentication                 authentication
 	Groups                         []group
 	AdminUser                      user
-	DefaultUser                    user
+	E2eTestUser                    user
 	S3Bucket                       string
 	S3Region                       string
 	S3Endpoint                     string
@@ -93,7 +93,7 @@ func New() Config {
 		},
 		Groups:      newGroups(),
 		AdminUser:   newAdminUser(),
-		DefaultUser: user{},
+		E2eTestUser: newE2eTestUser(),
 		S3Bucket:    requireEnv("S3_BUCKET"),
 		S3Region:    requireEnv("S3_REGION"),
 		S3Endpoint:  os.Getenv("S3_ENDPOINT"),
@@ -224,6 +224,16 @@ type user struct {
 func newAdminUser() user {
 	email := requireEnv("ADMIN_USER_EMAIL")
 	pw := requireEnv("ADMIN_USER_PASSWORD")
+
+	return user{
+		Email:    email,
+		Password: pw,
+	}
+}
+
+func newE2eTestUser() user {
+	email := requireEnv("E2E_TEST_USER_EMAIL")
+	pw := requireEnv("E2E_TEST_USER_PASSWORD")
 
 	return user{
 		Email:    email,
