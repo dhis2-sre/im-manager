@@ -1,9 +1,10 @@
 package event
 
 import (
+	"testing"
+
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func TestBroker_Subscribe(t *testing.T) {
