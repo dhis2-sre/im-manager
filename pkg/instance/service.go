@@ -917,6 +917,8 @@ func (s service) ListenForClusterUpdates() {
 					}
 				}
 			}
+			// TODO: Delete this once tested
+			log.Println("EVENT-LOOP-BROKE")
 		}()
 	}
 }
