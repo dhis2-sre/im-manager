@@ -34,7 +34,7 @@ func (e *Broker) Subscribe(user model.User) {
 	defer e.lock.Unlock()
 	e.subscribers[user.ID] = Subscriber{
 		user:    user,
-		channel: make(chan Event),
+		channel: make(chan Event, 1),
 	}
 }
 
