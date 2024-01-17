@@ -272,7 +272,6 @@ type groupService struct {
 }
 
 func (gs groupService) FindAll(user *model.User, deployable bool) ([]model.Group, error) {
-	//TODO implement me
 	panic("implement me")
 }
 
