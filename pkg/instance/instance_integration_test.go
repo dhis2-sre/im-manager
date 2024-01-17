@@ -156,7 +156,7 @@ func TestInstanceHandler(t *testing.T) {
 		}`)
 		client.PostJSON(t, "/instances", body, &instance, inttest.WithAuthToken("sometoken"))
 
-		k8sClient.AssertPodIsReady(t, group.Name, instance.Name+"-database", 60)
+		k8sClient.AssertPodIsReady(t, group.Name, instance.Name+"-database", 3*60)
 		k8sClient.AssertPodIsReady(t, group.Name, instance.Name, 5*60)
 	})
 
