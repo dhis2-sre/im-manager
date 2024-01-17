@@ -907,6 +907,9 @@ func (s service) ListenForClusterUpdates() {
 					log.Fatal(err)
 				}
 
+				// TODO: Remove
+				log.Println(string(jsonMessage))
+
 				subscribers := s.broker.Subscribers()
 				for _, subscriber := range subscribers {
 					if subscriber.IsMemberOf(pod.Namespace) {
