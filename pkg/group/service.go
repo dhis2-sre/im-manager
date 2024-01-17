@@ -22,6 +22,7 @@ type groupRepository interface {
 	findWithDetails(name string) (*model.Group, error)
 	findOrCreate(group *model.Group) (*model.Group, error)
 	findAll(user *model.User, deployable bool) ([]model.Group, error)
+	findByGroupNames(groupNames []string) ([]model.Group, error)
 }
 
 type userService interface {
@@ -109,4 +110,8 @@ func (s *service) GetClusterConfiguration(groupName string) (*model.ClusterConfi
 
 func (s *service) FindAll(user *model.User, deployable bool) ([]model.Group, error) {
 	return s.groupRepository.findAll(user, deployable)
+}
+
+func (s *service) FindByGroupNames(groupNames []string) ([]model.Group, error) {
+	return s.groupRepository.findByGroupNames(groupNames)
 }

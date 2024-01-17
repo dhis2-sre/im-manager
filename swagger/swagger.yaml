@@ -295,9 +295,6 @@ definitions:
                     $ref: '#/definitions/Database'
                 type: array
                 x-go-name: Databases
-            hostname:
-                type: string
-                x-go-name: Hostname
             name:
                 type: string
                 x-go-name: Name

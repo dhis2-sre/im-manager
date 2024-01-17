@@ -271,6 +271,10 @@ type groupService struct {
 	group *model.Group
 }
 
+func (gs groupService) FindByGroupNames(groupNames []string) ([]model.Group, error) {
+	panic("implement me")
+}
+
 func (gs groupService) Find(name string) (*model.Group, error) {
 	return gs.group, nil
 }
