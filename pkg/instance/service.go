@@ -828,10 +828,6 @@ func (s service) ListenForClusterUpdates() {
 			{
 				Name: model.AdministratorGroupName,
 			},
-			// TODO: WTF!?1
-			{
-				Name: "whoami",
-			},
 		},
 	}
 
@@ -839,6 +835,9 @@ func (s service) ListenForClusterUpdates() {
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	indent, _ := json.MarshalIndent(groups, "", "  ")
+	log.Println(string(indent))
 
 	for _, group := range groups {
 		// TODO: Remove logging
