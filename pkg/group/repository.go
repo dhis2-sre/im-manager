@@ -4,11 +4,9 @@ import (
 	"errors"
 	"fmt"
 
-	"golang.org/x/exp/maps"
-	"golang.org/x/exp/slices"
-
 	"github.com/dhis2-sre/im-manager/internal/errdef"
 	"github.com/dhis2-sre/im-manager/pkg/model"
+	"golang.org/x/exp/maps"
 	"gorm.io/gorm"
 )
 
@@ -57,17 +55,8 @@ func (r repository) findWithDetails(name string) (*model.Group, error) {
 	return group, nil
 }
 
-const AdministratorGroupName = "administrators"
-
 func (r repository) findAll(user *model.User, deployable bool) ([]model.Group, error) {
-	groupsByName := make(map[string]struct{})
-	for _, group := range user.Groups {
-		groupsByName[group.Name] = struct{}{}
-	}
-	groupNames := maps.Keys(groupsByName)
-	isAdmin := slices.Contains(groupNames, AdministratorGroupName)
-
-	if isAdmin {
+	if user.IsAdministrator() {
 		var groups []model.Group
 		if deployable {
 			err := r.db.

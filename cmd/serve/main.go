@@ -27,27 +27,26 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/go-mail/mail"
-
 	"github.com/aws/aws-sdk-go-v2/aws"
+	s3config "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
-	"github.com/dhis2-sre/im-manager/internal/middleware"
-	"github.com/dhis2-sre/im-manager/pkg/database"
-	"github.com/dhis2-sre/im-manager/pkg/group"
-	"github.com/dhis2-sre/im-manager/pkg/model"
-	"github.com/dhis2-sre/im-manager/pkg/token"
-	"github.com/dhis2-sre/im-manager/pkg/user"
-
-	s3config "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/dhis2-sre/im-manager/internal/handler"
+	"github.com/dhis2-sre/im-manager/internal/middleware"
 	"github.com/dhis2-sre/im-manager/internal/server"
 	"github.com/dhis2-sre/im-manager/pkg/config"
+	"github.com/dhis2-sre/im-manager/pkg/database"
+	"github.com/dhis2-sre/im-manager/pkg/event"
+	"github.com/dhis2-sre/im-manager/pkg/group"
 	"github.com/dhis2-sre/im-manager/pkg/instance"
 	"github.com/dhis2-sre/im-manager/pkg/integration"
+	"github.com/dhis2-sre/im-manager/pkg/model"
 	"github.com/dhis2-sre/im-manager/pkg/stack"
 	"github.com/dhis2-sre/im-manager/pkg/storage"
+	"github.com/dhis2-sre/im-manager/pkg/token"
+	"github.com/dhis2-sre/im-manager/pkg/user"
 	"github.com/dhis2-sre/rabbitmq"
+	"github.com/go-mail/mail"
 )
 
 func main() {
@@ -104,9 +103,12 @@ func run() error {
 
 	stackService := stack.NewService(stacks)
 
+	broker := event.NewEventBroker()
+
 	instanceRepository := instance.NewRepository(db, cfg.InstanceParameterEncryptionKey)
 	helmfileService := instance.NewHelmfileService("./stacks", stackService, cfg.Classification)
-	instanceService := instance.NewService(instanceRepository, groupService, stackService, helmfileService)
+	instanceService := instance.NewService(broker, instanceRepository, groupService, stackService, helmfileService)
+	instanceService.ListenForClusterUpdates()
 
 	dockerHubClient := integration.NewDockerHubClient(cfg.DockerHub.Username, cfg.DockerHub.Password)
 
@@ -150,6 +152,8 @@ func run() error {
 	databaseService := database.NewService(cfg.S3Bucket, s3Client, groupService, databaseRepository)
 	databaseHandler := database.NewHandler(databaseService, groupService, instanceService, stackService)
 
+	eventHandler := event.NewHandler(broker)
+
 	err = handler.RegisterValidation()
 	if err != nil {
 		return err
@@ -172,6 +176,7 @@ func run() error {
 
 	r := server.GetEngine(cfg.BasePath)
 
+	event.Routes(r, authentication.QueryStringAuthentication, eventHandler)
 	group.Routes(r, authentication, authorization, groupHandler)
 	user.Routes(r, authentication, authorization, userHandler)
 	stack.Routes(r, authentication.TokenAuthentication, stackHandler)

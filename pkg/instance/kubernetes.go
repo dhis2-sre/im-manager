@@ -7,8 +7,11 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"slices"
 	"strings"
 	"time"
+
+	"k8s.io/apimachinery/pkg/watch"
 
 	"github.com/dhis2-sre/im-manager/internal/errdef"
 
@@ -35,6 +38,10 @@ func NewKubernetesService(config *model.ClusterConfiguration) (*kubernetesServic
 	}
 
 	return &kubernetesService{client: client}, nil
+}
+
+func (ks kubernetesService) GetClient() *kubernetes.Clientset {
+	return ks.client
 }
 
 func commandExecutor(cmd *exec.Cmd, configuration *model.ClusterConfiguration) (stdout []byte, stderr []byte, err error) {
@@ -347,6 +354,18 @@ func (ks kubernetesService) deletePersistentVolumeClaim(instance *model.Instance
 	return nil
 }
 
+func (ks kubernetesService) watch(group string) (<-chan watch.Event, error) {
+	options := metav1.ListOptions{
+		LabelSelector: "im=true",
+	}
+	w, err := ks.client.CoreV1().Pods(group).Watch(context.Background(), options)
+	if err != nil {
+		return nil, err
+	}
+
+	return w.ResultChan(), nil
+}
+
 func (ks kubernetesService) scale(instance *model.Instance, replicas uint) error {
 	labelSelector := fmt.Sprintf("im-id=%d", instance.ID)
 	listOptions := metav1.ListOptions{LabelSelector: labelSelector}
@@ -404,4 +423,68 @@ func scale(sc scaler, name string, replicas int32) (int32, error) {
 	}
 
 	return prevReplicas, nil
+}
+
+type Status string
+
+const (
+	NotDeployed        Status = "NotDeployed"
+	Pending            Status = "Pending"
+	Booting            Status = "Booting"
+	BootingWithRestart Status = "Booting (%d)"
+	Running            Status = "Running"
+	Error              Status = "Error"
+	Terminating        Status = "Terminating"
+)
+
+func PodStatus(pod *v1.Pod) (Status, error) {
+	switch pod.Status.Phase {
+	case v1.PodPending:
+		initContainerErrorIndex := slices.IndexFunc(pod.Status.InitContainerStatuses, func(status v1.ContainerStatus) bool {
+			return status.State.Waiting != nil && status.State.Waiting.Reason == "ImagePullBackOff"
+		})
+		if initContainerErrorIndex != -1 {
+			status := pod.Status.InitContainerStatuses[initContainerErrorIndex]
+			return Status(string(Error) + ": " + status.State.Waiting.Message), nil
+		}
+
+		containerErrorIndex := slices.IndexFunc(pod.Status.ContainerStatuses, func(status v1.ContainerStatus) bool {
+			return status.State.Waiting != nil && status.State.Waiting.Reason == "ImagePullBackOff"
+		})
+		if containerErrorIndex != -1 {
+			status := pod.Status.ContainerStatuses[containerErrorIndex]
+			return Status(string(Error) + ": " + status.State.Waiting.Message), nil
+		}
+		return Pending, nil
+	case v1.PodFailed:
+		return Error, nil
+	case v1.PodRunning:
+		booting := slices.ContainsFunc(pod.Status.Conditions, func(condition v1.PodCondition) bool {
+			return condition.Status == v1.ConditionFalse
+		})
+		if booting {
+			initContainerStatuses := pod.Status.InitContainerStatuses
+			if initContainerStatuses != nil {
+				initContainerError := slices.ContainsFunc(initContainerStatuses, func(status v1.ContainerStatus) bool {
+					return status.LastTerminationState.Terminated != nil && status.LastTerminationState.Terminated.Reason == "Error"
+				})
+				if initContainerError {
+					status := fmt.Sprintf(string(BootingWithRestart), initContainerStatuses[0].RestartCount)
+					return Status(status), nil
+				}
+			}
+
+			containerError := slices.ContainsFunc(pod.Status.ContainerStatuses, func(status v1.ContainerStatus) bool {
+				return status.LastTerminationState.Terminated != nil && status.LastTerminationState.Terminated.Reason == "Error"
+			})
+			if containerError {
+				status := fmt.Sprintf(string(BootingWithRestart), pod.Status.ContainerStatuses[0].RestartCount)
+				return Status(status), nil
+			}
+
+			return Booting, nil
+		}
+		return Running, nil
+	}
+	return "", fmt.Errorf("failed to get instance status")
 }

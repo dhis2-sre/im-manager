@@ -22,6 +22,11 @@ type repository struct {
 	instanceParameterEncryptionKey string
 }
 
+func (r repository) UpdateInstanceStatus(id uint, status Status) error {
+	instance := model.DeploymentInstance{ID: id}
+	return r.db.Model(&instance).Update("status", status).Error
+}
+
 func (r repository) DeleteDeploymentInstance(instance *model.DeploymentInstance) error {
 	err := r.db.Unscoped().Delete(&model.DeploymentInstance{}, instance.ID).Error
 	if err != nil {

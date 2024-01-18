@@ -208,6 +208,9 @@ definitions:
                 description: Stack     *Stack `json:"stack,omitempty"`
                 type: string
                 x-go-name: StackName
+            status:
+                type: string
+                x-go-name: Status
             updatedAt:
                 format: date-time
                 type: string
@@ -226,6 +229,18 @@ definitions:
             $ref: '#/definitions/DeploymentInstanceParameter'
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/model
+    Event:
+        properties:
+            Data: {}
+            Event:
+                type: string
+            Id:
+                type: string
+            Retry:
+                format: uint64
+                type: integer
+        type: object
+        x-go-package: github.com/gin-contrib/sse
     ExternalDownload:
         properties:
             databaseId:
@@ -402,9 +417,6 @@ definitions:
                 x-go-name: Value
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/model
-    InstanceStatus:
-        type: string
-        x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
     Lock:
         properties:
             databaseId:
@@ -1731,33 +1743,6 @@ paths:
             security:
                 - oauth2: []
             summary: Resume paused instance
-    /instances/{id}/status:
-        get:
-            description: Get instance status...
-            operationId: status
-            parameters:
-                - format: uint64
-                  in: path
-                  name: id
-                  required: true
-                  type: integer
-                  x-go-name: ID
-            responses:
-                "200":
-                    $ref: '#/responses/Status'
-                "401":
-                    $ref: '#/responses/Error'
-                "403":
-                    $ref: '#/responses/Error'
-                "404":
-                    $ref: '#/responses/Error'
-                "409":
-                    $ref: '#/responses/Error'
-                "415":
-                    $ref: '#/responses/Error'
-            security:
-                - oauth2: []
-            summary: Get instance status
     /integrations:
         post:
             description: Return integration for a given key
@@ -1886,6 +1871,22 @@ paths:
             security:
                 - oauth2: []
             summary: Find stack
+    /subscribe:
+        get:
+            description: Stream events...
+            operationId: streamSSE
+            responses:
+                "200":
+                    $ref: '#/responses/Stream'
+                "400":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Stream events
     /tokens:
         post:
             description: Sign in... And get tokens
@@ -2117,10 +2118,10 @@ responses:
             items:
                 $ref: '#/definitions/Stack'
             type: array
-    Status:
+    Stream:
         description: ""
         schema:
-            $ref: '#/definitions/InstanceStatus'
+            $ref: '#/definitions/Event'
     Tokens:
         description: ""
         schema:
