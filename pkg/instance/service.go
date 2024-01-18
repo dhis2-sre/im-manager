@@ -835,26 +835,22 @@ func (s service) ListenForClusterUpdates() {
 	}
 
 	for _, group := range groups {
-		// TODO: Remove logging
-		log.Println("group:", group.Name)
 		g := group
 		go func() {
 			ks, err := NewKubernetesService(g.ClusterConfiguration)
 			if err != nil {
-				log.Fatal(err)
+				log.Printf("unable to get create new kubernetes service: %v", err)
 			}
 
 			for {
 				events, err := ks.watch(g.Name)
 				if err != nil {
-					log.Fatal(err)
+					log.Printf("error watching %q: %v", g.Name, err)
 				}
 
 				for e := range events {
 					s.handleEvent(e)
 				}
-				// TODO: Delete this once tested
-				log.Println("EVENT-LOOP-BROKE")
 			}
 		}()
 	}
@@ -869,31 +865,31 @@ func (s service) handleEvent(e watch.Event) {
 
 	status, err := PodStatus(pod)
 	if err != nil {
-		log.Fatal(err)
+		log.Printf("unable to get pod status: %v", err)
 	}
 
 	deploymentIdStr, ok := pod.Labels["im-deployment-id"]
 	if !ok {
-		log.Fatal(fmt.Errorf("im-deployment-id label not found"))
+		log.Println("im-deployment-id label not found")
 	}
 	deploymentId, err := strconv.Atoi(deploymentIdStr)
 	if err != nil {
-		log.Fatal(err)
+		log.Printf("can't convert deployment id to integer: %v", err)
 	}
 
 	instanceIdStr, ok := pod.Labels["im-instance-id"]
 	if !ok {
-		log.Fatal(fmt.Errorf("im-instance-id label not found"))
+		log.Println("im-instance-id label not found")
 	}
 
 	instanceId, err := strconv.Atoi(instanceIdStr)
 	if err != nil {
-		log.Fatal(err)
+		log.Printf("can't convert instance id to integer: %v", err)
 	}
 
 	err = s.UpdateInstanceStatus(uint(instanceId), status)
 	if err != nil {
-		log.Fatal(err)
+		log.Printf("unable to update instance status: %v", err)
 	}
 
 	message := updateMessage{
@@ -906,11 +902,8 @@ func (s service) handleEvent(e watch.Event) {
 
 	jsonMessage, err := json.Marshal(message)
 	if err != nil {
-		log.Fatal(err)
+		log.Printf("failed to marshal message: %v", err)
 	}
-
-	// TODO: Remove
-	log.Println(string(jsonMessage))
 
 	subscribers := s.broker.Subscribers()
 	for _, subscriber := range subscribers {
