@@ -5,12 +5,13 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"k8s.io/apimachinery/pkg/watch"
 	"os"
 	"os/exec"
 	"slices"
 	"strings"
 	"time"
+
+	"k8s.io/apimachinery/pkg/watch"
 
 	"github.com/dhis2-sre/im-manager/internal/errdef"
 
