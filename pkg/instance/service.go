@@ -2,7 +2,6 @@ package instance
 
 import (
 	"cmp"
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -13,7 +12,6 @@ import (
 	"strconv"
 
 	"github.com/dhis2-sre/im-manager/pkg/event"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/watch"
 
 	"golang.org/x/exp/maps"
@@ -836,92 +834,91 @@ func (s service) ListenForClusterUpdates() {
 		log.Fatal(err)
 	}
 
-	indent, _ := json.MarshalIndent(groups, "", "  ")
-	log.Println(string(indent))
-
 	for _, group := range groups {
 		// TODO: Remove logging
 		log.Println("group:", group.Name)
 		g := group
 		go func() {
-			kubernetesService, err := NewKubernetesService(g.ClusterConfiguration)
+			ks, err := NewKubernetesService(g.ClusterConfiguration)
 			if err != nil {
 				log.Fatal(err)
 			}
 
-			client := kubernetesService.GetClient()
-			options := metav1.ListOptions{
-				LabelSelector: "im=true",
+			for {
+				events, err := ks.watch(g.Name)
+				if err != nil {
+					log.Fatal(err)
+				}
+
+				for e := range events {
+					s.handleEvent(e)
+				}
+				// TODO: Delete this once tested
+				log.Println("EVENT-LOOP-BROKE")
 			}
-			w, err := client.CoreV1().Pods(g.Name).Watch(context.Background(), options)
-			if err != nil {
-				log.Fatal(err)
-			}
-
-			for e := range w.ResultChan() {
-				pod, ok := e.Object.(*v1.Pod)
-				if !ok {
-					// TODO: Log entire e.Object... Entire e?
-					log.Fatal("unexpected type")
-				}
-
-				status, err := PodStatus(pod)
-				if err != nil {
-					log.Fatal(err)
-				}
-
-				deploymentIdStr, ok := pod.Labels["im-deployment-id"]
-				if !ok {
-					log.Fatal(fmt.Errorf("im-deployment-id label not found"))
-				}
-				deploymentId, err := strconv.Atoi(deploymentIdStr)
-				if err != nil {
-					log.Fatal(err)
-				}
-
-				instanceIdStr, ok := pod.Labels["im-instance-id"]
-				if !ok {
-					log.Fatal(fmt.Errorf("im-instance-id label not found"))
-				}
-
-				instanceId, err := strconv.Atoi(instanceIdStr)
-				if err != nil {
-					log.Fatal(err)
-				}
-
-				err = s.UpdateInstanceStatus(uint(instanceId), status)
-				if err != nil {
-					log.Fatal(err)
-				}
-
-				message := updateMessage{
-					// TODO: We probably shouldn't return the raw e.Type
-					EventType:    e.Type,
-					DeploymentId: uint(deploymentId),
-					InstanceId:   uint(instanceId),
-					Status:       status,
-				}
-
-				jsonMessage, err := json.Marshal(message)
-				if err != nil {
-					log.Fatal(err)
-				}
-
-				// TODO: Remove
-				log.Println(string(jsonMessage))
-
-				subscribers := s.broker.Subscribers()
-				for _, subscriber := range subscribers {
-					if subscriber.IsMemberOf(pod.Namespace) {
-						s.broker.Send(subscriber.ID, event.Event{
-							Type:    "instance-update",
-							Message: string(jsonMessage),
-						})
-					}
-				}
-			}
-			// TODO: Delete this once tested
-			log.Println("EVENT-LOOP-BROKE")
 		}()
+	}
+}
+
+func (s service) handleEvent(e watch.Event) {
+	pod, ok := e.Object.(*v1.Pod)
+	if !ok {
+		// TODO: Log entire e.Object... Entire e?
+		log.Println("unexpected type")
+	}
+
+	status, err := PodStatus(pod)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	deploymentIdStr, ok := pod.Labels["im-deployment-id"]
+	if !ok {
+		log.Fatal(fmt.Errorf("im-deployment-id label not found"))
+	}
+	deploymentId, err := strconv.Atoi(deploymentIdStr)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	instanceIdStr, ok := pod.Labels["im-instance-id"]
+	if !ok {
+		log.Fatal(fmt.Errorf("im-instance-id label not found"))
+	}
+
+	instanceId, err := strconv.Atoi(instanceIdStr)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = s.UpdateInstanceStatus(uint(instanceId), status)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	message := updateMessage{
+		// TODO: We probably shouldn't return the raw e.Type
+		EventType:    e.Type,
+		DeploymentId: uint(deploymentId),
+		InstanceId:   uint(instanceId),
+		Status:       status,
+	}
+
+	jsonMessage, err := json.Marshal(message)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// TODO: Remove
+	log.Println(string(jsonMessage))
+
+	subscribers := s.broker.Subscribers()
+	for _, subscriber := range subscribers {
+		if subscriber.IsMemberOf(pod.Namespace) {
+			s.broker.Send(subscriber.ID, event.Event{
+				Type:    "instance-update",
+				Message: string(jsonMessage),
+			})
+		}
 	}
 }

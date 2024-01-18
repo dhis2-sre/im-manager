@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"k8s.io/apimachinery/pkg/watch"
 	"os"
 	"os/exec"
 	"slices"
@@ -350,6 +351,18 @@ func (ks kubernetesService) deletePersistentVolumeClaim(instance *model.Instance
 	}
 
 	return nil
+}
+
+func (ks kubernetesService) watch(group string) (<-chan watch.Event, error) {
+	options := metav1.ListOptions{
+		LabelSelector: "im=true",
+	}
+	w, err := ks.client.CoreV1().Pods(group).Watch(context.Background(), options)
+	if err != nil {
+		return nil, err
+	}
+
+	return w.ResultChan(), nil
 }
 
 func (ks kubernetesService) scale(instance *model.Instance, replicas uint) error {
