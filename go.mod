@@ -6,8 +6,8 @@ require (
 	filippo.io/age v1.1.1
 	github.com/anthhub/forwarder v1.1.0
 	github.com/aws/aws-sdk-go-v2 v1.24.1
-	github.com/aws/aws-sdk-go-v2/config v1.26.4
-	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.15.12
+	github.com/aws/aws-sdk-go-v2/config v1.26.5
+	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.15.13
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.48.0
 	github.com/dhis2-sre/rabbitmq v0.3.1-0.20231106051247-d45d1d39d012
 	github.com/dominikbraun/graph v0.23.0
@@ -55,7 +55,7 @@ require (
 	github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2 // indirect
 	github.com/aws/aws-sdk-go v1.47.13 // indirect
 	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.5.4 // indirect
-	github.com/aws/aws-sdk-go-v2/credentials v1.16.15 // indirect
+	github.com/aws/aws-sdk-go-v2/credentials v1.16.16 // indirect
 	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.14.11 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/configsources v1.2.10 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.5.10 // indirect
@@ -65,7 +65,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/internal/checksum v1.2.10 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.10.10 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/s3shared v1.16.10 // indirect
-	github.com/aws/aws-sdk-go-v2/service/sso v1.18.6 // indirect
+	github.com/aws/aws-sdk-go-v2/service/sso v1.18.7 // indirect
 	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.21.7 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sts v1.26.7 // indirect
 	github.com/aws/smithy-go v1.19.0 // indirect
