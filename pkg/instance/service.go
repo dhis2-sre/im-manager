@@ -61,6 +61,7 @@ type Repository interface {
 
 type groupService interface {
 	Find(name string) (*model.Group, error)
+	FindByGroupNames(groupNames []string) ([]model.Group, error)
 }
 
 type helmfile interface {
@@ -716,13 +717,26 @@ func (s service) FindDeployments(user *model.User) ([]GroupsWithDeployments, err
 		return []GroupsWithDeployments{}, nil
 	}
 
-	groupsWithDeployments := groupDeployments(groupsByName, deployments)
-
-	return groupsWithDeployments, nil
+	return s.groupDeployments(deployments)
 }
 
-func groupDeployments(groupsByName map[string]model.Group, deployments []*model.Deployment) []GroupsWithDeployments {
-	groupNames := maps.Keys(groupsByName)
+func (s service) groupDeployments(deployments []*model.Deployment) ([]GroupsWithDeployments, error) {
+	groupNamesMap := map[string]struct{}{}
+	for _, deployment := range deployments {
+		groupNamesMap[deployment.GroupName] = struct{}{}
+	}
+
+	groupNames := maps.Keys(groupNamesMap)
+
+	groups, err := s.groupService.FindByGroupNames(groupNames)
+	if err != nil {
+		return nil, err
+	}
+
+	groupsByName := map[string]model.Group{}
+	for _, group := range groups {
+		groupsByName[group.Name] = group
+	}
 
 	groupsWithDeployments := make([]GroupsWithDeployments, len(groupNames))
 	for i, name := range groupNames {
@@ -746,7 +760,7 @@ func groupDeployments(groupsByName map[string]model.Group, deployments []*model.
 		return cmp.Compare(a.Name, b.Name)
 	})
 
-	return groupsWithDeployments
+	return groupsWithDeployments, nil
 }
 
 type InstanceStatus string

@@ -207,16 +207,21 @@ func (s service) List(user *model.User) ([]GroupsWithDatabases, error) {
 		return []GroupsWithDatabases{}, nil
 	}
 
-	return groupsWithDatabases(groups, databases), nil
+	return groupsWithDatabases(databases), nil
 }
 
-func groupsWithDatabases(groups []model.Group, databases []model.Database) []GroupsWithDatabases {
-	groupsWithDatabases := make([]GroupsWithDatabases, len(groups))
-	for i, group := range groups {
-		groupsWithDatabases[i].Name = group.Name
-		groupsWithDatabases[i].Hostname = group.Hostname
+func groupsWithDatabases(databases []model.Database) []GroupsWithDatabases {
+	groupNamesMap := map[string]struct{}{}
+	for _, database := range databases {
+		groupNamesMap[database.GroupName] = struct{}{}
+	}
+
+	groupNames := maps.Keys(groupNamesMap)
+	groupsWithDatabases := make([]GroupsWithDatabases, len(groupNames))
+	for i, groupName := range groupNames {
+		groupsWithDatabases[i].Name = groupName
 		groupsWithDatabases[i].Databases = filterDatabases(databases, func(database *model.Database) bool {
-			return database.GroupName == group.Name
+			return database.GroupName == groupName
 		})
 	}
 	return groupsWithDatabases
