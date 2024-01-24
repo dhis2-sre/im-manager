@@ -3,6 +3,7 @@ package middleware
 import (
 	"crypto/rsa"
 	"errors"
+	"log"
 	"net/http"
 
 	"github.com/dhis2-sre/im-manager/internal/errdef"
@@ -56,14 +57,15 @@ func (m AuthenticationMiddleware) handleError(c *gin.Context, e error) {
 func (m AuthenticationMiddleware) QueryStringAuthentication(c *gin.Context) {
 	token, ok := c.GetQuery("token")
 	if !ok {
-		_ = c.Error(errdef.NewUnauthorized("token not valid"))
+		_ = c.Error(errdef.NewUnauthorized("token missing"))
 		c.Abort()
 		return
 	}
 
 	user, err := parseToken(token, m.publicKey)
 	if err != nil {
-		_ = c.Error(errdef.NewUnauthorized("token not valid: %v", err))
+		log.Printf("token not valid: %v", err)
+		_ = c.Error(errdef.NewUnauthorized("token not valid"))
 		c.Abort()
 		return
 	}
@@ -94,7 +96,7 @@ func parseToken(token string, key *rsa.PublicKey) (*model.User, error) {
 func (m AuthenticationMiddleware) TokenAuthentication(c *gin.Context) {
 	u, err := parseRequest(c.Request, m.publicKey)
 	if err != nil {
-		// TODO: token could be not valid for lots of reasons, return err or at least log it
+		log.Printf("token not valid: %v", err)
 		_ = c.Error(errdef.NewUnauthorized("token not valid"))
 		c.Abort()
 		return
