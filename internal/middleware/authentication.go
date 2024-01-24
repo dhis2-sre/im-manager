@@ -63,7 +63,7 @@ func (m AuthenticationMiddleware) QueryStringAuthentication(c *gin.Context) {
 
 	user, err := parseToken(token, m.publicKey)
 	if err != nil {
-		_ = c.Error(errdef.NewUnauthorized("token not valid: %s", err.Error()))
+		_ = c.Error(errdef.NewUnauthorized("token not valid: %v", err))
 		c.Abort()
 		return
 	}
