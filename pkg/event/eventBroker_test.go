@@ -41,16 +41,12 @@ func TestBroker_Unsubscribe(t *testing.T) {
 func TestBroker_Receive(t *testing.T) {
 	eventBroker := NewEventBroker()
 	eventBroker.Subscribe(model.User{ID: 123})
-	eventBroker.Send(123, Event{
-		Type:    "type",
-		Message: "message",
-	})
+	eventBroker.Send(123, Event{Type: "type", Message: "message"})
 
 	event, ok := eventBroker.Receive(123)
 
 	assert.True(t, ok)
-	assert.Equal(t, "type", event.Type)
-	assert.Equal(t, "message", event.Message)
+	assert.Equal(t, Event{Type: "type", Message: "message"}, event)
 }
 
 func TestBroker_Receive_MultipleSubscribers(t *testing.T) {
@@ -71,12 +67,10 @@ func TestBroker_Receive_MultipleSubscribers(t *testing.T) {
 	event2, ok2 := eventBroker.Receive(321)
 
 	assert.True(t, ok)
-	assert.Equal(t, "type", event.Type)
-	assert.Equal(t, "message", event.Message)
+	assert.Equal(t, Event{Type: "type", Message: "message"}, event)
 
 	assert.True(t, ok2)
-	assert.Equal(t, "type2", event2.Type)
-	assert.Equal(t, "message2", event2.Message)
+	assert.Equal(t, Event{Type: "type2", Message: "message2"}, event2)
 }
 
 func TestBroker_Send(t *testing.T) {
