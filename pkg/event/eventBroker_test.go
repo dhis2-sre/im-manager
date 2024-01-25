@@ -33,9 +33,18 @@ func TestBroker_Unsubscribe(t *testing.T) {
 
 	assert.Len(t, eventBroker.subscribers, 1)
 
-	eventBroker.Unsubscribe(123)
+	err := eventBroker.Unsubscribe(123)
+	assert.NoError(t, err)
 
 	assert.Len(t, eventBroker.subscribers, 0)
+}
+
+func TestBroker_Unsubscribe_NotSubscribed(t *testing.T) {
+	eventBroker := NewEventBroker()
+
+	err := eventBroker.Unsubscribe(123)
+
+	assert.ErrorContains(t, err, "subscriber not found: 123")
 }
 
 func TestBroker_Receive(t *testing.T) {

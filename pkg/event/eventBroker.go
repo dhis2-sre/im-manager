@@ -1,6 +1,7 @@
 package event
 
 import (
+	"fmt"
 	"sync"
 
 	"github.com/dhis2-sre/im-manager/pkg/model"
@@ -38,12 +39,17 @@ func (e *Broker) Subscribe(user model.User) {
 	}
 }
 
-func (e *Broker) Unsubscribe(id uint) {
+func (e *Broker) Unsubscribe(id uint) error {
+	subscriber, ok := e.subscribers[id]
+	if !ok {
+		return fmt.Errorf("subscriber not found: %d", id)
+	}
+
 	e.lock.Lock()
 	defer e.lock.Unlock()
-	// TODO: Possible panic? Yes..
-	close(e.subscribers[id].channel)
+	close(subscriber.channel)
 	delete(e.subscribers, id)
+	return nil
 }
 
 func (e *Broker) Subscribers() []model.User {

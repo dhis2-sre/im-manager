@@ -19,7 +19,7 @@ type Handler struct {
 
 type broker interface {
 	Subscribe(user model.User)
-	Unsubscribe(id uint)
+	Unsubscribe(id uint) error
 	Receive(id uint) (Event, bool)
 }
 
@@ -52,22 +52,25 @@ func (h Handler) Subscribe(c *gin.Context) {
 	c.Writer.Header().Set("Transfer-Encoding", "chunked")
 
 	defer func() {
-		h.broker.Unsubscribe(user.ID)
+		err := h.broker.Unsubscribe(user.ID)
+		if err != nil {
+			log.Println(err)
+		}
 		log.Printf("Closing client %d", user.ID)
 	}()
 
 	go func() {
 		<-c.Done()
-		h.broker.Unsubscribe(user.ID)
+		err := h.broker.Unsubscribe(user.ID)
+		if err != nil {
+			log.Println(err)
+		}
 		log.Printf("Closing client %d", user.ID)
 	}()
 
 	c.Stream(func(w io.Writer) bool {
 		if event, ok := h.broker.Receive(user.ID); ok {
-			// if !cached
 			c.SSEvent(event.Type, event.Message)
-			// cache
-			// remove expired?
 			return true
 		}
 		return false
