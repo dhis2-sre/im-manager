@@ -5,7 +5,7 @@ import (
 )
 
 func Routes(r *gin.Engine, authenticator gin.HandlerFunc, handler Handler) {
-	queryStringAuthenticationRouter := r.Group("")
-	queryStringAuthenticationRouter.Use(authenticator)
-	queryStringAuthenticationRouter.GET("/subscribe", handler.Subscribe)
+	router := r.Group("")
+	router.Use(authenticator)
+	router.GET("/subscribe", handler.Subscribe)
 }
