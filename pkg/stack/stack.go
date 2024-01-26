@@ -195,6 +195,12 @@ var DHIS2Core = model.Stack{
 		"STARTUP_PROBE_PERIOD_SECONDS":    {Priority: 12, DisplayName: "Startup Probe Period Seconds", DefaultValue: &dhis2CoreDefaults.startupProbePeriodSeconds},
 		"JAVA_OPTS":                       {Priority: 13, DisplayName: "JAVA_OPTS", DefaultValue: &dhis2CoreDefaults.javaOpts},
 		"CHART_VERSION":                   {Priority: 14, DisplayName: "Chart Version", DefaultValue: &dhis2CoreDefaults.chartVersion},
+		"GOOGLE_AUTH_PROJECT_ID":          {Priority: 15, DisplayName: "Chart Version", DefaultValue: &dhis2CoreDefaults.chartVersion},
+		"GOOGLE_AUTH_PRIVATE_KEY":         {Priority: 16, DisplayName: "Chart Version", DefaultValue: &dhis2CoreDefaults.chartVersion},
+		"GOOGLE_AUTH_PRIVATE_KEY_ID":      {Priority: 17, DisplayName: "Chart Version", DefaultValue: &dhis2CoreDefaults.chartVersion},
+		"GOOGLE_AUTH_CLIENT_EMAIL":        {Priority: 18, DisplayName: "Chart Version", DefaultValue: &dhis2CoreDefaults.chartVersion},
+		"GOOGLE_AUTH_CLIENT_ID":           {Priority: 19, DisplayName: "Chart Version", DefaultValue: &dhis2CoreDefaults.chartVersion},
+		"INSTALL_REDIS":                   {Priority: 20, DisplayName: "Install Redis", DefaultValue: &dhis2Defaults.installRedis},
 		"DATABASE_HOSTNAME":               {Priority: 0, DisplayName: "Database Hostname", Consumed: true},
 		"DATABASE_NAME":                   {Priority: 0, DisplayName: "Database Name", Consumed: true},
 		"DATABASE_PASSWORD":               {Priority: 0, DisplayName: "Database Password", Consumed: true},
@@ -221,6 +227,11 @@ var dhis2CoreDefaults = struct {
 	resourcesRequestsMemory      string
 	startupProbeFailureThreshold string
 	startupProbePeriodSeconds    string
+	googleAuthProjectId          string
+	googleAuthPrivateKey         string
+	googleAuthPrivateKeyId       string
+	googleAuthClientEmail        string
+	googleAuthClientId           string
 }{
 	chartVersion:                 "0.14.0",
 	dhis2Home:                    "/opt/dhis2",
@@ -229,13 +240,18 @@ var dhis2CoreDefaults = struct {
 	imagePullPolicy:              ifNotPresent,
 	imageRepository:              "core",
 	imageTag:                     "2.40.2",
-	javaOpts:                     "",
+	javaOpts:                     " ",
 	livenessProbeTimeoutSeconds:  "1",
 	readinessProbeTimeoutSeconds: "1",
 	resourcesRequestsCPU:         "250m",
 	resourcesRequestsMemory:      "1500Mi",
 	startupProbeFailureThreshold: "26",
 	startupProbePeriodSeconds:    "5",
+	googleAuthProjectId:          "",
+	googleAuthPrivateKey:         "",
+	googleAuthPrivateKeyId:       "",
+	googleAuthClientEmail:        "",
+	googleAuthClientId:           "",
 }
 
 // Stack representing ../../stacks/dhis2/helmfile.yaml
@@ -267,6 +283,11 @@ var DHIS2 = model.Stack{
 		"STARTUP_PROBE_PERIOD_SECONDS":    {Priority: 21, DisplayName: "Startup Probe Period Seconds", DefaultValue: &dhis2CoreDefaults.startupProbePeriodSeconds},
 		"JAVA_OPTS":                       {Priority: 22, DisplayName: "JAVA_OPTS", DefaultValue: &dhis2CoreDefaults.javaOpts},
 		"CHART_VERSION":                   {Priority: 23, DisplayName: "Chart Version", DefaultValue: &dhis2CoreDefaults.chartVersion},
+		"GOOGLE_AUTH_PROJECT_ID":          {Priority: 24, DisplayName: "Chart Version", DefaultValue: &dhis2CoreDefaults.chartVersion},
+		"GOOGLE_AUTH_PRIVATE_KEY":         {Priority: 25, DisplayName: "Chart Version", DefaultValue: &dhis2CoreDefaults.chartVersion},
+		"GOOGLE_AUTH_PRIVATE_KEY_ID":      {Priority: 26, DisplayName: "Chart Version", DefaultValue: &dhis2CoreDefaults.chartVersion},
+		"GOOGLE_AUTH_CLIENT_EMAIL":        {Priority: 27, DisplayName: "Chart Version", DefaultValue: &dhis2CoreDefaults.chartVersion},
+		"GOOGLE_AUTH_CLIENT_ID":           {Priority: 28, DisplayName: "Chart Version", DefaultValue: &dhis2CoreDefaults.chartVersion},
 	},
 	ParameterProviders: model.ParameterProviders{
 		"DATABASE_HOSTNAME": postgresHostnameProvider,
