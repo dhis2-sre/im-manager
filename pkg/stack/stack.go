@@ -195,7 +195,6 @@ var DHIS2Core = model.Stack{
 		"STARTUP_PROBE_PERIOD_SECONDS":    {Priority: 12, DisplayName: "Startup Probe Period Seconds", DefaultValue: &dhis2CoreDefaults.startupProbePeriodSeconds},
 		"JAVA_OPTS":                       {Priority: 13, DisplayName: "JAVA_OPTS", DefaultValue: &dhis2CoreDefaults.javaOpts},
 		"CHART_VERSION":                   {Priority: 14, DisplayName: "Chart Version", DefaultValue: &dhis2CoreDefaults.chartVersion},
-		"INSTALL_REDIS":                   {Priority: 15, DisplayName: "Install Redis", DefaultValue: &dhis2Defaults.installRedis},
 		"GOOGLE_AUTH_PROJECT_ID":          {Priority: 0, DisplayName: "Google auth project id", DefaultValue: &dhis2CoreDefaults.googleAuthClientId},
 		"GOOGLE_AUTH_PRIVATE_KEY":         {Priority: 0, DisplayName: "Google auth private key", DefaultValue: &dhis2CoreDefaults.googleAuthPrivateKey},
 		"GOOGLE_AUTH_PRIVATE_KEY_ID":      {Priority: 0, DisplayName: "Google auth private key id", DefaultValue: &dhis2CoreDefaults.googleAuthPrivateKeyId},
