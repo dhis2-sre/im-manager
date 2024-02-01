@@ -62,7 +62,7 @@ releases:
       - googleAuth:
           projectId: "{{ requiredEnv "GOOGLE_AUTH_PROJECT_ID" }}"
           privateKeyId: "{{ requiredEnv "GOOGLE_AUTH_PRIVATE_KEY_ID" }}"
-          privateKey: "{{ requiredEnv "GOOGLE_AUTH_PRIVATE_KEY" }}"
+          privateKey: '{{ requiredEnv "GOOGLE_AUTH_PRIVATE_KEY" }}'
           clientEmail: "{{ requiredEnv "GOOGLE_AUTH_CLIENT_EMAIL" }}"
           clientId: "{{ requiredEnv "GOOGLE_AUTH_CLIENT_ID" }}"
       - resources:
