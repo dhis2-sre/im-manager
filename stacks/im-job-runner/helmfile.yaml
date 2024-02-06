@@ -2,7 +2,7 @@ releases:
   - name: {{ requiredEnv "INSTANCE_NAME" }}-job
     namespace: "{{ requiredEnv "INSTANCE_NAMESPACE" }}"
     chart: tons/im-job-runner
-    version: "{{ env "CHART_VERSION" | default "0.1.0" }}"
+    version: "{{ requiredEnv "CHART_VERSION" }}"
     values:
       - image:
           pullPolicy: Always
@@ -13,19 +13,19 @@ releases:
           im-instance-id: "{{ requiredEnv "INSTANCE_ID" }}"
           im-id: "{{ requiredEnv "INSTANCE_ID" }}"
           im-type: "job"
-          im-creation-timestamp: "{{ env "INSTANCE_CREATION_TIMESTAMP" | default "" }}"
-          im-ttl: "{{ env "INSTANCE_TTL" | default "" }}"
+          im-creation-timestamp: "{{ requiredEnv "INSTANCE_CREATION_TIMESTAMP" }}"
+          im-ttl: "{{ requiredEnv "INSTANCE_TTL" }}"
       - command: "{{ requiredEnv "COMMAND" }}"
-      - payload: "{{ env "PAYLOAD" | default "-" }}"
+      - payload: "{{ requiredEnv "PAYLOAD" }}"
       - dhis2:
           database:
-            hostname: "{{ env "DHIS2_DATABASE_HOSTNAME" | default "-" }}"
-            port: "{{ env "DHIS2_DATABASE_PORT" | default "5432" }}"
-            username: "{{ env "DHIS2_DATABASE_USERNAME" | default "dhis" }}"
-            password: "{{ env "DHIS2_DATABASE_PASSWORD" | default "dhis" }}"
-            database: "{{ env "DHIS2_DATABASE_DATABASE" | default "dhis2" }}"
-          hostname: "{{ env "DHIS2_HOSTNAME" | default "-" }}"
-      - imToken: "{{ env "IM_ACCESS_TOKEN" | default "-" }}"
+            hostname: "{{ requiredEnv "DHIS2_DATABASE_HOSTNAME" }}"
+            port: "{{ requiredEnv "DHIS2_DATABASE_PORT" }}"
+            username: "{{ requiredEnv "DHIS2_DATABASE_USERNAME" }}"
+            password: "{{ requiredEnv "DHIS2_DATABASE_PASSWORD" }}"
+            database: "{{ requiredEnv "DHIS2_DATABASE_DATABASE" }}"
+          hostname: "{{ requiredEnv "DHIS2_HOSTNAME" }}"
+      - imToken: "{{ requiredEnv "IM_ACCESS_TOKEN" }}"
 
 repositories:
   - name: tons
