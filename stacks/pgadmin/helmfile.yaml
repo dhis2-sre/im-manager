@@ -4,7 +4,7 @@ releases:
   - name: {{ requiredEnv "INSTANCE_NAME" }}-pgadmin
     namespace: "{{ requiredEnv "INSTANCE_NAMESPACE" }}"
     chart: runix/pgadmin4
-    version: "{{ env "CHART_VERSION" | default "1.11.0" }}"
+    version: "{{ requiredEnv "CHART_VERSION" }}"
     values:
       - podLabels:
           im: "true"
@@ -13,7 +13,7 @@ releases:
           im-instance-id: "{{ requiredEnv "INSTANCE_ID" }}"
           im-id: "{{ requiredEnv "INSTANCE_ID" }}"
           im-type: "pgadmin"
-          im-creation-timestamp: "{{ env "INSTANCE_CREATION_TIMESTAMP" | default "" }}"
+          im-creation-timestamp: "{{ requiredEnv "INSTANCE_CREATION_TIMESTAMP" }}"
           im-ttl: "{{ requiredEnv "INSTANCE_TTL" }}"
 
       - ingress:

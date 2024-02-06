@@ -3,7 +3,7 @@ releases:
   - name: {{ requiredEnv "INSTANCE_NAME" }}-database
     namespace: "{{ requiredEnv "INSTANCE_NAMESPACE" }}"
     chart: bitnami/postgresql
-    version: "{{ env "CHART_VERSION" | default "12.6.2" }}"
+    version: "{{ requiredEnv "CHART_VERSION" }}"
     verify: false
     values:
       - commonLabels:
@@ -13,7 +13,7 @@ releases:
           im-instance-id: "{{ requiredEnv "INSTANCE_ID" }}"
           im-id: "{{ requiredEnv "INSTANCE_ID" }}"
           im-type: "db"
-          im-creation-timestamp: "{{ env "INSTANCE_CREATION_TIMESTAMP" | default "" }}"
+          im-creation-timestamp: "{{ requiredEnv "INSTANCE_CREATION_TIMESTAMP" }}"
           im-ttl: "{{ requiredEnv "INSTANCE_TTL" }}"
 
       - primary:
@@ -25,14 +25,14 @@ releases:
             - name: IM_ACCESS_TOKEN
               value: {{ requiredEnv "IM_ACCESS_TOKEN" }}
             - name: DATABASE_USERNAME
-              value: {{ env "DATABASE_USERNAME" | default "dhis" }}
+              value: {{ requiredEnv "DATABASE_USERNAME" }}
             - name: DATABASE_PASSWORD
-              value: {{ env "DATABASE_PASSWORD" | default "dhis" }}
+              value: {{ requiredEnv "DATABASE_PASSWORD" }}
             - name: DATABASE_NAME
-              value: {{ env "DATABASE_NAME" | default "dhis2" }}
+              value: {{ requiredEnv "DATABASE_NAME" }}
 
           persistence:
-            size: {{ env "DATABASE_SIZE" | default "20Gi" }}
+            size: {{ requiredEnv "DATABASE_SIZE" }}
 
           initdb:
             scripts:
@@ -41,17 +41,17 @@ releases:
 
           resources:
             requests:
-              cpu: {{ env "RESOURCES_REQUESTS_CPU" | default "250m" }}
-              memory: {{ env "RESOURCES_REQUESTS_MEMORY" | default "256Mi" }}
+              cpu: {{ requiredEnv "RESOURCES_REQUESTS_CPU" }}
+              memory: {{ requiredEnv "RESOURCES_REQUESTS_MEMORY" }}
 
       - image:
           repository: dhis2/postgresql-curl
-          tag: {{ env "DATABASE_VERSION" | default "13" }}
+          tag: {{ requiredEnv "DATABASE_VERSION" }}
 
       - auth:
-          username: {{ env "DATABASE_USERNAME" | default "dhis" }}
-          password: {{ env "DATABASE_PASSWORD" | default "dhis" }}
-          database: {{ env "DATABASE_NAME" | default "dhis2" }}
+          username: {{ requiredEnv "DATABASE_USERNAME" }}
+          password: {{ requiredEnv "DATABASE_PASSWORD" }}
+          database: {{ requiredEnv "DATABASE_NAME" }}
 
 repositories:
   - name: bitnami

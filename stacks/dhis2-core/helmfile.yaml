@@ -5,12 +5,12 @@ releases:
   - name: "{{ requiredEnv "INSTANCE_NAME" }}"
     namespace: "{{ requiredEnv "INSTANCE_NAMESPACE" }}"
     chart: dhis2/core
-    version: "{{ env "CHART_VERSION" | default "0.14.0" }}"
+    version: "{{ requiredEnv "CHART_VERSION" }}"
     values:
       - image:
-          repository: dhis2/{{ env "IMAGE_REPOSITORY" | default "core" }}
-          tag: "{{ env "IMAGE_TAG" | default "2.40.2" }}"
-          pullPolicy: {{ env "IMAGE_PULL_POLICY" | default "IfNotPresent" }}
+          repository: dhis2/{{ requiredEnv "IMAGE_REPOSITORY" }}
+          tag: "{{ requiredEnv "IMAGE_TAG" }}"
+          pullPolicy: {{ requiredEnv "IMAGE_PULL_POLICY" }}
       - ingress:
           enabled: true
           hostname: {{ requiredEnv "INSTANCE_HOSTNAME" }}
@@ -18,18 +18,18 @@ releases:
           certIssuer: cert-issuer-prod
           annotations:
             nginx.ingress.kubernetes.io/proxy-body-size: 128m
-      - dhis2Home: "{{ env "DHIS2_HOME" | default "/opt/dhis2" }}"
+      - dhis2Home: "{{ requiredEnv "DHIS2_HOME" }}"
       - catalinaOpts: "-Dcontext.path=/{{ requiredEnv "INSTANCE_NAME" }}"
-      - javaOpts: "{{ env "JAVA_OPTS" | default "" }}"
+      - javaOpts: "{{ requiredEnv "JAVA_OPTS" }}"
       - startupProbe:
-          failureThreshold: {{ env "STARTUP_PROBE_FAILURE_THRESHOLD" | default 26 }}
-          periodSeconds: {{ env "STARTUP_PROBE_PERIOD_SECONDS" | default 5 }}
+          failureThreshold: {{ requiredEnv "STARTUP_PROBE_FAILURE_THRESHOLD" }}
+          periodSeconds: {{ requiredEnv "STARTUP_PROBE_PERIOD_SECONDS" }}
           path: /{{ requiredEnv "INSTANCE_NAME" }}
       - livenessProbe:
-          timeoutSeconds: {{ env "LIVENESS_PROBE_TIMEOUT_SECONDS" | default 1 }}
+          timeoutSeconds: {{ requiredEnv "LIVENESS_PROBE_TIMEOUT_SECONDS" }}
           path: /{{ requiredEnv "INSTANCE_NAME" }}
       - readinessProbe:
-          timeoutSeconds: {{ env "READINESS_PROBE_TIMEOUT_SECONDS" | default 1 }}
+          timeoutSeconds: {{ requiredEnv "READINESS_PROBE_TIMEOUT_SECONDS" }}
           path: /{{ requiredEnv "INSTANCE_NAME" }}
       - commonLabels:
           im: "true"
@@ -38,7 +38,7 @@ releases:
           im-instance-id: "{{ requiredEnv "INSTANCE_ID" }}"
           im-id: "{{ requiredEnv "INSTANCE_ID" }}"
           im-type: "dhis2"
-          im-creation-timestamp: "{{ env "INSTANCE_CREATION_TIMESTAMP" | default "" }}"
+          im-creation-timestamp: "{{ requiredEnv "INSTANCE_CREATION_TIMESTAMP" }}"
           im-ttl: "{{ requiredEnv "INSTANCE_TTL" }}"
       - dhisConfig: |
           connection.dialect = org.hibernate.dialect.PostgreSQLDialect
@@ -50,18 +50,18 @@ releases:
           connection.schema = update
           # Server base URL
           server.base.url = https://{{ requiredEnv "INSTANCE_HOSTNAME" }}/{{ requiredEnv "INSTANCE_NAME" }}
-          flyway.migrate_out_of_order = {{ env "FLYWAY_MIGRATE_OUT_OF_ORDER" | default false }}
-          flyway.repair_before_migration = {{ env "FLYWAY_REPAIR_BEFORE_MIGRATION" | default false }}
+          flyway.migrate_out_of_order = {{ requiredEnv "FLYWAY_MIGRATE_OUT_OF_ORDER" }}
+          flyway.repair_before_migration = {{ requiredEnv "FLYWAY_REPAIR_BEFORE_MIGRATION" }}
       - googleAuth:
-          projectId: "{{ env "GOOGLE_AUTH_PROJECT_ID" | default "" }}"
-          privateKeyId: "{{ env "GOOGLE_AUTH_PRIVATE_KEY_ID" | default "" }}"
-          privateKey: {{ env "GOOGLE_AUTH_PRIVATE_KEY" | default "" }}
-          clientEmail: "{{ env "GOOGLE_AUTH_CLIENT_EMAIL" | default "" }}"
-          clientId: "{{ env "GOOGLE_AUTH_CLIENT_ID" | default "" }}"
+          projectId: "{{ requiredEnv "GOOGLE_AUTH_PROJECT_ID" }}"
+          privateKeyId: "{{ requiredEnv "GOOGLE_AUTH_PRIVATE_KEY_ID" }}"
+          privateKey: '{{ requiredEnv "GOOGLE_AUTH_PRIVATE_KEY" }}'
+          clientEmail: "{{ requiredEnv "GOOGLE_AUTH_CLIENT_EMAIL" }}"
+          clientId: "{{ requiredEnv "GOOGLE_AUTH_CLIENT_ID" }}"
       - resources:
           requests:
-            cpu: {{ env "RESOURCES_REQUESTS_CPU" | default "250m" }}
-            memory: {{ env "RESOURCES_REQUESTS_MEMORY" | default "1500Mi" }}
+            cpu: {{ requiredEnv "RESOURCES_REQUESTS_CPU" }}
+            memory: {{ requiredEnv "RESOURCES_REQUESTS_MEMORY" }}
 
 repositories:
   - name: dhis2
