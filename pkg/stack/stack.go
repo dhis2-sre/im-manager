@@ -246,8 +246,8 @@ var dhis2CoreDefaults = struct {
 	resourcesRequestsMemory:      "1500Mi",
 	startupProbeFailureThreshold: "26",
 	startupProbePeriodSeconds:    "5",
-	googleAuthProjectId:          " ", // " " is used here due to the same reason as with `javaOpts`
-	googleAuthPrivateKey:         " ",
+	googleAuthProjectId:          " ", // TODO: " " doesn't need to be used here as with `javaOpts` since the googleAuth* parameters are stack parameters and therefor always populated
+	googleAuthPrivateKey:         " ", // However the web client currently doesn't support these empty parameter so for now
 	googleAuthPrivateKeyId:       " ",
 	googleAuthClientEmail:        " ",
 	googleAuthClientId:           " ",
