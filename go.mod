@@ -29,7 +29,7 @@ require (
 	go.mozilla.org/sops/v3 v3.7.3
 	golang.org/x/crypto v0.18.0
 	golang.org/x/exp v0.0.0-20231108232855-2478ac86f678
-	gorm.io/driver/postgres v1.5.5
+	gorm.io/driver/postgres v1.5.6
 	gorm.io/gorm v1.25.7
 	k8s.io/api v0.28.3
 	k8s.io/apimachinery v0.28.3
