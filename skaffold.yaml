@@ -65,7 +65,7 @@ deploy:
             repository: dhis2/im-manager
           serviceAccount:
             annotations:
-              "eks\\.amazonaws\\.com\\/role-arn": arn:aws:iam::767224633206:role/instance-cluster-test-im-manager-{{ .CLASSIFICATION }}
+              "eks\\.amazonaws\\.com\\/role-arn": arn:aws:iam::767224633206:role/instance-cluster-production-im-manager-{{ .CLASSIFICATION }}
           ingress:
             enabled: true
             hostname: "{{ .API_HOSTNAME }}"
