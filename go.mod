@@ -7,7 +7,7 @@ require (
 	github.com/anthhub/forwarder v1.1.0
 	github.com/aws/aws-sdk-go-v2 v1.25.0
 	github.com/aws/aws-sdk-go-v2/config v1.27.0
-	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.16.0
+	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.16.1
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.50.0
 	github.com/dhis2-sre/rabbitmq v0.3.1-0.20231106051247-d45d1d39d012
 	github.com/dominikbraun/graph v0.23.0
