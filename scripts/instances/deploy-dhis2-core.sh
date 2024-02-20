@@ -10,6 +10,7 @@ GROUP=$1
 NAME=$2
 SOURCE_INSTANCE=${3:-""}
 
+MIN_READY_SECONDS=${MIN_READY_SECONDS:-180}
 # container(s) in dhis2 pod will be restarted after that due to restartPolicy
 # 5*26=130s
 STARTUP_PROBE_FAILURE_THRESHOLD=${STARTUP_PROBE_FAILURE_THRESHOLD:-26}
@@ -39,6 +40,10 @@ echo "{
   \"public\": $PUBLIC,
   \"sourceInstance\": $SOURCE_INSTANCE_ID,
   \"parameters\": [
+    {
+      \"name\": \"MIN_READY_SECONDS\",
+      \"value\": \"$MIN_READY_SECONDS\"
+    },
     {
       \"name\": \"STARTUP_PROBE_FAILURE_THRESHOLD\",
       \"value\": \"$STARTUP_PROBE_FAILURE_THRESHOLD\"
