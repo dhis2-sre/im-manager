@@ -21,6 +21,7 @@ releases:
       - dhis2Home: "{{ requiredEnv "DHIS2_HOME" }}"
       - catalinaOpts: "-Dcontext.path=/{{ requiredEnv "INSTANCE_NAME" }}"
       - javaOpts: "{{ requiredEnv "JAVA_OPTS" }}"
+      - minReadySeconds: {{ requiredEnv "MIN_READY_SECONDS" }}
       - startupProbe:
           failureThreshold: {{ requiredEnv "STARTUP_PROBE_FAILURE_THRESHOLD" }}
           periodSeconds: {{ requiredEnv "STARTUP_PROBE_PERIOD_SECONDS" }}
