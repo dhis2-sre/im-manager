@@ -234,7 +234,7 @@ var dhis2CoreDefaults = struct {
 	googleAuthClientEmail        string
 	googleAuthClientId           string
 }{
-	chartVersion:                 "0.16.0",
+	chartVersion:                 "0.16.1",
 	dhis2Home:                    "/opt/dhis2",
 	flywayMigrateOutOfOrder:      "false",
 	flywayRepairBeforeMigration:  "false",
