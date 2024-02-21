@@ -598,7 +598,6 @@ func (h Handler) Delete(c *gin.Context) {
 // swagger:model GroupsWithDatabases
 type GroupsWithDatabases struct {
 	Name      string           `json:"name"`
-	Hostname  string           `json:"hostname"`
 	Databases []model.Database `json:"databases"`
 }
 

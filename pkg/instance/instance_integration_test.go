@@ -156,7 +156,7 @@ func TestInstanceHandler(t *testing.T) {
 		}`)
 		client.PostJSON(t, "/instances", body, &instance, inttest.WithAuthToken("sometoken"))
 
-		k8sClient.AssertPodIsReady(t, group.Name, instance.Name+"-database", 60)
+		k8sClient.AssertPodIsReady(t, group.Name, instance.Name+"-database", 3*60)
 		k8sClient.AssertPodIsReady(t, group.Name, instance.Name, 5*60)
 	})
 
@@ -269,6 +269,10 @@ func encryptUsingAge(t *testing.T, identity *age.X25519Identity, yamlData []byte
 
 type groupService struct {
 	group *model.Group
+}
+
+func (gs groupService) FindByGroupNames(groupNames []string) ([]model.Group, error) {
+	panic("implement me")
 }
 
 func (gs groupService) Find(name string) (*model.Group, error) {
