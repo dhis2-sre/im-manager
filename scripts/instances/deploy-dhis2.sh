@@ -12,7 +12,7 @@ shift
 shift
 DESCRIPTION=${*:-""}
 
-MIN_READY_SECONDS=${MIN_READY_SECONDS:-0}
+MIN_READY_SECONDS=${MIN_READY_SECONDS:-120}
 # container(s) in dhis2 pod will be restarted after that due to restartPolicy
 # 5*26=130s
 STARTUP_PROBE_FAILURE_THRESHOLD=${STARTUP_PROBE_FAILURE_THRESHOLD:-26}
