@@ -15,5 +15,5 @@ echo "{
   \"name\": \"$NAME\",
   \"group\": \"$GROUP\",
   \"description\": \"$DESCRIPTION\",
-  \"ttl\": \"$INSTANCE_TTL\"
+  \"ttl\": $INSTANCE_TTL
 }" | $HTTP post "$IM_HOST/deployments" "Authorization: Bearer $ACCESS_TOKEN"
