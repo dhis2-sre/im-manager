@@ -34,11 +34,11 @@ type DeploymentInstance struct {
 	UpdatedAt time.Time `json:"updatedAt"`
 
 	// TODO: FK to name of Deployment?
-	Name      string `json:"name" gorm:"index:idx_name_and_group,unique"`
+	Name      string `json:"name" gorm:"index:idx_name_and_group_stack,unique"`
 	Group     *Group `json:"group,omitempty"`
-	GroupName string `json:"groupName" gorm:"index:idx_name_and_group,unique; references:Name"`
+	GroupName string `json:"groupName" gorm:"index:idx_name_and_group_stack,unique; references:Name"`
 	//	Stack     *Stack `json:"stack,omitempty"`
-	StackName string `json:"stackName" gorm:"index:idx_name_and_group,unique"`
+	StackName string `json:"stackName" gorm:"index:idx_name_and_group_stack,unique"`
 
 	DeploymentID uint        `json:"deploymentId"`
 	Deployment   *Deployment `json:"deployment,omitempty"`
