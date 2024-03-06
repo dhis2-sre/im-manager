@@ -96,14 +96,6 @@ type Instance struct {
 	UpdatedAt time.Time `json:"updatedAt"`
 }
 
-type Linked struct {
-	SourceInstanceID      uint     `json:"sourceInstanceId" gorm:"primaryKey"`
-	SourceInstance        Instance `json:"sourceInstance"`
-	DestinationStackName  string   `json:"destinationStackName" gorm:"primaryKey"`
-	DestinationInstanceID uint     `json:"destinationInstanceId" gorm:"index:idx_linked_second_instance,unique"`
-	DestinationInstance   Instance `json:"destinationInstance"`
-}
-
 func (i Instance) FindParameter(name string) (InstanceParameter, error) {
 	for _, parameter := range i.Parameters {
 		if parameter.Name == name {
