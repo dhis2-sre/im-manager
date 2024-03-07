@@ -1,7 +1,6 @@
 package model
 
 import (
-	"fmt"
 	"time"
 
 	"gorm.io/gorm"
@@ -73,40 +72,4 @@ func (i *DeploymentInstance) AfterFind(_ *gorm.DB) error {
 		i.Parameters[parameter.ParameterName] = parameter
 	}
 	return nil
-}
-
-// swagger:model Instance
-type Instance struct {
-	ID          uint                `json:"id" gorm:"primarykey"`
-	User        User                `json:"user"`
-	UserID      uint                `json:"userId"`
-	Name        string              `json:"name" gorm:"index:instance_name_group_idx,unique"`
-	Group       Group               `json:"group"`
-	GroupName   string              `json:"groupName" gorm:"index:instance_name_group_idx,unique"`
-	Description string              `json:"description"`
-	StackName   string              `json:"stackName"`
-	TTL         uint                `json:"ttl"`
-	Parameters  []InstanceParameter `json:"parameters" gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
-	DeployLog   string              `json:"deployLog" gorm:"type:text"`
-	Preset      bool                `json:"preset"`
-	Public      bool                `json:"public"`
-	// The preset which this instance is created from
-	PresetID  uint      `json:"presetId"`
-	CreatedAt time.Time `json:"createdAt"`
-	UpdatedAt time.Time `json:"updatedAt"`
-}
-
-func (i Instance) FindParameter(name string) (InstanceParameter, error) {
-	for _, parameter := range i.Parameters {
-		if parameter.Name == name {
-			return parameter, nil
-		}
-	}
-	return InstanceParameter{}, fmt.Errorf("parameter not found: %s", name)
-}
-
-type InstanceParameter struct {
-	InstanceID uint   `json:"-" gorm:"primaryKey"`
-	Name       string `json:"name" gorm:"primaryKey"`
-	Value      string `json:"value"`
 }
