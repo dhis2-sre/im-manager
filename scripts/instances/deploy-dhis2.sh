@@ -36,7 +36,8 @@ FLYWAY_REPAIR_BEFORE_MIGRATION=${FLYWAY_REPAIR_BEFORE_MIGRATION:-false}
 DEPLOYMENT_ID=$(echo "{
   \"name\": \"$NAME\",
   \"group\": \"$GROUP\",
-  \"description\": \"$DESCRIPTION\"
+  \"description\": \"$DESCRIPTION\",
+  \"ttl\": $INSTANCE_TTL
 }" | $HTTP post "$IM_HOST/deployments" "Authorization: Bearer $ACCESS_TOKEN" | jq -r '.id')
 
 echo "{

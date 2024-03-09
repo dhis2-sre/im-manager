@@ -39,8 +39,6 @@ func NewService(
 type Repository interface {
 	SaveDeployment(deployment *model.Deployment) error
 	SaveInstance(instance *model.DeploymentInstance) error
-	Link(firstInstance, secondInstance *model.Instance) error
-	Unlink(instance *model.Instance) error
 	Save(instance *model.Instance) error
 	FindById(id uint) (*model.Instance, error)
 	FindByIdDecrypted(id uint) (*model.Instance, error)
@@ -557,17 +555,6 @@ func (s service) Restart(instance *model.DeploymentInstance, typeSelector string
 	return ks.restart(instance, typeSelector, stack)
 }
 
-func (s service) Link(source, destination *model.Instance) error {
-	return s.instanceRepository.Link(source, destination)
-}
-
-func (s service) unlink(id uint) error {
-	instance := &model.Instance{
-		ID: id,
-	}
-	return s.instanceRepository.Unlink(instance)
-}
-
 func (s service) Save(instance *model.Instance) error {
 	stack, err := s.stackService.Find(instance.StackName)
 	if err != nil {
@@ -643,11 +630,6 @@ func (s service) Deploy(token string, instance *model.Instance) error {
 }
 
 func (s service) Delete(id uint) error {
-	err := s.unlink(id)
-	if err != nil {
-		return err
-	}
-
 	instance, err := s.FindByIdDecrypted(id)
 	if err != nil {
 		return err
