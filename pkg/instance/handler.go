@@ -469,12 +469,6 @@ func (h Handler) consumeParameters(user *model.User, sourceInstanceId uint, inst
 		return err
 	}
 
-	if !preset {
-		err = h.instanceService.Link(sourceInstance, instance)
-		if err != nil {
-			return err
-		}
-	}
 	return nil
 }
 

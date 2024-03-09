@@ -39,6 +39,7 @@ func (r repository) findAll() ([]*model.User, error) {
 	err := r.db.
 		Preload("Groups").
 		Preload("AdminGroups").
+		Order("Email").
 		Find(&users).Error
 	if err != nil {
 		return nil, fmt.Errorf("failed to find all users: %v", err)
