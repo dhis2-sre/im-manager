@@ -11,8 +11,8 @@ type Database struct {
 	ID                uint               `json:"id" gorm:"primarykey"`
 	CreatedAt         time.Time          `json:"createdAt"`
 	UpdatedAt         time.Time          `json:"updatedAt"`
-	Name              string             `json:"name" gorm:"index:idx_name_and_group,unique"`
-	GroupName         string             `json:"groupName" gorm:"index:idx_name_and_group,unique"`
+	Name              string             `json:"name" gorm:"index:database_name_group_idx,unique"`
+	GroupName         string             `json:"groupName" gorm:"index:database_name_group_idx,unique"`
 	Url               string             `json:"url"` // s3... Path?
 	ExternalDownloads []ExternalDownload `json:"externalDownloads" gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
 	Lock              *Lock              `json:"lock" gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
