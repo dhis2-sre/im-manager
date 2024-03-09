@@ -147,43 +147,6 @@ func (r repository) FindByIdDecrypted(id uint) (*model.Instance, error) {
 	return instance, err
 }
 
-func (r repository) Link(source *model.Instance, destination *model.Instance) error {
-	link := &model.Linked{
-		SourceInstanceID:      source.ID,
-		DestinationStackName:  destination.StackName,
-		DestinationInstanceID: destination.ID,
-	}
-
-	err := r.db.Create(&link).Error
-	if errors.Is(err, gorm.ErrDuplicatedKey) {
-		return errdef.NewDuplicated("instance (%d) already linked with a stack of type \"%s\"", source.ID, destination.StackName)
-	}
-
-	return err
-}
-
-func (r repository) Unlink(instance *model.Instance) error {
-	link := &model.Linked{}
-
-	// Does another instance depend on the instance we're trying to unlink
-	err := r.db.First(link, "source_instance_id = ?", instance.ID).Error
-	if err == nil {
-		return fmt.Errorf("instance %d depends on %d", link.DestinationInstanceID, instance.ID)
-	}
-
-	// Any error beside ErrRecordNotFound?
-	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-		return err
-	}
-
-	// Attempt to unlink
-	err = r.db.Unscoped().Delete(link, "destination_instance_id = ?", instance.ID).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil
-	}
-	return err
-}
-
 func (r repository) Save(instance *model.Instance) error {
 	//key := r.instanceParameterEncryptionKey
 
