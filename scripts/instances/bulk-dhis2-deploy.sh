@@ -19,7 +19,7 @@ export CORE_RESOURCES_REQUESTS_CPU=500m # 250m
 export CORE_RESOURCES_REQUESTS_MEMORY=2500Mi # 1500Mi
 
 
-for ((i = 0; i < INSTANCES; i++)); do
+for ((i = 1; i < INSTANCES + 1; i++)); do
   # Ensure each deploy get a fresh access token
   rm -f .access_token_cache
   source ./auth.sh
