@@ -93,42 +93,6 @@ definitions:
                 x-go-name: Url
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/model
-    DeployInstanceRequest:
-        properties:
-            description:
-                type: string
-                x-go-name: Description
-            groupName:
-                type: string
-                x-go-name: Group
-            name:
-                type: string
-                x-go-name: Name
-            parameters:
-                items:
-                    $ref: '#/definitions/InstanceParameter'
-                type: array
-                x-go-name: Parameters
-            presetInstance:
-                format: uint64
-                type: integer
-                x-go-name: PresetInstance
-            public:
-                type: boolean
-                x-go-name: Public
-            sourceInstance:
-                format: uint64
-                type: integer
-                x-go-name: SourceInstance
-            stackName:
-                type: string
-                x-go-name: Stack
-            ttl:
-                format: uint64
-                type: integer
-                x-go-name: TTL
-        type: object
-        x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
     Deployment:
         properties:
             createdAt:
@@ -315,90 +279,6 @@ definitions:
                 x-go-name: Name
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
-    GroupsWithInstances:
-        properties:
-            hostname:
-                type: string
-                x-go-name: Hostname
-            instances:
-                items:
-                    $ref: '#/definitions/Instance'
-                type: array
-                x-go-name: Instances
-            name:
-                type: string
-                x-go-name: Name
-        type: object
-        x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
-    Instance:
-        properties:
-            createdAt:
-                format: date-time
-                type: string
-                x-go-name: CreatedAt
-            deployLog:
-                type: string
-                x-go-name: DeployLog
-            description:
-                type: string
-                x-go-name: Description
-            group:
-                $ref: '#/definitions/Group'
-            groupName:
-                type: string
-                x-go-name: GroupName
-            id:
-                format: uint64
-                type: integer
-                x-go-name: ID
-            name:
-                type: string
-                x-go-name: Name
-            parameters:
-                items:
-                    $ref: '#/definitions/InstanceParameter'
-                type: array
-                x-go-name: Parameters
-            preset:
-                type: boolean
-                x-go-name: Preset
-            presetId:
-                description: The preset which this instance is created from
-                format: uint64
-                type: integer
-                x-go-name: PresetID
-            public:
-                type: boolean
-                x-go-name: Public
-            stackName:
-                type: string
-                x-go-name: StackName
-            ttl:
-                format: uint64
-                type: integer
-                x-go-name: TTL
-            updatedAt:
-                format: date-time
-                type: string
-                x-go-name: UpdatedAt
-            user:
-                $ref: '#/definitions/User'
-            userId:
-                format: uint64
-                type: integer
-                x-go-name: UserID
-        type: object
-        x-go-package: github.com/dhis2-sre/im-manager/pkg/model
-    InstanceParameter:
-        properties:
-            name:
-                type: string
-                x-go-name: Name
-            value:
-                type: string
-                x-go-name: Value
-        type: object
-        x-go-package: github.com/dhis2-sre/im-manager/pkg/model
     InstanceStatus:
         type: string
         x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
@@ -547,19 +427,6 @@ definitions:
                 x-go-name: Name
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/database
-    UpdateInstanceRequest:
-        properties:
-            parameters:
-                items:
-                    $ref: '#/definitions/InstanceParameter'
-                type: array
-                x-go-name: Parameters
-            ttl:
-                format: uint64
-                type: integer
-                x-go-name: TTL
-        type: object
-        x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
     User:
         description: User domain object defining a user
         properties:
@@ -1399,169 +1266,6 @@ paths:
                 "200":
                     $ref: '#/responses/Response'
             summary: Health status
-    /instances:
-        get:
-            description: List all instances accessible by the user
-            operationId: listInstances
-            responses:
-                "200":
-                    $ref: '#/responses/GroupsWithInstances'
-                "401":
-                    $ref: '#/responses/Error'
-                "403":
-                    $ref: '#/responses/Error'
-                "415":
-                    $ref: '#/responses/Error'
-            security:
-                - oauth2: []
-            summary: List instances
-        post:
-            description: Deploy an instance...
-            operationId: deployInstance
-            parameters:
-                - description: Deploy instance request body parameter
-                  in: body
-                  name: Payload
-                  required: true
-                  schema:
-                    $ref: '#/definitions/DeployInstanceRequest'
-                - description: preset
-                  in: query
-                  name: preset
-                  type: string
-                  x-go-name: Preset
-            responses:
-                "201":
-                    description: Instance
-                    schema:
-                        $ref: '#/definitions/Instance'
-                "400":
-                    $ref: '#/responses/Error'
-                "401":
-                    $ref: '#/responses/Error'
-                "403":
-                    $ref: '#/responses/Error'
-                "404":
-                    $ref: '#/responses/Error'
-                "415":
-                    $ref: '#/responses/Error'
-            security:
-                - oauth2: []
-            summary: Deploy instance
-    /instances-name-to-id/{groupName}/{instanceName}:
-        get:
-            description: Find instance id by name and group name
-            operationId: instanceNameToId
-            parameters:
-                - in: path
-                  name: groupName
-                  required: true
-                  type: string
-                  x-go-name: GroupName
-                - in: path
-                  name: instanceName
-                  required: true
-                  type: string
-                  x-go-name: InstanceName
-            responses:
-                "200":
-                    description: Instance
-                    schema:
-                        $ref: '#/definitions/Instance'
-                "401":
-                    $ref: '#/responses/Error'
-                "403":
-                    $ref: '#/responses/Error'
-                "404":
-                    $ref: '#/responses/Error'
-                "415":
-                    $ref: '#/responses/Error'
-            security:
-                - oauth2: []
-            summary: Find an instance
-    /instances/{id}:
-        delete:
-            description: Delete an instance by id
-            operationId: deleteInstance
-            parameters:
-                - format: uint64
-                  in: path
-                  name: id
-                  required: true
-                  type: integer
-                  x-go-name: ID
-            responses:
-                "202":
-                    description: ""
-                "401":
-                    $ref: '#/responses/Error'
-                "403":
-                    $ref: '#/responses/Error'
-                "404":
-                    $ref: '#/responses/Error'
-                "415":
-                    $ref: '#/responses/Error'
-            security:
-                - oauth2: []
-            summary: Delete instance
-        get:
-            description: Find an instance by id
-            operationId: findById
-            parameters:
-                - format: uint64
-                  in: path
-                  name: id
-                  required: true
-                  type: integer
-                  x-go-name: ID
-            responses:
-                "200":
-                    description: Instance
-                    schema:
-                        $ref: '#/definitions/Instance'
-                "401":
-                    $ref: '#/responses/Error'
-                "403":
-                    $ref: '#/responses/Error'
-                "404":
-                    $ref: '#/responses/Error'
-                "415":
-                    $ref: '#/responses/Error'
-            security:
-                - oauth2: []
-            summary: Find instance
-        put:
-            description: Update an instance...
-            operationId: updateInstance
-            parameters:
-                - format: uint64
-                  in: path
-                  name: id
-                  required: true
-                  type: integer
-                  x-go-name: ID
-                - description: Update instance request body parameter
-                  in: body
-                  name: Payload
-                  required: true
-                  schema:
-                    $ref: '#/definitions/UpdateInstanceRequest'
-            responses:
-                "204":
-                    description: Instance
-                    schema:
-                        $ref: '#/definitions/Instance'
-                "401":
-                    $ref: '#/responses/Error'
-                "403":
-                    $ref: '#/responses/Error'
-                "404":
-                    $ref: '#/responses/Error'
-                "415":
-                    $ref: '#/responses/Error'
-            security:
-                - oauth2: []
-            summary: Update instance
     /instances/{id}/logs:
         get:
             description: Stream instance logs in real time
@@ -1592,33 +1296,6 @@ paths:
             security:
                 - oauth2: []
             summary: Stream logs
-    /instances/{id}/parameters:
-        get:
-            description: Find instance by id with decrypted parameters
-            operationId: findByIdDecrypted
-            parameters:
-                - format: uint64
-                  in: path
-                  name: id
-                  required: true
-                  type: integer
-                  x-go-name: ID
-            responses:
-                "200":
-                    description: Instance
-                    schema:
-                        $ref: '#/definitions/Instance'
-                "401":
-                    $ref: '#/responses/Error'
-                "403":
-                    $ref: '#/responses/Error'
-                "404":
-                    $ref: '#/responses/Error'
-                "415":
-                    $ref: '#/responses/Error'
-            security:
-                - oauth2: []
-            summary: Find decrypted instance
     /instances/{id}/pause:
         put:
             description: |-
@@ -1798,30 +1475,6 @@ paths:
             security:
                 - oauth2: []
             summary: User details
-    /presets:
-        get:
-            description: List all presets accessible by the user
-            operationId: listPresets
-            responses:
-                "200":
-                    $ref: '#/responses/GroupsWithInstances'
-                "401":
-                    $ref: '#/responses/Error'
-                "403":
-                    $ref: '#/responses/Error'
-                "415":
-                    $ref: '#/responses/Error'
-            security:
-                - oauth2: []
-            summary: List presets
-    /public/instances:
-        get:
-            description: List all public instances
-            operationId: listPublicInstances
-            responses:
-                "200":
-                    $ref: '#/responses/GroupsWithInstances'
-            summary: List Public Instances
     /refresh:
         post:
             description: Refresh user tokens
@@ -2087,12 +1740,6 @@ responses:
         schema:
             items:
                 $ref: '#/definitions/GroupsWithDeployments'
-            type: array
-    GroupsWithInstances:
-        description: ""
-        schema:
-            items:
-                $ref: '#/definitions/GroupsWithInstances'
             type: array
     InstanceLogsResponse:
         description: ""
