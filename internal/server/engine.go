@@ -8,11 +8,12 @@ import (
 	redocMiddleware "github.com/go-openapi/runtime/middleware"
 )
 
-func GetEngine(basePath string) *gin.Engine {
+func GetEngine(basePath string, allowedOrigin string) *gin.Engine {
 	r := gin.Default()
 
 	corsConfig := cors.DefaultConfig()
-	corsConfig.AllowAllOrigins = true
+	// Without specifying origin, secure cookies won't work
+	corsConfig.AllowOrigins = []string{allowedOrigin}
 	corsConfig.AllowCredentials = true
 	corsConfig.AddAllowHeaders("authorization")
 	corsConfig.AddExposeHeaders("Content-Disposition", "Content-Length")

@@ -8,9 +8,9 @@ import (
 	"time"
 
 	"github.com/dhis2-sre/im-manager/pkg/model"
-	"github.com/gofrs/uuid"
-	"github.com/lestrrat-go/jwx/jwa"
-	"github.com/lestrrat-go/jwx/jwt"
+	"github.com/google/uuid"
+	"github.com/lestrrat-go/jwx/v2/jwa"
+	"github.com/lestrrat-go/jwx/v2/jwt"
 )
 
 func GenerateAccessToken(user *model.User, key *rsa.PrivateKey, expirationInSeconds int) (string, error) {
@@ -34,7 +34,7 @@ func GenerateAccessToken(user *model.User, key *rsa.PrivateKey, expirationInSeco
 		return "", err
 	}
 
-	signed, err := jwt.Sign(token, jwa.RS256, key)
+	signed, err := jwt.Sign(token, jwt.WithKey(jwa.RS256, key))
 	if err != nil {
 		return "", err
 	}
@@ -51,8 +51,7 @@ type AccessTokenClaims struct {
 func ValidateAccessToken(tokenString string, key *rsa.PublicKey) (*AccessTokenClaims, error) {
 	token, err := jwt.Parse(
 		[]byte(tokenString),
-		jwt.WithValidate(true),
-		jwt.WithVerify(jwa.RS256, key),
+		jwt.WithKey(jwa.RS256, key),
 	)
 	if err != nil {
 		return nil, err
@@ -101,7 +100,7 @@ func GenerateRefreshToken(user *model.User, secretKey string, expirationInSecond
 	currentTime := time.Now()
 	tokenExpiration := currentTime.Add(time.Duration(expirationInSeconds) * time.Second)
 
-	tokenId, err := uuid.NewV4()
+	tokenId, err := uuid.NewUUID()
 	if err != nil {
 		log.Println("Failed to generate refresh token id")
 		return nil, err
@@ -129,7 +128,7 @@ func GenerateRefreshToken(user *model.User, secretKey string, expirationInSecond
 		return nil, err
 	}
 
-	signed, err := jwt.Sign(token, jwa.HS256, []byte(secretKey))
+	signed, err := jwt.Sign(token, jwt.WithKey(jwa.HS256, []byte(secretKey)))
 	if err != nil {
 		log.Printf("Failed to sign token: %s", err)
 		return nil, err
@@ -153,8 +152,7 @@ type refreshTokenClaims struct {
 func ValidateRefreshToken(tokenString string, secretKey string) (*refreshTokenClaims, error) {
 	token, err := jwt.Parse(
 		[]byte(tokenString),
-		jwt.WithValidate(true),
-		jwt.WithVerify(jwa.HS256, []byte(secretKey)),
+		jwt.WithKey(jwa.HS256, []byte(secretKey)),
 	)
 	if err != nil {
 		return nil, err

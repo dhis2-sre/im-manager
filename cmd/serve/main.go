@@ -83,7 +83,7 @@ func run() error {
 		return err
 	}
 
-	userHandler := user.NewHandler(userService, tokenService)
+	userHandler := user.NewHandler(cfg, userService, tokenService)
 
 	authentication := middleware.NewAuthentication(publicKey, userService)
 	groupRepository := group.NewRepository(db)
@@ -170,7 +170,7 @@ func run() error {
 		return err
 	}
 
-	r := server.GetEngine(cfg.BasePath)
+	r := server.GetEngine(cfg.BasePath, cfg.UIHostname)
 
 	group.Routes(r, authentication, authorization, groupHandler)
 	user.Routes(r, authentication, authorization, userHandler)

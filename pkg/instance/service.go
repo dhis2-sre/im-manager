@@ -630,17 +630,17 @@ func (s service) Deploy(token string, instance *model.Instance) error {
 }
 
 func (s service) Delete(id uint) error {
-	instance, err := s.FindByIdDecrypted(id)
+	instance, err := s.FindDeploymentInstanceById(id)
 	if err != nil {
 		return err
 	}
 
-	err = s.destroy(instance)
+	deployment, err := s.FindDeploymentById(instance.DeploymentID)
 	if err != nil {
 		return err
 	}
 
-	return s.instanceRepository.Delete(id)
+	return s.DeleteDeployment(deployment)
 }
 
 func (s service) Logs(instance *model.DeploymentInstance, group *model.Group, typeSelector string) (io.ReadCloser, error) {
