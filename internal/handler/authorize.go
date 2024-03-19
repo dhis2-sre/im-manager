@@ -6,16 +6,6 @@ import (
 
 const AdministratorGroupName = "administrators"
 
-func CanReadInstance(user *model.User, instance *model.Instance) bool {
-	return isAdministrator(user) || isMemberOf(instance.GroupName, user.Groups)
-}
-
-func CanWriteInstance(user *model.User, instance *model.Instance) bool {
-	return isAdministrator(user) ||
-		isMemberOf(instance.GroupName, user.AdminGroups) ||
-		(user.ID == instance.UserID && isMemberOf(instance.GroupName, user.Groups))
-}
-
 func CanWriteDeployment(user *model.User, deployment *model.Deployment) bool {
 	return isAdministrator(user) ||
 		isMemberOf(deployment.GroupName, user.AdminGroups) ||

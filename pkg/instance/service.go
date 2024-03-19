@@ -39,15 +39,7 @@ func NewService(
 type Repository interface {
 	SaveDeployment(deployment *model.Deployment) error
 	SaveInstance(instance *model.DeploymentInstance) error
-	Save(instance *model.Instance) error
-	FindById(id uint) (*model.Instance, error)
-	FindByIdDecrypted(id uint) (*model.Instance, error)
-	FindByNameAndGroup(instance string, group string) (*model.Instance, error)
-	FindByGroups(groups []model.Group, presets bool) ([]GroupsWithInstances, error)
-	FindPublicInstances() ([]GroupsWithInstances, error)
-	SaveDeployLog(instance *model.Instance, log string) error
-	SaveDeployLog_deployment(instance *model.DeploymentInstance, log string) error
-	Delete(id uint) error
+	SaveDeployLog(instance *model.DeploymentInstance, log string) error
 	DeleteDeploymentInstance(instance *model.DeploymentInstance) error
 	DeleteDeployment(deployment *model.Deployment) error
 	FindDeploymentById(id uint) (*model.Deployment, error)
@@ -63,10 +55,8 @@ type groupService interface {
 }
 
 type helmfile interface {
-	sync_deployment(token string, instance *model.DeploymentInstance, group *model.Group, ttl uint) (*exec.Cmd, error)
-	sync(token string, instance *model.Instance, group *model.Group) (*exec.Cmd, error)
-	destroy_deployment(instance *model.DeploymentInstance, group *model.Group) (*exec.Cmd, error)
-	destroy(instance *model.Instance, group *model.Group) (*exec.Cmd, error)
+	sync(token string, instance *model.DeploymentInstance, group *model.Group, ttl uint) (*exec.Cmd, error)
+	destroy(instance *model.DeploymentInstance, group *model.Group) (*exec.Cmd, error)
 }
 
 type service struct {
@@ -346,7 +336,7 @@ func (s service) deployDeploymentInstance(token string, instance *model.Deployme
 		return err
 	}
 
-	syncCmd, err := s.helmfileService.sync_deployment(token, instance, group, ttl)
+	syncCmd, err := s.helmfileService.sync(token, instance, group, ttl)
 	if err != nil {
 		return err
 	}
@@ -364,7 +354,7 @@ func (s service) deployDeploymentInstance(token string, instance *model.Deployme
 	}
 
 	// TODO: Encrypt before saving? Yes...
-	err = s.instanceRepository.SaveDeployLog_deployment(instance, string(deployLog))
+	err = s.instanceRepository.SaveDeployLog(instance, string(deployLog))
 	instance.DeployLog = string(deployLog)
 	if err != nil {
 		// TODO
@@ -372,6 +362,15 @@ func (s service) deployDeploymentInstance(token string, instance *model.Deployme
 		return err
 	}
 	return nil
+}
+
+func (s service) Delete(deploymentId uint) error {
+	deployment, err := s.FindDeploymentById(deploymentId)
+	if err != nil {
+		return err
+	}
+
+	return s.DeleteDeployment(deployment)
 }
 
 func (s service) DeleteDeployment(deployment *model.Deployment) error {
@@ -415,7 +414,7 @@ func (s service) destroyDeploymentInstance(instance *model.DeploymentInstance) e
 		return err
 	}
 
-	destroyCmd, err := s.helmfileService.destroy_deployment(instance, group)
+	destroyCmd, err := s.helmfileService.destroy(instance, group)
 	if err != nil {
 		return err
 	}
@@ -432,7 +431,7 @@ func (s service) destroyDeploymentInstance(instance *model.DeploymentInstance) e
 		return err
 	}
 
-	return ks.deletePersistentVolumeClaim_deployment(instance)
+	return ks.deletePersistentVolumeClaim(instance)
 }
 
 func deploymentOrder(deployment *model.Deployment, g graph.Graph[string, *model.DeploymentInstance]) ([]*model.DeploymentInstance, error) {
@@ -451,64 +450,7 @@ func deploymentOrder(deployment *model.Deployment, g graph.Graph[string, *model.
 	return orderedInstances, nil
 }
 
-func (s service) ConsumeParameters(source, destination *model.Instance) error {
-	sourceStack, err := s.stackService.Find(source.StackName)
-	if err != nil {
-		return fmt.Errorf("error finding stack %q of source instance: %w", source.StackName, err)
-	}
-
-	destinationStack, err := s.stackService.Find(destination.StackName)
-	if err != nil {
-		return fmt.Errorf("error finding stack %q of destination instance: %w", destination.StackName, err)
-	}
-
-	// Consumed parameters
-	for name, parameter := range destinationStack.Parameters {
-		if (parameter.Consumed || source.Preset) && name != destinationStack.HostnameVariable {
-			value, err := s.findParameterValue(name, source, sourceStack)
-			if err != nil {
-				return err
-			}
-			parameterRequest := model.InstanceParameter{
-				Name:  name,
-				Value: value,
-			}
-			destination.Parameters = append(destination.Parameters, parameterRequest)
-		}
-	}
-
-	// Hostname parameter
-	if !source.Preset && destinationStack.HostnameVariable != "" {
-		hostnameParameter := model.InstanceParameter{
-			Name:  destinationStack.HostnameVariable,
-			Value: fmt.Sprintf(sourceStack.HostnamePattern, source.Name, source.GroupName),
-		}
-		destination.Parameters = append(destination.Parameters, hostnameParameter)
-	}
-
-	return nil
-}
-
-func (s service) findParameterValue(parameter string, sourceInstance *model.Instance, sourceStack *model.Stack) (string, error) {
-	instanceParameter, err := sourceInstance.FindParameter(parameter)
-	if err == nil {
-		return instanceParameter.Value, nil
-	}
-
-	stackParameter, ok := sourceStack.Parameters[parameter]
-	if ok {
-		return *stackParameter.DefaultValue, nil
-	}
-
-	// TODO: Remove HostnamePattern once stacks 2.0 are the default
-	if parameter == "DATABASE_HOSTNAME" {
-		return fmt.Sprintf(sourceStack.HostnamePattern, sourceInstance.Name, sourceInstance.GroupName), nil
-	}
-
-	return "", fmt.Errorf("unable to find value for parameter: %s", parameter)
-}
-
-func (s service) Pause(instance *model.Instance) error {
+func (s service) Pause(instance *model.DeploymentInstance) error {
 	group, err := s.groupService.Find(instance.GroupName)
 	if err != nil {
 		return err
@@ -522,7 +464,7 @@ func (s service) Pause(instance *model.Instance) error {
 	return ks.pause(instance)
 }
 
-func (s service) Resume(instance *model.Instance) error {
+func (s service) Resume(instance *model.DeploymentInstance) error {
 	group, err := s.groupService.Find(instance.GroupName)
 	if err != nil {
 		return err
@@ -555,94 +497,6 @@ func (s service) Restart(instance *model.DeploymentInstance, typeSelector string
 	return ks.restart(instance, typeSelector, stack)
 }
 
-func (s service) Save(instance *model.Instance) error {
-	stack, err := s.stackService.Find(instance.StackName)
-	if err != nil {
-		return err
-	}
-
-	err = validateInstanceParameters(instance, stack)
-	if err != nil {
-		return err
-	}
-
-	return s.instanceRepository.Save(instance)
-}
-
-func validateInstanceParameters(instance *model.Instance, stack *model.Stack) error {
-	var errs []error
-	for _, parameter := range instance.Parameters {
-		stackParameter, ok := stack.Parameters[parameter.Name]
-		if !ok {
-			errs = append(errs, fmt.Errorf("parameter %q: is not a stack parameter", parameter.Name))
-			continue
-		}
-
-		if stackParameter.Validator == nil {
-			continue
-		}
-		err := stackParameter.Validator(parameter.Value)
-		if err != nil {
-			errs = append(errs, fmt.Errorf("parameter %q: %v", parameter.Name, err))
-		}
-	}
-
-	if errs != nil {
-		return errdef.NewBadRequest("invalid parameter(s): %v", errors.Join(errs...))
-	}
-
-	return nil
-}
-
-func (s service) Deploy(token string, instance *model.Instance) error {
-	group, err := s.groupService.Find(instance.GroupName)
-	if err != nil {
-		return err
-	}
-
-	syncCmd, err := s.helmfileService.sync(token, instance, group)
-	if err != nil {
-		return fmt.Errorf("failed to execute helmfile sync: %v", err)
-	}
-
-	deployLog, deployErrorLog, err := commandExecutor(syncCmd, group.ClusterConfiguration)
-	log.Printf("Deploy log: %s\n", deployLog)
-	log.Printf("Deploy error log: %s\n", deployErrorLog)
-	/* TODO: return error log if relevant
-	if len(deployErrorLog) > 0 {
-		return errors.New(string(deployErrorLog))
-	}
-	*/
-	if err != nil {
-		return err
-	}
-
-	// TODO: Encrypt before saving? Yes...
-	err = s.instanceRepository.SaveDeployLog(instance, string(deployLog))
-	instance.DeployLog = string(deployLog)
-	if err != nil {
-		// TODO
-		log.Printf("Store error log: %s", deployErrorLog)
-		return err
-	}
-
-	return nil
-}
-
-func (s service) Delete(id uint) error {
-	instance, err := s.FindDeploymentInstanceById(id)
-	if err != nil {
-		return err
-	}
-
-	deployment, err := s.FindDeploymentById(instance.DeploymentID)
-	if err != nil {
-		return err
-	}
-
-	return s.DeleteDeployment(deployment)
-}
-
 func (s service) Logs(instance *model.DeploymentInstance, group *model.Group, typeSelector string) (io.ReadCloser, error) {
 	ks, err := NewKubernetesService(group.ClusterConfiguration)
 	if err != nil {
@@ -650,29 +504,6 @@ func (s service) Logs(instance *model.DeploymentInstance, group *model.Group, ty
 	}
 
 	return ks.getLogs(instance, typeSelector)
-}
-
-func (s service) FindById(id uint) (*model.Instance, error) {
-	return s.instanceRepository.FindById(id)
-}
-
-func (s service) FindByIdDecrypted(id uint) (*model.Instance, error) {
-	return s.instanceRepository.FindByIdDecrypted(id)
-}
-
-func (s service) FindByNameAndGroup(instance string, group string) (*model.Instance, error) {
-	return s.instanceRepository.FindByNameAndGroup(instance, group)
-}
-
-func (s service) FindInstances(user *model.User, presets bool) ([]GroupsWithInstances, error) {
-	groups := append(user.Groups, user.AdminGroups...) //nolint:gocritic
-
-	instances, err := s.instanceRepository.FindByGroups(groups, presets)
-	if err != nil {
-		return nil, err
-	}
-
-	return instances, err
 }
 
 type GroupsWithDeployments struct {
@@ -821,10 +652,6 @@ func (s service) GetStatus(instance *model.DeploymentInstance) (InstanceStatus, 
 	return "", fmt.Errorf("failed to get instance status")
 }
 
-func (s service) FindPublicInstances() ([]GroupsWithInstances, error) {
-	return s.instanceRepository.FindPublicInstances()
-}
-
 func (s service) Reset(token string, instance *model.DeploymentInstance, ttl uint) error {
 	err := s.destroyDeploymentInstance(instance)
 	if err != nil {
@@ -832,36 +659,4 @@ func (s service) Reset(token string, instance *model.DeploymentInstance, ttl uin
 	}
 
 	return s.deployDeploymentInstance(token, instance, ttl)
-}
-
-func (s service) destroy(instance *model.Instance) error {
-	if instance.DeployLog != "" {
-		group, err := s.groupService.Find(instance.GroupName)
-		if err != nil {
-			return err
-		}
-
-		destroyCmd, err := s.helmfileService.destroy(instance, group)
-		if err != nil {
-			return err
-		}
-
-		destroyLog, destroyErrorLog, err := commandExecutor(destroyCmd, group.ClusterConfiguration)
-		log.Printf("Destroy log: %s\n", destroyLog)
-		log.Printf("Destroy error log: %s\n", destroyErrorLog)
-		if err != nil {
-			return err
-		}
-
-		ks, err := NewKubernetesService(group.ClusterConfiguration)
-		if err != nil {
-			return err
-		}
-
-		err = ks.deletePersistentVolumeClaim(instance)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
 }
