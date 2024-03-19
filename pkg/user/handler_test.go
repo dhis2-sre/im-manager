@@ -37,12 +37,13 @@ func TestHandler_RefreshToken_Cookie(t *testing.T) {
 		AccessToken:  "accessToken",
 		TokenType:    "tokenType",
 		RefreshToken: "refreshToken",
-		ExpiresIn:    312,
+		ExpiresIn:    900,
 	}
 	tokenService.
 		On("GetTokens", user, id.String()).
 		Return(tokens, nil)
-	cfg := config.Config{Hostname: "hostname"}
+	authentication := config.Authentication{AccessTokenExpirationSeconds: 900, RefreshTokenExpirationSeconds: 86400}
+	cfg := config.Config{Hostname: "hostname", Authentication: authentication}
 	handler := NewHandler(cfg, userService, tokenService)
 
 	recorder := httptest.NewRecorder()
@@ -58,9 +59,9 @@ func TestHandler_RefreshToken_Cookie(t *testing.T) {
 	require.Len(t, c.Errors.Errors(), 0)
 	cookies := recorder.Result().Cookies()
 	assert.Len(t, cookies, 2)
-	expectedAccessTokenCookie := "accessToken=accessToken; Path=/; Domain=hostname; Max-Age=312000; HttpOnly; Secure; SameSite=Strict"
+	expectedAccessTokenCookie := "accessToken=accessToken; Path=/; Domain=hostname; Max-Age=900; HttpOnly; Secure; SameSite=Strict"
 	assert.Equal(t, expectedAccessTokenCookie, cookies[0].Raw)
-	expectedRefreshTokenCookie := "refreshToken=refreshToken; Path=/refresh; Domain=hostname; HttpOnly; Secure; SameSite=Strict"
+	expectedRefreshTokenCookie := "refreshToken=refreshToken; Path=/refresh; Domain=hostname; Max-Age=86400; HttpOnly; Secure; SameSite=Strict"
 	assert.Equal(t, expectedRefreshTokenCookie, cookies[1].Raw)
 	tokenService.AssertExpectations(t)
 	userService.AssertExpectations(t)
@@ -86,12 +87,13 @@ func TestHandler_RefreshToken_RequestBody(t *testing.T) {
 		AccessToken:  "accessToken",
 		TokenType:    "tokenType",
 		RefreshToken: "refreshToken",
-		ExpiresIn:    312,
+		ExpiresIn:    900,
 	}
 	tokenService.
 		On("GetTokens", user, id.String()).
 		Return(tokens, nil)
-	cfg := config.Config{Hostname: "hostname"}
+	authentication := config.Authentication{AccessTokenExpirationSeconds: 900, RefreshTokenExpirationSeconds: 86400}
+	cfg := config.Config{Hostname: "hostname", Authentication: authentication}
 	handler := NewHandler(cfg, userService, tokenService)
 
 	recorder := httptest.NewRecorder()
@@ -103,9 +105,9 @@ func TestHandler_RefreshToken_RequestBody(t *testing.T) {
 	require.Len(t, c.Errors.Errors(), 0)
 	cookies := recorder.Result().Cookies()
 	assert.Len(t, cookies, 2)
-	expectedAccessTokenCookie := "accessToken=accessToken; Path=/; Domain=hostname; Max-Age=312000; HttpOnly; Secure; SameSite=Strict"
+	expectedAccessTokenCookie := "accessToken=accessToken; Path=/; Domain=hostname; Max-Age=900; HttpOnly; Secure; SameSite=Strict"
 	assert.Equal(t, expectedAccessTokenCookie, cookies[0].Raw)
-	expectedRefreshTokenCookie := "refreshToken=refreshToken; Path=/refresh; Domain=hostname; HttpOnly; Secure; SameSite=Strict"
+	expectedRefreshTokenCookie := "refreshToken=refreshToken; Path=/refresh; Domain=hostname; Max-Age=86400; HttpOnly; Secure; SameSite=Strict"
 	assert.Equal(t, expectedRefreshTokenCookie, cookies[1].Raw)
 	tokenService.AssertExpectations(t)
 	userService.AssertExpectations(t)
@@ -119,12 +121,13 @@ func TestHandler_SignIn_Cookies(t *testing.T) {
 		AccessToken:  "accessToken",
 		TokenType:    "tokenType",
 		RefreshToken: "refreshToken",
-		ExpiresIn:    312,
+		ExpiresIn:    900,
 	}
 	tokenService.
 		On("GetTokens", user, "").
 		Return(tokens, nil)
-	cfg := config.Config{Hostname: "hostname"}
+	authentication := config.Authentication{AccessTokenExpirationSeconds: 900, RefreshTokenExpirationSeconds: 86400}
+	cfg := config.Config{Hostname: "hostname", Authentication: authentication}
 	handler := NewHandler(cfg, userService, tokenService)
 
 	recorder := httptest.NewRecorder()
@@ -137,9 +140,9 @@ func TestHandler_SignIn_Cookies(t *testing.T) {
 	require.Len(t, c.Errors.Errors(), 0)
 	cookies := recorder.Result().Cookies()
 	assert.Len(t, cookies, 2)
-	expectedAccessTokenCookie := "accessToken=accessToken; Path=/; Domain=hostname; Max-Age=312000; HttpOnly; Secure; SameSite=Strict"
+	expectedAccessTokenCookie := "accessToken=accessToken; Path=/; Domain=hostname; Max-Age=900; HttpOnly; Secure; SameSite=Strict"
 	assert.Equal(t, expectedAccessTokenCookie, cookies[0].Raw)
-	expectedRefreshTokenCookie := "refreshToken=refreshToken; Path=/refresh; Domain=hostname; HttpOnly; Secure; SameSite=Strict"
+	expectedRefreshTokenCookie := "refreshToken=refreshToken; Path=/refresh; Domain=hostname; Max-Age=86400; HttpOnly; Secure; SameSite=Strict"
 	assert.Equal(t, expectedRefreshTokenCookie, cookies[1].Raw)
 	tokenService.AssertExpectations(t)
 	userService.AssertExpectations(t)
