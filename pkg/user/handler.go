@@ -200,7 +200,7 @@ func (h Handler) RefreshToken(c *gin.Context) {
 		refreshTokenString = cookie
 	}
 
-	// TODO: what if err isn't http.ErrNoCookie
+	// as of this writing http.ErrNoCookie is the only error which can be return from c.Cookie
 	if errors.Is(err, http.ErrNoCookie) {
 		var request RefreshTokenRequest
 		if err := handler.DataBinder(c, &request); err != nil {
