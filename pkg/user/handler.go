@@ -3,10 +3,11 @@ package user
 import (
 	"errors"
 	"fmt"
-	"github.com/dhis2-sre/im-manager/pkg/config"
 	"log"
 	"net/http"
 	"strings"
+
+	"github.com/dhis2-sre/im-manager/pkg/config"
 
 	"github.com/google/uuid"
 
