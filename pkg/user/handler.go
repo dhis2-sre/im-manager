@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/dhis2-sre/im-manager/pkg/config"
+	"log"
 	"net/http"
 	"strings"
 
@@ -244,6 +245,7 @@ func (h Handler) RefreshToken(c *gin.Context) {
 func (h Handler) setCookies(authentication config.Authentication, c *gin.Context, tokens *token.Tokens) {
 	//c.SetSameSite(http.SameSiteStrictMode)
 	c.SetSameSite(http.SameSiteNoneMode)
+	log.Println("Hostname:", h.config.Hostname)
 	domain, _ := strings.CutPrefix(h.config.Hostname, "https://")
 	c.SetCookie("accessToken", tokens.AccessToken, authentication.AccessTokenExpirationSeconds, "/", domain, true, true)
 	c.SetCookie("refreshToken", tokens.RefreshToken, authentication.RefreshTokenExpirationSeconds, "/refresh", domain, true, true)
