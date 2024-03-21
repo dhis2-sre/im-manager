@@ -13,7 +13,7 @@ func GetEngine(basePath string, allowedOrigin string) *gin.Engine {
 
 	corsConfig := cors.DefaultConfig()
 	// Without specifying origin, secure cookies won't work
-	corsConfig.AllowOrigins = []string{allowedOrigin, "http://localhost"}
+	corsConfig.AllowOrigins = []string{allowedOrigin, "http://localhost", "http://localhost:3000"}
 	corsConfig.AllowCredentials = true
 	corsConfig.AddAllowHeaders("authorization")
 	corsConfig.AddExposeHeaders("Content-Disposition", "Content-Length")
