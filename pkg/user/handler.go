@@ -244,12 +244,13 @@ func (h Handler) RefreshToken(c *gin.Context) {
 }
 
 func (h Handler) setCookies(authentication config.Authentication, c *gin.Context, tokens *token.Tokens) {
-	//c.SetSameSite(http.SameSiteStrictMode)
-	c.SetSameSite(http.SameSiteNoneMode)
-	log.Println("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!Hostname:", h.config.Hostname)
+	c.SetSameSite(http.SameSiteStrictMode)
+	//c.SetSameSite(http.SameSiteNoneMode)
 	domain, _ := strings.CutPrefix(h.config.Hostname, "https://")
+	log.Println("domain!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!", domain)
 	c.SetCookie("accessToken", tokens.AccessToken, authentication.AccessTokenExpirationSeconds, "/", domain, true, true)
-	c.SetCookie("refreshToken", tokens.RefreshToken, authentication.RefreshTokenExpirationSeconds, "/refresh", domain, true, true)
+	// TODO: Remove *1000 once testing is done
+	c.SetCookie("refreshToken", tokens.RefreshToken, authentication.RefreshTokenExpirationSeconds*1000, "/refresh", domain, true, true)
 }
 
 // Me user
