@@ -76,7 +76,7 @@ deploy:
           environment:
             ENVIRONMENT: "{{ .ENVIRONMENT }}"
             CLASSIFICATION: "{{ .CLASSIFICATION }}"
-            HOSTNAME: "https://{{ .API_HOSTNAME }}"
+            HOSTNAME: "{{ .API_HOSTNAME }}"
             UI_HOSTNAME: "https://{{ .UI_HOSTNAME }}"
             INSTANCE_SERVICE_HOST: im-manager-{{ .ENVIRONMENT }}.instance-manager-{{ .CLASSIFICATION }}.svc:8080
             INSTANCE_SERVICE_BASE_PATH: /

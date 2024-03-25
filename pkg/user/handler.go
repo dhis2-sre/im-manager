@@ -3,9 +3,7 @@ package user
 import (
 	"errors"
 	"fmt"
-	"log"
 	"net/http"
-	"strings"
 
 	"github.com/dhis2-sre/im-manager/pkg/config"
 
@@ -172,7 +170,7 @@ func (h Handler) SignIn(c *gin.Context) {
 		return
 	}
 
-	h.setCookies(h.config.Authentication, c, tokens)
+	h.setCookies(c, tokens)
 
 	c.JSON(http.StatusCreated, tokens)
 }
@@ -238,19 +236,17 @@ func (h Handler) RefreshToken(c *gin.Context) {
 		return
 	}
 
-	h.setCookies(h.config.Authentication, c, tokens)
+	h.setCookies(c, tokens)
 
 	c.JSON(http.StatusCreated, tokens)
 }
 
-func (h Handler) setCookies(authentication config.Authentication, c *gin.Context, tokens *token.Tokens) {
+func (h Handler) setCookies(c *gin.Context, tokens *token.Tokens) {
 	c.SetSameSite(http.SameSiteStrictMode)
-	//c.SetSameSite(http.SameSiteNoneMode)
-	domain, _ := strings.CutPrefix(h.config.Hostname, "https://")
-	log.Println("domain!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!", domain)
+	domain := h.config.Hostname
+	authentication := h.config.Authentication
 	c.SetCookie("accessToken", tokens.AccessToken, authentication.AccessTokenExpirationSeconds, "/", domain, true, true)
-	// TODO: Remove *1000 once testing is done
-	c.SetCookie("refreshToken", tokens.RefreshToken, authentication.RefreshTokenExpirationSeconds*1000, "/refresh", domain, true, true)
+	c.SetCookie("refreshToken", tokens.RefreshToken, authentication.RefreshTokenExpirationSeconds, "/refresh", domain, true, true)
 }
 
 // Me user
