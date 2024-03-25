@@ -1,6 +1,8 @@
 package server
 
 import (
+	"log"
+
 	"github.com/dhis2-sre/im-manager/internal/middleware"
 	"github.com/dhis2-sre/im-manager/pkg/health"
 	"github.com/gin-contrib/cors"
@@ -14,7 +16,8 @@ func GetEngine(basePath string, allowedOrigin string) *gin.Engine {
 	corsConfig := cors.DefaultConfig()
 	// TODO: Allow multiple origins?
 	// Without specifying origin, secure cookies won't work
-	corsConfig.AllowOrigins = []string{allowedOrigin, "http://localhost", "http://localhost:3000"}
+	log.Println("Allowed origin:", allowedOrigin)
+	corsConfig.AllowOrigins = []string{allowedOrigin, "http://localhost:5173", "http://localhost:3000"}
 	corsConfig.AllowCredentials = true
 	corsConfig.AddAllowHeaders("authorization")
 	corsConfig.AddExposeHeaders("Content-Disposition", "Content-Length")

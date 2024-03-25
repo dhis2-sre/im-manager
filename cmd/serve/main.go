@@ -170,7 +170,7 @@ func run() error {
 		return err
 	}
 
-	r := server.GetEngine(cfg.BasePath, cfg.UIHostname)
+	r := server.GetEngine(cfg.BasePath, cfg.UIURL)
 
 	group.Routes(r, authentication, authorization, groupHandler)
 	user.Routes(r, authentication, authorization, userHandler)
