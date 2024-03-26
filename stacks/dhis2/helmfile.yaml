@@ -52,6 +52,8 @@ releases:
           connection.schema = update
           # Server base URL
           server.base.url = https://{{ requiredEnv "INSTANCE_HOSTNAME" }}/{{ requiredEnv "INSTANCE_NAME" }}
+          # This will ensure the secure property of the JSESSIONID cookie is set to true
+          server.https = on
           flyway.migrate_out_of_order = {{ requiredEnv "FLYWAY_MIGRATE_OUT_OF_ORDER" }}
           flyway.repair_before_migration = {{ requiredEnv "FLYWAY_REPAIR_BEFORE_MIGRATION" }}
           {{- if eq (requiredEnv "INSTALL_REDIS" | default "false") "true" }}
