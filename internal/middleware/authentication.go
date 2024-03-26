@@ -59,7 +59,7 @@ func (m AuthenticationMiddleware) handleError(c *gin.Context, e error) {
 func (m AuthenticationMiddleware) TokenAuthentication(c *gin.Context) {
 	user, err := parseRequest(c.Request, m.publicKey)
 	if err != nil {
-		log.Println("http header token not valid:", err)
+		log.Println("token not valid:", err)
 		_ = c.Error(errdef.NewUnauthorized("token not valid"))
 		c.Abort()
 		return
