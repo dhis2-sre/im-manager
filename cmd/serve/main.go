@@ -78,12 +78,12 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	tokenService, err := token.NewService(tokenRepository, privateKey, publicKey, cfg.Authentication.AccessTokenExpirationSeconds, cfg.Authentication.RefreshTokenSecretKey, cfg.Authentication.RefreshTokenExpirationSeconds)
+	tokenService, err := token.NewService(tokenRepository, privateKey, publicKey, cfg.Authentication)
 	if err != nil {
 		return err
 	}
 
-	userHandler := user.NewHandler(userService, tokenService)
+	userHandler := user.NewHandler(cfg, userService, tokenService)
 
 	authentication := middleware.NewAuthentication(publicKey, userService)
 	groupRepository := group.NewRepository(db)
@@ -170,7 +170,7 @@ func run() error {
 		return err
 	}
 
-	r := server.GetEngine(cfg.BasePath)
+	r := server.GetEngine(cfg.BasePath, cfg.UIURL)
 
 	group.Routes(r, authentication, authorization, groupHandler)
 	user.Routes(r, authentication, authorization, userHandler)

@@ -1480,10 +1480,9 @@ paths:
             description: Refresh user tokens
             operationId: refreshToken
             parameters:
-                - description: Refresh token request body parameter
+                - description: Refresh token request body parameter. Note that this is optional and the refresh token can also be supplied using a cookie named "refreshToken"
                   in: body
                   name: Body
-                  required: true
                   schema:
                     $ref: '#/definitions/RefreshTokenRequest'
             responses:

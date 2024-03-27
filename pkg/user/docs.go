@@ -15,9 +15,9 @@ type _ struct {
 
 // swagger:parameters refreshToken
 type _ struct {
-	// Refresh token request body parameter
+	// Refresh token request body parameter. Note that this is optional and the refresh token can also be supplied using a cookie named "refreshToken"
 	// in: body
-	// required: true
+	// required: false
 	Body RefreshTokenRequest
 }
 
