@@ -7,11 +7,12 @@ import (
 	"log"
 	"time"
 
+	"github.com/google/uuid"
+
 	"github.com/dhis2-sre/im-manager/internal/errdef"
 
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	"github.com/dhis2-sre/im-manager/pkg/token/helper"
-	"github.com/gofrs/uuid"
 )
 
 //goland:noinspection GoExportedFuncWithUnexportedType
@@ -109,7 +110,7 @@ func (t tokenService) ValidateRefreshToken(tokenString string) (*RefreshTokenDat
 		return nil, errors.New("unable to verify refresh token")
 	}
 
-	tokenId, err := uuid.FromString(claims.ID)
+	tokenId, err := uuid.Parse(claims.ID)
 	if err != nil {
 		log.Printf("Couldn't parse token id: %s\n%s\n", claims.ID, err)
 		return nil, errors.New("unable to verify refresh token")

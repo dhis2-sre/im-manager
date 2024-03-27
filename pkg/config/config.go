@@ -16,7 +16,7 @@ type Config struct {
 	Environment                    string
 	Classification                 string
 	Hostname                       string
-	UIHostname                     string
+	UIURL                          string
 	InstanceParameterEncryptionKey string
 	BasePath                       string
 	DefaultTTL                     uint
@@ -27,7 +27,7 @@ type Config struct {
 	RabbitMqURL                    rabbitmq
 	SMTP                           smtp
 	Redis                          redis
-	Authentication                 authentication
+	Authentication                 Authentication
 	Groups                         []group
 	AdminUser                      user
 	E2eTestUser                    user
@@ -41,7 +41,7 @@ func New() Config {
 		Environment:                    requireEnv("ENVIRONMENT"),
 		Classification:                 requireEnv("CLASSIFICATION"),
 		Hostname:                       requireEnv("HOSTNAME"),
-		UIHostname:                     requireEnv("UI_HOSTNAME"),
+		UIURL:                          requireEnv("UI_URL"),
 		BasePath:                       requireEnv("BASE_PATH"),
 		InstanceParameterEncryptionKey: requireEnv("INSTANCE_PARAMETER_ENCRYPTION_KEY"),
 		DefaultTTL:                     uint(requireEnvAsInt("DEFAULT_TTL")),
@@ -82,7 +82,7 @@ func New() Config {
 			Host: requireEnv("REDIS_HOST"),
 			Port: requireEnvAsInt("REDIS_PORT"),
 		},
-		Authentication: authentication{
+		Authentication: Authentication{
 			Keys: keys{
 				PrivateKey: requireEnv("PRIVATE_KEY"),
 				PublicKey:  requireEnv("PUBLIC_KEY"),
@@ -143,7 +143,7 @@ type redis struct {
 	Port int
 }
 
-type authentication struct {
+type Authentication struct {
 	Keys                          keys
 	RefreshTokenSecretKey         string
 	AccessTokenExpirationSeconds  int

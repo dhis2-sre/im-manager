@@ -47,7 +47,7 @@ func TestUserHandler(t *testing.T) {
 	require.NoError(t, err)
 
 	client := inttest.SetupHTTPServer(t, func(engine *gin.Engine) {
-		userHandler := user.NewHandler(userService, tokenService)
+		userHandler := user.NewHandler(config.Config{}, userService, tokenService)
 		user.Routes(engine, authentication, authorization, userHandler)
 	})
 

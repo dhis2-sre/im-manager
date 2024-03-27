@@ -2,7 +2,10 @@ package user
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
+
+	"github.com/dhis2-sre/im-manager/pkg/config"
 
 	"github.com/google/uuid"
 
@@ -15,14 +18,16 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func NewHandler(userService userService, tokenService tokenService) Handler {
+func NewHandler(config config.Config, userService userService, tokenService tokenService) Handler {
 	return Handler{
+		config,
 		userService,
 		tokenService,
 	}
 }
 
 type Handler struct {
+	config       config.Config
 	userService  userService
 	tokenService tokenService
 }
@@ -76,7 +81,8 @@ func (h Handler) SignUp(c *gin.Context) {
 }
 
 func handleSignUpErrors(err error) error {
-	validationErrors, ok := err.(validator.ValidationErrors)
+	var validationErrors validator.ValidationErrors
+	ok := errors.As(err, &validationErrors)
 	if !ok {
 		return errdef.NewBadRequest("Error binding data: %+v", err)
 	}
@@ -164,11 +170,13 @@ func (h Handler) SignIn(c *gin.Context) {
 		return
 	}
 
+	h.setCookies(c, tokens)
+
 	c.JSON(http.StatusCreated, tokens)
 }
 
 type RefreshTokenRequest struct {
-	RefreshToken string `json:"refreshToken" binding:"required"`
+	RefreshToken string `json:"refreshToken"`
 }
 
 // RefreshToken user
@@ -183,14 +191,30 @@ func (h Handler) RefreshToken(c *gin.Context) {
 	//   201: Tokens
 	//   400: Error
 	//   415: Error
-	var request RefreshTokenRequest
 
-	if err := handler.DataBinder(c, &request); err != nil {
-		_ = c.Error(err)
+	var refreshTokenString string
+
+	cookie, err := c.Cookie("refreshToken")
+	if err == nil {
+		refreshTokenString = cookie
+	}
+
+	// as of this writing http.ErrNoCookie is the only error which can be return from c.Cookie
+	if errors.Is(err, http.ErrNoCookie) {
+		var request RefreshTokenRequest
+		if err := handler.DataBinder(c, &request); err != nil {
+			_ = c.Error(err)
+			return
+		}
+		refreshTokenString = request.RefreshToken
+	}
+
+	if refreshTokenString == "" {
+		_ = c.AbortWithError(http.StatusBadRequest, fmt.Errorf("refresh token not found"))
 		return
 	}
 
-	refreshToken, err := h.tokenService.ValidateRefreshToken(request.RefreshToken)
+	refreshToken, err := h.tokenService.ValidateRefreshToken(refreshTokenString)
 	if err != nil {
 		_ = c.AbortWithError(http.StatusUnauthorized, err)
 		return
@@ -212,7 +236,17 @@ func (h Handler) RefreshToken(c *gin.Context) {
 		return
 	}
 
+	h.setCookies(c, tokens)
+
 	c.JSON(http.StatusCreated, tokens)
+}
+
+func (h Handler) setCookies(c *gin.Context, tokens *token.Tokens) {
+	c.SetSameSite(http.SameSiteStrictMode)
+	domain := h.config.Hostname
+	authentication := h.config.Authentication
+	c.SetCookie("accessToken", tokens.AccessToken, authentication.AccessTokenExpirationSeconds, "/", domain, true, true)
+	c.SetCookie("refreshToken", tokens.RefreshToken, authentication.RefreshTokenExpirationSeconds, "/refresh", domain, true, true)
 }
 
 // Me user
@@ -273,7 +307,14 @@ func (h Handler) SignOut(c *gin.Context) {
 		return
 	}
 
+	unsetCookie(c)
+
 	c.Status(http.StatusOK)
+}
+
+func unsetCookie(c *gin.Context) {
+	c.SetCookie("accessToken", "", -1, "/", "", true, true)
+	c.SetCookie("refreshToken", "", -1, "/", "", true, true)
 }
 
 // FindById user
