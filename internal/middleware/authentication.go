@@ -51,8 +51,6 @@ func (m AuthenticationMiddleware) BasicAuthentication(c *gin.Context) {
 }
 
 func (m AuthenticationMiddleware) handleError(c *gin.Context, e error) {
-	// Trigger username/password prompt
-	c.Header("WWW-Authenticate", "Basic realm=\"DHIS2\"")
 	_ = c.AbortWithError(http.StatusUnauthorized, e)
 }
 
