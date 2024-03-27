@@ -7,6 +7,8 @@ import (
 	"log"
 	"time"
 
+	"github.com/dhis2-sre/im-manager/pkg/config"
+
 	"github.com/google/uuid"
 
 	"github.com/dhis2-sre/im-manager/internal/errdef"
@@ -20,17 +22,13 @@ func NewService(
 	tokenRepository repository,
 	privateKey *rsa.PrivateKey,
 	publicKey *rsa.PublicKey,
-	accessTokenExpirationSeconds int,
-	refreshTokenSecretKey string,
-	refreshTokenExpirationSeconds int,
+	authentication config.Authentication,
 ) (*tokenService, error) {
 	return &tokenService{
-		repository:                    tokenRepository,
-		privateKey:                    privateKey,
-		publicKey:                     publicKey,
-		accessTokenExpirationSeconds:  accessTokenExpirationSeconds,
-		refreshTokenSecretKey:         refreshTokenSecretKey,
-		refreshTokenExpirationSeconds: refreshTokenExpirationSeconds,
+		repository:     tokenRepository,
+		privateKey:     privateKey,
+		publicKey:      publicKey,
+		authentication: authentication,
 	}, nil
 }
 
@@ -56,27 +54,30 @@ type RefreshTokenData struct {
 }
 
 type tokenService struct {
-	repository                    repository
-	privateKey                    *rsa.PrivateKey
-	publicKey                     *rsa.PublicKey
-	accessTokenExpirationSeconds  int
-	refreshTokenSecretKey         string
-	refreshTokenExpirationSeconds int
+	repository     repository
+	privateKey     *rsa.PrivateKey
+	publicKey      *rsa.PublicKey
+	authentication config.Authentication
 }
 
-func (t tokenService) GetTokens(user *model.User, previousRefreshTokenId string) (*Tokens, error) {
+func (t tokenService) GetTokens(user *model.User, previousRefreshTokenId string, rememberMe bool) (*Tokens, error) {
 	if previousRefreshTokenId != "" {
 		if err := t.repository.DeleteRefreshToken(user.ID, previousRefreshTokenId); err != nil {
 			return nil, errdef.NewUnauthorized("could not delete previous refreshToken for user.Id: %d, tokenId: %s", user.ID, previousRefreshTokenId)
 		}
 	}
 
-	accessToken, err := helper.GenerateAccessToken(user, t.privateKey, t.accessTokenExpirationSeconds)
+	accessToken, err := helper.GenerateAccessToken(user, t.privateKey, t.authentication.AccessTokenExpirationSeconds)
 	if err != nil {
 		return nil, fmt.Errorf("error generating accessToken for user: %+v\nError: %s", user, err)
 	}
 
-	refreshToken, err := helper.GenerateRefreshToken(user, t.refreshTokenSecretKey, t.refreshTokenExpirationSeconds)
+	expiration := t.authentication.RefreshTokenExpirationSeconds
+	if rememberMe {
+		expiration = t.authentication.RefreshTokenRememberMeExpirationSeconds
+	}
+
+	refreshToken, err := helper.GenerateRefreshToken(user, t.authentication.RefreshTokenSecretKey, expiration)
 	if err != nil {
 		return nil, fmt.Errorf("error generating refreshToken for user: %+v\nError: %s", user, err)
 	}
@@ -89,7 +90,7 @@ func (t tokenService) GetTokens(user *model.User, previousRefreshTokenId string)
 		AccessToken:  accessToken,
 		TokenType:    "bearer",
 		RefreshToken: refreshToken.SignedString,
-		ExpiresIn:    uint(t.accessTokenExpirationSeconds),
+		ExpiresIn:    uint(t.authentication.AccessTokenExpirationSeconds),
 	}, nil
 }
 
@@ -104,7 +105,7 @@ func (t tokenService) ValidateAccessToken(tokenString string) (*model.User, erro
 }
 
 func (t tokenService) ValidateRefreshToken(tokenString string) (*RefreshTokenData, error) {
-	claims, err := helper.ValidateRefreshToken(tokenString, t.refreshTokenSecretKey)
+	claims, err := helper.ValidateRefreshToken(tokenString, t.authentication.RefreshTokenSecretKey)
 	if err != nil {
 		log.Printf("Unable to validate token: %s\n%s\n", tokenString, err)
 		return nil, errors.New("unable to verify refresh token")

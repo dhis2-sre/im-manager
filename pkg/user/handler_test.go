@@ -40,7 +40,7 @@ func TestHandler_RefreshToken_Cookie(t *testing.T) {
 		ExpiresIn:    900,
 	}
 	tokenService.
-		On("GetTokens", user, id.String()).
+		On("GetTokens", user, id.String(), false).
 		Return(tokens, nil)
 	authentication := config.Authentication{AccessTokenExpirationSeconds: 900, RefreshTokenExpirationSeconds: 86400}
 	cfg := config.Config{Hostname: "hostname", Authentication: authentication}
@@ -63,6 +63,61 @@ func TestHandler_RefreshToken_Cookie(t *testing.T) {
 	assert.Equal(t, expectedAccessTokenCookie, cookies[0].Raw)
 	expectedRefreshTokenCookie := "refreshToken=refreshToken; Path=/refresh; Domain=hostname; Max-Age=86400; HttpOnly; Secure; SameSite=Strict"
 	assert.Equal(t, expectedRefreshTokenCookie, cookies[1].Raw)
+	tokenService.AssertExpectations(t)
+	userService.AssertExpectations(t)
+}
+
+func TestHandler_RefreshToken_Cookie_RememberMe(t *testing.T) {
+	userService := &mockUserService{}
+	user := &model.User{ID: 123}
+	userService.
+		On("FindById", uint(123)).
+		Return(user, nil)
+	tokenService := &mockTokenService{}
+	id := uuid.New()
+	refreshTokenData := &token.RefreshTokenData{
+		SignedToken: "signed-token",
+		ID:          id,
+		UserId:      123,
+	}
+	tokenService.
+		On("ValidateRefreshToken", "token").
+		Return(refreshTokenData, nil)
+	tokens := &token.Tokens{
+		AccessToken:  "accessToken",
+		TokenType:    "tokenType",
+		RefreshToken: "refreshToken",
+		ExpiresIn:    900,
+	}
+	tokenService.
+		On("GetTokens", user, id.String(), true).
+		Return(tokens, nil)
+	authentication := config.Authentication{AccessTokenExpirationSeconds: 900, RefreshTokenExpirationSeconds: 2592000, RefreshTokenRememberMeExpirationSeconds: 2592000}
+	cfg := config.Config{Hostname: "hostname", Authentication: authentication}
+	handler := NewHandler(cfg, userService, tokenService)
+
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	request := newPost(t, "/some-path", nil)
+	refreshCookie := &http.Cookie{Name: "refreshToken", Value: "token"}
+	require.NoError(t, refreshCookie.Valid())
+	request.AddCookie(refreshCookie)
+	rememberMeCookie := &http.Cookie{Name: "rememberMe", Value: "true"}
+	require.NoError(t, rememberMeCookie.Valid())
+	request.AddCookie(rememberMeCookie)
+	c.Request = request
+
+	handler.RefreshToken(c)
+
+	require.Len(t, c.Errors.Errors(), 0)
+	cookies := recorder.Result().Cookies()
+	assert.Len(t, cookies, 3)
+	expectedAccessTokenCookie := "accessToken=accessToken; Path=/; Domain=hostname; Max-Age=900; HttpOnly; Secure; SameSite=Strict"
+	assert.Equal(t, expectedAccessTokenCookie, cookies[0].Raw)
+	expectedRefreshTokenCookie := "refreshToken=refreshToken; Path=/refresh; Domain=hostname; Max-Age=2592000; HttpOnly; Secure; SameSite=Strict"
+	assert.Equal(t, expectedRefreshTokenCookie, cookies[1].Raw)
+	expectedRefreshTokenRememberMeCookie := "rememberMe=true; Path=/refresh; Domain=hostname; Max-Age=2592000; HttpOnly; Secure; SameSite=Strict"
+	assert.Equal(t, expectedRefreshTokenRememberMeCookie, cookies[2].Raw)
 	tokenService.AssertExpectations(t)
 	userService.AssertExpectations(t)
 }
@@ -90,7 +145,7 @@ func TestHandler_RefreshToken_RequestBody(t *testing.T) {
 		ExpiresIn:    900,
 	}
 	tokenService.
-		On("GetTokens", user, id.String()).
+		On("GetTokens", user, id.String(), false).
 		Return(tokens, nil)
 	authentication := config.Authentication{AccessTokenExpirationSeconds: 900, RefreshTokenExpirationSeconds: 86400}
 	cfg := config.Config{Hostname: "hostname", Authentication: authentication}
@@ -124,7 +179,7 @@ func TestHandler_SignIn_Cookies(t *testing.T) {
 		ExpiresIn:    900,
 	}
 	tokenService.
-		On("GetTokens", user, "").
+		On("GetTokens", user, "", false).
 		Return(tokens, nil)
 	authentication := config.Authentication{AccessTokenExpirationSeconds: 900, RefreshTokenExpirationSeconds: 86400}
 	cfg := config.Config{Hostname: "hostname", Authentication: authentication}
@@ -167,11 +222,13 @@ func TestHandler_SignOut_Cookies(t *testing.T) {
 
 	require.Len(t, c.Errors.Errors(), 0)
 	cookies := recorder.Result().Cookies()
-	assert.Len(t, cookies, 2)
+	assert.Len(t, cookies, 3)
 	expectedAccessTokenCookie := "accessToken=; Path=/; Max-Age=0; HttpOnly; Secure"
 	assert.Equal(t, expectedAccessTokenCookie, cookies[0].Raw)
 	expectedRefreshTokenCookie := "refreshToken=; Path=/; Max-Age=0; HttpOnly; Secure"
 	assert.Equal(t, expectedRefreshTokenCookie, cookies[1].Raw)
+	expectedRefreshTokenRememberMeCookie := "rememberMe=; Path=/; Max-Age=0; HttpOnly; Secure"
+	assert.Equal(t, expectedRefreshTokenRememberMeCookie, cookies[2].Raw)
 	tokenService.AssertExpectations(t)
 	userService.AssertExpectations(t)
 }
@@ -209,8 +266,8 @@ func (m *mockUserService) ValidateEmail(token uuid.UUID) error {
 
 type mockTokenService struct{ mock.Mock }
 
-func (m *mockTokenService) GetTokens(user *model.User, previousTokenId string) (*token.Tokens, error) {
-	called := m.Called(user, previousTokenId)
+func (m *mockTokenService) GetTokens(user *model.User, previousTokenId string, rememberMe bool) (*token.Tokens, error) {
+	called := m.Called(user, previousTokenId, rememberMe)
 	return called.Get(0).(*token.Tokens), nil
 }
 
@@ -231,7 +288,7 @@ func newPost(t *testing.T, path string, jsonBody any) *http.Request {
 	req, err := http.NewRequest(http.MethodPost, path, bytes.NewReader(body))
 	require.NoError(t, err)
 
-	req.Header.Set("Content-Type", "application/json; charset=UTF-8")
+	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "token")
 
 	return req

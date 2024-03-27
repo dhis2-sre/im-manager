@@ -43,7 +43,7 @@ type userService interface {
 }
 
 type tokenService interface {
-	GetTokens(user *model.User, previousTokenId string) (*token.Tokens, error)
+	GetTokens(user *model.User, previousTokenId string, rememberMe bool) (*token.Tokens, error)
 	ValidateRefreshToken(tokenString string) (*token.RefreshTokenData, error)
 	SignOut(userId uint) error
 }
@@ -120,7 +120,7 @@ func (h Handler) ValidateEmail(c *gin.Context) {
 	//   404: Error
 	var request validateEmailRequest
 	if err := handler.DataBinder(c, &request); err != nil {
-		_ = c.Error(handleSignUpErrors(err))
+		_ = c.Error(errdef.NewBadRequest("validate email error: %v", err))
 		return
 	}
 
@@ -139,6 +139,10 @@ func (h Handler) ValidateEmail(c *gin.Context) {
 	}
 
 	c.Status(http.StatusOK)
+}
+
+type signInRequest struct {
+	RememberMe bool `json:"rememberMe"`
 }
 
 // SignIn user
@@ -164,13 +168,18 @@ func (h Handler) SignIn(c *gin.Context) {
 		return
 	}
 
-	tokens, err := h.tokenService.GetTokens(user, "")
+	var request signInRequest
+	if err := handler.DataBinder(c, &request); err != nil {
+		request = signInRequest{RememberMe: false}
+	}
+
+	tokens, err := h.tokenService.GetTokens(user, "", request.RememberMe)
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
 
-	h.setCookies(c, tokens)
+	h.setCookies(c, tokens, request.RememberMe)
 
 	c.JSON(http.StatusCreated, tokens)
 }
@@ -230,23 +239,34 @@ func (h Handler) RefreshToken(c *gin.Context) {
 		return
 	}
 
-	tokens, err := h.tokenService.GetTokens(user, refreshToken.ID.String())
+	rememberMe := false
+	rememberMeCookie, _ := c.Cookie("rememberMe")
+	if rememberMeCookie == "true" {
+		rememberMe = true
+	}
+
+	tokens, err := h.tokenService.GetTokens(user, refreshToken.ID.String(), rememberMe)
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
 
-	h.setCookies(c, tokens)
+	h.setCookies(c, tokens, rememberMe)
 
 	c.JSON(http.StatusCreated, tokens)
 }
 
-func (h Handler) setCookies(c *gin.Context, tokens *token.Tokens) {
+func (h Handler) setCookies(c *gin.Context, tokens *token.Tokens, rememberMe bool) {
 	c.SetSameSite(http.SameSiteStrictMode)
 	domain := h.config.Hostname
 	authentication := h.config.Authentication
 	c.SetCookie("accessToken", tokens.AccessToken, authentication.AccessTokenExpirationSeconds, "/", domain, true, true)
-	c.SetCookie("refreshToken", tokens.RefreshToken, authentication.RefreshTokenExpirationSeconds, "/refresh", domain, true, true)
+	if rememberMe {
+		c.SetCookie("refreshToken", tokens.RefreshToken, authentication.RefreshTokenRememberMeExpirationSeconds, "/refresh", domain, true, true)
+		c.SetCookie("rememberMe", "true", authentication.RefreshTokenRememberMeExpirationSeconds, "/refresh", domain, true, true)
+	} else {
+		c.SetCookie("refreshToken", tokens.RefreshToken, authentication.RefreshTokenExpirationSeconds, "/refresh", domain, true, true)
+	}
 }
 
 // Me user
@@ -296,6 +316,9 @@ func (h Handler) SignOut(c *gin.Context) {
 	//	200:
 	//	401: Error
 	//	415: Error
+
+	// TODO: cookies should be cleared no matter what...
+	// The below shouldn't result in an error if the access token is expired and we still want to remove the other cookies
 	user, err := handler.GetUserFromContext(c)
 	if err != nil {
 		_ = c.Error(err)
@@ -315,6 +338,7 @@ func (h Handler) SignOut(c *gin.Context) {
 func unsetCookie(c *gin.Context) {
 	c.SetCookie("accessToken", "", -1, "/", "", true, true)
 	c.SetCookie("refreshToken", "", -1, "/", "", true, true)
+	c.SetCookie("rememberMe", "", -1, "/", "", true, true)
 }
 
 // FindById user

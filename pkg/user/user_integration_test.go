@@ -43,7 +43,13 @@ func TestUserHandler(t *testing.T) {
 
 	redis := inttest.SetupRedis(t)
 	tokenRepository := token.NewRepository(redis)
-	tokenService, err := token.NewService(tokenRepository, key, &key.PublicKey, 10, "secret", 10)
+	authenticationConfig := config.Authentication{
+		RefreshTokenSecretKey:                   "secret",
+		AccessTokenExpirationSeconds:            10,
+		RefreshTokenExpirationSeconds:           20,
+		RefreshTokenRememberMeExpirationSeconds: 30,
+	}
+	tokenService, err := token.NewService(tokenRepository, key, &key.PublicKey, authenticationConfig)
 	require.NoError(t, err)
 
 	client := inttest.SetupHTTPServer(t, func(engine *gin.Engine) {

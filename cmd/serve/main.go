@@ -78,7 +78,7 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	tokenService, err := token.NewService(tokenRepository, privateKey, publicKey, cfg.Authentication.AccessTokenExpirationSeconds, cfg.Authentication.RefreshTokenSecretKey, cfg.Authentication.RefreshTokenExpirationSeconds)
+	tokenService, err := token.NewService(tokenRepository, privateKey, publicKey, cfg.Authentication)
 	if err != nil {
 		return err
 	}
