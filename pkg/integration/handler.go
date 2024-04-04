@@ -52,6 +52,11 @@ func (h Handler) Integrations(c *gin.Context) {
 		return
 	}
 
+	if request.Key == "ENABLE_PERSISTENT_STORAGE" {
+		c.JSON(http.StatusOK, []string{"true", "false"})
+		return
+	}
+
 	if request.Key == "IMAGE_REPOSITORY" {
 		payload := request.Payload.(map[string]any)
 

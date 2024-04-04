@@ -72,6 +72,9 @@ releases:
           requests:
             cpu: {{ requiredEnv "CORE_RESOURCES_REQUESTS_CPU" }}
             memory: {{ requiredEnv "CORE_RESOURCES_REQUESTS_MEMORY" }}
+      - storage:
+          persisted: {{ requiredEnv "ENABLE_PERSISTENT_STORAGE" }}
+          volumeSize: {{ requiredEnv "PERSISTENT_STORAGE_VOLUME_SIZE" }}
 
   - name: {{ requiredEnv "INSTANCE_NAME" }}-database
     namespace: "{{ requiredEnv "INSTANCE_NAMESPACE" }}"

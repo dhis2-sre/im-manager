@@ -189,13 +189,15 @@ var DHIS2Core = model.Stack{
 		"FLYWAY_REPAIR_BEFORE_MIGRATION":  {Priority: 6, DisplayName: "Flyway Repair Before Migration", DefaultValue: &dhis2CoreDefaults.flywayRepairBeforeMigration},
 		"RESOURCES_REQUESTS_CPU":          {Priority: 7, DisplayName: "Resources Requests CPU", DefaultValue: &dhis2CoreDefaults.resourcesRequestsCPU},
 		"RESOURCES_REQUESTS_MEMORY":       {Priority: 8, DisplayName: "Resources Requests Memory", DefaultValue: &dhis2CoreDefaults.resourcesRequestsMemory},
-		"MIN_READY_SECONDS":               {Priority: 9, DisplayName: "Minimum Ready Seconds", DefaultValue: &dhis2CoreDefaults.minReadySeconds},
-		"LIVENESS_PROBE_TIMEOUT_SECONDS":  {Priority: 10, DisplayName: "Liveness Probe Timeout Seconds", DefaultValue: &dhis2CoreDefaults.livenessProbeTimeoutSeconds},
-		"READINESS_PROBE_TIMEOUT_SECONDS": {Priority: 11, DisplayName: "Readiness Probe Timeout Seconds", DefaultValue: &dhis2CoreDefaults.readinessProbeTimeoutSeconds},
-		"STARTUP_PROBE_FAILURE_THRESHOLD": {Priority: 12, DisplayName: "Startup Probe Failure Threshold", DefaultValue: &dhis2CoreDefaults.startupProbeFailureThreshold},
-		"STARTUP_PROBE_PERIOD_SECONDS":    {Priority: 13, DisplayName: "Startup Probe Period Seconds", DefaultValue: &dhis2CoreDefaults.startupProbePeriodSeconds},
-		"JAVA_OPTS":                       {Priority: 14, DisplayName: "JAVA_OPTS", DefaultValue: &dhis2CoreDefaults.javaOpts},
-		"CHART_VERSION":                   {Priority: 15, DisplayName: "Chart Version", DefaultValue: &dhis2CoreDefaults.chartVersion},
+		"ENABLE_PERSISTENT_STORAGE":       {Priority: 9, DisplayName: "Enable persistent storage", DefaultValue: &dhis2CoreDefaults.enablePersistentStorage},
+		"PERSISTENT_STORAGE_VOLUME_SIZE":  {Priority: 10, DisplayName: "Enable persistent storage", DefaultValue: &dhis2CoreDefaults.persistentStorageVolumeSize},
+		"MIN_READY_SECONDS":               {Priority: 11, DisplayName: "Minimum Ready Seconds", DefaultValue: &dhis2CoreDefaults.minReadySeconds},
+		"LIVENESS_PROBE_TIMEOUT_SECONDS":  {Priority: 12, DisplayName: "Liveness Probe Timeout Seconds", DefaultValue: &dhis2CoreDefaults.livenessProbeTimeoutSeconds},
+		"READINESS_PROBE_TIMEOUT_SECONDS": {Priority: 13, DisplayName: "Readiness Probe Timeout Seconds", DefaultValue: &dhis2CoreDefaults.readinessProbeTimeoutSeconds},
+		"STARTUP_PROBE_FAILURE_THRESHOLD": {Priority: 14, DisplayName: "Startup Probe Failure Threshold", DefaultValue: &dhis2CoreDefaults.startupProbeFailureThreshold},
+		"STARTUP_PROBE_PERIOD_SECONDS":    {Priority: 15, DisplayName: "Startup Probe Period Seconds", DefaultValue: &dhis2CoreDefaults.startupProbePeriodSeconds},
+		"JAVA_OPTS":                       {Priority: 16, DisplayName: "JAVA_OPTS", DefaultValue: &dhis2CoreDefaults.javaOpts},
+		"CHART_VERSION":                   {Priority: 17, DisplayName: "Chart Version", DefaultValue: &dhis2CoreDefaults.chartVersion},
 		"GOOGLE_AUTH_PROJECT_ID":          {Priority: 0, DisplayName: "Google auth project id", DefaultValue: &dhis2CoreDefaults.googleAuthClientId},
 		"GOOGLE_AUTH_PRIVATE_KEY":         {Priority: 0, DisplayName: "Google auth private key", DefaultValue: &dhis2CoreDefaults.googleAuthPrivateKey},
 		"GOOGLE_AUTH_PRIVATE_KEY_ID":      {Priority: 0, DisplayName: "Google auth private key id", DefaultValue: &dhis2CoreDefaults.googleAuthPrivateKeyId},
@@ -233,8 +235,10 @@ var dhis2CoreDefaults = struct {
 	googleAuthPrivateKeyId       string
 	googleAuthClientEmail        string
 	googleAuthClientId           string
+	enablePersistentStorage      string
+	persistentStorageVolumeSize  string
 }{
-	chartVersion:                 "0.16.1",
+	chartVersion:                 "0.17.0",
 	dhis2Home:                    "/opt/dhis2",
 	flywayMigrateOutOfOrder:      "false",
 	flywayRepairBeforeMigration:  "false",
@@ -254,6 +258,8 @@ var dhis2CoreDefaults = struct {
 	googleAuthPrivateKeyId:       " ",
 	googleAuthClientEmail:        " ",
 	googleAuthClientId:           " ",
+	enablePersistentStorage:      "true",
+	persistentStorageVolumeSize:  "1Gi",
 }
 
 // Stack representing ../../stacks/dhis2/helmfile.yaml
@@ -279,13 +285,15 @@ var DHIS2 = model.Stack{
 		"CORE_RESOURCES_REQUESTS_MEMORY":  {Priority: 15, DisplayName: "Core Resources Requests Memory", DefaultValue: &dhis2CoreDefaults.resourcesRequestsMemory},
 		"DB_RESOURCES_REQUESTS_CPU":       {Priority: 16, DisplayName: "DB Resources Requests CPU", DefaultValue: &dhis2DBDefaults.resourcesRequestsCPU},
 		"DB_RESOURCES_REQUESTS_MEMORY":    {Priority: 17, DisplayName: "DB Resources Requests Memory", DefaultValue: &dhis2DBDefaults.resourcesRequestsMemory},
-		"MIN_READY_SECONDS":               {Priority: 18, DisplayName: "Minimum Ready Seconds", DefaultValue: &dhis2CoreDefaults.minReadySeconds},
-		"LIVENESS_PROBE_TIMEOUT_SECONDS":  {Priority: 19, DisplayName: "Liveness Probe Timeout Seconds", DefaultValue: &dhis2CoreDefaults.livenessProbeTimeoutSeconds},
-		"READINESS_PROBE_TIMEOUT_SECONDS": {Priority: 20, DisplayName: "Readiness Probe Timeout Seconds", DefaultValue: &dhis2CoreDefaults.readinessProbeTimeoutSeconds},
-		"STARTUP_PROBE_FAILURE_THRESHOLD": {Priority: 21, DisplayName: "Startup Probe Failure Threshold", DefaultValue: &dhis2CoreDefaults.startupProbeFailureThreshold},
-		"STARTUP_PROBE_PERIOD_SECONDS":    {Priority: 22, DisplayName: "Startup Probe Period Seconds", DefaultValue: &dhis2CoreDefaults.startupProbePeriodSeconds},
-		"CHART_VERSION":                   {Priority: 23, DisplayName: "Chart Version", DefaultValue: &dhis2CoreDefaults.chartVersion},
-		"JAVA_OPTS":                       {Priority: 24, DisplayName: "JAVA Options", DefaultValue: &dhis2CoreDefaults.javaOpts},
+		"ENABLE_PERSISTENT_STORAGE":       {Priority: 18, DisplayName: "Enable persistent storage", DefaultValue: &dhis2CoreDefaults.enablePersistentStorage},
+		"PERSISTENT_STORAGE_VOLUME_SIZE":  {Priority: 19, DisplayName: "Enable persistent storage", DefaultValue: &dhis2CoreDefaults.persistentStorageVolumeSize},
+		"MIN_READY_SECONDS":               {Priority: 20, DisplayName: "Minimum Ready Seconds", DefaultValue: &dhis2CoreDefaults.minReadySeconds},
+		"LIVENESS_PROBE_TIMEOUT_SECONDS":  {Priority: 21, DisplayName: "Liveness Probe Timeout Seconds", DefaultValue: &dhis2CoreDefaults.livenessProbeTimeoutSeconds},
+		"READINESS_PROBE_TIMEOUT_SECONDS": {Priority: 22, DisplayName: "Readiness Probe Timeout Seconds", DefaultValue: &dhis2CoreDefaults.readinessProbeTimeoutSeconds},
+		"STARTUP_PROBE_FAILURE_THRESHOLD": {Priority: 23, DisplayName: "Startup Probe Failure Threshold", DefaultValue: &dhis2CoreDefaults.startupProbeFailureThreshold},
+		"STARTUP_PROBE_PERIOD_SECONDS":    {Priority: 24, DisplayName: "Startup Probe Period Seconds", DefaultValue: &dhis2CoreDefaults.startupProbePeriodSeconds},
+		"CHART_VERSION":                   {Priority: 25, DisplayName: "Chart Version", DefaultValue: &dhis2CoreDefaults.chartVersion},
+		"JAVA_OPTS":                       {Priority: 26, DisplayName: "JAVA Options", DefaultValue: &dhis2CoreDefaults.javaOpts},
 		"GOOGLE_AUTH_PROJECT_ID":          {Priority: 0, DisplayName: "Google auth project id", DefaultValue: &dhis2CoreDefaults.googleAuthClientId},
 		"GOOGLE_AUTH_PRIVATE_KEY":         {Priority: 0, DisplayName: "Google auth private key", DefaultValue: &dhis2CoreDefaults.googleAuthPrivateKey},
 		"GOOGLE_AUTH_PRIVATE_KEY_ID":      {Priority: 0, DisplayName: "Google auth private key id", DefaultValue: &dhis2CoreDefaults.googleAuthPrivateKeyId},
@@ -307,7 +315,7 @@ var dhis2Defaults = struct {
 var PgAdmin = model.Stack{
 	Name: "pgadmin",
 	Parameters: model.StackParameters{
-		"PGADMIN_USERNAME":  {Priority: 1, DisplayName: "pgAdmin Username"},
+		"PGADMIN_USERNAME":  {Priority: 1, DisplayName: "pgAdmin Username (must be a valid email!)"},
 		"PGADMIN_PASSWORD":  {Priority: 2, DisplayName: "pgAdmin Password"},
 		"CHART_VERSION":     {Priority: 3, DisplayName: "Chart Version", DefaultValue: &pgAdminDefaults.chartVersion},
 		"DATABASE_HOSTNAME": {Priority: 0, DisplayName: "Database Hostname", Consumed: true},

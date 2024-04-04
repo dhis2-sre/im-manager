@@ -65,6 +65,9 @@ releases:
           requests:
             cpu: {{ requiredEnv "RESOURCES_REQUESTS_CPU" }}
             memory: {{ requiredEnv "RESOURCES_REQUESTS_MEMORY" }}
+      - storage:
+          persisted: {{ requiredEnv "ENABLE_PERSISTENT_STORAGE" }}
+          volumeSize: {{ requiredEnv "PERSISTENT_STORAGE_VOLUME_SIZE" }}
 
 repositories:
   - name: dhis2
