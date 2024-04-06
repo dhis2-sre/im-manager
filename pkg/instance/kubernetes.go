@@ -274,8 +274,9 @@ func (ks kubernetesService) resume(instance *model.DeploymentInstance) error {
 func (ks kubernetesService) deletePersistentVolumeClaim(instance *model.DeploymentInstance) error {
 	// TODO: This should be stack metadata
 	labelMap := map[string][]string{
-		"dhis2":    {"app.kubernetes.io/instance=%s-database", "app.kubernetes.io/instance=%s-redis"},
-		"dhis2-db": {"app.kubernetes.io/instance=%s-database"},
+		"dhis2":      {"app.kubernetes.io/instance=%s", "app.kubernetes.io/instance=%s-database", "app.kubernetes.io/instance=%s-redis"},
+		"dhis2-core": {"app.kubernetes.io/instance=%s"},
+		"dhis2-db":   {"app.kubernetes.io/instance=%s-database"},
 	}
 
 	labelPatterns := labelMap[instance.StackName]
