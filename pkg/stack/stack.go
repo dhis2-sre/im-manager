@@ -238,7 +238,7 @@ var dhis2CoreDefaults = struct {
 	enablePersistentStorage      string
 	persistentStorageVolumeSize  string
 }{
-	chartVersion:                 "0.17.1",
+	chartVersion:                 "0.18.0",
 	dhis2Home:                    "/opt/dhis2",
 	flywayMigrateOutOfOrder:      "false",
 	flywayRepairBeforeMigration:  "false",
