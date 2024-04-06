@@ -211,7 +211,7 @@ var DHIS2Core = model.Stack{
 	Requires: []model.Stack{
 		DHIS2DB,
 	},
-	KubernetesResource: model.DeploymentResource,
+	KubernetesResource: model.StatefulSetResource,
 }
 
 var dhis2CoreDefaults = struct {
