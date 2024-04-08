@@ -18,7 +18,7 @@ function createDatabase() {
   curl -C - "$2" -o "$HOME/Downloads/$name"
 
   echo "Login ..."
-  rm .access_token_cache # to make sure we're not using an expired token if we're seeding a lot of databases
+  rm -f .access_token_cache # to make sure we're not using an expired token if we're seeding a lot of databases
   source ./auth.sh
 
   echo "Uploading database $name ..."
