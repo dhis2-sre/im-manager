@@ -4,8 +4,5 @@ set -euo pipefail
 
 source ./auth.sh
 
-GROUP=$1
-NAME=$2
-
-INSTANCE_ID=$($HTTP get "$IM_HOST/instances-name-to-id/$GROUP/$NAME" "Authorization: Bearer $ACCESS_TOKEN")
+INSTANCE_ID=$1
 $HTTP post "$IM_HOST/databases/save/$INSTANCE_ID" "Authorization: Bearer $ACCESS_TOKEN"

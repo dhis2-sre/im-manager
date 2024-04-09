@@ -11,7 +11,6 @@ const (
 type Stack struct {
 	Name             string          `json:"name"`
 	Parameters       StackParameters `json:"parameters"`
-	Instances        []Instance      `json:"instances"`
 	HostnamePattern  string          `json:"hostnamePattern"`
 	HostnameVariable string          `json:"hostnameVariable"`
 	// ParameterProviders provide parameters to other stacks.
