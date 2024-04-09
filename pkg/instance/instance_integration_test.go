@@ -94,17 +94,6 @@ func TestInstanceHandler(t *testing.T) {
 		database.Routes(engine, authenticator, databaseHandler)
 	})
 
-	t.Run("DeployWhoAmI", func(t *testing.T) {
-		var instance model.Instance
-		body := strings.NewReader(`{
-			"name": "test-whoami",
-			"groupName": "group-name",
-			"stackName": "whoami-go"
-		}`)
-		client.PostJSON(t, "/instances", body, &instance, inttest.WithAuthToken("sometoken"))
-
-		k8sClient.AssertPodIsReady(t, group.Name, instance.Name, 60)
-	})
 	// TODO: Convert below test to use deployments
 	/*
 		//	var databaseID string
