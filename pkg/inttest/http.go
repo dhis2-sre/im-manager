@@ -26,7 +26,7 @@ func SetupHTTPServer(t *testing.T, f func(engine *gin.Engine)) *HTTPClient {
 	require.NoError(t, err, "failed to register validation")
 	gin.SetMode(gin.TestMode)
 
-	engine := server.GetEngine("", "http://localhost")
+	engine := server.GetEngine("", []string{"http://localhost"})
 	f(engine)
 
 	//goland:noinspection GoImportUsedAsName
