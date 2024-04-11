@@ -1,6 +1,7 @@
 package model
 
 import (
+	"database/sql"
 	"time"
 
 	"github.com/google/uuid"
@@ -9,15 +10,17 @@ import (
 // User domain object defining a user
 // swagger:model
 type User struct {
-	ID          uint      `json:"id" gorm:"primarykey"`
-	CreatedAt   time.Time `json:"createdAt"`
-	UpdatedAt   time.Time `json:"updatedAt"`
-	Email       string    `json:"email" gorm:"index;unique"`
-	EmailToken  uuid.UUID `json:"-" gorm:"unique;type:uuid"`
-	Validated   bool      `json:"validated"`
-	Password    string    `json:"-"`
-	Groups      []Group   `json:"groups" gorm:"many2many:user_groups;constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
-	AdminGroups []Group   `json:"adminGroups" gorm:"many2many:user_groups_admin;constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
+	ID               uint           `json:"id" gorm:"primarykey"`
+	CreatedAt        time.Time      `json:"createdAt"`
+	UpdatedAt        time.Time      `json:"updatedAt"`
+	Email            string         `json:"email" gorm:"index;unique"`
+	EmailToken       uuid.UUID      `json:"-" gorm:"unique;type:uuid"`
+	Validated        bool           `json:"validated"`
+	Password         string         `json:"-"`
+	PasswordToken    sql.NullString `json:"-"`
+	PasswordTokenTTL uint           `json:"-"`
+	Groups           []Group        `json:"groups" gorm:"many2many:user_groups;constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
+	AdminGroups      []Group        `json:"adminGroups" gorm:"many2many:user_groups_admin;constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
 }
 
 func (u *User) IsMemberOf(group string) bool {

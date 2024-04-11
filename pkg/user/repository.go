@@ -1,6 +1,7 @@
 package user
 
 import (
+	"database/sql"
 	"errors"
 	"fmt"
 
@@ -70,6 +71,16 @@ func (r repository) findByEmailToken(token uuid.UUID) (*model.User, error) {
 	return user, err
 }
 
+func (r repository) findByPasswordResetToken(token string) (*model.User, error) {
+	var user *model.User
+	err := r.db.First(&user, "password_token = ?", token).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		// TODO should we use NotFound 404 error here instead of 400?
+		return nil, errdef.NewBadRequest("invalid password reset token")
+	}
+	return user, err
+}
+
 func (r repository) findOrCreate(user *model.User) (*model.User, error) {
 	var u *model.User
 	err := r.db.
@@ -111,6 +122,20 @@ func (r repository) update(user *model.User) (*model.User, error) {
 	err := r.db.Model(&user).Updates(updatedUser).Error
 	if err != nil {
 		return nil, fmt.Errorf("failed to update user: %v", err)
+	}
+
+	return user, nil
+}
+
+func (r repository) resetPassword(user *model.User) (*model.User, error) {
+	updatedUser := model.User{
+		Password:      user.Password,
+		PasswordToken: sql.NullString{String: "", Valid: false},
+	}
+
+	err := r.db.Model(&user).Select("Password", "PasswordToken").Updates(updatedUser).Error
+	if err != nil {
+		return nil, fmt.Errorf("failed to update user password: %v", err)
 	}
 
 	return user, nil

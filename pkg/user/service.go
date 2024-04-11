@@ -2,9 +2,12 @@ package user
 
 import (
 	"crypto/rand"
+	"database/sql"
+	"encoding/base64"
 	"encoding/hex"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/dhis2-sre/im-manager/pkg/config"
 	"github.com/google/uuid"
@@ -31,6 +34,8 @@ type userRepository interface {
 	update(user *model.User) (*model.User, error)
 	findByEmailToken(token uuid.UUID) (*model.User, error)
 	save(user *model.User) error
+	resetPassword(user *model.User) (*model.User, error)
+	findByPasswordResetToken(token string) (*model.User, error)
 }
 
 type dailer interface {
@@ -204,4 +209,71 @@ func (s service) Update(id uint, email, password string) (*model.User, error) {
 	}
 
 	return s.repository.update(user)
+}
+
+func (s service) sendResetPasswordEmail(user *model.User) error {
+	_, err := s.repository.findByEmail(user.Email)
+	if err != nil {
+		if errdef.IsNotFound(err) {
+			// TODO is this the correct way to not do anything here?
+			return nil
+		}
+		// TODO should we return error in other cases besides not found? Security?
+		return err
+	}
+
+	m := mail.NewMessage()
+	m.SetHeader("From", "DHIS2 Instance Manager <no-reply@dhis2.org>")
+	m.SetHeader("To", user.Email)
+	m.SetHeader("Subject", "Reset your IM password")
+	link := fmt.Sprintf("%s/reset-password/%s", s.config.UIHostname, user.PasswordToken.String)
+	body := fmt.Sprintf("Hello, please click the link below to reset your password.<br/>%s", link)
+	m.SetBody("text/html", body)
+	return s.dailer.DialAndSend(m)
+}
+
+func (s service) RequestPasswordReset(email string) error {
+	user, err := s.repository.findByEmail(email)
+
+	// TODO is it correct to not do anything if user is not found here?
+	if err == nil {
+		bytes := make([]byte, 64)
+		if _, err := rand.Read(bytes); err != nil {
+			return err
+		}
+		token := base64.URLEncoding.EncodeToString(bytes)
+
+		user.PasswordToken = sql.NullString{String: token, Valid: true}
+		user.PasswordTokenTTL = uint(time.Now().Unix()) + 900
+
+		err := s.sendResetPasswordEmail(user)
+		if err != nil {
+			return err
+		}
+		return s.repository.save(user)
+	}
+
+	return nil
+}
+
+func (s service) ResetPassword(token string, password string) (*model.User, error) {
+	user, err := s.repository.findByPasswordResetToken(token)
+	if err != nil {
+		return nil, err
+	}
+
+	tokenTtl := time.Unix(int64(user.PasswordTokenTTL), 0).UTC()
+	if tokenTtl.Before(time.Now()) {
+		return nil, errdef.NewBadRequest("reset token has expired")
+	}
+
+	if password != "" {
+		var err error
+		user.Password, err = hashPassword(password)
+		if err != nil {
+			return nil, fmt.Errorf("failed to hash password: %s", err)
+		}
+	}
+
+	return s.repository.resetPassword(user)
 }
