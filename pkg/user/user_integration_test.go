@@ -208,6 +208,42 @@ func TestUserHandler(t *testing.T) {
 				client.Do(t, http.MethodDelete, "/users/"+user1ID, nil, http.StatusUnauthorized, inttest.WithAuthToken(user2Token.AccessToken))
 			}
 		})
+
+		t.Run("ResetUserPassword", func(t *testing.T) {
+			t.Parallel()
+
+			{
+				t.Log("RequestPasswordReset")
+
+				requestResetRequestBody := strings.NewReader(`{
+					"email":    "user1@dhis2.org"
+				}`)
+
+				client.Do(t, http.MethodPost, "/users/request-reset", requestResetRequestBody, http.StatusOK, inttest.WithHeader("Content-Type", "application/json"))
+
+				user1IDInt, _ := strconv.ParseUint(user1ID, 10, 0)
+				user1, _ := userService.FindById(uint(user1IDInt))
+
+				require.NotEmpty(t, user1.PasswordToken, "should have a password token")
+				require.NotEmpty(t, user1.PasswordTokenTTL, "should have a password token TTL timestamp")
+
+				t.Log("ResetPassword")
+
+				resetRequestBody := strings.NewReader(`{
+					"token": "` + user1.PasswordToken.String + `",
+					"password": "ResetResetResetResetReset"
+				}`)
+
+				oldPassword := user1.Password
+
+				client.Do(t, http.MethodPost, "/users/reset-password", resetRequestBody, http.StatusOK, inttest.WithHeader("Content-Type", "application/json"))
+
+				newUser1, _ := userService.FindById(uint(user1IDInt))
+				newPassword := newUser1.Password
+
+				require.NotEqual(t, oldPassword, newPassword, "old and new password should be different")
+			}
+		})
 	})
 
 	t.Run("AsAdmin", func(t *testing.T) {
