@@ -157,7 +157,7 @@ func (h Handler) RequestPasswordReset(c *gin.Context) {
 	// Request user's password reset
 	//
 	// responses:
-	//   200:
+	//   201:
 	//   400: Error
 	//   404: Error
 	//   415: Error
@@ -173,7 +173,7 @@ func (h Handler) RequestPasswordReset(c *gin.Context) {
 		return
 	}
 
-	c.Status(http.StatusOK)
+	c.Status(http.StatusCreated)
 }
 
 type resetPasswordRequest struct {
@@ -189,7 +189,7 @@ func (h Handler) ResetPassword(c *gin.Context) {
 	// Reset user's password
 	//
 	// responses:
-	//   200:
+	//   201:
 	//   400: Error
 	//   404: Error
 	//   415: Error
@@ -205,7 +205,7 @@ func (h Handler) ResetPassword(c *gin.Context) {
 		return
 	}
 
-	c.Status(http.StatusOK)
+	c.Status(http.StatusCreated)
 }
 
 // SignIn user

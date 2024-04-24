@@ -1706,7 +1706,7 @@ paths:
                   schema:
                     $ref: '#/definitions/requestPasswordResetRequest'
             responses:
-                "200":
+                "201":
                     description: ""
                 "400":
                     $ref: '#/responses/Error'
@@ -1720,7 +1720,7 @@ paths:
             description: Reset user's password
             operationId: resetPassword
             responses:
-                "200":
+                "201":
                     description: ""
                 "400":
                     $ref: '#/responses/Error'

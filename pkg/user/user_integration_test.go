@@ -217,7 +217,7 @@ func TestUserHandler(t *testing.T) {
 					"email":    "user1@dhis2.org"
 				}`)
 
-				client.Do(t, http.MethodPost, "/users/request-reset", requestResetRequestBody, http.StatusOK, inttest.WithHeader("Content-Type", "application/json"))
+				client.Do(t, http.MethodPost, "/users/request-reset", requestResetRequestBody, http.StatusCreated, inttest.WithHeader("Content-Type", "application/json"))
 
 				user1IDInt, _ := strconv.ParseUint(user1ID, 10, 0)
 				user1, _ := userService.FindById(uint(user1IDInt))
@@ -234,7 +234,7 @@ func TestUserHandler(t *testing.T) {
 
 				oldPassword := user1.Password
 
-				client.Do(t, http.MethodPost, "/users/reset-password", resetRequestBody, http.StatusOK, inttest.WithHeader("Content-Type", "application/json"))
+				client.Do(t, http.MethodPost, "/users/reset-password", resetRequestBody, http.StatusCreated, inttest.WithHeader("Content-Type", "application/json"))
 
 				newUser1, _ := userService.FindById(uint(user1IDInt))
 				newPassword := newUser1.Password

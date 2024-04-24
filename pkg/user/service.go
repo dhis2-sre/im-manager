@@ -217,7 +217,6 @@ func (s service) sendResetPasswordEmail(user *model.User) error {
 		if errdef.IsNotFound(err) {
 			return nil
 		}
-		// TODO should we return error in other cases besides not found? Security?
 		return err
 	}
 
