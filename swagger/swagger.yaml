@@ -1712,6 +1712,8 @@ paths:
                     $ref: '#/responses/Error'
                 "404":
                     $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
             summary: Request password reset
     /users/reset-password:
         post:
@@ -1723,6 +1725,8 @@ paths:
                 "400":
                     $ref: '#/responses/Error'
                 "404":
+                    $ref: '#/responses/Error'
+                "415":
                     $ref: '#/responses/Error'
             summary: Reset password
     /users/validate:
