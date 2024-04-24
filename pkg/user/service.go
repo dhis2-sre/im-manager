@@ -244,7 +244,7 @@ func (s service) RequestPasswordReset(email string) error {
 		token := base64.URLEncoding.EncodeToString(bytes)
 
 		user.PasswordToken = sql.NullString{String: token, Valid: true}
-		user.PasswordTokenTTL = uint(time.Now().Unix()) + 900
+		user.PasswordTokenTTL = uint(time.Now().Unix()) + s.config.PasswordTokenTTL
 
 		err := s.sendResetPasswordEmail(user)
 		if err != nil {
