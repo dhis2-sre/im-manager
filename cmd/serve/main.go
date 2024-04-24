@@ -170,6 +170,10 @@ func run() error {
 		return err
 	}
 
+	// TODO: This is a hack! Allowed origins for different environments should be applied using skaffold profiles... But I can't get it working!
+	if cfg.Environment != "production" {
+		cfg.AllowedOrigins = append(cfg.AllowedOrigins, "http://localhost:3000", "http://localhost:5173")
+	}
 	r := server.GetEngine(cfg.BasePath, cfg.AllowedOrigins)
 
 	group.Routes(r, authentication, authorization, groupHandler)
