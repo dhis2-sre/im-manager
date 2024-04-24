@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/dhis2-sre/im-manager/pkg/config"
 	"github.com/go-mail/mail"
@@ -27,7 +28,7 @@ func TestUserHandler(t *testing.T) {
 
 	db := inttest.SetupDB(t)
 	userRepository := user.NewRepository(db)
-	userService := user.NewService(config.Config{}, userRepository, fakeDialer{t})
+	userService := user.NewService(config.Config{PasswordTokenTTL: 900}, userRepository, fakeDialer{t})
 	groupRepository := group.NewRepository(db)
 	groupService := group.NewService(groupRepository, userService)
 
@@ -240,6 +241,23 @@ func TestUserHandler(t *testing.T) {
 				newPassword := newUser1.Password
 
 				require.NotEqual(t, oldPassword, newPassword, "old and new password should be different")
+			}
+
+			{
+				t.Log("PasswordResetTokenExpired")
+
+				newUserService := user.NewService(config.Config{PasswordTokenTTL: 1}, userRepository, fakeDialer{t})
+
+				_ = newUserService.RequestPasswordReset("user1@dhis2.org")
+
+				user1IDInt, _ := strconv.ParseUint(user1ID, 10, 0)
+				user1, _ := newUserService.FindById(uint(user1IDInt))
+
+				// Wait for token to expire
+				time.Sleep(5 * time.Second)
+
+				_, err := newUserService.ResetPassword(user1.PasswordToken.String, "ResetResetResetResetReset")
+				require.Error(t, err, "reset token has expired")
 			}
 		})
 	})
