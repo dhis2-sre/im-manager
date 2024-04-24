@@ -215,7 +215,6 @@ func (s service) sendResetPasswordEmail(user *model.User) error {
 	_, err := s.repository.findByEmail(user.Email)
 	if err != nil {
 		if errdef.IsNotFound(err) {
-			// TODO is this the correct way to not do anything here?
 			return nil
 		}
 		// TODO should we return error in other cases besides not found? Security?

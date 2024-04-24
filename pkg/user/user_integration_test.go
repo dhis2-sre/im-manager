@@ -51,8 +51,6 @@ func TestUserHandler(t *testing.T) {
 		user.Routes(engine, authentication, authorization, userHandler)
 	})
 
-	// TODO add tests for resetting password
-
 	var user1ID string
 	{
 		t.Log("SignUpUsers")
