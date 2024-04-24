@@ -234,25 +234,25 @@ func (s service) sendResetPasswordEmail(user *model.User) error {
 func (s service) RequestPasswordReset(email string) error {
 	user, err := s.repository.findByEmail(email)
 
-	// TODO is it correct to not do anything if user is not found here?
-	if err == nil {
-		bytes := make([]byte, 64)
-		if _, err := rand.Read(bytes); err != nil {
-			return err
-		}
-		token := base64.URLEncoding.EncodeToString(bytes)
-
-		user.PasswordToken = sql.NullString{String: token, Valid: true}
-		user.PasswordTokenTTL = uint(time.Now().Unix()) + s.config.PasswordTokenTTL
-
-		err := s.sendResetPasswordEmail(user)
-		if err != nil {
-			return err
-		}
-		return s.repository.save(user)
+	if err != nil {
+		return nil
 	}
 
-	return nil
+	bytes := make([]byte, 64)
+	if _, err := rand.Read(bytes); err != nil {
+		return err
+	}
+	token := base64.URLEncoding.EncodeToString(bytes)
+
+	user.PasswordToken = sql.NullString{String: token, Valid: true}
+	user.PasswordTokenTTL = uint(time.Now().Unix()) + s.config.PasswordTokenTTL
+
+	err = s.sendResetPasswordEmail(user)
+	if err != nil {
+		return err
+	}
+
+	return s.repository.save(user)
 }
 
 func (s service) ResetPassword(token string, password string) (*model.User, error) {
