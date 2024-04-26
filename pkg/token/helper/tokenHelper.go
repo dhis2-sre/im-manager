@@ -91,7 +91,7 @@ func ValidateAccessToken(tokenString string, key *rsa.PublicKey) (*AccessTokenCl
 
 type refreshToken struct {
 	SignedString string
-	TokenId      uuid.UUID
+	TokenId      string
 	ExpiresIn    time.Duration
 }
 
@@ -100,20 +100,15 @@ func GenerateRefreshToken(user *model.User, secretKey string, expirationInSecond
 	currentTime := time.Now()
 	tokenExpiration := currentTime.Add(time.Duration(expirationInSeconds) * time.Second)
 
-	tokenId, err := uuid.NewUUID()
-	if err != nil {
-		log.Println("Failed to generate refresh token id")
-		return nil, err
-	}
-
 	token := jwt.New()
 
-	err = token.Set("userId", user.ID)
+	err := token.Set("userId", user.ID)
 	if err != nil {
 		return nil, err
 	}
 
-	err = token.Set(jwt.JwtIDKey, tokenId.String())
+	tokenId := uuid.NewString()
+	err = token.Set(jwt.JwtIDKey, tokenId)
 	if err != nil {
 		return nil, err
 	}
