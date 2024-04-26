@@ -74,10 +74,6 @@ func (r repository) findByEmailToken(token uuid.UUID) (*model.User, error) {
 func (r repository) findByPasswordResetToken(token string) (*model.User, error) {
 	var user *model.User
 	err := r.db.First(&user, "password_token = ?", token).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		// TODO should we use NotFound 404 error here instead of 400?
-		return nil, errdef.NewBadRequest("invalid password reset token")
-	}
 	return user, err
 }
 

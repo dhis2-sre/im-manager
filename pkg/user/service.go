@@ -260,7 +260,7 @@ func (s service) RequestPasswordReset(email string) error {
 func (s service) ResetPassword(token string, password string) error {
 	user, err := s.repository.findByPasswordResetToken(token)
 	if err != nil {
-		return err
+		return nil
 	}
 
 	tokenTtl := time.Unix(int64(user.PasswordTokenTTL), 0).UTC()
