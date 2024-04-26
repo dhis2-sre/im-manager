@@ -220,8 +220,11 @@ func TestUserHandler(t *testing.T) {
 
 				client.Do(t, http.MethodPost, "/users/request-reset", requestResetRequestBody, http.StatusCreated, inttest.WithHeader("Content-Type", "application/json"))
 
-				user1IDInt, _ := strconv.ParseUint(user1ID, 10, 0)
-				user1, _ := userService.FindById(uint(user1IDInt))
+				user1ID, err := strconv.ParseUint(user1ID, 10, 0)
+				require.NoError(t, err)
+				user1IDInt := uint(user1ID)
+				user1, err := userService.FindById(user1IDInt)
+				require.NoError(t, err)
 
 				require.NotEmpty(t, user1.PasswordToken, "should have a password token")
 				require.NotEmpty(t, user1.PasswordTokenTTL, "should have a password token TTL timestamp")
@@ -237,7 +240,7 @@ func TestUserHandler(t *testing.T) {
 
 				client.Do(t, http.MethodPost, "/users/reset-password", resetRequestBody, http.StatusCreated, inttest.WithHeader("Content-Type", "application/json"))
 
-				newUser1, _ := userService.FindById(uint(user1IDInt))
+				newUser1, _ := userService.FindById(user1IDInt)
 				newPassword := newUser1.Password
 
 				require.NotEqual(t, oldPassword, newPassword, "old and new password should be different")
@@ -250,13 +253,16 @@ func TestUserHandler(t *testing.T) {
 
 				_ = newUserService.RequestPasswordReset("user1@dhis2.org")
 
-				user1IDInt, _ := strconv.ParseUint(user1ID, 10, 0)
-				user1, _ := newUserService.FindById(uint(user1IDInt))
+				user1ID, err := strconv.ParseUint(user1ID, 10, 0)
+				require.NoError(t, err)
+				user1IDInt := uint(user1ID)
+				user1, _ := newUserService.FindById(user1IDInt)
+				require.NoError(t, err)
 
 				// Wait for token to expire
 				time.Sleep(5 * time.Second)
 
-				_, err := newUserService.ResetPassword(user1.PasswordToken.String, "ResetResetResetResetReset")
+				err = newUserService.ResetPassword(user1.PasswordToken.String, "ResetResetResetResetReset")
 				require.Error(t, err, "reset token has expired")
 			}
 		})
