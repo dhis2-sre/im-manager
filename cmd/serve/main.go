@@ -26,6 +26,10 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"log/slog"
+	"os"
+	"runtime/debug"
+	"slices"
 
 	"github.com/go-mail/mail"
 
@@ -47,7 +51,7 @@ import (
 	"github.com/dhis2-sre/im-manager/pkg/integration"
 	"github.com/dhis2-sre/im-manager/pkg/stack"
 	"github.com/dhis2-sre/im-manager/pkg/storage"
-	"github.com/dhis2-sre/rabbitmq"
+	"github.com/dhis2-sre/rabbitmq-client/pkg/rabbitmq"
 )
 
 func main() {
@@ -110,9 +114,12 @@ func run() error {
 
 	dockerHubClient := integration.NewDockerHubClient(cfg.DockerHub.Username, cfg.DockerHub.Password)
 
+	logger := createLogger()
 	consumer, err := rabbitmq.NewConsumer(
 		cfg.RabbitMqURL.GetUrl(),
-		rabbitmq.WithConsumerPrefix("im-manager"),
+		rabbitmq.WithConnectionName("im-manager"),
+		rabbitmq.WithConsumerTagPrefix("im-manager"),
+		rabbitmq.WithLogger(logger.WithGroup("rabbitmq")),
 	)
 	if err != nil {
 		return err
@@ -180,6 +187,28 @@ func run() error {
 	instance.Routes(r, authentication.TokenAuthentication, instanceHandler)
 
 	return r.Run()
+}
+
+func createLogger() *slog.Logger {
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+	return withBuildInfo(logger)
+}
+
+func withBuildInfo(logger *slog.Logger) *slog.Logger {
+	buildInfo, ok := debug.ReadBuildInfo()
+	if !ok {
+		return logger
+	}
+
+	logger = logger.With(slog.String("goVersion", buildInfo.GoVersion))
+	i := slices.IndexFunc(buildInfo.Settings, func(setting debug.BuildSetting) bool {
+		return setting.Key == "vcs.revision"
+	})
+	if i >= 0 {
+		logger = logger.With(slog.String("version", buildInfo.Settings[i].Value))
+	}
+
+	return logger
 }
 
 type groupService interface {
