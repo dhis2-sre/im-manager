@@ -9,19 +9,13 @@ import (
 
 func GetTokenFromRequest(c *gin.Context) (string, error) {
 	token := c.GetHeader("Authorization")
-	if token == "" {
-		cookie, err := c.Cookie("accessToken")
-		if err != nil {
-			return "", err
-		}
-		token = cookie
+	if token != "" {
+		return strings.TrimPrefix(token, "Bearer "), nil
 	}
 
-	token = strings.TrimPrefix(token, "Bearer ")
-
-	if token == "" {
-		return "", errors.New("token not found on request")
+	cookie, err := c.Cookie("accessToken")
+	if err != nil {
+		return "", errors.New("no token found on request")
 	}
-
-	return token, nil
+	return cookie, nil
 }
