@@ -127,7 +127,7 @@ func (r repository) update(user *model.User) (*model.User, error) {
 	return user, nil
 }
 
-func (r repository) resetPassword(user *model.User) (*model.User, error) {
+func (r repository) resetPassword(user *model.User) error {
 	updatedUser := model.User{
 		Password:      user.Password,
 		PasswordToken: sql.NullString{String: "", Valid: false},
@@ -135,8 +135,8 @@ func (r repository) resetPassword(user *model.User) (*model.User, error) {
 
 	err := r.db.Model(&user).Select("Password", "PasswordToken").Updates(updatedUser).Error
 	if err != nil {
-		return nil, fmt.Errorf("failed to update user password: %v", err)
+		return fmt.Errorf("failed to update user password: %v", err)
 	}
 
-	return user, nil
+	return nil
 }

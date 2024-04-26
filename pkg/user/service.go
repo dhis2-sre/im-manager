@@ -34,7 +34,7 @@ type userRepository interface {
 	update(user *model.User) (*model.User, error)
 	findByEmailToken(token uuid.UUID) (*model.User, error)
 	save(user *model.User) error
-	resetPassword(user *model.User) (*model.User, error)
+	resetPassword(user *model.User) error
 	findByPasswordResetToken(token string) (*model.User, error)
 }
 
@@ -254,22 +254,22 @@ func (s service) RequestPasswordReset(email string) error {
 	return s.repository.save(user)
 }
 
-func (s service) ResetPassword(token string, password string) (*model.User, error) {
+func (s service) ResetPassword(token string, password string) error {
 	user, err := s.repository.findByPasswordResetToken(token)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	tokenTtl := time.Unix(int64(user.PasswordTokenTTL), 0).UTC()
 	if tokenTtl.Before(time.Now()) {
-		return nil, errdef.NewBadRequest("reset token has expired")
+		return errdef.NewBadRequest("reset token has expired")
 	}
 
 	if password != "" {
 		var err error
 		user.Password, err = hashPassword(password)
 		if err != nil {
-			return nil, fmt.Errorf("failed to hash password: %s", err)
+			return fmt.Errorf("failed to hash password: %s", err)
 		}
 	}
 

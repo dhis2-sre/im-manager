@@ -43,7 +43,7 @@ type userService interface {
 	Update(id uint, email, password string) (*model.User, error)
 	ValidateEmail(token uuid.UUID) error
 	RequestPasswordReset(email string) error
-	ResetPassword(token string, password string) (*model.User, error)
+	ResetPassword(token string, password string) error
 }
 
 type tokenService interface {
@@ -199,7 +199,7 @@ func (h Handler) ResetPassword(c *gin.Context) {
 		return
 	}
 
-	_, err := h.userService.ResetPassword(request.Token, request.Password)
+	err := h.userService.ResetPassword(request.Token, request.Password)
 	if err != nil {
 		_ = c.Error(err)
 		return
