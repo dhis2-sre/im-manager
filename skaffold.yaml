@@ -9,6 +9,7 @@
     serviceAccount:
       name: im-manager-prod
       namespace: instance-manager-prod
+## TODO: Once we get Skaffold profiles working this should be uncommented
 #    setValueTemplates:
 #      corsAllowOrigins:
 #        - "https://{{ .UI_URL }}"
@@ -109,6 +110,7 @@ profiles:
           namespace: whoami
           <<: *im-group-chart-config
           setValueTemplates:
+## TODO: Once we get Skaffold profiles working this should be uncommented
 #            corsAllowOrigins:
 #              - "http://localhost:3000"
 #              - "http://localhost:5173"
