@@ -234,7 +234,10 @@ func (s service) RequestPasswordReset(email string) error {
 	user, err := s.repository.findByEmail(email)
 
 	if err != nil {
-		return nil
+		if errdef.IsNotFound(err) {
+			return nil
+		}
+		return err
 	}
 
 	bytes := make([]byte, 64)
