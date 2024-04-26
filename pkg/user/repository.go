@@ -133,7 +133,10 @@ func (r repository) resetPassword(user *model.User) error {
 		PasswordToken: sql.NullString{String: "", Valid: false},
 	}
 
-	err := r.db.Model(&user).Select("Password", "PasswordToken").Updates(updatedUser).Error
+	err := r.db.
+		Model(&user).
+		Select("Password", "PasswordToken").
+		Updates(updatedUser).Error
 	if err != nil {
 		return fmt.Errorf("failed to update user password: %v", err)
 	}
