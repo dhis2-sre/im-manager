@@ -1,8 +1,6 @@
 package server
 
 import (
-	"log"
-
 	"github.com/dhis2-sre/im-manager/internal/middleware"
 	"github.com/dhis2-sre/im-manager/pkg/health"
 	"github.com/gin-contrib/cors"
@@ -14,8 +12,7 @@ func GetEngine(basePath string, allowedOrigins []string) *gin.Engine {
 	r := gin.Default()
 
 	corsConfig := cors.DefaultConfig()
-	// Without specifying origin, secure cookies won't work
-	log.Println("Allowed origin:", allowedOrigins)
+	// Without specifying origins, secure cookies won't work
 	corsConfig.AllowOrigins = allowedOrigins
 	corsConfig.AllowCredentials = true
 	corsConfig.AddAllowHeaders("authorization")
