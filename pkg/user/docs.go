@@ -21,6 +21,14 @@ type _ struct {
 	Body requestPasswordResetRequest
 }
 
+// swagger:parameters resetPassword
+type _ struct {
+	// Reset password request body parameter
+	// in: body
+	// required: true
+	Body resetPasswordRequest
+}
+
 // swagger:parameters refreshToken
 type _ struct {
 	// Refresh token request body parameter. Note that this is optional and the refresh token can also be supplied using a cookie named "refreshToken"
