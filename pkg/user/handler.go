@@ -145,7 +145,7 @@ func (h Handler) ValidateEmail(c *gin.Context) {
 	c.Status(http.StatusOK)
 }
 
-type requestPasswordResetRequest struct {
+type RequestPasswordResetRequest struct {
 	Email string `json:"email" binding:"required,email"`
 }
 
@@ -161,7 +161,7 @@ func (h Handler) RequestPasswordReset(c *gin.Context) {
 	//   400: Error
 	//   404: Error
 	//   415: Error
-	var request requestPasswordResetRequest
+	var request RequestPasswordResetRequest
 	if err := handler.DataBinder(c, &request); err != nil {
 		_ = c.Error(err)
 		return
@@ -176,7 +176,7 @@ func (h Handler) RequestPasswordReset(c *gin.Context) {
 	c.Status(http.StatusCreated)
 }
 
-type resetPasswordRequest struct {
+type ResetPasswordRequest struct {
 	Token    string `json:"token" binding:"required"`
 	Password string `json:"password" binding:"required,gte=24,lte=128"`
 }
@@ -193,7 +193,7 @@ func (h Handler) ResetPassword(c *gin.Context) {
 	//   400: Error
 	//   404: Error
 	//   415: Error
-	var request resetPasswordRequest
+	var request ResetPasswordRequest
 	if err := handler.DataBinder(c, &request); err != nil {
 		_ = c.Error(err)
 		return

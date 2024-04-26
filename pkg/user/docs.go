@@ -18,7 +18,7 @@ type _ struct {
 	// Request password reset request body parameter
 	// in: body
 	// required: true
-	Body requestPasswordResetRequest
+	Body RequestPasswordResetRequest
 }
 
 // swagger:parameters resetPassword
@@ -26,7 +26,7 @@ type _ struct {
 	// Reset password request body parameter
 	// in: body
 	// required: true
-	Body resetPasswordRequest
+	Body ResetPasswordRequest
 }
 
 // swagger:parameters refreshToken

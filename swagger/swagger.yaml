@@ -332,6 +332,23 @@ definitions:
                 x-go-name: Payload
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/integration
+    RequestPasswordResetRequest:
+        properties:
+            email:
+                type: string
+                x-go-name: Email
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/user
+    ResetPasswordRequest:
+        properties:
+            password:
+                type: string
+                x-go-name: Password
+            token:
+                type: string
+                x-go-name: Token
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/user
     Response:
         description: Response depends on the input and can be either a list or a map
         type: object
@@ -472,23 +489,6 @@ definitions:
             $ref: '#/definitions/parameter'
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
-    requestPasswordResetRequest:
-        properties:
-            email:
-                type: string
-                x-go-name: Email
-        type: object
-        x-go-package: github.com/dhis2-sre/im-manager/pkg/user
-    resetPasswordRequest:
-        properties:
-            password:
-                type: string
-                x-go-name: Password
-            token:
-                type: string
-                x-go-name: Token
-        type: object
-        x-go-package: github.com/dhis2-sre/im-manager/pkg/user
     saveAsRequest:
         properties:
             format:
@@ -1714,7 +1714,7 @@ paths:
                   name: Body
                   required: true
                   schema:
-                    $ref: '#/definitions/requestPasswordResetRequest'
+                    $ref: '#/definitions/RequestPasswordResetRequest'
             responses:
                 "201":
                     description: ""
@@ -1735,7 +1735,7 @@ paths:
                   name: Body
                   required: true
                   schema:
-                    $ref: '#/definitions/resetPasswordRequest'
+                    $ref: '#/definitions/ResetPasswordRequest'
             responses:
                 "201":
                     description: ""
