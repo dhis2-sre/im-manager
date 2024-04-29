@@ -52,8 +52,6 @@ import (
 	"github.com/dhis2-sre/rabbitmq-client/pkg/rabbitmq"
 )
 
-var Version = "unset"
-
 func main() {
 	if err := run(); err != nil {
 		log.Fatal(err)
@@ -115,7 +113,7 @@ func run() error {
 	dockerHubClient := integration.NewDockerHubClient(cfg.DockerHub.Username, cfg.DockerHub.Password)
 
 	host := hostname()
-	logger := createLogger(host, cfg.Environment, cfg.Classification)
+	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	consumer, err := rabbitmq.NewConsumer(
 		cfg.RabbitMqURL.GetUrl(),
 		rabbitmq.WithConnectionName(host),
@@ -188,15 +186,6 @@ func run() error {
 	instance.Routes(r, authentication.TokenAuthentication, instanceHandler)
 
 	return r.Run()
-}
-
-func createLogger(hostname, environment, classification string) *slog.Logger {
-	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
-	return logger.With("service", "im-manager").
-		With(slog.String("hostname", hostname)).
-		With(slog.String("environment", environment)).
-		With(slog.String("classification", classification)).
-		With(slog.String("version", Version))
 }
 
 func hostname() string {
