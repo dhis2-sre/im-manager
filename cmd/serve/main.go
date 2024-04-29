@@ -26,6 +26,8 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"log/slog"
+	"os"
 
 	"github.com/go-mail/mail"
 
@@ -47,7 +49,7 @@ import (
 	"github.com/dhis2-sre/im-manager/pkg/integration"
 	"github.com/dhis2-sre/im-manager/pkg/stack"
 	"github.com/dhis2-sre/im-manager/pkg/storage"
-	"github.com/dhis2-sre/rabbitmq"
+	"github.com/dhis2-sre/rabbitmq-client/pkg/rabbitmq"
 )
 
 func main() {
@@ -110,9 +112,13 @@ func run() error {
 
 	dockerHubClient := integration.NewDockerHubClient(cfg.DockerHub.Username, cfg.DockerHub.Password)
 
+	host := hostname()
+	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	consumer, err := rabbitmq.NewConsumer(
 		cfg.RabbitMqURL.GetUrl(),
-		rabbitmq.WithConsumerPrefix("im-manager"),
+		rabbitmq.WithConnectionName(host),
+		rabbitmq.WithConsumerTagPrefix(host),
+		rabbitmq.WithLogger(logger.WithGroup("rabbitmq")),
 	)
 	if err != nil {
 		return err
@@ -180,6 +186,14 @@ func run() error {
 	instance.Routes(r, authentication.TokenAuthentication, instanceHandler)
 
 	return r.Run()
+}
+
+func hostname() string {
+	hostname, err := os.Hostname()
+	if err != nil {
+		return "im-manager"
+	}
+	return hostname
 }
 
 type groupService interface {
