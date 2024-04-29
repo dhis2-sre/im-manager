@@ -213,7 +213,6 @@ func withBuildInfo(logger *slog.Logger) *slog.Logger {
 		return logger
 	}
 
-	logger = logger.With(slog.String("goVersion", buildInfo.GoVersion))
 	i := slices.IndexFunc(buildInfo.Settings, func(setting debug.BuildSetting) bool {
 		return setting.Key == "vcs.revision"
 	})
