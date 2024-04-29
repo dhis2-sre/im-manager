@@ -93,16 +93,6 @@ func (t tokenService) GetTokens(user *model.User, previousRefreshTokenId string)
 	}, nil
 }
 
-func (t tokenService) ValidateAccessToken(tokenString string) (*model.User, error) {
-	tokenClaims, err := helper.ValidateAccessToken(tokenString, t.publicKey)
-	if err != nil {
-		log.Printf("Unable to verify token: %s\n", err)
-		return nil, errors.New("unable to verify token")
-	}
-
-	return tokenClaims.User, nil
-}
-
 func (t tokenService) ValidateRefreshToken(tokenString string) (*RefreshTokenData, error) {
 	claims, err := helper.ValidateRefreshToken(tokenString, t.refreshTokenSecretKey)
 	if err != nil {

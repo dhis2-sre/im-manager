@@ -42,53 +42,6 @@ func GenerateAccessToken(user *model.User, key *rsa.PrivateKey, expirationInSeco
 	return string(signed), nil
 }
 
-type AccessTokenClaims struct {
-	User      *model.User `json:"user"`
-	IssuedAt  int64       `json:"iat"`
-	ExpiresIn int64       `json:"exp"`
-}
-
-func ValidateAccessToken(tokenString string, key *rsa.PublicKey) (*AccessTokenClaims, error) {
-	token, err := jwt.Parse(
-		[]byte(tokenString),
-		jwt.WithKey(jwa.RS256, key),
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	userData, ok := token.Get("user")
-	if !ok {
-		return nil, errors.New("user not found in claims")
-	}
-
-	userMap, ok := userData.(map[string]any)
-	if !ok {
-		return nil, errors.New("failed to parse user data")
-	}
-
-	id, ok := userMap["id"].(float64)
-	if !ok {
-		return nil, errors.New("\"id\" not found in userMap")
-	}
-
-	email, ok := userMap["email"].(string)
-	if !ok {
-		return nil, errors.New("\"email\" not found in userMap")
-	}
-
-	user := &model.User{
-		ID:    uint(id),
-		Email: email,
-	}
-
-	return &AccessTokenClaims{
-		user,
-		token.IssuedAt().Unix(),
-		token.Expiration().Unix(),
-	}, nil
-}
-
 type refreshToken struct {
 	SignedString string
 	TokenId      string
