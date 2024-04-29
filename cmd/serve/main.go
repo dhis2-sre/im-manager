@@ -115,7 +115,7 @@ func run() error {
 	dockerHubClient := integration.NewDockerHubClient(cfg.DockerHub.Username, cfg.DockerHub.Password)
 
 	host := hostname()
-	logger := createLogger(host)
+	logger := createLogger(host, cfg.Environment, cfg.Classification)
 	consumer, err := rabbitmq.NewConsumer(
 		cfg.RabbitMqURL.GetUrl(),
 		rabbitmq.WithConnectionName(host),
@@ -190,14 +190,13 @@ func run() error {
 	return r.Run()
 }
 
-func createLogger(hostname string) *slog.Logger {
+func createLogger(hostname, environment, classification string) *slog.Logger {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
-	logger = logger.With("service", "im-manager")
-	return withHostname(withBuildInfo(logger), hostname)
-}
-
-func withHostname(logger *slog.Logger, hostname string) *slog.Logger {
-	return logger.With(slog.String("hostname", hostname))
+	logger = logger.With("service", "im-manager").
+		With("hostname", hostname).
+		With("environment", environment).
+		With("classification", classification)
+	return withBuildInfo(logger)
 }
 
 func hostname() string {
