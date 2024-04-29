@@ -28,8 +28,6 @@ import (
 	"log"
 	"log/slog"
 	"os"
-	"runtime/debug"
-	"slices"
 
 	"github.com/go-mail/mail"
 
@@ -53,6 +51,8 @@ import (
 	"github.com/dhis2-sre/im-manager/pkg/storage"
 	"github.com/dhis2-sre/rabbitmq-client/pkg/rabbitmq"
 )
+
+var Version = "unset"
 
 func main() {
 	if err := run(); err != nil {
@@ -192,11 +192,11 @@ func run() error {
 
 func createLogger(hostname, environment, classification string) *slog.Logger {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
-	logger = logger.With("service", "im-manager").
-		With("hostname", hostname).
-		With("environment", environment).
-		With("classification", classification)
-	return withBuildInfo(logger)
+	return logger.With("service", "im-manager").
+		With(slog.String("hostname", hostname)).
+		With(slog.String("environment", environment)).
+		With(slog.String("classification", classification)).
+		With(slog.String("version", Version))
 }
 
 func hostname() string {
@@ -205,22 +205,6 @@ func hostname() string {
 		return "im-manager"
 	}
 	return hostname
-}
-
-func withBuildInfo(logger *slog.Logger) *slog.Logger {
-	buildInfo, ok := debug.ReadBuildInfo()
-	if !ok {
-		return logger
-	}
-
-	i := slices.IndexFunc(buildInfo.Settings, func(setting debug.BuildSetting) bool {
-		return setting.Key == "vcs.revision"
-	})
-	if i >= 0 {
-		logger = logger.With(slog.String("version", buildInfo.Settings[i].Value))
-	}
-
-	return logger
 }
 
 type groupService interface {
