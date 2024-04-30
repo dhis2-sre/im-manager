@@ -180,7 +180,7 @@ func run() error {
 	if cfg.Environment != "production" {
 		cfg.AllowedOrigins = append(cfg.AllowedOrigins, "http://localhost:3000", "http://localhost:5173")
 	}
-	r := server.GetEngine(cfg.BasePath, cfg.AllowedOrigins)
+	r := server.GetEngine(logger, cfg.BasePath, cfg.AllowedOrigins)
 
 	group.Routes(r, authentication, authorization, groupHandler)
 	user.Routes(r, authentication, authorization, userHandler)

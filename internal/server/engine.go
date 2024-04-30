@@ -1,6 +1,10 @@
 package server
 
 import (
+	"log/slog"
+
+	sloggin "github.com/samber/slog-gin"
+
 	"github.com/dhis2-sre/im-manager/internal/middleware"
 	"github.com/dhis2-sre/im-manager/pkg/health"
 	"github.com/gin-contrib/cors"
@@ -8,8 +12,10 @@ import (
 	redocMiddleware "github.com/go-openapi/runtime/middleware"
 )
 
-func GetEngine(basePath string, allowedOrigins []string) *gin.Engine {
-	r := gin.Default()
+func GetEngine(logger *slog.Logger, basePath string, allowedOrigins []string) *gin.Engine {
+	r := gin.New()
+	r.Use(gin.Recovery())
+	r.Use(sloggin.New(logger.WithGroup("http")))
 
 	corsConfig := cors.DefaultConfig()
 	// Without specifying origins, secure cookies won't work
