@@ -18,18 +18,20 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func NewHandler(config config.Config, userService userService, tokenService tokenService) Handler {
+func NewHandler(hostname string, authentication config.Authentication, userService userService, tokenService tokenService) Handler {
 	return Handler{
-		config,
+		hostname,
+		authentication,
 		userService,
 		tokenService,
 	}
 }
 
 type Handler struct {
-	config       config.Config
-	userService  userService
-	tokenService tokenService
+	hostname       string
+	authentication config.Authentication
+	userService    userService
+	tokenService   tokenService
 }
 
 type userService interface {
@@ -258,8 +260,8 @@ func (h Handler) RefreshToken(c *gin.Context) {
 
 func (h Handler) setCookies(c *gin.Context, tokens *token.Tokens, rememberMe bool) {
 	c.SetSameSite(http.SameSiteStrictMode)
-	domain := h.config.Hostname
-	authentication := h.config.Authentication
+	domain := h.hostname
+	authentication := h.authentication
 	c.SetCookie("accessToken", tokens.AccessToken, authentication.AccessTokenExpirationSeconds, "/", domain, true, true)
 	if rememberMe {
 		c.SetCookie("refreshToken", tokens.RefreshToken, authentication.RefreshTokenRememberMeExpirationSeconds, "/refresh", domain, true, true)

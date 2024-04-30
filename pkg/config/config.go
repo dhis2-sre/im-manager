@@ -17,6 +17,7 @@ type Config struct {
 	Classification                 string
 	Hostname                       string
 	UIURL                          string
+	AllowedOrigins                 []string
 	InstanceParameterEncryptionKey string
 	BasePath                       string
 	DefaultTTL                     uint
@@ -42,6 +43,7 @@ func New() Config {
 		Classification:                 requireEnv("CLASSIFICATION"),
 		Hostname:                       requireEnv("HOSTNAME"),
 		UIURL:                          requireEnv("UI_URL"),
+		AllowedOrigins:                 requireEnvAsArray("CORS_ALLOWED_ORIGINS"),
 		BasePath:                       requireEnv("BASE_PATH"),
 		InstanceParameterEncryptionKey: requireEnv("INSTANCE_PARAMETER_ENCRYPTION_KEY"),
 		DefaultTTL:                     uint(requireEnvAsInt("DEFAULT_TTL")),

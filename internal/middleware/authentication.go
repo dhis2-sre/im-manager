@@ -2,7 +2,6 @@ package middleware
 
 import (
 	"crypto/rsa"
-	"encoding/json"
 	"errors"
 	"log"
 	"net/http"
@@ -51,8 +50,6 @@ func (m AuthenticationMiddleware) BasicAuthentication(c *gin.Context) {
 }
 
 func (m AuthenticationMiddleware) handleError(c *gin.Context, e error) {
-	// Trigger username/password prompt
-	c.Header("WWW-Authenticate", "Basic realm=\"DHIS2\"")
 	_ = c.AbortWithError(http.StatusUnauthorized, e)
 }
 
@@ -82,26 +79,21 @@ func parseRequest(request *http.Request, key *rsa.PublicKey) (*model.User, error
 		jwt.WithHeaderKey("Authorization"),
 		jwt.WithCookieKey("accessToken"),
 		jwt.WithCookieKey("refreshToken"),
+		jwt.WithTypedClaim("user", model.User{}),
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	return extractUser(token)
-}
-
-func extractUser(token jwt.Token) (*model.User, error) {
 	userData, ok := token.Get("user")
 	if !ok {
 		return nil, errors.New("user not found in claims")
 	}
 
-	bytes, err := json.Marshal(userData)
-	if err != nil {
-		return nil, err
+	user, ok := userData.(model.User)
+	if !ok {
+		return nil, errors.New("unable to convert claim to user")
 	}
 
-	user := &model.User{}
-	err = json.Unmarshal(bytes, user)
-	return user, err
+	return &user, nil
 }

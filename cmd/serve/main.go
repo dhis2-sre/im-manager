@@ -26,6 +26,8 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"log/slog"
+	"os"
 
 	"github.com/go-mail/mail"
 
@@ -47,7 +49,7 @@ import (
 	"github.com/dhis2-sre/im-manager/pkg/integration"
 	"github.com/dhis2-sre/im-manager/pkg/stack"
 	"github.com/dhis2-sre/im-manager/pkg/storage"
-	"github.com/dhis2-sre/rabbitmq"
+	"github.com/dhis2-sre/rabbitmq-client/pkg/rabbitmq"
 )
 
 func main() {
@@ -83,7 +85,7 @@ func run() error {
 		return err
 	}
 
-	userHandler := user.NewHandler(cfg, userService, tokenService)
+	userHandler := user.NewHandler(cfg.Hostname, cfg.Authentication, userService, tokenService)
 
 	authentication := middleware.NewAuthentication(publicKey, userService)
 	groupRepository := group.NewRepository(db)
@@ -110,9 +112,13 @@ func run() error {
 
 	dockerHubClient := integration.NewDockerHubClient(cfg.DockerHub.Username, cfg.DockerHub.Password)
 
+	host := hostname()
+	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	consumer, err := rabbitmq.NewConsumer(
 		cfg.RabbitMqURL.GetUrl(),
-		rabbitmq.WithConsumerPrefix("im-manager"),
+		rabbitmq.WithConnectionName(host),
+		rabbitmq.WithConsumerTagPrefix(host),
+		rabbitmq.WithLogger(logger.WithGroup("rabbitmq")),
 	)
 	if err != nil {
 		return err
@@ -170,7 +176,11 @@ func run() error {
 		return err
 	}
 
-	r := server.GetEngine(cfg.BasePath, cfg.UIURL)
+	// TODO: This is a hack! Allowed origins for different environments should be applied using skaffold profiles... But I can't get it working!
+	if cfg.Environment != "production" {
+		cfg.AllowedOrigins = append(cfg.AllowedOrigins, "http://localhost:3000", "http://localhost:5173")
+	}
+	r := server.GetEngine(logger, cfg.BasePath, cfg.AllowedOrigins)
 
 	group.Routes(r, authentication, authorization, groupHandler)
 	user.Routes(r, authentication, authorization, userHandler)
@@ -180,6 +190,14 @@ func run() error {
 	instance.Routes(r, authentication.TokenAuthentication, instanceHandler)
 
 	return r.Run()
+}
+
+func hostname() string {
+	hostname, err := os.Hostname()
+	if err != nil {
+		return "im-manager"
+	}
+	return hostname
 }
 
 type groupService interface {

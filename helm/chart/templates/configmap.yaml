@@ -16,4 +16,5 @@ data:
 
   GROUP_NAMES: {{ .Values.groups.names }}
   GROUP_HOSTNAMES: {{ .Values.groups.hostnames }}
+  CORS_ALLOWED_ORIGINS: {{ join "," .Values.corsAllowOrigins | quote }}
 {{- end }}

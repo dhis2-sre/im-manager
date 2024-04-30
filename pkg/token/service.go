@@ -82,7 +82,7 @@ func (t tokenService) GetTokens(user *model.User, previousRefreshTokenId string,
 		return nil, fmt.Errorf("error generating refreshToken for user: %+v\nError: %s", user, err)
 	}
 
-	if err := t.repository.SetRefreshToken(user.ID, refreshToken.TokenId.String(), refreshToken.ExpiresIn); err != nil {
+	if err := t.repository.SetRefreshToken(user.ID, refreshToken.TokenId, refreshToken.ExpiresIn); err != nil {
 		return nil, fmt.Errorf("error storing token: %d\nError: %s", user.ID, err)
 	}
 
@@ -92,16 +92,6 @@ func (t tokenService) GetTokens(user *model.User, previousRefreshTokenId string,
 		RefreshToken: refreshToken.SignedString,
 		ExpiresIn:    uint(t.authentication.AccessTokenExpirationSeconds),
 	}, nil
-}
-
-func (t tokenService) ValidateAccessToken(tokenString string) (*model.User, error) {
-	tokenClaims, err := helper.ValidateAccessToken(tokenString, t.publicKey)
-	if err != nil {
-		log.Printf("Unable to verify token: %s\n", err)
-		return nil, errors.New("unable to verify token")
-	}
-
-	return tokenClaims.User, nil
 }
 
 func (t tokenService) ValidateRefreshToken(tokenString string) (*RefreshTokenData, error) {
