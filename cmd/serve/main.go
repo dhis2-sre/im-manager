@@ -67,10 +67,12 @@ func run() error {
 		return err
 	}
 
+	httpLoggerGroup := "http"
+	logger := slog.New(log.New(slog.NewTextHandler(os.Stdout, nil), httpLoggerGroup))
 	userRepository := user.NewRepository(db)
 	dailer := mail.NewDialer(cfg.SMTP.Host, cfg.SMTP.Port, cfg.SMTP.Username, cfg.SMTP.Password)
 	userService := user.NewService(cfg.UIURL, cfg.PasswordTokenTTL, userRepository, dailer)
-	authorization := middleware.NewAuthorization(userService)
+	authorization := middleware.NewAuthorization(logger, userService)
 	redis := storage.NewRedis(cfg)
 	tokenRepository := token.NewRepository(redis)
 	privateKey, err := cfg.Authentication.Keys.GetPrivateKey()
@@ -113,8 +115,6 @@ func run() error {
 
 	dockerHubClient := integration.NewDockerHubClient(cfg.DockerHub.Username, cfg.DockerHub.Password)
 
-	httpLoggerGroup := "http"
-	logger := slog.New(log.New(slog.NewTextHandler(os.Stdout, nil), httpLoggerGroup))
 	host := hostname()
 	consumer, err := rabbitmq.NewConsumer(
 		cfg.RabbitMqURL.GetUrl(),

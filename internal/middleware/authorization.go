@@ -2,7 +2,7 @@ package middleware
 
 import (
 	"errors"
-	"log"
+	"log/slog"
 	"net/http"
 
 	"github.com/dhis2-sre/im-manager/pkg/model"
@@ -12,11 +12,15 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func NewAuthorization(userService userService) AuthorizationMiddleware {
-	return AuthorizationMiddleware{userService}
+func NewAuthorization(logger *slog.Logger, userService userService) AuthorizationMiddleware {
+	return AuthorizationMiddleware{
+		logger:      logger,
+		userService: userService,
+	}
 }
 
 type AuthorizationMiddleware struct {
+	logger      *slog.Logger
 	userService userService
 }
 
@@ -41,7 +45,10 @@ func (m AuthorizationMiddleware) RequireAdministrator(c *gin.Context) {
 	}
 
 	if !userWithGroups.IsAdministrator() {
-		log.Printf("User tried to access administrator restricted endpoint: %+v\n", u)
+		// TODO investigate how to log user related info without logging sensitive information
+		// failed requests are already logged by samber/slog-gin so we would want to add necessary
+		// debug info into the middleware if possible
+		m.logger.ErrorContext(c, "User tried to access administrator restricted endpoint", "user", u.ID)
 		_ = c.AbortWithError(http.StatusUnauthorized, errors.New("administrator access denied"))
 		return
 	}
