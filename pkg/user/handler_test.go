@@ -43,8 +43,7 @@ func TestHandler_RefreshToken_Cookie(t *testing.T) {
 		On("GetTokens", user, id.String()).
 		Return(tokens, nil)
 	authentication := config.Authentication{AccessTokenExpirationSeconds: 900, RefreshTokenExpirationSeconds: 86400}
-	cfg := config.Config{Hostname: "hostname", Authentication: authentication}
-	handler := NewHandler(cfg, userService, tokenService)
+	handler := NewHandler("hostname", authentication, userService, tokenService)
 
 	recorder := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(recorder)
@@ -93,8 +92,7 @@ func TestHandler_RefreshToken_RequestBody(t *testing.T) {
 		On("GetTokens", user, id.String()).
 		Return(tokens, nil)
 	authentication := config.Authentication{AccessTokenExpirationSeconds: 900, RefreshTokenExpirationSeconds: 86400}
-	cfg := config.Config{Hostname: "hostname", Authentication: authentication}
-	handler := NewHandler(cfg, userService, tokenService)
+	handler := NewHandler("hostname", authentication, userService, tokenService)
 
 	recorder := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(recorder)
@@ -127,8 +125,7 @@ func TestHandler_SignIn_Cookies(t *testing.T) {
 		On("GetTokens", user, "").
 		Return(tokens, nil)
 	authentication := config.Authentication{AccessTokenExpirationSeconds: 900, RefreshTokenExpirationSeconds: 86400}
-	cfg := config.Config{Hostname: "hostname", Authentication: authentication}
-	handler := NewHandler(cfg, userService, tokenService)
+	handler := NewHandler("hostname", authentication, userService, tokenService)
 
 	recorder := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(recorder)
@@ -155,8 +152,7 @@ func TestHandler_SignOut_Cookies(t *testing.T) {
 	tokenService.
 		On("SignOut", uint(123)).
 		Return(nil)
-	cfg := config.Config{Hostname: "hostname"}
-	handler := NewHandler(cfg, userService, tokenService)
+	handler := NewHandler("hostname", config.Authentication{}, userService, tokenService)
 
 	recorder := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(recorder)
