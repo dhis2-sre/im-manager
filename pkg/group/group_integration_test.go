@@ -7,7 +7,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/dhis2-sre/im-manager/pkg/config"
 	"github.com/go-mail/mail"
 
 	"github.com/stretchr/testify/assert"
@@ -25,7 +24,7 @@ func TestGroupHandler(t *testing.T) {
 
 	db := inttest.SetupDB(t)
 	userRepository := user.NewRepository(db)
-	userService := user.NewService(config.Config{}, userRepository, fakeDialer{})
+	userService := user.NewService("", 900, userRepository, fakeDialer{})
 	groupRepository := group.NewRepository(db)
 	groupService := group.NewService(groupRepository, userService)
 

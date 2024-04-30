@@ -9,6 +9,8 @@ func Routes(r *gin.Engine, authenticationMiddleware middleware.AuthenticationMid
 	r.POST("/users", handler.SignUp)
 	r.POST("/refresh", handler.RefreshToken)
 	r.POST("/users/validate", handler.ValidateEmail)
+	r.POST("/users/request-reset", handler.RequestPasswordReset)
+	r.POST("/users/reset-password", handler.ResetPassword)
 
 	basicAuthenticationRouter := r.Group("")
 	basicAuthenticationRouter.Use(authenticationMiddleware.BasicAuthentication)

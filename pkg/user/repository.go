@@ -1,6 +1,7 @@
 package user
 
 import (
+	"database/sql"
 	"errors"
 	"fmt"
 
@@ -70,6 +71,12 @@ func (r repository) findByEmailToken(token uuid.UUID) (*model.User, error) {
 	return user, err
 }
 
+func (r repository) findByPasswordResetToken(token string) (*model.User, error) {
+	var user *model.User
+	err := r.db.First(&user, "password_token = ?", token).Error
+	return user, err
+}
+
 func (r repository) findOrCreate(user *model.User) (*model.User, error) {
 	var u *model.User
 	err := r.db.
@@ -114,4 +121,21 @@ func (r repository) update(user *model.User) (*model.User, error) {
 	}
 
 	return user, nil
+}
+
+func (r repository) resetPassword(user *model.User) error {
+	updatedUser := model.User{
+		Password:      user.Password,
+		PasswordToken: sql.NullString{String: "", Valid: false},
+	}
+
+	err := r.db.
+		Model(&user).
+		Select("Password", "PasswordToken").
+		Updates(updatedUser).Error
+	if err != nil {
+		return fmt.Errorf("failed to update user password: %v", err)
+	}
+
+	return nil
 }
