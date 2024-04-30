@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dhis2-sre/im-manager/pkg/config"
 	"github.com/google/uuid"
 
 	"github.com/dhis2-sre/im-manager/internal/errdef"
@@ -20,8 +19,8 @@ import (
 )
 
 //goland:noinspection GoExportedFuncWithUnexportedType
-func NewService(config config.Config, repository userRepository, dailer dailer) *service {
-	return &service{config, repository, dailer}
+func NewService(uiUrl string, passwordTokenTtl uint, repository userRepository, dailer dailer) *service {
+	return &service{uiUrl, passwordTokenTtl, repository, dailer}
 }
 
 type userRepository interface {
@@ -43,9 +42,10 @@ type dailer interface {
 }
 
 type service struct {
-	config     config.Config
-	repository userRepository
-	dailer     dailer
+	uiUrl            string
+	passwordTokenTtl uint
+	repository       userRepository
+	dailer           dailer
 }
 
 func (s service) Save(user *model.User) error {
@@ -82,7 +82,7 @@ func (s service) sendValidationEmail(user *model.User) error {
 	m.SetHeader("From", "DHIS2 Instance Manager <no-reply@dhis2.org>")
 	m.SetHeader("To", user.Email)
 	m.SetHeader("Subject", "Welcome to IM")
-	link := fmt.Sprintf("%s/validate/%s", s.config.UIURL, user.EmailToken)
+	link := fmt.Sprintf("%s/validate/%s", s.uiUrl, user.EmailToken)
 	body := fmt.Sprintf("Hello, please click the below link to verify your email.<br/>%s", link)
 	m.SetBody("text/html", body)
 	return s.dailer.DialAndSend(m)
@@ -224,7 +224,7 @@ func (s service) sendResetPasswordEmail(user *model.User) error {
 	m.SetHeader("From", "DHIS2 Instance Manager <no-reply@dhis2.org>")
 	m.SetHeader("To", user.Email)
 	m.SetHeader("Subject", "Reset your IM password")
-	link := fmt.Sprintf("%s/reset-password/%s", s.config.UIHostname, user.PasswordToken.String)
+	link := fmt.Sprintf("%s/reset-password/%s", s.uiUrl, user.PasswordToken.String)
 	body := fmt.Sprintf("Hello, please click the link below to reset your password.<br/>%s", link)
 	m.SetBody("text/html", body)
 	return s.dailer.DialAndSend(m)
@@ -247,7 +247,7 @@ func (s service) RequestPasswordReset(email string) error {
 	token := base64.URLEncoding.EncodeToString(bytes)
 
 	user.PasswordToken = sql.NullString{String: token, Valid: true}
-	user.PasswordTokenTTL = uint(time.Now().Unix()) + s.config.PasswordTokenTTL
+	user.PasswordTokenTTL = uint(time.Now().Unix()) + s.passwordTokenTtl
 
 	err = s.sendResetPasswordEmail(user)
 	if err != nil {

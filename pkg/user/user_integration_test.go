@@ -28,7 +28,7 @@ func TestUserHandler(t *testing.T) {
 
 	db := inttest.SetupDB(t)
 	userRepository := user.NewRepository(db)
-	userService := user.NewService(config.Config{PasswordTokenTTL: 900}, userRepository, fakeDialer{t})
+	userService := user.NewService("", 900, userRepository, fakeDialer{t})
 	groupRepository := group.NewRepository(db)
 	groupService := group.NewService(groupRepository, userService)
 
@@ -249,7 +249,7 @@ func TestUserHandler(t *testing.T) {
 			{
 				t.Log("PasswordResetTokenExpired")
 
-				newUserService := user.NewService(config.Config{PasswordTokenTTL: 1}, userRepository, fakeDialer{t})
+				newUserService := user.NewService("", 1, userRepository, fakeDialer{t})
 
 				_ = newUserService.RequestPasswordReset("user1@dhis2.org")
 
