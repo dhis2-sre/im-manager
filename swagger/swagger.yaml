@@ -332,6 +332,23 @@ definitions:
                 x-go-name: Payload
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/integration
+    RequestPasswordResetRequest:
+        properties:
+            email:
+                type: string
+                x-go-name: Email
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/user
+    ResetPasswordRequest:
+        properties:
+            password:
+                type: string
+                x-go-name: Password
+            token:
+                type: string
+                x-go-name: Token
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/user
     Response:
         description: Response depends on the input and can be either a list or a map
         type: object
@@ -1687,6 +1704,48 @@ paths:
             security:
                 - oauth2: []
             summary: Update user
+    /users/request-reset:
+        post:
+            description: Request user's password reset
+            operationId: requestPasswordReset
+            parameters:
+                - description: Request password reset request body parameter
+                  in: body
+                  name: Body
+                  required: true
+                  schema:
+                    $ref: '#/definitions/RequestPasswordResetRequest'
+            responses:
+                "201":
+                    description: ""
+                "400":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            summary: Request password reset
+    /users/reset-password:
+        post:
+            description: Reset user's password
+            operationId: resetPassword
+            parameters:
+                - description: Reset password request body parameter
+                  in: body
+                  name: Body
+                  required: true
+                  schema:
+                    $ref: '#/definitions/ResetPasswordRequest'
+            responses:
+                "201":
+                    description: ""
+                "400":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            summary: Reset password
     /users/validate:
         post:
             description: Validate users email

@@ -42,6 +42,8 @@ type userService interface {
 	Delete(id uint) error
 	Update(id uint, email, password string) (*model.User, error)
 	ValidateEmail(token uuid.UUID) error
+	RequestPasswordReset(email string) error
+	ResetPassword(token string, password string) error
 }
 
 type tokenService interface {
@@ -141,6 +143,69 @@ func (h Handler) ValidateEmail(c *gin.Context) {
 	}
 
 	c.Status(http.StatusOK)
+}
+
+type RequestPasswordResetRequest struct {
+	Email string `json:"email" binding:"required,email"`
+}
+
+func (h Handler) RequestPasswordReset(c *gin.Context) {
+	// swagger:route POST /users/request-reset requestPasswordReset
+	//
+	// Request password reset
+	//
+	// Request user's password reset
+	//
+	// responses:
+	//   201:
+	//   400: Error
+	//   404: Error
+	//   415: Error
+	var request RequestPasswordResetRequest
+	if err := handler.DataBinder(c, &request); err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	err := h.userService.RequestPasswordReset(request.Email)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	c.Status(http.StatusCreated)
+}
+
+type ResetPasswordRequest struct {
+	Token    string `json:"token" binding:"required"`
+	Password string `json:"password" binding:"required,gte=24,lte=128"`
+}
+
+func (h Handler) ResetPassword(c *gin.Context) {
+	// swagger:route POST /users/reset-password resetPassword
+	//
+	// Reset password
+	//
+	// Reset user's password
+	//
+	// responses:
+	//   201:
+	//   400: Error
+	//   404: Error
+	//   415: Error
+	var request ResetPasswordRequest
+	if err := handler.DataBinder(c, &request); err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	err := h.userService.ResetPassword(request.Token, request.Password)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	c.Status(http.StatusCreated)
 }
 
 // SignIn user
