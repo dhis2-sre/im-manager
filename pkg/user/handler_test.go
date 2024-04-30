@@ -230,6 +230,14 @@ func TestHandler_SignOut_Cookies(t *testing.T) {
 
 type mockUserService struct{ mock.Mock }
 
+func (m *mockUserService) RequestPasswordReset(email string) error {
+	panic("implement me")
+}
+
+func (m *mockUserService) ResetPassword(token string, password string) error {
+	panic("implement me")
+}
+
 func (m *mockUserService) SignUp(email string, password string) (*model.User, error) {
 	panic("implement me")
 }

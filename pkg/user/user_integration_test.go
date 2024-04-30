@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/dhis2-sre/im-manager/pkg/config"
 	"github.com/go-mail/mail"
@@ -27,7 +28,7 @@ func TestUserHandler(t *testing.T) {
 
 	db := inttest.SetupDB(t)
 	userRepository := user.NewRepository(db)
-	userService := user.NewService(config.Config{}, userRepository, fakeDialer{t})
+	userService := user.NewService("", 900, userRepository, fakeDialer{t})
 	groupRepository := group.NewRepository(db)
 	groupService := group.NewService(groupRepository, userService)
 
@@ -210,6 +211,65 @@ func TestUserHandler(t *testing.T) {
 				t.Log("Delete")
 
 				client.Do(t, http.MethodDelete, "/users/"+user1ID, nil, http.StatusUnauthorized, inttest.WithAuthToken(user2Token.AccessToken))
+			}
+		})
+
+		t.Run("ResetUserPassword", func(t *testing.T) {
+			t.Parallel()
+
+			{
+				t.Log("RequestPasswordReset")
+
+				requestResetRequestBody := strings.NewReader(`{
+					"email":    "user1@dhis2.org"
+				}`)
+
+				client.Do(t, http.MethodPost, "/users/request-reset", requestResetRequestBody, http.StatusCreated, inttest.WithHeader("Content-Type", "application/json"))
+
+				user1ID, err := strconv.ParseUint(user1ID, 10, 0)
+				require.NoError(t, err)
+				user1IDInt := uint(user1ID)
+				user1, err := userService.FindById(user1IDInt)
+				require.NoError(t, err)
+
+				require.NotEmpty(t, user1.PasswordToken, "should have a password token")
+				require.NotEmpty(t, user1.PasswordTokenTTL, "should have a password token TTL timestamp")
+
+				t.Log("ResetPassword")
+
+				resetRequestBody := strings.NewReader(`{
+					"token": "` + user1.PasswordToken.String + `",
+					"password": "ResetResetResetResetReset"
+				}`)
+
+				oldPassword := user1.Password
+
+				client.Do(t, http.MethodPost, "/users/reset-password", resetRequestBody, http.StatusCreated, inttest.WithHeader("Content-Type", "application/json"))
+
+				newUser1, _ := userService.FindById(user1IDInt)
+				newPassword := newUser1.Password
+
+				require.NotEqual(t, oldPassword, newPassword, "old and new password should be different")
+			}
+
+			{
+				t.Log("PasswordResetTokenExpired")
+
+				newUserService := user.NewService("", 1, userRepository, fakeDialer{t})
+
+				_ = newUserService.RequestPasswordReset("user1@dhis2.org")
+
+				user1ID, err := strconv.ParseUint(user1ID, 10, 0)
+				require.NoError(t, err)
+				user1IDInt := uint(user1ID)
+				user1, _ := newUserService.FindById(user1IDInt)
+				require.NoError(t, err)
+
+				// Wait for token to expire
+				time.Sleep(5 * time.Second)
+
+				err = newUserService.ResetPassword(user1.PasswordToken.String, "ResetResetResetResetReset")
+				require.Error(t, err, "reset token has expired")
 			}
 		})
 	})

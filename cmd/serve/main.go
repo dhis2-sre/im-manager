@@ -68,7 +68,7 @@ func run() error {
 
 	userRepository := user.NewRepository(db)
 	dailer := mail.NewDialer(cfg.SMTP.Host, cfg.SMTP.Port, cfg.SMTP.Username, cfg.SMTP.Password)
-	userService := user.NewService(cfg, userRepository, dailer)
+	userService := user.NewService(cfg.UIURL, cfg.PasswordTokenTTL, userRepository, dailer)
 	authorization := middleware.NewAuthorization(userService)
 	redis := storage.NewRedis(cfg)
 	tokenRepository := token.NewRepository(redis)
