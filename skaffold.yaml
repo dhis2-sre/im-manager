@@ -9,6 +9,10 @@
     serviceAccount:
       name: im-manager-prod
       namespace: instance-manager-prod
+## TODO: Once we get Skaffold profiles working this should be uncommented
+#    setValueTemplates:
+#      corsAllowOrigins:
+#        - "https://{{ .UI_URL }}"
 
 apiVersion: skaffold/v4beta6
 kind: Config
@@ -62,6 +66,8 @@ deploy:
         createNamespace: true
         chartPath: helm/chart
         setValueTemplates:
+          corsAllowOrigins:
+            - "{{ .UI_URL }}"
           image:
             repository: dhis2/im-manager
           serviceAccount:
@@ -76,8 +82,8 @@ deploy:
           environment:
             ENVIRONMENT: "{{ .ENVIRONMENT }}"
             CLASSIFICATION: "{{ .CLASSIFICATION }}"
-            HOSTNAME: "https://{{ .API_HOSTNAME }}"
-            UI_HOSTNAME: "https://{{ .UI_HOSTNAME }}"
+            HOSTNAME: "{{ .API_HOSTNAME }}"
+            UI_URL: "{{ .UI_URL }}"
             INSTANCE_SERVICE_HOST: im-manager-{{ .ENVIRONMENT }}.instance-manager-{{ .CLASSIFICATION }}.svc:8080
             INSTANCE_SERVICE_BASE_PATH: /
             DATABASE_MANAGER_SERVICE_HOST: im-manager-{{ .ENVIRONMENT }}.instance-manager-{{ .CLASSIFICATION }}.svc:8080
@@ -104,6 +110,11 @@ profiles:
           namespace: whoami
           <<: *im-group-chart-config
           setValueTemplates:
+## TODO: Once we get Skaffold profiles working this should be uncommented
+#            corsAllowOrigins:
+#              - "http://localhost:3000"
+#              - "http://localhost:5173"
+#              - "{{ .UI_URL }}"
             serviceAccount:
               name: im-manager-{{ .ENVIRONMENT }}
               namespace: instance-manager-{{ .CLASSIFICATION }}

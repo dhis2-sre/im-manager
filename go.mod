@@ -17,11 +17,10 @@ require (
 	github.com/go-openapi/runtime v0.28.0
 	github.com/go-playground/validator/v10 v10.19.0
 	github.com/go-redis/redis v6.15.9+incompatible
-	github.com/gofrs/uuid v4.4.0+incompatible
 	github.com/google/uuid v1.6.0
 	github.com/gosimple/slug v1.14.0
 	github.com/habx/pg-commands v0.6.1
-	github.com/lestrrat-go/jwx v1.2.29
+	github.com/lestrrat-go/jwx/v2 v2.0.19-0.20240309224501-3735e8aace59
 	github.com/lib/pq v1.10.9
 	github.com/orlangure/gnomock v0.30.0
 	github.com/rabbitmq/amqp091-go v1.9.0
@@ -145,9 +144,9 @@ require (
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.7 // indirect
 	github.com/leodido/go-urn v1.4.0 // indirect
-	github.com/lestrrat-go/backoff/v2 v2.0.8 // indirect
 	github.com/lestrrat-go/blackmagic v1.0.2 // indirect
 	github.com/lestrrat-go/httpcc v1.0.1 // indirect
+	github.com/lestrrat-go/httprc v1.0.5 // indirect
 	github.com/lestrrat-go/iter v1.0.2 // indirect
 	github.com/lestrrat-go/option v1.0.1 // indirect
 	github.com/liggitt/tabwriter v0.0.0-20181228230101-89fcab3d43de // indirect
@@ -171,6 +170,7 @@ require (
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/ryanuber/go-glob v1.0.0 // indirect
+	github.com/segmentio/asm v1.2.0 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/spf13/cobra v1.8.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect

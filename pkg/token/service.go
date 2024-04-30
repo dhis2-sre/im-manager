@@ -7,11 +7,12 @@ import (
 	"log"
 	"time"
 
+	"github.com/google/uuid"
+
 	"github.com/dhis2-sre/im-manager/internal/errdef"
 
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	"github.com/dhis2-sre/im-manager/pkg/token/helper"
-	"github.com/gofrs/uuid"
 )
 
 //goland:noinspection GoExportedFuncWithUnexportedType
@@ -80,7 +81,7 @@ func (t tokenService) GetTokens(user *model.User, previousRefreshTokenId string)
 		return nil, fmt.Errorf("error generating refreshToken for user: %+v\nError: %s", user, err)
 	}
 
-	if err := t.repository.SetRefreshToken(user.ID, refreshToken.TokenId.String(), refreshToken.ExpiresIn); err != nil {
+	if err := t.repository.SetRefreshToken(user.ID, refreshToken.TokenId, refreshToken.ExpiresIn); err != nil {
 		return nil, fmt.Errorf("error storing token: %d\nError: %s", user.ID, err)
 	}
 
@@ -92,16 +93,6 @@ func (t tokenService) GetTokens(user *model.User, previousRefreshTokenId string)
 	}, nil
 }
 
-func (t tokenService) ValidateAccessToken(tokenString string) (*model.User, error) {
-	tokenClaims, err := helper.ValidateAccessToken(tokenString, t.publicKey)
-	if err != nil {
-		log.Printf("Unable to verify token: %s\n", err)
-		return nil, errors.New("unable to verify token")
-	}
-
-	return tokenClaims.User, nil
-}
-
 func (t tokenService) ValidateRefreshToken(tokenString string) (*RefreshTokenData, error) {
 	claims, err := helper.ValidateRefreshToken(tokenString, t.refreshTokenSecretKey)
 	if err != nil {
@@ -109,7 +100,7 @@ func (t tokenService) ValidateRefreshToken(tokenString string) (*RefreshTokenDat
 		return nil, errors.New("unable to verify refresh token")
 	}
 
-	tokenId, err := uuid.FromString(claims.ID)
+	tokenId, err := uuid.Parse(claims.ID)
 	if err != nil {
 		log.Printf("Couldn't parse token id: %s\n%s\n", claims.ID, err)
 		return nil, errors.New("unable to verify refresh token")

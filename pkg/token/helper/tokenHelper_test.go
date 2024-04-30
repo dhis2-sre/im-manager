@@ -32,24 +32,6 @@ func TestGenerateAccessToken(t *testing.T) {
 	//	assert.Equal(t, expectedToken, token)
 }
 
-func TestValidateAccessToken(t *testing.T) {
-	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
-	require.NoError(t, err, "failed to generate private key")
-	user := &model.User{
-		Email:    "email",
-		Password: "pass",
-	}
-
-	token, err := GenerateAccessToken(user, privateKey, 12)
-	assert.NoError(t, err)
-
-	claims, err := ValidateAccessToken(token, &privateKey.PublicKey)
-	assert.NoError(t, err)
-
-	// TODO: Assert more
-	assert.Equal(t, "email", claims.User.Email)
-}
-
 func TestGenerateRefreshToken(t *testing.T) {
 	user := &model.User{}
 	user.ID = 1

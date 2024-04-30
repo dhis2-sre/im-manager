@@ -85,7 +85,7 @@ func run() error {
 		return err
 	}
 
-	userHandler := user.NewHandler(userService, tokenService)
+	userHandler := user.NewHandler(cfg.Hostname, cfg.Authentication, userService, tokenService)
 
 	authentication := middleware.NewAuthentication(publicKey, userService)
 	groupRepository := group.NewRepository(db)
@@ -176,7 +176,11 @@ func run() error {
 		return err
 	}
 
-	r := server.GetEngine(logger, cfg.BasePath)
+	// TODO: This is a hack! Allowed origins for different environments should be applied using skaffold profiles... But I can't get it working!
+	if cfg.Environment != "production" {
+		cfg.AllowedOrigins = append(cfg.AllowedOrigins, "http://localhost:3000", "http://localhost:5173")
+	}
+	r := server.GetEngine(logger, cfg.BasePath, cfg.AllowedOrigins)
 
 	group.Routes(r, authentication, authorization, groupHandler)
 	user.Routes(r, authentication, authorization, userHandler)

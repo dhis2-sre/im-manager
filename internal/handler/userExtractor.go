@@ -15,7 +15,7 @@ func GetUserFromContext(c *gin.Context) (*model.User, error) {
 
 	user, ok := userData.(*model.User)
 	if !ok {
-		return nil, errors.New("failed to parse user data")
+		return nil, errors.New("failed to parse user data from context")
 	}
 
 	return user, nil

@@ -85,7 +85,7 @@ func (h Handler) DeployDeployment(c *gin.Context) {
 		return
 	}
 
-	token, err := handler.GetTokenFromHttpAuthHeader(c)
+	token, err := handler.GetTokenFromRequest(c)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -361,7 +361,7 @@ func (h Handler) Reset(c *gin.Context) {
 		return
 	}
 
-	token, err := handler.GetTokenFromHttpAuthHeader(c)
+	token, err := handler.GetTokenFromRequest(c)
 	if err != nil {
 		_ = c.Error(err)
 		return
