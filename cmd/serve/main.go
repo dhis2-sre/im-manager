@@ -25,7 +25,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
 	"log/slog"
 	"os"
 
@@ -34,6 +33,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/dhis2-sre/im-manager/internal/log"
 	"github.com/dhis2-sre/im-manager/internal/middleware"
 	"github.com/dhis2-sre/im-manager/pkg/database"
 	"github.com/dhis2-sre/im-manager/pkg/group"
@@ -54,7 +54,8 @@ import (
 
 func main() {
 	if err := run(); err != nil {
-		log.Fatal(err)
+		fmt.Printf("im-manager exits due to: %v", err)
+		os.Exit(1)
 	}
 }
 
@@ -112,8 +113,9 @@ func run() error {
 
 	dockerHubClient := integration.NewDockerHubClient(cfg.DockerHub.Username, cfg.DockerHub.Password)
 
+	httpLoggerGroup := "http"
+	logger := slog.New(log.New(slog.NewTextHandler(os.Stdout, nil), httpLoggerGroup))
 	host := hostname()
-	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	consumer, err := rabbitmq.NewConsumer(
 		cfg.RabbitMqURL.GetUrl(),
 		rabbitmq.WithConnectionName(host),
@@ -167,7 +169,7 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	err = createGroups(cfg, groupService)
+	err = createGroups(cfg.Groups, logger, groupService)
 	if err != nil {
 		return err
 	}
@@ -180,7 +182,7 @@ func run() error {
 	if cfg.Environment != "production" {
 		cfg.AllowedOrigins = append(cfg.AllowedOrigins, "http://localhost:3000", "http://localhost:5173")
 	}
-	r := server.GetEngine(logger, cfg.BasePath, cfg.AllowedOrigins)
+	r := server.GetEngine(logger, httpLoggerGroup, cfg.BasePath, cfg.AllowedOrigins)
 
 	group.Routes(r, authentication, authorization, groupHandler)
 	user.Routes(r, authentication, authorization, userHandler)
@@ -205,16 +207,15 @@ type groupService interface {
 	AddUser(groupName string, userId uint) error
 }
 
-func createGroups(config config.Config, groupService groupService) error {
-	log.Println("Creating groups...")
-	groups := config.Groups
+func createGroups(groups []config.Group, logger *slog.Logger, groupService groupService) error {
+	logger.Info("Creating groups...")
 	for _, g := range groups {
 		newGroup, err := groupService.FindOrCreate(g.Name, g.Hostname, true)
 		if err != nil {
 			return fmt.Errorf("error creating group: %v", err)
 		}
 		if newGroup != nil {
-			log.Println("Created:", newGroup.Name)
+			logger.Info("Created group", "group", newGroup.Name)
 		}
 	}
 

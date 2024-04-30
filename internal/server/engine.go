@@ -11,10 +11,10 @@ import (
 	sloggin "github.com/samber/slog-gin"
 )
 
-func GetEngine(logger *slog.Logger, basePath string, allowedOrigins []string) *gin.Engine {
+func GetEngine(logger *slog.Logger, loggerGroup, basePath string, allowedOrigins []string) *gin.Engine {
 	r := gin.New()
 	r.Use(gin.Recovery())
-	r.Use(sloggin.New(logger.WithGroup("http")))
+	r.Use(sloggin.New(logger.WithGroup(loggerGroup)))
 
 	corsConfig := cors.DefaultConfig()
 	// Without specifying origins, secure cookies won't work
