@@ -5,10 +5,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"testing"
 
 	"github.com/dhis2-sre/im-manager/internal/handler"
@@ -26,7 +28,8 @@ func SetupHTTPServer(t *testing.T, f func(engine *gin.Engine)) *HTTPClient {
 	require.NoError(t, err, "failed to register validation")
 	gin.SetMode(gin.TestMode)
 
-	engine := server.GetEngine("")
+	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
+	engine := server.GetEngine(logger, "")
 	f(engine)
 
 	//goland:noinspection GoImportUsedAsName

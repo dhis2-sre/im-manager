@@ -176,7 +176,7 @@ func run() error {
 		return err
 	}
 
-	r := server.GetEngine(cfg.BasePath)
+	r := server.GetEngine(logger, cfg.BasePath)
 
 	group.Routes(r, authentication, authorization, groupHandler)
 	user.Routes(r, authentication, authorization, userHandler)
