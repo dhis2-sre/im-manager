@@ -127,7 +127,7 @@ func run() error {
 	}
 	defer consumer.Close()
 
-	ttlDestroyConsumer := instance.NewTTLDestroyConsumer(consumer, instanceService)
+	ttlDestroyConsumer := instance.NewTTLDestroyConsumer(logger, consumer, instanceService)
 	err = ttlDestroyConsumer.Consume()
 	if err != nil {
 		return err
@@ -152,7 +152,7 @@ func run() error {
 		o.UsePathStyle = true
 	})
 	uploader := manager.NewUploader(s3AWSClient)
-	s3Client := storage.NewS3Client(s3AWSClient, uploader)
+	s3Client := storage.NewS3Client(logger, s3AWSClient, uploader)
 
 	databaseRepository := database.NewRepository(db)
 	databaseService := database.NewService(cfg.S3Bucket, s3Client, groupService, databaseRepository)

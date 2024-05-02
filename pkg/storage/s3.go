@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"path"
+	"log/slog"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
@@ -13,11 +13,16 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 )
 
-func NewS3Client(client AWSS3Client, uploader AWSS3Uploader) *S3Client {
-	return &S3Client{client, uploader}
+func NewS3Client(logger *slog.Logger, client AWSS3Client, uploader AWSS3Uploader) *S3Client {
+	return &S3Client{
+		logger:   logger,
+		client:   client,
+		uploader: uploader,
+	}
 }
 
 type S3Client struct {
+	logger   *slog.Logger
 	client   AWSS3Client
 	uploader AWSS3Uploader
 }
@@ -61,10 +66,12 @@ func (s S3Client) Move(bucket string, source string, destination string) error {
 }
 
 func (s S3Client) Upload(bucket string, key string, body ReadAtSeeker, size int64) error {
-	target := path.Join(bucket, key)
-	log.Printf("Uploading: " + target)
+	s.logger.Info("Uploading", "bucket", bucket, "key", key)
 	reader, err := newProgressReader(body, size, func(read int64, size int64) {
-		log.Printf("%s - total read:%d\tprogress:%d%%", target, read, int(float32(read*100)/float32(size)))
+		// TODO(DEVOPS-390) we should not use log anymore but slog instead. Since this is likely
+		// meant for the user we first need to figure out how exactly it should work. It does not
+		// seem to be working right now.
+		log.Printf("%s/%s - total read:%d\tprogress:%d%%", bucket, key, read, int(float32(read*100)/float32(size)))
 	})
 	if err != nil {
 		return err
