@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestCanWriteInstance_isOwnerAndMember(t *testing.T) {
+func TestCanWriteDeployment_isOwnerAndMember(t *testing.T) {
 	var userId uint = 123
 	var group = "321"
 
@@ -20,17 +20,17 @@ func TestCanWriteInstance_isOwnerAndMember(t *testing.T) {
 		},
 	}
 
-	instance := &model.Instance{
+	instance := &model.Deployment{
 		UserID:    userId,
 		GroupName: group,
 	}
 
-	isAdmin := CanWriteInstance(user, instance)
+	isAdmin := CanWriteDeployment(user, instance)
 
 	assert.True(t, isAdmin)
 }
 
-func TestCanWriteInstance_isGroupAdministrator(t *testing.T) {
+func TestCanWriteDeployment_isGroupAdministrator(t *testing.T) {
 	var group = "123"
 
 	user := &model.User{
@@ -41,14 +41,14 @@ func TestCanWriteInstance_isGroupAdministrator(t *testing.T) {
 		},
 	}
 
-	instance := &model.Instance{GroupName: group}
+	instance := &model.Deployment{GroupName: group}
 
-	isAdmin := CanWriteInstance(user, instance)
+	isAdmin := CanWriteDeployment(user, instance)
 
 	assert.True(t, isAdmin)
 }
 
-func TestCanWriteInstance_isAdministrator(t *testing.T) {
+func TestCanWriteDeployment_isAdministrator(t *testing.T) {
 	user := &model.User{
 		Groups: []model.Group{
 			{
@@ -60,14 +60,14 @@ func TestCanWriteInstance_isAdministrator(t *testing.T) {
 		},
 	}
 
-	instance := &model.Instance{}
+	instance := &model.Deployment{}
 
-	isAdmin := CanWriteInstance(user, instance)
+	isAdmin := CanWriteDeployment(user, instance)
 
 	assert.True(t, isAdmin)
 }
 
-func TestCanReadInstance_isMemberOf(t *testing.T) {
+func TestCanReadDeployment_isMemberOf(t *testing.T) {
 	var group = "123"
 
 	user := &model.User{
@@ -78,14 +78,14 @@ func TestCanReadInstance_isMemberOf(t *testing.T) {
 		},
 	}
 
-	instance := &model.Instance{GroupName: group}
+	instance := &model.Deployment{GroupName: group}
 
-	isAdmin := CanReadInstance(user, instance)
+	isAdmin := CanReadDeployment(user, instance)
 
 	assert.True(t, isAdmin)
 }
 
-func TestCanReadInstance_isAdministrator(t *testing.T) {
+func TestCanReadDeployment_isAdministrator(t *testing.T) {
 	user := &model.User{
 		Groups: []model.Group{
 			{
@@ -97,14 +97,14 @@ func TestCanReadInstance_isAdministrator(t *testing.T) {
 		},
 	}
 
-	instance := &model.Instance{}
+	instance := &model.Deployment{}
 
-	isAdmin := CanReadInstance(user, instance)
+	isAdmin := CanReadDeployment(user, instance)
 
 	assert.True(t, isAdmin)
 }
 
-func TestCanReadInstance_AccessDenied(t *testing.T) {
+func TestCanReadDeployment_AccessDenied(t *testing.T) {
 	user := &model.User{
 		Groups: []model.Group{
 			{
@@ -113,9 +113,9 @@ func TestCanReadInstance_AccessDenied(t *testing.T) {
 		},
 	}
 
-	instance := &model.Instance{}
+	instance := &model.Deployment{}
 
-	isAdmin := CanReadInstance(user, instance)
+	isAdmin := CanReadDeployment(user, instance)
 
 	assert.False(t, isAdmin)
 }

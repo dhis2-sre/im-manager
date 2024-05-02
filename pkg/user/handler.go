@@ -2,7 +2,10 @@ package user
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
+
+	"github.com/dhis2-sre/im-manager/pkg/config"
 
 	"github.com/google/uuid"
 
@@ -15,16 +18,20 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func NewHandler(userService userService, tokenService tokenService) Handler {
+func NewHandler(hostname string, authentication config.Authentication, userService userService, tokenService tokenService) Handler {
 	return Handler{
+		hostname,
+		authentication,
 		userService,
 		tokenService,
 	}
 }
 
 type Handler struct {
-	userService  userService
-	tokenService tokenService
+	hostname       string
+	authentication config.Authentication
+	userService    userService
+	tokenService   tokenService
 }
 
 type userService interface {
@@ -35,6 +42,8 @@ type userService interface {
 	Delete(id uint) error
 	Update(id uint, email, password string) (*model.User, error)
 	ValidateEmail(token uuid.UUID) error
+	RequestPasswordReset(email string) error
+	ResetPassword(token string, password string) error
 }
 
 type tokenService interface {
@@ -76,7 +85,8 @@ func (h Handler) SignUp(c *gin.Context) {
 }
 
 func handleSignUpErrors(err error) error {
-	validationErrors, ok := err.(validator.ValidationErrors)
+	var validationErrors validator.ValidationErrors
+	ok := errors.As(err, &validationErrors)
 	if !ok {
 		return errdef.NewBadRequest("Error binding data: %+v", err)
 	}
@@ -135,6 +145,69 @@ func (h Handler) ValidateEmail(c *gin.Context) {
 	c.Status(http.StatusOK)
 }
 
+type RequestPasswordResetRequest struct {
+	Email string `json:"email" binding:"required,email"`
+}
+
+func (h Handler) RequestPasswordReset(c *gin.Context) {
+	// swagger:route POST /users/request-reset requestPasswordReset
+	//
+	// Request password reset
+	//
+	// Request user's password reset
+	//
+	// responses:
+	//   201:
+	//   400: Error
+	//   404: Error
+	//   415: Error
+	var request RequestPasswordResetRequest
+	if err := handler.DataBinder(c, &request); err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	err := h.userService.RequestPasswordReset(request.Email)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	c.Status(http.StatusCreated)
+}
+
+type ResetPasswordRequest struct {
+	Token    string `json:"token" binding:"required"`
+	Password string `json:"password" binding:"required,gte=24,lte=128"`
+}
+
+func (h Handler) ResetPassword(c *gin.Context) {
+	// swagger:route POST /users/reset-password resetPassword
+	//
+	// Reset password
+	//
+	// Reset user's password
+	//
+	// responses:
+	//   201:
+	//   400: Error
+	//   404: Error
+	//   415: Error
+	var request ResetPasswordRequest
+	if err := handler.DataBinder(c, &request); err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	err := h.userService.ResetPassword(request.Token, request.Password)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	c.Status(http.StatusCreated)
+}
+
 // SignIn user
 func (h Handler) SignIn(c *gin.Context) {
 	// swagger:route POST /tokens signIn
@@ -164,11 +237,13 @@ func (h Handler) SignIn(c *gin.Context) {
 		return
 	}
 
+	h.setCookies(c, tokens)
+
 	c.JSON(http.StatusCreated, tokens)
 }
 
 type RefreshTokenRequest struct {
-	RefreshToken string `json:"refreshToken" binding:"required"`
+	RefreshToken string `json:"refreshToken"`
 }
 
 // RefreshToken user
@@ -183,14 +258,30 @@ func (h Handler) RefreshToken(c *gin.Context) {
 	//   201: Tokens
 	//   400: Error
 	//   415: Error
-	var request RefreshTokenRequest
 
-	if err := handler.DataBinder(c, &request); err != nil {
-		_ = c.Error(err)
+	var refreshTokenString string
+
+	cookie, err := c.Cookie("refreshToken")
+	if err == nil {
+		refreshTokenString = cookie
+	}
+
+	// as of this writing http.ErrNoCookie is the only error which can be return from c.Cookie
+	if errors.Is(err, http.ErrNoCookie) {
+		var request RefreshTokenRequest
+		if err := handler.DataBinder(c, &request); err != nil {
+			_ = c.Error(err)
+			return
+		}
+		refreshTokenString = request.RefreshToken
+	}
+
+	if refreshTokenString == "" {
+		_ = c.AbortWithError(http.StatusBadRequest, fmt.Errorf("refresh token not found"))
 		return
 	}
 
-	refreshToken, err := h.tokenService.ValidateRefreshToken(request.RefreshToken)
+	refreshToken, err := h.tokenService.ValidateRefreshToken(refreshTokenString)
 	if err != nil {
 		_ = c.AbortWithError(http.StatusUnauthorized, err)
 		return
@@ -212,7 +303,17 @@ func (h Handler) RefreshToken(c *gin.Context) {
 		return
 	}
 
+	h.setCookies(c, tokens)
+
 	c.JSON(http.StatusCreated, tokens)
+}
+
+func (h Handler) setCookies(c *gin.Context, tokens *token.Tokens) {
+	c.SetSameSite(http.SameSiteStrictMode)
+	domain := h.hostname
+	authentication := h.authentication
+	c.SetCookie("accessToken", tokens.AccessToken, authentication.AccessTokenExpirationSeconds, "/", domain, true, true)
+	c.SetCookie("refreshToken", tokens.RefreshToken, authentication.RefreshTokenExpirationSeconds, "/refresh", domain, true, true)
 }
 
 // Me user
@@ -273,7 +374,14 @@ func (h Handler) SignOut(c *gin.Context) {
 		return
 	}
 
+	unsetCookie(c)
+
 	c.Status(http.StatusOK)
+}
+
+func unsetCookie(c *gin.Context) {
+	c.SetCookie("accessToken", "", -1, "/", "", true, true)
+	c.SetCookie("refreshToken", "", -1, "/", "", true, true)
 }
 
 // FindById user

@@ -9,6 +9,10 @@
     serviceAccount:
       name: im-manager-prod
       namespace: instance-manager-prod
+## TODO: Once we get Skaffold profiles working this should be uncommented
+#    setValueTemplates:
+#      corsAllowOrigins:
+#        - "https://{{ .UI_URL }}"
 
 apiVersion: skaffold/v4beta6
 kind: Config
@@ -50,7 +54,8 @@ deploy:
         createNamespace: true
         remoteChart: postgresql
         repo: https://charts.bitnami.com/bitnami
-        version: 11.6.2
+        version: 13.2.30
+        upgradeOnChange: true
         useHelmSecrets: true
         valuesFiles:
           - helm/data/secrets/{{ .CLASSIFICATION }}/postgresql.yaml
@@ -61,11 +66,13 @@ deploy:
         createNamespace: true
         chartPath: helm/chart
         setValueTemplates:
+          corsAllowOrigins:
+            - "{{ .UI_URL }}"
           image:
             repository: dhis2/im-manager
           serviceAccount:
             annotations:
-              "eks\\.amazonaws\\.com\\/role-arn": arn:aws:iam::767224633206:role/instance-cluster-test-im-manager-{{ .CLASSIFICATION }}
+              "eks\\.amazonaws\\.com\\/role-arn": arn:aws:iam::767224633206:role/instance-cluster-production-im-manager-{{ .CLASSIFICATION }}
           ingress:
             enabled: true
             hostname: "{{ .API_HOSTNAME }}"
@@ -75,8 +82,8 @@ deploy:
           environment:
             ENVIRONMENT: "{{ .ENVIRONMENT }}"
             CLASSIFICATION: "{{ .CLASSIFICATION }}"
-            HOSTNAME: "https://{{ .API_HOSTNAME }}"
-            UI_HOSTNAME: "https://{{ .UI_HOSTNAME }}"
+            HOSTNAME: "{{ .API_HOSTNAME }}"
+            UI_URL: "{{ .UI_URL }}"
             INSTANCE_SERVICE_HOST: im-manager-{{ .ENVIRONMENT }}.instance-manager-{{ .CLASSIFICATION }}.svc:8080
             INSTANCE_SERVICE_BASE_PATH: /
             DATABASE_MANAGER_SERVICE_HOST: im-manager-{{ .ENVIRONMENT }}.instance-manager-{{ .CLASSIFICATION }}.svc:8080
@@ -88,6 +95,7 @@ deploy:
             S3_BUCKET: im-databases-{{ .CLASSIFICATION }}
             S3_REGION: eu-west-1
             DEFAULT_TTL: "172800" # 48 hours
+            PASSWORD_TOKEN_TTL: "900" # 15 minutes
         useHelmSecrets: true
         valuesFiles:
           - helm/data/secrets/{{ .CLASSIFICATION }}/values.yaml
@@ -103,6 +111,11 @@ profiles:
           namespace: whoami
           <<: *im-group-chart-config
           setValueTemplates:
+## TODO: Once we get Skaffold profiles working this should be uncommented
+#            corsAllowOrigins:
+#              - "http://localhost:3000"
+#              - "http://localhost:5173"
+#              - "{{ .UI_URL }}"
             serviceAccount:
               name: im-manager-{{ .ENVIRONMENT }}
               namespace: instance-manager-{{ .CLASSIFICATION }}

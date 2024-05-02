@@ -136,3 +136,12 @@ func (r repository) getClusterConfiguration(groupName string) (*model.ClusterCon
 	}
 	return configuration, err
 }
+
+func (r repository) findByGroupNames(groupNames []string) ([]model.Group, error) {
+	var databases []model.Group
+	err := r.db.
+		Where("name IN ?", groupNames).
+		Order("updated_at desc").
+		Find(&databases).Error
+	return databases, err
+}

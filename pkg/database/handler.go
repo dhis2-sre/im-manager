@@ -54,8 +54,6 @@ type Service interface {
 }
 
 type instanceService interface {
-	FindById(id uint) (*model.Instance, error)
-	FindByIdDecrypted(id uint) (*model.Instance, error)
 	FindDecryptedDeploymentInstanceById(id uint) (*model.DeploymentInstance, error)
 }
 
@@ -598,7 +596,6 @@ func (h Handler) Delete(c *gin.Context) {
 // swagger:model GroupsWithDatabases
 type GroupsWithDatabases struct {
 	Name      string           `json:"name"`
-	Hostname  string           `json:"hostname"`
 	Databases []model.Database `json:"databases"`
 }
 

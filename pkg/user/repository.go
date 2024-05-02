@@ -1,6 +1,7 @@
 package user
 
 import (
+	"database/sql"
 	"errors"
 	"fmt"
 
@@ -39,6 +40,7 @@ func (r repository) findAll() ([]*model.User, error) {
 	err := r.db.
 		Preload("Groups").
 		Preload("AdminGroups").
+		Order("Email").
 		Find(&users).Error
 	if err != nil {
 		return nil, fmt.Errorf("failed to find all users: %v", err)
@@ -66,6 +68,12 @@ func (r repository) findByEmailToken(token uuid.UUID) (*model.User, error) {
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, errdef.NewNotFound("failed to find user with email token %q", token.String())
 	}
+	return user, err
+}
+
+func (r repository) findByPasswordResetToken(token string) (*model.User, error) {
+	var user *model.User
+	err := r.db.First(&user, "password_token = ?", token).Error
 	return user, err
 }
 
@@ -113,4 +121,21 @@ func (r repository) update(user *model.User) (*model.User, error) {
 	}
 
 	return user, nil
+}
+
+func (r repository) resetPassword(user *model.User) error {
+	updatedUser := model.User{
+		Password:      user.Password,
+		PasswordToken: sql.NullString{String: "", Valid: false},
+	}
+
+	err := r.db.
+		Model(&user).
+		Select("Password", "PasswordToken").
+		Updates(updatedUser).Error
+	if err != nil {
+		return fmt.Errorf("failed to update user password: %v", err)
+	}
+
+	return nil
 }

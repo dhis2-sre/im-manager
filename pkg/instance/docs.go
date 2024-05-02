@@ -2,33 +2,6 @@ package instance
 
 import "github.com/dhis2-sre/im-manager/pkg/model"
 
-// swagger:parameters deployInstance
-type _ struct {
-	// Deploy instance request body parameter
-	// in: body
-	// required: true
-	Payload DeployInstanceRequest
-
-	// preset
-	// in: query
-	// required: false
-	// type: string
-	// description: define deployment as a preset
-	Preset string `json:"preset"`
-}
-
-// swagger:parameters updateInstance
-type _ struct {
-	// in: path
-	// required: true
-	ID uint `json:"id"`
-
-	// Update instance request body parameter
-	// in: body
-	// required: true
-	Payload UpdateInstanceRequest
-}
-
 // swagger:parameters restartInstance
 type _ struct {
 	// in: path
@@ -96,12 +69,6 @@ type _ struct {
 	// The error message
 	// in: body
 	Message string
-}
-
-// swagger:response GroupsWithInstances
-type _ struct {
-	// in: body
-	_ []GroupsWithInstances
 }
 
 // swagger:response GroupsWithDeployments

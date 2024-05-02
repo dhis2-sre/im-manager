@@ -7,7 +7,7 @@ import (
 
 	"github.com/dhis2-sre/im-manager/pkg/instance"
 	"github.com/dhis2-sre/im-manager/pkg/inttest"
-	"github.com/dhis2-sre/rabbitmq"
+	"github.com/dhis2-sre/rabbitmq-client/pkg/rabbitmq"
 	amqp "github.com/rabbitmq/amqp091-go"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -20,7 +20,8 @@ func TestConsumeDeletesInstance(t *testing.T) {
 
 	consumer, err := rabbitmq.NewConsumer(
 		amqpClient.URI,
-		rabbitmq.WithConsumerPrefix("im-manager"),
+		rabbitmq.WithConnectionName(t.Name()),
+		rabbitmq.WithConsumerTagPrefix(t.Name()),
 	)
 	require.NoError(t, err, "failed to create new RabbitMQ consumer")
 	defer func() { require.NoError(t, consumer.Close()) }()

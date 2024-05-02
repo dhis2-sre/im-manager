@@ -1,15 +1,10 @@
 package instance_test
 
 import (
-	"bytes"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
-	"mime/multipart"
 	"net/http"
 	"os"
-	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -99,67 +94,56 @@ func TestInstanceHandler(t *testing.T) {
 		database.Routes(engine, authenticator, databaseHandler)
 	})
 
-	t.Run("DeployWhoAmI", func(t *testing.T) {
-		var instance model.Instance
-		body := strings.NewReader(`{
-			"name": "test-whoami",
-			"groupName": "group-name",
-			"stackName": "whoami-go"
-		}`)
-		client.PostJSON(t, "/instances", body, &instance, inttest.WithAuthToken("sometoken"))
+	// TODO: Convert below test to use deployments
+	/*
+		//	var databaseID string
+			{
+				t.Log("Upload")
+				var b bytes.Buffer
+				w := multipart.NewWriter(&b)
+				err := w.WriteField("group", "group-name")
+				require.NoError(t, err, "failed to write form field")
+				err = w.WriteField("name", "path/name.extension")
+				require.NoError(t, err, "failed to write form field")
+				f, err := w.CreateFormFile("database", "mydb")
+				require.NoError(t, err, "failed to create form file")
+				_, err = io.WriteString(f, "select now();")
+				require.NoError(t, err, "failed to write file")
+				_ = w.Close()
 
-		k8sClient.AssertPodIsReady(t, group.Name, instance.Name, 60)
-	})
+				body := client.Post(t, "/databases", &b, inttest.WithHeader("Content-Type", w.FormDataContentType()))
 
-	var databaseID string
-	{
-		t.Log("Upload")
-		var b bytes.Buffer
-		w := multipart.NewWriter(&b)
-		err := w.WriteField("group", "group-name")
-		require.NoError(t, err, "failed to write form field")
-		err = w.WriteField("name", "path/name.extension")
-		require.NoError(t, err, "failed to write form field")
-		f, err := w.CreateFormFile("database", "mydb")
-		require.NoError(t, err, "failed to create form file")
-		_, err = io.WriteString(f, "select now();")
-		require.NoError(t, err, "failed to write file")
-		_ = w.Close()
+				var actualDB model.Database
+				err = json.Unmarshal(body, &actualDB)
+				require.NoError(t, err, "POST /databases: failed to unmarshal HTTP response body")
+				require.Equal(t, "path/name.extension", actualDB.Name)
+				require.Equal(t, "group-name", actualDB.GroupName)
 
-		body := client.Post(t, "/databases", &b, inttest.WithHeader("Content-Type", w.FormDataContentType()))
+				databaseID = strconv.FormatUint(uint64(actualDB.ID), 10)
+			}
+			   	t.Run("DeployDHIS2", func(t *testing.T) {
+			   		hostname := client.GetHostname(t)
+			   		t.Log("hostname:", hostname)
+			   		t.Setenv("HOSTNAME", hostname)
 
-		var actualDB model.Database
-		err = json.Unmarshal(body, &actualDB)
-		require.NoError(t, err, "POST /databases: failed to unmarshal HTTP response body")
-		require.Equal(t, "path/name.extension", actualDB.Name)
-		require.Equal(t, "group-name", actualDB.GroupName)
+			   		var instance model.Instance
+			   		body := strings.NewReader(`{
+			   			"name": "test-dhis2",
+			   			"groupName": "group-name",
+			   			"stackName": "dhis2",
+			   			"parameters": [
+			                   {
+			       		        "name": "DATABASE_ID",
+			   			        "value": "` + databaseID + `"
+			   			    }
+			   			]
+			   		}`)
+			   		client.PostJSON(t, "/instances", body, &instance, inttest.WithAuthToken("sometoken"))
 
-		databaseID = strconv.FormatUint(uint64(actualDB.ID), 10)
-	}
-
-	t.Run("DeployDHIS2", func(t *testing.T) {
-		hostname := client.GetHostname(t)
-		t.Log("hostname:", hostname)
-		t.Setenv("HOSTNAME", hostname)
-
-		var instance model.Instance
-		body := strings.NewReader(`{
-			"name": "test-dhis2",
-			"groupName": "group-name",
-			"stackName": "dhis2",
-			"parameters": [
-                {
-    		        "name": "DATABASE_ID",
-			        "value": "` + databaseID + `"
-			    }
-			]
-		}`)
-		client.PostJSON(t, "/instances", body, &instance, inttest.WithAuthToken("sometoken"))
-
-		k8sClient.AssertPodIsReady(t, group.Name, instance.Name+"-database", 60)
-		k8sClient.AssertPodIsReady(t, group.Name, instance.Name, 5*60)
-	})
-
+			   		k8sClient.AssertPodIsReady(t, group.Name, instance.Name+"-database", 3*60)
+			   		k8sClient.AssertPodIsReady(t, group.Name, instance.Name, 5*60)
+			   	})
+	*/
 	t.Run("DeployDeploymentWithoutInstances", func(t *testing.T) {
 		t.Log("Create deployment")
 		var deployment model.Deployment
@@ -269,6 +253,10 @@ func encryptUsingAge(t *testing.T, identity *age.X25519Identity, yamlData []byte
 
 type groupService struct {
 	group *model.Group
+}
+
+func (gs groupService) FindByGroupNames(groupNames []string) ([]model.Group, error) {
+	panic("implement me")
 }
 
 func (gs groupService) FindAll(user *model.User, deployable bool) ([]model.Group, error) {

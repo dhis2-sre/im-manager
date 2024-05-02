@@ -7,14 +7,15 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func GetTokenFromHttpAuthHeader(c *gin.Context) (string, error) {
+func GetTokenFromRequest(c *gin.Context) (string, error) {
 	token := c.GetHeader("Authorization")
-
-	token = strings.TrimPrefix(token, "Bearer ")
-
-	if token == "" {
-		return "", errors.New("token not found in Authorization header")
+	if token != "" {
+		return strings.TrimPrefix(token, "Bearer "), nil
 	}
 
-	return token, nil
+	cookie, err := c.Cookie("accessToken")
+	if err != nil {
+		return "", errors.New("no token found on request")
+	}
+	return cookie, nil
 }

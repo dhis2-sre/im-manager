@@ -28,7 +28,6 @@ func TestStackDefinitionsAreInSyncWithHelmfile(t *testing.T) {
 			consumedParameter[p] = struct{}{}
 		}
 
-		t.Logf("helmfile stack %q: %#v", stackName, helmfileStack)
 		parameters := make(model.StackParameters)
 		for name, value := range helmfileStack.parameters {
 			_, consumed := consumedParameter[name]
@@ -52,11 +51,11 @@ func TestStackDefinitionsAreInSyncWithHelmfile(t *testing.T) {
 	for stackName, stackParameters := range stacks {
 		stackDefinitionParameters := make(map[string]model.StackParameter, len(stackParameters))
 		for parameterName, parameter := range stackParameters {
-			stackDefinitionParameters[parameterName] = model.StackParameter{DefaultValue: parameter.DefaultValue, Consumed: parameter.Consumed}
+			// DefaultValue is nil since it's no longer in the helmfile and therefor we don't have anything to compare it to
+			stackDefinitionParameters[parameterName] = model.StackParameter{DefaultValue: nil, Consumed: parameter.Consumed}
 		}
 		stackDefinitions[stackName] = stackDefinitionParameters
 	}
-	require.NoError(t, err)
 
 	for name, parameters := range helmfileParameters {
 		stackDefinition, ok := stackDefinitions[name]
@@ -91,7 +90,6 @@ const (
 
 type stack struct {
 	consumedParameters []string
-	stackParameters    []string
 	parameters         map[string]*string
 }
 
@@ -129,16 +127,18 @@ func parseStack(dir, name string) (*stack, error) {
 	consumedParameters := extractMetadataParameters(file, consumedParametersIdentifier)
 	stackParameters := extractMetadataParameters(file, stackParametersIdentifier)
 	requiredParams := extractRequiredParameters(file, stackParameters)
-	optionalParams := extractOptionalParameters(file, stackParameters)
 
+	parameters := make(map[string]*string, len(stackParameters)+len(requiredParams))
+	for _, parameter := range stackParameters {
+		parameters[parameter] = nil
+	}
 	for _, parameter := range requiredParams {
-		optionalParams[parameter] = nil
+		parameters[parameter] = nil
 	}
 
 	return &stack{
 		consumedParameters: consumedParameters,
-		stackParameters:    stackParameters,
-		parameters:         optionalParams,
+		parameters:         parameters,
 	}, nil
 }
 
@@ -159,22 +159,6 @@ func extractMetadataParameters(file []byte, identifier string) []string {
 func extractRequiredParameters(file []byte, stackParameters []string) []string {
 	regexStr := `{{[ ]requiredEnv[ ]"(.*?)".*?}}`
 	return extractParameters(file, regexStr, stackParameters)
-}
-
-func extractOptionalParameters(file []byte, stackParameters []string) map[string]*string {
-	regexStr := `{{[ ]env[ ]"(\w+)"[ ]?(\|[ ]?default[ ]["]?(.*)\s+}})?`
-	fileData := string(file)
-	parameterMap := make(map[string]*string)
-	re := regexp.MustCompile(regexStr)
-	matches := re.FindAllStringSubmatch(fileData, -1)
-	for _, match := range matches {
-		if !isSystemParameter(match[1]) && !isStackParameter(match[1], stackParameters) {
-			// TODO: Update the regular expression so there's no need to trim
-			value := strings.TrimSuffix(strings.TrimSpace(match[3]), "\"")
-			parameterMap[match[1]] = &value
-		}
-	}
-	return parameterMap
 }
 
 func extractParameters(file []byte, regexStr string, stackParameters []string) []string {

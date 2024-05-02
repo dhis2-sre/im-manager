@@ -153,13 +153,11 @@ func (r repository) Delete(id uint) error {
 	})
 }
 
-const administratorGroupName = "administrators"
-
 func (r repository) FindByGroupNames(groupNames []string) ([]model.Database, error) {
 	var databases []model.Database
 
 	query := r.db
-	isAdmin := slices.Contains(groupNames, administratorGroupName)
+	isAdmin := slices.Contains(groupNames, model.AdministratorGroupName)
 	if !isAdmin {
 		query = query.Where("group_name IN ?", groupNames)
 	}

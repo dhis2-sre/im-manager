@@ -1,7 +1,6 @@
 package model
 
 import (
-	"fmt"
 	"time"
 
 	"gorm.io/gorm"
@@ -15,9 +14,9 @@ type Deployment struct {
 	UserID uint  `json:"userId"`
 	User   *User `json:"user,omitempty"`
 
-	Name        string `json:"name" gorm:"index:idx_name_and_group,unique"`
+	Name        string `json:"name" gorm:"index:deployment_name_group_idx,unique"`
 	Description string `json:"description"`
-	GroupName   string `json:"groupName" gorm:"index:idx_name_and_group,unique; references:Name"`
+	GroupName   string `json:"groupName" gorm:"index:deployment_name_group_idx,unique; references:Name"`
 	Group       *Group `json:"group,omitempty"`
 
 	Public bool `json:"public"`
@@ -34,11 +33,11 @@ type DeploymentInstance struct {
 	UpdatedAt time.Time `json:"updatedAt"`
 
 	// TODO: FK to name of Deployment?
-	Name      string `json:"name" gorm:"index:idx_name_and_group,unique"`
+	Name      string `json:"name" gorm:"index:deployment_instance_name_group_stack_idx,unique"`
 	Group     *Group `json:"group,omitempty"`
-	GroupName string `json:"groupName" gorm:"index:idx_name_and_group,unique; references:Name"`
+	GroupName string `json:"groupName" gorm:"index:deployment_instance_name_group_stack_idx,unique; references:Name"`
 	//	Stack     *Stack `json:"stack,omitempty"`
-	StackName string `json:"stackName" gorm:"index:idx_name_and_group,unique"`
+	StackName string `json:"stackName" gorm:"index:deployment_instance_name_group_stack_idx,unique"`
 
 	DeploymentID uint        `json:"deploymentId"`
 	Deployment   *Deployment `json:"deployment,omitempty"`
@@ -75,48 +74,4 @@ func (i *DeploymentInstance) AfterFind(_ *gorm.DB) error {
 		i.Parameters[parameter.ParameterName] = parameter
 	}
 	return nil
-}
-
-// swagger:model Instance
-type Instance struct {
-	ID          uint                `json:"id" gorm:"primarykey"`
-	User        User                `json:"user"`
-	UserID      uint                `json:"userId"`
-	Name        string              `json:"name" gorm:"index:idx_name_and_group,unique"`
-	Group       Group               `json:"group"`
-	GroupName   string              `json:"groupName" gorm:"index:idx_name_and_group,unique"`
-	Description string              `json:"description"`
-	StackName   string              `json:"stackName"`
-	TTL         uint                `json:"ttl"`
-	Parameters  []InstanceParameter `json:"parameters" gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
-	DeployLog   string              `json:"deployLog" gorm:"type:text"`
-	Preset      bool                `json:"preset"`
-	Public      bool                `json:"public"`
-	// The preset which this instance is created from
-	PresetID  uint      `json:"presetId"`
-	CreatedAt time.Time `json:"createdAt"`
-	UpdatedAt time.Time `json:"updatedAt"`
-}
-
-type Linked struct {
-	SourceInstanceID      uint     `json:"sourceInstanceId" gorm:"primaryKey"`
-	SourceInstance        Instance `json:"sourceInstance"`
-	DestinationStackName  string   `json:"destinationStackName" gorm:"primaryKey"`
-	DestinationInstanceID uint     `json:"destinationInstanceId" gorm:"index:idx_linked_second_instance,unique"`
-	DestinationInstance   Instance `json:"destinationInstance"`
-}
-
-func (i Instance) FindParameter(name string) (InstanceParameter, error) {
-	for _, parameter := range i.Parameters {
-		if parameter.Name == name {
-			return parameter, nil
-		}
-	}
-	return InstanceParameter{}, fmt.Errorf("parameter not found: %s", name)
-}
-
-type InstanceParameter struct {
-	InstanceID uint   `json:"-" gorm:"primaryKey"`
-	Name       string `json:"name" gorm:"primaryKey"`
-	Value      string `json:"value"`
 }

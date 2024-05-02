@@ -256,14 +256,6 @@ func (is instanceService) FindDecryptedDeploymentInstanceById(id uint) (*model.D
 	panic("implement me")
 }
 
-func (is instanceService) FindById(id uint) (*model.Instance, error) {
-	return nil, nil
-}
-
-func (is instanceService) FindByIdDecrypted(id uint) (*model.Instance, error) {
-	return nil, nil
-}
-
 type stackService struct{}
 
 func (ss stackService) Find(name string) (*model.Stack, error) {
