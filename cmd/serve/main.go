@@ -169,7 +169,7 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	err = createGroups(cfg.Groups, logger, groupService)
+	err = createGroups(logger, groupService, cfg.Groups)
 	if err != nil {
 		return err
 	}
@@ -207,7 +207,7 @@ type groupService interface {
 	AddUser(groupName string, userId uint) error
 }
 
-func createGroups(groups []config.Group, logger *slog.Logger, groupService groupService) error {
+func createGroups(logger *slog.Logger, groupService groupService, groups []config.Group) error {
 	logger.Info("Creating groups...")
 	for _, g := range groups {
 		newGroup, err := groupService.FindOrCreate(g.Name, g.Hostname, true)
