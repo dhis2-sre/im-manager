@@ -30,7 +30,7 @@ type Config struct {
 	SMTP                           smtp
 	Redis                          redis
 	Authentication                 Authentication
-	Groups                         []group
+	Groups                         []Group
 	AdminUser                      user
 	E2eTestUser                    user
 	S3Bucket                       string
@@ -198,12 +198,12 @@ func (k keys) GetPublicKey() (*rsa.PublicKey, error) {
 	return publicKey.(*rsa.PublicKey), nil
 }
 
-type group struct {
+type Group struct {
 	Name     string
 	Hostname string
 }
 
-func newGroups() []group {
+func newGroups() []Group {
 	groupNames := requireEnvAsArray("GROUP_NAMES")
 	groupHostnames := requireEnvAsArray("GROUP_HOSTNAMES")
 
@@ -211,7 +211,7 @@ func newGroups() []group {
 		log.Fatalf("len(GROUP_NAMES) != len(GROUP_HOSTNAMES)")
 	}
 
-	groups := make([]group, len(groupNames))
+	groups := make([]Group, len(groupNames))
 	for i := 0; i < len(groupNames); i++ {
 		groups[i].Name = groupNames[i]
 		groups[i].Hostname = groupHostnames[i]

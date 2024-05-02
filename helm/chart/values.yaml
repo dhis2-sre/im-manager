@@ -30,9 +30,8 @@ basePath: ""
 #  key: value
 #  ...
 
-#environment:
-#  key: value
-#  ...
+environment:
+  GIN_MODE: release
 
 #groups:
 #  names: whoami
