@@ -43,10 +43,10 @@ func TestDatabaseHandler(t *testing.T) {
 	s3Client := storage.NewS3Client(logger, s3.Client, uploader)
 
 	databaseRepository := database.NewRepository(db)
-	databaseService := database.NewService(s3Bucket, s3Client, groupService{}, databaseRepository)
+	databaseService := database.NewService(logger, s3Bucket, s3Client, groupService{}, databaseRepository)
 
 	client := inttest.SetupHTTPServer(t, func(engine *gin.Engine) {
-		databaseHandler := database.NewHandler(databaseService, groupService{groupName: "packages"}, instanceService{}, stackService{})
+		databaseHandler := database.NewHandler(logger, databaseService, groupService{groupName: "packages"}, instanceService{}, stackService{})
 		authenticator := func(ctx *gin.Context) {
 			ctx.Set("user", &model.User{
 				ID:    1,

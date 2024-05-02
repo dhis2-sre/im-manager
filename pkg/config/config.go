@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"log/slog"
 	"os"
 	"strconv"
 	"strings"
@@ -159,7 +160,7 @@ type keys struct {
 	PublicKey  string
 }
 
-func (k keys) GetPrivateKey() (*rsa.PrivateKey, error) {
+func (k keys) GetPrivateKey(logger *slog.Logger) (*rsa.PrivateKey, error) {
 	decode, _ := pem.Decode([]byte(k.PrivateKey))
 	if decode == nil {
 		return nil, errors.New("failed to decode private key")
@@ -170,7 +171,7 @@ func (k keys) GetPrivateKey() (*rsa.PrivateKey, error) {
 	privateKey, err := x509.ParsePKCS8PrivateKey(decode.Bytes)
 	if err != nil {
 		if err.Error() == "x509: failed to parse private key (use ParsePKCS1PrivateKey instead for this key format)" {
-			log.Println("Trying to parse PKCS1 format...")
+			logger.Info("Trying to parse PKCS1 format...")
 			privateKey, err = x509.ParsePKCS1PrivateKey(decode.Bytes)
 			if err != nil {
 				return nil, err
@@ -178,7 +179,7 @@ func (k keys) GetPrivateKey() (*rsa.PrivateKey, error) {
 		} else {
 			return nil, err
 		}
-		log.Println("Successfully parsed private key")
+		logger.Info("Successfully parsed private key")
 	}
 
 	return privateKey.(*rsa.PrivateKey), nil

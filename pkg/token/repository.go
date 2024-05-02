@@ -1,9 +1,7 @@
 package token
 
 import (
-	"errors"
 	"fmt"
-	"log"
 	"time"
 
 	"github.com/go-redis/redis"
@@ -38,8 +36,7 @@ func (r redisTokenRepository) DeleteRefreshToken(userId uint, previousTokenId st
 	}
 
 	if result.Val() < 1 {
-		log.Printf("Refresh token to redis for userId/tokenId: %d/%s does not exist\n", userId, previousTokenId)
-		return errors.New("invalid refresh token")
+		return fmt.Errorf("refresh token to redis for userId/tokenId does not exist: %d/%s", userId, previousTokenId)
 	}
 
 	return nil
@@ -53,7 +50,6 @@ func (r redisTokenRepository) DeleteRefreshTokens(userId uint) error {
 
 	for iterator.Next() {
 		if err := r.redis.Del(iterator.Val()).Err(); err != nil {
-			log.Printf("Failed to delete refresh token: %s\n", iterator.Val())
 			failCount++
 		}
 	}
