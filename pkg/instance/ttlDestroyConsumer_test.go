@@ -2,6 +2,8 @@ package instance_test
 
 import (
 	"context"
+	"log/slog"
+	"os"
 	"testing"
 	"time"
 
@@ -29,7 +31,8 @@ func TestConsumeDeletesInstance(t *testing.T) {
 	is := &instanceService{}
 	is.On("Delete", uint(1)).Return(nil)
 
-	td := instance.NewTTLDestroyConsumer(consumer, is)
+	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
+	td := instance.NewTTLDestroyConsumer(logger, consumer, is)
 	require.NoError(t, td.Consume())
 
 	require.NoError(t, amqpClient.Channel.PublishWithContext(context.TODO(), "", "ttl-destroy", false, false, amqp.Publishing{

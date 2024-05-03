@@ -1,2 +1,16 @@
 run:
   timeout: 4m
+linters:
+  enable:
+    - errcheck
+    - gosimple
+    - govet
+    - ineffassign
+    - sloglint
+    - staticcheck
+    - unused
+linters-settings:
+  sloglint:
+    no-global: "all"
+    static-msg: true
+    key-naming-case: camel

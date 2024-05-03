@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log"
-	"path"
+	"log/slog"
+	"os"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
@@ -13,11 +13,16 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 )
 
-func NewS3Client(client AWSS3Client, uploader AWSS3Uploader) *S3Client {
-	return &S3Client{client, uploader}
+func NewS3Client(logger *slog.Logger, client AWSS3Client, uploader AWSS3Uploader) *S3Client {
+	return &S3Client{
+		logger:   logger,
+		client:   client,
+		uploader: uploader,
+	}
 }
 
 type S3Client struct {
+	logger   *slog.Logger
 	client   AWSS3Client
 	uploader AWSS3Uploader
 }
@@ -61,10 +66,10 @@ func (s S3Client) Move(bucket string, source string, destination string) error {
 }
 
 func (s S3Client) Upload(bucket string, key string, body ReadAtSeeker, size int64) error {
-	target := path.Join(bucket, key)
-	log.Printf("Uploading: " + target)
+	s.logger.Info("Uploading", "bucket", bucket, "key", key)
 	reader, err := newProgressReader(body, size, func(read int64, size int64) {
-		log.Printf("%s - total read:%d\tprogress:%d%%", target, read, int(float32(read*100)/float32(size)))
+		// TODO(DEVOPS-390) this is meant to be read by users but this implementation does not work
+		fmt.Fprintf(os.Stdout, "%s/%s - total read:%d\tprogress:%d%%", bucket, key, read, int(float32(read*100)/float32(size)))
 	})
 	if err != nil {
 		return err

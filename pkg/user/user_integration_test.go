@@ -44,9 +44,10 @@ func TestUserHandler(t *testing.T) {
 	// certificate
 	authentication := middleware.NewAuthentication(&key.PublicKey, userService)
 
+	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	redis := inttest.SetupRedis(t)
 	tokenRepository := token.NewRepository(redis)
-	tokenService, err := token.NewService(tokenRepository, key, &key.PublicKey, 10, "secret", 10)
+	tokenService, err := token.NewService(logger, tokenRepository, key, &key.PublicKey, 10, "secret", 10)
 	require.NoError(t, err)
 
 	client := inttest.SetupHTTPServer(t, func(engine *gin.Engine) {

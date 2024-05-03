@@ -5,7 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"net/url"
 	"os"
 	"path"
@@ -27,8 +27,9 @@ import (
 )
 
 //goland:noinspection GoExportedFuncWithUnexportedType
-func NewService(s3Bucket string, s3Client S3Client, groupService groupService, repository Repository) *service {
+func NewService(logger *slog.Logger, s3Bucket string, s3Client S3Client, groupService groupService, repository Repository) *service {
 	return &service{
+		logger:       logger,
 		s3Bucket:     s3Bucket,
 		s3Client:     s3Client,
 		groupService: groupService,
@@ -41,6 +42,7 @@ type groupService interface {
 }
 
 type service struct {
+	logger       *slog.Logger
 	s3Bucket     string
 	s3Client     S3Client
 	groupService groupService
@@ -284,20 +286,20 @@ func (s service) Save(userId uint, database *model.Database, instance *model.Dep
 			if !isLocked {
 				err := s.Unlock(database.ID)
 				if err != nil {
-					logError(fmt.Errorf("unlock database failed: %v", err))
+					s.logError(fmt.Errorf("unlock database failed: %v", err))
 				}
 			}
 		}()
 
 		u, err := url.Parse(saved.Url)
 		if err != nil {
-			logError(err)
+			s.logError(err)
 			return
 		}
 
 		err = s.Delete(database.ID)
 		if err != nil {
-			logError(err)
+			s.logError(err)
 			return
 		}
 
@@ -305,7 +307,7 @@ func (s service) Save(userId uint, database *model.Database, instance *model.Dep
 		destinationKey := fmt.Sprintf("%s/%s", saved.GroupName, database.Name)
 		err = s.s3Client.Move(s.s3Bucket, sourceKey, destinationKey)
 		if err != nil {
-			logError(err)
+			s.logError(err)
 			return
 		}
 
@@ -315,20 +317,20 @@ func (s service) Save(userId uint, database *model.Database, instance *model.Dep
 		saved.CreatedAt = database.CreatedAt
 		err = s.Update(saved)
 		if err != nil {
-			logError(err)
+			s.logError(err)
 			return
 		}
 
 		err = s.repository.UpdateId(saved.ID, database.ID)
 		if err != nil {
-			logError(err)
+			s.logError(err)
 			return
 		}
 
 		if database.Lock != nil {
 			_, err := s.repository.Lock(database.ID, database.Lock.InstanceID, database.Lock.UserID)
 			if err != nil {
-				logError(err)
+				s.logError(err)
 				return
 			}
 		}
@@ -384,20 +386,20 @@ func (s service) SaveAs(database *model.Database, instance *model.DeploymentInst
 
 			kubeConfig, err := decryptYaml(group.ClusterConfiguration.KubernetesConfiguration)
 			if err != nil {
-				logError(err)
+				s.logError(err)
 				return
 			}
 
 			ret, err = forwarder.WithForwardersEmbedConfig(context.Background(), options, kubeConfig)
 			if err != nil {
-				logError(err)
+				s.logError(err)
 				return
 			}
 			defer ret.Close()
 
 			ports, err := ret.Ready()
 			if err != nil {
-				logError(err)
+				s.logError(err)
 				return
 			}
 
@@ -415,47 +417,45 @@ func (s service) SaveAs(database *model.Database, instance *model.DeploymentInst
 
 		dumpExec := dump.Exec(pg.ExecOptions{StreamPrint: true, StreamDestination: os.Stdout})
 		if dumpExec.Error != nil {
-			log.Println(dumpExec.Error.Err)
-			log.Println(dumpExec.Output)
-			logError(dumpExec.Error.Err)
+			s.logger.Error("Failed to dump DB", "error", dumpExec.Error.Err, "dumpOutput", dumpExec.Output)
 			return
 		}
 
 		dumpFile := path.Join(dumpPath, dumpExec.File)
 		file, err := os.Open(dumpFile) // #nosec
 		if err != nil {
-			logError(err)
+			s.logError(err)
 			return
 		}
-		defer removeTempFile(file)
+		defer s.removeTempFile(file)
 
 		if format == "plain" {
 			gzFileName := path.Join(dumpPath, fileId+".gz")
-			file, err = gz(gzFileName, database, file)
+			file, err = s.gz(gzFileName, database, file)
 			if err != nil {
-				logError(err)
+				s.logError(err)
 				return
 			}
 
-			defer removeTempFile(file)
+			defer s.removeTempFile(file)
 		}
 
 		stat, err := file.Stat()
 		if err != nil {
-			logError(err)
+			s.logError(err)
 			return
 		}
 
 		// This is added due to the following issue - https://github.com/aws/aws-sdk-go/issues/1962
 		_, err = file.Seek(0, 0)
 		if err != nil {
-			logError(err)
+			s.logError(err)
 			return
 		}
 
 		_, err = s.Upload(newDatabase, group, file, stat.Size())
 		if err != nil {
-			logError(err)
+			s.logError(err)
 			return
 		}
 
@@ -465,20 +465,20 @@ func (s service) SaveAs(database *model.Database, instance *model.DeploymentInst
 	return newDatabase, nil
 }
 
-func logError(err error) {
+func (s service) logError(err error) {
 	// TODO: Persist error message
-	log.Println(err)
+	s.logger.Error("Failed to SaveAs DB", "error", err)
 }
 
-func removeTempFile(fd *os.File) {
+func (s service) removeTempFile(fd *os.File) {
 	for _, err := range [...]error{fd.Close(), os.Remove(fd.Name())} {
 		if err != nil {
-			log.Println("failed to remove temp file:", err)
+			s.logger.Error("Failed to remove temp file", "error", err)
 		}
 	}
 }
 
-func gz(gzFile string, database *model.Database, src *os.File) (*os.File, error) {
+func (s service) gz(gzFile string, database *model.Database, src *os.File) (*os.File, error) {
 	outFile, err := os.Create(gzFile) // #nosec
 	if err != nil {
 		return nil, err
@@ -490,7 +490,7 @@ func gz(gzFile string, database *model.Database, src *os.File) (*os.File, error)
 	defer func(zw *gzip.Writer) {
 		err := zw.Close()
 		if err != nil {
-			log.Println(err)
+			s.logger.Error("Failed to close gzip writer", "error", err)
 		}
 	}(zw)
 
@@ -502,7 +502,7 @@ func gz(gzFile string, database *model.Database, src *os.File) (*os.File, error)
 	defer func(src *os.File) {
 		err := src.Close()
 		if err != nil {
-			log.Println(err)
+			s.logger.Error("Failed to close file", "error", err)
 		}
 	}(src)
 

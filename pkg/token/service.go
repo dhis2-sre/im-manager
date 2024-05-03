@@ -4,7 +4,7 @@ import (
 	"crypto/rsa"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"time"
 
 	"github.com/google/uuid"
@@ -17,6 +17,7 @@ import (
 
 //goland:noinspection GoExportedFuncWithUnexportedType
 func NewService(
+	logger *slog.Logger,
 	tokenRepository repository,
 	privateKey *rsa.PrivateKey,
 	publicKey *rsa.PublicKey,
@@ -25,6 +26,7 @@ func NewService(
 	refreshTokenExpirationSeconds int,
 ) (*tokenService, error) {
 	return &tokenService{
+		logger:                        logger,
 		repository:                    tokenRepository,
 		privateKey:                    privateKey,
 		publicKey:                     publicKey,
@@ -56,6 +58,7 @@ type RefreshTokenData struct {
 }
 
 type tokenService struct {
+	logger                        *slog.Logger
 	repository                    repository
 	privateKey                    *rsa.PrivateKey
 	publicKey                     *rsa.PublicKey
@@ -96,13 +99,13 @@ func (t tokenService) GetTokens(user *model.User, previousRefreshTokenId string)
 func (t tokenService) ValidateRefreshToken(tokenString string) (*RefreshTokenData, error) {
 	claims, err := helper.ValidateRefreshToken(tokenString, t.refreshTokenSecretKey)
 	if err != nil {
-		log.Printf("Unable to validate token: %s\n%s\n", tokenString, err)
+		t.logger.Error("Unable to validate token", "error", err, "token", tokenString)
 		return nil, errors.New("unable to verify refresh token")
 	}
 
 	tokenId, err := uuid.Parse(claims.ID)
 	if err != nil {
-		log.Printf("Couldn't parse token id: %s\n%s\n", claims.ID, err)
+		t.logger.Error("Couldn't parse token id", "error", err, "claimsId", claims.ID)
 		return nil, errors.New("unable to verify refresh token")
 	}
 

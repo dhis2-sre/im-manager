@@ -75,7 +75,7 @@ func run() error {
 	authorization := middleware.NewAuthorization(logger, userService)
 	redis := storage.NewRedis(cfg)
 	tokenRepository := token.NewRepository(redis)
-	privateKey, err := cfg.Authentication.Keys.GetPrivateKey()
+	privateKey, err := cfg.Authentication.Keys.GetPrivateKey(logger)
 	if err != nil {
 		return err
 	}
@@ -83,7 +83,9 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	tokenService, err := token.NewService(tokenRepository, privateKey, publicKey, cfg.Authentication.AccessTokenExpirationSeconds, cfg.Authentication.RefreshTokenSecretKey, cfg.Authentication.RefreshTokenExpirationSeconds)
+	tokenService, err := token.NewService(logger, tokenRepository, privateKey, publicKey,
+		cfg.Authentication.AccessTokenExpirationSeconds, cfg.Authentication.RefreshTokenSecretKey,
+		cfg.Authentication.RefreshTokenExpirationSeconds)
 	if err != nil {
 		return err
 	}
@@ -110,8 +112,8 @@ func run() error {
 	stackService := stack.NewService(stacks)
 
 	instanceRepository := instance.NewRepository(db, cfg.InstanceParameterEncryptionKey)
-	helmfileService := instance.NewHelmfileService("./stacks", stackService, cfg.Classification)
-	instanceService := instance.NewService(instanceRepository, groupService, stackService, helmfileService)
+	helmfileService := instance.NewHelmfileService(logger, stackService, "./stacks", cfg.Classification)
+	instanceService := instance.NewService(logger, instanceRepository, groupService, stackService, helmfileService)
 
 	dockerHubClient := integration.NewDockerHubClient(cfg.DockerHub.Username, cfg.DockerHub.Password)
 
@@ -127,7 +129,7 @@ func run() error {
 	}
 	defer consumer.Close()
 
-	ttlDestroyConsumer := instance.NewTTLDestroyConsumer(consumer, instanceService)
+	ttlDestroyConsumer := instance.NewTTLDestroyConsumer(logger, consumer, instanceService)
 	err = ttlDestroyConsumer.Consume()
 	if err != nil {
 		return err
@@ -152,11 +154,11 @@ func run() error {
 		o.UsePathStyle = true
 	})
 	uploader := manager.NewUploader(s3AWSClient)
-	s3Client := storage.NewS3Client(s3AWSClient, uploader)
+	s3Client := storage.NewS3Client(logger, s3AWSClient, uploader)
 
 	databaseRepository := database.NewRepository(db)
-	databaseService := database.NewService(cfg.S3Bucket, s3Client, groupService, databaseRepository)
-	databaseHandler := database.NewHandler(databaseService, groupService, instanceService, stackService)
+	databaseService := database.NewService(logger, cfg.S3Bucket, s3Client, groupService, databaseRepository)
+	databaseHandler := database.NewHandler(logger, databaseService, groupService, instanceService, stackService)
 
 	err = handler.RegisterValidation()
 	if err != nil {
