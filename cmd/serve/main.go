@@ -62,13 +62,13 @@ func main() {
 func run() error {
 	cfg := config.New()
 
-	db, err := storage.NewDatabase(cfg.Postgresql)
+	httpLoggerGroup := "http"
+	logger := slog.New(log.New(slog.NewTextHandler(os.Stdout, nil), httpLoggerGroup))
+	db, err := storage.NewDatabase(logger, cfg.Postgresql)
 	if err != nil {
 		return err
 	}
 
-	httpLoggerGroup := "http"
-	logger := slog.New(log.New(slog.NewTextHandler(os.Stdout, nil), httpLoggerGroup))
 	userRepository := user.NewRepository(db)
 	dailer := mail.NewDialer(cfg.SMTP.Host, cfg.SMTP.Port, cfg.SMTP.Username, cfg.SMTP.Password)
 	userService := user.NewService(cfg.UIURL, cfg.PasswordTokenTTL, userRepository, dailer)

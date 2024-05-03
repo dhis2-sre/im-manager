@@ -668,6 +668,8 @@ github.com/opencontainers/image-spec v1.1.0 h1:8SG7/vwALn54lVB/0yZ/MMwhFrPYtpEHQ
 github.com/opencontainers/image-spec v1.1.0/go.mod h1:W4s4sFTMaBeK1BQLXbG4AdM2szdn85PY75RI83NrTrM=
 github.com/opencontainers/runc v1.1.0 h1:O9+X96OcDjkmmZyfaG996kV7yq8HsoU2h1XRRQcefG8=
 github.com/opencontainers/runc v1.1.0/go.mod h1:Tj1hFw6eFWp/o33uxGf5yF2BX5yz2Z6iptFpuvbbKqc=
+github.com/orandin/slog-gorm v1.3.2 h1:C0lKDQPAx/pF+8K2HL7bdShPwOEJpPM0Bn80zTzxU1g=
+github.com/orandin/slog-gorm v1.3.2/go.mod h1:MoZ51+b7xE9lwGNPYEhxcUtRNrYzjdcKvA8QXQQGEPA=
 github.com/orlangure/gnomock v0.30.0 h1:WXq/3KTKRVYe9a3BXa5JMZCCrg2RwNAPB2bZHMxEntE=
 github.com/orlangure/gnomock v0.30.0/go.mod h1:vDur9icFVsecjDQrHn06SbUs0BXjJaNJRDexBsPh5f4=
 github.com/ory/dockertest v3.3.5+incompatible h1:iLLK6SQwIhcbrG783Dghaaa3WPzGc+4Emza6EbVUUGA=
