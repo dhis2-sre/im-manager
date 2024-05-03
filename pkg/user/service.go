@@ -27,10 +27,10 @@ func NewService(uiUrl string, passwordTokenTtl uint, repository userRepository, 
 type userRepository interface {
 	create(user *model.User) error
 	findByEmail(email string) (*model.User, error)
-	findById(id uint) (*model.User, error)
+	findById(ctx context.Context, id uint) (*model.User, error)
 	findOrCreate(email *model.User) (*model.User, error)
 	findAll(ctx context.Context) ([]*model.User, error)
-	delete(id uint) error
+	delete(ctx context.Context, id uint) error
 	update(user *model.User) (*model.User, error)
 	findByEmailToken(token uuid.UUID) (*model.User, error)
 	save(user *model.User) error
@@ -168,8 +168,8 @@ func (s service) FindAll(ctx context.Context) ([]*model.User, error) {
 	return s.repository.findAll(ctx)
 }
 
-func (s service) FindById(id uint) (*model.User, error) {
-	return s.repository.findById(id)
+func (s service) FindById(ctx context.Context, id uint) (*model.User, error) {
+	return s.repository.findById(ctx, id)
 }
 
 func (s service) FindOrCreate(email string, password string) (*model.User, error) {
@@ -187,12 +187,12 @@ func (s service) FindOrCreate(email string, password string) (*model.User, error
 	return s.repository.findOrCreate(user)
 }
 
-func (s service) Delete(id uint) error {
-	return s.repository.delete(id)
+func (s service) Delete(ctx context.Context, id uint) error {
+	return s.repository.delete(ctx, id)
 }
 
-func (s service) Update(id uint, email, password string) (*model.User, error) {
-	user, err := s.repository.findById(id)
+func (s service) Update(ctx context.Context, id uint, email, password string) (*model.User, error) {
+	user, err := s.repository.findById(ctx, id)
 	if err != nil {
 		return nil, err
 	}

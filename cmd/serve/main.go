@@ -206,7 +206,6 @@ func hostname() string {
 
 type groupService interface {
 	FindOrCreate(name string, hostname string, deployable bool) (*model.Group, error)
-	AddUser(groupName string, userId uint) error
 }
 
 func createGroups(logger *slog.Logger, groupService groupService, groups []config.Group) error {

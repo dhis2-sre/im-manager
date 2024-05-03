@@ -191,7 +191,7 @@ func (m *mockUserService) SignIn(email string, password string) (*model.User, er
 	panic("implement me")
 }
 
-func (m *mockUserService) FindById(id uint) (*model.User, error) {
+func (m *mockUserService) FindById(ctx context.Context, id uint) (*model.User, error) {
 	called := m.Called(id)
 	return called.Get(0).(*model.User), nil
 }
@@ -200,11 +200,11 @@ func (m *mockUserService) FindAll(ctx context.Context) ([]*model.User, error) {
 	panic("implement me")
 }
 
-func (m *mockUserService) Delete(id uint) error {
+func (m *mockUserService) Delete(ctx context.Context, id uint) error {
 	panic("implement me")
 }
 
-func (m *mockUserService) Update(id uint, email, password string) (*model.User, error) {
+func (m *mockUserService) Update(ctx context.Context, id uint, email, password string) (*model.User, error) {
 	panic("implement me")
 }
 

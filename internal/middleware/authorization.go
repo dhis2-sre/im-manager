@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"context"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -25,7 +26,7 @@ type AuthorizationMiddleware struct {
 }
 
 type userService interface {
-	FindById(id uint) (*model.User, error)
+	FindById(ctx context.Context, id uint) (*model.User, error)
 }
 
 func (m AuthorizationMiddleware) RequireAdministrator(c *gin.Context) {
@@ -34,7 +35,7 @@ func (m AuthorizationMiddleware) RequireAdministrator(c *gin.Context) {
 		return
 	}
 
-	userWithGroups, err := m.userService.FindById(u.ID)
+	userWithGroups, err := m.userService.FindById(c, u.ID)
 	if err != nil {
 		if errdef.IsNotFound(err) {
 			_ = c.AbortWithError(http.StatusUnauthorized, err)

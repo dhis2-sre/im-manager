@@ -1,6 +1,8 @@
 package group
 
 import (
+	"context"
+
 	"github.com/dhis2-sre/im-manager/pkg/model"
 )
 
@@ -26,7 +28,7 @@ type groupRepository interface {
 }
 
 type userService interface {
-	FindById(id uint) (*model.User, error)
+	FindById(ctx context.Context, id uint) (*model.User, error)
 }
 
 type service struct {
@@ -72,13 +74,13 @@ func (s *service) FindOrCreate(name string, hostname string, deployable bool) (*
 	return g, err
 }
 
-func (s *service) AddUser(groupName string, userId uint) error {
+func (s *service) AddUser(ctx context.Context, groupName string, userId uint) error {
 	group, err := s.Find(groupName)
 	if err != nil {
 		return err
 	}
 
-	u, err := s.userService.FindById(userId)
+	u, err := s.userService.FindById(ctx, userId)
 	if err != nil {
 		return err
 	}
@@ -86,13 +88,13 @@ func (s *service) AddUser(groupName string, userId uint) error {
 	return s.groupRepository.addUser(group, u)
 }
 
-func (s *service) RemoveUser(groupName string, userId uint) error {
+func (s *service) RemoveUser(c context.Context, groupName string, userId uint) error {
 	group, err := s.Find(groupName)
 	if err != nil {
 		return err
 	}
 
-	u, err := s.userService.FindById(userId)
+	u, err := s.userService.FindById(c, userId)
 	if err != nil {
 		return err
 	}

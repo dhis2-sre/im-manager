@@ -88,9 +88,10 @@ func (r repository) findOrCreate(user *model.User) (*model.User, error) {
 	return u, err
 }
 
-func (r repository) findById(id uint) (*model.User, error) {
+func (r repository) findById(ctx context.Context, id uint) (*model.User, error) {
 	var u *model.User
 	err := r.db.
+		WithContext(ctx).
 		Preload("Groups").
 		Preload("AdminGroups").
 		First(&u, id).Error
@@ -100,8 +101,8 @@ func (r repository) findById(id uint) (*model.User, error) {
 	return u, err
 }
 
-func (r repository) delete(id uint) error {
-	db := r.db.Unscoped().Delete(&model.User{}, id)
+func (r repository) delete(ctx context.Context, id uint) error {
+	db := r.db.WithContext(ctx).Unscoped().Delete(&model.User{}, id)
 	if db.Error != nil {
 		return fmt.Errorf("failed to delete user with id %d: %v", id, db.Error)
 	} else if db.RowsAffected < 1 {

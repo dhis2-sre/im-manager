@@ -1,6 +1,7 @@
 package user_test
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"log/slog"
@@ -69,7 +70,7 @@ func TestUserHandler(t *testing.T) {
 		require.Empty(t, user1.Password)
 		user1ID = strconv.FormatUint(uint64(user1.ID), 10)
 
-		u1, err := userService.FindById(user1.ID)
+		u1, err := userService.FindById(context.Background(), user1.ID)
 		require.NoError(t, err)
 		err = userService.ValidateEmail(u1.EmailToken)
 		require.NoError(t, err)
@@ -83,7 +84,7 @@ func TestUserHandler(t *testing.T) {
 		require.Equal(t, "user2@dhis2.org", user2.Email)
 		require.Empty(t, user2.Password)
 
-		u2, err := userService.FindById(user2.ID)
+		u2, err := userService.FindById(context.Background(), user2.ID)
 		require.NoError(t, err)
 		err = userService.ValidateEmail(u2.EmailToken)
 		require.NoError(t, err)
@@ -226,7 +227,7 @@ func TestUserHandler(t *testing.T) {
 				user1ID, err := strconv.ParseUint(user1ID, 10, 0)
 				require.NoError(t, err)
 				user1IDInt := uint(user1ID)
-				user1, err := userService.FindById(user1IDInt)
+				user1, err := userService.FindById(context.Background(), user1IDInt)
 				require.NoError(t, err)
 
 				require.NotEmpty(t, user1.PasswordToken, "should have a password token")
@@ -243,7 +244,7 @@ func TestUserHandler(t *testing.T) {
 
 				client.Do(t, http.MethodPost, "/users/reset-password", resetRequestBody, http.StatusCreated, inttest.WithHeader("Content-Type", "application/json"))
 
-				newUser1, _ := userService.FindById(user1IDInt)
+				newUser1, _ := userService.FindById(context.Background(), user1IDInt)
 				newPassword := newUser1.Password
 
 				require.NotEqual(t, oldPassword, newPassword, "old and new password should be different")
@@ -259,7 +260,7 @@ func TestUserHandler(t *testing.T) {
 				user1ID, err := strconv.ParseUint(user1ID, 10, 0)
 				require.NoError(t, err)
 				user1IDInt := uint(user1ID)
-				user1, _ := newUserService.FindById(user1IDInt)
+				user1, _ := newUserService.FindById(context.Background(), user1IDInt)
 				require.NoError(t, err)
 
 				// Wait for token to expire
