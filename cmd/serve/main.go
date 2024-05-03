@@ -62,8 +62,7 @@ func main() {
 func run() error {
 	cfg := config.New()
 
-	httpLoggerGroup := "http"
-	logger := slog.New(log.New(slog.NewTextHandler(os.Stdout, nil), httpLoggerGroup))
+	logger := slog.New(log.New(slog.NewTextHandler(os.Stdout, nil)))
 	db, err := storage.NewDatabase(logger, cfg.Postgresql)
 	if err != nil {
 		return err
@@ -184,7 +183,7 @@ func run() error {
 	if cfg.Environment != "production" {
 		cfg.AllowedOrigins = append(cfg.AllowedOrigins, "http://localhost:3000", "http://localhost:5173")
 	}
-	r := server.GetEngine(logger, httpLoggerGroup, cfg.BasePath, cfg.AllowedOrigins)
+	r := server.GetEngine(logger, cfg.BasePath, cfg.AllowedOrigins)
 
 	group.Routes(r, authentication, authorization, groupHandler)
 	user.Routes(r, authentication, authorization, userHandler)
