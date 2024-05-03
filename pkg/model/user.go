@@ -2,6 +2,7 @@ package model
 
 import (
 	"database/sql"
+	"log/slog"
 	"time"
 
 	"github.com/google/uuid"
@@ -42,4 +43,8 @@ func (u *User) contains(group string, groups []Group) bool {
 
 func (u *User) IsAdministrator() bool {
 	return u.IsMemberOf(AdministratorGroupName)
+}
+
+func (u *User) LogValue() slog.Value {
+	return slog.Uint64Value(uint64(u.ID))
 }

@@ -45,10 +45,7 @@ func (m AuthorizationMiddleware) RequireAdministrator(c *gin.Context) {
 	}
 
 	if !userWithGroups.IsAdministrator() {
-		// TODO(DEVOPS-170) investigate how to log user related info without logging sensitive
-		// information failed requests are already logged by samber/slog-gin so we would want to add
-		// necessary debug info into the middleware if possible
-		m.logger.ErrorContext(c, "User tried to access administrator restricted endpoint", "user", u.ID)
+		m.logger.ErrorContext(c, "User tried to access administrator restricted endpoint", "user", u)
 		_ = c.AbortWithError(http.StatusUnauthorized, errors.New("administrator access denied"))
 		return
 	}
