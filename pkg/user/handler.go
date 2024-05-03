@@ -1,6 +1,7 @@
 package user
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -38,7 +39,7 @@ type userService interface {
 	SignUp(email string, password string) (*model.User, error)
 	SignIn(email string, password string) (*model.User, error)
 	FindById(id uint) (*model.User, error)
-	FindAll() ([]*model.User, error)
+	FindAll(ctx context.Context) ([]*model.User, error)
 	Delete(id uint) error
 	Update(id uint, email, password string) (*model.User, error)
 	ValidateEmail(token uuid.UUID) error
@@ -63,7 +64,7 @@ func (h Handler) SignUp(c *gin.Context) {
 	//
 	// SignUp user
 	//
-	// Sign up a user. This endpoint is publicly accessible and therefor anyone can sign up. However, before being able to perform any actions, users needs to be a member of a group. And only administrators can add users to groups.
+	// Sign up a user. This endpoint is publicly accessible and therefore anyone can sign up. However, before being able to perform any actions, users needs to be a member of a group. And only administrators can add users to groups.
 	//
 	// responses:
 	//   201: User
@@ -432,7 +433,7 @@ func (h Handler) FindAll(c *gin.Context) {
 	//	403: Error
 	//	404: Error
 	//	415: Error
-	users, err := h.userService.FindAll()
+	users, err := h.userService.FindAll(c)
 	if err != nil {
 		_ = c.Error(err)
 		return

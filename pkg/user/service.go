@@ -1,6 +1,7 @@
 package user
 
 import (
+	"context"
 	"crypto/rand"
 	"database/sql"
 	"encoding/base64"
@@ -28,7 +29,7 @@ type userRepository interface {
 	findByEmail(email string) (*model.User, error)
 	findById(id uint) (*model.User, error)
 	findOrCreate(email *model.User) (*model.User, error)
-	findAll() ([]*model.User, error)
+	findAll(ctx context.Context) ([]*model.User, error)
 	delete(id uint) error
 	update(user *model.User) (*model.User, error)
 	findByEmailToken(token uuid.UUID) (*model.User, error)
@@ -163,8 +164,8 @@ func comparePasswords(storedPassword string, suppliedPassword string) (bool, err
 	return hex.EncodeToString(hash) == passwordAndSalt[0], nil
 }
 
-func (s service) FindAll() ([]*model.User, error) {
-	return s.repository.findAll()
+func (s service) FindAll(ctx context.Context) ([]*model.User, error) {
+	return s.repository.findAll(ctx)
 }
 
 func (s service) FindById(id uint) (*model.User, error) {

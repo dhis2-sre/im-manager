@@ -17,6 +17,7 @@ func NewDatabase(logger *slog.Logger, c config.Postgresql) (*gorm.DB, error) {
 		slogGorm.WithHandler(logger.Handler()),
 		slogGorm.WithRecordNotFoundError(),
 		slogGorm.WithSlowThreshold(200*time.Millisecond),
+		slogGorm.WithContextValue("user", "user"),
 	)
 	databaseConfig := gorm.Config{
 		Logger:         gormLogger,

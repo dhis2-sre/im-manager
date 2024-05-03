@@ -2,6 +2,7 @@ package user
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -195,7 +196,7 @@ func (m *mockUserService) FindById(id uint) (*model.User, error) {
 	return called.Get(0).(*model.User), nil
 }
 
-func (m *mockUserService) FindAll() ([]*model.User, error) {
+func (m *mockUserService) FindAll(ctx context.Context) ([]*model.User, error) {
 	panic("implement me")
 }
 

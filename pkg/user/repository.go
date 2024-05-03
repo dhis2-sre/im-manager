@@ -1,6 +1,7 @@
 package user
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -34,10 +35,11 @@ func (r repository) create(u *model.User) error {
 	return err
 }
 
-func (r repository) findAll() ([]*model.User, error) {
+func (r repository) findAll(ctx context.Context) ([]*model.User, error) {
 	var users []*model.User
 
 	err := r.db.
+		WithContext(ctx).
 		Preload("Groups").
 		Preload("AdminGroups").
 		Order("Email").
