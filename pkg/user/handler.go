@@ -237,7 +237,8 @@ func (h Handler) SignIn(c *gin.Context) {
 
 	var request signInRequest
 	if err := handler.DataBinder(c, &request); err != nil {
-		request = signInRequest{RememberMe: false}
+		_ = c.Error(err)
+		return
 	}
 
 	tokens, err := h.tokenService.GetTokens(user, "", request.RememberMe)
