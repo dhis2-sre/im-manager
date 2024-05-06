@@ -23,7 +23,7 @@ func TestRequestIDHandler(t *testing.T) {
 	var b bytes.Buffer
 	var requestID string
 	r := gin.New()
-	logger := slog.New(RequestIDHandler{Handler: slog.NewJSONHandler(&b, nil)})
+	logger := slog.New(New(slog.NewJSONHandler(&b, nil)))
 	r.Use(sloggin.New(logger))
 
 	r.GET("/", func(ctx *gin.Context) {

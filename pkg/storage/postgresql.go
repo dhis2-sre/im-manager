@@ -2,28 +2,33 @@ package storage
 
 import (
 	"fmt"
+	"log/slog"
+	"time"
 
 	"github.com/dhis2-sre/im-manager/pkg/config"
 	"github.com/dhis2-sre/im-manager/pkg/model"
+	slogGorm "github.com/orandin/slog-gorm"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
-	"gorm.io/gorm/logger"
 )
 
-func NewDatabase(c config.Postgresql) (*gorm.DB, error) {
+func NewDatabase(logger *slog.Logger, c config.Postgresql) (*gorm.DB, error) {
+	gormLogger := slogGorm.New(
+		slogGorm.WithHandler(logger.Handler()),
+		slogGorm.WithRecordNotFoundError(),
+		slogGorm.WithSlowThreshold(200*time.Second),
+	)
+	databaseConfig := gorm.Config{
+		Logger:         gormLogger,
+		TranslateError: true,
+	}
+
 	host := c.Host
 	port := c.Port
 	username := c.Username
 	password := c.Password
 	name := c.DatabaseName
-
 	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%d sslmode=disable", host, username, password, name, port)
-
-	databaseConfig := gorm.Config{
-		Logger:         logger.Default.LogMode(logger.Warn),
-		TranslateError: true,
-	}
-
 	db, err := gorm.Open(postgres.Open(dsn), &databaseConfig)
 	if err != nil {
 		return nil, err
@@ -44,7 +49,7 @@ func NewDatabase(c config.Postgresql) (*gorm.DB, error) {
 	)
 
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to open Gorm session: %v", err)
 	}
 
 	return db, nil

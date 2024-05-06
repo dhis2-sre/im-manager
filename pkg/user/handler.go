@@ -1,6 +1,7 @@
 package user
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -37,10 +38,10 @@ type Handler struct {
 type userService interface {
 	SignUp(email string, password string) (*model.User, error)
 	SignIn(email string, password string) (*model.User, error)
-	FindById(id uint) (*model.User, error)
-	FindAll() ([]*model.User, error)
-	Delete(id uint) error
-	Update(id uint, email, password string) (*model.User, error)
+	FindById(ctx context.Context, id uint) (*model.User, error)
+	FindAll(ctx context.Context) ([]*model.User, error)
+	Delete(ctx context.Context, id uint) error
+	Update(ctx context.Context, id uint, email, password string) (*model.User, error)
 	ValidateEmail(token uuid.UUID) error
 	RequestPasswordReset(email string) error
 	ResetPassword(token string, password string) error
@@ -63,7 +64,7 @@ func (h Handler) SignUp(c *gin.Context) {
 	//
 	// SignUp user
 	//
-	// Sign up a user. This endpoint is publicly accessible and therefor anyone can sign up. However, before being able to perform any actions, users needs to be a member of a group. And only administrators can add users to groups.
+	// Sign up a user. This endpoint is publicly accessible and therefore anyone can sign up. However, before being able to perform any actions, users needs to be a member of a group. And only administrators can add users to groups.
 	//
 	// responses:
 	//   201: User
@@ -287,7 +288,7 @@ func (h Handler) RefreshToken(c *gin.Context) {
 		return
 	}
 
-	user, err := h.userService.FindById(refreshToken.UserId)
+	user, err := h.userService.FindById(c, refreshToken.UserId)
 	if err != nil {
 		if errdef.IsNotFound(err) {
 			_ = c.AbortWithError(http.StatusUnauthorized, err)
@@ -339,7 +340,7 @@ func (h Handler) Me(c *gin.Context) {
 		return
 	}
 
-	userWithGroups, err := h.userService.FindById(user.ID)
+	userWithGroups, err := h.userService.FindById(c, user.ID)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -406,7 +407,7 @@ func (h Handler) FindById(c *gin.Context) {
 		return
 	}
 
-	userWithGroups, err := h.userService.FindById(id)
+	userWithGroups, err := h.userService.FindById(c, id)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -432,7 +433,7 @@ func (h Handler) FindAll(c *gin.Context) {
 	//	403: Error
 	//	404: Error
 	//	415: Error
-	users, err := h.userService.FindAll()
+	users, err := h.userService.FindAll(c)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -469,7 +470,7 @@ func (h Handler) Delete(c *gin.Context) {
 		return
 	}
 
-	_, err = h.userService.FindById(id)
+	_, err = h.userService.FindById(c, id)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -480,7 +481,7 @@ func (h Handler) Delete(c *gin.Context) {
 		return
 	}
 
-	err = h.userService.Delete(id)
+	err = h.userService.Delete(c, id)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -527,7 +528,7 @@ func (h Handler) Update(c *gin.Context) {
 		return
 	}
 
-	user, err := h.userService.Update(id, request.Email, request.Password)
+	user, err := h.userService.Update(c, id, request.Email, request.Password)
 	if err != nil {
 		_ = c.Error(err)
 		return
