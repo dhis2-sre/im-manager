@@ -5,41 +5,46 @@ import (
 	"context"
 	"log/slog"
 
+	"github.com/dhis2-sre/im-manager/internal/middleware"
+	"github.com/dhis2-sre/im-manager/pkg/model"
 	"github.com/gin-gonic/gin"
-	sloggin "github.com/samber/slog-gin"
 )
 
-// RequestIDHandler adds the request ID to the slog.Record if present in the Gin context.
-type RequestIDHandler struct {
+// ContextHandler adds values from the Gin context to the slog.Record.
+type ContextHandler struct {
 	slog.Handler
 }
 
-func New(handler slog.Handler) *RequestIDHandler {
-	return &RequestIDHandler{
+func New(handler slog.Handler) *ContextHandler {
+	return &ContextHandler{
 		Handler: handler,
 	}
 }
 
-func (rh *RequestIDHandler) Enabled(ctx context.Context, level slog.Level) bool {
+func (rh *ContextHandler) Enabled(ctx context.Context, level slog.Level) bool {
 	return rh.Handler.Enabled(ctx, level)
 }
 
-func (rh *RequestIDHandler) Handle(ctx context.Context, r slog.Record) error {
+func (rh *ContextHandler) Handle(ctx context.Context, r slog.Record) error {
+	// We are logging the request id/user under the same keys as in middleware.RequestLogger. This
+	// is to find logs we make via the context aware logger functions like logger.InfoContext as
+	// well as the ones made by the Gin middleware.RequestLogger.
 	if ginCtx, ok := ctx.(*gin.Context); ok {
-		// we are logging the request id under the same key used by the slog Gin middleware
-		// https://github.com/samber/slog-gin/blob/812b3ffb5d6c562fa79e00edaef5409cd053f4d0/middleware.go#L167-L169
-		// this allows us to find logs we make via the context aware logger functions like
-		// logger.InfoContext as well as the ones made by the Gin middleware using the same key and
-		// id
-		r.AddAttrs(slog.String("id", sloggin.GetRequestID(ginCtx)))
+		r.AddAttrs(slog.String(middleware.RequestLoggerKeyID, middleware.GetRequestID(ginCtx)))
+
+		if user, ok := ginCtx.Get("user"); ok {
+			if user, ok := user.(*model.User); ok {
+				r.AddAttrs(slog.Any(middleware.RequestLoggerKeyUser, user))
+			}
+		}
 	}
 	return rh.Handler.Handle(ctx, r)
 }
 
-func (rh *RequestIDHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
+func (rh *ContextHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
 	return New(rh.Handler.WithAttrs(attrs))
 }
 
-func (rh *RequestIDHandler) WithGroup(name string) slog.Handler {
+func (rh *ContextHandler) WithGroup(name string) slog.Handler {
 	return New(rh.Handler.WithGroup(name))
 }

@@ -8,13 +8,13 @@ import (
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	redocMiddleware "github.com/go-openapi/runtime/middleware"
-	sloggin "github.com/samber/slog-gin"
 )
 
 func GetEngine(logger *slog.Logger, basePath string, allowedOrigins []string) *gin.Engine {
 	r := gin.New()
 	r.Use(gin.Recovery())
-	r.Use(sloggin.New(logger))
+	r.Use(middleware.RequestID())
+	r.Use(middleware.RequestLogger(logger))
 
 	corsConfig := cors.DefaultConfig()
 	// Without specifying origins, secure cookies won't work
