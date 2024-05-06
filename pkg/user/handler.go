@@ -306,7 +306,7 @@ func (h Handler) RefreshToken(c *gin.Context) {
 		return
 	}
 
-	rememberMe := false
+	var rememberMe bool
 	rememberMeCookie, _ := c.Cookie("rememberMe")
 	if rememberMeCookie == "true" {
 		rememberMe = true
