@@ -7,8 +7,8 @@ require (
 	github.com/anthhub/forwarder v1.1.0
 	github.com/aws/aws-sdk-go-v2 v1.26.1
 	github.com/aws/aws-sdk-go-v2/config v1.27.12
-	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.16.15
-	github.com/aws/aws-sdk-go-v2/service/s3 v1.53.1
+	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.16.16
+	github.com/aws/aws-sdk-go-v2/service/s3 v1.53.2
 	github.com/dhis2-sre/rabbitmq-client v0.3.1
 	github.com/dominikbraun/graph v0.23.0
 	github.com/gin-contrib/cors v1.7.2
