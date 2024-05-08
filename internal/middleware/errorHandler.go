@@ -37,7 +37,7 @@ func ErrorHandler() gin.HandlerFunc {
 			c.String(http.StatusConflict, err.Error())
 		} else {
 			id := sloggin.GetRequestID(c)
-			err := fmt.Errorf("something went wrong. We'll look into it if you send us the id %q :)", id)
+			err := fmt.Errorf("something went wrong. We'll look into it if you send us the request id %q :)", id)
 			c.String(http.StatusInternalServerError, err.Error())
 		}
 	}
