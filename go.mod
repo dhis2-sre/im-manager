@@ -28,7 +28,7 @@ require (
 	github.com/samber/slog-gin v1.12.1
 	github.com/stretchr/testify v1.9.0
 	go.mozilla.org/sops/v3 v3.7.3
-	golang.org/x/crypto v0.22.0
+	golang.org/x/crypto v0.23.0
 	golang.org/x/exp v0.0.0-20231108232855-2478ac86f678
 	gorm.io/driver/postgres v1.5.7
 	gorm.io/gorm v1.25.10
@@ -197,9 +197,9 @@ require (
 	golang.org/x/net v0.24.0 // indirect
 	golang.org/x/oauth2 v0.17.0 // indirect
 	golang.org/x/sync v0.6.0 // indirect
-	golang.org/x/sys v0.19.0 // indirect
-	golang.org/x/term v0.19.0 // indirect
-	golang.org/x/text v0.14.0 // indirect
+	golang.org/x/sys v0.20.0 // indirect
+	golang.org/x/term v0.20.0 // indirect
+	golang.org/x/text v0.15.0 // indirect
 	golang.org/x/time v0.5.0 // indirect
 	golang.org/x/tools v0.15.0 // indirect
 	google.golang.org/api v0.162.0 // indirect
