@@ -1,9 +1,14 @@
 package user
 
 import (
+	"crypto/rsa"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
+
+	"github.com/lestrrat-go/jwx/v2/jwa"
+	"github.com/lestrrat-go/jwx/v2/jwt"
 
 	"github.com/dhis2-sre/im-manager/pkg/config"
 
@@ -385,11 +390,19 @@ func (h Handler) SignOut(c *gin.Context) {
 	//	401: Error
 	//	415: Error
 
-	// TODO: cookies should be cleared no matter what...
-	// The below shouldn't result in an error if the access token is expired and we still want to remove the other cookies
-	user, err := handler.GetUserFromContext(c)
+	// No matter what happens, if the user sends a sign-out request, delete all cookies
+	unsetCookie(c)
+
+	key, err := h.authentication.Keys.GetPublicKey()
 	if err != nil {
 		_ = c.Error(err)
+		return
+	}
+
+	user, err := parseRequest(c.Request, key)
+	if err != nil {
+		log.Println("token not valid:", err)
+		_ = c.Error(errdef.NewUnauthorized("token not valid"))
 		return
 	}
 
@@ -398,9 +411,33 @@ func (h Handler) SignOut(c *gin.Context) {
 		return
 	}
 
-	unsetCookie(c)
-
 	c.Status(http.StatusOK)
+}
+
+func parseRequest(request *http.Request, key *rsa.PublicKey) (*model.User, error) {
+	token, err := jwt.ParseRequest(
+		request,
+		jwt.WithKey(jwa.RS256, key),
+		jwt.WithHeaderKey("Authorization"),
+		jwt.WithCookieKey("accessToken"),
+		jwt.WithCookieKey("refreshToken"),
+		jwt.WithTypedClaim("user", model.User{}),
+	)
+	if err != nil && !errors.Is(err, jwt.ErrTokenExpired()) {
+		return nil, err
+	}
+
+	userData, ok := token.Get("user")
+	if !ok {
+		return nil, errors.New("user not found in claims")
+	}
+
+	user, ok := userData.(model.User)
+	if !ok {
+		return nil, errors.New("unable to convert claim to user")
+	}
+
+	return &user, nil
 }
 
 func unsetCookie(c *gin.Context) {
