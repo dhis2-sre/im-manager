@@ -62,7 +62,7 @@ func main() {
 func run() error {
 	cfg := config.New()
 
-	logger := slog.New(log.New(slog.NewTextHandler(os.Stdout, nil)))
+	logger := slog.New(log.New(slog.NewJSONHandler(os.Stdout, nil)))
 	db, err := storage.NewDatabase(logger, cfg.Postgresql)
 	if err != nil {
 		return err
