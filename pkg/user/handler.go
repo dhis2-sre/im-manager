@@ -23,10 +23,11 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func NewHandler(hostname string, authentication config.Authentication, userService userService, tokenService tokenService) Handler {
+func NewHandler(hostname string, authentication config.Authentication, publicKey *rsa.PublicKey, userService userService, tokenService tokenService) Handler {
 	return Handler{
 		hostname,
 		authentication,
+		publicKey,
 		userService,
 		tokenService,
 	}
@@ -35,6 +36,7 @@ func NewHandler(hostname string, authentication config.Authentication, userServi
 type Handler struct {
 	hostname       string
 	authentication config.Authentication
+	publicKey      *rsa.PublicKey
 	userService    userService
 	tokenService   tokenService
 }
@@ -393,13 +395,7 @@ func (h Handler) SignOut(c *gin.Context) {
 	// No matter what happens, if the user sends a sign-out request, delete all cookies
 	unsetCookie(c)
 
-	key, err := h.authentication.Keys.GetPublicKey()
-	if err != nil {
-		_ = c.Error(err)
-		return
-	}
-
-	user, err := parseRequest(c.Request, key)
+	user, err := h.parseRequest(c.Request)
 	if err != nil {
 		log.Println("token not valid:", err)
 		_ = c.Error(errdef.NewUnauthorized("token not valid"))
@@ -414,10 +410,10 @@ func (h Handler) SignOut(c *gin.Context) {
 	c.Status(http.StatusOK)
 }
 
-func parseRequest(request *http.Request, key *rsa.PublicKey) (*model.User, error) {
+func (h Handler) parseRequest(request *http.Request) (*model.User, error) {
 	token, err := jwt.ParseRequest(
 		request,
-		jwt.WithKey(jwa.RS256, key),
+		jwt.WithKey(jwa.RS256, h.publicKey),
 		jwt.WithHeaderKey("Authorization"),
 		jwt.WithCookieKey("accessToken"),
 		jwt.WithCookieKey("refreshToken"),

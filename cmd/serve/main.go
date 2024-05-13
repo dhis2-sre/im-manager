@@ -85,7 +85,7 @@ func run() error {
 		return err
 	}
 
-	userHandler := user.NewHandler(cfg.Hostname, cfg.Authentication, userService, tokenService)
+	userHandler := user.NewHandler(cfg.Hostname, cfg.Authentication, publicKey, userService, tokenService)
 
 	authentication := middleware.NewAuthentication(publicKey, userService)
 	groupRepository := group.NewRepository(db)

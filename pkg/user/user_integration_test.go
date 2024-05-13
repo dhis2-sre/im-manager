@@ -38,8 +38,7 @@ func TestUserHandler(t *testing.T) {
 	authorization := middleware.NewAuthorization(userService)
 	key, err := rsa.GenerateKey(rand.Reader, 2048)
 	require.NoError(t, err, "failed to generate private key")
-	// TODO(DEVOPS-259) we should not use a pointer as we do not mutate and should not mutate the
-	// certificate
+	// TODO(DEVOPS-259) we should not use a pointer as we do not mutate and should not mutate the certificate
 	authentication := middleware.NewAuthentication(&key.PublicKey, userService)
 
 	redis := inttest.SetupRedis(t)
@@ -54,7 +53,7 @@ func TestUserHandler(t *testing.T) {
 	require.NoError(t, err)
 
 	client := inttest.SetupHTTPServer(t, func(engine *gin.Engine) {
-		userHandler := user.NewHandler("hostname", config.Authentication{}, userService, tokenService)
+		userHandler := user.NewHandler("hostname", authenticationConfig, &key.PublicKey, userService, tokenService)
 		user.Routes(engine, authentication, authorization, userHandler)
 	})
 
@@ -100,6 +99,17 @@ func TestUserHandler(t *testing.T) {
 		require.Equal(t, "user3@dhis2.org", user3.Email)
 		require.Empty(t, user3.Password)
 	}
+
+	t.Run("SignOut", func(t *testing.T) {
+		t.Parallel()
+
+		t.Run("NoToken", func(t *testing.T) {
+			client.Do(t, http.MethodDelete, "/users", nil, http.StatusUnauthorized)
+		})
+
+		t.Run("ValidToken", func(t *testing.T) {})
+		t.Run("ExpiredToken", func(t *testing.T) {})
+	})
 
 	t.Run("SignUpFailed", func(t *testing.T) {
 		t.Parallel()
@@ -158,7 +168,8 @@ func TestUserHandler(t *testing.T) {
 			{
 				t.Log("SignIn")
 
-				client.PostJSON(t, "/tokens", nil, &user1Token, inttest.WithBasicAuth("user1@dhis2.org", "oneoneoneoneoneoneone111"))
+				requestBody := strings.NewReader(`{}`)
+				client.PostJSON(t, "/tokens", requestBody, &user1Token, inttest.WithBasicAuth("user1@dhis2.org", "oneoneoneoneoneoneone111"))
 
 				require.NotEmpty(t, user1Token.AccessToken, "should return an access token")
 			}
@@ -202,7 +213,8 @@ func TestUserHandler(t *testing.T) {
 			{
 				t.Log("SignIn")
 
-				client.PostJSON(t, "/tokens", nil, &user2Token, inttest.WithBasicAuth("user2@dhis2.org", "oneoneoneoneoneoneone111"))
+				requestBody := strings.NewReader(`{}`)
+				client.PostJSON(t, "/tokens", requestBody, &user2Token, inttest.WithBasicAuth("user2@dhis2.org", "oneoneoneoneoneoneone111"))
 
 				require.NotEmpty(t, user2Token.AccessToken, "should return an access token")
 			}
@@ -281,7 +293,8 @@ func TestUserHandler(t *testing.T) {
 		{
 			t.Log("SignIn")
 
-			client.PostJSON(t, "/tokens", nil, &adminToken, inttest.WithBasicAuth("admin", "admin"))
+			requestBody := strings.NewReader(`{}`)
+			client.PostJSON(t, "/tokens", requestBody, &adminToken, inttest.WithBasicAuth("admin", "admin"))
 
 			require.NotEmpty(t, adminToken.AccessToken, "should return an access token")
 		}
