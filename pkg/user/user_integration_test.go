@@ -107,7 +107,28 @@ func TestUserHandler(t *testing.T) {
 			client.Do(t, http.MethodDelete, "/users", nil, http.StatusUnauthorized)
 		})
 
-		t.Run("ValidToken", func(t *testing.T) {})
+		t.Run("ValidToken", func(t *testing.T) {
+			var user1 model.User
+			client.PostJSON(t, "/users", strings.NewReader(`{
+				"email":    "user5@dhis2.org",
+				"password": "oneoneoneoneoneoneone111"
+			}`), &user1)
+
+			require.Equal(t, "user5@dhis2.org", user1.Email)
+			require.Empty(t, user1.Password)
+			user1ID = strconv.FormatUint(uint64(user1.ID), 10)
+
+			u1, err := userService.FindById(user1.ID)
+			require.NoError(t, err)
+			err = userService.ValidateEmail(u1.EmailToken)
+			require.NoError(t, err)
+
+			var tokens *token.Tokens
+			client.PostJSON(t, "/tokens", strings.NewReader(`{}`), &tokens, inttest.WithBasicAuth(user1.Email, user1.Password))
+			t.Log(tokens.AccessToken)
+			client.Do(t, http.MethodDelete, "/users", nil, http.StatusOK, inttest.WithAuthToken(tokens.AccessToken))
+		})
+
 		t.Run("ExpiredToken", func(t *testing.T) {})
 	})
 
