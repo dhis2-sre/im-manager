@@ -21,7 +21,7 @@ exec_psql "create extension if not exists pg_trgm"
 exec_psql "create extension if not exists btree_gin"
 
 tmp_file=$(mktemp)
-curl --connect-timeout 10 --retry 5 --retry-delay 1 --fail -L "$DATABASE_DOWNLOAD_URL" -H "Authorization: $IM_ACCESS_TOKEN" >"$tmp_file"
+curl --connect-timeout 10 --retry 5 --retry-delay 1 --fail -L "$DATABASE_DOWNLOAD_URL" --cookie "accessToken=$IM_ACCESS_TOKEN" >"$tmp_file"
 
 # Try pg_restore... Or gzipped sql
 # pg_restore often returns a non zero return code due to benign errors resulting in executing of gunzip despite the restore being successful
