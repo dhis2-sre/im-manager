@@ -103,8 +103,62 @@ func TestUserHandler(t *testing.T) {
 	t.Run("SignOut", func(t *testing.T) {
 		t.Parallel()
 
+		expires, err := time.Parse(time.RFC3339, "0001-01-01T00:00:00Z")
+		require.NoError(t, err)
+
+		expectedCookies := []*http.Cookie{
+			{
+				Name:       "accessToken",
+				Value:      "",
+				Path:       "/",
+				Domain:     "",
+				Expires:    expires,
+				RawExpires: "",
+				MaxAge:     -1,
+				Secure:     true,
+				HttpOnly:   true,
+				SameSite:   0,
+				Raw:        "accessToken=; Path=/; Max-Age=0; HttpOnly; Secure",
+				Unparsed:   nil,
+			},
+			{
+				Name:       "refreshToken",
+				Value:      "",
+				Path:       "/",
+				Domain:     "",
+				Expires:    expires,
+				RawExpires: "",
+				MaxAge:     -1,
+				Secure:     true,
+				HttpOnly:   true,
+				SameSite:   0,
+				Raw:        "refreshToken=; Path=/; Max-Age=0; HttpOnly; Secure",
+				Unparsed:   nil,
+			},
+			{
+				Name:       "rememberMe",
+				Value:      "",
+				Path:       "/",
+				Domain:     "",
+				Expires:    expires,
+				RawExpires: "",
+				MaxAge:     -1,
+				Secure:     true,
+				HttpOnly:   true,
+				SameSite:   0,
+				Raw:        "rememberMe=; Path=/; Max-Age=0; HttpOnly; Secure",
+				Unparsed:   nil,
+			},
+		}
+
 		t.Run("NoToken", func(t *testing.T) {
-			client.Do(t, http.MethodDelete, "/users", nil, http.StatusUnauthorized)
+			request := client.NewRequest(t, http.MethodDelete, "/users", nil)
+
+			response, err := client.Client.Do(request)
+			require.NoError(t, err)
+
+			require.Equal(t, http.StatusUnauthorized, response.StatusCode)
+			assert.EqualValues(t, expectedCookies, response.Cookies())
 		})
 
 		t.Run("ValidToken", func(t *testing.T) {
@@ -123,9 +177,44 @@ func TestUserHandler(t *testing.T) {
 			require.NoError(t, err)
 
 			var tokens *token.Tokens
-			client.PostJSON(t, "/tokens", strings.NewReader(`{}`), &tokens, inttest.WithBasicAuth(user4.Email, "oneoneoneoneoneoneone111"))
+			client.PostJSON(t, "/tokens", strings.NewReader(`{}`), &tokens, inttest.WithBasicAuth("user4@dhis2.org", "oneoneoneoneoneoneone111"))
 
-			client.Do(t, http.MethodDelete, "/users", nil, http.StatusOK, inttest.WithAuthToken(tokens.AccessToken))
+			request := client.NewRequest(t, http.MethodDelete, "/users", nil, inttest.WithAuthToken(tokens.AccessToken))
+
+			response, err := client.Client.Do(request)
+			require.NoError(t, err)
+
+			require.Equal(t, http.StatusOK, response.StatusCode)
+			assert.EqualValues(t, expectedCookies, response.Cookies())
+		})
+
+		t.Run("ExpiredToken", func(t *testing.T) {
+			var user5 model.User
+			client.PostJSON(t, "/users", strings.NewReader(`{
+				"email":    "user5@dhis2.org",
+				"password": "oneoneoneoneoneoneone111"
+			}`), &user5)
+
+			require.Equal(t, "user5@dhis2.org", user5.Email)
+			user1ID = strconv.FormatUint(uint64(user5.ID), 10)
+
+			u1, err := userService.FindById(user5.ID)
+			require.NoError(t, err)
+			err = userService.ValidateEmail(u1.EmailToken)
+			require.NoError(t, err)
+
+			var tokens *token.Tokens
+			client.PostJSON(t, "/tokens", strings.NewReader(`{}`), &tokens, inttest.WithBasicAuth("user5@dhis2.org", "oneoneoneoneoneoneone111"))
+
+			time.Sleep(time.Duration(tokens.ExpiresIn) * time.Second)
+
+			request := client.NewRequest(t, http.MethodDelete, "/users", nil, inttest.WithAuthToken(tokens.AccessToken))
+
+			response, err := client.Client.Do(request)
+			require.NoError(t, err)
+
+			require.Equal(t, http.StatusOK, response.StatusCode)
+			assert.EqualValues(t, expectedCookies, response.Cookies())
 		})
 	})
 

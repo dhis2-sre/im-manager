@@ -121,7 +121,7 @@ func (hc *HTTPClient) Delete(t *testing.T, path string, headers ...func(http.Hea
 func (hc *HTTPClient) Do(t *testing.T, method, path string, requestBody io.Reader, expectedStatus int, headers ...func(http.Header)) []byte {
 	t.Helper()
 
-	req := hc.newRequest(t, method, path, requestBody, headers...)
+	req := hc.NewRequest(t, method, path, requestBody, headers...)
 	res := hc.do(t, req)
 
 	errMsg := httpClientErrMessage(method, path)
@@ -175,9 +175,9 @@ func httpClientErrMessage(method, path string) string {
 	return fmt.Sprintf("failed %s %q", method, path)
 }
 
-// newRequest creates a new HTTP request to the server at given path after applying any optional
+// NewRequest creates a new HTTP request to the server at given path after applying any optional
 // headers.
-func (hc *HTTPClient) newRequest(t *testing.T, method, path string, body io.Reader, headers ...func(http.Header)) *http.Request {
+func (hc *HTTPClient) NewRequest(t *testing.T, method, path string, body io.Reader, headers ...func(http.Header)) *http.Request {
 	t.Helper()
 
 	req, err := http.NewRequest(method, hc.ServerURL+path, body)

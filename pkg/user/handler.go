@@ -418,7 +418,13 @@ func (h Handler) parseRequest(request *http.Request) (*model.User, error) {
 		jwt.WithCookieKey("accessToken"),
 		jwt.WithCookieKey("refreshToken"),
 		jwt.WithTypedClaim("user", model.User{}),
+		jwt.WithValidate(false),
 	)
+	if err != nil {
+		return nil, err
+	}
+
+	err = jwt.Validate(token)
 	if err != nil && !errors.Is(err, jwt.ErrTokenExpired()) {
 		return nil, err
 	}
