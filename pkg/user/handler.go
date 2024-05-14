@@ -10,8 +10,6 @@ import (
 	"github.com/lestrrat-go/jwx/v2/jwa"
 	"github.com/lestrrat-go/jwx/v2/jwt"
 
-	"github.com/dhis2-sre/im-manager/pkg/config"
-
 	"github.com/google/uuid"
 
 	"github.com/dhis2-sre/im-manager/internal/errdef"
@@ -23,10 +21,12 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func NewHandler(hostname string, authentication config.Authentication, publicKey *rsa.PublicKey, userService userService, tokenService tokenService) Handler {
+func NewHandler(hostname string, accessTokenExpirationSeconds int, refreshTokenExpirationSeconds int, refreshTokenRememberMeExpirationSeconds int, publicKey *rsa.PublicKey, userService userService, tokenService tokenService) Handler {
 	return Handler{
 		hostname,
-		authentication,
+		accessTokenExpirationSeconds,
+		refreshTokenExpirationSeconds,
+		refreshTokenRememberMeExpirationSeconds,
 		publicKey,
 		userService,
 		tokenService,
@@ -34,11 +34,13 @@ func NewHandler(hostname string, authentication config.Authentication, publicKey
 }
 
 type Handler struct {
-	hostname       string
-	authentication config.Authentication
-	publicKey      *rsa.PublicKey
-	userService    userService
-	tokenService   tokenService
+	hostname                                string
+	accessTokenExpirationSeconds            int
+	refreshTokenExpirationSeconds           int
+	refreshTokenRememberMeExpirationSeconds int
+	publicKey                               *rsa.PublicKey
+	userService                             userService
+	tokenService                            tokenService
 }
 
 type userService interface {
@@ -334,13 +336,12 @@ func (h Handler) RefreshToken(c *gin.Context) {
 func (h Handler) setCookies(c *gin.Context, tokens *token.Tokens, rememberMe bool) {
 	c.SetSameSite(http.SameSiteStrictMode)
 	domain := h.hostname
-	authentication := h.authentication
-	c.SetCookie("accessToken", tokens.AccessToken, authentication.AccessTokenExpirationSeconds, "/", domain, true, true)
+	c.SetCookie("accessToken", tokens.AccessToken, h.accessTokenExpirationSeconds, "/", domain, true, true)
 	if rememberMe {
-		c.SetCookie("refreshToken", tokens.RefreshToken, authentication.RefreshTokenRememberMeExpirationSeconds, "/refresh", domain, true, true)
-		c.SetCookie("rememberMe", "true", authentication.RefreshTokenRememberMeExpirationSeconds, "/refresh", domain, true, true)
+		c.SetCookie("refreshToken", tokens.RefreshToken, h.refreshTokenRememberMeExpirationSeconds, "/refresh", domain, true, true)
+		c.SetCookie("rememberMe", "true", h.refreshTokenRememberMeExpirationSeconds, "/refresh", domain, true, true)
 	} else {
-		c.SetCookie("refreshToken", tokens.RefreshToken, authentication.RefreshTokenExpirationSeconds, "/refresh", domain, true, true)
+		c.SetCookie("refreshToken", tokens.RefreshToken, h.refreshTokenExpirationSeconds, "/refresh", domain, true, true)
 	}
 }
 

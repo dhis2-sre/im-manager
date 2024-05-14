@@ -53,7 +53,7 @@ func TestUserHandler(t *testing.T) {
 	require.NoError(t, err)
 
 	client := inttest.SetupHTTPServer(t, func(engine *gin.Engine) {
-		userHandler := user.NewHandler("hostname", authenticationConfig, &key.PublicKey, userService, tokenService)
+		userHandler := user.NewHandler("hostname", 10, 20, 30, &key.PublicKey, userService, tokenService)
 		user.Routes(engine, authentication, authorization, userHandler)
 	})
 
@@ -412,7 +412,7 @@ func TestUserHandler(t *testing.T) {
 			var users []model.User
 			client.GetJSON(t, "/users", &users, inttest.WithAuthToken(adminToken.AccessToken))
 
-			assert.Lenf(t, users, 4, "GET /users should return 4 users one of which is an admin")
+			assert.Lenf(t, users, 5, "GET /users should return 4 users one of which is an admin")
 		}
 
 		{
