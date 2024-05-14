@@ -9,6 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"golang.org/x/exp/slices"
+
 	"github.com/dhis2-sre/im-manager/pkg/config"
 	"github.com/go-mail/mail"
 
@@ -295,6 +297,67 @@ func TestUserHandler(t *testing.T) {
 
 				client.Do(t, http.MethodGet, "/users", nil, http.StatusUnauthorized, inttest.WithAuthToken(user1Token.AccessToken))
 			}
+
+			{
+				t.Log("SignInCookies")
+
+				requestBody := strings.NewReader(`{}`)
+				request := client.NewRequest(t, http.MethodPost, "/tokens", requestBody, inttest.WithBasicAuth("user1@dhis2.org", "oneoneoneoneoneoneone111"), inttest.WithHeader("Content-Type", "application/json"))
+
+				response, err := client.Client.Do(request)
+				require.NoError(t, err)
+
+				actualCookies := response.Cookies()
+				require.Len(t, actualCookies, 2)
+				accessTokenCookie := findCookieByName("accessToken", actualCookies)
+				require.NotNil(t, accessTokenCookie)
+				assert.Equal(t, accessTokenCookie.Path, "/")
+				assert.Equal(t, accessTokenCookie.MaxAge, 10)
+				assert.Equal(t, accessTokenCookie.Secure, true)
+				assert.Equal(t, accessTokenCookie.HttpOnly, true)
+				assert.Equal(t, accessTokenCookie.SameSite, http.SameSiteStrictMode)
+				refreshTokenCookie := findCookieByName("refreshToken", actualCookies)
+				require.NotNil(t, refreshTokenCookie)
+				assert.Equal(t, refreshTokenCookie.Path, "/refresh")
+				assert.Equal(t, refreshTokenCookie.MaxAge, 20)
+				assert.Equal(t, refreshTokenCookie.Secure, true)
+				assert.Equal(t, refreshTokenCookie.HttpOnly, true)
+				assert.Equal(t, refreshTokenCookie.SameSite, http.SameSiteStrictMode)
+			}
+
+			{
+				t.Log("SignInCookiesWithRememberMe")
+
+				requestBody := strings.NewReader(`{"rememberMe": true}`)
+				request := client.NewRequest(t, http.MethodPost, "/tokens", requestBody, inttest.WithBasicAuth("user2@dhis2.org", "oneoneoneoneoneoneone111"), inttest.WithHeader("Content-Type", "application/json"))
+
+				response, err := client.Client.Do(request)
+				require.NoError(t, err)
+
+				actualCookies := response.Cookies()
+				require.Len(t, actualCookies, 3)
+				accessTokenCookie := findCookieByName("accessToken", actualCookies)
+				require.NotNil(t, accessTokenCookie)
+				assert.Equal(t, accessTokenCookie.Path, "/")
+				assert.Equal(t, accessTokenCookie.MaxAge, 10)
+				assert.Equal(t, accessTokenCookie.Secure, true)
+				assert.Equal(t, accessTokenCookie.HttpOnly, true)
+				assert.Equal(t, accessTokenCookie.SameSite, http.SameSiteStrictMode)
+				refreshTokenCookie := findCookieByName("refreshToken", actualCookies)
+				require.NotNil(t, refreshTokenCookie)
+				assert.Equal(t, refreshTokenCookie.Path, "/refresh")
+				assert.Equal(t, refreshTokenCookie.MaxAge, 30)
+				assert.Equal(t, refreshTokenCookie.Secure, true)
+				assert.Equal(t, refreshTokenCookie.HttpOnly, true)
+				assert.Equal(t, refreshTokenCookie.SameSite, http.SameSiteStrictMode)
+				rememberMeTokenCookie := findCookieByName("rememberMe", actualCookies)
+				require.NotNil(t, rememberMeTokenCookie)
+				assert.Equal(t, rememberMeTokenCookie.Path, "/refresh")
+				assert.Equal(t, rememberMeTokenCookie.MaxAge, 30)
+				assert.Equal(t, rememberMeTokenCookie.Secure, true)
+				assert.Equal(t, rememberMeTokenCookie.HttpOnly, true)
+				assert.Equal(t, rememberMeTokenCookie.SameSite, http.SameSiteStrictMode)
+			}
 		})
 
 		t.Run("SignInFailed", func(t *testing.T) {
@@ -307,9 +370,35 @@ func TestUserHandler(t *testing.T) {
 			}
 
 			{
+				t.Log("WrongPasswordNoCookies")
+
+				requestBody := strings.NewReader(`{}`)
+				request := client.NewRequest(t, http.MethodPost, "/tokens", requestBody, inttest.WithBasicAuth("user1@dhis2.org", "wrongpassword"))
+
+				response, err := client.Client.Do(request)
+				require.NoError(t, err)
+
+				assert.Equal(t, http.StatusUnauthorized, response.StatusCode)
+				assert.Len(t, response.Cookies(), 0)
+			}
+
+			{
 				t.Log("EmailNotValidated")
 
 				client.Do(t, http.MethodPost, "/tokens", nil, http.StatusUnauthorized, inttest.WithBasicAuth("user3@dhis2.org", "oneoneoneoneoneoneone111"))
+			}
+
+			{
+				t.Log("EmailNotValidatedNoCookies")
+
+				requestBody := strings.NewReader(`{}`)
+				request := client.NewRequest(t, http.MethodPost, "/tokens", requestBody, inttest.WithBasicAuth("user3@dhis2.org", "oneoneoneoneoneoneone111"))
+
+				response, err := client.Client.Do(request)
+				require.NoError(t, err)
+
+				assert.Equal(t, http.StatusUnauthorized, response.StatusCode)
+				assert.Len(t, response.Cookies(), 0)
 			}
 		})
 
@@ -412,7 +501,7 @@ func TestUserHandler(t *testing.T) {
 			var users []model.User
 			client.GetJSON(t, "/users", &users, inttest.WithAuthToken(adminToken.AccessToken))
 
-			assert.Lenf(t, users, 5, "GET /users should return 4 users one of which is an admin")
+			assert.Lenf(t, users, 5, "GET /users should return 5 users one of which is an admin")
 		}
 
 		{
@@ -432,4 +521,15 @@ type fakeDialer struct {
 func (f fakeDialer) DialAndSend(m ...*mail.Message) error {
 	f.t.Log("Fake sending mail...", m[0].GetHeader("To"))
 	return nil
+}
+
+func findCookieByName(name string, cookies []*http.Cookie) *http.Cookie {
+	index := slices.IndexFunc(cookies, func(cookie *http.Cookie) bool {
+		return cookie.Name == name
+	})
+	if index == -1 {
+		return nil
+	}
+
+	return cookies[index]
 }
