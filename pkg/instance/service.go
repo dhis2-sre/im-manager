@@ -366,13 +366,13 @@ func (s service) deployDeploymentInstance(token string, instance *model.Deployme
 	return nil
 }
 
-func (s service) Delete(deploymentId uint) error {
-	deployment, err := s.FindDeploymentById(deploymentId)
+func (s service) Delete(deploymentInstanceId uint) error {
+	deploymentInstance, err := s.FindDeploymentInstanceById(deploymentInstanceId)
 	if err != nil {
 		return err
 	}
 
-	return s.DeleteDeployment(deployment)
+	return s.DeleteInstance(deploymentInstance.DeploymentID, deploymentInstance.ID)
 }
 
 func (s service) DeleteDeployment(deployment *model.Deployment) error {
