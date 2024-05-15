@@ -3,6 +3,7 @@ package user_test
 import (
 	"crypto/rand"
 	"crypto/rsa"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -358,6 +359,120 @@ func TestUserHandler(t *testing.T) {
 				assert.Equal(t, rememberMeTokenCookie.HttpOnly, true)
 				assert.Equal(t, rememberMeTokenCookie.SameSite, http.SameSiteStrictMode)
 			}
+
+			{
+				t.Log("RefreshTokenUsingCookie")
+
+				var tokens *token.Tokens
+				client.PostJSON(t, "/tokens", strings.NewReader(`{}`), &tokens, inttest.WithBasicAuth("user1@dhis2.org", "oneoneoneoneoneoneone111"))
+				require.NotEmpty(t, tokens.AccessToken, "should return an access token")
+				request := client.NewRequest(t, http.MethodPost, "/refresh", strings.NewReader(`{}`), inttest.WithHeader("Content-Type", "application/json"))
+				cookie := &http.Cookie{Name: "refreshToken", Value: user1Token.RefreshToken, Path: "/refresh"}
+				require.NoError(t, cookie.Valid())
+				request.AddCookie(cookie)
+
+				response, err := client.Client.Do(request)
+				require.NoError(t, err)
+
+				assert.Equal(t, http.StatusCreated, response.StatusCode)
+				actualCookies := response.Cookies()
+				require.Len(t, actualCookies, 2)
+				accessTokenCookie := findCookieByName("accessToken", actualCookies)
+				require.NotNil(t, accessTokenCookie)
+				assert.Equal(t, accessTokenCookie.Path, "/")
+				assert.Equal(t, accessTokenCookie.MaxAge, 10)
+				assert.Equal(t, accessTokenCookie.Secure, true)
+				assert.Equal(t, accessTokenCookie.HttpOnly, true)
+				assert.Equal(t, accessTokenCookie.SameSite, http.SameSiteStrictMode)
+				refreshTokenCookie := findCookieByName("refreshToken", actualCookies)
+				require.NotNil(t, refreshTokenCookie)
+				assert.Equal(t, refreshTokenCookie.Path, "/refresh")
+				assert.Equal(t, refreshTokenCookie.MaxAge, 20)
+				assert.Equal(t, refreshTokenCookie.Secure, true)
+				assert.Equal(t, refreshTokenCookie.HttpOnly, true)
+				assert.Equal(t, refreshTokenCookie.SameSite, http.SameSiteStrictMode)
+
+				// TODO: Assert response body?
+			}
+
+			{
+				t.Log("RefreshTokenUsingCookieWithRememberMe")
+
+				var tokens *token.Tokens
+				client.PostJSON(t, "/tokens", strings.NewReader(`{}`), &tokens, inttest.WithBasicAuth("user2@dhis2.org", "oneoneoneoneoneoneone111"))
+				require.NotEmpty(t, tokens.AccessToken, "should return an access token")
+				request := client.NewRequest(t, http.MethodPost, "/refresh", strings.NewReader(`{}`), inttest.WithHeader("Content-Type", "application/json"))
+				refreshCookie := &http.Cookie{Name: "refreshToken", Value: tokens.RefreshToken, Path: "/refresh"}
+				require.NoError(t, refreshCookie.Valid())
+				request.AddCookie(refreshCookie)
+				rememberMeCookie := &http.Cookie{Name: "rememberMe", Value: "true", Path: "/refresh"}
+				require.NoError(t, rememberMeCookie.Valid())
+				request.AddCookie(rememberMeCookie)
+
+				response, err := client.Client.Do(request)
+				require.NoError(t, err)
+
+				assert.Equal(t, http.StatusCreated, response.StatusCode)
+				actualCookies := response.Cookies()
+				require.Len(t, actualCookies, 3)
+				accessTokenCookie := findCookieByName("accessToken", actualCookies)
+				require.NotNil(t, accessTokenCookie)
+				assert.Equal(t, accessTokenCookie.Path, "/")
+				assert.Equal(t, accessTokenCookie.MaxAge, 10)
+				assert.Equal(t, accessTokenCookie.Secure, true)
+				assert.Equal(t, accessTokenCookie.HttpOnly, true)
+				assert.Equal(t, accessTokenCookie.SameSite, http.SameSiteStrictMode)
+				refreshTokenCookie := findCookieByName("refreshToken", actualCookies)
+				require.NotNil(t, refreshTokenCookie)
+				assert.Equal(t, refreshTokenCookie.Path, "/refresh")
+				assert.Equal(t, refreshTokenCookie.MaxAge, 30)
+				assert.Equal(t, refreshTokenCookie.Secure, true)
+				assert.Equal(t, refreshTokenCookie.HttpOnly, true)
+				assert.Equal(t, refreshTokenCookie.SameSite, http.SameSiteStrictMode)
+				rememberMeTokenCookie := findCookieByName("rememberMe", actualCookies)
+				require.NotNil(t, rememberMeTokenCookie)
+				assert.Equal(t, rememberMeTokenCookie.Path, "/refresh")
+				assert.Equal(t, rememberMeTokenCookie.MaxAge, 30)
+				assert.Equal(t, rememberMeTokenCookie.Secure, true)
+				assert.Equal(t, rememberMeTokenCookie.HttpOnly, true)
+				assert.Equal(t, rememberMeTokenCookie.SameSite, http.SameSiteStrictMode)
+
+				// TODO: Assert response body?
+			}
+
+			{
+				t.Log("RefreshTokenRequestBody")
+
+				var tokens *token.Tokens
+				client.PostJSON(t, "/tokens", strings.NewReader(`{}`), &tokens, inttest.WithBasicAuth("user1@dhis2.org", "oneoneoneoneoneoneone111"))
+				require.NotEmpty(t, tokens.AccessToken, "should return an access token")
+				requestBody := strings.NewReader(fmt.Sprintf(`{"refreshToken": "%s"}`, tokens.RefreshToken))
+				request := client.NewRequest(t, http.MethodPost, "/refresh", requestBody, inttest.WithHeader("Content-Type", "application/json"))
+
+				response, err := client.Client.Do(request)
+				require.NoError(t, err)
+
+				assert.Equal(t, http.StatusCreated, response.StatusCode)
+				actualCookies := response.Cookies()
+				require.Len(t, actualCookies, 2)
+				accessTokenCookie := findCookieByName("accessToken", actualCookies)
+				require.NotNil(t, accessTokenCookie)
+				assert.Equal(t, accessTokenCookie.Path, "/")
+				assert.Equal(t, accessTokenCookie.MaxAge, 10)
+				assert.Equal(t, accessTokenCookie.Secure, true)
+				assert.Equal(t, accessTokenCookie.HttpOnly, true)
+				assert.Equal(t, accessTokenCookie.SameSite, http.SameSiteStrictMode)
+				refreshTokenCookie := findCookieByName("refreshToken", actualCookies)
+				require.NotNil(t, refreshTokenCookie)
+				assert.Equal(t, refreshTokenCookie.Path, "/refresh")
+				assert.Equal(t, refreshTokenCookie.MaxAge, 20)
+				assert.Equal(t, refreshTokenCookie.Secure, true)
+				assert.Equal(t, refreshTokenCookie.HttpOnly, true)
+				assert.Equal(t, refreshTokenCookie.SameSite, http.SameSiteStrictMode)
+
+				// TODO: Assert response body?
+			}
+
 		})
 
 		t.Run("SignInFailed", func(t *testing.T) {
