@@ -372,7 +372,21 @@ func (s service) Delete(deploymentInstanceId uint) error {
 		return err
 	}
 
-	return s.DeleteInstance(deploymentInstance.DeploymentID, deploymentInstance.ID)
+	err = s.DeleteInstance(deploymentInstance.DeploymentID, deploymentInstance.ID)
+	if err != nil {
+		return err
+	}
+
+	deployment, err := s.FindDeploymentById(deploymentInstance.DeploymentID)
+	if err != nil {
+		return err
+	}
+
+	if len(deployment.Instances) == 0 {
+		return s.DeleteDeployment(deployment)
+	}
+
+	return nil
 }
 
 func (s service) DeleteDeployment(deployment *model.Deployment) error {
