@@ -234,6 +234,7 @@ func (h Handler) SignIn(c *gin.Context) {
 	//
 	// responses:
 	//   201: Tokens
+	//   400: Error
 	//   401: Error
 	//   403: Error
 	//   404: Error
