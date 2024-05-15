@@ -4,10 +4,8 @@ import (
 	"crypto/rsa"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"time"
-
-	"github.com/dhis2-sre/im-manager/pkg/config"
 
 	"github.com/google/uuid"
 
@@ -19,16 +17,24 @@ import (
 
 //goland:noinspection GoExportedFuncWithUnexportedType
 func NewService(
+	logger *slog.Logger,
 	tokenRepository repository,
 	privateKey *rsa.PrivateKey,
 	publicKey *rsa.PublicKey,
-	authentication config.Authentication,
+	accessTokenExpirationSeconds int,
+	refreshTokenSecretKey string,
+	refreshTokenExpirationSeconds int,
+	refreshTokenRememberMeExpirationSeconds int,
 ) (*tokenService, error) {
 	return &tokenService{
-		repository:     tokenRepository,
-		privateKey:     privateKey,
-		publicKey:      publicKey,
-		authentication: authentication,
+		logger:                                  logger,
+		repository:                              tokenRepository,
+		privateKey:                              privateKey,
+		publicKey:                               publicKey,
+		accessTokenExpirationSeconds:            accessTokenExpirationSeconds,
+		refreshTokenSecretKey:                   refreshTokenSecretKey,
+		refreshTokenExpirationSeconds:           refreshTokenExpirationSeconds,
+		refreshTokenRememberMeExpirationSeconds: refreshTokenRememberMeExpirationSeconds,
 	}, nil
 }
 
@@ -54,10 +60,14 @@ type RefreshTokenData struct {
 }
 
 type tokenService struct {
-	repository     repository
-	privateKey     *rsa.PrivateKey
-	publicKey      *rsa.PublicKey
-	authentication config.Authentication
+	logger                                  *slog.Logger
+	repository                              repository
+	privateKey                              *rsa.PrivateKey
+	publicKey                               *rsa.PublicKey
+	accessTokenExpirationSeconds            int
+	refreshTokenSecretKey                   string
+	refreshTokenExpirationSeconds           int
+	refreshTokenRememberMeExpirationSeconds int
 }
 
 func (t tokenService) GetTokens(user *model.User, previousRefreshTokenId string, rememberMe bool) (*Tokens, error) {
@@ -67,17 +77,17 @@ func (t tokenService) GetTokens(user *model.User, previousRefreshTokenId string,
 		}
 	}
 
-	accessToken, err := helper.GenerateAccessToken(user, t.privateKey, t.authentication.AccessTokenExpirationSeconds)
+	accessToken, err := helper.GenerateAccessToken(user, t.privateKey, t.accessTokenExpirationSeconds)
 	if err != nil {
 		return nil, fmt.Errorf("error generating accessToken for user: %+v\nError: %s", user, err)
 	}
 
-	expiration := t.authentication.RefreshTokenExpirationSeconds
+	expiration := t.refreshTokenExpirationSeconds
 	if rememberMe {
-		expiration = t.authentication.RefreshTokenRememberMeExpirationSeconds
+		expiration = t.refreshTokenRememberMeExpirationSeconds
 	}
 
-	refreshToken, err := helper.GenerateRefreshToken(user, t.authentication.RefreshTokenSecretKey, expiration)
+	refreshToken, err := helper.GenerateRefreshToken(user, t.refreshTokenSecretKey, expiration)
 	if err != nil {
 		return nil, fmt.Errorf("error generating refreshToken for user: %+v\nError: %s", user, err)
 	}
@@ -90,20 +100,20 @@ func (t tokenService) GetTokens(user *model.User, previousRefreshTokenId string,
 		AccessToken:  accessToken,
 		TokenType:    "bearer",
 		RefreshToken: refreshToken.SignedString,
-		ExpiresIn:    uint(t.authentication.AccessTokenExpirationSeconds),
+		ExpiresIn:    uint(t.accessTokenExpirationSeconds),
 	}, nil
 }
 
 func (t tokenService) ValidateRefreshToken(tokenString string) (*RefreshTokenData, error) {
-	claims, err := helper.ValidateRefreshToken(tokenString, t.authentication.RefreshTokenSecretKey)
+	claims, err := helper.ValidateRefreshToken(tokenString, t.refreshTokenSecretKey)
 	if err != nil {
-		log.Printf("Unable to validate token: %s\n%s\n", tokenString, err)
+		t.logger.Error("Unable to validate token", "error", err, "token", tokenString)
 		return nil, errors.New("unable to verify refresh token")
 	}
 
 	tokenId, err := uuid.Parse(claims.ID)
 	if err != nil {
-		log.Printf("Couldn't parse token id: %s\n%s\n", claims.ID, err)
+		t.logger.Error("Couldn't parse token id", "error", err, "claimsId", claims.ID)
 		return nil, errors.New("unable to verify refresh token")
 	}
 

@@ -1,6 +1,8 @@
 package inttest
 
 import (
+	"log/slog"
+	"os"
 	"testing"
 
 	"github.com/dhis2-sre/im-manager/pkg/config"
@@ -25,7 +27,8 @@ func SetupDB(t *testing.T) *gorm.DB {
 	require.NoError(t, err, "failed to start DB")
 	t.Cleanup(func() { require.NoError(t, gnomock.Stop(container), "failed to stop DB") })
 
-	db, err := storage.NewDatabase(config.Postgresql{
+	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
+	db, err := storage.NewDatabase(logger, config.Postgresql{
 		Host:         container.Host,
 		Port:         container.DefaultPort(),
 		Username:     "im",

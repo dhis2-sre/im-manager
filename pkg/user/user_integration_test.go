@@ -1,10 +1,13 @@
 package user_test
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"fmt"
+	"log/slog"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"testing"
@@ -14,7 +17,6 @@ import (
 
 	"golang.org/x/exp/slices"
 
-	"github.com/dhis2-sre/im-manager/pkg/config"
 	"github.com/go-mail/mail"
 
 	"github.com/dhis2-sre/im-manager/internal/middleware"
@@ -40,21 +42,16 @@ func TestUserHandler(t *testing.T) {
 	err := user.CreateUser("admin", "admin", userService, groupService, model.AdministratorGroupName, "admin")
 	require.NoError(t, err, "failed to create admin user and group")
 
-	authorization := middleware.NewAuthorization(userService)
+	authorization := middleware.NewAuthorization(slog.New(slog.NewTextHandler(os.Stdout, nil)), userService)
 	key, err := rsa.GenerateKey(rand.Reader, 2048)
 	require.NoError(t, err, "failed to generate private key")
 	// TODO(DEVOPS-259) we should not use a pointer as we do not mutate and should not mutate the certificate
 	authentication := middleware.NewAuthentication(&key.PublicKey, userService)
 
+	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	redis := inttest.SetupRedis(t)
 	tokenRepository := token.NewRepository(redis)
-	authenticationConfig := config.Authentication{
-		RefreshTokenSecretKey:                   "secret",
-		AccessTokenExpirationSeconds:            10,
-		RefreshTokenExpirationSeconds:           20,
-		RefreshTokenRememberMeExpirationSeconds: 30,
-	}
-	tokenService, err := token.NewService(tokenRepository, key, &key.PublicKey, authenticationConfig)
+	tokenService, err := token.NewService(logger, tokenRepository, key, &key.PublicKey, 10, "secret", 20, 30)
 	require.NoError(t, err)
 
 	client := inttest.SetupHTTPServer(t, func(engine *gin.Engine) {
@@ -517,7 +514,7 @@ func TestUserHandler(t *testing.T) {
 				user1ID, err := strconv.ParseUint(user1ID, 10, 0)
 				require.NoError(t, err)
 				user1IDInt := uint(user1ID)
-				user1, err := userService.FindById(user1IDInt)
+				user1, err := userService.FindById(context.Background(), user1IDInt)
 				require.NoError(t, err)
 
 				require.NotEmpty(t, user1.PasswordToken, "should have a password token")
@@ -534,7 +531,7 @@ func TestUserHandler(t *testing.T) {
 
 				client.Do(t, http.MethodPost, "/users/reset-password", resetRequestBody, http.StatusCreated, inttest.WithHeader("Content-Type", "application/json"))
 
-				newUser1, _ := userService.FindById(user1IDInt)
+				newUser1, _ := userService.FindById(context.Background(), user1IDInt)
 				newPassword := newUser1.Password
 
 				require.NotEqual(t, oldPassword, newPassword, "old and new password should be different")
@@ -550,7 +547,7 @@ func TestUserHandler(t *testing.T) {
 				user1ID, err := strconv.ParseUint(user1ID, 10, 0)
 				require.NoError(t, err)
 				user1IDInt := uint(user1ID)
-				user1, _ := newUserService.FindById(user1IDInt)
+				user1, _ := newUserService.FindById(context.Background(), user1IDInt)
 				require.NoError(t, err)
 
 				// Wait for token to expire
@@ -595,7 +592,7 @@ func TestUserHandler(t *testing.T) {
 }
 
 type userService interface {
-	FindById(id uint) (*model.User, error)
+	FindById(context context.Context, id uint) (*model.User, error)
 	ValidateEmail(emailToken uuid.UUID) error
 }
 
@@ -611,7 +608,7 @@ func createUser(t *testing.T, client *inttest.HTTPClient, userService userServic
 	require.Equal(t, email, user.Email)
 	require.Empty(t, user.Password)
 
-	u, err := userService.FindById(user.ID)
+	u, err := userService.FindById(context.Background(), user.ID)
 	require.NoError(t, err)
 	err = userService.ValidateEmail(u.EmailToken)
 	require.NoError(t, err)

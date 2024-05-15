@@ -1,6 +1,7 @@
 package user
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/dhis2-sre/im-manager/pkg/model"
@@ -8,7 +9,7 @@ import (
 
 type groupService interface {
 	FindOrCreate(group, hostname string, deployable bool) (*model.Group, error)
-	AddUser(group string, userId uint) error
+	AddUser(ctx context.Context, group string, userId uint) error
 }
 
 type userServiceUtil interface {
@@ -34,7 +35,7 @@ func CreateUser(email, password string, userService userServiceUtil, groupServic
 		return fmt.Errorf("error creating %s group: %v", groupName, err)
 	}
 
-	err = groupService.AddUser(g.Name, u.ID)
+	err = groupService.AddUser(context.Background(), g.Name, u.ID)
 	if err != nil {
 		return fmt.Errorf("error adding %s user to %s group: %v", userType, groupName, err)
 	}

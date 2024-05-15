@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"os/exec"
 	"slices"
 
@@ -23,16 +23,18 @@ import (
 
 //goland:noinspection GoExportedFuncWithUnexportedType
 func NewService(
+	logger *slog.Logger,
 	instanceRepository Repository,
 	groupService groupService,
 	stackService stack.Service,
 	helmfileService helmfile,
 ) *service {
 	return &service{
-		instanceRepository,
-		groupService,
-		stackService,
-		helmfileService,
+		logger:             logger,
+		instanceRepository: instanceRepository,
+		groupService:       groupService,
+		stackService:       stackService,
+		helmfileService:    helmfileService,
 	}
 }
 
@@ -60,6 +62,7 @@ type helmfile interface {
 }
 
 type service struct {
+	logger             *slog.Logger
 	instanceRepository Repository
 	groupService       groupService
 	stackService       stack.Service
@@ -342,8 +345,7 @@ func (s service) deployDeploymentInstance(token string, instance *model.Deployme
 	}
 
 	deployLog, deployErrorLog, err := commandExecutor(syncCmd, group.ClusterConfiguration)
-	log.Printf("Deploy log: %s\n", deployLog)
-	log.Printf("Deploy error log: %s\n", deployErrorLog)
+	s.logger.Info("Deploy log", "log", deployLog, "errorLog", deployErrorLog)
 	/* TODO: return error log if relevant
 	if len(deployErrorLog) > 0 {
 		return errors.New(string(deployErrorLog))
@@ -358,19 +360,33 @@ func (s service) deployDeploymentInstance(token string, instance *model.Deployme
 	instance.DeployLog = string(deployLog)
 	if err != nil {
 		// TODO
-		log.Printf("Store error log: %s", deployErrorLog)
+		s.logger.Error("Failed saving deploy log", "error", err)
 		return err
 	}
 	return nil
 }
 
-func (s service) Delete(deploymentId uint) error {
-	deployment, err := s.FindDeploymentById(deploymentId)
+func (s service) Delete(deploymentInstanceId uint) error {
+	deploymentInstance, err := s.FindDeploymentInstanceById(deploymentInstanceId)
 	if err != nil {
 		return err
 	}
 
-	return s.DeleteDeployment(deployment)
+	err = s.DeleteInstance(deploymentInstance.DeploymentID, deploymentInstance.ID)
+	if err != nil {
+		return err
+	}
+
+	deployment, err := s.FindDeploymentById(deploymentInstance.DeploymentID)
+	if err != nil {
+		return err
+	}
+
+	if len(deployment.Instances) == 0 {
+		return s.DeleteDeployment(deployment)
+	}
+
+	return nil
 }
 
 func (s service) DeleteDeployment(deployment *model.Deployment) error {
@@ -420,8 +436,7 @@ func (s service) destroyDeploymentInstance(instance *model.DeploymentInstance) e
 	}
 
 	destroyLog, destroyErrorLog, err := commandExecutor(destroyCmd, group.ClusterConfiguration)
-	log.Printf("Destroy log: %s\n", destroyLog)
-	log.Printf("Destroy error log: %s\n", destroyErrorLog)
+	s.logger.Info("Destroy log", "log", destroyLog, "errorLog", destroyErrorLog)
 	if err != nil {
 		return err
 	}

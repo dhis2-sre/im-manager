@@ -1,8 +1,9 @@
 package middleware
 
 import (
+	"context"
 	"errors"
-	"log"
+	"log/slog"
 	"net/http"
 
 	"github.com/dhis2-sre/im-manager/pkg/model"
@@ -12,16 +13,20 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func NewAuthorization(userService userService) AuthorizationMiddleware {
-	return AuthorizationMiddleware{userService}
+func NewAuthorization(logger *slog.Logger, userService userService) AuthorizationMiddleware {
+	return AuthorizationMiddleware{
+		logger:      logger,
+		userService: userService,
+	}
 }
 
 type AuthorizationMiddleware struct {
+	logger      *slog.Logger
 	userService userService
 }
 
 type userService interface {
-	FindById(id uint) (*model.User, error)
+	FindById(ctx context.Context, id uint) (*model.User, error)
 }
 
 func (m AuthorizationMiddleware) RequireAdministrator(c *gin.Context) {
@@ -30,7 +35,7 @@ func (m AuthorizationMiddleware) RequireAdministrator(c *gin.Context) {
 		return
 	}
 
-	userWithGroups, err := m.userService.FindById(u.ID)
+	userWithGroups, err := m.userService.FindById(c, u.ID)
 	if err != nil {
 		if errdef.IsNotFound(err) {
 			_ = c.AbortWithError(http.StatusUnauthorized, err)
@@ -41,7 +46,7 @@ func (m AuthorizationMiddleware) RequireAdministrator(c *gin.Context) {
 	}
 
 	if !userWithGroups.IsAdministrator() {
-		log.Printf("User tried to access administrator restricted endpoint: %+v\n", u)
+		m.logger.ErrorContext(c, "User tried to access administrator restricted endpoint", "user", u)
 		_ = c.AbortWithError(http.StatusUnauthorized, errors.New("administrator access denied"))
 		return
 	}

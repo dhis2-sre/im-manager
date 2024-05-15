@@ -3,7 +3,6 @@ package middleware
 import (
 	"crypto/rsa"
 	"errors"
-	"log"
 	"net/http"
 
 	"github.com/lestrrat-go/jwx/v2/jwa"
@@ -56,7 +55,6 @@ func (m AuthenticationMiddleware) handleError(c *gin.Context, e error) {
 func (m AuthenticationMiddleware) TokenAuthentication(c *gin.Context) {
 	user, err := parseRequest(c.Request, m.publicKey)
 	if err != nil {
-		log.Println("token not valid:", err)
 		_ = c.Error(errdef.NewUnauthorized("token not valid"))
 		c.Abort()
 		return

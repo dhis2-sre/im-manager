@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"mime/multipart"
 	"net/http"
 	"path"
@@ -20,16 +20,18 @@ import (
 	"github.com/google/uuid"
 )
 
-func NewHandler(databaseService Service, groupService groupService, instanceService instanceService, stackService stackService) Handler {
+func NewHandler(logger *slog.Logger, databaseService Service, groupService groupService, instanceService instanceService, stackService stackService) Handler {
 	return Handler{
-		databaseService,
-		groupService,
-		instanceService,
-		stackService,
+		logger:          logger,
+		databaseService: databaseService,
+		groupService:    groupService,
+		instanceService: instanceService,
+		stackService:    stackService,
 	}
 }
 
 type Handler struct {
+	logger          *slog.Logger
 	databaseService Service
 	groupService    groupService
 	instanceService instanceService
@@ -220,7 +222,7 @@ func (h Handler) SaveAs(c *gin.Context) {
 	}
 
 	save, err := h.databaseService.SaveAs(database, instance, stack, request.Name, request.Format, func(saved *model.Database) {
-		log.Printf("Database %s/%s from instance: %v", saved.GroupName, saved.Name, instance)
+		h.logger.Info("Save an instances database as", "groupName", saved.GroupName, "databaseName", saved.Name, "instanceName", instance.Name)
 	})
 	if err != nil {
 		_ = c.Error(err)
