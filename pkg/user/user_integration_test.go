@@ -71,13 +71,15 @@ func TestUserHandler(t *testing.T) {
 
 		assert.Equal(t, "user@dhis2.org", user.Email)
 		assert.Empty(t, user.Password)
+		assert.Empty(t, user.EmailToken)
 		assert.False(t, user.Validated)
 
 		t.Log("ValidateEmail")
 
-		client.PostJSON(t, "/users/validate", strings.NewReader(`{
-			"token":    "`+user.EmailToken.String()+`"
-		}`), &user)
+		u, err := userService.FindById(context.Background(), user.ID)
+		require.NoError(t, err)
+		requestBody := strings.NewReader(`{"token": "` + u.EmailToken.String() + `"}`)
+		client.Do(t, http.MethodPost, "/users/validate", requestBody, http.StatusOK, inttest.WithHeader("Content-Type", "application/json"))
 
 		t.Log("SignIn")
 
