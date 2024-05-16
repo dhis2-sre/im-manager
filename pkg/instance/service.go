@@ -359,7 +359,6 @@ func (s service) deployDeploymentInstance(token string, instance *model.Deployme
 	err = s.instanceRepository.SaveDeployLog(instance, string(deployLog))
 	instance.DeployLog = string(deployLog)
 	if err != nil {
-		// TODO
 		s.logger.Error("Failed saving deploy log", "error", err)
 		return err
 	}
