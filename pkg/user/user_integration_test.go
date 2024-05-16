@@ -8,14 +8,13 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"slices"
 	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
-
-	"golang.org/x/exp/slices"
 
 	"github.com/go-mail/mail"
 
