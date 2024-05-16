@@ -596,6 +596,8 @@ type userService interface {
 var userCounter atomic.Uint64
 
 func createUser(t *testing.T, client *inttest.HTTPClient, userService userService) (uint, string, string) {
+	t.Helper()
+
 	userCounter.Add(1)
 	currentUserCount := userCounter.Load()
 
