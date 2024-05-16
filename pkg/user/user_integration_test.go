@@ -595,7 +595,7 @@ type userService interface {
 	ValidateEmail(emailToken uuid.UUID) error
 }
 
-var userCounter atomic.Uint64
+var userCounter atomic.Uint32
 
 func createUser(t *testing.T, client *inttest.HTTPClient, userService userService) (uint, string, string) {
 	t.Helper()
