@@ -173,7 +173,7 @@ func TestUserHandler(t *testing.T) {
 			_, email, password := createUser(t, client, userService)
 			var tokens *token.Tokens
 			client.PostJSON(t, "/tokens", strings.NewReader(`{}`), &tokens, inttest.WithBasicAuth(email, password))
-			time.Sleep(time.Duration(tokens.ExpiresIn) * time.Second)
+			<-time.After(time.Duration(tokens.ExpiresIn) * time.Second)
 			request := client.NewRequest(t, http.MethodDelete, "/users", nil, inttest.WithAuthToken(tokens.AccessToken))
 
 			response, err := client.Client.Do(request)
