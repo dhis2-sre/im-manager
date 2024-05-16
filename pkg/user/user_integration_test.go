@@ -58,6 +58,41 @@ func TestUserHandler(t *testing.T) {
 		user.Routes(engine, authentication, authorization, userHandler)
 	})
 
+	t.Run("SignUp", func(t *testing.T) {
+		t.Parallel()
+
+		t.Log("SignUpUser")
+
+		var user model.User
+		client.PostJSON(t, "/users", strings.NewReader(`{
+			"email":    "user@dhis2.org",
+			"password": "oneoneoneoneoneoneone111"
+		}`), &user)
+
+		assert.Equal(t, "user@dhis2.org", user.Email)
+		assert.Empty(t, user.Password)
+		assert.False(t, user.Validated)
+
+		t.Log("ValidateEmail")
+
+		client.PostJSON(t, "/users/validate", strings.NewReader(`{
+			"token":    "`+user.EmailToken.String()+`"
+		}`), &user)
+
+		t.Log("SignIn")
+
+		var tokens *token.Tokens
+		client.PostJSON(t, "/tokens", strings.NewReader(`{}`), &tokens, inttest.WithBasicAuth("user@dhis2.org", "oneoneoneoneoneoneone111"))
+		require.NotEmpty(t, tokens.AccessToken, "should return an access token")
+
+		t.Log("GetMe")
+
+		var me model.User
+		client.GetJSON(t, "/me", &me, inttest.WithAuthToken(tokens.AccessToken))
+		assert.Equal(t, "user@dhis2.org", me.Email)
+		assert.True(t, me.Validated)
+	})
+
 	t.Run("SignOut", func(t *testing.T) {
 		t.Parallel()
 
