@@ -6,7 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"net/http"
 
 	"github.com/lestrrat-go/jwx/v2/jwa"
@@ -23,8 +23,9 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func NewHandler(hostname string, accessTokenExpirationSeconds int, refreshTokenExpirationSeconds int, refreshTokenRememberMeExpirationSeconds int, publicKey *rsa.PublicKey, userService userService, tokenService tokenService) Handler {
+func NewHandler(logger *slog.Logger, hostname string, accessTokenExpirationSeconds int, refreshTokenExpirationSeconds int, refreshTokenRememberMeExpirationSeconds int, publicKey *rsa.PublicKey, userService userService, tokenService tokenService) Handler {
 	return Handler{
+		logger,
 		hostname,
 		accessTokenExpirationSeconds,
 		refreshTokenExpirationSeconds,
@@ -36,6 +37,7 @@ func NewHandler(hostname string, accessTokenExpirationSeconds int, refreshTokenE
 }
 
 type Handler struct {
+	logger                                  *slog.Logger
 	hostname                                string
 	accessTokenExpirationSeconds            int
 	refreshTokenExpirationSeconds           int
@@ -401,7 +403,7 @@ func (h Handler) SignOut(c *gin.Context) {
 
 	user, err := h.parseRequest(c.Request)
 	if err != nil {
-		log.Println("token not valid:", err)
+		h.logger.Error("token not valid", "error", err)
 		_ = c.Error(errdef.NewUnauthorized("token not valid"))
 		return
 	}
