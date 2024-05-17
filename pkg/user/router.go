@@ -7,6 +7,7 @@ import (
 
 func Routes(r *gin.Engine, authenticationMiddleware middleware.AuthenticationMiddleware, authorizationMiddleware middleware.AuthorizationMiddleware, handler Handler) {
 	r.POST("/users", handler.SignUp)
+	r.DELETE("/users", handler.SignOut)
 	r.POST("/refresh", handler.RefreshToken)
 	r.POST("/users/validate", handler.ValidateEmail)
 	r.POST("/users/request-reset", handler.RequestPasswordReset)
@@ -19,7 +20,6 @@ func Routes(r *gin.Engine, authenticationMiddleware middleware.AuthenticationMid
 	tokenAuthenticationRouter := r.Group("")
 	tokenAuthenticationRouter.Use(authenticationMiddleware.TokenAuthentication)
 	tokenAuthenticationRouter.GET("/me", handler.Me)
-	tokenAuthenticationRouter.DELETE("/users", handler.SignOut)
 	tokenAuthenticationRouter.GET("/users/:id", handler.FindById)
 
 	administratorRestrictedRouter := tokenAuthenticationRouter.Group("")

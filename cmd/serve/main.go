@@ -74,22 +74,21 @@ func run() error {
 	authorization := middleware.NewAuthorization(logger, userService)
 	redis := storage.NewRedis(cfg)
 	tokenRepository := token.NewRepository(redis)
-	privateKey, err := cfg.Authentication.Keys.GetPrivateKey(logger)
+	authConfig := cfg.Authentication
+	privateKey, err := authConfig.Keys.GetPrivateKey(logger)
 	if err != nil {
 		return err
 	}
-	publicKey, err := cfg.Authentication.Keys.GetPublicKey()
+	publicKey, err := authConfig.Keys.GetPublicKey()
 	if err != nil {
 		return err
 	}
-	tokenService, err := token.NewService(logger, tokenRepository, privateKey, publicKey,
-		cfg.Authentication.AccessTokenExpirationSeconds, cfg.Authentication.RefreshTokenSecretKey,
-		cfg.Authentication.RefreshTokenExpirationSeconds)
+	tokenService, err := token.NewService(logger, tokenRepository, privateKey, publicKey, authConfig.AccessTokenExpirationSeconds, authConfig.RefreshTokenSecretKey, authConfig.RefreshTokenExpirationSeconds, authConfig.RefreshTokenRememberMeExpirationSeconds)
 	if err != nil {
 		return err
 	}
 
-	userHandler := user.NewHandler(cfg.Hostname, cfg.Authentication, userService, tokenService)
+	userHandler := user.NewHandler(logger, cfg.Hostname, authConfig.AccessTokenExpirationSeconds, authConfig.RefreshTokenExpirationSeconds, authConfig.RefreshTokenRememberMeExpirationSeconds, publicKey, userService, tokenService)
 
 	authentication := middleware.NewAuthentication(publicKey, userService)
 	groupRepository := group.NewRepository(db)

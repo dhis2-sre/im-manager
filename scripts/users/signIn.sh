@@ -2,4 +2,4 @@
 
 set -euo pipefail
 
-$HTTP --auth "$USER_EMAIL:$PASSWORD" post "$IM_HOST/tokens"
+echo "{}" | $HTTP --auth "$USER_EMAIL:$PASSWORD" post "$IM_HOST/tokens"

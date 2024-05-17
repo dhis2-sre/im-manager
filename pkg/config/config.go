@@ -92,9 +92,10 @@ func New() Config {
 				PrivateKey: requireEnv("PRIVATE_KEY"),
 				PublicKey:  requireEnv("PUBLIC_KEY"),
 			},
-			RefreshTokenSecretKey:         requireEnv("REFRESH_TOKEN_SECRET_KEY"),
-			AccessTokenExpirationSeconds:  requireEnvAsInt("ACCESS_TOKEN_EXPIRATION_IN_SECONDS"),
-			RefreshTokenExpirationSeconds: requireEnvAsInt("REFRESH_TOKEN_EXPIRATION_IN_SECONDS"),
+			RefreshTokenSecretKey:                   requireEnv("REFRESH_TOKEN_SECRET_KEY"),
+			AccessTokenExpirationSeconds:            requireEnvAsInt("ACCESS_TOKEN_EXPIRATION_IN_SECONDS"),
+			RefreshTokenExpirationSeconds:           requireEnvAsInt("REFRESH_TOKEN_EXPIRATION_IN_SECONDS"),
+			RefreshTokenRememberMeExpirationSeconds: requireEnvAsInt("REFRESH_TOKEN_REMEMBER_ME_EXPIRATION_IN_SECONDS"),
 		},
 		Groups:      newGroups(),
 		AdminUser:   newAdminUser(),
@@ -149,10 +150,11 @@ type redis struct {
 }
 
 type Authentication struct {
-	Keys                          keys
-	RefreshTokenSecretKey         string
-	AccessTokenExpirationSeconds  int
-	RefreshTokenExpirationSeconds int
+	Keys                                    keys
+	RefreshTokenSecretKey                   string
+	AccessTokenExpirationSeconds            int
+	RefreshTokenExpirationSeconds           int
+	RefreshTokenRememberMeExpirationSeconds int
 }
 
 type keys struct {

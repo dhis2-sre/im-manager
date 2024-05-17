@@ -1559,6 +1559,8 @@ paths:
             responses:
                 "201":
                     $ref: '#/responses/Tokens'
+                "400":
+                    $ref: '#/responses/Error'
                 "401":
                     $ref: '#/responses/Error'
                 "403":
