@@ -35,7 +35,8 @@ func TestUserHandler(t *testing.T) {
 
 	db := inttest.SetupDB(t)
 	userRepository := user.NewRepository(db)
-	userService := user.NewService("", 900, userRepository, fakeDialer{t})
+	const passwordTokenTtl = 10
+	userService := user.NewService("", passwordTokenTtl, userRepository, fakeDialer{t})
 	groupRepository := group.NewRepository(db)
 	groupService := group.NewService(groupRepository, userService)
 
@@ -499,16 +500,22 @@ func TestUserHandler(t *testing.T) {
 			{
 				t.Log("PasswordResetTokenExpired")
 
-				newUserService := user.NewService("", 1, userRepository, fakeDialer{t})
 				id, email, _ := createUser(t, client, userService)
-				_ = newUserService.RequestPasswordReset(email)
-				user1, err := newUserService.FindById(context.Background(), id)
-				require.NoError(t, err)
-				// Wait for token to expire
-				time.Sleep(5 * time.Second)
 
-				err = newUserService.ResetPassword(user1.PasswordToken.String, "ResetResetResetResetReset")
-				require.Error(t, err, "reset token has expired")
+				requestResetRequestBody := jsonBody(`{"email": "%s"}`, email)
+				client.Do(t, http.MethodPost, "/users/request-reset", requestResetRequestBody, http.StatusCreated, inttest.WithHeader("Content-Type", "application/json"))
+
+				user, err := userService.FindById(context.Background(), id)
+				require.NoError(t, err)
+
+				resetRequestBody := jsonBody(`{
+					"token": "%s",
+					"password": "ResetResetResetResetReset"
+				}`, user.PasswordToken.String)
+
+				<-time.After(time.Duration(passwordTokenTtl) * time.Second)
+
+				client.Do(t, http.MethodPost, "/users/reset-password", resetRequestBody, http.StatusBadRequest, inttest.WithHeader("Content-Type", "application/json"))
 			}
 		})
 	})
