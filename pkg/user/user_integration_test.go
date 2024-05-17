@@ -276,20 +276,14 @@ func TestUserHandler(t *testing.T) {
 				assert.Equal(t, http.StatusCreated, response.StatusCode)
 				actualCookies := response.Cookies()
 				require.Len(t, actualCookies, 2)
+
 				accessTokenCookie := findCookieByName("accessToken", actualCookies)
 				require.NotNil(t, accessTokenCookie)
-				assert.Equal(t, accessTokenCookie.Path, "/")
-				assert.Equal(t, accessTokenCookie.MaxAge, 10)
-				assert.Equal(t, accessTokenCookie.Secure, true)
-				assert.Equal(t, accessTokenCookie.HttpOnly, true)
-				assert.Equal(t, accessTokenCookie.SameSite, http.SameSiteStrictMode)
+				assertCookie(t, accessTokenCookie, "/", 10, http.SameSiteStrictMode)
+
 				refreshTokenCookie := findCookieByName("refreshToken", actualCookies)
 				require.NotNil(t, refreshTokenCookie)
-				assert.Equal(t, refreshTokenCookie.Path, "/refresh")
-				assert.Equal(t, refreshTokenCookie.MaxAge, 20)
-				assert.Equal(t, refreshTokenCookie.Secure, true)
-				assert.Equal(t, refreshTokenCookie.HttpOnly, true)
-				assert.Equal(t, refreshTokenCookie.SameSite, http.SameSiteStrictMode)
+				assertCookie(t, refreshTokenCookie, "/refresh", 20, http.SameSiteStrictMode)
 			}
 
 			{
@@ -305,27 +299,18 @@ func TestUserHandler(t *testing.T) {
 				assert.Equal(t, http.StatusCreated, response.StatusCode)
 				actualCookies := response.Cookies()
 				require.Len(t, actualCookies, 3)
+
 				accessTokenCookie := findCookieByName("accessToken", actualCookies)
 				require.NotNil(t, accessTokenCookie)
-				assert.Equal(t, accessTokenCookie.Path, "/")
-				assert.Equal(t, accessTokenCookie.MaxAge, 10)
-				assert.Equal(t, accessTokenCookie.Secure, true)
-				assert.Equal(t, accessTokenCookie.HttpOnly, true)
-				assert.Equal(t, accessTokenCookie.SameSite, http.SameSiteStrictMode)
+				assertCookie(t, accessTokenCookie, "/", 10, http.SameSiteStrictMode)
+
 				refreshTokenCookie := findCookieByName("refreshToken", actualCookies)
 				require.NotNil(t, refreshTokenCookie)
-				assert.Equal(t, refreshTokenCookie.Path, "/refresh")
-				assert.Equal(t, refreshTokenCookie.MaxAge, 30)
-				assert.Equal(t, refreshTokenCookie.Secure, true)
-				assert.Equal(t, refreshTokenCookie.HttpOnly, true)
-				assert.Equal(t, refreshTokenCookie.SameSite, http.SameSiteStrictMode)
+				assertCookie(t, refreshTokenCookie, "/refresh", 30, http.SameSiteStrictMode)
+
 				rememberMeTokenCookie := findCookieByName("rememberMe", actualCookies)
 				require.NotNil(t, rememberMeTokenCookie)
-				assert.Equal(t, rememberMeTokenCookie.Path, "/refresh")
-				assert.Equal(t, rememberMeTokenCookie.MaxAge, 30)
-				assert.Equal(t, rememberMeTokenCookie.Secure, true)
-				assert.Equal(t, rememberMeTokenCookie.HttpOnly, true)
-				assert.Equal(t, rememberMeTokenCookie.SameSite, http.SameSiteStrictMode)
+				assertCookie(t, rememberMeTokenCookie, "/refresh", 30, http.SameSiteStrictMode)
 			}
 
 			{
@@ -346,22 +331,14 @@ func TestUserHandler(t *testing.T) {
 				assert.Equal(t, http.StatusCreated, response.StatusCode)
 				actualCookies := response.Cookies()
 				require.Len(t, actualCookies, 2)
+
 				accessTokenCookie := findCookieByName("accessToken", actualCookies)
 				require.NotNil(t, accessTokenCookie)
-				assert.Equal(t, accessTokenCookie.Path, "/")
-				assert.Equal(t, accessTokenCookie.MaxAge, 10)
-				assert.Equal(t, accessTokenCookie.Secure, true)
-				assert.Equal(t, accessTokenCookie.HttpOnly, true)
-				assert.Equal(t, accessTokenCookie.SameSite, http.SameSiteStrictMode)
+				assertCookie(t, accessTokenCookie, "/", 10, http.SameSiteStrictMode)
+
 				refreshTokenCookie := findCookieByName("refreshToken", actualCookies)
 				require.NotNil(t, refreshTokenCookie)
-				assert.Equal(t, refreshTokenCookie.Path, "/refresh")
-				assert.Equal(t, refreshTokenCookie.MaxAge, 20)
-				assert.Equal(t, refreshTokenCookie.Secure, true)
-				assert.Equal(t, refreshTokenCookie.HttpOnly, true)
-				assert.Equal(t, refreshTokenCookie.SameSite, http.SameSiteStrictMode)
-
-				// TODO: Assert response body?
+				assertCookie(t, refreshTokenCookie, "/refresh", 20, http.SameSiteStrictMode)
 			}
 
 			{
@@ -385,29 +362,18 @@ func TestUserHandler(t *testing.T) {
 				assert.Equal(t, http.StatusCreated, response.StatusCode)
 				actualCookies := response.Cookies()
 				require.Len(t, actualCookies, 3)
+
 				accessTokenCookie := findCookieByName("accessToken", actualCookies)
 				require.NotNil(t, accessTokenCookie)
-				assert.Equal(t, accessTokenCookie.Path, "/")
-				assert.Equal(t, accessTokenCookie.MaxAge, 10)
-				assert.Equal(t, accessTokenCookie.Secure, true)
-				assert.Equal(t, accessTokenCookie.HttpOnly, true)
-				assert.Equal(t, accessTokenCookie.SameSite, http.SameSiteStrictMode)
+				assertCookie(t, accessTokenCookie, "/", 10, http.SameSiteStrictMode)
+
 				refreshTokenCookie := findCookieByName("refreshToken", actualCookies)
 				require.NotNil(t, refreshTokenCookie)
-				assert.Equal(t, refreshTokenCookie.Path, "/refresh")
-				assert.Equal(t, refreshTokenCookie.MaxAge, 30)
-				assert.Equal(t, refreshTokenCookie.Secure, true)
-				assert.Equal(t, refreshTokenCookie.HttpOnly, true)
-				assert.Equal(t, refreshTokenCookie.SameSite, http.SameSiteStrictMode)
+				assertCookie(t, refreshTokenCookie, "/refresh", 30, http.SameSiteStrictMode)
+
 				rememberMeTokenCookie := findCookieByName("rememberMe", actualCookies)
 				require.NotNil(t, rememberMeTokenCookie)
-				assert.Equal(t, rememberMeTokenCookie.Path, "/refresh")
-				assert.Equal(t, rememberMeTokenCookie.MaxAge, 30)
-				assert.Equal(t, rememberMeTokenCookie.Secure, true)
-				assert.Equal(t, rememberMeTokenCookie.HttpOnly, true)
-				assert.Equal(t, rememberMeTokenCookie.SameSite, http.SameSiteStrictMode)
-
-				// TODO: Assert response body?
+				assertCookie(t, rememberMeTokenCookie, "/refresh", 30, http.SameSiteStrictMode)
 			}
 
 			{
@@ -426,22 +392,14 @@ func TestUserHandler(t *testing.T) {
 				assert.Equal(t, http.StatusCreated, response.StatusCode)
 				actualCookies := response.Cookies()
 				require.Len(t, actualCookies, 2)
+
 				accessTokenCookie := findCookieByName("accessToken", actualCookies)
 				require.NotNil(t, accessTokenCookie)
-				assert.Equal(t, accessTokenCookie.Path, "/")
-				assert.Equal(t, accessTokenCookie.MaxAge, 10)
-				assert.Equal(t, accessTokenCookie.Secure, true)
-				assert.Equal(t, accessTokenCookie.HttpOnly, true)
-				assert.Equal(t, accessTokenCookie.SameSite, http.SameSiteStrictMode)
+				assertCookie(t, accessTokenCookie, "/", 10, http.SameSiteStrictMode)
+
 				refreshTokenCookie := findCookieByName("refreshToken", actualCookies)
 				require.NotNil(t, refreshTokenCookie)
-				assert.Equal(t, refreshTokenCookie.Path, "/refresh")
-				assert.Equal(t, refreshTokenCookie.MaxAge, 20)
-				assert.Equal(t, refreshTokenCookie.Secure, true)
-				assert.Equal(t, refreshTokenCookie.HttpOnly, true)
-				assert.Equal(t, refreshTokenCookie.SameSite, http.SameSiteStrictMode)
-
-				// TODO: Assert response body?
+				assertCookie(t, refreshTokenCookie, "/refresh", 20, http.SameSiteStrictMode)
 			}
 
 		})
@@ -573,7 +531,7 @@ func TestUserHandler(t *testing.T) {
 			var users []model.User
 			client.GetJSON(t, "/users", &users, inttest.WithAuthToken(adminToken.AccessToken))
 
-			expectedNumberOfUsers := int(userCounter.Load())
+			expectedNumberOfUsers := int(userCounter.Load()) + 3 // counter + 1 admin + 1 manually created + 1 manually created which isn't validated
 			assert.Lenf(t, users, expectedNumberOfUsers, "GET /users should return %d users", expectedNumberOfUsers)
 			assert.Truef(t, slices.IndexFunc(users, func(u model.User) bool {
 				return slices.IndexFunc(u.Groups, func(g model.Group) bool {
@@ -592,6 +550,14 @@ func TestUserHandler(t *testing.T) {
 			client.Do(t, http.MethodGet, path, nil, http.StatusNotFound, inttest.WithAuthToken(adminToken.AccessToken))
 		}
 	})
+}
+
+func assertCookie(t *testing.T, cookie *http.Cookie, path string, maxAge int, sameSiteMode http.SameSite) {
+	assert.Equal(t, path, cookie.Path)
+	assert.Equal(t, maxAge, cookie.MaxAge)
+	assert.Equal(t, true, cookie.Secure)
+	assert.Equal(t, true, cookie.HttpOnly)
+	assert.Equal(t, sameSiteMode, cookie.SameSite)
 }
 
 type userService interface {
