@@ -70,6 +70,7 @@ func TestUserHandler(t *testing.T) {
 			"email":    "user@dhis2.org",
 			"password": "oneoneoneoneoneoneone111"
 		}`), &user)
+		userCounter.Add(1)
 
 		assert.Equal(t, "user@dhis2.org", user.Email)
 		assert.Empty(t, user.Password)
@@ -440,6 +441,7 @@ func TestUserHandler(t *testing.T) {
 					"email":    "no-email-validation@dhis2.org",
 					"password": "oneoneoneoneoneoneone111"
 				}`), &user)
+				userCounter.Add(1)
 				require.Equal(t, "no-email-validation@dhis2.org", user.Email)
 				require.Empty(t, user.Password)
 				request := client.NewRequest(t, http.MethodPost, "/tokens", jsonBody(`{}`), inttest.WithBasicAuth("no-email-validation@dhis2.org", "oneoneoneoneoneoneone111"))
@@ -538,7 +540,7 @@ func TestUserHandler(t *testing.T) {
 			var users []model.User
 			client.GetJSON(t, "/users", &users, inttest.WithAuthToken(adminToken.AccessToken))
 
-			expectedNumberOfUsers := int(userCounter.Load()) + 3 // counter + 1 admin + 1 manually created + 1 manually created which isn't validated
+			expectedNumberOfUsers := int(userCounter.Load()) + 1 // counter + 1 admin
 			assert.Lenf(t, users, expectedNumberOfUsers, "GET /users should return %d users", expectedNumberOfUsers)
 			assert.Truef(t, slices.IndexFunc(users, func(u model.User) bool {
 				return slices.IndexFunc(u.Groups, func(g model.Group) bool {
