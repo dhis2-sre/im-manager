@@ -5,6 +5,7 @@ import (
 	"crypto/rsa"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 
@@ -247,7 +248,7 @@ func (h Handler) SignIn(c *gin.Context) {
 	}
 
 	var request signInRequest
-	if err := handler.DataBinder(c, &request); err != nil {
+	if err := handler.DataBinder(c, &request); err != nil && err != io.EOF {
 		_ = c.Error(err)
 		return
 	}
