@@ -161,9 +161,8 @@ func (hc *HTTPClient) GetJSON(t *testing.T, path string, responseBody any, heade
 func (hc *HTTPClient) PostJSON(t *testing.T, path string, requestBody io.Reader, responseBody any, headers ...func(http.Header)) {
 	t.Helper()
 
-	if requestBody != nil {
-		headers = append(headers, WithHeader("Content-Type", "application/json"))
-	}
+	headers = append(headers, WithHeader("Content-Type", "application/json"))
+
 	body := hc.Post(t, path, requestBody, headers...)
 
 	err := json.Unmarshal(body, &responseBody)
