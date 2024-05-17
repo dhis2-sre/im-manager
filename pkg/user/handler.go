@@ -424,12 +424,12 @@ func (h Handler) parseRequest(request *http.Request) (*model.User, error) {
 		jwt.WithValidate(false),
 	)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error parsing request: %s", err)
 	}
 
 	err = jwt.Validate(token)
 	if err != nil && !errors.Is(err, jwt.ErrTokenExpired()) {
-		return nil, err
+		return nil, fmt.Errorf("error validating token: %s", err)
 	}
 
 	userData, ok := token.Get("user")
