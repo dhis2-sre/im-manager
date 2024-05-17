@@ -604,12 +604,7 @@ func createUser(t *testing.T, client *inttest.HTTPClient, userService userServic
 	currentUserCount := userCounter.Load()
 
 	email := fmt.Sprintf("user%d@dhis2.org", currentUserCount)
-
-	passwordLength := 24
-	b := make([]byte, passwordLength+2)
-	_, err := rand.Read(b)
-	require.NoError(t, err)
-	password := fmt.Sprintf("%x", b)[2 : passwordLength+2]
+	password := uuid.NewString()
 
 	requestBody := strings.NewReader(fmt.Sprintf(`{
 			"email":    "%s",
