@@ -574,7 +574,12 @@ func TestUserHandler(t *testing.T) {
 			client.GetJSON(t, "/users", &users, inttest.WithAuthToken(adminToken.AccessToken))
 
 			expectedNumberOfUsers := int(userCounter.Load())
-			assert.Lenf(t, users, expectedNumberOfUsers, "GET /users should return %d users one of which is an admin", expectedNumberOfUsers)
+			assert.Lenf(t, users, expectedNumberOfUsers, "GET /users should return %d users", expectedNumberOfUsers)
+			assert.Truef(t, slices.IndexFunc(users, func(u model.User) bool {
+				return slices.IndexFunc(u.Groups, func(g model.Group) bool {
+					return g.Name == model.AdministratorGroupName
+				}) != -1
+			}) != -1, "at least one user should be Administrator")
 		}
 
 		{
