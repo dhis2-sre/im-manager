@@ -575,7 +575,8 @@ func TestUserHandler(t *testing.T) {
 			var users []model.User
 			client.GetJSON(t, "/users", &users, inttest.WithAuthToken(adminToken.AccessToken))
 
-			assert.Lenf(t, users, 13, "GET /users should return 13 users one of which is an admin")
+			expectedNumberOfUsers := int(userCounter.Load())
+			assert.Lenf(t, users, expectedNumberOfUsers, "GET /users should return %d users one of which is an admin", expectedNumberOfUsers)
 		}
 
 		{
