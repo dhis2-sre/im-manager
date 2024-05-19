@@ -8,9 +8,15 @@ touch ./.access_token_cache
 ACCESS_TOKEN="$(cat ./.access_token_cache || "")"
 exp=$(echo "$ACCESS_TOKEN" | jq -R 'split(".")? | .[1] | @base64d | fromjson | .exp')
 NOW=$(date +%s)
-#if $IM_USER_TYPE != "" and token doesn't match
+RESPONSE=""
 if [[ -z "$exp" ]] || (( exp < NOW )); then
   # shellcheck disable=SC2155
-  export ACCESS_TOKEN=$(./signIn$IM_USER_TYPE.sh | grep Set-Cookie | grep accessToken | sed s/Set-Cookie:\ accessToken=// | cut -f1 -d ";")
-  echo "$ACCESS_TOKEN" > ./.access_token_cache
+  if [[ -z "$IM_USER_TYPE" ]]; then
+    RESPONSE=$(echo "{}" | $HTTP --headers --auth "$USER_EMAIL:$PASSWORD" post "$IM_HOST/tokens")
+  else
+    RESPONSE=$(echo "{}" | $HTTP --headers --auth "$ADMIN_USER_EMAIL:$ADMIN_USER_PASSWORD" post "$IM_HOST/tokens")
+  fi
 fi
+# shellcheck disable=SC2155
+export ACCESS_TOKEN=$(echo "$RESPONSE" | grep Set-Cookie | grep accessToken | sed s/Set-Cookie:\ accessToken=// | cut -f1 -d ";")
+echo "$ACCESS_TOKEN" > ./.access_token_cache
