@@ -16,7 +16,7 @@ if [[ -z "$exp" ]] || (( exp < NOW )); then
   else
     RESPONSE=$(echo "{}" | $HTTP --headers --auth "$ADMIN_USER_EMAIL:$ADMIN_USER_PASSWORD" post "$IM_HOST/tokens")
   fi
+  # shellcheck disable=SC2155
+  export ACCESS_TOKEN=$(echo "$RESPONSE" | grep Set-Cookie | grep accessToken | sed s/Set-Cookie:\ accessToken=// | cut -f1 -d ";")
+  echo "$ACCESS_TOKEN" > ./.access_token_cache
 fi
-# shellcheck disable=SC2155
-export ACCESS_TOKEN=$(echo "$RESPONSE" | grep Set-Cookie | grep accessToken | sed s/Set-Cookie:\ accessToken=// | cut -f1 -d ";")
-echo "$ACCESS_TOKEN" > ./.access_token_cache
