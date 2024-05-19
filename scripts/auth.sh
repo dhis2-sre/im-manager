@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+IM_USER_TYPE="${1:-}"
+
+touch ./.access_token_cache
+ACCESS_TOKEN="$(cat ./.access_token_cache || "")"
+exp=$(echo "$ACCESS_TOKEN" | jq -R 'split(".")? | .[1] | @base64d | fromjson | .exp')
+NOW=$(date +%s)
+#if $IM_USER_TYPE != "" and token doesn't match
+if [[ -z "$exp" ]] || (( exp < NOW )); then
+  # shellcheck disable=SC2155
+  export ACCESS_TOKEN=$(./signIn$IM_USER_TYPE.sh | grep Set-Cookie | grep accessToken | sed s/Set-Cookie:\ accessToken=// | cut -f1 -d ";")
+  echo "$ACCESS_TOKEN" > ./.access_token_cache
+fi
