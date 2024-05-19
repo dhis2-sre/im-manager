@@ -11,6 +11,6 @@ NOW=$(date +%s)
 #if $IM_USER_TYPE != "" and token doesn't match
 if [[ -z "$exp" ]] || (( exp < NOW )); then
   # shellcheck disable=SC2155
-  export ACCESS_TOKEN=$(./signIn$IM_USER_TYPE.sh | jq -r '.accessToken')
+  export ACCESS_TOKEN=$(./signIn$IM_USER_TYPE.sh | grep Set-Cookie | grep accessToken | sed s/Set-Cookie:\ accessToken=// | cut -f1 -d ";")
   echo "$ACCESS_TOKEN" > ./.access_token_cache
 fi
