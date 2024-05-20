@@ -4,18 +4,19 @@ set -euo pipefail
 
 IM_USER_TYPE="${1:-}"
 
-touch ./.access_token_cache
-ACCESS_TOKEN="$(cat ./.access_token_cache || "")"
+TOKEN_CACHE_FILE=./.access_token_cache_$IM_USER_TYPE
+touch "$TOKEN_CACHE_FILE"
+
+ACCESS_TOKEN="$(cat "$TOKEN_CACHE_FILE" || "")"
 exp=$(echo "$ACCESS_TOKEN" | jq -R 'split(".")? | .[1] | @base64d | fromjson | .exp')
 NOW=$(date +%s)
 if [[ -z "$exp" ]] || (( exp < NOW )); then
-  RESPONSE=""
-  if [[ -z "$IM_USER_TYPE" ]]; then
-    RESPONSE=$(echo "{}" | $HTTP --headers --auth "$USER_EMAIL:$PASSWORD" post "$IM_HOST/tokens")
-  else
-    RESPONSE=$(echo "{}" | $HTTP --headers --auth "$ADMIN_USER_EMAIL:$ADMIN_USER_PASSWORD" post "$IM_HOST/tokens")
+  if [ "$IM_USER_TYPE" == "Admin" ]; then
+    USER_EMAIL=$ADMIN_USER_EMAIL
+    PASSWORD=$ADMIN_USER_PASSWORD
   fi
+  RESPONSE=$(echo "{}" | $HTTP --headers --auth "$USER_EMAIL:$PASSWORD" post "$IM_HOST/tokens")
   # shellcheck disable=SC2155
   export ACCESS_TOKEN=$(echo "$RESPONSE" | grep Set-Cookie | grep accessToken | sed s/Set-Cookie:\ accessToken=// | cut -f1 -d ";")
-  echo "$ACCESS_TOKEN" > ./.access_token_cache
+  echo "$ACCESS_TOKEN" > "$TOKEN_CACHE_FILE"
 fi
