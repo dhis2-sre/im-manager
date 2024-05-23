@@ -339,14 +339,15 @@ func (h Handler) RefreshToken(c *gin.Context) {
 }
 
 func (h Handler) setCookies(c *gin.Context, tokens *token.Tokens, rememberMe bool) {
-	c.SetSameSite(http.SameSiteStrictMode)
+	c.SetSameSite(http.SameSiteNoneMode)
 	domain := h.hostname
-	c.SetCookie("accessToken", tokens.AccessToken, h.accessTokenExpirationSeconds, "/", domain, true, true)
+	secure := true
+	c.SetCookie("accessToken", tokens.AccessToken, h.accessTokenExpirationSeconds, "/", domain, secure, true)
 	if rememberMe {
-		c.SetCookie("refreshToken", tokens.RefreshToken, h.refreshTokenRememberMeExpirationSeconds, "/refresh", domain, true, true)
-		c.SetCookie("rememberMe", "true", h.refreshTokenRememberMeExpirationSeconds, "/refresh", domain, true, true)
+		c.SetCookie("refreshToken", tokens.RefreshToken, h.refreshTokenRememberMeExpirationSeconds, "/refresh", domain, secure, true)
+		c.SetCookie("rememberMe", "true", h.refreshTokenRememberMeExpirationSeconds, "/refresh", domain, secure, true)
 	} else {
-		c.SetCookie("refreshToken", tokens.RefreshToken, h.refreshTokenExpirationSeconds, "/refresh", domain, true, true)
+		c.SetCookie("refreshToken", tokens.RefreshToken, h.refreshTokenExpirationSeconds, "/refresh", domain, secure, true)
 	}
 }
 
