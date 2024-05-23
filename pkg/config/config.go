@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log"
 	"log/slog"
+	"net/http"
 	"os"
 	"strconv"
 	"strings"
@@ -92,6 +93,7 @@ func New() Config {
 				PrivateKey: requireEnv("PRIVATE_KEY"),
 				PublicKey:  requireEnv("PUBLIC_KEY"),
 			},
+			SameSiteMode:                            sameSiteMode(),
 			RefreshTokenSecretKey:                   requireEnv("REFRESH_TOKEN_SECRET_KEY"),
 			AccessTokenExpirationSeconds:            requireEnvAsInt("ACCESS_TOKEN_EXPIRATION_IN_SECONDS"),
 			RefreshTokenExpirationSeconds:           requireEnvAsInt("REFRESH_TOKEN_EXPIRATION_IN_SECONDS"),
@@ -104,6 +106,21 @@ func New() Config {
 		S3Region:    requireEnv("S3_REGION"),
 		S3Endpoint:  os.Getenv("S3_ENDPOINT"),
 	}
+}
+
+func sameSiteMode() http.SameSite {
+	sameSiteMode := requireEnv("SAME_SITE_MODE")
+	switch sameSiteMode {
+	case "default":
+		return http.SameSiteDefaultMode
+	case "lax":
+		return http.SameSiteLaxMode
+	case "strict":
+		return http.SameSiteStrictMode
+	case "none":
+		return http.SameSiteNoneMode
+	}
+	return -1
 }
 
 type Service struct {
@@ -151,6 +168,7 @@ type redis struct {
 
 type Authentication struct {
 	Keys                                    keys
+	SameSiteMode                            http.SameSite
 	RefreshTokenSecretKey                   string
 	AccessTokenExpirationSeconds            int
 	RefreshTokenExpirationSeconds           int
