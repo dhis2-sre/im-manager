@@ -535,6 +535,17 @@ func TestUserHandler(t *testing.T) {
 		}
 
 		{
+			t.Log("DeleteUser")
+
+			id, _, _ := createUser(t, client, userService)
+			path := fmt.Sprintf("/users/%d", id)
+			client.Delete(t, path, inttest.WithAuthToken(adminToken.AccessToken))
+
+			client.Do(t, http.MethodGet, path, nil, http.StatusNotFound, inttest.WithAuthToken(adminToken.AccessToken))
+			userCounter.Add(-1)
+		}
+
+		{
 			t.Log("GetAllUsers")
 
 			var users []model.User
@@ -547,16 +558,6 @@ func TestUserHandler(t *testing.T) {
 					return g.Name == model.AdministratorGroupName
 				}) != -1
 			}) != -1, "at least one user should be Administrator")
-		}
-
-		{
-			t.Log("DeleteUser")
-
-			id, _, _ := createUser(t, client, userService)
-			path := fmt.Sprintf("/users/%d", id)
-			client.Delete(t, path, inttest.WithAuthToken(adminToken.AccessToken))
-
-			client.Do(t, http.MethodGet, path, nil, http.StatusNotFound, inttest.WithAuthToken(adminToken.AccessToken))
 		}
 	})
 }
@@ -574,7 +575,7 @@ type userService interface {
 	ValidateEmail(emailToken uuid.UUID) error
 }
 
-var userCounter atomic.Uint32
+var userCounter atomic.Int32
 
 func createUser(t *testing.T, client *inttest.HTTPClient, userService userService) (uint, string, string) {
 	t.Helper()
