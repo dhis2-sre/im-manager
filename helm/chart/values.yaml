@@ -7,6 +7,7 @@ corsAllowOrigins:
 
 # DO NOT SET THIS TO ANYTHING BUT "strict" IN PRODUCTION!
 sameSiteMode: strict
+
 accessTokenExpirationInSeconds: 300 # 5 minutes
 refreshTokenExpirationInSeconds: 900 # 15 minutes
 refreshTokenRememberMeExpirationInSeconds: "2592000" # 30 days
