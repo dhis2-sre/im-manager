@@ -120,6 +120,8 @@ func sameSiteMode() http.SameSite {
 	case "none":
 		return http.SameSiteNoneMode
 	}
+
+	log.Fatalf("Can't parse same site mode: %s\n", sameSiteMode)
 	return -1
 }
 
