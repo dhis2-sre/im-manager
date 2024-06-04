@@ -89,10 +89,6 @@ func New() Config {
 			Port: requireEnvAsInt("REDIS_PORT"),
 		},
 		Authentication: Authentication{
-			Keys: keys{
-				PrivateKey: requireEnv("PRIVATE_KEY"),
-				PublicKey:  requireEnv("PUBLIC_KEY"),
-			},
 			SameSiteMode:                            sameSiteMode(),
 			RefreshTokenSecretKey:                   requireEnv("REFRESH_TOKEN_SECRET_KEY"),
 			AccessTokenExpirationSeconds:            requireEnvAsInt("ACCESS_TOKEN_EXPIRATION_IN_SECONDS"),
@@ -169,7 +165,6 @@ type redis struct {
 }
 
 type Authentication struct {
-	Keys                                    keys
 	SameSiteMode                            http.SameSite
 	RefreshTokenSecretKey                   string
 	AccessTokenExpirationSeconds            int
@@ -177,13 +172,12 @@ type Authentication struct {
 	RefreshTokenRememberMeExpirationSeconds int
 }
 
-type keys struct {
-	PrivateKey string
-	PublicKey  string
-}
-
-func (k keys) GetPrivateKey(logger *slog.Logger) (*rsa.PrivateKey, error) {
-	decode, _ := pem.Decode([]byte(k.PrivateKey))
+func GetPrivateKey(logger *slog.Logger) (*rsa.PrivateKey, error) {
+	key, err := requireEnvNew("PRIVATE_KEY")
+	if err != nil {
+		return nil, err
+	}
+	decode, _ := pem.Decode([]byte(key))
 	if decode == nil {
 		return nil, errors.New("failed to decode private key")
 	}
@@ -205,20 +199,6 @@ func (k keys) GetPrivateKey(logger *slog.Logger) (*rsa.PrivateKey, error) {
 	}
 
 	return privateKey.(*rsa.PrivateKey), nil
-}
-
-func (k keys) GetPublicKey() (*rsa.PublicKey, error) {
-	decode, _ := pem.Decode([]byte(k.PublicKey))
-	if decode == nil {
-		return nil, errors.New("failed to decode public key")
-	}
-
-	publicKey, err := x509.ParsePKIXPublicKey(decode.Bytes)
-	if err != nil {
-		return nil, err
-	}
-
-	return publicKey.(*rsa.PublicKey), nil
 }
 
 type Group struct {
@@ -268,12 +248,23 @@ func newE2eTestUser() user {
 	}
 }
 
+// Deprecated: requiredEnv is deprecated. Use requiredEnvNew instead.
+// TODO(DEVOPS-394) replace this function with requiredEnvNew, renaming requiredEnvNew to
+// requiredEnv
 func requireEnv(key string) string {
 	value, exists := os.LookupEnv(key)
 	if !exists {
 		log.Fatalf("Can't find environment variable: %s\n", key)
 	}
 	return value
+}
+
+func requireEnvNew(key string) (string, error) {
+	value, exists := os.LookupEnv(key)
+	if !exists {
+		return "", fmt.Errorf("required environment variable %q not set", key)
+	}
+	return value, nil
 }
 
 func requireEnvAsInt(key string) int {
