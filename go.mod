@@ -25,7 +25,7 @@ require (
 	github.com/orandin/slog-gorm v1.3.2
 	github.com/orlangure/gnomock v0.30.0
 	github.com/rabbitmq/amqp091-go v1.10.0
-	github.com/samber/slog-gin v1.13.0
+	github.com/samber/slog-gin v1.13.3
 	github.com/stretchr/testify v1.9.0
 	go.mozilla.org/sops/v3 v3.7.3
 	golang.org/x/crypto v0.23.0
