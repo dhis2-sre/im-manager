@@ -49,7 +49,6 @@ func TestUserHandler(t *testing.T) {
 	authorization := middleware.NewAuthorization(slog.New(slog.NewTextHandler(os.Stdout, nil)), userService)
 	key, err := rsa.GenerateKey(rand.Reader, 2048)
 	require.NoError(t, err, "failed to generate private key")
-	// TODO(DEVOPS-259) we should not use a pointer as we do not mutate and should not mutate the certificate
 	authentication := middleware.NewAuthentication(key.PublicKey, userService)
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
