@@ -41,8 +41,10 @@ func TestUserHandler(t *testing.T) {
 	groupRepository := group.NewRepository(db)
 	groupService := group.NewService(groupRepository, userService)
 
+	userCount.Increment()
 	err := user.CreateUser("admin", "admin", userService, groupService, model.AdministratorGroupName, "admin")
 	require.NoError(t, err, "failed to create admin user and group")
+	userCount.Done()
 
 	authorization := middleware.NewAuthorization(slog.New(slog.NewTextHandler(os.Stdout, nil)), userService)
 	key, err := rsa.GenerateKey(rand.Reader, 2048)
@@ -546,7 +548,7 @@ func TestUserHandler(t *testing.T) {
 			var users []model.User
 			client.GetJSON(t, "/users", &users, inttest.WithAuthToken(adminToken.AccessToken))
 
-			expectedNumberOfUsers := userCount.Value() + 1 // counter + 1 admin created in main test setup
+			expectedNumberOfUsers := userCount.Value()
 			assert.Lenf(t, users, expectedNumberOfUsers, "GET /users should return %d users", expectedNumberOfUsers)
 			assert.Truef(t, slices.IndexFunc(users, func(u model.User) bool {
 				return slices.IndexFunc(u.Groups, func(g model.Group) bool {
