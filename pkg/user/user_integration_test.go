@@ -546,8 +546,7 @@ func TestUserHandler(t *testing.T) {
 			var users []model.User
 			client.GetJSON(t, "/users", &users, inttest.WithAuthToken(adminToken.AccessToken))
 
-			// TODO where is the +1 coming from? we also need to wait for it
-			expectedNumberOfUsers := userCount.Value() + 1 // counter + 1 admin
+			expectedNumberOfUsers := userCount.Value() + 1 // counter + 1 admin created in main test setup
 			assert.Lenf(t, users, expectedNumberOfUsers, "GET /users should return %d users", expectedNumberOfUsers)
 			assert.Truef(t, slices.IndexFunc(users, func(u model.User) bool {
 				return slices.IndexFunc(u.Groups, func(g model.Group) bool {
