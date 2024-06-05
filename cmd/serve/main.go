@@ -25,42 +25,45 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
 	"log/slog"
 	"os"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-	s3config "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
-	"github.com/dhis2-sre/im-manager/internal/handler"
+	"github.com/dhis2-sre/im-manager/internal/log"
 	"github.com/dhis2-sre/im-manager/internal/middleware"
-	"github.com/dhis2-sre/im-manager/internal/server"
-	"github.com/dhis2-sre/im-manager/pkg/config"
 	"github.com/dhis2-sre/im-manager/pkg/database"
-	"github.com/dhis2-sre/im-manager/pkg/event"
 	"github.com/dhis2-sre/im-manager/pkg/group"
-	"github.com/dhis2-sre/im-manager/pkg/instance"
-	"github.com/dhis2-sre/im-manager/pkg/integration"
 	"github.com/dhis2-sre/im-manager/pkg/model"
-	"github.com/dhis2-sre/im-manager/pkg/stack"
-	"github.com/dhis2-sre/im-manager/pkg/storage"
 	"github.com/dhis2-sre/im-manager/pkg/token"
 	"github.com/dhis2-sre/im-manager/pkg/user"
+
+	s3config "github.com/aws/aws-sdk-go-v2/config"
+	"github.com/dhis2-sre/im-manager/internal/handler"
+	"github.com/dhis2-sre/im-manager/internal/server"
+	"github.com/dhis2-sre/im-manager/pkg/config"
+	"github.com/dhis2-sre/im-manager/pkg/event"
+	"github.com/dhis2-sre/im-manager/pkg/instance"
+	"github.com/dhis2-sre/im-manager/pkg/integration"
+	"github.com/dhis2-sre/im-manager/pkg/stack"
+	"github.com/dhis2-sre/im-manager/pkg/storage"
 	"github.com/dhis2-sre/rabbitmq-client/pkg/rabbitmq"
 	"github.com/go-mail/mail"
 )
 
 func main() {
 	if err := run(); err != nil {
-		log.Fatal(err)
+		fmt.Printf("im-manager exits due to: %v", err)
+		os.Exit(1)
 	}
 }
 
 func run() error {
 	cfg := config.New()
 
-	db, err := storage.NewDatabase(cfg.Postgresql)
+	logger := slog.New(log.New(slog.NewJSONHandler(os.Stdout, nil)))
+	db, err := storage.NewDatabase(logger, cfg.Postgresql)
 	if err != nil {
 		return err
 	}
@@ -68,23 +71,24 @@ func run() error {
 	userRepository := user.NewRepository(db)
 	dailer := mail.NewDialer(cfg.SMTP.Host, cfg.SMTP.Port, cfg.SMTP.Username, cfg.SMTP.Password)
 	userService := user.NewService(cfg.UIURL, cfg.PasswordTokenTTL, userRepository, dailer)
-	authorization := middleware.NewAuthorization(userService)
+	authorization := middleware.NewAuthorization(logger, userService)
 	redis := storage.NewRedis(cfg)
 	tokenRepository := token.NewRepository(redis)
-	privateKey, err := cfg.Authentication.Keys.GetPrivateKey()
+	authConfig := cfg.Authentication
+	privateKey, err := authConfig.Keys.GetPrivateKey(logger)
 	if err != nil {
 		return err
 	}
-	publicKey, err := cfg.Authentication.Keys.GetPublicKey()
+	publicKey, err := authConfig.Keys.GetPublicKey()
 	if err != nil {
 		return err
 	}
-	tokenService, err := token.NewService(tokenRepository, privateKey, publicKey, cfg.Authentication.AccessTokenExpirationSeconds, cfg.Authentication.RefreshTokenSecretKey, cfg.Authentication.RefreshTokenExpirationSeconds)
+	tokenService, err := token.NewService(logger, tokenRepository, privateKey, publicKey, authConfig.AccessTokenExpirationSeconds, authConfig.RefreshTokenSecretKey, authConfig.RefreshTokenExpirationSeconds, authConfig.RefreshTokenRememberMeExpirationSeconds)
 	if err != nil {
 		return err
 	}
 
-	userHandler := user.NewHandler(cfg.Hostname, cfg.Authentication, userService, tokenService)
+	userHandler := user.NewHandler(logger, cfg.Hostname, authConfig.AccessTokenExpirationSeconds, authConfig.RefreshTokenExpirationSeconds, authConfig.RefreshTokenRememberMeExpirationSeconds, publicKey, userService, tokenService)
 
 	authentication := middleware.NewAuthentication(publicKey, userService)
 	groupRepository := group.NewRepository(db)
@@ -108,14 +112,13 @@ func run() error {
 	broker := event.NewEventBroker()
 
 	instanceRepository := instance.NewRepository(db, cfg.InstanceParameterEncryptionKey)
-	helmfileService := instance.NewHelmfileService("./stacks", stackService, cfg.Classification)
-	instanceService := instance.NewService(broker, instanceRepository, groupService, stackService, helmfileService)
+	helmfileService := instance.NewHelmfileService(logger, stackService, "./stacks", cfg.Classification)
+	instanceService := instance.NewService(logger, broker, instanceRepository, groupService, stackService, helmfileService)
 	instanceService.ListenForClusterUpdates()
 
 	dockerHubClient := integration.NewDockerHubClient(cfg.DockerHub.Username, cfg.DockerHub.Password)
 
 	host := hostname()
-	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	consumer, err := rabbitmq.NewConsumer(
 		cfg.RabbitMqURL.GetUrl(),
 		rabbitmq.WithConnectionName(host),
@@ -127,7 +130,7 @@ func run() error {
 	}
 	defer consumer.Close()
 
-	ttlDestroyConsumer := instance.NewTTLDestroyConsumer(consumer, instanceService)
+	ttlDestroyConsumer := instance.NewTTLDestroyConsumer(logger, consumer, instanceService)
 	err = ttlDestroyConsumer.Consume()
 	if err != nil {
 		return err
@@ -152,11 +155,11 @@ func run() error {
 		o.UsePathStyle = true
 	})
 	uploader := manager.NewUploader(s3AWSClient)
-	s3Client := storage.NewS3Client(s3AWSClient, uploader)
+	s3Client := storage.NewS3Client(logger, s3AWSClient, uploader)
 
 	databaseRepository := database.NewRepository(db)
-	databaseService := database.NewService(cfg.S3Bucket, s3Client, groupService, databaseRepository)
-	databaseHandler := database.NewHandler(databaseService, groupService, instanceService, stackService)
+	databaseService := database.NewService(logger, cfg.S3Bucket, s3Client, groupService, databaseRepository)
+	databaseHandler := database.NewHandler(logger, databaseService, groupService, instanceService, stackService)
 
 	eventHandler := event.NewHandler(broker)
 
@@ -171,7 +174,7 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	err = createGroups(cfg, groupService)
+	err = createGroups(logger, groupService, cfg.Groups)
 	if err != nil {
 		return err
 	}
@@ -207,19 +210,17 @@ func hostname() string {
 
 type groupService interface {
 	FindOrCreate(name string, hostname string, deployable bool) (*model.Group, error)
-	AddUser(groupName string, userId uint) error
 }
 
-func createGroups(config config.Config, groupService groupService) error {
-	log.Println("Creating groups...")
-	groups := config.Groups
+func createGroups(logger *slog.Logger, groupService groupService, groups []config.Group) error {
+	logger.Info("Creating groups...")
 	for _, g := range groups {
 		newGroup, err := groupService.FindOrCreate(g.Name, g.Hostname, true)
 		if err != nil {
 			return fmt.Errorf("error creating group: %v", err)
 		}
 		if newGroup != nil {
-			log.Println("Created:", newGroup.Name)
+			logger.Info("Created group", "group", newGroup.Name)
 		}
 	}
 

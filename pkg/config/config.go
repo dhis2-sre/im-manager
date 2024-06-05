@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"log/slog"
 	"os"
 	"strconv"
 	"strings"
@@ -30,7 +31,7 @@ type Config struct {
 	SMTP                           smtp
 	Redis                          redis
 	Authentication                 Authentication
-	Groups                         []group
+	Groups                         []Group
 	AdminUser                      user
 	E2eTestUser                    user
 	S3Bucket                       string
@@ -91,9 +92,10 @@ func New() Config {
 				PrivateKey: requireEnv("PRIVATE_KEY"),
 				PublicKey:  requireEnv("PUBLIC_KEY"),
 			},
-			RefreshTokenSecretKey:         requireEnv("REFRESH_TOKEN_SECRET_KEY"),
-			AccessTokenExpirationSeconds:  requireEnvAsInt("ACCESS_TOKEN_EXPIRATION_IN_SECONDS"),
-			RefreshTokenExpirationSeconds: requireEnvAsInt("REFRESH_TOKEN_EXPIRATION_IN_SECONDS"),
+			RefreshTokenSecretKey:                   requireEnv("REFRESH_TOKEN_SECRET_KEY"),
+			AccessTokenExpirationSeconds:            requireEnvAsInt("ACCESS_TOKEN_EXPIRATION_IN_SECONDS"),
+			RefreshTokenExpirationSeconds:           requireEnvAsInt("REFRESH_TOKEN_EXPIRATION_IN_SECONDS"),
+			RefreshTokenRememberMeExpirationSeconds: requireEnvAsInt("REFRESH_TOKEN_REMEMBER_ME_EXPIRATION_IN_SECONDS"),
 		},
 		Groups:      newGroups(),
 		AdminUser:   newAdminUser(),
@@ -148,10 +150,11 @@ type redis struct {
 }
 
 type Authentication struct {
-	Keys                          keys
-	RefreshTokenSecretKey         string
-	AccessTokenExpirationSeconds  int
-	RefreshTokenExpirationSeconds int
+	Keys                                    keys
+	RefreshTokenSecretKey                   string
+	AccessTokenExpirationSeconds            int
+	RefreshTokenExpirationSeconds           int
+	RefreshTokenRememberMeExpirationSeconds int
 }
 
 type keys struct {
@@ -159,7 +162,7 @@ type keys struct {
 	PublicKey  string
 }
 
-func (k keys) GetPrivateKey() (*rsa.PrivateKey, error) {
+func (k keys) GetPrivateKey(logger *slog.Logger) (*rsa.PrivateKey, error) {
 	decode, _ := pem.Decode([]byte(k.PrivateKey))
 	if decode == nil {
 		return nil, errors.New("failed to decode private key")
@@ -170,7 +173,7 @@ func (k keys) GetPrivateKey() (*rsa.PrivateKey, error) {
 	privateKey, err := x509.ParsePKCS8PrivateKey(decode.Bytes)
 	if err != nil {
 		if err.Error() == "x509: failed to parse private key (use ParsePKCS1PrivateKey instead for this key format)" {
-			log.Println("Trying to parse PKCS1 format...")
+			logger.Info("Trying to parse PKCS1 format...")
 			privateKey, err = x509.ParsePKCS1PrivateKey(decode.Bytes)
 			if err != nil {
 				return nil, err
@@ -178,7 +181,7 @@ func (k keys) GetPrivateKey() (*rsa.PrivateKey, error) {
 		} else {
 			return nil, err
 		}
-		log.Println("Successfully parsed private key")
+		logger.Info("Successfully parsed private key")
 	}
 
 	return privateKey.(*rsa.PrivateKey), nil
@@ -198,12 +201,12 @@ func (k keys) GetPublicKey() (*rsa.PublicKey, error) {
 	return publicKey.(*rsa.PublicKey), nil
 }
 
-type group struct {
+type Group struct {
 	Name     string
 	Hostname string
 }
 
-func newGroups() []group {
+func newGroups() []Group {
 	groupNames := requireEnvAsArray("GROUP_NAMES")
 	groupHostnames := requireEnvAsArray("GROUP_HOSTNAMES")
 
@@ -211,7 +214,7 @@ func newGroups() []group {
 		log.Fatalf("len(GROUP_NAMES) != len(GROUP_HOSTNAMES)")
 	}
 
-	groups := make([]group, len(groupNames))
+	groups := make([]Group, len(groupNames))
 	for i := 0; i < len(groupNames); i++ {
 		groups[i].Name = groupNames[i]
 		groups[i].Hostname = groupHostnames[i]

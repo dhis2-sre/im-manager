@@ -1,15 +1,22 @@
 package user_test
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/rsa"
+	"fmt"
+	"io"
+	"log/slog"
 	"net/http"
-	"strconv"
+	"os"
+	"slices"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
-	"github.com/dhis2-sre/im-manager/pkg/config"
+	"github.com/google/uuid"
+
 	"github.com/go-mail/mail"
 
 	"github.com/dhis2-sre/im-manager/internal/middleware"
@@ -28,78 +35,163 @@ func TestUserHandler(t *testing.T) {
 
 	db := inttest.SetupDB(t)
 	userRepository := user.NewRepository(db)
-	userService := user.NewService("", 900, userRepository, fakeDialer{t})
+	const passwordTokenTtl = 10
+	userService := user.NewService("", passwordTokenTtl, userRepository, fakeDialer{t})
 	groupRepository := group.NewRepository(db)
 	groupService := group.NewService(groupRepository, userService)
 
 	err := user.CreateUser("admin", "admin", userService, groupService, model.AdministratorGroupName, "admin")
 	require.NoError(t, err, "failed to create admin user and group")
 
-	authorization := middleware.NewAuthorization(userService)
+	authorization := middleware.NewAuthorization(slog.New(slog.NewTextHandler(os.Stdout, nil)), userService)
 	key, err := rsa.GenerateKey(rand.Reader, 2048)
 	require.NoError(t, err, "failed to generate private key")
-	// TODO(DEVOPS-259) we should not use a pointer as we do not mutate and should not mutate the
-	// certificate
+	// TODO(DEVOPS-259) we should not use a pointer as we do not mutate and should not mutate the certificate
 	authentication := middleware.NewAuthentication(&key.PublicKey, userService)
 
+	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	redis := inttest.SetupRedis(t)
 	tokenRepository := token.NewRepository(redis)
-	tokenService, err := token.NewService(tokenRepository, key, &key.PublicKey, 10, "secret", 10)
+	tokenService, err := token.NewService(logger, tokenRepository, key, &key.PublicKey, 10, "secret", 20, 30)
 	require.NoError(t, err)
 
 	client := inttest.SetupHTTPServer(t, func(engine *gin.Engine) {
-		userHandler := user.NewHandler("hostname", config.Authentication{}, userService, tokenService)
+		userHandler := user.NewHandler(logger, "hostname", 10, 20, 30, &key.PublicKey, userService, tokenService)
 		user.Routes(engine, authentication, authorization, userHandler)
 	})
 
-	var user1ID string
-	{
-		t.Log("SignUpUsers")
+	t.Run("SignUp", func(t *testing.T) {
+		t.Parallel()
 
-		var user1 model.User
-		client.PostJSON(t, "/users", strings.NewReader(`{
-			"email":    "user1@dhis2.org",
+		t.Log("SignUpUser")
+
+		var user model.User
+		client.PostJSON(t, "/users", jsonBody(`{
+			"email":    "user@dhis2.org",
 			"password": "oneoneoneoneoneoneone111"
-		}`), &user1)
+		}`), &user)
+		userCounter.Add(1)
 
-		require.Equal(t, "user1@dhis2.org", user1.Email)
-		require.Empty(t, user1.Password)
-		user1ID = strconv.FormatUint(uint64(user1.ID), 10)
+		assert.Equal(t, "user@dhis2.org", user.Email)
+		assert.Empty(t, user.Password)
+		assert.Empty(t, user.EmailToken)
+		assert.False(t, user.Validated)
 
-		u1, err := userService.FindById(user1.ID)
+		t.Log("ValidateEmail")
+
+		u, err := userService.FindById(context.Background(), user.ID)
 		require.NoError(t, err)
-		err = userService.ValidateEmail(u1.EmailToken)
+		requestBody := jsonBody(`{"token": "%s"}`, u.EmailToken.String())
+		client.Do(t, http.MethodPost, "/users/validate", requestBody, http.StatusOK, inttest.WithHeader("Content-Type", "application/json"))
+
+		t.Log("SignIn")
+
+		var tokens *token.Tokens
+		client.PostJSON(t, "/tokens", nil, &tokens, inttest.WithBasicAuth("user@dhis2.org", "oneoneoneoneoneoneone111"))
+		require.NotEmpty(t, tokens.AccessToken, "should return an access token")
+
+		t.Log("GetMe")
+
+		var me model.User
+		client.GetJSON(t, "/me", &me, inttest.WithAuthToken(tokens.AccessToken))
+		assert.Equal(t, "user@dhis2.org", me.Email)
+		assert.True(t, me.Validated)
+	})
+
+	t.Run("SignOut", func(t *testing.T) {
+		t.Parallel()
+
+		expires, err := time.Parse(time.RFC3339, "0001-01-01T00:00:00Z")
 		require.NoError(t, err)
 
-		var user2 model.User
-		client.PostJSON(t, "/users", strings.NewReader(`{
-			"email":    "user2@dhis2.org",
-			"password": "oneoneoneoneoneoneone111"
-		}`), &user2)
+		expectedCookies := []*http.Cookie{
+			{
+				Name:       "accessToken",
+				Value:      "",
+				Path:       "/",
+				Domain:     "",
+				Expires:    expires,
+				RawExpires: "",
+				MaxAge:     -1,
+				Secure:     true,
+				HttpOnly:   true,
+				SameSite:   0,
+				Raw:        "accessToken=; Path=/; Max-Age=0; HttpOnly; Secure",
+				Unparsed:   nil,
+			},
+			{
+				Name:       "refreshToken",
+				Value:      "",
+				Path:       "/",
+				Domain:     "",
+				Expires:    expires,
+				RawExpires: "",
+				MaxAge:     -1,
+				Secure:     true,
+				HttpOnly:   true,
+				SameSite:   0,
+				Raw:        "refreshToken=; Path=/; Max-Age=0; HttpOnly; Secure",
+				Unparsed:   nil,
+			},
+			{
+				Name:       "rememberMe",
+				Value:      "",
+				Path:       "/",
+				Domain:     "",
+				Expires:    expires,
+				RawExpires: "",
+				MaxAge:     -1,
+				Secure:     true,
+				HttpOnly:   true,
+				SameSite:   0,
+				Raw:        "rememberMe=; Path=/; Max-Age=0; HttpOnly; Secure",
+				Unparsed:   nil,
+			},
+		}
 
-		require.Equal(t, "user2@dhis2.org", user2.Email)
-		require.Empty(t, user2.Password)
+		t.Run("NoToken", func(t *testing.T) {
+			request := client.NewRequest(t, http.MethodDelete, "/users", nil)
 
-		u2, err := userService.FindById(user2.ID)
-		require.NoError(t, err)
-		err = userService.ValidateEmail(u2.EmailToken)
-		require.NoError(t, err)
+			response, err := client.Client.Do(request)
+			require.NoError(t, err)
 
-		var user3 model.User
-		client.PostJSON(t, "/users", strings.NewReader(`{
-			"email":    "user3@dhis2.org",
-			"password": "oneoneoneoneoneoneone111"
-		}`), &user3)
+			require.Equal(t, http.StatusUnauthorized, response.StatusCode)
+			assert.EqualValues(t, expectedCookies, response.Cookies())
+		})
 
-		require.Equal(t, "user3@dhis2.org", user3.Email)
-		require.Empty(t, user3.Password)
-	}
+		t.Run("ValidToken", func(t *testing.T) {
+			_, email, password := createUser(t, client, userService)
+			var tokens *token.Tokens
+			client.PostJSON(t, "/tokens", nil, &tokens, inttest.WithBasicAuth(email, password))
+			request := client.NewRequest(t, http.MethodDelete, "/users", nil, inttest.WithAuthToken(tokens.AccessToken))
+
+			response, err := client.Client.Do(request)
+			require.NoError(t, err)
+
+			require.Equal(t, http.StatusOK, response.StatusCode)
+			assert.EqualValues(t, expectedCookies, response.Cookies())
+		})
+
+		t.Run("ExpiredToken", func(t *testing.T) {
+			_, email, password := createUser(t, client, userService)
+			var tokens *token.Tokens
+			client.PostJSON(t, "/tokens", nil, &tokens, inttest.WithBasicAuth(email, password))
+			<-time.After(time.Duration(tokens.ExpiresIn) * time.Second)
+			request := client.NewRequest(t, http.MethodDelete, "/users", nil, inttest.WithAuthToken(tokens.AccessToken))
+
+			response, err := client.Client.Do(request)
+			require.NoError(t, err)
+
+			require.Equal(t, http.StatusOK, response.StatusCode)
+			assert.EqualValues(t, expectedCookies, response.Cookies())
+		})
+	})
 
 	t.Run("SignUpFailed", func(t *testing.T) {
 		t.Parallel()
 
 		t.Run("InvalidEmail", func(t *testing.T) {
-			requestBody := strings.NewReader(`{
+			requestBody := jsonBody(`{
 				"email":    "not-a-valid-email",
 				"password": "oneoneoneoneoneoneone111"
 			}`)
@@ -110,7 +202,7 @@ func TestUserHandler(t *testing.T) {
 		})
 
 		t.Run("TooShortPassword", func(t *testing.T) {
-			requestBody := strings.NewReader(`{
+			requestBody := jsonBody(`{
 				"email":    "some@email.com",
 				"password": "short-password"
 			}`)
@@ -122,10 +214,10 @@ func TestUserHandler(t *testing.T) {
 
 		t.Run("TooLongPassword", func(t *testing.T) {
 			password := strings.Repeat("a", 129)
-			requestBody := strings.NewReader(`{
+			requestBody := jsonBody(`{
 				"email":    "some@email.com",
-				"password": "` + password + `"
-			}`)
+				"password": "%s"
+			}`, password)
 
 			response := client.Do(t, http.MethodPost, "/users", requestBody, http.StatusBadRequest, inttest.WithHeader("Content-Type", "application/json"))
 
@@ -133,7 +225,7 @@ func TestUserHandler(t *testing.T) {
 		})
 
 		t.Run("BothEmailAndPasswordAreInvalid", func(t *testing.T) {
-			requestBody := strings.NewReader(`{
+			requestBody := jsonBody(`{
 				"email":    "not-a-valid-email",
 				"password": "short-password"
 			}`)
@@ -148,64 +240,231 @@ func TestUserHandler(t *testing.T) {
 		t.Run("Success", func(t *testing.T) {
 			t.Parallel()
 
-			var user1Token *token.Tokens
+			var tokens *token.Tokens
 			{
 				t.Log("SignIn")
 
-				client.PostJSON(t, "/tokens", nil, &user1Token, inttest.WithBasicAuth("user1@dhis2.org", "oneoneoneoneoneoneone111"))
+				_, email, password := createUser(t, client, userService)
 
-				require.NotEmpty(t, user1Token.AccessToken, "should return an access token")
-			}
+				client.PostJSON(t, "/tokens", nil, &tokens, inttest.WithBasicAuth(email, password))
 
-			{
+				require.NotEmpty(t, tokens.AccessToken, "should return an access token")
+
 				t.Log("GetMe")
 
 				var me model.User
-				client.GetJSON(t, "/me", &me, inttest.WithAuthToken(user1Token.AccessToken))
 
-				assert.Equal(t, "user1@dhis2.org", me.Email)
+				client.GetJSON(t, "/me", &me, inttest.WithAuthToken(tokens.AccessToken))
+
+				assert.Equal(t, email, me.Email)
 			}
 
 			{
 				t.Log("GetAllIsUnauthorized")
 
-				client.Do(t, http.MethodGet, "/users", nil, http.StatusUnauthorized, inttest.WithAuthToken(user1Token.AccessToken))
+				client.Do(t, http.MethodGet, "/users", nil, http.StatusUnauthorized, inttest.WithAuthToken(tokens.AccessToken))
 			}
+
+			{
+				t.Log("SignInCookies")
+
+				_, email, password := createUser(t, client, userService)
+				requestBody := jsonBody(`{}`)
+				request := client.NewRequest(t, http.MethodPost, "/tokens", requestBody, inttest.WithBasicAuth(email, password), inttest.WithHeader("Content-Type", "application/json"))
+
+				response, err := client.Client.Do(request)
+				require.NoError(t, err)
+
+				assert.Equal(t, http.StatusCreated, response.StatusCode)
+				actualCookies := response.Cookies()
+				require.Len(t, actualCookies, 2)
+
+				accessTokenCookie := findCookieByName("accessToken", actualCookies)
+				require.NotNil(t, accessTokenCookie)
+				assertCookie(t, accessTokenCookie, "/", 10, http.SameSiteStrictMode)
+
+				refreshTokenCookie := findCookieByName("refreshToken", actualCookies)
+				require.NotNil(t, refreshTokenCookie)
+				assertCookie(t, refreshTokenCookie, "/refresh", 20, http.SameSiteStrictMode)
+			}
+
+			{
+				t.Log("SignInCookiesWithRememberMe")
+
+				_, email, password := createUser(t, client, userService)
+				requestBody := jsonBody(`{"rememberMe": true}`)
+				request := client.NewRequest(t, http.MethodPost, "/tokens", requestBody, inttest.WithBasicAuth(email, password), inttest.WithHeader("Content-Type", "application/json"))
+
+				response, err := client.Client.Do(request)
+				require.NoError(t, err)
+
+				assert.Equal(t, http.StatusCreated, response.StatusCode)
+				actualCookies := response.Cookies()
+				require.Len(t, actualCookies, 3)
+
+				accessTokenCookie := findCookieByName("accessToken", actualCookies)
+				require.NotNil(t, accessTokenCookie)
+				assertCookie(t, accessTokenCookie, "/", 10, http.SameSiteStrictMode)
+
+				refreshTokenCookie := findCookieByName("refreshToken", actualCookies)
+				require.NotNil(t, refreshTokenCookie)
+				assertCookie(t, refreshTokenCookie, "/refresh", 30, http.SameSiteStrictMode)
+
+				rememberMeTokenCookie := findCookieByName("rememberMe", actualCookies)
+				require.NotNil(t, rememberMeTokenCookie)
+				assertCookie(t, rememberMeTokenCookie, "/refresh", 30, http.SameSiteStrictMode)
+			}
+
+			{
+				t.Log("RefreshTokensUsingCookie")
+
+				_, email, password := createUser(t, client, userService)
+				var tokens *token.Tokens
+				client.PostJSON(t, "/tokens", nil, &tokens, inttest.WithBasicAuth(email, password))
+				require.NotEmpty(t, tokens.AccessToken, "should return an access token")
+				request := client.NewRequest(t, http.MethodPost, "/refresh", jsonBody(`{}`), inttest.WithHeader("Content-Type", "application/json"))
+				cookie := &http.Cookie{Name: "refreshToken", Value: tokens.RefreshToken, Path: "/refresh"}
+				require.NoError(t, cookie.Valid())
+				request.AddCookie(cookie)
+
+				response, err := client.Client.Do(request)
+				require.NoError(t, err)
+
+				assert.Equal(t, http.StatusCreated, response.StatusCode)
+				actualCookies := response.Cookies()
+				require.Len(t, actualCookies, 2)
+
+				accessTokenCookie := findCookieByName("accessToken", actualCookies)
+				require.NotNil(t, accessTokenCookie)
+				assertCookie(t, accessTokenCookie, "/", 10, http.SameSiteStrictMode)
+
+				refreshTokenCookie := findCookieByName("refreshToken", actualCookies)
+				require.NotNil(t, refreshTokenCookie)
+				assertCookie(t, refreshTokenCookie, "/refresh", 20, http.SameSiteStrictMode)
+			}
+
+			{
+				t.Log("RefreshTokensUsingCookieWithRememberMe")
+
+				_, email, password := createUser(t, client, userService)
+				var tokens *token.Tokens
+				client.PostJSON(t, "/tokens", nil, &tokens, inttest.WithBasicAuth(email, password))
+				require.NotEmpty(t, tokens.AccessToken, "should return an access token")
+				request := client.NewRequest(t, http.MethodPost, "/refresh", jsonBody(`{}`), inttest.WithHeader("Content-Type", "application/json"))
+				refreshCookie := &http.Cookie{Name: "refreshToken", Value: tokens.RefreshToken, Path: "/refresh"}
+				require.NoError(t, refreshCookie.Valid())
+				request.AddCookie(refreshCookie)
+				rememberMeCookie := &http.Cookie{Name: "rememberMe", Value: "true", Path: "/refresh"}
+				require.NoError(t, rememberMeCookie.Valid())
+				request.AddCookie(rememberMeCookie)
+
+				response, err := client.Client.Do(request)
+				require.NoError(t, err)
+
+				assert.Equal(t, http.StatusCreated, response.StatusCode)
+				actualCookies := response.Cookies()
+				require.Len(t, actualCookies, 3)
+
+				accessTokenCookie := findCookieByName("accessToken", actualCookies)
+				require.NotNil(t, accessTokenCookie)
+				assertCookie(t, accessTokenCookie, "/", 10, http.SameSiteStrictMode)
+
+				refreshTokenCookie := findCookieByName("refreshToken", actualCookies)
+				require.NotNil(t, refreshTokenCookie)
+				assertCookie(t, refreshTokenCookie, "/refresh", 30, http.SameSiteStrictMode)
+
+				rememberMeTokenCookie := findCookieByName("rememberMe", actualCookies)
+				require.NotNil(t, rememberMeTokenCookie)
+				assertCookie(t, rememberMeTokenCookie, "/refresh", 30, http.SameSiteStrictMode)
+			}
+
+			{
+				t.Log("RefreshTokensRequestBody")
+
+				_, email, password := createUser(t, client, userService)
+				var tokens *token.Tokens
+				client.PostJSON(t, "/tokens", nil, &tokens, inttest.WithBasicAuth(email, password))
+				require.NotEmpty(t, tokens.AccessToken, "should return an access token")
+				requestBody := jsonBody(`{"refreshToken": "%s"}`, tokens.RefreshToken)
+				request := client.NewRequest(t, http.MethodPost, "/refresh", requestBody, inttest.WithHeader("Content-Type", "application/json"))
+
+				response, err := client.Client.Do(request)
+				require.NoError(t, err)
+
+				assert.Equal(t, http.StatusCreated, response.StatusCode)
+				actualCookies := response.Cookies()
+				require.Len(t, actualCookies, 2)
+
+				accessTokenCookie := findCookieByName("accessToken", actualCookies)
+				require.NotNil(t, accessTokenCookie)
+				assertCookie(t, accessTokenCookie, "/", 10, http.SameSiteStrictMode)
+
+				refreshTokenCookie := findCookieByName("refreshToken", actualCookies)
+				require.NotNil(t, refreshTokenCookie)
+				assertCookie(t, refreshTokenCookie, "/refresh", 20, http.SameSiteStrictMode)
+			}
+
 		})
 
 		t.Run("SignInFailed", func(t *testing.T) {
 			t.Parallel()
 
 			{
+				t.Log("WrongEverything")
+
+				request := client.NewRequest(t, http.MethodPost, "/tokens", jsonBody(`{}`), inttest.WithBasicAuth("some-non-existing-user@dhis2.org", "wrongpassword"))
+
+				response, err := client.Client.Do(request)
+				require.NoError(t, err)
+
+				assert.Equal(t, http.StatusUnauthorized, response.StatusCode)
+				assert.Len(t, response.Cookies(), 0)
+			}
+
+			{
 				t.Log("WrongPassword")
 
-				client.Do(t, http.MethodPost, "/tokens", nil, http.StatusUnauthorized, inttest.WithBasicAuth("user1@dhis2.org", "wrongpassword"))
+				_, email, _ := createUser(t, client, userService)
+				request := client.NewRequest(t, http.MethodPost, "/tokens", jsonBody(`{}`), inttest.WithBasicAuth(email, "wrongpassword"))
+
+				response, err := client.Client.Do(request)
+				require.NoError(t, err)
+
+				assert.Equal(t, http.StatusUnauthorized, response.StatusCode)
+				assert.Len(t, response.Cookies(), 0)
 			}
 
 			{
 				t.Log("EmailNotValidated")
+				var user model.User
+				client.PostJSON(t, "/users", jsonBody(`{
+					"email":    "no-email-validation@dhis2.org",
+					"password": "oneoneoneoneoneoneone111"
+				}`), &user)
+				userCounter.Add(1)
+				require.Equal(t, "no-email-validation@dhis2.org", user.Email)
+				require.Empty(t, user.Password)
+				request := client.NewRequest(t, http.MethodPost, "/tokens", jsonBody(`{}`), inttest.WithBasicAuth("no-email-validation@dhis2.org", "oneoneoneoneoneoneone111"))
 
-				client.Do(t, http.MethodPost, "/tokens", nil, http.StatusUnauthorized, inttest.WithBasicAuth("user3@dhis2.org", "oneoneoneoneoneoneone111"))
+				response, err := client.Client.Do(request)
+				require.NoError(t, err)
+
+				assert.Equal(t, http.StatusUnauthorized, response.StatusCode)
+				assert.Len(t, response.Cookies(), 0)
 			}
 		})
 
-		t.Run("DeleteUserIsUnauthorized", func(t *testing.T) {
+		t.Run("DeleteOwnUserIsUnauthorized", func(t *testing.T) {
 			t.Parallel()
 
-			var user2Token *token.Tokens
-			{
-				t.Log("SignIn")
+			t.Log("SignIn")
+			id, email, password := createUser(t, client, userService)
+			var tokens *token.Tokens
+			client.PostJSON(t, "/tokens", nil, &tokens, inttest.WithBasicAuth(email, password))
+			require.NotEmpty(t, tokens.AccessToken, "should return an access token")
 
-				client.PostJSON(t, "/tokens", nil, &user2Token, inttest.WithBasicAuth("user2@dhis2.org", "oneoneoneoneoneoneone111"))
-
-				require.NotEmpty(t, user2Token.AccessToken, "should return an access token")
-			}
-
-			{
-				t.Log("Delete")
-
-				client.Do(t, http.MethodDelete, "/users/"+user1ID, nil, http.StatusUnauthorized, inttest.WithAuthToken(user2Token.AccessToken))
-			}
+			t.Log("Delete")
+			client.Do(t, http.MethodDelete, fmt.Sprintf("/users/%d", id), nil, http.StatusUnauthorized, inttest.WithAuthToken(tokens.AccessToken))
 		})
 
 		t.Run("ResetUserPassword", func(t *testing.T) {
@@ -214,33 +473,27 @@ func TestUserHandler(t *testing.T) {
 			{
 				t.Log("RequestPasswordReset")
 
-				requestResetRequestBody := strings.NewReader(`{
-					"email":    "user1@dhis2.org"
-				}`)
+				id, email, _ := createUser(t, client, userService)
+				requestResetRequestBody := jsonBody(`{"email": "%s"}`, email)
 
 				client.Do(t, http.MethodPost, "/users/request-reset", requestResetRequestBody, http.StatusCreated, inttest.WithHeader("Content-Type", "application/json"))
 
-				user1ID, err := strconv.ParseUint(user1ID, 10, 0)
+				user, err := userService.FindById(context.Background(), id)
 				require.NoError(t, err)
-				user1IDInt := uint(user1ID)
-				user1, err := userService.FindById(user1IDInt)
-				require.NoError(t, err)
-
-				require.NotEmpty(t, user1.PasswordToken, "should have a password token")
-				require.NotEmpty(t, user1.PasswordTokenTTL, "should have a password token TTL timestamp")
+				require.NotEmpty(t, user.PasswordToken, "should have a password token")
+				require.NotEmpty(t, user.PasswordTokenTTL, "should have a password token TTL timestamp")
 
 				t.Log("ResetPassword")
 
-				resetRequestBody := strings.NewReader(`{
-					"token": "` + user1.PasswordToken.String + `",
+				resetRequestBody := jsonBody(`{
+					"token": "%s",
 					"password": "ResetResetResetResetReset"
-				}`)
-
-				oldPassword := user1.Password
+				}`, user.PasswordToken.String)
+				oldPassword := user.Password
 
 				client.Do(t, http.MethodPost, "/users/reset-password", resetRequestBody, http.StatusCreated, inttest.WithHeader("Content-Type", "application/json"))
 
-				newUser1, _ := userService.FindById(user1IDInt)
+				newUser1, _ := userService.FindById(context.Background(), id)
 				newPassword := newUser1.Password
 
 				require.NotEqual(t, oldPassword, newPassword, "old and new password should be different")
@@ -249,21 +502,22 @@ func TestUserHandler(t *testing.T) {
 			{
 				t.Log("PasswordResetTokenExpired")
 
-				newUserService := user.NewService("", 1, userRepository, fakeDialer{t})
+				id, email, _ := createUser(t, client, userService)
 
-				_ = newUserService.RequestPasswordReset("user1@dhis2.org")
+				requestResetRequestBody := jsonBody(`{"email": "%s"}`, email)
+				client.Do(t, http.MethodPost, "/users/request-reset", requestResetRequestBody, http.StatusCreated, inttest.WithHeader("Content-Type", "application/json"))
 
-				user1ID, err := strconv.ParseUint(user1ID, 10, 0)
-				require.NoError(t, err)
-				user1IDInt := uint(user1ID)
-				user1, _ := newUserService.FindById(user1IDInt)
+				user, err := userService.FindById(context.Background(), id)
 				require.NoError(t, err)
 
-				// Wait for token to expire
-				time.Sleep(5 * time.Second)
+				resetRequestBody := jsonBody(`{
+					"token": "%s",
+					"password": "ResetResetResetResetReset"
+				}`, user.PasswordToken.String)
 
-				err = newUserService.ResetPassword(user1.PasswordToken.String, "ResetResetResetResetReset")
-				require.Error(t, err, "reset token has expired")
+				<-time.After(time.Duration(passwordTokenTtl) * time.Second)
+
+				client.Do(t, http.MethodPost, "/users/reset-password", resetRequestBody, http.StatusBadRequest, inttest.WithHeader("Content-Type", "application/json"))
 			}
 		})
 	})
@@ -286,17 +540,65 @@ func TestUserHandler(t *testing.T) {
 			var users []model.User
 			client.GetJSON(t, "/users", &users, inttest.WithAuthToken(adminToken.AccessToken))
 
-			assert.Lenf(t, users, 4, "GET /users should return 4 users one of which is an admin")
+			expectedNumberOfUsers := int(userCounter.Load()) + 1 // counter + 1 admin
+			assert.Lenf(t, users, expectedNumberOfUsers, "GET /users should return %d users", expectedNumberOfUsers)
+			assert.Truef(t, slices.IndexFunc(users, func(u model.User) bool {
+				return slices.IndexFunc(u.Groups, func(g model.Group) bool {
+					return g.Name == model.AdministratorGroupName
+				}) != -1
+			}) != -1, "at least one user should be Administrator")
 		}
 
 		{
 			t.Log("DeleteUser")
 
-			client.Delete(t, "/users/"+user1ID, inttest.WithAuthToken(adminToken.AccessToken))
+			id, _, _ := createUser(t, client, userService)
+			path := fmt.Sprintf("/users/%d", id)
+			client.Delete(t, path, inttest.WithAuthToken(adminToken.AccessToken))
 
-			client.Do(t, http.MethodGet, "/users/"+user1ID, nil, http.StatusNotFound, inttest.WithAuthToken(adminToken.AccessToken))
+			client.Do(t, http.MethodGet, path, nil, http.StatusNotFound, inttest.WithAuthToken(adminToken.AccessToken))
 		}
 	})
+}
+
+func assertCookie(t *testing.T, cookie *http.Cookie, path string, maxAge int, sameSiteMode http.SameSite) {
+	assert.Equal(t, path, cookie.Path)
+	assert.Equal(t, maxAge, cookie.MaxAge)
+	assert.Equal(t, true, cookie.Secure)
+	assert.Equal(t, true, cookie.HttpOnly)
+	assert.Equal(t, sameSiteMode, cookie.SameSite)
+}
+
+type userService interface {
+	FindById(context context.Context, id uint) (*model.User, error)
+	ValidateEmail(emailToken uuid.UUID) error
+}
+
+var userCounter atomic.Uint32
+
+func createUser(t *testing.T, client *inttest.HTTPClient, userService userService) (uint, string, string) {
+	t.Helper()
+
+	userCounter.Add(1)
+	currentUserCount := userCounter.Load()
+
+	email := fmt.Sprintf("user%d@dhis2.org", currentUserCount)
+	password := uuid.NewString()
+
+	requestBody := jsonBody(`{"email": "%s", "password": "%s"}`, email, password)
+
+	var user model.User
+	client.PostJSON(t, "/users", requestBody, &user)
+
+	require.Equal(t, email, user.Email)
+	require.Empty(t, user.Password)
+
+	u, err := userService.FindById(context.Background(), user.ID)
+	require.NoError(t, err)
+	err = userService.ValidateEmail(u.EmailToken)
+	require.NoError(t, err)
+
+	return user.ID, email, password
 }
 
 type fakeDialer struct {
@@ -306,4 +608,19 @@ type fakeDialer struct {
 func (f fakeDialer) DialAndSend(m ...*mail.Message) error {
 	f.t.Log("Fake sending mail...", m[0].GetHeader("To"))
 	return nil
+}
+
+func findCookieByName(name string, cookies []*http.Cookie) *http.Cookie {
+	index := slices.IndexFunc(cookies, func(cookie *http.Cookie) bool {
+		return cookie.Name == name
+	})
+	if index == -1 {
+		return nil
+	}
+
+	return cookies[index]
+}
+
+func jsonBody(format string, args ...any) io.Reader {
+	return strings.NewReader(fmt.Sprintf(format, args...))
 }

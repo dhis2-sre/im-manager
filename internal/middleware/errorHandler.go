@@ -2,12 +2,11 @@ package middleware
 
 import (
 	"fmt"
-	"log"
 	"net/http"
 
 	"github.com/dhis2-sre/im-manager/internal/errdef"
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
+	sloggin "github.com/samber/slog-gin"
 )
 
 func ErrorHandler() gin.HandlerFunc {
@@ -37,9 +36,8 @@ func ErrorHandler() gin.HandlerFunc {
 		} else if errdef.IsConflict(err) {
 			c.String(http.StatusConflict, err.Error())
 		} else {
-			id := uuid.New()
-			log.Printf("unhandled error: %q, log id: %s\n", err, id)
-			err := fmt.Errorf("something went wrong. We'll look into it if you send us the id %q :)", id)
+			id := sloggin.GetRequestID(c)
+			err := fmt.Errorf("something went wrong. We'll look into it if you send us the request id %q :)", id)
 			c.String(http.StatusInternalServerError, err.Error())
 		}
 	}

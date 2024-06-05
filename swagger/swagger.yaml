@@ -1563,6 +1563,8 @@ paths:
             responses:
                 "201":
                     $ref: '#/responses/Tokens'
+                "400":
+                    $ref: '#/responses/Error'
                 "401":
                     $ref: '#/responses/Error'
                 "403":
@@ -1606,7 +1608,7 @@ paths:
                 - oauth2: []
             summary: Find users
         post:
-            description: Sign up a user. This endpoint is publicly accessible and therefor anyone can sign up. However, before being able to perform any actions, users needs to be a member of a group. And only administrators can add users to groups.
+            description: Sign up a user. This endpoint is publicly accessible and therefore anyone can sign up. However, before being able to perform any actions, users needs to be a member of a group. And only administrators can add users to groups.
             operationId: signUp
             parameters:
                 - description: SignUp request body parameter

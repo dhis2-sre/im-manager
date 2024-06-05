@@ -6,7 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"os/exec"
 	"slices"
 	"strconv"
@@ -28,6 +28,7 @@ import (
 
 //goland:noinspection GoExportedFuncWithUnexportedType
 func NewService(
+	logger *slog.Logger,
 	broker broker,
 	instanceRepository Repository,
 	groupService groupService,
@@ -35,6 +36,7 @@ func NewService(
 	helmfileService helmfile,
 ) *service {
 	return &service{
+		logger,
 		broker,
 		instanceRepository,
 		groupService,
@@ -74,6 +76,7 @@ type helmfile interface {
 }
 
 type service struct {
+	logger             *slog.Logger
 	broker             broker
 	instanceRepository Repository
 	groupService       groupService
@@ -361,8 +364,7 @@ func (s service) deployDeploymentInstance(token string, instance *model.Deployme
 	}
 
 	deployLog, deployErrorLog, err := commandExecutor(syncCmd, group.ClusterConfiguration)
-	log.Printf("Deploy log: %s\n", deployLog)
-	log.Printf("Deploy error log: %s\n", deployErrorLog)
+	s.logger.Info("Deploy log", "log", deployLog, "errorLog", deployErrorLog)
 	/* TODO: return error log if relevant
 	if len(deployErrorLog) > 0 {
 		return errors.New(string(deployErrorLog))
@@ -376,20 +378,33 @@ func (s service) deployDeploymentInstance(token string, instance *model.Deployme
 	err = s.instanceRepository.SaveDeployLog(instance, string(deployLog))
 	instance.DeployLog = string(deployLog)
 	if err != nil {
-		// TODO
-		log.Printf("Store error log: %s", deployErrorLog)
+		s.logger.Error("Failed saving deploy log", "error", err)
 		return err
 	}
 	return nil
 }
 
-func (s service) Delete(deploymentId uint) error {
-	deployment, err := s.FindDeploymentById(deploymentId)
+func (s service) Delete(deploymentInstanceId uint) error {
+	deploymentInstance, err := s.FindDeploymentInstanceById(deploymentInstanceId)
 	if err != nil {
 		return err
 	}
 
-	return s.DeleteDeployment(deployment)
+	err = s.DeleteInstance(deploymentInstance.DeploymentID, deploymentInstance.ID)
+	if err != nil {
+		return err
+	}
+
+	deployment, err := s.FindDeploymentById(deploymentInstance.DeploymentID)
+	if err != nil {
+		return err
+	}
+
+	if len(deployment.Instances) == 0 {
+		return s.DeleteDeployment(deployment)
+	}
+
+	return nil
 }
 
 func (s service) DeleteDeployment(deployment *model.Deployment) error {
@@ -439,8 +454,7 @@ func (s service) destroyDeploymentInstance(instance *model.DeploymentInstance) e
 	}
 
 	destroyLog, destroyErrorLog, err := commandExecutor(destroyCmd, group.ClusterConfiguration)
-	log.Printf("Destroy log: %s\n", destroyLog)
-	log.Printf("Destroy error log: %s\n", destroyErrorLog)
+	s.logger.Info("Destroy log", "log", destroyLog, "errorLog", destroyErrorLog)
 	if err != nil {
 		return err
 	}
@@ -622,7 +636,8 @@ func (s service) ListenForClusterUpdates() {
 
 	groups, err := s.groupService.FindAll(fakeAdministrator, true)
 	if err != nil {
-		log.Fatal(err)
+		// TODO: Previously this was log.Fatal...
+		s.logger.Info(err.Error())
 	}
 
 	for _, group := range groups {
@@ -630,13 +645,13 @@ func (s service) ListenForClusterUpdates() {
 		go func() {
 			ks, err := NewKubernetesService(g.ClusterConfiguration)
 			if err != nil {
-				log.Printf("unable to get create new kubernetes service: %v", err)
+				s.logger.Info("unable to get create new kubernetes service: %v", err)
 			}
 
 			for {
 				events, err := ks.watch(g.Name)
 				if err != nil {
-					log.Printf("error watching %q: %v", g.Name, err)
+					s.logger.Info("error watching %q: %v", g.Name, err)
 				}
 
 				for e := range events {
@@ -651,36 +666,36 @@ func (s service) handleEvent(e watch.Event) {
 	pod, ok := e.Object.(*v1.Pod)
 	if !ok {
 		// TODO: Log entire e.Object... Entire e?
-		log.Println("unexpected type")
+		s.logger.Info("unexpected type")
 	}
 
 	status, err := PodStatus(pod)
 	if err != nil {
-		log.Printf("unable to get pod status: %v", err)
+		s.logger.Info("unable to get pod status: %v", err)
 	}
 
 	deploymentIdStr, ok := pod.Labels["im-deployment-id"]
 	if !ok {
-		log.Println("im-deployment-id label not found")
+		s.logger.Info("im-deployment-id label not found")
 	}
 	deploymentId, err := strconv.Atoi(deploymentIdStr)
 	if err != nil {
-		log.Printf("can't convert deployment id to integer: %v", err)
+		s.logger.Info("can't convert deployment id to integer: %v", err)
 	}
 
 	instanceIdStr, ok := pod.Labels["im-instance-id"]
 	if !ok {
-		log.Println("im-instance-id label not found")
+		s.logger.Info("im-instance-id label not found")
 	}
 
 	instanceId, err := strconv.Atoi(instanceIdStr)
 	if err != nil {
-		log.Printf("can't convert instance id to integer: %v", err)
+		s.logger.Info("can't convert instance id to integer: %v", err)
 	}
 
 	err = s.UpdateInstanceStatus(uint(instanceId), status)
 	if err != nil {
-		log.Printf("unable to update instance status: %v", err)
+		s.logger.Info("unable to update instance status: %v", err)
 	}
 
 	message := updateMessage{
@@ -693,7 +708,7 @@ func (s service) handleEvent(e watch.Event) {
 
 	jsonMessage, err := json.Marshal(message)
 	if err != nil {
-		log.Printf("failed to marshal message: %v", err)
+		s.logger.Info("failed to marshal message: %v", err)
 	}
 
 	subscribers := s.broker.Subscribers()

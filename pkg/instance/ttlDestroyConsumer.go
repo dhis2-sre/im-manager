@@ -2,7 +2,7 @@ package instance
 
 import (
 	"encoding/json"
-	"log"
+	"log/slog"
 
 	"github.com/dhis2-sre/im-manager/internal/errdef"
 
@@ -11,6 +11,7 @@ import (
 )
 
 type ttlDestroyConsumer struct {
+	logger          *slog.Logger
 	consumer        *rabbitmq.Consumer
 	instanceDeleter deleter
 }
@@ -20,8 +21,9 @@ type deleter interface {
 }
 
 //goland:noinspection GoExportedFuncWithUnexportedType
-func NewTTLDestroyConsumer(consumer *rabbitmq.Consumer, instanceDeleter deleter) *ttlDestroyConsumer {
+func NewTTLDestroyConsumer(logger *slog.Logger, consumer *rabbitmq.Consumer, instanceDeleter deleter) *ttlDestroyConsumer {
 	return &ttlDestroyConsumer{
+		logger:          logger,
 		consumer:        consumer,
 		instanceDeleter: instanceDeleter,
 	}
@@ -32,10 +34,10 @@ func (c *ttlDestroyConsumer) Consume() error {
 		payload := struct{ ID uint }{}
 
 		if err := json.Unmarshal(d.Body, &payload); err != nil {
-			log.Printf("Error unmarshalling ttl-destroy message: %v\n", err)
+			c.logger.Error("Error unmarshalling ttl-destroy message", "error", err)
 			err := d.Nack(false, false)
 			if err != nil {
-				log.Printf("Error negatively acknowledging ttl-destroy message: %v\n", err)
+				c.logger.Error("Error negatively acknowledging ttl-destroy message", "error", err)
 				return
 			}
 			return
@@ -46,18 +48,18 @@ func (c *ttlDestroyConsumer) Consume() error {
 			if errdef.IsNotFound(err) {
 				err := d.Ack(false)
 				if err != nil {
-					log.Printf("Error acknowledging ttl-destroy message for instance %d: %v\n", payload.ID, err)
+					c.logger.Error("Error acknowledging ttl-destroy message after deleting instance", "instanceId", payload.ID, "error", err)
 					return
 				}
 			}
-			log.Printf("Error deleting instance %d: %v\n", payload.ID, err)
+			c.logger.Error("Error deleting instance", "instanceId", payload.ID, "error", err)
 			return
 		}
-		log.Printf("Deleted instance %d since TTL expired\n", payload.ID)
+		c.logger.Info("Deleted expired instance", "instanceId", payload.ID)
 
 		err = d.Ack(false)
 		if err != nil {
-			log.Printf("Error acknowledging ttl-destroy message for instance %d: %v\n", payload.ID, err)
+			c.logger.Error("Error acknowledging ttl-destroy message for instance", "instanceId", payload.ID, "error", err)
 		}
 	})
 	return err

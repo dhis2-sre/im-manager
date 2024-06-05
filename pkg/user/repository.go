@@ -1,6 +1,7 @@
 package user
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -34,10 +35,11 @@ func (r repository) create(u *model.User) error {
 	return err
 }
 
-func (r repository) findAll() ([]*model.User, error) {
+func (r repository) findAll(ctx context.Context) ([]*model.User, error) {
 	var users []*model.User
 
 	err := r.db.
+		WithContext(ctx).
 		Preload("Groups").
 		Preload("AdminGroups").
 		Order("Email").
@@ -86,9 +88,10 @@ func (r repository) findOrCreate(user *model.User) (*model.User, error) {
 	return u, err
 }
 
-func (r repository) findById(id uint) (*model.User, error) {
+func (r repository) findById(ctx context.Context, id uint) (*model.User, error) {
 	var u *model.User
 	err := r.db.
+		WithContext(ctx).
 		Preload("Groups").
 		Preload("AdminGroups").
 		First(&u, id).Error
@@ -98,8 +101,8 @@ func (r repository) findById(id uint) (*model.User, error) {
 	return u, err
 }
 
-func (r repository) delete(id uint) error {
-	db := r.db.Unscoped().Delete(&model.User{}, id)
+func (r repository) delete(ctx context.Context, id uint) error {
+	db := r.db.WithContext(ctx).Unscoped().Delete(&model.User{}, id)
 	if db.Error != nil {
 		return fmt.Errorf("failed to delete user with id %d: %v", id, db.Error)
 	} else if db.RowsAffected < 1 {

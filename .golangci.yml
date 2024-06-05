@@ -1,2 +1,23 @@
 run:
   timeout: 4m
+linters:
+  enable:
+    - errcheck
+    - forbidigo
+    - gosimple
+    - govet
+    - ineffassign
+    - sloglint
+    - staticcheck
+    - unused
+linters-settings:
+  forbidigo:
+    forbid:
+      - p: ^log\.Print.*$
+        msg: Use log/slog to log
+      - p: ^log\.Fatal.*$
+        msg: Only main should call os.Exit(). Return an error instead
+  sloglint:
+    no-global: "all"
+    static-msg: true
+    key-naming-case: camel

@@ -1,6 +1,7 @@
 package group
 
 import (
+	"context"
 	"errors"
 	"io"
 	"mime/multipart"
@@ -24,8 +25,8 @@ type Handler struct {
 
 type groupService interface {
 	Create(name string, hostname string, deployable bool) (*model.Group, error)
-	AddUser(groupName string, userId uint) error
-	RemoveUser(groupName string, userId uint) error
+	AddUser(ctx context.Context, groupName string, userId uint) error
+	RemoveUser(ctx context.Context, groupName string, userId uint) error
 	AddClusterConfiguration(clusterConfiguration *model.ClusterConfiguration) error
 	GetClusterConfiguration(groupName string) (*model.ClusterConfiguration, error)
 	Find(name string) (*model.Group, error)
@@ -96,7 +97,7 @@ func (h Handler) AddUserToGroup(c *gin.Context) {
 		return
 	}
 
-	err := h.groupService.AddUser(groupName, userId)
+	err := h.groupService.AddUser(c, groupName, userId)
 	if err != nil {
 		if errdef.IsNotFound(err) {
 			_ = c.AbortWithError(http.StatusNotFound, err)
@@ -133,7 +134,7 @@ func (h Handler) RemoveUserFromGroup(c *gin.Context) {
 		return
 	}
 
-	err := h.groupService.RemoveUser(groupName, userId)
+	err := h.groupService.RemoveUser(c, groupName, userId)
 	if err != nil {
 		_ = c.Error(err)
 		return

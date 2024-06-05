@@ -4,7 +4,6 @@ import (
 	"crypto/rsa"
 	"errors"
 	"fmt"
-	"log"
 	"time"
 
 	"github.com/dhis2-sre/im-manager/pkg/model"
@@ -78,7 +77,6 @@ func GenerateRefreshToken(user *model.User, secretKey string, expirationInSecond
 
 	signed, err := jwt.Sign(token, jwt.WithKey(jwa.HS256, []byte(secretKey)))
 	if err != nil {
-		log.Printf("Failed to sign token: %s", err)
 		return nil, err
 	}
 
