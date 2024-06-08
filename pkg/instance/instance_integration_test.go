@@ -8,7 +8,6 @@ import (
 	"os"
 	"strings"
 	"testing"
-	"time"
 
 	"go.mozilla.org/sops/v3"
 
@@ -198,14 +197,50 @@ func TestInstanceHandler(t *testing.T) {
 		t.Log("Deploy deployment")
 		path = fmt.Sprintf("/deployments/%d/deploy", deployment.ID)
 		client.Do(t, http.MethodPost, path, nil, http.StatusOK, inttest.WithAuthToken("sometoken"))
-		k8sClient.AssertPodIsReady(t, deploymentInstance.GroupName, deploymentInstance.Name, 60)
+		k8sClient.AssertPodIsReady(t, deploymentInstance.GroupName, deploymentInstance.Name)
 
 		t.Log("Destroy deployment")
 		path = fmt.Sprintf("/deployments/%d", deployment.ID)
 		client.Do(t, http.MethodDelete, path, nil, http.StatusAccepted, inttest.WithAuthToken("sometoken"))
-		// TODO: Ideally we shouldn't use sleep here but rather watch the pod until it disappears or a timeout is reached
-		time.Sleep(3 * time.Second)
-		k8sClient.AssertPodIsNotRunning(t, deploymentInstance.GroupName, deploymentInstance.Name)
+		k8sClient.AssertPodIsDeleted(t, deploymentInstance.GroupName, deploymentInstance.Name)
+	})
+
+	t.Run("WatchGroup", func(t *testing.T) {
+		t.Log("Create deployment")
+		var deployment model.Deployment
+		body := strings.NewReader(`{
+			"name": "test-deployment-whoami",
+			"group": "group-name",
+			"description": "some description"
+		}`)
+
+		client.PostJSON(t, "/deployments", body, &deployment, inttest.WithAuthToken("sometoken"))
+
+		assert.Equal(t, "test-deployment-whoami", deployment.Name)
+		assert.Equal(t, "group-name", deployment.GroupName)
+		assert.Equal(t, "some description", deployment.Description)
+
+		t.Log("Create deployment instance")
+		var deploymentInstance model.DeploymentInstance
+		body = strings.NewReader(`{
+			"stackName": "whoami-go"
+		}`)
+
+		path := fmt.Sprintf("/deployments/%d/instance", deployment.ID)
+		client.PostJSON(t, path, body, &deploymentInstance, inttest.WithAuthToken("sometoken"))
+		assert.Equal(t, deployment.ID, deploymentInstance.DeploymentID)
+		assert.Equal(t, "group-name", deploymentInstance.GroupName)
+		assert.Equal(t, "whoami-go", deploymentInstance.StackName)
+
+		t.Log("Deploy deployment")
+		path = fmt.Sprintf("/deployments/%d/deploy", deployment.ID)
+		client.Do(t, http.MethodPost, path, nil, http.StatusOK, inttest.WithAuthToken("sometoken"))
+		k8sClient.AssertPodIsReady(t, deploymentInstance.GroupName, deploymentInstance.Name)
+
+		t.Log("Destroy deployment")
+		path = fmt.Sprintf("/deployments/%d", deployment.ID)
+		client.Do(t, http.MethodDelete, path, nil, http.StatusAccepted, inttest.WithAuthToken("sometoken"))
+		k8sClient.AssertPodIsDeleted(t, deploymentInstance.GroupName, deploymentInstance.Name)
 	})
 }
 

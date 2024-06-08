@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/watch"
 
 	"github.com/orlangure/gnomock/preset/k3s"
 	"k8s.io/client-go/kubernetes"
@@ -42,45 +43,38 @@ func SetupK8s(t *testing.T) *K8sClient {
 	require.NoError(t, err, "failed to get k3s config from container as bytes")
 
 	return &K8sClient{
-		Client: k8sClient,
-		Config: k3sConfigBytes,
+		AssertionTimeout: 60 * time.Second,
+		Client:           k8sClient,
+		Config:           k3sConfigBytes,
 	}
 }
 
 // K8sClient allows making requests to K8s. It does so by wrapping a kubernetes.Clientset. Access
 // the actual Clientset for specific use cases where our defaults don't work.
 type K8sClient struct {
-	Client *kubernetes.Clientset
-	Config []byte
+	AssertionTimeout time.Duration
+	Client           *kubernetes.Clientset
+	Config           []byte
 }
 
-func (k K8sClient) AssertPodIsNotRunning(t *testing.T, group string, instance string) {
-	pods, err := k.Client.CoreV1().Pods(group).List(context.TODO(), metav1.ListOptions{
-		LabelSelector: "app.kubernetes.io/instance=" + instance,
-	})
-	require.NoError(t, err)
-
-	require.Len(t, pods.Items, 0)
-}
-
-func (k K8sClient) AssertPodIsReady(t *testing.T, group string, instance string, timeoutInSeconds time.Duration) {
+func (k K8sClient) AssertPodIsReady(t *testing.T, group string, instance string) {
 	ctx, cancel := context.WithCancel(context.Background())
-	watch, err := k.Client.CoreV1().Pods(group).Watch(ctx, metav1.ListOptions{
+	defer cancel()
+	watcher, err := k.Client.CoreV1().Pods(group).Watch(ctx, metav1.ListOptions{
 		LabelSelector: "app.kubernetes.io/instance=" + instance,
 	})
 	require.NoErrorf(t, err, "failed to find pod for instance %q", instance)
+	defer watcher.Stop()
 
-	t.Log("Waiting for:", instance)
-	timeout := timeoutInSeconds * time.Second
-	tm := time.NewTimer(timeout)
+	t.Logf("Waiting for readiness of %s", instance)
+	tm := time.NewTimer(k.AssertionTimeout)
 	defer tm.Stop()
 	for {
 		select {
 		case <-tm.C:
 			assert.Fail(t, "timed out waiting on pod")
-			cancel()
 			return
-		case event := <-watch.ResultChan():
+		case event := <-watcher.ResultChan():
 			pod, ok := event.Object.(*v1.Pod)
 			t.Log("Received pod updated event...")
 			if !ok {
@@ -88,7 +82,6 @@ func (k K8sClient) AssertPodIsReady(t *testing.T, group string, instance string,
 				if !tm.Stop() {
 					<-tm.C
 				}
-				cancel()
 				return
 			}
 
@@ -99,14 +92,40 @@ func (k K8sClient) AssertPodIsReady(t *testing.T, group string, instance string,
 				})
 				readyCondition := conditions[index]
 				if readyCondition.Status == "True" {
-					t.Logf("pod for instance %q is running", instance)
+					t.Logf("Pod for instance %q is running", instance)
 					if !tm.Stop() {
 						<-tm.C
 					}
-					cancel()
 					return
 				}
 			}
+		}
+	}
+}
+
+func (k K8sClient) AssertPodIsDeleted(t *testing.T, group string, instance string) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	watcher, err := k.Client.CoreV1().Pods(group).Watch(ctx, metav1.ListOptions{
+		LabelSelector: "app.kubernetes.io/instance=" + instance,
+	})
+	require.NoErrorf(t, err, "failed to find pod for instance %q", instance)
+	defer watcher.Stop()
+
+	t.Logf("Waiting for deletion of %s", instance)
+	tm := time.NewTimer(k.AssertionTimeout)
+	defer tm.Stop()
+	for {
+		select {
+		case <-tm.C:
+			assert.Fail(t, "timed out waiting on pod")
+			return
+		case event := <-watcher.ResultChan():
+			if event.Type != watch.Deleted {
+				continue
+			}
+			t.Logf("Pod for instance %q is deleted", instance)
+			return
 		}
 	}
 }
