@@ -66,7 +66,7 @@ func (k K8sClient) AssertPodIsReady(t *testing.T, group string, instance string)
 	require.NoErrorf(t, err, "failed to find pod for instance %q", instance)
 	defer watcher.Stop()
 
-	t.Logf("Waiting for readiness of %s", instance)
+	t.Logf("Waiting for readiness of %q", instance)
 	tm := time.NewTimer(k.AssertionTimeout)
 	defer tm.Stop()
 	for {
@@ -112,7 +112,7 @@ func (k K8sClient) AssertPodIsDeleted(t *testing.T, group string, instance strin
 	require.NoErrorf(t, err, "failed to find pod for instance %q", instance)
 	defer watcher.Stop()
 
-	t.Logf("Waiting for deletion of %s", instance)
+	t.Logf("Waiting for deletion of %q", instance)
 	tm := time.NewTimer(k.AssertionTimeout)
 	defer tm.Stop()
 	for {

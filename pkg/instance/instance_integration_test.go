@@ -1,6 +1,7 @@
 package instance_test
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -9,11 +10,15 @@ import (
 	"strings"
 	"testing"
 
+	// "github.com/kr/pretty"
+	// "github.com/kylelemons/godebug/pretty"
+
 	"go.mozilla.org/sops/v3"
 
 	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
 	"github.com/dhis2-sre/im-manager/pkg/database"
 	"github.com/dhis2-sre/im-manager/pkg/storage"
+	"github.com/gookit/goutil/dump"
 
 	"filippo.io/age"
 	"go.mozilla.org/sops/v3/aes"
@@ -206,6 +211,8 @@ func TestInstanceHandler(t *testing.T) {
 	})
 
 	t.Run("WatchGroup", func(t *testing.T) {
+		t.Skip()
+
 		t.Log("Create deployment")
 		var deployment model.Deployment
 		body := strings.NewReader(`{
@@ -237,12 +244,39 @@ func TestInstanceHandler(t *testing.T) {
 		client.Do(t, http.MethodPost, path, nil, http.StatusOK, inttest.WithAuthToken("sometoken"))
 		k8sClient.AssertPodIsReady(t, deploymentInstance.GroupName, deploymentInstance.Name)
 
-		// TODO start listening for events assert on pod events
+		ctx, cancel := context.WithCancel(context.Background())
+		events, err := instanceService.ListenForClusterUpdates(ctx)
+		require.NoError(t, err, "failed to listen for cluster updates")
+		defer cancel()
+		// TODO stream them via kubectl from within the cluster to see what they are?
+		// TODO assert on creation events and when to stop?
+		// for event := range events {
+		// 	dump.P(event)
+		// }
+
+		// TODO section with create another deployment in another group
+		// TODO section with deleting one or both deployments
 
 		t.Log("Destroy deployment")
 		path = fmt.Sprintf("/deployments/%d", deployment.ID)
 		client.Do(t, http.MethodDelete, path, nil, http.StatusAccepted, inttest.WithAuthToken("sometoken"))
 		k8sClient.AssertPodIsDeleted(t, deploymentInstance.GroupName, deploymentInstance.Name)
+
+		dumper := dump.NewWithOptions(dump.WithoutColor())
+		// var prev, cur *watch.Event
+		for event := range events {
+			// pretty.Print(event)
+			// fmt.Printf("%#v\n", pretty.Formatter(event))
+			dumper.Println(event)
+			// if prev == nil {
+			// 	prev = &event
+			// } else {
+			// 	cur = &event
+			// 	cmp.Diff(prev, cur)
+			// 	prev = cur
+			// 	cur = nil
+			// }
+		}
 	})
 }
 

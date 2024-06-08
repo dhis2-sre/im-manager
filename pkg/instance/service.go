@@ -679,30 +679,34 @@ func (s service) Reset(token string, instance *model.DeploymentInstance, ttl uin
 	return s.deployDeploymentInstance(token, instance, ttl)
 }
 
-func (s service) ListenForClusterUpdates(ctx context.Context) (error, <-chan watch.Event) {
-	fakeAdministrator := &model.User{
-		Groups: []model.Group{
-			{
-				Name: model.AdministratorGroupName,
-			},
-		},
-	}
-
+func (s service) ListenForClusterUpdates(ctx context.Context) (<-chan watch.Event, error) {
 	// TODO implement polling, pass in the interval to look for new groups
-	groups, err := s.groupService.FindAll(fakeAdministrator, true)
+	// systemAdmin := &model.User{
+	// 	Groups: []model.Group{
+	// 		{
+	// 			Name: model.AdministratorGroupName,
+	// 		},
+	// 	},
+	// }
+	// TODO replace it again with watching all groups after having recorded events
+	// groups, err := s.groupService.FindAll(systemAdmin, true)
+	group, err := s.groupService.Find("dev")
 	if err != nil {
-		return err, nil
+		return nil, err
 	}
+	groups := []*model.Group{group}
 
 	// TODO blocking/non-blocking/pass in context
 	watch := make(chan *model.ClusterConfiguration, len(groups))
-	// for _, group := range groups {
+	for _, group := range groups {
+		watch <- group.ClusterConfiguration
+	}
 	// 	select {
 	// 	case <-ctx.Done():
 	// 	case watch <- group.ClusterConfiguration:
 	// 	}
 	// }
-	return nil, s.watchGroups(ctx, watch)
+	return s.watchGroups(ctx, watch), nil
 }
 
 // watchGroups streams pod events for each of the given groups into the returned channel. To start
@@ -722,17 +726,21 @@ func (s service) watchGroups(ctx context.Context, groups <-chan *model.ClusterCo
 			case group := <-groups:
 				wg.Add(1)
 				go func() {
-					defer wg.Done()
+					defer func() {
+						s.logger.Info("Stop watching pod events for group", "group", group.GroupName)
+						wg.Done()
+					}()
 
 					ks, err := NewKubernetesService(s.logger, group)
 					if err != nil {
-						ks.logger.Info("unable to get create new kubernetes service: %v", err)
+						s.logger.Error("Failed to create kubernetes service for a group", "error", err, "group", group)
 					}
 					watcher, err := ks.watchGroup(ctx, group)
 					if err != nil {
-						ks.logger.Error("Failed to watch a groups pod events", "error", err, "group", group)
+						s.logger.Error("Failed to watch a groups pod events", "error", err, "group", group)
 					}
 					defer watcher.Stop()
+					s.logger.Info("Watching pod events for group", "group", group.GroupName)
 
 					events := watcher.ResultChan()
 					for {

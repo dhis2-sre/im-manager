@@ -24,9 +24,11 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"os"
+	"os/signal"
 
 	"github.com/go-mail/mail"
 
@@ -113,6 +115,34 @@ func run() error {
 	instanceRepository := instance.NewRepository(db, cfg.InstanceParameterEncryptionKey)
 	helmfileService := instance.NewHelmfileService(logger, stackService, "./stacks", cfg.Classification)
 	instanceService := instance.NewService(logger, instanceRepository, groupService, stackService, helmfileService)
+
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, os.Kill)
+	defer cancel()
+	go func() {
+		f, err := os.CreateTemp("", "k8s-events")
+		if err != nil {
+			logger.Error("failed to create temp file", "error", err)
+		}
+		defer os.Remove(f.Name())
+
+		events, err := instanceService.ListenForClusterUpdates(ctx)
+		if err != nil {
+			logger.Error("failed listening for group events", "error", err)
+		}
+
+		for event := range events {
+			b, err := json.Marshal(event)
+			if err != nil {
+				logger.Error("failed marshaling event to Json", "error", err)
+				return
+			}
+			_, err = f.Write(b)
+			if err != nil {
+				logger.Error("failed write event to file", "error", err)
+				return
+			}
+		}
+	}()
 
 	dockerHubClient := integration.NewDockerHubClient(cfg.DockerHub.Username, cfg.DockerHub.Password)
 
