@@ -2,16 +2,19 @@ package instance
 
 import (
 	"cmp"
+	"context"
 	"errors"
 	"fmt"
 	"io"
 	"log/slog"
 	"os/exec"
 	"slices"
+	"sync"
 
 	"golang.org/x/exp/maps"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/watch"
 
 	"github.com/dhis2-sre/im-manager/internal/errdef"
 	"github.com/dominikbraun/graph"
@@ -53,6 +56,7 @@ type Repository interface {
 
 type groupService interface {
 	Find(name string) (*model.Group, error)
+	FindAll(user *model.User, deployable bool) ([]model.Group, error)
 	FindByGroupNames(groupNames []string) ([]model.Group, error)
 }
 
@@ -440,7 +444,7 @@ func (s service) destroyDeploymentInstance(instance *model.DeploymentInstance) e
 		return err
 	}
 
-	ks, err := NewKubernetesService(group.ClusterConfiguration)
+	ks, err := NewKubernetesService(s.logger, group.ClusterConfiguration)
 	if err != nil {
 		return err
 	}
@@ -470,7 +474,7 @@ func (s service) Pause(instance *model.DeploymentInstance) error {
 		return err
 	}
 
-	ks, err := NewKubernetesService(group.ClusterConfiguration)
+	ks, err := NewKubernetesService(s.logger, group.ClusterConfiguration)
 	if err != nil {
 		return err
 	}
@@ -484,7 +488,7 @@ func (s service) Resume(instance *model.DeploymentInstance) error {
 		return err
 	}
 
-	ks, err := NewKubernetesService(group.ClusterConfiguration)
+	ks, err := NewKubernetesService(s.logger, group.ClusterConfiguration)
 	if err != nil {
 		return err
 	}
@@ -498,7 +502,7 @@ func (s service) Restart(instance *model.DeploymentInstance, typeSelector string
 		return err
 	}
 
-	ks, err := NewKubernetesService(group.ClusterConfiguration)
+	ks, err := NewKubernetesService(s.logger, group.ClusterConfiguration)
 	if err != nil {
 		return err
 	}
@@ -512,7 +516,7 @@ func (s service) Restart(instance *model.DeploymentInstance, typeSelector string
 }
 
 func (s service) Logs(instance *model.DeploymentInstance, group *model.Group, typeSelector string) (io.ReadCloser, error) {
-	ks, err := NewKubernetesService(group.ClusterConfiguration)
+	ks, err := NewKubernetesService(s.logger, group.ClusterConfiguration)
 	if err != nil {
 		return nil, err
 	}
@@ -602,7 +606,7 @@ const (
 )
 
 func (s service) GetStatus(instance *model.DeploymentInstance) (InstanceStatus, error) {
-	ks, err := NewKubernetesService(instance.Group.ClusterConfiguration)
+	ks, err := NewKubernetesService(s.logger, instance.Group.ClusterConfiguration)
 	if err != nil {
 		return "", err
 	}
@@ -673,4 +677,76 @@ func (s service) Reset(token string, instance *model.DeploymentInstance, ttl uin
 	}
 
 	return s.deployDeploymentInstance(token, instance, ttl)
+}
+
+func (s service) ListenForClusterUpdates(ctx context.Context) (error, <-chan watch.Event) {
+	fakeAdministrator := &model.User{
+		Groups: []model.Group{
+			{
+				Name: model.AdministratorGroupName,
+			},
+		},
+	}
+
+	// TODO implement polling, pass in the interval to look for new groups
+	groups, err := s.groupService.FindAll(fakeAdministrator, true)
+	if err != nil {
+		return err, nil
+	}
+
+	// TODO blocking/non-blocking/pass in context
+	watch := make(chan *model.ClusterConfiguration, len(groups))
+	// for _, group := range groups {
+	// 	select {
+	// 	case <-ctx.Done():
+	// 	case watch <- group.ClusterConfiguration:
+	// 	}
+	// }
+	return nil, s.watchGroups(ctx, watch)
+}
+
+// watchGroups streams pod events for each of the given groups into the returned channel. To start
+// streaming pod events from a new group send the groups cluster config into groups.
+func (s service) watchGroups(ctx context.Context, groups <-chan *model.ClusterConfiguration) <-chan watch.Event {
+	// TODO handle errors and panics
+	out := make(chan watch.Event)
+
+	go func() {
+		var wg sync.WaitGroup
+		for {
+			select {
+			case <-ctx.Done():
+				wg.Wait()
+				close(out)
+				return
+			case group := <-groups:
+				wg.Add(1)
+				go func() {
+					defer wg.Done()
+
+					ks, err := NewKubernetesService(s.logger, group)
+					if err != nil {
+						ks.logger.Info("unable to get create new kubernetes service: %v", err)
+					}
+					watcher, err := ks.watchGroup(ctx, group)
+					if err != nil {
+						ks.logger.Error("Failed to watch a groups pod events", "error", err, "group", group)
+					}
+					defer watcher.Stop()
+
+					events := watcher.ResultChan()
+					for {
+						select {
+						case <-ctx.Done():
+							return
+						case event := <-events:
+							out <- event
+						}
+					}
+				}()
+			}
+		}
+	}()
+
+	return out
 }

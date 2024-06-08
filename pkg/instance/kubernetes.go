@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"os/exec"
 	"strings"
@@ -13,6 +14,7 @@ import (
 	"github.com/dhis2-sre/im-manager/internal/errdef"
 
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/watch"
 
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
@@ -24,17 +26,18 @@ import (
 )
 
 type kubernetesService struct {
+	logger *slog.Logger
 	client *kubernetes.Clientset
 }
 
 //goland:noinspection GoExportedFuncWithUnexportedType
-func NewKubernetesService(config *model.ClusterConfiguration) (*kubernetesService, error) {
+func NewKubernetesService(logger *slog.Logger, config *model.ClusterConfiguration) (*kubernetesService, error) {
 	client, err := newClient(config)
 	if err != nil {
 		return nil, fmt.Errorf("error creating kube client: %v", err)
 	}
 
-	return &kubernetesService{client: client}, nil
+	return &kubernetesService{logger: logger, client: client}, nil
 }
 
 func commandExecutor(cmd *exec.Cmd, configuration *model.ClusterConfiguration) (stdout []byte, stderr []byte, err error) {
@@ -366,4 +369,11 @@ func scale(sc scaler, name string, replicas int32) (int32, error) {
 	}
 
 	return prevReplicas, nil
+}
+
+func (ks kubernetesService) watchGroup(ctx context.Context, group *model.ClusterConfiguration) (watch.Interface, error) {
+	options := metav1.ListOptions{
+		LabelSelector: "im=true",
+	}
+	return ks.client.CoreV1().Pods(group.GroupName).Watch(ctx, options)
 }

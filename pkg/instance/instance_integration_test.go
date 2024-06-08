@@ -237,6 +237,8 @@ func TestInstanceHandler(t *testing.T) {
 		client.Do(t, http.MethodPost, path, nil, http.StatusOK, inttest.WithAuthToken("sometoken"))
 		k8sClient.AssertPodIsReady(t, deploymentInstance.GroupName, deploymentInstance.Name)
 
+		// TODO start listening for events assert on pod events
+
 		t.Log("Destroy deployment")
 		path = fmt.Sprintf("/deployments/%d", deployment.ID)
 		client.Do(t, http.MethodDelete, path, nil, http.StatusAccepted, inttest.WithAuthToken("sometoken"))
@@ -292,10 +294,14 @@ type groupService struct {
 	group *model.Group
 }
 
-func (gs groupService) FindByGroupNames(groupNames []string) ([]model.Group, error) {
-	panic("implement me")
-}
-
 func (gs groupService) Find(name string) (*model.Group, error) {
 	return gs.group, nil
+}
+
+func (gs groupService) FindAll(user *model.User, deployable bool) ([]model.Group, error) {
+	return []model.Group{(*gs.group)}, nil
+}
+
+func (gs groupService) FindByGroupNames(groupNames []string) ([]model.Group, error) {
+	panic("implement me")
 }
