@@ -21,7 +21,7 @@ func TestConsumeDeletesInstance(t *testing.T) {
 	amqpClient := inttest.SetupRabbitMQ(t)
 
 	consumer, err := rabbitmq.NewConsumer(
-		amqpClient.URI,
+		amqpClient.URI(t),
 		rabbitmq.WithConnectionName(t.Name()),
 		rabbitmq.WithConsumerTagPrefix(t.Name()),
 	)
