@@ -27,8 +27,10 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"time"
 
 	"github.com/go-mail/mail"
+	"github.com/rabbitmq/rabbitmq-stream-go-client/pkg/stream"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
@@ -36,6 +38,7 @@ import (
 	"github.com/dhis2-sre/im-manager/internal/log"
 	"github.com/dhis2-sre/im-manager/internal/middleware"
 	"github.com/dhis2-sre/im-manager/pkg/database"
+	"github.com/dhis2-sre/im-manager/pkg/event"
 	"github.com/dhis2-sre/im-manager/pkg/group"
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	"github.com/dhis2-sre/im-manager/pkg/token"
@@ -166,6 +169,24 @@ func run() error {
 
 	integrationHandler := integration.NewHandler(dockerHubClient, cfg.InstanceService.Host, cfg.DatabaseManagerService.Host)
 
+	// TODO(ivo) fix the uri as this does not point to the stream port
+	env, err := stream.NewEnvironment(
+		stream.NewEnvironmentOptions().
+			SetUri(cfg.RabbitMqURL.GetUrl()))
+	if err != nil {
+		return err
+	}
+	streamName := "events"
+	err = env.DeclareStream(streamName,
+		stream.NewStreamOptions().
+			SetMaxSegmentSizeBytes(stream.ByteCapacity{}.MB(1)).
+			SetMaxAge(1*time.Hour).
+			SetMaxLengthBytes(stream.ByteCapacity{}.GB(1)))
+	if err != nil {
+		return err
+	}
+	eventHandler := event.NewHandler(logger, env, streamName)
+
 	err = user.CreateUser(cfg.AdminUser.Email, cfg.AdminUser.Password, userService, groupService, model.AdministratorGroupName, "admin")
 	if err != nil {
 		return err
@@ -191,6 +212,7 @@ func run() error {
 	integration.Routes(r, authentication, integrationHandler)
 	database.Routes(r, authentication.TokenAuthentication, databaseHandler)
 	instance.Routes(r, authentication.TokenAuthentication, instanceHandler)
+	event.Routes(r, authentication.TokenAuthentication, eventHandler)
 
 	return r.Run()
 }
