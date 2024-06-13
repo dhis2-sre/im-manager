@@ -61,6 +61,8 @@ func (h Handler) StreamEvents(c *gin.Context) {
 	w := c.Writer
 	clientGone := w.CloseNotify()
 
+	sseEvents := make(chan sse.Event)
+
 	// TODO(ivo) understand match unfiltered
 	userGroups := sortedGroupNames(user.Groups)
 	filter := stream.NewConsumerFilter(userGroups, true, postFilter(logger, user.ID, userGroups))
@@ -73,7 +75,7 @@ func (h Handler) StreamEvents(c *gin.Context) {
 		select {
 		case <-c.Request.Context().Done():
 		case <-clientGone:
-			logger.Info("Request canceled, closing consumer")
+			logger.Info("Request canceled, returning from messageHandler")
 			// TODO anything else we should be doing?
 			return
 		default:
@@ -102,8 +104,14 @@ func (h Handler) StreamEvents(c *gin.Context) {
 			if eventType != "" { // SSE named event
 				sseEvent.Event = eventType
 			}
-			c.Render(-1, sseEvent)
-			w.Flush()
+
+			select {
+			case <-c.Request.Context().Done():
+			case <-clientGone:
+				logger.Info("Request canceled, returning from messageHandler")
+				return
+			case sseEvents <- sseEvent:
+			}
 		}
 	}
 	consumer, err := ha.NewReliableConsumer(h.env, h.streamName, opts, messageHandler)
@@ -114,8 +122,18 @@ func (h Handler) StreamEvents(c *gin.Context) {
 	defer consumer.Close()
 
 	logger.Info("Connection established for sending events via SSE")
-	// TODO think about this here
-	<-clientGone
+	// TODO(ivo) think about this here
+	for {
+		select {
+		case <-c.Request.Context().Done():
+		case <-clientGone:
+			logger.Info("Request canceled, returning from handler")
+			return
+		case sseEvent := <-sseEvents:
+			c.Render(-1, sseEvent)
+			w.Flush()
+		}
+	}
 }
 
 func sortedGroupNames(groups []model.Group) []string {
