@@ -83,7 +83,7 @@ func (h Handler) StreamEvents(c *gin.Context) {
 	}
 	defer consumer.Close()
 
-	logger.Info("Connection established for sending events via SSE")
+	logger.Info("Connection established for sending SSE events")
 	for {
 		select {
 		case <-c.Request.Context().Done():
