@@ -2,6 +2,7 @@ package event_test
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -80,8 +81,21 @@ func TestEventHandler(t *testing.T) {
 	require.NoError(t, err, "failed to declare RabbitMQ stream")
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
+	// this is only to allow testing using multiple users without bringing in all our auth stack
 	authenticator := func(ctx *gin.Context) {
-		ctx.Set("user", user1)
+		userParam := ctx.Query("user")
+		userID, err := strconv.ParseUint(userParam, 10, 64)
+		require.NoErrorf(t, err, "failed to parse query param user=%q into user ID", userParam)
+
+		if userID == uint64(user1.ID) {
+			ctx.Set("user", user1)
+			return
+		} else if userID == uint64(user2.ID) {
+			ctx.Set("user", user2)
+			return
+		}
+
+		require.FailNow(t, "provide query param user=userID in the test")
 	}
 	client := inttest.SetupHTTPServer(t, func(engine *gin.Engine) {
 		eventHandler := event.NewHandler(logger, env, streamName)
@@ -112,6 +126,7 @@ func TestEventHandler(t *testing.T) {
 	defer producer.Close()
 	store := eventStorer{producer: producer}
 
+	// TODO(ivo) should we wait for the publish confirmation before subscribing?
 	event1 := store.storeEvent(t, "db-update", sharedGroup.Name, user1)
 	event2 := store.storeEvent(t, "db-update", sharedGroup.Name, user2)
 	event3 := store.storeEvent(t, "db-update", sharedGroup.Name, nil)
@@ -119,38 +134,89 @@ func TestEventHandler(t *testing.T) {
 
 	wantUser1Messages := []*sse.Event{event1, event3, event4}
 	wantUser2Messages := []*sse.Event{event2, event3, event4}
-	_ = wantUser2Messages
 
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
+	ctxUser2, cancelUser2 := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancelUser2()
+	ctxUser1, cancelUser1 := context.WithCancelCause(ctxUser2)
 
-	t.Log("User1 starts streaming /events")
-	user1Messages := make(chan *sse.Event)
-	go func(ctx context.Context) {
-		sseClient := sse.NewClient(client.ServerURL + "/events")
-		err = sseClient.SubscribeWithContext(ctx, "", func(msg *sse.Event) {
-			user1Messages <- msg
-		})
-		require.NoError(t, err, "failed to stream from /events")
-	}(ctx)
-	// TODO(ivo) subscribe with a user2 and assert wantUser2Messages
+	user1Messages := streamEvents(t, ctxUser1, client.ServerURL+"/events", user1)
+	user2Messages := streamEvents(t, ctxUser2, client.ServerURL+"/events", user2)
 
-	t.Log("Waiting on messages...")
 	// TODO(ivo) do assert the messages we got on timeout
-	var gotUser1Messages []*sse.Event
-	for len(wantUser1Messages) != len(gotUser1Messages) {
+	t.Log("Waiting on messages...")
+	var gotUser1Messages, gotUser2Messages []*sse.Event
+	for len(wantUser1Messages) != len(gotUser1Messages) || len(wantUser2Messages) != len(gotUser2Messages) {
 		select {
+		case <-ctxUser1.Done():
+		case <-ctxUser2.Done():
+			assert.FailNow(t, "Timed out waiting on messages.")
 		case msg := <-user1Messages:
 			gotUser1Messages = append(gotUser1Messages, msg)
-		case <-ctx.Done():
-			assert.FailNow(t, "Timed out waiting on messages.")
+		case msg := <-user2Messages:
+			gotUser2Messages = append(gotUser2Messages, msg)
 		}
 	}
 
 	assert.EqualValuesf(t, wantUser1Messages, gotUser1Messages, "mismatch in expected messages for user %d", user1.ID)
+	assert.EqualValuesf(t, wantUser2Messages, gotUser2Messages, "mismatch in expected messages for user %d", user2.ID)
+	t.Log("Every user got their expected first batch of messages")
 
-	// TODO(ivo) shutdown user1 and send messages it should get, start subscribing again and show
-	// the user resumes while user2 got them as well
+	cancelUser1(errors.New("drop connection"))
+	t.Log("Cancelled user1")
+	<-user1Messages // wait for user1 to be unsubscribed before sending new messages to test offset tracking
+	ctxUser1, cancelUser1 = context.WithCancelCause(ctxUser2)
+	defer cancelUser1(nil)
+
+	event5 := store.storeEvent(t, "instance-update", groupExclusiveToUser2.Name, nil)
+	event6 := store.storeEvent(t, "db-update", sharedGroup.Name, nil)
+	event7 := store.storeEvent(t, "instance-update", sharedGroup.Name, nil)
+
+	user1Messages = streamEvents(t, ctxUser2, client.ServerURL+"/events", user1)
+
+	wantUser1Messages = []*sse.Event{event6, event7}
+	wantUser2Messages = []*sse.Event{event5, event6, event7}
+
+	// TODO(ivo) do assert the messages we got on timeout
+	t.Log("Waiting on messages...")
+	gotUser1Messages, gotUser2Messages = nil, nil
+	for len(wantUser1Messages) != len(gotUser1Messages) || len(wantUser2Messages) != len(gotUser2Messages) {
+		select {
+		case <-ctxUser1.Done():
+		case <-ctxUser2.Done():
+			assert.FailNow(t, "Timed out waiting on messages.")
+		case msg := <-user1Messages:
+			gotUser1Messages = append(gotUser1Messages, msg)
+		case msg := <-user2Messages:
+			gotUser2Messages = append(gotUser2Messages, msg)
+		}
+	}
+
+	assert.EqualValuesf(t, wantUser1Messages, gotUser1Messages, "mismatch in expected messages for user %d", user1.ID)
+	assert.EqualValuesf(t, wantUser2Messages, gotUser2Messages, "mismatch in expected messages for user %d", user2.ID)
+	t.Log("Every user got their expected second batch of messages")
+}
+
+func streamEvents(t *testing.T, ctx context.Context, url string, user *model.User) <-chan *sse.Event {
+	out := make(chan *sse.Event)
+	go func() {
+		sseClient := sse.NewClient(url + fmt.Sprintf("?user=%d", user.ID))
+		t.Logf("User %d starts to stream from %q", user.ID, url)
+		err := sseClient.SubscribeWithContext(ctx, "", func(msg *sse.Event) {
+			select {
+			case <-ctx.Done():
+				return
+			case out <- msg:
+			}
+		})
+		require.NoError(t, err, "failed to stream from %q for user %d", url, user.ID)
+	}()
+	go func() {
+		t.Logf("waiting on context: user %d from %q", user.ID, url)
+		<-ctx.Done()
+		t.Logf("User %d stops to stream from %q due: %v", user.ID, url, context.Cause(ctx))
+		close(out)
+	}()
+	return out
 }
 
 type eventStorer struct {
