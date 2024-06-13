@@ -1,6 +1,8 @@
 package event
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"slices"
@@ -61,59 +63,14 @@ func (h Handler) StreamEvents(c *gin.Context) {
 	w := c.Writer
 	clientGone := w.CloseNotify()
 
-	sseEvents := make(chan sse.Event)
-
 	// TODO(ivo) understand match unfiltered
 	userGroups := sortedGroupNames(user.Groups)
 	filter := stream.NewConsumerFilter(userGroups, true, postFilter(logger, user.ID, userGroups))
 	opts := stream.NewConsumerOptions().
-		// SetOffset(stream.OffsetSpecification{}.First()).
 		SetConsumerName(consumerName).
 		SetClientProvidedName(consumerName).
 		SetFilter(filter)
-	messageHandler := func(consumerContext stream.ConsumerContext, message *amqp.Message) {
-		select {
-		case <-c.Request.Context().Done():
-		case <-clientGone:
-			logger.Info("Request canceled, returning from messageHandler")
-			// TODO anything else we should be doing?
-			return
-		default:
-			var data string
-			if len(message.Data) == 0 {
-				logger.Error("Received no data")
-				return
-			}
-
-			data = string(message.Data[0])
-
-			var eventType string
-			if event, ok := message.ApplicationProperties["type"]; ok {
-				if kind, ok := event.(string); ok {
-					eventType = kind
-				} else {
-					logger.Error("Failed to type assert RabbitMQ message application property to a string", "messageProperty", "type", "messagePropertyValue", event)
-				}
-			}
-
-			logger.Info("Received message", "type", eventType, "data", message.Data)
-
-			sseEvent := sse.Event{
-				Data: data,
-			}
-			if eventType != "" { // SSE named event
-				sseEvent.Event = eventType
-			}
-
-			select {
-			case <-c.Request.Context().Done():
-			case <-clientGone:
-				logger.Info("Request canceled, returning from messageHandler")
-				return
-			case sseEvents <- sseEvent:
-			}
-		}
-	}
+	sseEvents, messageHandler := createMessageHandler(c.Request.Context(), clientGone, logger)
 	consumer, err := ha.NewReliableConsumer(h.env, h.streamName, opts, messageHandler)
 	if err != nil {
 		logger.Error("Failed to create RabbitMQ consumer", "error", err)
@@ -122,7 +79,6 @@ func (h Handler) StreamEvents(c *gin.Context) {
 	defer consumer.Close()
 
 	logger.Info("Connection established for sending events via SSE")
-	// TODO(ivo) think about this here
 	for {
 		select {
 		case <-c.Request.Context().Done():
@@ -207,4 +163,66 @@ func isUserPartOfMessageGroup(logger *slog.Logger, userGroups []string, applicat
 	}
 
 	return true
+}
+
+// createMessageHandler returns stream.MessagesHandler that will transform RabbitMQ messages of
+// instance manager events into SSE events. These SSE events are sent via the read-only channel
+// returned. This is to avoid race conditions when writing the data out to the HTTP response writer.
+// Only one Go routine should write to the HTTP response writer. The RabbitMQ stream client runs our
+// stream.MessagesHandler in a separate Go routine.
+func createMessageHandler(ctx context.Context, done <-chan bool, logger *slog.Logger) (<-chan sse.Event, stream.MessagesHandler) {
+	out := make(chan sse.Event)
+	return out, func(consumerContext stream.ConsumerContext, message *amqp.Message) {
+		select {
+		case <-ctx.Done():
+		case <-done:
+			logger.Info("Request canceled, returning from messageHandler")
+			close(out)
+			return
+		default:
+			sseEvent, err := mapMessageToEvent(message)
+			if err != nil {
+				logger.Error("Failed to map AMQP message", "error", err)
+				return
+			}
+			logger.Debug("Transformed AMQP message to SSE event", "message", sseEvent)
+
+			select {
+			case <-ctx.Done():
+			case <-done:
+				logger.Info("Request canceled, returning from messageHandler")
+				close(out)
+				return
+			case out <- sseEvent:
+			}
+		}
+	}
+}
+
+// mapMessageToEvent maps an AMQP message of an instance manager event to an SSE event. True is
+// returned if the message could be processed and an SSE event should be sent, false otherwise.
+func mapMessageToEvent(message *amqp.Message) (sse.Event, error) {
+	var data string
+	if len(message.Data) == 0 {
+		return sse.Event{}, errors.New("received no data")
+	}
+
+	data = string(message.Data[0])
+
+	var eventType string
+	if event, ok := message.ApplicationProperties["type"]; ok {
+		if kind, ok := event.(string); ok {
+			eventType = kind
+		} else {
+			return sse.Event{}, fmt.Errorf("type assertion of RabbitMQ message application property %q failed, value=%v", "type", event)
+		}
+	}
+
+	sseEvent := sse.Event{
+		Data: data,
+	}
+	if eventType != "" { // SSE named event
+		sseEvent.Event = eventType
+	}
+	return sseEvent, nil
 }
