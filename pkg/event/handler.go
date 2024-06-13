@@ -64,8 +64,13 @@ func (h Handler) StreamEvents(c *gin.Context) {
 	clientGone := w.CloseNotify()
 
 	// TODO(ivo) understand match unfiltered
+	// TODO: Do we still need to sort group names for the sake of stream.NewConsumerFilter?
 	userGroups := sortedGroupNames(user.Groups)
-	filter := stream.NewConsumerFilter(userGroups, true, postFilter(logger, user.ID, userGroups))
+	userGroupsMap := make(map[string]struct{}, len(userGroups))
+	for _, group := range userGroups {
+		userGroupsMap[group] = struct{}{}
+	}
+	filter := stream.NewConsumerFilter(userGroups, true, postFilter(logger, user.ID, userGroupsMap))
 	opts := stream.NewConsumerOptions().
 		SetConsumerName(consumerName).
 		SetClientProvidedName(consumerName).
@@ -93,23 +98,23 @@ func (h Handler) StreamEvents(c *gin.Context) {
 }
 
 func sortedGroupNames(groups []model.Group) []string {
-	var result []string
-	for _, group := range groups {
-		result = append(result, group.Name)
+	groupCount := len(groups)
+	groupNames := make([]string, groupCount)
+	for i := 0; i < groupCount; i++ {
+		groupNames[i] = groups[i].Name
 	}
-	slices.Sort(result)
-	return result
+	slices.Sort(groupNames)
+	return groupNames
 }
 
 // postFilter is a RabbitMQ stream post filter that is applied client side. This is necessary as the
 // server side filter is probabilistic and can let false positives through. (see
 // https://www.rabbitmq.com/blog/2023/10/16/stream-filtering) The filter must be simple and fast.
-// userGroups must be in sorted order!
-func postFilter(logger *slog.Logger, userID uint, userGroups []string) func(message *amqp.Message) bool {
+func postFilter(logger *slog.Logger, userID uint, userGroupsMap map[string]struct{}) stream.PostFilter {
 	// TODO(ivo) how to pass the user.ID as is without having to stringify and parse it again. Type
 	// assertion is causing me a headache
 	return func(message *amqp.Message) bool {
-		return isUserMessageOwner(logger, userID, message.ApplicationProperties) && isUserPartOfMessageGroup(logger, userGroups, message.ApplicationProperties)
+		return isUserMessageOwner(logger, userID, message.ApplicationProperties) && isUserPartOfMessageGroup(logger, userGroupsMap, message.ApplicationProperties)
 	}
 }
 
@@ -135,6 +140,7 @@ func isUserMessageOwner(logger *slog.Logger, userID uint, applicationProperties 
 		return false
 
 	}
+
 	if uint(messageOwnerID) != userID {
 		return false
 	}
@@ -145,8 +151,8 @@ func isUserMessageOwner(logger *slog.Logger, userID uint, applicationProperties 
 // isUserPartOfMessageGroup determines if the user is allowed to receive the message. This function
 // only considers the "group" property of a message. Messages that have no group can be read by the
 // user. Messages that have a group can only be read by the user if the "group" property value can
-// be parsed and matches one of the userGroups.
-func isUserPartOfMessageGroup(logger *slog.Logger, userGroups []string, applicationProperties map[string]any) bool {
+// be parsed and matches one of the userGroupsMap.
+func isUserPartOfMessageGroup(logger *slog.Logger, userGroupsMap map[string]struct{}, applicationProperties map[string]any) bool {
 	group, ok := applicationProperties["group"]
 	if !ok {
 		return true
@@ -158,7 +164,7 @@ func isUserPartOfMessageGroup(logger *slog.Logger, userGroups []string, applicat
 		return false
 	}
 
-	if _, ok := slices.BinarySearch(userGroups, messageGroup); !ok {
+	if _, ok = userGroupsMap[messageGroup]; !ok {
 		return false
 	}
 
