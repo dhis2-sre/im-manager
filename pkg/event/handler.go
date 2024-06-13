@@ -75,7 +75,7 @@ func (h Handler) StreamEvents(c *gin.Context) {
 		SetConsumerName(consumerName).
 		SetClientProvidedName(consumerName).
 		SetFilter(filter)
-	sseEvents, messageHandler := createMessageHandler(c.Request.Context(), clientGone, logger)
+	sseEvents, messageHandler := createMessageHandler(or(c.Request.Context(), clientGone), logger)
 	consumer, err := ha.NewReliableConsumer(h.env, h.streamName, opts, messageHandler)
 	if err != nil {
 		logger.Error("Failed to create RabbitMQ consumer", "error", err)
@@ -165,16 +165,29 @@ func isUserPartOfMessageGroup(logger *slog.Logger, userGroupsMap map[string]stru
 	return ok
 }
 
+// or closes the channel it returns when one of context or done channel are closed.
+func or(ctx context.Context, done <-chan bool) <-chan struct{} {
+	out := make(chan struct{})
+	go func() {
+		select {
+		case <-ctx.Done():
+		case <-done:
+			close(out)
+			return
+		}
+	}()
+	return out
+}
+
 // createMessageHandler returns stream.MessagesHandler that will transform RabbitMQ messages of
 // instance manager events into SSE events. These SSE events are sent via the read-only channel
 // returned. This is to avoid race conditions when writing the data out to the HTTP response writer.
 // Only one Go routine should write to the HTTP response writer. The RabbitMQ stream client runs our
 // stream.MessagesHandler in a separate Go routine.
-func createMessageHandler(ctx context.Context, done <-chan bool, logger *slog.Logger) (<-chan sse.Event, stream.MessagesHandler) {
+func createMessageHandler(done <-chan struct{}, logger *slog.Logger) (<-chan sse.Event, stream.MessagesHandler) {
 	out := make(chan sse.Event)
 	return out, func(consumerContext stream.ConsumerContext, message *amqp.Message) {
 		select {
-		case <-ctx.Done():
 		case <-done:
 			logger.Info("Request canceled, returning from messageHandler")
 			close(out)
@@ -188,7 +201,6 @@ func createMessageHandler(ctx context.Context, done <-chan bool, logger *slog.Lo
 			logger.Debug("Transformed AMQP message to SSE event", "message", sseEvent)
 
 			select {
-			case <-ctx.Done():
 			case <-done:
 				logger.Info("Request canceled, returning from messageHandler")
 				close(out)
