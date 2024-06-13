@@ -112,18 +112,13 @@ func TestEventHandler(t *testing.T) {
 	defer producer.Close()
 	store := eventStorer{producer: producer}
 
-	// TODO(ivo) assert both users get messages for the group they are in if there is no owner
-	// to do that I need to adapt the authenticator
-	// TODO(ivo) assert that only the owner gets the message if there is an owner
-	// TODO(ivo) assert that users get messages for different named events
-	// store.storeEvent(t, "instance-update", group.Name, nil, "DHIS2 is ready")
-
 	event1 := store.storeEvent(t, "db-update", sharedGroup.Name, user1)
 	event2 := store.storeEvent(t, "db-update", sharedGroup.Name, user2)
 	event3 := store.storeEvent(t, "db-update", sharedGroup.Name, nil)
+	event4 := store.storeEvent(t, "instance-update", sharedGroup.Name, nil)
 
-	wantUser1Messages := []*sse.Event{event1, event3}
-	wantUser2Messages := []*sse.Event{event2, event3}
+	wantUser1Messages := []*sse.Event{event1, event3, event4}
+	wantUser2Messages := []*sse.Event{event2, event3, event4}
 	_ = wantUser2Messages
 
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
@@ -138,7 +133,7 @@ func TestEventHandler(t *testing.T) {
 		})
 		require.NoError(t, err, "failed to stream from /events")
 	}(ctx)
-	// TODO(ivo) subscribe with a different user
+	// TODO(ivo) subscribe with a user2 and assert wantUser2Messages
 
 	t.Log("Waiting on messages...")
 	// TODO(ivo) do assert the messages we got on timeout
@@ -153,6 +148,9 @@ func TestEventHandler(t *testing.T) {
 	}
 
 	assert.EqualValuesf(t, wantUser1Messages, gotUser1Messages, "mismatch in expected messages for user %d", user1.ID)
+
+	// TODO(ivo) shutdown user1 and send messages it should get, start subscribing again and show
+	// the user resumes while user2 got them as well
 }
 
 type eventStorer struct {
