@@ -141,11 +141,7 @@ func isUserMessageOwner(logger *slog.Logger, userID uint, applicationProperties 
 
 	}
 
-	if uint(messageOwnerID) != userID {
-		return false
-	}
-
-	return true
+	return uint(messageOwnerID) == userID
 }
 
 // isUserPartOfMessageGroup determines if the user is allowed to receive the message. This function
@@ -164,11 +160,9 @@ func isUserPartOfMessageGroup(logger *slog.Logger, userGroupsMap map[string]stru
 		return false
 	}
 
-	if _, ok = userGroupsMap[messageGroup]; !ok {
-		return false
-	}
+	_, ok = userGroupsMap[messageGroup]
 
-	return true
+	return ok
 }
 
 // createMessageHandler returns stream.MessagesHandler that will transform RabbitMQ messages of
