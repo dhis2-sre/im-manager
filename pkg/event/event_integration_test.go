@@ -31,9 +31,8 @@ func TestEventHandler(t *testing.T) {
 	amqpClient := inttest.SetupRabbitMQ(t)
 
 	sharedGroup := model.Group{
-		Name:       "eventtest1",
-		Hostname:   "eventtest1",
-		Deployable: true,
+		Name:     "eventtest1",
+		Hostname: "eventtest1",
 	}
 	user1 := &model.User{
 		ID:         1,
@@ -44,12 +43,17 @@ func TestEventHandler(t *testing.T) {
 		},
 	}
 	db.Create(user1)
+	groupExclusiveToUser2 := model.Group{
+		Name:     "eventtest2",
+		Hostname: "eventtest2",
+	}
 	user2 := &model.User{
 		ID:         2,
 		Email:      "user2@dhis2.org",
 		EmailToken: uuid.New(),
 		Groups: []model.Group{
 			sharedGroup,
+			groupExclusiveToUser2,
 		},
 	}
 	db.Create(user2)
@@ -114,31 +118,41 @@ func TestEventHandler(t *testing.T) {
 	// TODO(ivo) assert that users get messages for different named events
 	// store.storeEvent(t, "instance-update", group.Name, nil, "DHIS2 is ready")
 
-	// TODO(ivo) how to assert? I have the publishing ID, does that help me in any way?
-	var wantUser1Messages, gotUser1Messages []int
-	var wantUser2Messages, gotUser2Messages []int
-	wantUser1Messages = append(wantUser1Messages, store.storeEvent(t, "db-update", sharedGroup.Name, user1))
-	wantUser2Messages = append(wantUser2Messages, store.storeEvent(t, "db-update", sharedGroup.Name, user2))
-	_ = gotUser2Messages
+	event1 := store.storeEvent(t, "db-update", sharedGroup.Name, user1)
+	event2 := store.storeEvent(t, "db-update", sharedGroup.Name, user2)
+	event3 := store.storeEvent(t, "db-update", sharedGroup.Name, nil)
 
-	t.Log("Stream from /events")
-	// TODO(ivo) cancel earlier if the assertions are true already
+	wantUser1Messages := []*sse.Event{event1, event3}
+	wantUser2Messages := []*sse.Event{event2, event3}
+	_ = wantUser2Messages
+
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
+	t.Log("User1 starts streaming /events")
+	user1Messages := make(chan *sse.Event)
 	go func(ctx context.Context) {
 		sseClient := sse.NewClient(client.ServerURL + "/events")
 		err = sseClient.SubscribeWithContext(ctx, "", func(msg *sse.Event) {
-			t.Log(string(msg.Data))
-			messageCount, _ := strconv.Atoi(string(msg.Data))
-			gotUser1Messages = append(gotUser1Messages, messageCount)
+			user1Messages <- msg
 		})
 		require.NoError(t, err, "failed to stream from /events")
 	}(ctx)
+	// TODO(ivo) subscribe with a different user
 
-	<-ctx.Done()
+	t.Log("Waiting on messages...")
+	// TODO(ivo) do assert the messages we got on timeout
+	var gotUser1Messages []*sse.Event
+	for len(wantUser1Messages) != len(gotUser1Messages) {
+		select {
+		case msg := <-user1Messages:
+			gotUser1Messages = append(gotUser1Messages, msg)
+		case <-ctx.Done():
+			assert.FailNow(t, "Timed out waiting on messages.")
+		}
+	}
 
-	assert.EqualValues(t, wantUser1Messages, gotUser1Messages)
+	assert.EqualValuesf(t, wantUser1Messages, gotUser1Messages, "mismatch in expected messages for user %d", user1.ID)
 }
 
 type eventStorer struct {
@@ -147,7 +161,9 @@ type eventStorer struct {
 	m            sync.Mutex
 }
 
-func (es *eventStorer) storeEvent(t *testing.T, kind, group string, owner *model.User) int {
+// storeEvent stores an instance manager event and returns the SSE event we expect an eligible user
+// to receive via /events.
+func (es *eventStorer) storeEvent(t *testing.T, kind, group string, owner *model.User) *sse.Event {
 	es.m.Lock()
 	messageCount := es.messageCount
 	es.messageCount++
@@ -156,7 +172,8 @@ func (es *eventStorer) storeEvent(t *testing.T, kind, group string, owner *model
 	// TODO(ivo) replace directly sending a message to RabbitMQ by calling an event repository to
 	// store an event in the DB
 
-	message := amqp.NewMessage([]byte(strconv.Itoa(messageCount)))
+	data := []byte(strconv.Itoa(messageCount))
+	message := amqp.NewMessage(data)
 	// set a publishing id for deduplication
 	message.SetPublishingId(int64(messageCount))
 	// set properties used for filtering
@@ -166,8 +183,11 @@ func (es *eventStorer) storeEvent(t *testing.T, kind, group string, owner *model
 	}
 	// set property that dictates the SSE event type
 	message.ApplicationProperties["type"] = kind
-
 	err := es.producer.Send(message)
 	require.NoErrorf(t, err, "failed to send message to RabbitMQ stream of kind %q, group %q, user %v", kind, group, owner)
-	return messageCount
+
+	return &sse.Event{
+		Event: []byte(kind),
+		Data:  data,
+	}
 }
