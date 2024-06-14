@@ -33,8 +33,10 @@ deploy:
         createNamespace: true
         remoteChart: rabbitmq
         repo: https://charts.bitnami.com/bitnami
-        version: 12.4.1
+        version: 14.4.2
         useHelmSecrets: true
+        setValues:
+          extraPlugins: "rabbitmq_stream,rabbitmq_stream_management"
         valuesFiles:
           - helm/data/secrets/{{ .CLASSIFICATION }}/rabbitmq.yaml
 
