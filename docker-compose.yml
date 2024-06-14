@@ -8,6 +8,7 @@ x-service: &common-dev-test
     - .:/src
   working_dir: /src
 
+version: "3.8"
 services:
   prod:
     image: dhis2/im-manager:${IMAGE_TAG:-latest}
