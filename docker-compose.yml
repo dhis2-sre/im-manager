@@ -85,7 +85,7 @@ services:
       RABBITMQ_USERNAME: "guest"
       RABBITMQ_PASSWORD: "guest"
       RABBITMQ_DISK_FREE_ABSOLUTE_LIMIT: "100MB"
-      RABBITMQ_PLUGINS: "rabbitmq_management,rabbitmq_web_dispatch,rabbitmq_management_agent,rabbitmq_stream,rabbitmq_stream_management"
+      RABBITMQ_PLUGINS: "rabbitmq_management,rabbitmq_management_agent,rabbitmq_stream,rabbitmq_stream_management"
     healthcheck:
       # https://www.rabbitmq.com/docs/monitoring#stage-3
       test: rabbitmq-diagnostics -q check_running && rabbitmq-diagnostics -q check_local_alarms
