@@ -2,7 +2,6 @@ package model
 
 import "time"
 
-// swagger:model
 type Event struct {
 	ID        uint      `json:"id" gorm:"primaryKey"`
 	CreatedAt time.Time `json:"createdAt"`
