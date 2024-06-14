@@ -59,18 +59,9 @@ func TestEventHandler(t *testing.T) {
 	}
 	db.Create(user2)
 
-	portString := amqpClient.StreamPort(t)
-	port, err := strconv.Atoi(portString)
-	require.NoError(t, err)
-	t.Logf("stream port %d", port)
-
 	env, err := stream.NewEnvironment(
 		stream.NewEnvironmentOptions().
-			// SetUri(amqpClient.StreamURI(t)))
-			SetHost("localhost").
-			SetPort(port).
-			SetUser("rabbitmq").
-			SetPassword("rabbitmq"))
+			SetUri(amqpClient.StreamURI(t)))
 	require.NoError(t, err, "failed to create new RabbitMQ stream environment")
 
 	streamName := "events"
@@ -161,7 +152,6 @@ func TestEventHandler(t *testing.T) {
 	t.Log("Every user got their expected first batch of messages")
 
 	cancelUser1(errors.New("drop connection"))
-	t.Log("Cancelled user1")
 	<-user1Messages // wait for user1 to be unsubscribed before sending new messages to test offset tracking
 	ctxUser1, cancelUser1 = context.WithCancelCause(ctxUser2)
 	defer cancelUser1(nil)
@@ -209,7 +199,6 @@ func streamEvents(t *testing.T, ctx context.Context, url string, user *model.Use
 		require.NoError(t, err, "failed to stream from %q for user %d", url, user.ID)
 	}()
 	go func() {
-		t.Logf("waiting on context: user %d from %q", user.ID, url)
 		<-ctx.Done()
 		t.Logf("User %d stops to stream from %q due: %v", user.ID, url, context.Cause(ctx))
 		close(out)
