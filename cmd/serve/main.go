@@ -173,7 +173,7 @@ func run() error {
 		stream.NewEnvironmentOptions().
 			SetUri(cfg.RabbitMqURL.GetStreamURI()))
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to connect with RabbitMQ stream client: %v", err)
 	}
 	streamName := "events"
 	err = env.DeclareStream(streamName,
@@ -182,7 +182,7 @@ func run() error {
 			SetMaxAge(1*time.Hour).
 			SetMaxLengthBytes(stream.ByteCapacity{}.GB(1)))
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to declare RabbitMQ stream %q: %v", streamName, err)
 	}
 	eventHandler := event.NewHandler(logger, env, streamName)
 
