@@ -68,7 +68,7 @@ func run() error {
 	logger := slog.New(log.New(slog.NewJSONHandler(os.Stdout, nil)))
 	db, err := storage.NewDatabase(logger, cfg.Postgresql)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to setup DB: %v", err)
 	}
 
 	userRepository := user.NewRepository(db)
@@ -127,7 +127,7 @@ func run() error {
 		rabbitmq.WithLogger(logger.WithGroup("rabbitmq")),
 	)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to setup RabbitMQ consumer: %v", err)
 	}
 	defer consumer.Close()
 
@@ -149,7 +149,7 @@ func run() error {
 
 	s3Config, err := newS3Config(cfg.S3Region, s3Endpoint)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to setup S3 config: %v", err)
 	}
 
 	s3AWSClient := s3.NewFromConfig(s3Config, func(o *s3.Options) {
