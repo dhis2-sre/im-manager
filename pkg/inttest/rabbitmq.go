@@ -1,9 +1,9 @@
-// Package inttest provides setup functions that create a RabbitMQ container with toxiproxy. These
-// help us test our consumer and producer under different network conditions like all connections
-// being dropped. We are using the management image for RabbitMQ so you can debug and interact with
-// tests using its admin panel. Use a debugger, adjust timeouts waiting for a message or add a
-// time.Sleep and find the exposed management port to login to the UI. You will find it easier to
-// debug if your test configures the consumers connection and or consumer tag prefix.
+// Package inttest provides setup functions that create a RabbitMQ container. These help us test our
+// consumer and producer under different network conditions like all connections being dropped. We
+// are using the management image for RabbitMQ so you can debug and interact with tests using its
+// admin panel. Use a debugger, adjust timeouts waiting for a message or add a time.Sleep and find
+// the exposed management port to login to the UI. You will find it easier to debug if your test
+// configures the consumers connection and or consumer tag prefix.
 package inttest
 
 import (
@@ -13,7 +13,6 @@ import (
 	"testing"
 	"time"
 
-	toxiproxy "github.com/Shopify/toxiproxy/v2/client"
 	"github.com/docker/go-connections/nat"
 	amqpgo "github.com/rabbitmq/amqp091-go"
 	"github.com/stretchr/testify/require"
@@ -22,8 +21,7 @@ import (
 	"github.com/testcontainers/testcontainers-go/wait"
 )
 
-// SetupRabbitMQ creates a RabbitMQ and toxiproxy container with an AMQP client ready to send
-// messages to it.
+// SetupRabbitMQ creates a RabbitMQ with an AMQP client ready to send messages to it.
 func SetupRabbitMQ(t *testing.T) *AMQP {
 	t.Helper()
 	require := require.New(t)
@@ -41,23 +39,6 @@ func SetupRabbitMQ(t *testing.T) *AMQP {
 		require.NoError(rabbitMQContainer.Terminate(ctx), "failed to terminate RabbitMQ")
 	})
 
-	proxiedPort := "18080" // port toxiproxy will listen on and forward to RabbitMQ
-	natProxiedPort := proxiedPort + "/tcp"
-	proxyContainer, err := NewToxiProxy(ctx, net.Name, WithExposedPorts(natProxiedPort))
-	require.NoError(err, "failed setting up toxiproxy")
-	t.Cleanup(func() {
-		require.NoError(proxyContainer.Terminate(ctx), "failed to terminate toxiproxy")
-	})
-
-	toxi := toxiproxy.NewClient(proxyContainer.apiURI)
-	proxy, err := toxi.CreateProxy("test_rabbitmq", "[::]:"+proxiedPort, rabbitMQContainer.networkAlias+":"+rabbitMQContainer.internalPort)
-	require.NoError(err, "failed creating proxy in toxiproxy")
-
-	exposedProxiedHost := "127.0.0.1"
-	exposedProxiedPort, ok := proxyContainer.ports[natProxiedPort]
-	require.True(ok, "failed to get RabbitMQ port proxied by toxiproxy")
-	proxiedURI := amqpURI(rabbitMQContainer.user, rabbitMQContainer.pw, exposedProxiedHost, exposedProxiedPort)
-
 	URI, err := rabbitMQContainer.AMQPURI(ctx)
 	require.NoError(err, "failed to get RabbitMQ AMQP URI")
 	conn, err := amqpgo.Dial(URI)
@@ -69,30 +50,19 @@ func SetupRabbitMQ(t *testing.T) *AMQP {
 		rabbitMQContainer: rabbitMQContainer,
 		conn:              conn,
 		Channel:           channel,
-		Proxy:             proxy,
-		ProxiedURI:        proxiedURI,
-		proxiedPort:       exposedProxiedPort,
-		proxiedHost:       exposedProxiedHost,
 	}
 }
 
-// AMQP allows making requests to RabbitMQ either directly or via a proxy. It does so by opening a
-// connection and channel to RabbitMQ directly via the low-level github.com/rabbitmq/amqp091-go
-// library. Access the actual amqp091-go channel for specific use cases where our defaults don't
-// work. Connect any code you want to test via the ProxiedURI if you want to test effects of
-// connections being dropped via DisableConnections. If you want to test other scenarios relating
-// networking issues use the Proxy and read the docs at http://github.com/Shopify/toxiproxy.
+// AMQP allows making requests to RabbitMQ. It does so by opening a connection and channel to
+// RabbitMQ directly via the low-level github.com/rabbitmq/amqp091-go library. Access the actual
+// amqp091-go channel for specific use cases where our defaults don't work.
 type AMQP struct {
 	rabbitMQContainer *rabbitmqContainer
-	conn              *amqpgo.Connection // Connection established directly with RabbitMQ without going through the proxy.
-	Channel           *amqpgo.Channel    // Channel established directly with RabbitMQ without going through the proxy.
-	Proxy             *toxiproxy.Proxy   // Proxy in front of RabbitMQ
-	ProxiedURI        string             // Proxied AMQP URI going via toxiproxy to RabbitMQ. Use this if you want to test an implementation. Use URI if you want to consume/publish directly to RabbitMQ for example in an assertion.
-	proxiedHost       string
-	proxiedPort       string
+	conn              *amqpgo.Connection // Connection established with RabbitMQ
+	Channel           *amqpgo.Channel    // Channel established with RabbitMQ
 }
 
-// URI is the AMQP URI going to RabbitMQ directly without going through toxiproxy.
+// URI is the AMQP URI going to RabbitMQ.
 func (a *AMQP) URI(t *testing.T) string {
 	t.Helper()
 
@@ -101,7 +71,7 @@ func (a *AMQP) URI(t *testing.T) string {
 	return URI
 }
 
-// StreamURI is the stream URI going to RabbitMQ directly without going through toxiproxy.
+// StreamURI is the stream URI going to RabbitMQ.
 func (a *AMQP) StreamURI(t *testing.T) string {
 	t.Helper()
 
@@ -118,12 +88,7 @@ func (a *AMQP) StreamPort(t *testing.T) string {
 	return port
 }
 
-func (a *AMQP) GetProxiedURI(user, pw string) string {
-	return amqpURI(user, pw, a.proxiedHost, a.proxiedPort)
-}
-
-// Publish a message to given queue. This will go directly to RabbitMQ using URI and thus not go via
-// the proxy.
+// Publish a message to given queue.
 func (a *AMQP) Publish(t *testing.T, queue, message string) {
 	t.Helper()
 
@@ -135,7 +100,7 @@ func (a *AMQP) Publish(t *testing.T, queue, message string) {
 }
 
 // PublishEvery publishes a message to given queue in given interval until done is closed. This will
-// go directly to RabbitMQ using URI and thus not go via the proxy.
+// go directly to RabbitMQ using URI.
 func (a *AMQP) PublishEvery(t *testing.T, tick time.Duration, done chan struct{}, queue, message string) {
 	t.Helper()
 
@@ -153,23 +118,6 @@ func (a *AMQP) PublishEvery(t *testing.T, tick time.Duration, done chan struct{}
 	}()
 }
 
-// Enable connections to RabbitMQ via the proxy. This will affect anyone going through the
-// ProxiedURI.
-func (a *AMQP) EnableConnections(t *testing.T) {
-	t.Helper()
-
-	require.NoError(t, a.Proxy.Enable(), "failed to enable proxy to RabbitMQ")
-}
-
-// Disable connections to RabbitMQ via the proxy. This will affect anyone going through the
-// ProxiedURI. It will drop existing connections and prevent new connections until
-// EnableConnections() is called.
-func (a *AMQP) DisableConnections(t *testing.T) {
-	t.Helper()
-
-	require.NoError(t, a.Proxy.Disable(), "failed to disable proxy to RabbitMQ")
-}
-
 func (a *AMQP) Restart(t *testing.T) {
 	t.Helper()
 
@@ -185,7 +133,7 @@ func (a *AMQP) Restart(t *testing.T) {
 	require.NoError(t, err, "failed setting up AMQP channel")
 	a.Channel = channel
 
-	t.Logf("Restarted RabbitMQ with new connection and channel for publishing to unproxied URI %q", URI)
+	t.Logf("Restarted RabbitMQ with new connection and channel for publishing to URI %q", URI)
 }
 
 type rabbitmqContainer struct {
@@ -396,77 +344,4 @@ func (rbw *rabbitMQStrategy) connect(ip, port string) (*amqpgo.Connection, error
 	uri := amqpURI(rbw.usr, rbw.pw, ip, port)
 	fmt.Printf("Waiting for RabbitMQ connection to: %q\n", uri)
 	return amqpgo.Dial(uri)
-}
-
-type toxiproxyContainer struct {
-	testcontainers.Container
-	apiURI string
-	ports  map[string]string // ports to mapped ports
-}
-
-type toxiproxyOptions struct {
-	exposedPorts []string
-}
-
-type toxiproxyOption func(*toxiproxyOptions)
-
-func WithExposedPorts(ports ...string) toxiproxyOption {
-	return func(options *toxiproxyOptions) {
-		options.exposedPorts = ports
-	}
-}
-
-// NewToxiProxy creates a toxiproxy container.
-func NewToxiProxy(ctx context.Context, network string, options ...toxiproxyOption) (*toxiproxyContainer, error) {
-	opts := &toxiproxyOptions{}
-	for _, o := range options {
-		o(opts)
-	}
-
-	natAPIPort := "8474/tcp" // toxiproxy API
-	exposedPorts := []string{natAPIPort}
-	exposedPorts = append(exposedPorts, opts.exposedPorts...)
-
-	req := testcontainers.ContainerRequest{
-		Image:        "ghcr.io/shopify/toxiproxy",
-		ExposedPorts: exposedPorts,
-		WaitingFor:   wait.ForHTTP("/version").WithPort(nat.Port(natAPIPort)),
-	}
-	if network != "" {
-		req.Networks = []string{network}
-		req.NetworkAliases = map[string][]string{network: {"toxiproxy"}}
-	}
-
-	container, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
-		ContainerRequest: req,
-		Started:          true,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	ip, err := container.Host(ctx)
-	if err != nil {
-		return nil, err
-	}
-	rp, err := container.MappedPort(ctx, nat.Port(natAPIPort))
-	if err != nil {
-		return nil, err
-	}
-	apiURI := fmt.Sprintf("http://%s:%s", ip, rp.Port())
-
-	ports := make(map[string]string)
-	for _, p := range opts.exposedPorts {
-		rp, err = container.MappedPort(ctx, nat.Port(p))
-		if err != nil {
-			return nil, err
-		}
-		ports[p] = rp.Port()
-	}
-
-	return &toxiproxyContainer{
-		Container: container,
-		apiURI:    apiURI,
-		ports:     ports,
-	}, nil
 }
