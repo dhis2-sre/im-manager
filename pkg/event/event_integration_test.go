@@ -142,7 +142,6 @@ func TestEventHandler(t *testing.T) {
 	user1Messages := streamEvents(t, ctxUser1, client.ServerURL+"/events", user1)
 	user2Messages := streamEvents(t, ctxUser2, client.ServerURL+"/events", user2)
 
-	// TODO(ivo) do assert the messages we got on timeout
 	t.Log("Waiting on messages...")
 	var gotUser1Messages, gotUser2Messages []*sse.Event
 	for len(wantUser1Messages) != len(gotUser1Messages) || len(wantUser2Messages) != len(gotUser2Messages) {
@@ -176,7 +175,6 @@ func TestEventHandler(t *testing.T) {
 	wantUser1Messages = []*sse.Event{event6, event7}
 	wantUser2Messages = []*sse.Event{event5, event6, event7}
 
-	// TODO(ivo) do assert the messages we got on timeout
 	t.Log("Waiting on messages...")
 	gotUser1Messages, gotUser2Messages = nil, nil
 	for len(wantUser1Messages) != len(gotUser1Messages) || len(wantUser2Messages) != len(gotUser2Messages) {
