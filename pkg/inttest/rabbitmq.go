@@ -243,7 +243,7 @@ func NewRabbitMQ(ctx context.Context, options ...rabbitMQOption) (*rabbitmqConta
 			{
 				Reader:            strings.NewReader(`[rabbitmq_management, rabbitmq_management_agent, rabbitmq_stream, rabbitmq_stream_management].`),
 				ContainerFilePath: "/etc/rabbitmq/enabled_plugins",
-				FileMode:          0o766,
+				FileMode:          0o444,
 			},
 		},
 		WaitingFor: wait.ForAll(
