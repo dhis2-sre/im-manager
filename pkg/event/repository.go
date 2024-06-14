@@ -6,14 +6,14 @@ import (
 )
 
 //goland:noinspection GoExportedFuncWithUnexportedType
-func NewRepository(db *gorm.DB) *repository {
-	return &repository{db}
+func NewRepository(db *gorm.DB) Repository {
+	return Repository{db}
 }
 
-type repository struct {
+type Repository struct {
 	db *gorm.DB
 }
 
-func (r repository) Create(event model.Event) error {
+func (r Repository) Create(event model.Event) error {
 	return r.db.Create(&event).Error
 }

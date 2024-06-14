@@ -214,12 +214,8 @@ func streamEvents(t *testing.T, ctx context.Context, url string, user *model.Use
 	return out
 }
 
-type eventRepository interface {
-	Create(event model.Event) error
-}
-
 type eventStorer struct {
-	repository   eventRepository
+	repository   event.Repository
 	producer     *ha.ReliableProducer
 	messageCount int
 	m            sync.Mutex
