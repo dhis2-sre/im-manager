@@ -227,24 +227,34 @@ func NewRabbitMQ(ctx context.Context, options ...rabbitMQOption) (*rabbitmqConta
 		o(opts)
 	}
 
+	// https://www.rabbitmq.com/blog/2021/07/23/connecting-to-streams When connecting to a stream we
+	// pass a URI but the clients will then ask the RabbitMQ nodes for their host/port and use that
+	// to stream. The advertised_host/port cannot be changed after RabbitMQ started. Since our Go
+	// tests run outside of Docker we need a fixed port and set the advertised_host to localhost.
 	natStreamPort := "5552:5552/tcp"
 	AMQPPort := "5672"
 	natAMQPPort := AMQPPort + "/tcp"
 	natPortMgmt := "15672/tcp"
 	req := testcontainers.ContainerRequest{
-		Image: "rabbitmq:3.13-management-alpine",
+		// Image: "bitnami/rabbitmq:3.13",
+		Image: "rabbitmq:3-management-alpine",
 		Env: map[string]string{
-			"RABBITMQ_DEFAULT_USER":               opts.user,
-			"RABBITMQ_DEFAULT_PASS":               opts.pw,
-			"RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS": `-rabbitmq_stream advertised_host localhost -rabbit loopback_users "none"`,
+			"DEFAULT_RABBITMQ_USERNAME":            opts.user, // official image
+			"DEFAULT_RABBITMQ_PASSWORD":            opts.pw,   // official image
+			"RABBITMQ_USERNAME":                    opts.user, // bitnami image
+			"RABBITMQ_PASSWORD":                    opts.pw,   // bitnami image
+			"BITNAMI_DEBUG":                        "true",    // bitnami image
+			"RABBITMQ_MANAGEMENT_ALLOW_WEB_ACCESS": "true",    // bitnami image
+			"RABBITMQ_DISK_FREE_ABSOLUTE_LIMIT":    "100MB",   // bitnami image
+			// "RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS":  `-rabbitmq_stream advertised_host localhost -rabbit loopback_users "none"`,// official image
 		},
 		ExposedPorts: []string{natAMQPPort, natStreamPort, natPortMgmt},
 		Files: []testcontainers.ContainerFile{
-			// {
-			// 	Reader:            strings.NewReader(`SERVER_ADDITIONAL_ERL_ARGS=-rabbitmq_stream advertised_host localhost -rabbit loopback_users "none"`),
-			// 	ContainerFilePath: "/etc/rabbitmq/rabbitmq-env.conf",
-			// 	FileMode:          0o766,
-			// },
+			{
+				Reader:            strings.NewReader(`SERVER_ADDITIONAL_ERL_ARGS=-rabbitmq_stream advertised_host localhost -rabbit loopback_users "none"`),
+				ContainerFilePath: "/etc/rabbitmq/rabbitmq-env.conf",
+				FileMode:          0o766,
+			},
 			{
 				Reader:            strings.NewReader(`[rabbitmq_management, rabbitmq_management_agent, rabbitmq_stream, rabbitmq_stream_management].`),
 				ContainerFilePath: "/etc/rabbitmq/enabled_plugins",
@@ -252,9 +262,9 @@ func NewRabbitMQ(ctx context.Context, options ...rabbitMQOption) (*rabbitmqConta
 			},
 		},
 		WaitingFor: wait.ForAll(
-			wait.ForListeningPort(nat.Port(natAMQPPort)),
-			WaitForRabbitMQ(opts.user, opts.pw, natAMQPPort),
-		).WithDeadline(time.Minute),
+			wait.ForListeningPort(nat.Port(natAMQPPort)).WithStartupTimeout(10*time.Minute),
+			WaitForRabbitMQ(opts.user, opts.pw, natAMQPPort).WithStartupTimeout(10*time.Minute),
+		).WithDeadline(10 * time.Minute),
 	}
 	if opts.network != "" {
 		req.Networks = []string{opts.network}
