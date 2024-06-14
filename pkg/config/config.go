@@ -162,14 +162,14 @@ func (r rabbitmq) GetURI() string {
 	return fmt.Sprintf("amqp://%s:%s@%s:%d/", r.Username, r.Password, r.Host, r.Port)
 }
 
-type Redis struct {
-	Host string
-	Port int
-}
-
 // GetURI returns the URI used for RabbitMQ streams.
 func (r rabbitmq) GetStreamURI() string {
 	return fmt.Sprintf("rabbitmq-stream://%s:%s@%s:%d", r.Username, r.Password, r.Host, r.StreamPort)
+}
+
+type Redis struct {
+	Host string
+	Port int
 }
 
 type Authentication struct {
