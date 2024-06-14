@@ -1,5 +1,5 @@
 .idea
 im-manager
 .env
-.access_token_cache_*
+.access_token_cache*
 coverage.*
