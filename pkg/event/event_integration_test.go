@@ -32,24 +32,30 @@ func TestEventHandler(t *testing.T) {
 	amqpClient := inttest.SetupRabbitMQ(t)
 
 	sharedGroup := model.Group{
-		Name:     "eventtest1",
-		Hostname: "eventtest1",
+		Name:     "group1",
+		Hostname: "hostname1",
 	}
+	err := db.Create(&sharedGroup).Error
+	require.NoError(t, err)
+
 	user1 := &model.User{
-		ID:         1,
 		Email:      "user1@dhis2.org",
 		EmailToken: uuid.New(),
 		Groups: []model.Group{
 			sharedGroup,
 		},
 	}
-	db.Create(user1)
+	err = db.Create(user1).Error
+	require.NoError(t, err)
+
 	groupExclusiveToUser2 := model.Group{
-		Name:     "eventtest2",
-		Hostname: "eventtest2",
+		Name:     "group2",
+		Hostname: "hostname2",
 	}
+	err = db.Create(&groupExclusiveToUser2).Error
+	require.NoError(t, err)
+
 	user2 := &model.User{
-		ID:         2,
 		Email:      "user2@dhis2.org",
 		EmailToken: uuid.New(),
 		Groups: []model.Group{
@@ -57,7 +63,8 @@ func TestEventHandler(t *testing.T) {
 			groupExclusiveToUser2,
 		},
 	}
-	db.Create(user2)
+	err = db.Create(user2).Error
+	require.NoError(t, err)
 
 	env, err := stream.NewEnvironment(
 		stream.NewEnvironmentOptions().
@@ -93,6 +100,7 @@ func TestEventHandler(t *testing.T) {
 		event.Routes(engine, authenticator, eventHandler)
 	})
 
+	repository := event.NewRepository(db)
 	producerName := "eventTestProducer"
 	opts := stream.NewProducerOptions().
 		SetProducerName(producerName).
@@ -115,7 +123,7 @@ func TestEventHandler(t *testing.T) {
 	})
 	require.NoError(t, err, "failed to create RabbitMQ producer")
 	defer producer.Close()
-	store := eventStorer{producer: producer}
+	store := eventStorer{repository: repository, producer: producer}
 
 	// TODO(ivo) should we wait for the publish confirmation before subscribing?
 	event1 := store.storeEvent(t, "db-update", sharedGroup.Name, user1)
@@ -206,7 +214,12 @@ func streamEvents(t *testing.T, ctx context.Context, url string, user *model.Use
 	return out
 }
 
+type eventRepository interface {
+	Create(event model.Event) error
+}
+
 type eventStorer struct {
+	repository   eventRepository
 	producer     *ha.ReliableProducer
 	messageCount int
 	m            sync.Mutex
@@ -220,10 +233,17 @@ func (es *eventStorer) storeEvent(t *testing.T, kind, group string, owner *model
 	es.messageCount++
 	es.m.Unlock()
 
+	data := []byte(strconv.Itoa(messageCount))
 	// TODO(ivo) replace directly sending a message to RabbitMQ by calling an event repository to
 	// store an event in the DB
+	err := es.repository.Create(model.Event{
+		Kind:      kind,
+		GroupName: group,
+		User:      owner,
+		Payload:   string(data),
+	})
+	require.NoError(t, err, "failed to store event in the database")
 
-	data := []byte(strconv.Itoa(messageCount))
 	message := amqp.NewMessage(data)
 	// set a publishing id for deduplication
 	message.SetPublishingId(int64(messageCount))
@@ -234,7 +254,7 @@ func (es *eventStorer) storeEvent(t *testing.T, kind, group string, owner *model
 	}
 	// set property that dictates the SSE event type
 	message.ApplicationProperties["type"] = kind
-	err := es.producer.Send(message)
+	err = es.producer.Send(message)
 	require.NoErrorf(t, err, "failed to send message to RabbitMQ stream of kind %q, group %q, user %v", kind, group, owner)
 
 	return &sse.Event{

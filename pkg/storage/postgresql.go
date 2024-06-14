@@ -46,6 +46,8 @@ func NewDatabase(logger *slog.Logger, c config.Postgresql) (*gorm.DB, error) {
 		&model.Database{},
 		&model.Lock{},
 		&model.ExternalDownload{},
+
+		&model.Event{},
 	)
 
 	if err != nil {
