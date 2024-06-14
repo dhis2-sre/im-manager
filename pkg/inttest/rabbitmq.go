@@ -236,15 +236,10 @@ func NewRabbitMQ(ctx context.Context, options ...rabbitMQOption) (*rabbitmqConta
 		Env: map[string]string{
 			"RABBITMQ_DEFAULT_USER":               opts.user,
 			"RABBITMQ_DEFAULT_PASS":               opts.pw,
-			"RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS": `-rabbitmq_stream advertised_host localhost -rabbit loopback_users "none"`,
+			"RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS": `-rabbitmq_stream advertised_host localhost`,
 		},
 		ExposedPorts: []string{natAMQPPort, natStreamPort, natPortMgmt},
 		Files: []testcontainers.ContainerFile{
-			// {
-			// 	Reader:            strings.NewReader(`SERVER_ADDITIONAL_ERL_ARGS=-rabbitmq_stream advertised_host localhost -rabbit loopback_users "none"`),
-			// 	ContainerFilePath: "/etc/rabbitmq/rabbitmq-env.conf",
-			// 	FileMode:          0o766,
-			// },
 			{
 				Reader:            strings.NewReader(`[rabbitmq_management, rabbitmq_management_agent, rabbitmq_stream, rabbitmq_stream_management].`),
 				ContainerFilePath: "/etc/rabbitmq/enabled_plugins",
