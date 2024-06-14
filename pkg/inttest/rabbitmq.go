@@ -220,9 +220,13 @@ func WithNetwork(name, alias string) rabbitMQOption {
 // the options.
 func NewRabbitMQ(ctx context.Context, options ...rabbitMQOption) (*rabbitmqContainer, error) {
 	opts := &rabbitMQOptions{
-		user: "rabbitmq",
-		pw:   "rabbitmq",
+		user: "guest",
+		pw:   "guest",
 	}
+	// opts := &rabbitMQOptions{
+	// 	user: "rabbitmq",
+	// 	pw:   "rabbitmq",
+	// }
 	for _, o := range options {
 		o(opts)
 	}
@@ -236,8 +240,8 @@ func NewRabbitMQ(ctx context.Context, options ...rabbitMQOption) (*rabbitmqConta
 	natAMQPPort := AMQPPort + "/tcp"
 	natPortMgmt := "15672/tcp"
 	req := testcontainers.ContainerRequest{
-		// Image: "bitnami/rabbitmq:3.13",
-		Image: "rabbitmq:3-management-alpine",
+		Image: "bitnami/rabbitmq:3.13",
+		// Image: "rabbitmq:3-management-alpine",
 		Env: map[string]string{
 			"DEFAULT_RABBITMQ_USERNAME":            opts.user, // official image
 			"DEFAULT_RABBITMQ_PASSWORD":            opts.pw,   // official image
@@ -251,7 +255,9 @@ func NewRabbitMQ(ctx context.Context, options ...rabbitMQOption) (*rabbitmqConta
 		ExposedPorts: []string{natAMQPPort, natStreamPort, natPortMgmt},
 		Files: []testcontainers.ContainerFile{
 			{
-				Reader:            strings.NewReader(`SERVER_ADDITIONAL_ERL_ARGS=-rabbitmq_stream advertised_host localhost -rabbit loopback_users "none"`),
+				// Reader:            strings.NewReader(`SERVER_ADDITIONAL_ERL_ARGS=-rabbitmq_stream advertised_host=localhost advertised_port=5552 -rabbit loopback_users="none"`),
+				// Reader:            strings.NewReader(`SERVER_ADDITIONAL_ERL_ARGS="-rabbitmq_stream advertised_host localhost advertised_port 5552 -rabbit loopback_users [none]"`),
+				Reader:            strings.NewReader(`SERVER_ADDITIONAL_ERL_ARGS="-rabbitmq_stream advertised_host localhost"`),
 				ContainerFilePath: "/etc/rabbitmq/rabbitmq-env.conf",
 				FileMode:          0o766,
 			},
