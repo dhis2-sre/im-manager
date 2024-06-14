@@ -92,6 +92,7 @@ deploy:
             DATABASE_PORT: "5432"
             RABBITMQ_HOST: im-rabbitmq-{{ .ENVIRONMENT }}.instance-manager-{{ .CLASSIFICATION }}.svc
             RABBITMQ_PORT: "5672"
+            RABBITMQ_STREAM_PORT: "5552"
             S3_BUCKET: im-databases-{{ .CLASSIFICATION }}
             S3_REGION: eu-west-1
             DEFAULT_TTL: "172800" # 48 hours

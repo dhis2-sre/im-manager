@@ -121,7 +121,7 @@ func run() error {
 
 	host := hostname()
 	consumer, err := rabbitmq.NewConsumer(
-		cfg.RabbitMqURL.GetUrl(),
+		cfg.RabbitMqURL.GetURI(),
 		rabbitmq.WithConnectionName(host),
 		rabbitmq.WithConsumerTagPrefix(host),
 		rabbitmq.WithLogger(logger.WithGroup("rabbitmq")),
@@ -169,10 +169,9 @@ func run() error {
 
 	integrationHandler := integration.NewHandler(dockerHubClient, cfg.InstanceService.Host, cfg.DatabaseManagerService.Host)
 
-	// TODO(ivo) fix the uri as this does not point to the stream port
 	env, err := stream.NewEnvironment(
 		stream.NewEnvironmentOptions().
-			SetUri(cfg.RabbitMqURL.GetUrl()))
+			SetUri(cfg.RabbitMqURL.GetStreamURI()))
 	if err != nil {
 		return err
 	}
