@@ -8,18 +8,16 @@ import (
 	"github.com/go-redis/redis"
 )
 
-func NewRedis(c config.Config) *redis.Client {
-	host := c.Redis.Host
-	port := c.Redis.Port
-
+func NewRedis(cfg config.Redis) (*redis.Client, error) {
 	client := redis.NewClient(&redis.Options{
-		Addr:     fmt.Sprintf("%s:%d", host, port),
+		Addr:     fmt.Sprintf("%s:%d", cfg.Host, cfg.Port),
 		Password: "",
 		DB:       0,
 	})
 
-	pong, err := client.Ping().Result()
-	fmt.Println(pong, err)
+	if _, err := client.Ping().Result(); err != nil {
+		return nil, fmt.Errorf("failed to ping redis: %v", err)
+	}
 
-	return client
+	return client, nil
 }

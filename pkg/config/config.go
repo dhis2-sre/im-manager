@@ -30,7 +30,7 @@ type Config struct {
 	Postgresql                     Postgresql
 	RabbitMqURL                    rabbitmq
 	SMTP                           smtp
-	Redis                          redis
+	Redis                          Redis
 	Authentication                 Authentication
 	Groups                         []Group
 	AdminUser                      user
@@ -84,7 +84,7 @@ func New() Config {
 			Username: requireEnv("RABBITMQ_USERNAME"),
 			Password: requireEnv("RABBITMQ_PASSWORD"),
 		},
-		Redis: redis{
+		Redis: Redis{
 			Host: requireEnv("REDIS_HOST"),
 			Port: requireEnvAsInt("REDIS_PORT"),
 		},
@@ -163,7 +163,7 @@ func (r rabbitmq) GetUrl() string {
 	return fmt.Sprintf("amqp://%s:%s@%s:%d/", r.Username, r.Password, r.Host, r.Port)
 }
 
-type redis struct {
+type Redis struct {
 	Host string
 	Port int
 }
