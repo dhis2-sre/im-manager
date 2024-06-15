@@ -26,8 +26,10 @@ import (
 )
 
 func TestEventHandler(t *testing.T) {
+	t.Parallel()
+
 	db := inttest.SetupDB(t)
-	amqpClient := inttest.SetupRabbitMQ(t)
+	amqpClient := inttest.SetupRabbitMQ(t, inttest.WithStreamingExposed())
 
 	sharedGroup := model.Group{
 		Name:     "group1",

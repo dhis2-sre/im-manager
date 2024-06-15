@@ -22,7 +22,7 @@ import (
 )
 
 // SetupRabbitMQ creates a RabbitMQ with an AMQP client ready to send messages to it.
-func SetupRabbitMQ(t *testing.T) *AMQP {
+func SetupRabbitMQ(t *testing.T, options ...rabbitMQOption) *AMQP {
 	t.Helper()
 	require := require.New(t)
 	ctx := context.TODO()
@@ -33,7 +33,8 @@ func SetupRabbitMQ(t *testing.T) *AMQP {
 		require.NoError(net.Remove(ctx), "failed to remove the Docker network")
 	})
 
-	rabbitMQContainer, err := NewRabbitMQ(ctx, WithNetwork(net.Name, "rabbitmq"))
+	options = append(options, WithNetwork(net.Name, "rabbitmq"))
+	rabbitMQContainer, err := NewRabbitMQ(ctx, options...)
 	require.NoError(err, "failed setting up RabbitMQ")
 	t.Cleanup(func() {
 		require.NoError(rabbitMQContainer.Terminate(ctx), "failed to terminate RabbitMQ")
@@ -186,10 +187,11 @@ func (rc *rabbitmqContainer) ExposedStreamPort(ctx context.Context) (string, err
 }
 
 type rabbitMQOptions struct {
-	user         string
-	pw           string
-	network      string
-	networkAlias string
+	user            string
+	pw              string
+	network         string
+	networkAlias    string
+	exposeStreaming bool
 }
 
 type rabbitMQOption func(*rabbitMQOptions)
@@ -215,6 +217,13 @@ func WithNetwork(name, alias string) rabbitMQOption {
 	}
 }
 
+// WithStreamingExposed exposes RabbitMQ streaming port 5552 to a fixed port of 5552.
+func WithStreamingExposed() rabbitMQOption {
+	return func(options *rabbitMQOptions) {
+		options.exposeStreaming = true
+	}
+}
+
 // NewRabbitMQ creates a RabbitMQ container. The container will be listening and ready to accept
 // connections. Connect using default user and password rabbitmq or the credentials you provided via
 // the options.
@@ -227,10 +236,13 @@ func NewRabbitMQ(ctx context.Context, options ...rabbitMQOption) (*rabbitmqConta
 		o(opts)
 	}
 
-	natStreamPort := "5552:5552/tcp"
 	AMQPPort := "5672"
 	natAMQPPort := AMQPPort + "/tcp"
 	natPortMgmt := "15672/tcp"
+	exposedPorts := []string{natAMQPPort, natPortMgmt}
+	if opts.exposeStreaming {
+		exposedPorts = append(exposedPorts, "5552:5552/tcp")
+	}
 	req := testcontainers.ContainerRequest{
 		Image: "rabbitmq:3.13-management-alpine",
 		Env: map[string]string{
@@ -238,7 +250,7 @@ func NewRabbitMQ(ctx context.Context, options ...rabbitMQOption) (*rabbitmqConta
 			"RABBITMQ_DEFAULT_PASS":               opts.pw,
 			"RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS": `-rabbitmq_stream advertised_host localhost`,
 		},
-		ExposedPorts: []string{natAMQPPort, natStreamPort, natPortMgmt},
+		ExposedPorts: exposedPorts,
 		Files: []testcontainers.ContainerFile{
 			{
 				Reader:            strings.NewReader(`[rabbitmq_management, rabbitmq_management_agent, rabbitmq_stream, rabbitmq_stream_management].`),
