@@ -78,7 +78,6 @@ services:
     image: bitnami/rabbitmq:3.13
     ports:
       - "127.0.0.1:5672:5672" # regular AMQP
-      - "127.0.0.1:5552:5552" # streams 
       - "127.0.0.1:15672:15672" # management UI
     environment:
       RABBITMQ_USERNAME: ${RABBITMQ_USERNAME}
