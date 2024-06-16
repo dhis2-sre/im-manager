@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"strconv"
+	"sync/atomic"
 
 	"github.com/dhis2-sre/im-manager/internal/handler"
 	"github.com/dhis2-sre/im-manager/pkg/model"
@@ -54,7 +55,28 @@ func (h Handler) StreamEvents(c *gin.Context) {
 
 	consumerName := fmt.Sprintf("events-%d", user.ID)
 	logger := h.logger.WithGroup("consumer").With("name", consumerName)
-	logger.Info("User subscribed")
+
+	// Set the RabbitMQ offset to the Last-Event-ID seen by the SSE client
+	// This ensures that the SSE client resumes consuming from the stream where it left off
+	// before the connection dropped. Otherwise, let the SSE client start streaming from the
+	// first new message that is added to the stream.
+	// https://web.dev/articles/eventsource-basics
+	var offset atomic.Int64
+	var offsetSpec stream.OffsetSpecification
+	lastEventID := c.GetHeader("Last-Event-ID")
+	if lastEventID == "" {
+		offsetSpec = stream.OffsetSpecification{}.Next()
+		logger.Info("User subscribed to events starting from the next published message")
+	} else {
+		lastOffset, err := strconv.ParseInt(lastEventID, 10, 64)
+		if err != nil {
+			_ = c.AbortWithError(400, fmt.Errorf("invalid %q value: %v", "Last-Event-ID", err))
+			return
+		}
+		offset.Store(lastOffset + 1) // we want to send what the client has not already seen
+		logger.Info("User subscribed to events starting from the Last-Event-ID", "lastEventId", lastOffset)
+		offsetSpec = stream.OffsetSpecification{}.Offset(lastOffset + 1)
+	}
 
 	c.Writer.Header().Set("Content-Type", "text/event-stream")
 	c.Writer.Header().Set("Cache-Control", "no-cache")
@@ -68,6 +90,8 @@ func (h Handler) StreamEvents(c *gin.Context) {
 	opts := stream.NewConsumerOptions().
 		SetConsumerName(consumerName).
 		SetClientProvidedName(consumerName).
+		SetManualCommit().
+		SetOffset(offsetSpec).
 		SetFilter(filter)
 	sseEvents, messageHandler := createMessageHandler(or(c.Request.Context(), clientGone), logger)
 	consumer, err := ha.NewReliableConsumer(h.env, h.streamName, opts, messageHandler)

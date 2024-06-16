@@ -7,7 +7,6 @@ import (
 	"log/slog"
 	"os"
 	"strconv"
-	"sync"
 	"testing"
 	"time"
 
@@ -101,48 +100,64 @@ func TestEventHandler(t *testing.T) {
 	})
 
 	repository := event.NewRepository(db)
-	producerName := "eventTestProducer"
-	opts := stream.NewProducerOptions().
-		SetProducerName(producerName).
-		SetClientProvidedName(producerName).
-		SetFilter(
-			// each message will get the group as filter key
-			stream.NewProducerFilter(func(message message.StreamMessage) string {
-				return fmt.Sprintf("%s", message.GetApplicationProperties()["group"])
-			}))
-	producer, err := ha.NewReliableProducer(env, streamName, opts, func(messageStatus []*stream.ConfirmationStatus) {
-		go func() {
-			for _, msgStatus := range messageStatus {
-				if msgStatus.IsConfirmed() {
-					t.Logf("Plublishing confirmed for message with publishing_id=%d", msgStatus.GetMessage().GetPublishingId())
-				} else {
-					t.Logf("Plublishing NOT confirmed for message with publishing_id=%d", msgStatus.GetMessage().GetPublishingId())
-				}
-			}
-		}()
-	})
-	require.NoError(t, err, "failed to create RabbitMQ producer")
-	defer producer.Close()
-	store := eventStorer{repository: repository, producer: producer}
+	store := NewEventEmitter(t, env, streamName, repository)
+	defer store.Close()
 
-	// TODO(ivo) should we wait for the publish confirmation before subscribing?
-	event1 := store.storeEvent(t, "db-update", sharedGroup.Name, user1)
-	event2 := store.storeEvent(t, "db-update", sharedGroup.Name, user2)
-	event3 := store.storeEvent(t, "db-update", sharedGroup.Name, nil)
-	event4 := store.storeEvent(t, "instance-update", sharedGroup.Name, nil)
+	t.Log("Sending messages before users are subscribed")
+	// users should only get the next published message after they subscribed so these messages
+	// should not be received by anyone
+	store.emit(t, "db-update", sharedGroup.Name, user1)
+	store.emit(t, "db-update", sharedGroup.Name, user2)
+	store.emit(t, "db-update", sharedGroup.Name, nil)
+	store.emit(t, "instance-update", sharedGroup.Name, nil)
 
-	wantUser1Messages := []sseEvent{event1, event3, event4}
-	wantUser2Messages := []sseEvent{event2, event3, event4}
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Second)
+	defer cancel()
+	ctxUser1, cancelUser1 := context.WithCancelCause(ctx)
+	user1Messages := streamEvents(t, ctxUser1, client.ServerURL+"/events", user1, nil)
 
-	ctxUser2, cancelUser2 := context.WithTimeout(context.Background(), 30*time.Second)
+	t.Log("Sending messages after user1 subscribed")
+	// TODO(ivo) I want to block only until the user is subscribed, so I can then test the offset
+	// spec next config
+	time.Sleep(5 * time.Second)
+	event5 := store.emit(t, "db-update", sharedGroup.Name, user1)
+	store.emit(t, "db-update", sharedGroup.Name, user2)
+	event7 := store.emit(t, "db-update", sharedGroup.Name, nil)
+	event8 := store.emit(t, "instance-update", sharedGroup.Name, nil)
+
+	wantUser1Messages := []sseEvent{event5, event7, event8}
+
+	t.Log("Waiting on messages for user1...")
+	var gotUser1Messages []sseEvent
+	for len(wantUser1Messages) != len(gotUser1Messages) {
+		select {
+		case <-ctx.Done():
+			assert.Fail(t, "Timed out waiting on messages.")
+		case msg := <-user1Messages:
+			gotUser1Messages = append(gotUser1Messages, msg)
+		}
+	}
+	assert.EqualValuesf(t, wantUser1Messages, gotUser1Messages, "mismatch in expected messages for user %d", user1.ID)
+
+	ctxUser2, cancelUser2 := context.WithTimeout(context.Background(), 50*time.Second)
 	defer cancelUser2()
-	ctxUser1, cancelUser1 := context.WithCancelCause(ctxUser2)
+	user2Messages := streamEvents(t, ctxUser2, client.ServerURL+"/events", user2, nil)
 
-	user1Messages := streamEvents(t, ctxUser1, client.ServerURL+"/events", user1)
-	user2Messages := streamEvents(t, ctxUser2, client.ServerURL+"/events", user2)
+	t.Log("Sending messages after user2 subscribed")
+	// TODO(ivo) I want to block only until the user is subscribed, so I can then test the offset
+	// spec next config
+	time.Sleep(5 * time.Second)
+	event9 := store.emit(t, "db-update", sharedGroup.Name, user1)
+	event10 := store.emit(t, "db-update", sharedGroup.Name, user2)
+	event11 := store.emit(t, "db-update", sharedGroup.Name, nil)
+	event12 := store.emit(t, "instance-update", groupExclusiveToUser2.Name, nil)
 
-	t.Log("Waiting on messages...")
-	var gotUser1Messages, gotUser2Messages []sseEvent
+	wantUser1Messages = []sseEvent{event9, event11}
+	wantUser2Messages := []sseEvent{event10, event11, event12}
+
+	t.Log("Waiting on messages for both users...")
+	gotUser1Messages = nil
+	var gotUser2Messages []sseEvent
 	for len(wantUser1Messages) != len(gotUser1Messages) || len(wantUser2Messages) != len(gotUser2Messages) {
 		select {
 		case <-ctxUser1.Done():
@@ -154,30 +169,28 @@ func TestEventHandler(t *testing.T) {
 			gotUser2Messages = append(gotUser2Messages, msg)
 		}
 	}
-
 	assert.EqualValuesf(t, wantUser1Messages, gotUser1Messages, "mismatch in expected messages for user %d", user1.ID)
 	assert.EqualValuesf(t, wantUser2Messages, gotUser2Messages, "mismatch in expected messages for user %d", user2.ID)
-	t.Log("Every user got their expected first batch of messages")
 
 	cancelUser1(errors.New("drop connection"))
-	<-user1Messages // wait for user1 to be unsubscribed before sending new messages to test offset tracking
-	ctxUser1, cancelUser1 = context.WithCancelCause(ctxUser2)
-	defer cancelUser1(nil)
+	<-user1Messages // wait for user1 to be unsubscribed before sending new messages to test Last-Event-ID
 
-	event5 := store.storeEvent(t, "instance-update", groupExclusiveToUser2.Name, nil)
-	event6 := store.storeEvent(t, "db-update", sharedGroup.Name, nil)
-	event7 := store.storeEvent(t, "instance-update", sharedGroup.Name, nil)
+	t.Log("Sending messages after user1 dropped its connection")
+	event13 := store.emit(t, "instance-update", groupExclusiveToUser2.Name, nil)
+	event14 := store.emit(t, "db-update", sharedGroup.Name, nil)
+	event15 := store.emit(t, "instance-update", sharedGroup.Name, nil)
 
-	user1Messages = streamEvents(t, ctxUser2, client.ServerURL+"/events", user1)
+	// When a SSE client disconnects it will send the HTTP header Last-Event-ID with the ID of the
+	// event it last received. We want to then send the event after that.
+	user1Messages = streamEvents(t, ctxUser2, client.ServerURL+"/events", user1, &event11.ID)
 
-	wantUser1Messages = []sseEvent{event6, event7}
-	wantUser2Messages = []sseEvent{event5, event6, event7}
+	wantUser1Messages = []sseEvent{event14, event15}
+	wantUser2Messages = []sseEvent{event13, event14, event15}
 
-	t.Log("Waiting on messages...")
+	t.Log("Waiting on messages for both users...")
 	gotUser1Messages, gotUser2Messages = nil, nil
 	for len(wantUser1Messages) != len(gotUser1Messages) || len(wantUser2Messages) != len(gotUser2Messages) {
 		select {
-		case <-ctxUser1.Done():
 		case <-ctxUser2.Done():
 			assert.FailNow(t, "Timed out waiting on messages.")
 		case msg := <-user1Messages:
@@ -186,17 +199,21 @@ func TestEventHandler(t *testing.T) {
 			gotUser2Messages = append(gotUser2Messages, msg)
 		}
 	}
-
 	assert.EqualValuesf(t, wantUser1Messages, gotUser1Messages, "mismatch in expected messages for user %d", user1.ID)
 	assert.EqualValuesf(t, wantUser2Messages, gotUser2Messages, "mismatch in expected messages for user %d", user2.ID)
-	t.Log("Every user got their expected second batch of messages")
 }
 
-func streamEvents(t *testing.T, ctx context.Context, url string, user *model.User) <-chan sseEvent {
+func streamEvents(t *testing.T, ctx context.Context, url string, user *model.User, lastEventId *int64) <-chan sseEvent {
 	out := make(chan sseEvent)
 	go func() {
 		sseClient := sse.NewClient(url + fmt.Sprintf("?user=%d", user.ID))
-		t.Logf("User %d starts to stream from %q", user.ID, url)
+		if lastEventId != nil {
+			sseClient.Headers["Last-Event-ID"] = strconv.FormatInt(*lastEventId, 10)
+			t.Logf("User %d starts to stream from %q from Last-Event-ID %d", user.ID, url, *lastEventId)
+		} else {
+			t.Logf("User %d starts to stream from %q from next event", user.ID, url)
+		}
+
 		err := sseClient.SubscribeWithContext(ctx, "", func(msg *sse.Event) {
 			select {
 			case <-ctx.Done():
@@ -214,6 +231,13 @@ func streamEvents(t *testing.T, ctx context.Context, url string, user *model.Use
 	return out
 }
 
+// sseEvent is the struct we use to assert on received SSE events.
+type sseEvent struct {
+	ID    int64
+	Event string
+	Data  []byte
+}
+
 func translateEvent(t *testing.T, msg *sse.Event) sseEvent {
 	id, err := strconv.ParseInt(string(msg.ID), 10, 64)
 	require.NoError(t, err, "failed to parse SSE event ID")
@@ -224,31 +248,51 @@ func translateEvent(t *testing.T, msg *sse.Event) sseEvent {
 	}
 }
 
-type eventStorer struct {
-	repository   event.Repository
-	producer     *ha.ReliableProducer
-	messageCount int64
-	m            sync.Mutex
+type eventEmitter struct {
+	repository     event.Repository
+	producer       *ha.ReliableProducer
+	eventCount     int64
+	eventPublished chan error
 }
 
-// sseEvent is the struct we use to assert on received SSE events.
-type sseEvent struct {
-	ID    int64
-	Event string
-	Data  []byte
+func NewEventEmitter(t *testing.T, env *stream.Environment, streamName string, repository event.Repository) eventEmitter {
+	producerName := "eventTestProducer"
+	eventPublished := make(chan error)
+	opts := stream.NewProducerOptions().
+		SetProducerName(producerName).
+		SetClientProvidedName(producerName).
+		SetFilter(
+			// each message will get the group as filter key
+			stream.NewProducerFilter(func(message message.StreamMessage) string {
+				return fmt.Sprintf("%s", message.GetApplicationProperties()["group"])
+			}))
+	producer, err := ha.NewReliableProducer(env, streamName, opts, func(messageStatus []*stream.ConfirmationStatus) {
+		go func() {
+			for _, msgStatus := range messageStatus {
+				if msgStatus.IsConfirmed() {
+					eventPublished <- nil
+				} else {
+					eventPublished <- fmt.Errorf("failed to publish message with publishing_id=%d", msgStatus.GetMessage().GetPublishingId())
+				}
+			}
+		}()
+	})
+	require.NoError(t, err, "failed to create RabbitMQ producer")
+	return eventEmitter{repository: repository, producer: producer, eventPublished: eventPublished}
 }
 
-// storeEvent stores an instance manager event and returns the SSE event we expect an eligible user
-// to receive via /events.
-func (es *eventStorer) storeEvent(t *testing.T, kind, group string, owner *model.User) sseEvent {
-	es.m.Lock()
-	messageCount := es.messageCount
-	es.messageCount++
-	es.m.Unlock()
+func (es *eventEmitter) Close() error {
+	return es.producer.Close()
+}
 
-	data := []byte(strconv.FormatInt(messageCount, 10))
-	// TODO(ivo) replace directly sending a message to RabbitMQ by calling an event repository to
-	// store an event in the DB
+// emit emits an instance manager event and returns the SSE event we expect an eligible user to
+// receive via /events. This is a blocking operation.
+func (es *eventEmitter) emit(t *testing.T, kind, group string, owner *model.User) sseEvent {
+	streamOffset := es.eventCount
+	es.eventCount++
+
+	data := []byte(strconv.FormatInt(es.eventCount, 10))
+	// TODO(ivo) I think this should move to another test, lets discuss.
 	err := es.repository.Create(model.Event{
 		Kind:      kind,
 		GroupName: group,
@@ -259,7 +303,7 @@ func (es *eventStorer) storeEvent(t *testing.T, kind, group string, owner *model
 
 	message := amqp.NewMessage(data)
 	// set a publishing id for deduplication
-	message.SetPublishingId(int64(messageCount))
+	message.SetPublishingId(es.eventCount)
 	// set properties used for filtering
 	message.ApplicationProperties = map[string]interface{}{"group": group}
 	if owner != nil {
@@ -270,9 +314,19 @@ func (es *eventStorer) storeEvent(t *testing.T, kind, group string, owner *model
 	err = es.producer.Send(message)
 	require.NoErrorf(t, err, "failed to send message to RabbitMQ stream of kind %q, group %q, user %v", kind, group, owner)
 
-	return sseEvent{
-		ID:    messageCount,
-		Event: kind,
-		Data:  data,
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	defer cancel()
+	select {
+	case <-ctx.Done():
+		assert.FailNow(t, "Timed out waiting on sent message.")
+	case err := <-es.eventPublished:
+		require.NoError(t, err)
+		t.Logf("Sent event %d", es.eventCount)
+		return sseEvent{
+			ID:    streamOffset,
+			Event: kind,
+			Data:  data,
+		}
 	}
+	return sseEvent{}
 }
