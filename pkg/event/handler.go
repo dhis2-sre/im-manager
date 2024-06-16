@@ -157,7 +157,7 @@ func isUserMessageOwner(logger *slog.Logger, userID uint, applicationProperties 
 
 	}
 
-	return uint(messageOwnerID) == userID
+	return messageOwnerID == uint64(userID)
 }
 
 // isUserPartOfMessageGroup determines if the user is allowed to receive the message. This function
