@@ -23,8 +23,6 @@ check:
 	pre-commit run --all-files --show-diff-on-failure
 
 smoke-test:
-	docker compose up -d database rabbitmq
-	sleep 10
 	IMAGE_TAG=$(tag) docker compose up -d prod
 
 docker-image:
@@ -42,9 +40,12 @@ test:
 test-coverage:
 	go test -coverprofile=./coverage.out ./... && go tool cover -html=./coverage.out -o ./coverage.html
 
-clean:
+clean-dev:
 	docker compose --profile dev down --remove-orphans --volumes
 	go clean
+
+clean:
+	docker compose --profile prod down --remove-orphans --volumes
 
 swagger-clean:
 	rm -f swagger/swagger.yaml
