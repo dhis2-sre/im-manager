@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"slices"
 	"strconv"
 
 	"github.com/dhis2-sre/im-manager/internal/handler"
@@ -15,6 +14,7 @@ import (
 	"github.com/rabbitmq/rabbitmq-stream-go-client/pkg/amqp"
 	"github.com/rabbitmq/rabbitmq-stream-go-client/pkg/ha"
 	"github.com/rabbitmq/rabbitmq-stream-go-client/pkg/stream"
+	"golang.org/x/exp/maps"
 )
 
 func NewHandler(logger *slog.Logger, env *stream.Environment, streamName string) Handler {
@@ -63,14 +63,8 @@ func (h Handler) StreamEvents(c *gin.Context) {
 	w := c.Writer
 	clientGone := w.CloseNotify()
 
-	// TODO(ivo) understand match unfiltered
-	// TODO: Do we still need to sort group names for the sake of stream.NewConsumerFilter?
-	userGroups := sortedGroupNames(user.Groups)
-	userGroupsMap := make(map[string]struct{}, len(userGroups))
-	for _, group := range userGroups {
-		userGroupsMap[group] = struct{}{}
-	}
-	filter := stream.NewConsumerFilter(userGroups, true, postFilter(logger, user.ID, userGroupsMap))
+	userGroups := userGroups(user)
+	filter := stream.NewConsumerFilter(maps.Keys(userGroups), true, postFilter(logger, user.ID, userGroups))
 	opts := stream.NewConsumerOptions().
 		SetConsumerName(consumerName).
 		SetClientProvidedName(consumerName).
@@ -97,14 +91,12 @@ func (h Handler) StreamEvents(c *gin.Context) {
 	}
 }
 
-func sortedGroupNames(groups []model.Group) []string {
-	groupCount := len(groups)
-	groupNames := make([]string, groupCount)
-	for i := 0; i < groupCount; i++ {
-		groupNames[i] = groups[i].Name
+func userGroups(user *model.User) map[string]struct{} {
+	result := make(map[string]struct{}, len(user.Groups))
+	for _, group := range user.Groups {
+		result[group.Name] = struct{}{}
 	}
-	slices.Sort(groupNames)
-	return groupNames
+	return result
 }
 
 // postFilter is a RabbitMQ stream post filter that is applied client side. This is necessary as the
