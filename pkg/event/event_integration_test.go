@@ -131,8 +131,8 @@ func TestEventHandler(t *testing.T) {
 	event3 := store.storeEvent(t, "db-update", sharedGroup.Name, nil)
 	event4 := store.storeEvent(t, "instance-update", sharedGroup.Name, nil)
 
-	wantUser1Messages := []*sse.Event{event1, event3, event4}
-	wantUser2Messages := []*sse.Event{event2, event3, event4}
+	wantUser1Messages := []sseEvent{event1, event3, event4}
+	wantUser2Messages := []sseEvent{event2, event3, event4}
 
 	ctxUser2, cancelUser2 := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancelUser2()
@@ -142,7 +142,7 @@ func TestEventHandler(t *testing.T) {
 	user2Messages := streamEvents(t, ctxUser2, client.ServerURL+"/events", user2)
 
 	t.Log("Waiting on messages...")
-	var gotUser1Messages, gotUser2Messages []*sse.Event
+	var gotUser1Messages, gotUser2Messages []sseEvent
 	for len(wantUser1Messages) != len(gotUser1Messages) || len(wantUser2Messages) != len(gotUser2Messages) {
 		select {
 		case <-ctxUser1.Done():
@@ -170,8 +170,8 @@ func TestEventHandler(t *testing.T) {
 
 	user1Messages = streamEvents(t, ctxUser2, client.ServerURL+"/events", user1)
 
-	wantUser1Messages = []*sse.Event{event6, event7}
-	wantUser2Messages = []*sse.Event{event5, event6, event7}
+	wantUser1Messages = []sseEvent{event6, event7}
+	wantUser2Messages = []sseEvent{event5, event6, event7}
 
 	t.Log("Waiting on messages...")
 	gotUser1Messages, gotUser2Messages = nil, nil
@@ -192,8 +192,8 @@ func TestEventHandler(t *testing.T) {
 	t.Log("Every user got their expected second batch of messages")
 }
 
-func streamEvents(t *testing.T, ctx context.Context, url string, user *model.User) <-chan *sse.Event {
-	out := make(chan *sse.Event)
+func streamEvents(t *testing.T, ctx context.Context, url string, user *model.User) <-chan sseEvent {
+	out := make(chan sseEvent)
 	go func() {
 		sseClient := sse.NewClient(url + fmt.Sprintf("?user=%d", user.ID))
 		t.Logf("User %d starts to stream from %q", user.ID, url)
@@ -201,7 +201,7 @@ func streamEvents(t *testing.T, ctx context.Context, url string, user *model.Use
 			select {
 			case <-ctx.Done():
 				return
-			case out <- msg:
+			case out <- translateEvent(t, msg):
 			}
 		})
 		require.NoError(t, err, "failed to stream from %q for user %d", url, user.ID)
@@ -214,22 +214,39 @@ func streamEvents(t *testing.T, ctx context.Context, url string, user *model.Use
 	return out
 }
 
+func translateEvent(t *testing.T, msg *sse.Event) sseEvent {
+	id, err := strconv.ParseInt(string(msg.ID), 10, 64)
+	require.NoError(t, err, "failed to parse SSE event ID")
+	return sseEvent{
+		ID:    id,
+		Event: string(msg.Event),
+		Data:  msg.Data,
+	}
+}
+
 type eventStorer struct {
 	repository   event.Repository
 	producer     *ha.ReliableProducer
-	messageCount int
+	messageCount int64
 	m            sync.Mutex
+}
+
+// sseEvent is the struct we use to assert on received SSE events.
+type sseEvent struct {
+	ID    int64
+	Event string
+	Data  []byte
 }
 
 // storeEvent stores an instance manager event and returns the SSE event we expect an eligible user
 // to receive via /events.
-func (es *eventStorer) storeEvent(t *testing.T, kind, group string, owner *model.User) *sse.Event {
+func (es *eventStorer) storeEvent(t *testing.T, kind, group string, owner *model.User) sseEvent {
 	es.m.Lock()
 	messageCount := es.messageCount
 	es.messageCount++
 	es.m.Unlock()
 
-	data := []byte(strconv.Itoa(messageCount))
+	data := []byte(strconv.FormatInt(messageCount, 10))
 	// TODO(ivo) replace directly sending a message to RabbitMQ by calling an event repository to
 	// store an event in the DB
 	err := es.repository.Create(model.Event{
@@ -253,8 +270,9 @@ func (es *eventStorer) storeEvent(t *testing.T, kind, group string, owner *model
 	err = es.producer.Send(message)
 	require.NoErrorf(t, err, "failed to send message to RabbitMQ stream of kind %q, group %q, user %v", kind, group, owner)
 
-	return &sse.Event{
-		Event: []byte(kind),
+	return sseEvent{
+		ID:    messageCount,
+		Event: kind,
 		Data:  data,
 	}
 }

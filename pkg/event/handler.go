@@ -193,7 +193,7 @@ func createMessageHandler(done <-chan struct{}, logger *slog.Logger) (<-chan sse
 			close(out)
 			return
 		default:
-			sseEvent, err := mapMessageToEvent(message)
+			sseEvent, err := mapMessageToEvent(consumerContext.Consumer.GetOffset(), message)
 			if err != nil {
 				logger.Error("Failed to map AMQP message", "error", err)
 				return
@@ -211,9 +211,10 @@ func createMessageHandler(done <-chan struct{}, logger *slog.Logger) (<-chan sse
 	}
 }
 
-// mapMessageToEvent maps an AMQP message of an instance manager event to an SSE event. True is
-// returned if the message could be processed and an SSE event should be sent, false otherwise.
-func mapMessageToEvent(message *amqp.Message) (sse.Event, error) {
+// mapMessageToEvent maps an AMQP message of an instance manager event to an SSE event. No error is
+// returned if the message could be processed and an SSE event should be sent. Do not send an SSE
+// event when an error is returned.
+func mapMessageToEvent(offset int64, message *amqp.Message) (sse.Event, error) {
 	var data string
 	if len(message.Data) == 0 {
 		return sse.Event{}, errors.New("received no data")
@@ -231,6 +232,7 @@ func mapMessageToEvent(message *amqp.Message) (sse.Event, error) {
 	}
 
 	sseEvent := sse.Event{
+		Id:   strconv.FormatInt(offset, 10),
 		Data: data,
 	}
 	if eventType != "" { // SSE named event
