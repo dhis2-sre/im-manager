@@ -102,15 +102,7 @@ services:
       - redis:/data
     profiles:
       - dev
-      - redis
       - prod
-
-  redisinsight:
-    image: redislabs/redisinsight:latest
-    ports:
-      - "8001:8001"
-    profiles:
-      - redis
 
   minio:
     image: quay.io/minio/minio:RELEASE.2023-07-21T21-12-44Z

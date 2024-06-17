@@ -3,14 +3,12 @@ package storage
 import (
 	"fmt"
 
-	"github.com/dhis2-sre/im-manager/pkg/config"
-
 	"github.com/go-redis/redis"
 )
 
-func NewRedis(cfg config.Redis) (*redis.Client, error) {
+func NewRedis(host string, port int) (*redis.Client, error) {
 	client := redis.NewClient(&redis.Options{
-		Addr:     fmt.Sprintf("%s:%d", cfg.Host, cfg.Port),
+		Addr:     fmt.Sprintf("%s:%d", host, port),
 		Password: "",
 		DB:       0,
 	})

@@ -72,7 +72,7 @@ func run() error {
 	dailer := mail.NewDialer(cfg.SMTP.Host, cfg.SMTP.Port, cfg.SMTP.Username, cfg.SMTP.Password)
 	userService := user.NewService(cfg.UIURL, cfg.PasswordTokenTTL, userRepository, dailer)
 	authorization := middleware.NewAuthorization(logger, userService)
-	redis, err := storage.NewRedis(cfg.Redis)
+	redis, err := storage.NewRedis(cfg.Redis.Host, cfg.Redis.Port)
 	if err != nil {
 		return err
 	}
