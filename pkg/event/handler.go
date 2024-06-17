@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log/slog"
 	"strconv"
-	"sync/atomic"
 
 	"github.com/dhis2-sre/im-manager/internal/handler"
 	"github.com/dhis2-sre/im-manager/pkg/model"
@@ -56,23 +55,13 @@ func (h Handler) StreamEvents(c *gin.Context) {
 	consumerName := fmt.Sprintf("events-%d", user.ID)
 	logger := h.logger.WithGroup("consumer").With("name", consumerName)
 
-	var offset atomic.Int64
-	var offsetSpec stream.OffsetSpecification
-	lastEventID := c.GetHeader("Last-Event-ID")
-	if lastEventID == "" {
-		offsetSpec = stream.OffsetSpecification{}.Next()
-		logger.Info("User subscribed to the next published event")
-	} else { // "Last-Event-ID" header is sent when SSE clients re-connect
-		lastOffset, err := strconv.ParseInt(lastEventID, 10, 64)
-		if err != nil {
-			_ = c.AbortWithError(400, fmt.Errorf("invalid %q value: %v", "Last-Event-ID", err))
-			return
-		}
-		offset.Store(lastOffset + 1) // we want to send what the client has not already seen
-		logger.Info("User subscribed to events after Last-Event-ID", "lastEventId", lastOffset)
-		offsetSpec = stream.OffsetSpecification{}.Offset(lastOffset + 1)
+	// check offset to return 400 before any other header in case of an error
+	offsetSpec, err := computeOffsetSpec(c)
+	if err != nil {
+		logger.Error("Failed to compute RabbitMQ offset spec", "error", err)
+		_ = c.AbortWithError(400, err)
+		return
 	}
-
 	c.Writer.Header().Set("Content-Type", "text/event-stream")
 	c.Writer.Header().Set("Cache-Control", "no-cache")
 	c.Writer.Header().Set("Connection", "keep-alive")
@@ -92,10 +81,11 @@ func (h Handler) StreamEvents(c *gin.Context) {
 	if err != nil {
 		logger.Error("Failed to create RabbitMQ consumer", "error", err)
 		_ = c.AbortWithError(500, err)
+		return
 	}
 	defer consumer.Close()
 
-	logger.Info("Connection established for sending SSE events")
+	logger.Info("Connection established for sending SSE events", "offsetSpec", offsetSpec)
 	for {
 		select {
 		case <-c.Request.Context().Done():
@@ -107,6 +97,26 @@ func (h Handler) StreamEvents(c *gin.Context) {
 			c.Writer.Flush()
 		}
 	}
+}
+
+// computeOffsetSpec computes the offset from which the SSE client will stream RabbitMQ messages
+// from. By default clients will receive the next message that is published to the events stream.
+// This means they will not receive "old" events. SSE clients send a "Last-Event-ID" HTTP header on
+// re-connect. The "Last-Event-ID" value is a RabbitMQ offset we send in the SSE id field. Clients
+// can thus resume where they left off.
+func computeOffsetSpec(c *gin.Context) (stream.OffsetSpecification, error) {
+	lastEventID := c.GetHeader("Last-Event-ID")
+	if lastEventID == "" {
+		return stream.OffsetSpecification{}.Next(), nil
+	}
+
+	// "Last-Event-ID" header is sent when SSE clients re-connect
+	lastOffset, err := strconv.ParseInt(lastEventID, 10, 64)
+	if err != nil {
+		return stream.OffsetSpecification{}, fmt.Errorf("invalid %q value: %v", "Last-Event-ID", err)
+	}
+
+	return stream.OffsetSpecification{}.Offset(lastOffset + 1), nil
 }
 
 func userGroups(user *model.User) map[string]struct{} {
