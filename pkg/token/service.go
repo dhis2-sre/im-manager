@@ -20,7 +20,6 @@ func NewService(
 	logger *slog.Logger,
 	tokenRepository repository,
 	privateKey *rsa.PrivateKey,
-	publicKey *rsa.PublicKey,
 	accessTokenExpirationSeconds int,
 	refreshTokenSecretKey string,
 	refreshTokenExpirationSeconds int,
@@ -30,7 +29,6 @@ func NewService(
 		logger:                                  logger,
 		repository:                              tokenRepository,
 		privateKey:                              privateKey,
-		publicKey:                               publicKey,
 		accessTokenExpirationSeconds:            accessTokenExpirationSeconds,
 		refreshTokenSecretKey:                   refreshTokenSecretKey,
 		refreshTokenExpirationSeconds:           refreshTokenExpirationSeconds,
@@ -63,7 +61,6 @@ type tokenService struct {
 	logger                                  *slog.Logger
 	repository                              repository
 	privateKey                              *rsa.PrivateKey
-	publicKey                               *rsa.PublicKey
 	accessTokenExpirationSeconds            int
 	refreshTokenSecretKey                   string
 	refreshTokenExpirationSeconds           int

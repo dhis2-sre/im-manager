@@ -14,7 +14,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func NewAuthentication(publicKey *rsa.PublicKey, signInService signInService) AuthenticationMiddleware {
+func NewAuthentication(publicKey rsa.PublicKey, signInService signInService) AuthenticationMiddleware {
 	return AuthenticationMiddleware{
 		publicKey:     publicKey,
 		signInService: signInService,
@@ -26,7 +26,7 @@ type signInService interface {
 }
 
 type AuthenticationMiddleware struct {
-	publicKey     *rsa.PublicKey
+	publicKey     rsa.PublicKey
 	signInService signInService
 }
 
@@ -70,7 +70,7 @@ func (m AuthenticationMiddleware) TokenAuthentication(c *gin.Context) {
 	}
 }
 
-func parseRequest(request *http.Request, key *rsa.PublicKey) (*model.User, error) {
+func parseRequest(request *http.Request, key rsa.PublicKey) (*model.User, error) {
 	token, err := jwt.ParseRequest(
 		request,
 		jwt.WithKey(jwa.RS256, key),

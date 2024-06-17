@@ -23,7 +23,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func NewHandler(logger *slog.Logger, hostname string, sameSiteMode http.SameSite, accessTokenExpirationSeconds int, refreshTokenExpirationSeconds int, refreshTokenRememberMeExpirationSeconds int, publicKey *rsa.PublicKey, userService userService, tokenService tokenService) Handler {
+func NewHandler(logger *slog.Logger, hostname string, sameSiteMode http.SameSite, accessTokenExpirationSeconds int, refreshTokenExpirationSeconds int, refreshTokenRememberMeExpirationSeconds int, publicKey rsa.PublicKey, userService userService, tokenService tokenService) Handler {
 	return Handler{
 		logger,
 		hostname,
@@ -44,7 +44,7 @@ type Handler struct {
 	accessTokenExpirationSeconds            int
 	refreshTokenExpirationSeconds           int
 	refreshTokenRememberMeExpirationSeconds int
-	publicKey                               *rsa.PublicKey
+	publicKey                               rsa.PublicKey
 	userService                             userService
 	tokenService                            tokenService
 }

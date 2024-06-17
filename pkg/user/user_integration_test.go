@@ -49,17 +49,16 @@ func TestUserHandler(t *testing.T) {
 	authorization := middleware.NewAuthorization(slog.New(slog.NewTextHandler(os.Stdout, nil)), userService)
 	key, err := rsa.GenerateKey(rand.Reader, 2048)
 	require.NoError(t, err, "failed to generate private key")
-	// TODO(DEVOPS-259) we should not use a pointer as we do not mutate and should not mutate the certificate
-	authentication := middleware.NewAuthentication(&key.PublicKey, userService)
+	authentication := middleware.NewAuthentication(key.PublicKey, userService)
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	redis := inttest.SetupRedis(t)
 	tokenRepository := token.NewRepository(redis)
-	tokenService, err := token.NewService(logger, tokenRepository, key, &key.PublicKey, 10, "secret", 20, 30)
+	tokenService, err := token.NewService(logger, tokenRepository, key, 10, "secret", 20, 30)
 	require.NoError(t, err)
 
 	client := inttest.SetupHTTPServer(t, func(engine *gin.Engine) {
-		userHandler := user.NewHandler(logger, "hostname", http.SameSiteStrictMode, 10, 20, 30, &key.PublicKey, userService, tokenService)
+		userHandler := user.NewHandler(logger, "hostname", http.SameSiteStrictMode, 10, 20, 30, key.PublicKey, userService, tokenService)
 		user.Routes(engine, authentication, authorization, userHandler)
 	})
 

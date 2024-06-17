@@ -3,6 +3,7 @@ package log
 import (
 	"bufio"
 	"bytes"
+	"crypto/rsa"
 	"encoding/json"
 	"errors"
 	"log/slog"
@@ -28,7 +29,7 @@ func TestLogs(t *testing.T) {
 	r.Use(middleware.RequestLogger(logger))
 
 	var userID uint = 1
-	auth := middleware.NewAuthentication(nil, SignInService{userID: userID})
+	auth := middleware.NewAuthentication(rsa.PublicKey{}, SignInService{userID: userID})
 	r.Use(auth.BasicAuthentication)
 
 	t.Run("ContainRequestIDAndUserID", func(t *testing.T) {

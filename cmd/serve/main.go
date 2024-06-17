@@ -78,20 +78,17 @@ func run() error {
 	}
 	tokenRepository := token.NewRepository(redis)
 	authConfig := cfg.Authentication
-	privateKey, err := authConfig.Keys.GetPrivateKey(logger)
+	privateKey, err := config.GetPrivateKey(logger)
 	if err != nil {
 		return err
 	}
-	publicKey, err := authConfig.Keys.GetPublicKey()
-	if err != nil {
-		return err
-	}
-	tokenService, err := token.NewService(logger, tokenRepository, privateKey, publicKey, authConfig.AccessTokenExpirationSeconds, authConfig.RefreshTokenSecretKey, authConfig.RefreshTokenExpirationSeconds, authConfig.RefreshTokenRememberMeExpirationSeconds)
+	tokenService, err := token.NewService(logger, tokenRepository, privateKey, authConfig.AccessTokenExpirationSeconds, authConfig.RefreshTokenSecretKey, authConfig.RefreshTokenExpirationSeconds, authConfig.RefreshTokenRememberMeExpirationSeconds)
 	if err != nil {
 		return err
 	}
 
 	// TODO: Assert authConfig.SameSiteMode not -1
+	publicKey := privateKey.PublicKey
 	userHandler := user.NewHandler(logger, cfg.Hostname, authConfig.SameSiteMode, authConfig.AccessTokenExpirationSeconds, authConfig.RefreshTokenExpirationSeconds, authConfig.RefreshTokenRememberMeExpirationSeconds, publicKey, userService, tokenService)
 
 	authentication := middleware.NewAuthentication(publicKey, userService)
