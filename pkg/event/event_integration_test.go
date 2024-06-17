@@ -100,16 +100,16 @@ func TestEventHandler(t *testing.T) {
 	})
 
 	repository := event.NewRepository(db)
-	store := NewEventEmitter(t, env, streamName, repository)
-	defer store.Close()
+	eventEmitter := NewEventEmitter(t, env, streamName, repository)
+	defer eventEmitter.Close()
 
 	t.Log("Sending messages before users are subscribed")
 	// users should only get the next published message after they subscribed so these messages
 	// should not be received by anyone
-	store.emit(t, "db-update", sharedGroup.Name, user1)
-	store.emit(t, "db-update", sharedGroup.Name, user2)
-	store.emit(t, "db-update", sharedGroup.Name, nil)
-	store.emit(t, "instance-update", sharedGroup.Name, nil)
+	eventEmitter.emit(t, "db-update", sharedGroup.Name, user1)
+	eventEmitter.emit(t, "db-update", sharedGroup.Name, user2)
+	eventEmitter.emit(t, "db-update", sharedGroup.Name, nil)
+	eventEmitter.emit(t, "instance-update", sharedGroup.Name, nil)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Second)
 	defer cancel()
@@ -120,10 +120,10 @@ func TestEventHandler(t *testing.T) {
 	// TODO(ivo) I want to block only until the user is subscribed, so I can then test the offset
 	// spec next config
 	time.Sleep(5 * time.Second)
-	event5 := store.emit(t, "db-update", sharedGroup.Name, user1)
-	store.emit(t, "db-update", sharedGroup.Name, user2)
-	event7 := store.emit(t, "db-update", sharedGroup.Name, nil)
-	event8 := store.emit(t, "instance-update", sharedGroup.Name, nil)
+	event5 := eventEmitter.emit(t, "db-update", sharedGroup.Name, user1)
+	eventEmitter.emit(t, "db-update", sharedGroup.Name, user2)
+	event7 := eventEmitter.emit(t, "db-update", sharedGroup.Name, nil)
+	event8 := eventEmitter.emit(t, "instance-update", sharedGroup.Name, nil)
 
 	wantUser1Messages := []sseEvent{event5, event7, event8}
 
@@ -137,7 +137,7 @@ func TestEventHandler(t *testing.T) {
 			gotUser1Messages = append(gotUser1Messages, msg)
 		}
 	}
-	assert.EqualValuesf(t, wantUser1Messages, gotUser1Messages, "mismatch in expected messages for user %d", user1.ID)
+	require.EqualValuesf(t, wantUser1Messages, gotUser1Messages, "mismatch in expected messages for user %d", user1.ID)
 
 	ctxUser2, cancelUser2 := context.WithTimeout(context.Background(), 50*time.Second)
 	defer cancelUser2()
@@ -147,10 +147,10 @@ func TestEventHandler(t *testing.T) {
 	// TODO(ivo) I want to block only until the user is subscribed, so I can then test the offset
 	// spec next config
 	time.Sleep(5 * time.Second)
-	event9 := store.emit(t, "db-update", sharedGroup.Name, user1)
-	event10 := store.emit(t, "db-update", sharedGroup.Name, user2)
-	event11 := store.emit(t, "db-update", sharedGroup.Name, nil)
-	event12 := store.emit(t, "instance-update", groupExclusiveToUser2.Name, nil)
+	event9 := eventEmitter.emit(t, "db-update", sharedGroup.Name, user1)
+	event10 := eventEmitter.emit(t, "db-update", sharedGroup.Name, user2)
+	event11 := eventEmitter.emit(t, "db-update", sharedGroup.Name, nil)
+	event12 := eventEmitter.emit(t, "instance-update", groupExclusiveToUser2.Name, nil)
 
 	wantUser1Messages = []sseEvent{event9, event11}
 	wantUser2Messages := []sseEvent{event10, event11, event12}
@@ -169,16 +169,16 @@ func TestEventHandler(t *testing.T) {
 			gotUser2Messages = append(gotUser2Messages, msg)
 		}
 	}
-	assert.EqualValuesf(t, wantUser1Messages, gotUser1Messages, "mismatch in expected messages for user %d", user1.ID)
-	assert.EqualValuesf(t, wantUser2Messages, gotUser2Messages, "mismatch in expected messages for user %d", user2.ID)
+	require.EqualValuesf(t, wantUser1Messages, gotUser1Messages, "mismatch in expected messages for user %d", user1.ID)
+	require.EqualValuesf(t, wantUser2Messages, gotUser2Messages, "mismatch in expected messages for user %d", user2.ID)
 
 	cancelUser1(errors.New("drop connection"))
 	<-user1Messages // wait for user1 to be unsubscribed before sending new messages to test Last-Event-ID
 
 	t.Log("Sending messages after user1 dropped its connection")
-	event13 := store.emit(t, "instance-update", groupExclusiveToUser2.Name, nil)
-	event14 := store.emit(t, "db-update", sharedGroup.Name, nil)
-	event15 := store.emit(t, "instance-update", sharedGroup.Name, nil)
+	event13 := eventEmitter.emit(t, "instance-update", groupExclusiveToUser2.Name, nil)
+	event14 := eventEmitter.emit(t, "db-update", sharedGroup.Name, nil)
+	event15 := eventEmitter.emit(t, "instance-update", sharedGroup.Name, nil)
 
 	// When a SSE client disconnects it will send the HTTP header Last-Event-ID with the ID of the
 	// event it last received. We want to then send the event after that.
@@ -238,6 +238,8 @@ type sseEvent struct {
 	Data  []byte
 }
 
+// translateEvent is translating an sse.Event from the 3rd party library to our sseEvent used in
+// assertions. The plan is to remove the 3rd party library.
 func translateEvent(t *testing.T, msg *sse.Event) sseEvent {
 	id, err := strconv.ParseInt(string(msg.ID), 10, 64)
 	require.NoError(t, err, "failed to parse SSE event ID")
@@ -248,6 +250,7 @@ func translateEvent(t *testing.T, msg *sse.Event) sseEvent {
 	}
 }
 
+// eventEmitter emits an event to RabbitMQ which can then be streamed via SSE from the event handler.
 type eventEmitter struct {
 	repository     event.Repository
 	producer       *ha.ReliableProducer
@@ -286,7 +289,7 @@ func (es *eventEmitter) Close() error {
 }
 
 // emit emits an instance manager event and returns the SSE event we expect an eligible user to
-// receive via /events. This is a blocking operation.
+// receive via the event handler. This is a blocking operation.
 func (es *eventEmitter) emit(t *testing.T, kind, group string, owner *model.User) sseEvent {
 	streamOffset := es.eventCount
 	es.eventCount++
