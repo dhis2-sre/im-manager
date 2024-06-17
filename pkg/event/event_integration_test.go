@@ -289,7 +289,11 @@ func (es *eventEmitter) Close() error {
 }
 
 // emit emits an instance manager event and returns the SSE event we expect an eligible user to
-// receive via the event handler. This is a blocking operation.
+// receive via the event handler. This is a blocking operation. An event has an event counter that
+// is 1-indexed for human readability. This event counter is also used for deduplication in RabbitMQ
+// by setting it as the publishing id. Since we assert on the SSE event clients should receive we
+// also need to assert on the SSE id field. The event handler sets the id field to the RabbitMQ
+// offset (0-indexed) so SSE clients can resume on re-connect.
 func (es *eventEmitter) emit(t *testing.T, kind, group string, owner *model.User) sseEvent {
 	streamOffset := es.eventCount
 	es.eventCount++
