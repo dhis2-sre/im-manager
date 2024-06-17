@@ -56,25 +56,20 @@ func (h Handler) StreamEvents(c *gin.Context) {
 	consumerName := fmt.Sprintf("events-%d", user.ID)
 	logger := h.logger.WithGroup("consumer").With("name", consumerName)
 
-	// Set the RabbitMQ offset to the Last-Event-ID seen by the SSE client
-	// This ensures that the SSE client resumes consuming from the stream where it left off
-	// before the connection dropped. Otherwise, let the SSE client start streaming from the
-	// first new message that is added to the stream.
-	// https://web.dev/articles/eventsource-basics
 	var offset atomic.Int64
 	var offsetSpec stream.OffsetSpecification
 	lastEventID := c.GetHeader("Last-Event-ID")
 	if lastEventID == "" {
 		offsetSpec = stream.OffsetSpecification{}.Next()
-		logger.Info("User subscribed to events starting from the next published message")
-	} else {
+		logger.Info("User subscribed to the next published event")
+	} else { // "Last-Event-ID" header is sent when SSE clients re-connect
 		lastOffset, err := strconv.ParseInt(lastEventID, 10, 64)
 		if err != nil {
 			_ = c.AbortWithError(400, fmt.Errorf("invalid %q value: %v", "Last-Event-ID", err))
 			return
 		}
 		offset.Store(lastOffset + 1) // we want to send what the client has not already seen
-		logger.Info("User subscribed to events starting from the Last-Event-ID", "lastEventId", lastOffset)
+		logger.Info("User subscribed to events after Last-Event-ID", "lastEventId", lastOffset)
 		offsetSpec = stream.OffsetSpecification{}.Offset(lastOffset + 1)
 	}
 
@@ -82,8 +77,6 @@ func (h Handler) StreamEvents(c *gin.Context) {
 	c.Writer.Header().Set("Cache-Control", "no-cache")
 	c.Writer.Header().Set("Connection", "keep-alive")
 	c.Writer.Header().Set("Transfer-Encoding", "chunked")
-	w := c.Writer
-	clientGone := w.CloseNotify()
 
 	userGroups := userGroups(user)
 	filter := stream.NewConsumerFilter(maps.Keys(userGroups), true, postFilter(logger, user.ID, userGroups))
@@ -93,6 +86,7 @@ func (h Handler) StreamEvents(c *gin.Context) {
 		SetManualCommit().
 		SetOffset(offsetSpec).
 		SetFilter(filter)
+	clientGone := c.Writer.CloseNotify()
 	sseEvents, messageHandler := createMessageHandler(or(c.Request.Context(), clientGone), logger)
 	consumer, err := ha.NewReliableConsumer(h.env, h.streamName, opts, messageHandler)
 	if err != nil {
@@ -110,7 +104,7 @@ func (h Handler) StreamEvents(c *gin.Context) {
 			return
 		case sseEvent := <-sseEvents:
 			c.Render(-1, sseEvent)
-			w.Flush()
+			c.Writer.Flush()
 		}
 	}
 }
