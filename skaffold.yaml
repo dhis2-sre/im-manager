@@ -36,7 +36,7 @@ deploy:
         version: 14.4.2
         useHelmSecrets: true
         setValues:
-          extraPlugins: "rabbitmq_stream,rabbitmq_stream_management"
+          extraPlugins: "rabbitmq_stream rabbitmq_stream_management"
         valuesFiles:
           - helm/data/secrets/{{ .CLASSIFICATION }}/rabbitmq.yaml
 
