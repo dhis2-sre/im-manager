@@ -1,6 +1,8 @@
 package server
 
 import (
+	"log/slog"
+
 	"github.com/dhis2-sre/im-manager/internal/middleware"
 	"github.com/dhis2-sre/im-manager/pkg/health"
 	"github.com/gin-contrib/cors"
@@ -8,11 +10,15 @@ import (
 	redocMiddleware "github.com/go-openapi/runtime/middleware"
 )
 
-func GetEngine(basePath string) *gin.Engine {
-	r := gin.Default()
+func GetEngine(logger *slog.Logger, basePath string, allowedOrigins []string) *gin.Engine {
+	r := gin.New()
+	r.Use(gin.Recovery())
+	r.Use(middleware.RequestID())
+	r.Use(middleware.RequestLogger(logger))
 
 	corsConfig := cors.DefaultConfig()
-	corsConfig.AllowAllOrigins = true
+	// Without specifying origins, secure cookies won't work
+	corsConfig.AllowOrigins = allowedOrigins
 	corsConfig.AllowCredentials = true
 	corsConfig.AddAllowHeaders("authorization")
 	corsConfig.AddExposeHeaders("Content-Disposition", "Content-Length")

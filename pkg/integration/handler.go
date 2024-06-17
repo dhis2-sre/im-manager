@@ -129,7 +129,7 @@ func (h Handler) Integrations(c *gin.Context) {
 	}
 
 	if request.Key == "DATABASE_ID" {
-		token, err := handler.GetTokenFromHttpAuthHeader(c)
+		token, err := handler.GetTokenFromRequest(c)
 		if err != nil {
 			_ = c.Error(err)
 			return

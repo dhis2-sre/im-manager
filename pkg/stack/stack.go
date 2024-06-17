@@ -331,7 +331,7 @@ var PgAdmin = model.Stack{
 var pgAdminDefaults = struct {
 	chartVersion string
 }{
-	chartVersion: "1.11.0",
+	chartVersion: "1.25.1",
 }
 
 // Stack representing ../../stacks/whoami-go/helmfile.yaml

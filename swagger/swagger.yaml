@@ -332,6 +332,23 @@ definitions:
                 x-go-name: Payload
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/integration
+    RequestPasswordResetRequest:
+        properties:
+            email:
+                type: string
+                x-go-name: Email
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/user
+    ResetPasswordRequest:
+        properties:
+            password:
+                type: string
+                x-go-name: Password
+            token:
+                type: string
+                x-go-name: Token
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/user
     Response:
         description: Response depends on the input and can be either a list or a map
         type: object
@@ -1480,10 +1497,9 @@ paths:
             description: Refresh user tokens
             operationId: refreshToken
             parameters:
-                - description: Refresh token request body parameter
+                - description: Refresh token request body parameter. Note that this is optional and the refresh token can also be supplied using a cookie named "refreshToken"
                   in: body
                   name: Body
-                  required: true
                   schema:
                     $ref: '#/definitions/RefreshTokenRequest'
             responses:
@@ -1543,6 +1559,8 @@ paths:
             responses:
                 "201":
                     $ref: '#/responses/Tokens'
+                "400":
+                    $ref: '#/responses/Error'
                 "401":
                     $ref: '#/responses/Error'
                 "403":
@@ -1586,7 +1604,7 @@ paths:
                 - oauth2: []
             summary: Find users
         post:
-            description: Sign up a user. This endpoint is publicly accessible and therefor anyone can sign up. However, before being able to perform any actions, users needs to be a member of a group. And only administrators can add users to groups.
+            description: Sign up a user. This endpoint is publicly accessible and therefore anyone can sign up. However, before being able to perform any actions, users needs to be a member of a group. And only administrators can add users to groups.
             operationId: signUp
             parameters:
                 - description: SignUp request body parameter
@@ -1688,6 +1706,48 @@ paths:
             security:
                 - oauth2: []
             summary: Update user
+    /users/request-reset:
+        post:
+            description: Request user's password reset
+            operationId: requestPasswordReset
+            parameters:
+                - description: Request password reset request body parameter
+                  in: body
+                  name: Body
+                  required: true
+                  schema:
+                    $ref: '#/definitions/RequestPasswordResetRequest'
+            responses:
+                "201":
+                    description: ""
+                "400":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            summary: Request password reset
+    /users/reset-password:
+        post:
+            description: Reset user's password
+            operationId: resetPassword
+            parameters:
+                - description: Reset password request body parameter
+                  in: body
+                  name: Body
+                  required: true
+                  schema:
+                    $ref: '#/definitions/ResetPasswordRequest'
+            responses:
+                "201":
+                    description: ""
+                "400":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            summary: Reset password
     /users/validate:
         post:
             description: Validate users email

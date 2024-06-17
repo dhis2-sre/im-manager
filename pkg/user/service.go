@@ -1,12 +1,15 @@
 package user
 
 import (
+	"context"
 	"crypto/rand"
+	"database/sql"
+	"encoding/base64"
 	"encoding/hex"
 	"fmt"
 	"strings"
+	"time"
 
-	"github.com/dhis2-sre/im-manager/pkg/config"
 	"github.com/google/uuid"
 
 	"github.com/dhis2-sre/im-manager/internal/errdef"
@@ -17,20 +20,22 @@ import (
 )
 
 //goland:noinspection GoExportedFuncWithUnexportedType
-func NewService(config config.Config, repository userRepository, dailer dailer) *service {
-	return &service{config, repository, dailer}
+func NewService(uiUrl string, passwordTokenTtl uint, repository userRepository, dailer dailer) *service {
+	return &service{uiUrl, passwordTokenTtl, repository, dailer}
 }
 
 type userRepository interface {
 	create(user *model.User) error
 	findByEmail(email string) (*model.User, error)
-	findById(id uint) (*model.User, error)
+	findById(ctx context.Context, id uint) (*model.User, error)
 	findOrCreate(email *model.User) (*model.User, error)
-	findAll() ([]*model.User, error)
-	delete(id uint) error
+	findAll(ctx context.Context) ([]*model.User, error)
+	delete(ctx context.Context, id uint) error
 	update(user *model.User) (*model.User, error)
 	findByEmailToken(token uuid.UUID) (*model.User, error)
 	save(user *model.User) error
+	resetPassword(user *model.User) error
+	findByPasswordResetToken(token string) (*model.User, error)
 }
 
 type dailer interface {
@@ -38,9 +43,10 @@ type dailer interface {
 }
 
 type service struct {
-	config     config.Config
-	repository userRepository
-	dailer     dailer
+	uiUrl            string
+	passwordTokenTtl uint
+	repository       userRepository
+	dailer           dailer
 }
 
 func (s service) Save(user *model.User) error {
@@ -77,7 +83,7 @@ func (s service) sendValidationEmail(user *model.User) error {
 	m.SetHeader("From", "DHIS2 Instance Manager <no-reply@dhis2.org>")
 	m.SetHeader("To", user.Email)
 	m.SetHeader("Subject", "Welcome to IM")
-	link := fmt.Sprintf("%s/validate/%s", s.config.UIHostname, user.EmailToken)
+	link := fmt.Sprintf("%s/validate/%s", s.uiUrl, user.EmailToken)
 	body := fmt.Sprintf("Hello, please click the below link to verify your email.<br/>%s", link)
 	m.SetBody("text/html", body)
 	return s.dailer.DialAndSend(m)
@@ -158,12 +164,12 @@ func comparePasswords(storedPassword string, suppliedPassword string) (bool, err
 	return hex.EncodeToString(hash) == passwordAndSalt[0], nil
 }
 
-func (s service) FindAll() ([]*model.User, error) {
-	return s.repository.findAll()
+func (s service) FindAll(ctx context.Context) ([]*model.User, error) {
+	return s.repository.findAll(ctx)
 }
 
-func (s service) FindById(id uint) (*model.User, error) {
-	return s.repository.findById(id)
+func (s service) FindById(ctx context.Context, id uint) (*model.User, error) {
+	return s.repository.findById(ctx, id)
 }
 
 func (s service) FindOrCreate(email string, password string) (*model.User, error) {
@@ -181,12 +187,12 @@ func (s service) FindOrCreate(email string, password string) (*model.User, error
 	return s.repository.findOrCreate(user)
 }
 
-func (s service) Delete(id uint) error {
-	return s.repository.delete(id)
+func (s service) Delete(ctx context.Context, id uint) error {
+	return s.repository.delete(ctx, id)
 }
 
-func (s service) Update(id uint, email, password string) (*model.User, error) {
-	user, err := s.repository.findById(id)
+func (s service) Update(ctx context.Context, id uint, email, password string) (*model.User, error) {
+	user, err := s.repository.findById(ctx, id)
 	if err != nil {
 		return nil, err
 	}
@@ -204,4 +210,72 @@ func (s service) Update(id uint, email, password string) (*model.User, error) {
 	}
 
 	return s.repository.update(user)
+}
+
+func (s service) sendResetPasswordEmail(user *model.User) error {
+	_, err := s.repository.findByEmail(user.Email)
+	if err != nil {
+		if errdef.IsNotFound(err) {
+			return nil
+		}
+		return err
+	}
+
+	m := mail.NewMessage()
+	m.SetHeader("From", "DHIS2 Instance Manager <no-reply@dhis2.org>")
+	m.SetHeader("To", user.Email)
+	m.SetHeader("Subject", "Reset your IM password")
+	link := fmt.Sprintf("%s/reset-password/%s", s.uiUrl, user.PasswordToken.String)
+	body := fmt.Sprintf("Hello, please click the link below to reset your password.<br/>%s", link)
+	m.SetBody("text/html", body)
+	return s.dailer.DialAndSend(m)
+}
+
+func (s service) RequestPasswordReset(email string) error {
+	user, err := s.repository.findByEmail(email)
+
+	if err != nil {
+		if errdef.IsNotFound(err) {
+			return nil
+		}
+		return err
+	}
+
+	bytes := make([]byte, 64)
+	if _, err := rand.Read(bytes); err != nil {
+		return err
+	}
+	token := base64.URLEncoding.EncodeToString(bytes)
+
+	user.PasswordToken = sql.NullString{String: token, Valid: true}
+	user.PasswordTokenTTL = uint(time.Now().Unix()) + s.passwordTokenTtl
+
+	err = s.sendResetPasswordEmail(user)
+	if err != nil {
+		return err
+	}
+
+	return s.repository.save(user)
+}
+
+func (s service) ResetPassword(token string, password string) error {
+	user, err := s.repository.findByPasswordResetToken(token)
+	if err != nil {
+		return err
+	}
+
+	tokenTtl := time.Unix(int64(user.PasswordTokenTTL), 0).UTC()
+	if tokenTtl.Before(time.Now()) {
+		return errdef.NewBadRequest("reset token has expired")
+	}
+
+	if password != "" {
+		var err error
+		user.Password, err = hashPassword(password)
+		if err != nil {
+			return fmt.Errorf("failed to hash password: %s", err)
+		}
+	}
+
+	return s.repository.resetPassword(user)
 }

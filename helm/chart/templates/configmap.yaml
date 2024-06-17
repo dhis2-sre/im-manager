@@ -10,9 +10,12 @@ data:
 {{- range $key, $value := $environment }}
   {{ $key }}: {{ $value | quote }}
 {{- end }}
+  SAME_SITE_MODE: {{ .Values.sameSiteMode }}
   ACCESS_TOKEN_EXPIRATION_IN_SECONDS: {{ .Values.accessTokenExpirationInSeconds | quote }}
   REFRESH_TOKEN_EXPIRATION_IN_SECONDS: {{ .Values.refreshTokenExpirationInSeconds | quote }}
+  REFRESH_TOKEN_REMEMBER_ME_EXPIRATION_IN_SECONDS: {{ .Values.refreshTokenRememberMeExpirationInSeconds | quote }}
 
   GROUP_NAMES: {{ .Values.groups.names }}
   GROUP_HOSTNAMES: {{ .Values.groups.hostnames }}
+  CORS_ALLOWED_ORIGINS: {{ join "," .Values.corsAllowOrigins | quote }}
 {{- end }}

@@ -14,7 +14,7 @@ repos:
       - id: go-sec-repo-mod
 
   - repo: https://github.com/golangci/golangci-lint
-    rev: v1.54.2
+    rev: v1.57.2
     hooks:
       - id: golangci-lint
         args:
