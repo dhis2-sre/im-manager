@@ -29,7 +29,8 @@ func SetupHTTPServer(t *testing.T, f func(engine *gin.Engine)) *HTTPClient {
 	gin.SetMode(gin.TestMode)
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	engine := server.GetEngine(logger, "", []string{"http://localhost"})
+	engine, err := server.GetEngine(logger, "", []string{"http://localhost"})
+	require.NoError(t, err, "failed to setup Gin")
 	f(engine)
 
 	//goland:noinspection GoImportUsedAsName

@@ -54,12 +54,19 @@ import (
 
 func main() {
 	if err := run(); err != nil {
-		fmt.Printf("im-manager exits due to: %v", err)
+		fmt.Printf("im-manager exited due to: %v", err)
 		os.Exit(1)
 	}
+	fmt.Printf("im-manager exited without any error")
 }
 
-func run() error {
+func run() (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("panicked due to: %v", r)
+		}
+	}()
+
 	cfg := config.New()
 
 	logger := slog.New(log.New(slog.NewJSONHandler(os.Stdout, nil)))
@@ -183,7 +190,10 @@ func run() error {
 	if cfg.Environment != "production" {
 		cfg.AllowedOrigins = append(cfg.AllowedOrigins, "http://localhost:3000", "http://localhost:5173")
 	}
-	r := server.GetEngine(logger, cfg.BasePath, cfg.AllowedOrigins)
+	r, err := server.GetEngine(logger, cfg.BasePath, cfg.AllowedOrigins)
+	if err != nil {
+		return err
+	}
 
 	group.Routes(r, authentication, authorization, groupHandler)
 	user.Routes(r, authentication, authorization, userHandler)
@@ -192,7 +202,11 @@ func run() error {
 	database.Routes(r, authentication.TokenAuthentication, databaseHandler)
 	instance.Routes(r, authentication.TokenAuthentication, instanceHandler)
 
-	return r.Run()
+	logger.Info("Listening and serving HTTP")
+	if err := r.Run(); err != nil {
+		return fmt.Errorf("failed to start the HTTP server: %v", err)
+	}
+	return nil
 }
 
 func hostname() string {

@@ -1,6 +1,7 @@
 package server
 
 import (
+	"fmt"
 	"log/slog"
 
 	"github.com/dhis2-sre/im-manager/internal/middleware"
@@ -10,7 +11,7 @@ import (
 	redocMiddleware "github.com/go-openapi/runtime/middleware"
 )
 
-func GetEngine(logger *slog.Logger, basePath string, allowedOrigins []string) *gin.Engine {
+func GetEngine(logger *slog.Logger, basePath string, allowedOrigins []string) (*gin.Engine, error) {
 	r := gin.New()
 	r.Use(gin.Recovery())
 	r.Use(middleware.RequestID())
@@ -22,6 +23,9 @@ func GetEngine(logger *slog.Logger, basePath string, allowedOrigins []string) *g
 	corsConfig.AllowCredentials = true
 	corsConfig.AddAllowHeaders("authorization")
 	corsConfig.AddExposeHeaders("Content-Disposition", "Content-Length")
+	if err := corsConfig.Validate(); err != nil {
+		return nil, fmt.Errorf("failed to configure CORS: %v", err)
+	}
 	r.Use(cors.New(corsConfig))
 
 	r.Use(middleware.ErrorHandler())
@@ -32,7 +36,7 @@ func GetEngine(logger *slog.Logger, basePath string, allowedOrigins []string) *g
 
 	router.GET("/health", health.Health)
 
-	return r
+	return r, nil
 }
 
 func redoc(router *gin.RouterGroup, basePath string) {
