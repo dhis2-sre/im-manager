@@ -1,12 +1,15 @@
 package event_test
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -15,7 +18,6 @@ import (
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	sse "github.com/r3labs/sse/v2"
 	"github.com/rabbitmq/rabbitmq-stream-go-client/pkg/amqp"
 	"github.com/rabbitmq/rabbitmq-stream-go-client/pkg/ha"
 	"github.com/rabbitmq/rabbitmq-stream-go-client/pkg/message"
@@ -105,15 +107,12 @@ func TestEventHandler(t *testing.T) {
 	eventEmitter.emit(t, "db-update", sharedGroup.Name, nil)
 	eventEmitter.emit(t, "instance-update", sharedGroup.Name, nil)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Second)
 	defer cancel()
 	ctxUser1, cancelUser1 := context.WithCancelCause(ctx)
-	user1Messages := streamEvents(t, ctxUser1, client.ServerURL+"/events", user1, nil)
+	user1Messages := streamEvents(t, ctxUser1, client, user1, nil)
 
 	t.Log("Sending messages after user1 subscribed")
-	// TODO(ivo) I want to block only until the user is subscribed, so I can then test the offset
-	// spec next config
-	time.Sleep(5 * time.Second)
 	event5 := eventEmitter.emit(t, "db-update", sharedGroup.Name, user1)
 	eventEmitter.emit(t, "db-update", sharedGroup.Name, user2)
 	event7 := eventEmitter.emit(t, "db-update", sharedGroup.Name, nil)
@@ -135,12 +134,9 @@ func TestEventHandler(t *testing.T) {
 
 	ctxUser2, cancelUser2 := context.WithTimeout(context.Background(), 50*time.Second)
 	defer cancelUser2()
-	user2Messages := streamEvents(t, ctxUser2, client.ServerURL+"/events", user2, nil)
+	user2Messages := streamEvents(t, ctxUser2, client, user2, nil)
 
 	t.Log("Sending messages after user2 subscribed")
-	// TODO(ivo) I want to block only until the user is subscribed, so I can then test the offset
-	// spec next config
-	time.Sleep(5 * time.Second)
 	event9 := eventEmitter.emit(t, "db-update", sharedGroup.Name, user1)
 	event10 := eventEmitter.emit(t, "db-update", sharedGroup.Name, user2)
 	event11 := eventEmitter.emit(t, "db-update", sharedGroup.Name, nil)
@@ -176,7 +172,7 @@ func TestEventHandler(t *testing.T) {
 
 	// When a SSE client disconnects it will send the HTTP header Last-Event-ID with the ID of the
 	// event it last received. We want to then send the event after that.
-	user1Messages = streamEvents(t, ctxUser2, client.ServerURL+"/events", user1, &event11.ID)
+	user1Messages = streamEvents(t, ctxUser2, client, user1, &event11.ID)
 
 	wantUser1Messages = []sseEvent{event14, event15}
 	wantUser2Messages = []sseEvent{event13, event14, event15}
@@ -197,30 +193,72 @@ func TestEventHandler(t *testing.T) {
 	assert.EqualValuesf(t, wantUser2Messages, gotUser2Messages, "mismatch in expected messages for user %d", user2.ID)
 }
 
-func streamEvents(t *testing.T, ctx context.Context, url string, user *model.User, lastEventId *int64) <-chan sseEvent {
+func streamEvents(t *testing.T, ctx context.Context, client *inttest.HTTPClient, user *model.User, lastEventId *int64) <-chan sseEvent {
+	url := fmt.Sprintf("%s/events?user=%d", client.ServerURL, user.ID)
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	require.NoErrorf(t, err, "failed to create request to stream from %q for user %d", url, user.ID)
+
+	if lastEventId != nil {
+		req.Header.Add("Last-Event-ID", strconv.FormatInt(*lastEventId, 10))
+		t.Logf("User %d starts to stream from %q from Last-Event-ID %d", user.ID, url, *lastEventId)
+	} else {
+		t.Logf("User %d starts to stream from %q from next event", user.ID, url)
+	}
+	req.Header.Set("Cache-Control", "no-cache")
+	req.Header.Set("Accept", "text/event-stream")
+	req.Header.Set("Connection", "keep-alive")
+
 	out := make(chan sseEvent)
+	subscribed := make(chan struct{})
 	go func() {
-		sseClient := sse.NewClient(url + fmt.Sprintf("?user=%d", user.ID))
-		if lastEventId != nil {
-			sseClient.Headers["Last-Event-ID"] = strconv.FormatInt(*lastEventId, 10)
-			t.Logf("User %d starts to stream from %q from Last-Event-ID %d", user.ID, url, *lastEventId)
-		} else {
-			t.Logf("User %d starts to stream from %q from next event", user.ID, url)
+		resp, err := client.Client.Do(req)
+		require.NoErrorf(t, err, "failed to stream from %q for user %d", url, user.ID)
+		require.Equal(t, http.StatusOK, resp.StatusCode, "failed to stream from %q for user %d", url, user.ID)
+		close(subscribed)
+		defer resp.Body.Close()
+		// TODO how to deal with errors more gracefully?
+		sc := bufio.NewScanner(resp.Body)
+		var event sseEvent
+		var gotData bool
+		var newlineCount int
+		for sc.Scan() {
+			line := sc.Text()
+			before, after, found := strings.Cut(line, ":")
+			if found {
+				switch before {
+				case "id":
+					id, err := strconv.ParseInt(after, 10, 64)
+					require.NoError(t, err, "failed to parse SSE event ID")
+					event.ID = id
+				case "event":
+					event.Event = after
+				case "data":
+					event.Data = []byte(after)
+					t.Logf("Got data: %q in line %q", after, line)
+					gotData = true
+					newlineCount++
+				}
+			} else if gotData {
+				newlineCount++
+				t.Logf("got newline %d", newlineCount)
+			}
+
+			if newlineCount == 2 { // SSE event is done
+				out <- event
+				newlineCount = 0
+			}
 		}
 
-		err := sseClient.SubscribeWithContext(ctx, "", func(msg *sse.Event) {
-			select {
-			case <-ctx.Done():
-				return
-			case out <- translateEvent(t, msg):
-			}
-		})
-		require.NoError(t, err, "failed to stream from %q for user %d", url, user.ID)
-
-		<-ctx.Done()
+		require.NoErrorf(t, sc.Err(), "error scanning event stream from %q for user %d", url, user.ID)
 		t.Logf("User %d stops to stream from %q due: %v", user.ID, url, context.Cause(ctx))
 		close(out)
 	}()
+
+	// select {
+	// case <-ctx.Done():
+	// case <-subscribed:
+	// }
+
 	return out
 }
 
@@ -229,18 +267,6 @@ type sseEvent struct {
 	ID    int64
 	Event string
 	Data  []byte
-}
-
-// translateEvent is translating an sse.Event from the 3rd party library to our sseEvent used in
-// assertions. The plan is to remove the 3rd party library.
-func translateEvent(t *testing.T, msg *sse.Event) sseEvent {
-	id, err := strconv.ParseInt(string(msg.ID), 10, 64)
-	require.NoError(t, err, "failed to parse SSE event ID")
-	return sseEvent{
-		ID:    id,
-		Event: string(msg.Event),
-		Data:  msg.Data,
-	}
 }
 
 // eventEmitter emits an event to RabbitMQ which can then be streamed via SSE from the event handler.

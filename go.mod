@@ -26,7 +26,6 @@ require (
 	github.com/lib/pq v1.10.9
 	github.com/orandin/slog-gorm v1.3.2
 	github.com/orlangure/gnomock v0.30.0
-	github.com/r3labs/sse/v2 v2.10.0
 	github.com/rabbitmq/amqp091-go v1.10.0
 	github.com/rabbitmq/rabbitmq-stream-go-client v1.4.4
 	github.com/samber/slog-gin v1.13.3
@@ -236,7 +235,6 @@ require (
 	google.golang.org/grpc v1.63.2 // indirect
 	google.golang.org/protobuf v1.34.1 // indirect
 	gopkg.in/alexcesaro/quotedprintable.v3 v3.0.0-20150716171945-2caba252f4dc // indirect
-	gopkg.in/cenkalti/backoff.v1 v1.1.0 // indirect
 	gopkg.in/evanphx/json-patch.v5 v5.7.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
