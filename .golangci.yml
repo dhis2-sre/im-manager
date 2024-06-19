@@ -4,6 +4,8 @@ linters:
   enable:
     - errcheck
     - forbidigo
+    - gocritic
+    - gosec
     - gosimple
     - govet
     - ineffassign
