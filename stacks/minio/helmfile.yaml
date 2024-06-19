@@ -1,0 +1,23 @@
+releases:
+  - name: {{ requiredEnv "INSTANCE_NAME" }}-minio
+    namespace: "{{ requiredEnv "INSTANCE_NAMESPACE" }}"
+    chart: bitnami/minio
+    version: "{{ requiredEnv "CHART_VERSION" }}"
+    verify: false
+    values:
+      - commonLabels:
+          im: "true"
+          im-default: "true"
+          im-deployment-id: "{{ requiredEnv "DEPLOYMENT_ID" }}"
+          im-instance-id: "{{ requiredEnv "INSTANCE_ID" }}"
+          im-id: "{{ requiredEnv "INSTANCE_ID" }}"
+          im-type: "minio"
+          im-creation-timestamp: "{{ requiredEnv "INSTANCE_CREATION_TIMESTAMP" }}"
+          im-ttl: "{{ requiredEnv "INSTANCE_TTL" }}"
+      - auth:
+          rootUser: {{ requiredEnv "MINIO_ROOT_USER" }}
+          rootPassword: {{ requiredEnv "MINIO_ROOT_PASSWORD" }}
+
+repositories:
+  - name: bitnami
+    url: https://charts.bitnami.com/bitnami

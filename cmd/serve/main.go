@@ -99,6 +99,7 @@ func run() error {
 	stacks, err := stack.New(
 		stack.DHIS2DB,
 		stack.DHIS2Core,
+		stack.MinIO,
 		stack.DHIS2,
 		stack.PgAdmin,
 		stack.WhoamiGo,

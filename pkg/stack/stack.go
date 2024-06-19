@@ -207,9 +207,13 @@ var DHIS2Core = model.Stack{
 		"DATABASE_NAME":                   {Priority: 0, DisplayName: "Database Name", Consumed: true},
 		"DATABASE_PASSWORD":               {Priority: 0, DisplayName: "Database Password", Consumed: true},
 		"DATABASE_USERNAME":               {Priority: 0, DisplayName: "Database Username", Consumed: true},
+		"MINIO_ROOT_USER":                 {Priority: 0, DisplayName: "MinIO Root Username", Consumed: true},
+		"MINIO_ROOT_PASSWORD":             {Priority: 0, DisplayName: "MinIO Root Password", Consumed: true},
+		"MINIO_HOSTNAME":                  {Priority: 0, DisplayName: "MinIO Hostname", Consumed: true},
 	},
 	Requires: []model.Stack{
 		DHIS2DB,
+		MinIO,
 	},
 	KubernetesResource: model.StatefulSetResource,
 }
@@ -238,7 +242,7 @@ var dhis2CoreDefaults = struct {
 	enablePersistentStorage      string
 	persistentStorageVolumeSize  string
 }{
-	chartVersion:                 "0.18.0",
+	chartVersion:                 "0.16.1",
 	dhis2Home:                    "/opt/dhis2",
 	flywayMigrateOutOfOrder:      "false",
 	flywayRepairBeforeMigration:  "false",
@@ -310,6 +314,35 @@ var dhis2Defaults = struct {
 }{
 	installRedis: "false",
 }
+
+// Stack representing ../../stacks/minio/helmfile.yaml
+var MinIO = model.Stack{
+	Name: "minio",
+	Parameters: model.StackParameters{
+		"MINIO_ROOT_USER":     {Priority: 1, DisplayName: "MinIO Root Username", DefaultValue: &minIODefaults.rootUser},
+		"MINIO_ROOT_PASSWORD": {Priority: 2, DisplayName: "MinIO Root Password", DefaultValue: &minIODefaults.rootPassword},
+		"CHART_VERSION":       {Priority: 3, DisplayName: "Chart Version", DefaultValue: &minIODefaults.chartVersion},
+	},
+	ParameterProviders: model.ParameterProviders{
+		"MINIO_HOSTNAME": minIOHostnameProvider,
+	},
+	KubernetesResource: model.StatefulSetResource,
+}
+
+var minIODefaults = struct {
+	chartVersion string
+	rootUser     string
+	rootPassword string
+}{
+	chartVersion: "14.6.7",
+	rootUser:     "admin",
+	rootPassword: "dhisdhis",
+}
+
+// Provides the MinIO hostname of an instance.
+var minIOHostnameProvider = model.ParameterProviderFunc(func(instance model.DeploymentInstance) (string, error) {
+	return fmt.Sprintf("%s-minio.%s.svc", instance.Name, instance.GroupName), nil
+})
 
 // Stack representing ../../stacks/pgadmin/helmfile.yaml
 var PgAdmin = model.Stack{
