@@ -202,11 +202,18 @@ func run() (err error) {
 	database.Routes(r, authentication.TokenAuthentication, databaseHandler)
 	instance.Routes(r, authentication.TokenAuthentication, instanceHandler)
 
+	foo(context.Background(), logger)
+
 	logger.Info("Listening and serving HTTP")
 	if err := r.Run(); err != nil {
 		return fmt.Errorf("failed to start the HTTP server: %v", err)
 	}
 	return nil
+}
+
+func foo(ctx context.Context, logger *slog.Logger) {
+	logger.Info("foo")
+	_ = ctx
 }
 
 func hostname() string {
