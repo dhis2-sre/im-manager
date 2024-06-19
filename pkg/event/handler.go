@@ -74,6 +74,7 @@ func (h Handler) StreamEvents(c *gin.Context) {
 	retry := computeRetry()
 	logger = h.logger.With("retry", retry)
 
+	userGroups := userGroups(user)
 	filter := stream.NewConsumerFilter(maps.Keys(userGroups), true, postFilter(logger, user.ID, userGroups))
 	opts := stream.NewConsumerOptions().
 		SetConsumerName(consumerName).
