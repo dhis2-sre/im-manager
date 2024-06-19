@@ -5,6 +5,7 @@ keys:
 
 init:
 	pip install pre-commit
+	pre-commit clean
 	pre-commit install --install-hooks --overwrite
 
 	go install github.com/direnv/direnv@latest
@@ -12,14 +13,11 @@ init:
 
 	go install golang.org/x/tools/cmd/goimports@latest
 
-	go install github.com/securego/gosec/v2/cmd/gosec@latest
-	gosec --version
-
 	go install github.com/go-swagger/go-swagger/cmd/swagger@latest
 	swagger version
 
 check:
-	pre-commit run --all-files --show-diff-on-failure
+	pre-commit run --verbose --all-files --show-diff-on-failure
 
 smoke-test:
 	IMAGE_TAG=$(tag) docker compose up -d prod

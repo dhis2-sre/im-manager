@@ -23,3 +23,4 @@ linters-settings:
     no-global: "all"
     static-msg: true
     key-naming-case: camel
+    context: scope
