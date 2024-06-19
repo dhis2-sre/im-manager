@@ -13,9 +13,10 @@ repos:
       - id: go-mod-tidy
 
   - repo: https://github.com/golangci/golangci-lint
-    rev: v1.57.2
+    rev: v1.59.1
     hooks:
       - id: golangci-lint
+        args: [--verbose]
 
   - repo: https://github.com/commitizen-tools/commitizen
     rev: v2.24.0
