@@ -58,7 +58,7 @@ func (h Handler) StreamEvents(c *gin.Context) {
 	consumerName := fmt.Sprintf("user-%d-%s", user.ID, uuid.NewString())
 	logger := h.logger.WithGroup("consumer").With("name", consumerName)
 
-	userGroups := userGroups(user)
+	userGroups := mapUserGroups(user)
 	if len(userGroups) == 0 {
 		_ = c.AbortWithError(403, errors.New("You cannot stream events as you are not part of a group. Ask an administrator for help."))
 		return
@@ -74,7 +74,6 @@ func (h Handler) StreamEvents(c *gin.Context) {
 	retry := computeRetry()
 	logger = h.logger.With("retry", retry)
 
-	userGroups := userGroups(user)
 	filter := stream.NewConsumerFilter(maps.Keys(userGroups), true, postFilter(logger, user.ID, userGroups))
 	opts := stream.NewConsumerOptions().
 		SetConsumerName(consumerName).
@@ -139,7 +138,7 @@ func computeRetry() uint {
 	return base + rand.UintN(maxJitter) //nolint:gosec
 }
 
-func userGroups(user *model.User) map[string]struct{} {
+func mapUserGroups(user *model.User) map[string]struct{} {
 	result := make(map[string]struct{}, len(user.Groups))
 	for _, group := range user.Groups {
 		result[group.Name] = struct{}{}
