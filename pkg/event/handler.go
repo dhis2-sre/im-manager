@@ -250,7 +250,7 @@ func mapMessageToEvent(retry uint, offset int64, message *amqp.Message) (sse.Eve
 
 	kindProperty, ok := message.ApplicationProperties["kind"]
 	if !ok {
-		return sse.Event{}, errors.New(`RabbitMQ message is missind application property "kind"`)
+		return sse.Event{}, errors.New(`RabbitMQ message is missing application property "kind"`)
 	}
 	kind, ok := kindProperty.(string)
 	if !ok {
