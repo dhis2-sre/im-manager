@@ -258,9 +258,12 @@ func mapMessageToEvent(retry uint, offset int64, message *amqp.Message) (sse.Eve
 		return sse.Event{}, fmt.Errorf("type assertion of RabbitMQ message application property %q failed, value=%v", "type", kindProperty)
 	}
 
+	// string() is needed as sse.Event will marshall using fmt.Sprint() which prints `[65]` for
+	// []byte{"A"} instead of `A`
+	data := string(message.Data[0])
 	return sse.Event{
 		Id:    strconv.FormatInt(offset, 10),
-		Data:  string(message.Data[0]),
+		Data:  data,
 		Retry: retry,
 		Event: kind,
 	}, nil
