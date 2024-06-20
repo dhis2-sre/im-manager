@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/dhis2-sre/im-manager/internal/errdef"
 	"github.com/dhis2-sre/im-manager/internal/handler"
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	"github.com/gin-contrib/sse"
@@ -55,20 +56,20 @@ func (h Handler) StreamEvents(c *gin.Context) {
 		return
 	}
 
-	consumerName := fmt.Sprintf("user-%d-%s", user.ID, uuid.NewString())
-	logger := h.logger.WithGroup("consumer").With("name", consumerName)
-
 	userGroups := mapUserGroups(user)
 	if len(userGroups) == 0 {
-		_ = c.AbortWithError(403, errors.New("You cannot stream events as you are not part of a group. Ask an administrator for help."))
+		_ = c.Error(errdef.NewForbidden("You cannot stream events as you are not part of a group. Ask an administrator for help."))
 		return
 	}
+
+	consumerName := fmt.Sprintf("user-%d-%s", user.ID, uuid.NewString())
+	logger := h.logger.WithGroup("consumer").With("name", consumerName)
 
 	// check offset to return 400 before any other header in case of an error
 	offsetSpec, err := computeOffsetSpec(c)
 	if err != nil {
 		logger.Error("Failed to compute RabbitMQ offset spec", "error", err)
-		_ = c.AbortWithError(400, err)
+		_ = c.Error(err)
 		return
 	}
 	retry := computeRetry()
@@ -85,7 +86,7 @@ func (h Handler) StreamEvents(c *gin.Context) {
 	consumer, err := ha.NewReliableConsumer(h.env, h.streamName, opts, messageHandler)
 	if err != nil {
 		logger.Error("Failed to create RabbitMQ consumer", "error", err)
-		_ = c.AbortWithError(500, err)
+		_ = c.Error(err)
 		return
 	}
 	defer consumer.Close()
@@ -121,10 +122,9 @@ func computeOffsetSpec(c *gin.Context) (stream.OffsetSpecification, error) {
 		return stream.OffsetSpecification{}.Next(), nil
 	}
 
-	// "Last-Event-ID" header is sent when SSE clients re-connect
 	lastOffset, err := strconv.ParseInt(lastEventID, 10, 64)
 	if err != nil {
-		return stream.OffsetSpecification{}, fmt.Errorf("invalid %q value: %v", "Last-Event-ID", err)
+		return stream.OffsetSpecification{}, errdef.NewBadRequest("invalid header %q value: %v", "Last-Event-ID", err)
 	}
 
 	return stream.OffsetSpecification{}.Offset(lastOffset + 1), nil
@@ -175,7 +175,6 @@ func isUserMessageOwner(logger *slog.Logger, userID uint, applicationProperties 
 	if err != nil {
 		logger.Error("Failed to parse RabbitMQ message application property to a uint", "messageProperty", "owner", "messagePropertyValue", owner, "error", err)
 		return false
-
 	}
 
 	return messageOwnerID == uint64(userID)
