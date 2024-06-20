@@ -248,22 +248,19 @@ func mapMessageToEvent(retry uint, offset int64, message *amqp.Message) (sse.Eve
 		return sse.Event{}, errors.New("received no data")
 	}
 
-	var event string
-	if kindProperty, ok := message.ApplicationProperties["kind"]; ok {
-		if kind, ok := kindProperty.(string); ok {
-			event = kind
-		} else {
-			return sse.Event{}, fmt.Errorf("type assertion of RabbitMQ message application property %q failed, value=%v", "type", kindProperty)
-		}
+	kindProperty, ok := message.ApplicationProperties["kind"]
+	if !ok {
+		return sse.Event{}, errors.New(`RabbitMQ message is missind application property "kind"`)
+	}
+	kind, ok := kindProperty.(string)
+	if !ok {
+		return sse.Event{}, fmt.Errorf("type assertion of RabbitMQ message application property %q failed, value=%v", "type", kindProperty)
 	}
 
-	sseEvent := sse.Event{
+	return sse.Event{
 		Id:    strconv.FormatInt(offset, 10),
 		Data:  string(message.Data[0]),
 		Retry: retry,
-	}
-	if event != "" { // SSE named event
-		sseEvent.Event = event
-	}
-	return sseEvent, nil
+		Event: kind,
+	}, nil
 }
