@@ -58,7 +58,7 @@ func (h Handler) StreamEvents(c *gin.Context) {
 
 	userGroups := mapUserGroups(user)
 	if len(userGroups) == 0 {
-		_ = c.Error(errdef.NewForbidden("You cannot stream events as you are not part of a group. Ask an administrator for help."))
+		_ = c.Error(errdef.NewForbidden("you cannot stream events as you are not part of a group. Ask an administrator for help."))
 		return
 	}
 
