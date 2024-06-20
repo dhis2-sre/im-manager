@@ -135,6 +135,7 @@ func computeOffsetSpec(c *gin.Context) (stream.OffsetSpecification, error) {
 func computeRetry() uint {
 	var base, maxJitter uint = 3_000, 1_001
 	// math rand v2 has the better API and is good enough for computing the jitter
+	// uses a half-open interval [0,n) so 1000ms+1ms
 	return base + rand.UintN(maxJitter) //nolint:gosec
 }
 
