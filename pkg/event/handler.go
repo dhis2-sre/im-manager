@@ -221,7 +221,7 @@ func createMessageHandler(c *gin.Context, logger *slog.Logger, retry uint) (<-ch
 			if r := recover(); r != nil {
 				logger.ErrorContext(c, "RabbitMQ message handler panicked", "recover", r)
 				// We assume that we cannot recover from a panic in a message handler. We thus panic
-				// again. We do want to log any panic to be notfied.
+				// again. We do want to log any panic to be notified.
 				panic(r)
 			}
 		}()
