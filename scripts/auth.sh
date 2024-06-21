@@ -7,8 +7,8 @@ IM_USER_TYPE="${1:-}"
 TOKEN_CACHE_FILE=./.access_token_cache_$IM_USER_TYPE
 touch "$TOKEN_CACHE_FILE"
 
-ACCESS_TOKEN="$(cat "$TOKEN_CACHE_FILE" || "")"
-exp=$(echo "$ACCESS_TOKEN" | jq -R 'split(".")? | .[1] | @base64d | fromjson | .exp')
+ACCESS_TOKEN="$(cat "$TOKEN_CACHE_FILE" || echo "")"
+exp=$(echo "$ACCESS_TOKEN" | jq -r 'split(".")? | .[1] | @base64d | fromjson | .exp')
 NOW=$(date +%s)
 if [[ -z "$exp" ]] || (( exp < NOW )); then
   if [ "$IM_USER_TYPE" == "Admin" ]; then
