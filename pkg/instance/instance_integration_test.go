@@ -208,11 +208,11 @@ func TestInstanceHandler(t *testing.T) {
 		k8sClient.AssertPodIsNotRunning(t, deploymentInstance.GroupName, deploymentInstance.Name)
 	})
 
-	t.Run("PublicDeployment", func(t *testing.T) {
+	t.Run("GetPublicDeployments", func(t *testing.T) {
 		t.Log("Create deployment")
 		var deployment model.Deployment
 		body := strings.NewReader(`{
-			"name": "test-deployment",
+			"name": "private-deployment",
 			"group": "group-name",
 			"description": "some description"
 		}`)
