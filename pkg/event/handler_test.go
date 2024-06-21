@@ -2,16 +2,21 @@ package event
 
 import (
 	"log/slog"
+	"net/http/httptest"
 	"os"
 	"strconv"
 	"testing"
 
+	"github.com/gin-gonic/gin"
 	"github.com/rabbitmq/rabbitmq-stream-go-client/pkg/amqp"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestEventPostFilter(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
+	w := httptest.ResponseRecorder{}
+	c := gin.CreateTestContextOnly(&w, &gin.Engine{})
+
 	var user1 uint = 1
 	user1GroupsMap := map[string]struct{}{
 		"group1": {},
@@ -117,7 +122,7 @@ func TestEventPostFilter(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			got := postFilter(logger, test.userID, test.userGroupsMap)(&test.message)
+			got := postFilter(c, logger, test.userID, test.userGroupsMap)(&test.message)
 
 			assert.Equal(t, test.want, got)
 		})

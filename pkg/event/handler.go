@@ -62,30 +62,32 @@ func (h Handler) StreamEvents(c *gin.Context) {
 		return
 	}
 
-	consumerName := fmt.Sprintf("user-%d-%s", user.ID, uuid.NewString())
-	logger := h.logger.WithGroup("consumer").With("name", consumerName)
-
 	// check offset to return 400 before any other header in case of an error
 	offsetSpec, err := computeOffsetSpec(c)
 	if err != nil {
-		logger.Error("Failed to compute RabbitMQ offset spec", "error", err)
+		h.logger.ErrorContext(c, "Failed to compute RabbitMQ offset spec", "error", err)
 		_ = c.Error(err)
 		return
 	}
-	retry := computeRetry()
-	logger = h.logger.With("retry", retry)
 
-	filter := stream.NewConsumerFilter(maps.Keys(userGroups), true, postFilter(logger, user.ID, userGroups))
+	consumerName := fmt.Sprintf("user-%d-%s", user.ID, uuid.NewString())
+	retry := computeRetry()
+	logger := h.logger.
+		With("consumerName", consumerName).
+		With("consumerOffsetSpec", offsetSpec.String()).
+		With("sseRetry", retry)
+
+	filter := stream.NewConsumerFilter(maps.Keys(userGroups), true, postFilter(c, logger, user.ID, userGroups))
 	opts := stream.NewConsumerOptions().
 		SetConsumerName(consumerName).
 		SetClientProvidedName(consumerName).
 		SetManualCommit().
 		SetOffset(offsetSpec).
 		SetFilter(filter)
-	sseEvents, messageHandler := createMessageHandler(c.Request.Context().Done(), logger, retry)
+	sseEvents, messageHandler := createMessageHandler(c, logger, retry)
 	consumer, err := ha.NewReliableConsumer(h.env, h.streamName, opts, messageHandler)
 	if err != nil {
-		logger.Error("Failed to create RabbitMQ consumer", "error", err)
+		logger.ErrorContext(c, "Failed to create RabbitMQ consumer", "error", err)
 		_ = c.Error(err)
 		return
 	}
@@ -97,12 +99,12 @@ func (h Handler) StreamEvents(c *gin.Context) {
 	c.Writer.Header().Set("Transfer-Encoding", "chunked")
 	c.Writer.WriteHeader(http.StatusOK)
 	c.Writer.Flush()
-	logger.Info("Connection established for sending SSE events", "offsetSpec", offsetSpec)
+	logger.InfoContext(c, "Connection established for sending SSE events")
 
 	for {
 		select {
 		case <-c.Request.Context().Done():
-			logger.Info("Request canceled, returning from handler")
+			logger.InfoContext(c, "Request canceled, returning from /events handler")
 			return
 		case sseEvent := <-sseEvents:
 			c.Render(-1, sseEvent)
@@ -150,9 +152,17 @@ func mapUserGroups(user *model.User) map[string]struct{} {
 // postFilter is a RabbitMQ stream post filter that is applied client side. This is necessary as the
 // server side filter is probabilistic and can let false positives through. (see
 // https://www.rabbitmq.com/blog/2023/10/16/stream-filtering) The filter must be simple and fast.
-func postFilter(logger *slog.Logger, userID uint, userGroupsMap map[string]struct{}) stream.PostFilter {
+func postFilter(c *gin.Context, logger *slog.Logger, userID uint, userGroups map[string]struct{}) stream.PostFilter {
 	return func(message *amqp.Message) bool {
-		return isUserMessageOwner(logger, userID, message.ApplicationProperties) && isUserPartOfMessageGroup(logger, userGroupsMap, message.ApplicationProperties)
+		isOwner, err := isUserMessageOwner(userID, message.ApplicationProperties)
+		if err != nil {
+			logger.ErrorContext(c, "Failed to post filter RabbitMQ message", "error", err, "applicationProperties", message.ApplicationProperties)
+		}
+		isInGroup, err := isUserPartOfMessageGroup(userGroups, message.ApplicationProperties)
+		if err != nil {
+			logger.ErrorContext(c, "Failed to post filter RabbitMQ message", "error", err, "applicationProperties", message.ApplicationProperties)
+		}
+		return isOwner && isInGroup
 	}
 }
 
@@ -160,45 +170,42 @@ func postFilter(logger *slog.Logger, userID uint, userGroupsMap map[string]struc
 // considers the "owner" property of a message. Messages that have no owner can be read by the user.
 // Messages that have an owner can only be read by the user if the "owner" property value can be
 // parsed and matches the userID.
-func isUserMessageOwner(logger *slog.Logger, userID uint, applicationProperties map[string]any) bool {
+func isUserMessageOwner(userID uint, applicationProperties map[string]any) (bool, error) {
 	owner, ok := applicationProperties["owner"]
 	if !ok {
-		return true
+		return true, nil
 	}
 
 	messageOwner, ok := owner.(string)
 	if !ok {
-		logger.Error("Failed to type assert RabbitMQ message application property to a string", "messageProperty", "owner", "messagePropertyValue", owner)
-		return false
+		return false, errors.New(`failed to type assert RabbitMQ message application property "owner" to a string`)
 	}
 
 	messageOwnerID, err := strconv.ParseUint(messageOwner, 10, 64)
 	if err != nil {
-		logger.Error("Failed to parse RabbitMQ message application property to a uint", "messageProperty", "owner", "messagePropertyValue", owner, "error", err)
-		return false
+		return false, fmt.Errorf("failed to parse RabbitMQ message application property \"owner\" to a uint: %v", err)
 	}
 
-	return messageOwnerID == uint64(userID)
+	return messageOwnerID == uint64(userID), nil
 }
 
 // isUserPartOfMessageGroup determines if the user is allowed to receive the message. This function
 // only considers the "group" property of a message. Messages that have no group can be read by the
 // user. Messages that have a group can only be read by the user if the "group" property value can
 // be parsed and matches one of the userGroupsMap.
-func isUserPartOfMessageGroup(logger *slog.Logger, userGroups map[string]struct{}, applicationProperties map[string]any) bool {
+func isUserPartOfMessageGroup(userGroups map[string]struct{}, applicationProperties map[string]any) (bool, error) {
 	group, ok := applicationProperties["group"]
 	if !ok {
-		return true
+		return true, nil
 	}
 
 	messageGroup, ok := group.(string)
 	if !ok {
-		logger.Error("Failed to type assert RabbitMQ message application property to a string", "messageProperty", "group", "messagePropertyValue", group)
-		return false
+		return false, errors.New(`failed to type assert RabbitMQ message application property "group" to a string`)
 	}
 
 	_, ok = userGroups[messageGroup]
-	return ok
+	return ok, nil
 }
 
 // createMessageHandler returns stream.MessagesHandler that will transform RabbitMQ messages of
@@ -206,12 +213,12 @@ func isUserPartOfMessageGroup(logger *slog.Logger, userGroups map[string]struct{
 // returned. This is to avoid race conditions when writing the data out to the HTTP response writer.
 // Only one Go routine should write to the HTTP response writer. The RabbitMQ stream client runs our
 // stream.MessagesHandler in a separate Go routine.
-func createMessageHandler(done <-chan struct{}, logger *slog.Logger, retry uint) (<-chan sse.Event, stream.MessagesHandler) {
+func createMessageHandler(c *gin.Context, logger *slog.Logger, retry uint) (<-chan sse.Event, stream.MessagesHandler) {
 	out := make(chan sse.Event)
 	return out, func(consumerContext stream.ConsumerContext, message *amqp.Message) {
 		defer func() {
 			if r := recover(); r != nil {
-				logger.Error("RabbitMQ message handler panicked", "recover", r)
+				logger.ErrorContext(c, "RabbitMQ message handler panicked", "recover", r)
 				// We assume that we cannot recover from a panic in a message handler. We thus panic
 				// again. We do want to log any panic to be notfied.
 				panic(r)
@@ -219,20 +226,20 @@ func createMessageHandler(done <-chan struct{}, logger *slog.Logger, retry uint)
 		}()
 
 		select {
-		case <-done:
-			logger.Info("Request canceled, returning from messageHandler")
+		case <-c.Request.Context().Done():
+			logger.InfoContext(c, "Request canceled, returning from /events messageHandler")
 			close(out)
 			return
 		default:
 			sseEvent, err := mapMessageToEvent(retry, consumerContext.Consumer.GetOffset(), message)
 			if err != nil {
-				logger.Error("Failed to map AMQP message", "error", err)
+				logger.ErrorContext(c, "Failed to map AMQP message", "error", err)
 				return
 			}
 
 			select {
-			case <-done:
-				logger.Info("Request canceled, returning from messageHandler")
+			case <-c.Request.Context().Done():
+				logger.InfoContext(c, "Request canceled, returning from messageHandler")
 				close(out)
 				return
 			case out <- sseEvent:
