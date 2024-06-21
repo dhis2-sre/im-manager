@@ -230,7 +230,7 @@ func streamEvents(t *testing.T, ctx context.Context, client *inttest.HTTPClient,
 				case "event":
 					event.Event = fieldValue
 				case "data":
-					event.Data = []byte(fieldValue)
+					event.Data = fieldValue
 					gotData = true
 					newlineCount++
 				}
@@ -258,7 +258,7 @@ func streamEvents(t *testing.T, ctx context.Context, client *inttest.HTTPClient,
 type sseEvent struct {
 	ID    int64
 	Event string
-	Data  []byte
+	Data  string
 }
 
 // eventEmitter emits an event to RabbitMQ which can then be streamed via SSE from the event handler.
@@ -308,8 +308,8 @@ func (es *eventEmitter) emit(t *testing.T, kind, group string, owner *model.User
 	streamOffset := es.eventCount
 	es.eventCount++
 
-	data := []byte(strconv.FormatInt(es.eventCount, 10))
-	message := amqp.NewMessage(data)
+	data := strconv.FormatInt(es.eventCount, 10)
+	message := amqp.NewMessage([]byte(data))
 	// set a publishing id for deduplication
 	message.SetPublishingId(es.eventCount)
 	// set properties used for filtering

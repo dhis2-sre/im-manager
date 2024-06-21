@@ -258,8 +258,9 @@ func mapMessageToEvent(retry uint, offset int64, message *amqp.Message) (sse.Eve
 		return sse.Event{}, fmt.Errorf("type assertion of RabbitMQ message application property %q failed, value=%v", "type", kindProperty)
 	}
 
-	// string() is needed as sse.Event will marshall using fmt.Sprint() which prints `[65]` for
-	// []byte{"A"} instead of `A`
+	// text/event-stream is text based. Thus our data needs to be converted to a string. Gin
+	// sse.Event marshalls the Data field using fmt.Sprint which uses the default formatting verb %v
+	// which for a []byte would print `[65]` for []byte{"A"} instead of `A`
 	data := string(message.Data[0])
 	return sse.Event{
 		Id:    strconv.FormatInt(offset, 10),
