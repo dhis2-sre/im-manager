@@ -156,10 +156,12 @@ func postFilter(c *gin.Context, logger *slog.Logger, userID uint, userGroups map
 		isOwner, err := isUserMessageOwner(userID, message.ApplicationProperties)
 		if err != nil {
 			logger.ErrorContext(c, "Failed to post filter RabbitMQ message", "error", err, "applicationProperties", message.ApplicationProperties)
+			return false
 		}
 		isInGroup, err := isInMessageGroup(userGroups, message.ApplicationProperties)
 		if err != nil {
 			logger.ErrorContext(c, "Failed to post filter RabbitMQ message", "error", err, "applicationProperties", message.ApplicationProperties)
+			return false
 		}
 		return isOwner && isInGroup
 	}
