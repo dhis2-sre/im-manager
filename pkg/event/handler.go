@@ -191,7 +191,7 @@ func isUserMessageOwner(userID uint, applicationProperties map[string]any) (bool
 // isUserPartOfMessageGroup determines if the user is allowed to receive the message. This function
 // only considers the "group" property of a message. Messages that have no group can be read by the
 // user. Messages that have a group can only be read by the user if the "group" property value can
-// be parsed and matches one of the userGroupsMap.
+// be parsed and matches one of the userGroups.
 func isUserPartOfMessageGroup(userGroups map[string]struct{}, applicationProperties map[string]any) (bool, error) {
 	group, ok := applicationProperties["group"]
 	if !ok {
