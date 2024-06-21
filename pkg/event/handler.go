@@ -62,7 +62,6 @@ func (h Handler) StreamEvents(c *gin.Context) {
 		return
 	}
 
-	// check offset to return 400 before any other header in case of an error
 	offsetSpec, err := computeOffsetSpec(c)
 	if err != nil {
 		h.logger.ErrorContext(c, "Failed to compute RabbitMQ offset spec", "error", err)
