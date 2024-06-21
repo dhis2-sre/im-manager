@@ -6,6 +6,8 @@ GROUP=$1
 HOSTNAME=$2
 DEPLOYABLE=${3:-false}
 
+source ./auth.sh Admin
+
 echo "{
   \"name\": \"$GROUP\",
   \"hostname\": \"$HOSTNAME\",

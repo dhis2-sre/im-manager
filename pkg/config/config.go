@@ -7,6 +7,8 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"log/slog"
+	"net/http"
 	"os"
 	"strconv"
 	"strings"
@@ -28,9 +30,9 @@ type Config struct {
 	Postgresql                     Postgresql
 	RabbitMqURL                    rabbitmq
 	SMTP                           smtp
-	Redis                          redis
+	Redis                          Redis
 	Authentication                 Authentication
-	Groups                         []group
+	Groups                         []Group
 	AdminUser                      user
 	E2eTestUser                    user
 	S3Bucket                       string
@@ -82,18 +84,16 @@ func New() Config {
 			Username: requireEnv("RABBITMQ_USERNAME"),
 			Password: requireEnv("RABBITMQ_PASSWORD"),
 		},
-		Redis: redis{
+		Redis: Redis{
 			Host: requireEnv("REDIS_HOST"),
 			Port: requireEnvAsInt("REDIS_PORT"),
 		},
 		Authentication: Authentication{
-			Keys: keys{
-				PrivateKey: requireEnv("PRIVATE_KEY"),
-				PublicKey:  requireEnv("PUBLIC_KEY"),
-			},
-			RefreshTokenSecretKey:         requireEnv("REFRESH_TOKEN_SECRET_KEY"),
-			AccessTokenExpirationSeconds:  requireEnvAsInt("ACCESS_TOKEN_EXPIRATION_IN_SECONDS"),
-			RefreshTokenExpirationSeconds: requireEnvAsInt("REFRESH_TOKEN_EXPIRATION_IN_SECONDS"),
+			SameSiteMode:                            sameSiteMode(),
+			RefreshTokenSecretKey:                   requireEnv("REFRESH_TOKEN_SECRET_KEY"),
+			AccessTokenExpirationSeconds:            requireEnvAsInt("ACCESS_TOKEN_EXPIRATION_IN_SECONDS"),
+			RefreshTokenExpirationSeconds:           requireEnvAsInt("REFRESH_TOKEN_EXPIRATION_IN_SECONDS"),
+			RefreshTokenRememberMeExpirationSeconds: requireEnvAsInt("REFRESH_TOKEN_REMEMBER_ME_EXPIRATION_IN_SECONDS"),
 		},
 		Groups:      newGroups(),
 		AdminUser:   newAdminUser(),
@@ -102,6 +102,23 @@ func New() Config {
 		S3Region:    requireEnv("S3_REGION"),
 		S3Endpoint:  os.Getenv("S3_ENDPOINT"),
 	}
+}
+
+func sameSiteMode() http.SameSite {
+	sameSiteMode := requireEnv("SAME_SITE_MODE")
+	switch sameSiteMode {
+	case "default":
+		return http.SameSiteDefaultMode
+	case "lax":
+		return http.SameSiteLaxMode
+	case "strict":
+		return http.SameSiteStrictMode
+	case "none":
+		return http.SameSiteNoneMode
+	}
+
+	log.Fatalf("Can't parse same site mode: %s\n", sameSiteMode)
+	return -1
 }
 
 type Service struct {
@@ -142,25 +159,25 @@ func (r rabbitmq) GetUrl() string {
 	return fmt.Sprintf("amqp://%s:%s@%s:%d/", r.Username, r.Password, r.Host, r.Port)
 }
 
-type redis struct {
+type Redis struct {
 	Host string
 	Port int
 }
 
 type Authentication struct {
-	Keys                          keys
-	RefreshTokenSecretKey         string
-	AccessTokenExpirationSeconds  int
-	RefreshTokenExpirationSeconds int
+	SameSiteMode                            http.SameSite
+	RefreshTokenSecretKey                   string
+	AccessTokenExpirationSeconds            int
+	RefreshTokenExpirationSeconds           int
+	RefreshTokenRememberMeExpirationSeconds int
 }
 
-type keys struct {
-	PrivateKey string
-	PublicKey  string
-}
-
-func (k keys) GetPrivateKey() (*rsa.PrivateKey, error) {
-	decode, _ := pem.Decode([]byte(k.PrivateKey))
+func GetPrivateKey(logger *slog.Logger) (*rsa.PrivateKey, error) {
+	key, err := requireEnvNew("PRIVATE_KEY")
+	if err != nil {
+		return nil, err
+	}
+	decode, _ := pem.Decode([]byte(key))
 	if decode == nil {
 		return nil, errors.New("failed to decode private key")
 	}
@@ -170,7 +187,7 @@ func (k keys) GetPrivateKey() (*rsa.PrivateKey, error) {
 	privateKey, err := x509.ParsePKCS8PrivateKey(decode.Bytes)
 	if err != nil {
 		if err.Error() == "x509: failed to parse private key (use ParsePKCS1PrivateKey instead for this key format)" {
-			log.Println("Trying to parse PKCS1 format...")
+			logger.Info("Trying to parse PKCS1 format...")
 			privateKey, err = x509.ParsePKCS1PrivateKey(decode.Bytes)
 			if err != nil {
 				return nil, err
@@ -178,32 +195,18 @@ func (k keys) GetPrivateKey() (*rsa.PrivateKey, error) {
 		} else {
 			return nil, err
 		}
-		log.Println("Successfully parsed private key")
+		logger.Info("Successfully parsed private key")
 	}
 
 	return privateKey.(*rsa.PrivateKey), nil
 }
 
-func (k keys) GetPublicKey() (*rsa.PublicKey, error) {
-	decode, _ := pem.Decode([]byte(k.PublicKey))
-	if decode == nil {
-		return nil, errors.New("failed to decode public key")
-	}
-
-	publicKey, err := x509.ParsePKIXPublicKey(decode.Bytes)
-	if err != nil {
-		return nil, err
-	}
-
-	return publicKey.(*rsa.PublicKey), nil
-}
-
-type group struct {
+type Group struct {
 	Name     string
 	Hostname string
 }
 
-func newGroups() []group {
+func newGroups() []Group {
 	groupNames := requireEnvAsArray("GROUP_NAMES")
 	groupHostnames := requireEnvAsArray("GROUP_HOSTNAMES")
 
@@ -211,7 +214,7 @@ func newGroups() []group {
 		log.Fatalf("len(GROUP_NAMES) != len(GROUP_HOSTNAMES)")
 	}
 
-	groups := make([]group, len(groupNames))
+	groups := make([]Group, len(groupNames))
 	for i := 0; i < len(groupNames); i++ {
 		groups[i].Name = groupNames[i]
 		groups[i].Hostname = groupHostnames[i]
@@ -245,12 +248,23 @@ func newE2eTestUser() user {
 	}
 }
 
+// Deprecated: requiredEnv is deprecated. Use requiredEnvNew instead.
+// TODO(DEVOPS-394) replace this function with requiredEnvNew, renaming requiredEnvNew to
+// requiredEnv
 func requireEnv(key string) string {
 	value, exists := os.LookupEnv(key)
 	if !exists {
 		log.Fatalf("Can't find environment variable: %s\n", key)
 	}
 	return value
+}
+
+func requireEnvNew(key string) (string, error) {
+	value, exists := os.LookupEnv(key)
+	if !exists {
+		return "", fmt.Errorf("required environment variable %q not set", key)
+	}
+	return value, nil
 }
 
 func requireEnvAsInt(key string) int {

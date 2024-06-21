@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"log/slog"
 	"mime/multipart"
 	"net/http"
 	"os"
@@ -36,15 +37,16 @@ func TestDatabaseHandler(t *testing.T) {
 	s3Bucket := "database-bucket"
 	err := os.Mkdir(s3Dir+"/"+s3Bucket, 0o755)
 	require.NoError(t, err, "failed to create S3 output bucket")
+	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	s3 := inttest.SetupS3(t, s3Dir)
 	uploader := manager.NewUploader(s3.Client)
-	s3Client := storage.NewS3Client(s3.Client, uploader)
+	s3Client := storage.NewS3Client(logger, s3.Client, uploader)
 
 	databaseRepository := database.NewRepository(db)
-	databaseService := database.NewService(s3Bucket, s3Client, groupService{}, databaseRepository)
+	databaseService := database.NewService(logger, s3Bucket, s3Client, groupService{}, databaseRepository)
 
 	client := inttest.SetupHTTPServer(t, func(engine *gin.Engine) {
-		databaseHandler := database.NewHandler(databaseService, groupService{groupName: "packages"}, instanceService{}, stackService{})
+		databaseHandler := database.NewHandler(logger, databaseService, groupService{groupName: "packages"}, instanceService{}, stackService{})
 		authenticator := func(ctx *gin.Context) {
 			ctx.Set("user", &model.User{
 				ID:    1,

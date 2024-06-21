@@ -3,7 +3,6 @@ package middleware
 import (
 	"crypto/rsa"
 	"errors"
-	"log"
 	"net/http"
 
 	"github.com/lestrrat-go/jwx/v2/jwa"
@@ -15,7 +14,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func NewAuthentication(publicKey *rsa.PublicKey, signInService signInService) AuthenticationMiddleware {
+func NewAuthentication(publicKey rsa.PublicKey, signInService signInService) AuthenticationMiddleware {
 	return AuthenticationMiddleware{
 		publicKey:     publicKey,
 		signInService: signInService,
@@ -27,7 +26,7 @@ type signInService interface {
 }
 
 type AuthenticationMiddleware struct {
-	publicKey     *rsa.PublicKey
+	publicKey     rsa.PublicKey
 	signInService signInService
 }
 
@@ -56,7 +55,6 @@ func (m AuthenticationMiddleware) handleError(c *gin.Context, e error) {
 func (m AuthenticationMiddleware) TokenAuthentication(c *gin.Context) {
 	user, err := parseRequest(c.Request, m.publicKey)
 	if err != nil {
-		log.Println("token not valid:", err)
 		_ = c.Error(errdef.NewUnauthorized("token not valid"))
 		c.Abort()
 		return
@@ -72,7 +70,7 @@ func (m AuthenticationMiddleware) TokenAuthentication(c *gin.Context) {
 	}
 }
 
-func parseRequest(request *http.Request, key *rsa.PublicKey) (*model.User, error) {
+func parseRequest(request *http.Request, key rsa.PublicKey) (*model.User, error) {
 	token, err := jwt.ParseRequest(
 		request,
 		jwt.WithKey(jwa.RS256, key),

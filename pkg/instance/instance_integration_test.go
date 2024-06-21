@@ -3,6 +3,7 @@ package instance_test
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"os"
 	"strings"
@@ -60,6 +61,7 @@ func TestInstanceHandler(t *testing.T) {
 	}
 	db.Create(user)
 
+	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	encryptionKey := strings.Repeat("a", 32)
 	instanceRepo := instance.NewRepository(db, encryptionKey)
 	groupService := groupService{group: group}
@@ -69,8 +71,8 @@ func TestInstanceHandler(t *testing.T) {
 	}
 	stackService := stack.NewService(stacks)
 	// classification 'test' does not actually exist, this is used to decrypt the stack parameters
-	helmfileService := instance.NewHelmfileService("../../stacks", stackService, "test")
-	instanceService := instance.NewService(instanceRepo, groupService, stackService, helmfileService)
+	helmfileService := instance.NewHelmfileService(logger, stackService, "../../stacks", "test")
+	instanceService := instance.NewService(logger, instanceRepo, groupService, stackService, helmfileService)
 
 	s3Dir := t.TempDir()
 	s3Bucket := "database-bucket"
@@ -78,9 +80,9 @@ func TestInstanceHandler(t *testing.T) {
 	require.NoError(t, err, "failed to create S3 output bucket")
 	s3 := inttest.SetupS3(t, s3Dir)
 	uploader := manager.NewUploader(s3.Client)
-	s3Client := storage.NewS3Client(s3.Client, uploader)
+	s3Client := storage.NewS3Client(logger, s3.Client, uploader)
 	databaseRepository := database.NewRepository(db)
-	databaseService := database.NewService(s3Bucket, s3Client, groupService, databaseRepository)
+	databaseService := database.NewService(logger, s3Bucket, s3Client, groupService, databaseRepository)
 
 	authenticator := func(ctx *gin.Context) {
 		ctx.Set("user", user)
@@ -90,7 +92,7 @@ func TestInstanceHandler(t *testing.T) {
 		instanceHandler := instance.NewHandler(groupService, instanceService, twoDayTTL)
 		instance.Routes(engine, authenticator, instanceHandler)
 
-		databaseHandler := database.NewHandler(databaseService, groupService, instanceService, stackService)
+		databaseHandler := database.NewHandler(logger, databaseService, groupService, instanceService, stackService)
 		database.Routes(engine, authenticator, databaseHandler)
 	})
 

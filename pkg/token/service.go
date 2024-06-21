@@ -4,7 +4,7 @@ import (
 	"crypto/rsa"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"time"
 
 	"github.com/google/uuid"
@@ -17,20 +17,22 @@ import (
 
 //goland:noinspection GoExportedFuncWithUnexportedType
 func NewService(
+	logger *slog.Logger,
 	tokenRepository repository,
 	privateKey *rsa.PrivateKey,
-	publicKey *rsa.PublicKey,
 	accessTokenExpirationSeconds int,
 	refreshTokenSecretKey string,
 	refreshTokenExpirationSeconds int,
+	refreshTokenRememberMeExpirationSeconds int,
 ) (*tokenService, error) {
 	return &tokenService{
-		repository:                    tokenRepository,
-		privateKey:                    privateKey,
-		publicKey:                     publicKey,
-		accessTokenExpirationSeconds:  accessTokenExpirationSeconds,
-		refreshTokenSecretKey:         refreshTokenSecretKey,
-		refreshTokenExpirationSeconds: refreshTokenExpirationSeconds,
+		logger:                                  logger,
+		repository:                              tokenRepository,
+		privateKey:                              privateKey,
+		accessTokenExpirationSeconds:            accessTokenExpirationSeconds,
+		refreshTokenSecretKey:                   refreshTokenSecretKey,
+		refreshTokenExpirationSeconds:           refreshTokenExpirationSeconds,
+		refreshTokenRememberMeExpirationSeconds: refreshTokenRememberMeExpirationSeconds,
 	}, nil
 }
 
@@ -56,15 +58,16 @@ type RefreshTokenData struct {
 }
 
 type tokenService struct {
-	repository                    repository
-	privateKey                    *rsa.PrivateKey
-	publicKey                     *rsa.PublicKey
-	accessTokenExpirationSeconds  int
-	refreshTokenSecretKey         string
-	refreshTokenExpirationSeconds int
+	logger                                  *slog.Logger
+	repository                              repository
+	privateKey                              *rsa.PrivateKey
+	accessTokenExpirationSeconds            int
+	refreshTokenSecretKey                   string
+	refreshTokenExpirationSeconds           int
+	refreshTokenRememberMeExpirationSeconds int
 }
 
-func (t tokenService) GetTokens(user *model.User, previousRefreshTokenId string) (*Tokens, error) {
+func (t tokenService) GetTokens(user *model.User, previousRefreshTokenId string, rememberMe bool) (*Tokens, error) {
 	if previousRefreshTokenId != "" {
 		if err := t.repository.DeleteRefreshToken(user.ID, previousRefreshTokenId); err != nil {
 			return nil, errdef.NewUnauthorized("could not delete previous refreshToken for user.Id: %d, tokenId: %s", user.ID, previousRefreshTokenId)
@@ -76,7 +79,12 @@ func (t tokenService) GetTokens(user *model.User, previousRefreshTokenId string)
 		return nil, fmt.Errorf("error generating accessToken for user: %+v\nError: %s", user, err)
 	}
 
-	refreshToken, err := helper.GenerateRefreshToken(user, t.refreshTokenSecretKey, t.refreshTokenExpirationSeconds)
+	expiration := t.refreshTokenExpirationSeconds
+	if rememberMe {
+		expiration = t.refreshTokenRememberMeExpirationSeconds
+	}
+
+	refreshToken, err := helper.GenerateRefreshToken(user, t.refreshTokenSecretKey, expiration)
 	if err != nil {
 		return nil, fmt.Errorf("error generating refreshToken for user: %+v\nError: %s", user, err)
 	}
@@ -96,13 +104,13 @@ func (t tokenService) GetTokens(user *model.User, previousRefreshTokenId string)
 func (t tokenService) ValidateRefreshToken(tokenString string) (*RefreshTokenData, error) {
 	claims, err := helper.ValidateRefreshToken(tokenString, t.refreshTokenSecretKey)
 	if err != nil {
-		log.Printf("Unable to validate token: %s\n%s\n", tokenString, err)
+		t.logger.Error("Unable to validate token", "error", err, "token", tokenString)
 		return nil, errors.New("unable to verify refresh token")
 	}
 
 	tokenId, err := uuid.Parse(claims.ID)
 	if err != nil {
-		log.Printf("Couldn't parse token id: %s\n%s\n", claims.ID, err)
+		t.logger.Error("Couldn't parse token id", "error", err, "claimsId", claims.ID)
 		return nil, errors.New("unable to verify refresh token")
 	}
 
