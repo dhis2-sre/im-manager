@@ -217,7 +217,7 @@ func TestInstanceHandler(t *testing.T) {
 			"description": "some description"
 		}`)
 		client.PostJSON(t, "/deployments", body, &deployment, inttest.WithAuthToken("sometoken"))
-		assert.Equal(t, "test-deployment", deployment.Name)
+		assert.Equal(t, "private-deployment", deployment.Name)
 		assert.Equal(t, "group-name", deployment.GroupName)
 		assert.Equal(t, "some description", deployment.Description)
 		assert.False(t, deployment.Public)
@@ -236,12 +236,15 @@ func TestInstanceHandler(t *testing.T) {
 		assert.True(t, deployment.Public)
 
 		t.Log("Get public deployments")
-		var deployments []model.Deployment
-		client.GetJSON(t, "/deployments/public", deployments)
+		var groupsWithDeployments []instance.GroupsWithDeployments
+		client.GetJSON(t, "/deployments/public", &groupsWithDeployments)
+		assert.Len(t, groupsWithDeployments, 1)
+		assert.Equal(t, "group-name", groupsWithDeployments[0].Name)
+		deployments := groupsWithDeployments[0].Deployments
 		assert.Len(t, deployments, 1)
 		assert.Equal(t, "public-deployment", deployments[0].Name)
-		assert.Equal(t, "group-name", deployments[0].GroupName)
 		assert.Equal(t, "some description", deployments[0].Description)
+		assert.Equal(t, "group-name", deployments[0].GroupName)
 		assert.True(t, deployments[0].Public)
 	})
 }
