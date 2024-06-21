@@ -1078,6 +1078,20 @@ paths:
             security:
                 - oauth2: []
             summary: Delete deployment instance
+    /deployments/public:
+        get:
+            description: Find all public deployments
+            operationId: listPublicDeployments
+            responses:
+                "200":
+                    $ref: '#/responses/GroupsWithDeployments'
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            summary: Find public deployments
     /groups:
         get:
             description: Find all groups by user

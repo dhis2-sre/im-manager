@@ -164,6 +164,16 @@ func (r repository) FindDeployments(groupNames []string) ([]*model.Deployment, e
 	return deployments, err
 }
 
+func (r repository) FindPublicDeployments() ([]*model.Deployment, error) {
+	var deployments []*model.Deployment
+	err := r.db.
+		Preload("Instances").
+		Where("public = true").
+		Order("updated_at desc").
+		Find(&deployments).Error
+	return deployments, err
+}
+
 func encryptParameters(key string, instance *model.DeploymentInstance) error {
 	for i, parameter := range instance.Parameters {
 		value, err := encryptText(key, parameter.Value)
