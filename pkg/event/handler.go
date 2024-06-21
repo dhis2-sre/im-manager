@@ -76,7 +76,7 @@ func (h Handler) StreamEvents(c *gin.Context) {
 		With("consumerOffsetSpec", offsetSpec.String()).
 		With("sseRetry", retry)
 
-	filter := stream.NewConsumerFilter(maps.Keys(userGroups), true, postFilter(c, logger, user.ID, userGroups))
+	filter := stream.NewConsumerFilter(maps.Keys(userGroups), false, postFilter(c, logger, user.ID, userGroups))
 	opts := stream.NewConsumerOptions().
 		SetConsumerName(consumerName).
 		SetClientProvidedName(consumerName).
@@ -157,7 +157,7 @@ func postFilter(c *gin.Context, logger *slog.Logger, userID uint, userGroups map
 		if err != nil {
 			logger.ErrorContext(c, "Failed to post filter RabbitMQ message", "error", err, "applicationProperties", message.ApplicationProperties)
 		}
-		isInGroup, err := isUserPartOfMessageGroup(userGroups, message.ApplicationProperties)
+		isInGroup, err := isInMessageGroup(userGroups, message.ApplicationProperties)
 		if err != nil {
 			logger.ErrorContext(c, "Failed to post filter RabbitMQ message", "error", err, "applicationProperties", message.ApplicationProperties)
 		}
@@ -188,14 +188,14 @@ func isUserMessageOwner(userID uint, applicationProperties map[string]any) (bool
 	return messageOwnerID == uint64(userID), nil
 }
 
-// isUserPartOfMessageGroup determines if the user is allowed to receive the message. This function
-// only considers the "group" property of a message. Messages that have no group can be read by the
-// user. Messages that have a group can only be read by the user if the "group" property value can
-// be parsed and matches one of the userGroups.
-func isUserPartOfMessageGroup(userGroups map[string]struct{}, applicationProperties map[string]any) (bool, error) {
+// isInMessageGroup determines if the user is allowed to receive the message. This function only
+// considers the "group" property of a message. Messages that have a group can only be read by the
+// user if the "group" property value can be parsed and matches one of the userGroups. "group" is a
+// required application property.
+func isInMessageGroup(userGroups map[string]struct{}, applicationProperties map[string]any) (bool, error) {
 	group, ok := applicationProperties["group"]
 	if !ok {
-		return true, nil
+		return false, errors.New(`RabbitMQ message is missing application property "group"`)
 	}
 
 	messageGroup, ok := group.(string)

@@ -32,25 +32,11 @@ func TestEventPostFilter(t *testing.T) {
 		message       amqp.Message
 		want          bool
 	}{
-		"MessageForAnyone": {
-			userID:        user1,
-			userGroupsMap: user1GroupsMap,
-			message:       amqp.Message{},
-			want:          true,
-		},
 		"MessageForGroupMatchingTheUsersGroup": {
 			userID:        user1,
 			userGroupsMap: user1GroupsMap,
 			message: amqp.Message{
 				ApplicationProperties: map[string]any{"group": "group3"},
-			},
-			want: true,
-		},
-		"MessageForUserMatchingTheUser": {
-			userID:        user1,
-			userGroupsMap: user1GroupsMap,
-			message: amqp.Message{
-				ApplicationProperties: map[string]any{"owner": strconv.Itoa(int(user1))},
 			},
 			want: true,
 		},
@@ -61,6 +47,20 @@ func TestEventPostFilter(t *testing.T) {
 				ApplicationProperties: map[string]any{"group": "group4", "owner": strconv.Itoa(int(user1))},
 			},
 			want: true,
+		},
+		"MessageForAnyone": {
+			userID:        user1,
+			userGroupsMap: user1GroupsMap,
+			message:       amqp.Message{},
+			want:          false,
+		},
+		"MessageForUserMatchingTheUser": {
+			userID:        user1,
+			userGroupsMap: user1GroupsMap,
+			message: amqp.Message{
+				ApplicationProperties: map[string]any{"owner": strconv.Itoa(int(user1))},
+			},
+			want: false,
 		},
 		"MessageForGroupNotMatchingTheUsersGroup": {
 			userID:        user1,
