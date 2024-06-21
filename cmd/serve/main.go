@@ -196,8 +196,7 @@ func run() (err error) {
 	err = env.DeclareStream(streamName,
 		stream.NewStreamOptions().
 			SetMaxSegmentSizeBytes(stream.ByteCapacity{}.MB(1)).
-			SetMaxAge(1*time.Hour).
-			SetMaxLengthBytes(stream.ByteCapacity{}.GB(1)))
+			SetMaxAge(1*time.Hour))
 	if err != nil {
 		return fmt.Errorf("failed to declare RabbitMQ stream %q: %v", streamName, err)
 	}
