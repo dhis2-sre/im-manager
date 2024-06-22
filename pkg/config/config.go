@@ -79,10 +79,11 @@ func New() Config {
 			Password: requireEnv("SMTP_PASSWORD"),
 		},
 		RabbitMqURL: rabbitmq{
-			Host:     requireEnv("RABBITMQ_HOST"),
-			Port:     requireEnvAsInt("RABBITMQ_PORT"),
-			Username: requireEnv("RABBITMQ_USERNAME"),
-			Password: requireEnv("RABBITMQ_PASSWORD"),
+			Host:       requireEnv("RABBITMQ_HOST"),
+			Port:       requireEnvAsInt("RABBITMQ_PORT"),
+			StreamPort: requireEnvAsInt("RABBITMQ_STREAM_PORT"),
+			Username:   requireEnv("RABBITMQ_USERNAME"),
+			Password:   requireEnv("RABBITMQ_PASSWORD"),
 		},
 		Redis: Redis{
 			Host: requireEnv("REDIS_HOST"),
@@ -142,10 +143,11 @@ type Postgresql struct {
 }
 
 type rabbitmq struct {
-	Host     string
-	Port     int
-	Username string
-	Password string
+	Host       string
+	Port       int
+	StreamPort int
+	Username   string
+	Password   string
 }
 
 type smtp struct {
@@ -155,7 +157,8 @@ type smtp struct {
 	Password string
 }
 
-func (r rabbitmq) GetUrl() string {
+// GetURI returns the AMQP URI for RabbitMQ.
+func (r rabbitmq) GetURI() string {
 	return fmt.Sprintf("amqp://%s:%s@%s:%d/", r.Username, r.Password, r.Host, r.Port)
 }
 
