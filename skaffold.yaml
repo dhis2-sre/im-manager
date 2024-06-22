@@ -34,6 +34,7 @@ deploy:
         remoteChart: rabbitmq
         repo: https://charts.bitnami.com/bitnami
         version: 14.4.2
+        upgradeOnChange: true
         useHelmSecrets: true
         setValues:
           extraPlugins: "rabbitmq_stream rabbitmq_stream_management"
@@ -51,6 +52,7 @@ deploy:
         remoteChart: redis
         repo: https://charts.bitnami.com/bitnami
         version: 18.2.2
+        upgradeOnChange: true
         setValues:
           architecture: standalone
           auth:
