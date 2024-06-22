@@ -11,6 +11,12 @@ on:
     types: [opened, reopened, synchronize, labeled]
 
   workflow_dispatch:
+    inputs:
+      deploy:
+        description: Deploy the environment
+        required: false
+        type: boolean
+        default: false
 
 # Cancel previous runs of the same workflow and PR number or branch/tag
 concurrency:
@@ -23,6 +29,7 @@ jobs:
     with:
       PROCESS_NAME: im-manager
       POD_NAME: im-manager
+      DEPLOY_ENVIRONMENT: ${{ inputs.deploy == true }}
     secrets:
       DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
       DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
