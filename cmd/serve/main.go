@@ -26,6 +26,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -237,6 +238,7 @@ func run() (err error) {
 
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM)
 	defer cancel()
+
 	r.GET("/sigterm", func(c *gin.Context) {
 		body := hostname
 		select {
@@ -248,10 +250,21 @@ func run() (err error) {
 		_, _ = c.Writer.WriteString(body)
 	})
 
-	logger.Info("Listening and serving HTTP")
-	if err := r.Run(); err != nil {
-		return fmt.Errorf("failed to start the HTTP server: %v", err)
+	//	TODO(ivo) configure timeouts
+	server := &http.Server{
+		Addr:    ":8080",
+		Handler: r.Handler(),
 	}
+	go func() {
+		logger.Info("Listening and serving HTTP")
+		if err := server.ListenAndServe(); err != http.ErrServerClosed {
+			//	TODO(ivo) return the error
+			fmt.Printf("failed to start the HTTP server: %v", err)
+		}
+	}()
+
+	<-ctx.Done()
+	// naively exiting and shutting down im-manager
 	return nil
 }
 
