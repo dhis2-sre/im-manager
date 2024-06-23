@@ -27,8 +27,11 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
+	"github.com/gin-gonic/gin"
 	"github.com/go-mail/mail"
 	"github.com/rabbitmq/rabbitmq-stream-go-client/pkg/stream"
 
@@ -231,6 +234,19 @@ func run() (err error) {
 	database.Routes(r, authentication.TokenAuthentication, databaseHandler)
 	instance.Routes(r, authentication.TokenAuthentication, instanceHandler)
 	event.Routes(r, authentication.TokenAuthentication, eventHandler)
+
+	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM)
+	defer cancel()
+	r.GET("/sigterm", func(c *gin.Context) {
+		body := hostname
+		select {
+		case <-ctx.Done():
+			body += "\nreceived SIGTERM"
+		default:
+		}
+		fmt.Println(body)
+		_, _ = c.Writer.WriteString(body)
+	})
 
 	logger.Info("Listening and serving HTTP")
 	if err := r.Run(); err != nil {
