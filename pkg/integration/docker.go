@@ -9,18 +9,17 @@ import (
 )
 
 //goland:noinspection GoExportedFuncWithUnexportedType
-func NewDockerHubClient(username, password string) dockerHubClient {
-	client := http.Client{}
-	return dockerHubClient{username, password, &client}
-}
-
-type HttpClient interface {
-	Do(req *http.Request) (*http.Response, error)
+func NewDockerHubClient(username, password string) *dockerHubClient {
+	return &dockerHubClient{
+		username: username,
+		password: password,
+		client:   &http.Client{},
+	}
 }
 
 type dockerHubClient struct {
 	username, password string
-	client             HttpClient
+	client             *http.Client
 }
 
 type dockerHubResponse struct {
@@ -29,14 +28,13 @@ type dockerHubResponse struct {
 	}
 }
 
-func (d dockerHubClient) GetTags(organization string, repository string) ([]string, error) {
+func (d *dockerHubClient) GetTags(organization string, repository string) ([]string, error) {
+	token, err := d.getToken()
+	if err != nil {
+		return nil, err
+	}
+
 	url := fmt.Sprintf("https://hub.docker.com/v2/repositories/%s/%s/tags?page_size=10000", organization, repository)
-
-	token, err := d.getToken()
-	if err != nil {
-		return nil, err
-	}
-
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
@@ -48,6 +46,7 @@ func (d dockerHubClient) GetTags(organization string, repository string) ([]stri
 	if err != nil {
 		return nil, err
 	}
+	defer response.Body.Close()
 
 	b, err := io.ReadAll(response.Body)
 	if err != nil {
@@ -60,22 +59,24 @@ func (d dockerHubClient) GetTags(organization string, repository string) ([]stri
 		return nil, err
 	}
 
-	tags := make([]string, len(body.Results))
-	for i, image := range body.Results {
-		tags[i] = image.Name
-	}
-
-	return tags, nil
+	return mapResponseToNames(body), nil
 }
 
-func (d dockerHubClient) GetImages(organization string) ([]string, error) {
+func mapResponseToNames(response dockerHubResponse) []string {
+	names := make([]string, len(response.Results))
+	for i, result := range response.Results {
+		names[i] = result.Name
+	}
+	return names
+}
+
+func (d *dockerHubClient) GetImages(organization string) ([]string, error) {
+	token, err := d.getToken()
+	if err != nil {
+		return nil, err
+	}
+
 	url := fmt.Sprintf("https://hub.docker.com/v2/repositories/%s?page_size=10000", organization)
-
-	token, err := d.getToken()
-	if err != nil {
-		return nil, err
-	}
-
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
@@ -87,6 +88,7 @@ func (d dockerHubClient) GetImages(organization string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer response.Body.Close()
 
 	b, err := io.ReadAll(response.Body)
 	if err != nil {
@@ -99,15 +101,10 @@ func (d dockerHubClient) GetImages(organization string) ([]string, error) {
 		return nil, err
 	}
 
-	images := make([]string, len(body.Results))
-	for i, image := range body.Results {
-		images[i] = image.Name
-	}
-
-	return images, nil
+	return mapResponseToNames(body), nil
 }
 
-func (d dockerHubClient) getToken() (string, error) {
+func (d *dockerHubClient) getToken() (string, error) {
 	body := struct {
 		Username string
 		Password string
@@ -126,6 +123,7 @@ func (d dockerHubClient) getToken() (string, error) {
 	if err != nil {
 		return "", err
 	}
+	defer response.Body.Close()
 
 	b, err := io.ReadAll(response.Body)
 	if err != nil {
