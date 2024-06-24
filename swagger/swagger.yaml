@@ -1091,37 +1091,37 @@ paths:
                 - oauth2: []
             summary: Delete deployment instance
     /deployments/public:
-      get:
-        description: Find all public deployments
-        operationId: findPublicDeployments
-        responses:
-          "200":
-            $ref: '#/responses/GroupsWithDeployments'
-          "401":
-            $ref: '#/responses/Error'
-          "403":
-            $ref: '#/responses/Error'
-          "415":
-            $ref: '#/responses/Error'
-        summary: Find public deployments
+        get:
+            description: Find all public deployments
+            operationId: findPublicDeployments
+            responses:
+                "200":
+                    $ref: '#/responses/GroupsWithDeployments'
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            summary: Find public deployments
     /events:
-      get:
-        description: Stream events...
-        operationId: streamSSE
-        responses:
-          "200":
-            $ref: '#/responses/Stream'
-          "400":
-            $ref: '#/responses/Error'
-          "403":
-            $ref: '#/responses/Error'
-          "404":
-            $ref: '#/responses/Error'
-          "415":
-            $ref: '#/responses/Error'
-        security:
-          - oauth2: []
-        summary: Stream events
+        get:
+            description: Stream events...
+            operationId: streamSSE
+            responses:
+                "200":
+                    $ref: '#/responses/Stream'
+                "400":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Stream events
     /groups:
         get:
             description: Find all groups by user
