@@ -682,7 +682,7 @@ func (h Handler) FindDeployments(c *gin.Context) {
 
 // FindPublicDeployments list public available deployments
 func (h Handler) FindPublicDeployments(c *gin.Context) {
-	// swagger:route GET /deployments/public listPublicDeployments
+	// swagger:route GET /deployments/public findPublicDeployments
 	//
 	// Find public deployments
 	//

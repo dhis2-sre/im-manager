@@ -1081,7 +1081,7 @@ paths:
     /deployments/public:
         get:
             description: Find all public deployments
-            operationId: listPublicDeployments
+            operationId: findPublicDeployments
             responses:
                 "200":
                     $ref: '#/responses/GroupsWithDeployments'
