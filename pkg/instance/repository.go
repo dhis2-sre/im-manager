@@ -171,6 +171,9 @@ func (r repository) FindPublicDeployments() ([]*model.Deployment, error) {
 		Where("public = true").
 		Order("updated_at desc").
 		Find(&deployments).Error
+	if err != nil {
+		return nil, fmt.Errorf("failed to find deployments: %v", err)
+	}
 	return deployments, err
 }
 
