@@ -190,6 +190,18 @@ definitions:
             $ref: '#/definitions/DeploymentInstanceParameter'
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/model
+    Event:
+        properties:
+            Data: {}
+            Event:
+                type: string
+            Id:
+                type: string
+            Retry:
+                format: uint64
+                type: integer
+        type: object
+        x-go-package: github.com/gin-contrib/sse
     ExternalDownload:
         properties:
             databaseId:
@@ -1079,19 +1091,37 @@ paths:
                 - oauth2: []
             summary: Delete deployment instance
     /deployments/public:
-        get:
-            description: Find all public deployments
-            operationId: findPublicDeployments
-            responses:
-                "200":
-                    $ref: '#/responses/GroupsWithDeployments'
-                "401":
-                    $ref: '#/responses/Error'
-                "403":
-                    $ref: '#/responses/Error'
-                "415":
-                    $ref: '#/responses/Error'
-            summary: Find public deployments
+      get:
+        description: Find all public deployments
+        operationId: findPublicDeployments
+        responses:
+          "200":
+            $ref: '#/responses/GroupsWithDeployments'
+          "401":
+            $ref: '#/responses/Error'
+          "403":
+            $ref: '#/responses/Error'
+          "415":
+            $ref: '#/responses/Error'
+        summary: Find public deployments
+    /events:
+      get:
+        description: Stream events...
+        operationId: streamSSE
+        responses:
+          "200":
+            $ref: '#/responses/Stream'
+          "400":
+            $ref: '#/responses/Error'
+          "403":
+            $ref: '#/responses/Error'
+          "404":
+            $ref: '#/responses/Error'
+          "415":
+            $ref: '#/responses/Error'
+        security:
+          - oauth2: []
+        summary: Stream events
     /groups:
         get:
             description: Find all groups by user
@@ -1839,6 +1869,10 @@ responses:
         description: ""
         schema:
             $ref: '#/definitions/InstanceStatus'
+    Stream:
+        description: ""
+        schema:
+            $ref: '#/definitions/Event'
     Tokens:
         description: ""
         schema:
