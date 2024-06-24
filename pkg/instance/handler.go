@@ -680,7 +680,7 @@ func (h Handler) FindDeployments(c *gin.Context) {
 	c.JSON(http.StatusOK, groupsWithDeployments)
 }
 
-// FindPublicDeployments publicDeployments
+// FindPublicDeployments list public available deployments
 func (h Handler) FindPublicDeployments(c *gin.Context) {
 	// swagger:route GET /deployments/public listPublicDeployments
 	//
