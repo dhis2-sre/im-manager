@@ -35,6 +35,8 @@ import (
 )
 
 func TestInstanceHandler(t *testing.T) {
+	t.Parallel()
+
 	k8sClient := inttest.SetupK8s(t)
 	db := inttest.SetupDB(t)
 
