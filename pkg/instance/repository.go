@@ -174,7 +174,7 @@ func (r repository) FindPublicDeployments() ([]*model.Deployment, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to find deployments: %v", err)
 	}
-	return deployments, err
+	return deployments, nil
 }
 
 func encryptParameters(key string, instance *model.DeploymentInstance) error {
