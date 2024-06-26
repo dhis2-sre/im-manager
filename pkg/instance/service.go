@@ -607,7 +607,7 @@ func (s service) GetStatus(instance *model.DeploymentInstance) (InstanceStatus, 
 		return "", err
 	}
 
-	pod, err := ks.getPod(instance.ID, "")
+	pod, err := ks.getPod(instance.GroupName, instance.ID, "")
 	if err != nil {
 		if errdef.IsNotFound(err) {
 			return NotDeployed, nil

@@ -52,6 +52,11 @@ func (h Handler) Integrations(c *gin.Context) {
 		return
 	}
 
+	if request.Key == "ENABLE_PERSISTENT_STORAGE" {
+		c.JSON(http.StatusOK, []string{"true", "false"})
+		return
+	}
+
 	if request.Key == "IMAGE_REPOSITORY" {
 		payload := request.Payload.(map[string]any)
 
@@ -138,42 +143,6 @@ func (h Handler) Integrations(c *gin.Context) {
 		}
 
 		c.JSON(http.StatusOK, databases)
-		return
-	}
-
-	if request.Key == "PRESET_ID" {
-		token, err := handler.GetTokenFromRequest(c)
-		if err != nil {
-			_ = c.Error(err)
-			return
-		}
-
-		url := fmt.Sprintf("http://%s/presets", h.instanceManagerHost)
-		presets, err := getInstances(token, url)
-		if err != nil {
-			_ = c.Error(err)
-			return
-		}
-
-		c.JSON(http.StatusOK, presets)
-		return
-	}
-
-	if request.Key == "SOURCE_ID" {
-		token, err := handler.GetTokenFromRequest(c)
-		if err != nil {
-			_ = c.Error(err)
-			return
-		}
-
-		url := fmt.Sprintf("http://%s/instances", h.instanceManagerHost)
-		presets, err := getInstances(token, url)
-		if err != nil {
-			_ = c.Error(err)
-			return
-		}
-
-		c.JSON(http.StatusOK, presets)
 		return
 	}
 

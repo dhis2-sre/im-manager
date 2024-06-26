@@ -129,7 +129,7 @@ func newClient(configuration *model.ClusterConfiguration) (*kubernetes.Clientset
 }
 
 func (ks kubernetesService) getLogs(instance *model.DeploymentInstance, typeSelector string) (io.ReadCloser, error) {
-	pod, err := ks.getPod(instance.ID, typeSelector)
+	pod, err := ks.getPod(instance.GroupName, instance.ID, typeSelector)
 	if err != nil {
 		return nil, err
 	}
@@ -145,7 +145,7 @@ func (ks kubernetesService) getLogs(instance *model.DeploymentInstance, typeSele
 		Stream(context.TODO())
 }
 
-func (ks kubernetesService) getPod(instanceID uint, typeSelector string) (v1.Pod, error) {
+func (ks kubernetesService) getPod(group string, instanceID uint, typeSelector string) (v1.Pod, error) {
 	selector, err := labelSelector(instanceID, typeSelector)
 	if err != nil {
 		return v1.Pod{}, err
@@ -154,7 +154,7 @@ func (ks kubernetesService) getPod(instanceID uint, typeSelector string) (v1.Pod
 		LabelSelector: selector,
 	}
 
-	pods, err := ks.client.CoreV1().Pods("").List(context.TODO(), listOptions)
+	pods, err := ks.client.CoreV1().Pods(group).List(context.TODO(), listOptions)
 	if err != nil {
 		return v1.Pod{}, fmt.Errorf("error getting pod for instance %d and selector %q: %v", instanceID, selector, err)
 	}
@@ -274,8 +274,9 @@ func (ks kubernetesService) resume(instance *model.DeploymentInstance) error {
 func (ks kubernetesService) deletePersistentVolumeClaim(instance *model.DeploymentInstance) error {
 	// TODO: This should be stack metadata
 	labelMap := map[string][]string{
-		"dhis2":    {"app.kubernetes.io/instance=%s-database", "app.kubernetes.io/instance=%s-redis"},
-		"dhis2-db": {"app.kubernetes.io/instance=%s-database"},
+		"dhis2":      {"app.kubernetes.io/instance=%s", "app.kubernetes.io/instance=%s-database", "app.kubernetes.io/instance=%s-redis"},
+		"dhis2-core": {"app.kubernetes.io/instance=%s"},
+		"dhis2-db":   {"app.kubernetes.io/instance=%s-database"},
 	}
 
 	labelPatterns := labelMap[instance.StackName]
