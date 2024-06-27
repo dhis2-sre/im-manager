@@ -247,15 +247,31 @@ func TestInstanceHandler(t *testing.T) {
 
 		client.GetJSON(t, "/deployments/public", &groupsWithDeployments)
 
-		assert.Len(t, groupsWithDeployments, 1)
-		assert.Equal(t, "group-name", groupsWithDeployments[0].Name)
-		deployments := groupsWithDeployments[0].Deployments
-		assert.Len(t, deployments, 1)
-		assert.Equal(t, "public-deployment", deployments[0].Name)
-		assert.Equal(t, "some description", deployments[0].Description)
-		assert.Equal(t, "group-name", deployments[0].GroupName)
-		assert.True(t, deployments[0].Public)
+		expected := []groupWithDeployments{{
+			Name:     "group-name",
+			Hostname: "some",
+			Deployments: []*deployment2{{
+				Name:        "public-deployment",
+				Description: "some description",
+				GroupName:   "group-name",
+				Public:      true,
+			}},
+		}}
+		assert.EqualValues(t, expected, groupsWithDeployments)
 	})
+}
+
+type deployment2 struct {
+	Name        string
+	Description string
+	GroupName   string
+	Public      bool
+}
+
+type groupWithDeployments struct {
+	Name        string
+	Hostname    string
+	Deployments []*deployment2
 }
 
 func encryptUsingAge(t *testing.T, identity *age.X25519Identity, yamlData []byte) []byte {
