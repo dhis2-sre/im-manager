@@ -35,8 +35,6 @@ import (
 )
 
 func TestInstanceHandler(t *testing.T) {
-	t.Parallel()
-
 	k8sClient := inttest.SetupK8s(t)
 	db := inttest.SetupDB(t)
 
@@ -149,6 +147,7 @@ func TestInstanceHandler(t *testing.T) {
 			   	})
 	*/
 	t.Run("DeployDeploymentWithoutInstances", func(t *testing.T) {
+		t.Parallel()
 		t.Log("Create deployment")
 		var deployment model.Deployment
 		body := strings.NewReader(`{
@@ -171,6 +170,7 @@ func TestInstanceHandler(t *testing.T) {
 	})
 
 	t.Run("Deployment", func(t *testing.T) {
+		t.Parallel()
 		t.Log("Create deployment")
 		var deployment model.Deployment
 		body := strings.NewReader(`{
@@ -211,6 +211,7 @@ func TestInstanceHandler(t *testing.T) {
 	})
 
 	t.Run("GetPublicDeployments", func(t *testing.T) {
+		t.Parallel()
 		t.Log("Create deployment")
 		var deployment model.Deployment
 		body := strings.NewReader(`{
