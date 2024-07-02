@@ -147,6 +147,7 @@ func TestInstanceHandler(t *testing.T) {
 			   	})
 	*/
 	t.Run("DeployDeploymentWithoutInstances", func(t *testing.T) {
+		t.Parallel()
 		t.Log("Create deployment")
 		var deployment model.Deployment
 		body := strings.NewReader(`{
@@ -169,6 +170,7 @@ func TestInstanceHandler(t *testing.T) {
 	})
 
 	t.Run("Deployment", func(t *testing.T) {
+		t.Parallel()
 		t.Log("Create deployment")
 		var deployment model.Deployment
 		body := strings.NewReader(`{
@@ -207,6 +209,69 @@ func TestInstanceHandler(t *testing.T) {
 		time.Sleep(3 * time.Second)
 		k8sClient.AssertPodIsNotRunning(t, deploymentInstance.GroupName, deploymentInstance.Name)
 	})
+
+	t.Run("GetPublicDeployments", func(t *testing.T) {
+		t.Parallel()
+		t.Log("Create deployment")
+		var deployment model.Deployment
+		body := strings.NewReader(`{
+			"name": "private-deployment",
+			"group": "group-name",
+			"description": "some description"
+		}`)
+
+		client.PostJSON(t, "/deployments", body, &deployment, inttest.WithAuthToken("sometoken"))
+
+		assert.Equal(t, "private-deployment", deployment.Name)
+		assert.Equal(t, "group-name", deployment.GroupName)
+		assert.Equal(t, "some description", deployment.Description)
+		assert.False(t, deployment.Public)
+
+		t.Log("Create public deployment")
+		body = strings.NewReader(`{
+			"name": "public-deployment",
+			"group": "group-name",
+			"description": "some description",
+			"public": true
+		}`)
+
+		client.PostJSON(t, "/deployments", body, &deployment, inttest.WithAuthToken("sometoken"))
+
+		assert.Equal(t, "public-deployment", deployment.Name)
+		assert.Equal(t, "group-name", deployment.GroupName)
+		assert.Equal(t, "some description", deployment.Description)
+		assert.True(t, deployment.Public)
+
+		t.Log("Get public deployments")
+		var groupsWithDeployments []instance.GroupsWithDeployments
+
+		client.GetJSON(t, "/deployments/public", &groupsWithDeployments)
+
+		expected := []groupWithDeployments{{
+			Name:     "group-name",
+			Hostname: "some",
+			Deployments: []*deployment2{{
+				Name:        "public-deployment",
+				Description: "some description",
+				GroupName:   "group-name",
+				Public:      true,
+			}},
+		}}
+		assert.EqualValues(t, expected, groupsWithDeployments)
+	})
+}
+
+type deployment2 struct {
+	Name        string
+	Description string
+	GroupName   string
+	Public      bool
+}
+
+type groupWithDeployments struct {
+	Name        string
+	Hostname    string
+	Deployments []*deployment2
 }
 
 func encryptUsingAge(t *testing.T, identity *age.X25519Identity, yamlData []byte) []byte {
@@ -258,7 +323,7 @@ type groupService struct {
 }
 
 func (gs groupService) FindByGroupNames(groupNames []string) ([]model.Group, error) {
-	panic("implement me")
+	return []model.Group{*gs.group}, nil
 }
 
 func (gs groupService) Find(name string) (*model.Group, error) {
