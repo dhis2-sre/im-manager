@@ -1,4 +1,4 @@
-FROM golang:1.22.4-alpine3.20 AS build
+FROM golang:1.23rc1-alpine3.20 AS build
 
 # https://kubernetes.io/docs/tasks/tools/install-kubectl-linux/
 ARG KUBECTL_VERSION=v1.28.0
