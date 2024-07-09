@@ -2,6 +2,7 @@ run:
   timeout: 4m
 linters:
   enable:
+    - bodyclose
     - errcheck
     - forbidigo
     - gocritic
