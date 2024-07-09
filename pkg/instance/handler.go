@@ -680,6 +680,28 @@ func (h Handler) FindDeployments(c *gin.Context) {
 	c.JSON(http.StatusOK, groupsWithDeployments)
 }
 
+// FindPublicDeployments list public available deployments
+func (h Handler) FindPublicDeployments(c *gin.Context) {
+	// swagger:route GET /deployments/public findPublicDeployments
+	//
+	// Find public deployments
+	//
+	// Find all public deployments
+	//
+	// responses:
+	//	200: []GroupsWithDeployments
+	//	401: Error
+	//	403: Error
+	//	415: Error
+	groupsWithDeployments, err := h.instanceService.FindPublicDeployments()
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	c.JSON(http.StatusOK, groupsWithDeployments)
+}
+
 // DeleteDeployment deployment by id
 func (h Handler) DeleteDeployment(c *gin.Context) {
 	// swagger:route DELETE /deployments/{id} deleteDeployment
