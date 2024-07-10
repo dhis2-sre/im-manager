@@ -49,6 +49,7 @@ type Repository interface {
 	FindDeploymentInstanceById(id uint) (*model.DeploymentInstance, error)
 	FindDecryptedDeploymentInstanceById(id uint) (*model.DeploymentInstance, error)
 	FindDeployments(groupNames []string) ([]*model.Deployment, error)
+	FindPublicDeployments() ([]*model.Deployment, error)
 }
 
 type groupService interface {
@@ -536,6 +537,19 @@ func (s service) FindDeployments(user *model.User) ([]GroupsWithDeployments, err
 	groupNames := maps.Keys(groupsByName)
 
 	deployments, err := s.instanceRepository.FindDeployments(groupNames)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(deployments) < 1 {
+		return []GroupsWithDeployments{}, nil
+	}
+
+	return s.groupDeployments(deployments)
+}
+
+func (s service) FindPublicDeployments() ([]GroupsWithDeployments, error) {
+	deployments, err := s.instanceRepository.FindPublicDeployments()
 	if err != nil {
 		return nil, err
 	}

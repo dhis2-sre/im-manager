@@ -147,6 +147,7 @@ func TestInstanceHandler(t *testing.T) {
 			   	})
 	*/
 	t.Run("DeployDeploymentWithoutInstances", func(t *testing.T) {
+		t.Parallel()
 		t.Log("Create deployment")
 		var deployment model.Deployment
 		body := strings.NewReader(`{
@@ -169,6 +170,7 @@ func TestInstanceHandler(t *testing.T) {
 	})
 
 	t.Run("Deployment", func(t *testing.T) {
+		t.Parallel()
 		t.Log("Create deployment")
 		var deployment model.Deployment
 		body := strings.NewReader(`{
@@ -206,6 +208,53 @@ func TestInstanceHandler(t *testing.T) {
 		// TODO: Ideally we shouldn't use sleep here but rather watch the pod until it disappears or a timeout is reached
 		time.Sleep(3 * time.Second)
 		k8sClient.AssertPodIsNotRunning(t, deploymentInstance.GroupName, deploymentInstance.Name)
+	})
+
+	t.Run("GetPublicDeployments", func(t *testing.T) {
+		t.Parallel()
+		t.Log("Create deployment")
+		var deployment model.Deployment
+		body := strings.NewReader(`{
+			"name": "private-deployment",
+			"group": "group-name",
+			"description": "some description"
+		}`)
+
+		client.PostJSON(t, "/deployments", body, &deployment, inttest.WithAuthToken("sometoken"))
+
+		assert.Equal(t, "private-deployment", deployment.Name)
+		assert.Equal(t, "group-name", deployment.GroupName)
+		assert.Equal(t, "some description", deployment.Description)
+		assert.False(t, deployment.Public)
+
+		t.Log("Create public deployment")
+		body = strings.NewReader(`{
+			"name": "public-deployment",
+			"group": "group-name",
+			"description": "some description",
+			"public": true
+		}`)
+
+		client.PostJSON(t, "/deployments", body, &deployment, inttest.WithAuthToken("sometoken"))
+
+		assert.Equal(t, "public-deployment", deployment.Name)
+		assert.Equal(t, "group-name", deployment.GroupName)
+		assert.Equal(t, "some description", deployment.Description)
+		assert.True(t, deployment.Public)
+
+		t.Log("Get public deployments")
+		var groupsWithDeployments []instance.GroupsWithDeployments
+
+		client.GetJSON(t, "/deployments/public", &groupsWithDeployments)
+
+		assert.Len(t, groupsWithDeployments, 1)
+		assert.Equal(t, "group-name", groupsWithDeployments[0].Name)
+		deployments := groupsWithDeployments[0].Deployments
+		assert.Len(t, deployments, 1)
+		assert.Equal(t, "public-deployment", deployments[0].Name)
+		assert.Equal(t, "some description", deployments[0].Description)
+		assert.Equal(t, "group-name", deployments[0].GroupName)
+		assert.True(t, deployments[0].Public)
 	})
 }
 
@@ -258,7 +307,7 @@ type groupService struct {
 }
 
 func (gs groupService) FindByGroupNames(groupNames []string) ([]model.Group, error) {
-	panic("implement me")
+	return []model.Group{*gs.group}, nil
 }
 
 func (gs groupService) Find(name string) (*model.Group, error) {
