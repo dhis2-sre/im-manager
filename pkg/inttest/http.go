@@ -197,8 +197,7 @@ func (hc *HTTPClient) SignIn(t *testing.T, email, password string) (*http.Cookie
 }
 
 func findCookie(res *http.Response, name string) (*http.Cookie, error) {
-	cookies := res.Cookies()
-	for _, cookie := range cookies {
+	for _, cookie := range res.Cookies() {
 		if cookie.Name == name {
 			return cookie, nil
 		}
