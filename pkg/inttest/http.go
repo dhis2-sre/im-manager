@@ -189,9 +189,11 @@ func (hc *HTTPClient) SignIn(t *testing.T, email, password string) (*http.Cookie
 
 	accessToken, err := findCookie(res, "accessToken")
 	require.NoError(t, err)
+	require.NotEmpty(t, accessToken.Value, "should return an access token")
 
 	refreshToken, err := findCookie(res, "refreshToken")
 	require.NoError(t, err)
+	require.NotEmpty(t, refreshToken.Value, "should return an access token")
 
 	return accessToken, refreshToken
 }

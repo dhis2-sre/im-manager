@@ -316,8 +316,7 @@ func TestUserHandler(t *testing.T) {
 				t.Log("RefreshTokensUsingCookie")
 
 				_, email, password := createUser(t, client, userService)
-				accessToken, refreshToken := client.SignIn(t, email, password)
-				require.NotEmpty(t, accessToken.Value, "should return an access token")
+				_, refreshToken := client.SignIn(t, email, password)
 				request := client.NewRequest(t, http.MethodPost, "/refresh", jsonBody(`{}`), inttest.WithHeader("Content-Type", "application/json"))
 				cookie := &http.Cookie{Name: "refreshToken", Value: refreshToken.Value, Path: "/refresh"}
 				require.NoError(t, cookie.Valid())
@@ -343,8 +342,7 @@ func TestUserHandler(t *testing.T) {
 				t.Log("RefreshTokensUsingCookieWithRememberMe")
 
 				_, email, password := createUser(t, client, userService)
-				accessToken, refreshToken := client.SignIn(t, email, password)
-				require.NotEmpty(t, accessToken.Value, "should return an access token")
+				_, refreshToken := client.SignIn(t, email, password)
 				request := client.NewRequest(t, http.MethodPost, "/refresh", jsonBody(`{}`), inttest.WithHeader("Content-Type", "application/json"))
 				refreshCookie := &http.Cookie{Name: "refreshToken", Value: refreshToken.Value, Path: "/refresh"}
 				require.NoError(t, refreshCookie.Valid())
@@ -377,8 +375,7 @@ func TestUserHandler(t *testing.T) {
 				t.Log("RefreshTokensRequestBody")
 
 				_, email, password := createUser(t, client, userService)
-				accessToken, refreshToken := client.SignIn(t, email, password)
-				require.NotEmpty(t, accessToken.Value, "should return an access token")
+				_, refreshToken := client.SignIn(t, email, password)
 				requestBody := jsonBody(`{"refreshToken": "%s"}`, refreshToken.Value)
 				request := client.NewRequest(t, http.MethodPost, "/refresh", requestBody, inttest.WithHeader("Content-Type", "application/json"))
 
@@ -457,7 +454,6 @@ func TestUserHandler(t *testing.T) {
 			t.Log("SignIn")
 			id, email, password := createUser(t, client, userService)
 			accessToken, _ := client.SignIn(t, email, password)
-			require.NotEmpty(t, accessToken.Value, "should return an access token")
 
 			t.Log("Delete")
 			client.Do(t, http.MethodDelete, fmt.Sprintf("/users/%d", id), nil, http.StatusUnauthorized, inttest.WithAuthToken(accessToken.Value))
@@ -526,8 +522,6 @@ func TestUserHandler(t *testing.T) {
 			t.Log("SignIn")
 
 			adminAccessToken, _ = client.SignIn(t, "admin", "admin")
-
-			require.NotEmpty(t, adminAccessToken.Value, "should return an access token")
 		}
 
 		{
