@@ -176,7 +176,7 @@ func (hc *HTTPClient) SignIn(t *testing.T, email, password string) (*http.Cookie
 
 	req := hc.NewRequest(t, http.MethodPost, "/tokens", nil, WithHeader("Content-Type", "application/json"), WithBasicAuth(email, password))
 	res := hc.do(t, req)
-	require.Zero(t, res.ContentLength)
+	require.Zero(t, res.ContentLength, "should be zero since no tokens should only be returned within cookies")
 
 	errMsg := httpClientErrMessage(http.MethodPost, "/tokens")
 	defer func() {
