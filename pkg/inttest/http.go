@@ -185,6 +185,7 @@ func (hc *HTTPClient) SignIn(t *testing.T, email, password string) (*http.Cookie
 	require.Equal(t, http.StatusCreated, res.StatusCode, errMsg+": HTTP status mismatch")
 
 	body, err := io.ReadAll(res.Body)
+	require.NoError(t, err)
 	require.Len(t, body, 0)
 
 	accessToken, err := findCookie(res, "accessToken")
