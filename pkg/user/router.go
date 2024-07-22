@@ -5,13 +5,19 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func Routes(r *gin.Engine, authenticationMiddleware middleware.AuthenticationMiddleware, authorizationMiddleware middleware.AuthorizationMiddleware, handler Handler) {
+func Routes(r *gin.Engine, authenticationMiddleware middleware.AuthenticationMiddleware, ssoMiddleware middleware.SSOMiddleware, authorizationMiddleware middleware.AuthorizationMiddleware, handler Handler) {
 	r.POST("/users", handler.SignUp)
 	r.DELETE("/users", handler.SignOut)
 	r.POST("/refresh", handler.RefreshToken)
 	r.POST("/users/validate", handler.ValidateEmail)
 	r.POST("/users/request-reset", handler.RequestPasswordReset)
 	r.POST("/users/reset-password", handler.ResetPassword)
+
+	ssoAuthenticationRouter := r.Group("")
+	//ssoAuthenticationRouter.Use(ssoMiddleware.SSOAuthentication)
+	ssoAuthenticationRouter.GET("/auth/:provider", ssoMiddleware.BeginAuthHandler)
+	ssoAuthenticationRouter.GET("/auth/:provider/callback", ssoMiddleware.SSOAuthentication)
+	ssoAuthenticationRouter.GET("/auth/logout", ssoMiddleware.LogoutHandler)
 
 	basicAuthenticationRouter := r.Group("")
 	basicAuthenticationRouter.Use(authenticationMiddleware.BasicAuthentication)

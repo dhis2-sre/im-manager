@@ -23,6 +23,7 @@ func NewAuthentication(publicKey rsa.PublicKey, signInService signInService) Aut
 
 type signInService interface {
 	SignIn(email string, password string) (*model.User, error)
+	FindOrCreate(email string, password string) (*model.User, error)
 }
 
 type AuthenticationMiddleware struct {
