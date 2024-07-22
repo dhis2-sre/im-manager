@@ -1548,7 +1548,7 @@ paths:
                     $ref: '#/definitions/RefreshTokenRequest'
             responses:
                 "201":
-                    $ref: '#/responses/Tokens'
+                    description: ""
                 "400":
                     $ref: '#/responses/Error'
                 "415":
@@ -1602,7 +1602,7 @@ paths:
             operationId: signIn
             responses:
                 "201":
-                    $ref: '#/responses/Tokens'
+                    description: ""
                 "400":
                     $ref: '#/responses/Error'
                 "401":

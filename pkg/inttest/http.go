@@ -171,6 +171,43 @@ func (hc *HTTPClient) PostJSON(t *testing.T, path string, requestBody io.Reader,
 	require.NoError(t, err, errMsg+": failed to unmarshal response body")
 }
 
+func (hc *HTTPClient) SignIn(t *testing.T, email, password string) (*http.Cookie, *http.Cookie) {
+	t.Helper()
+
+	req := hc.NewRequest(t, http.MethodPost, "/tokens", nil, WithHeader("Content-Type", "application/json"), WithBasicAuth(email, password))
+	res := hc.do(t, req)
+	require.Zero(t, res.ContentLength, "should be zero since no tokens should only be returned within cookies")
+
+	errMsg := httpClientErrMessage(http.MethodPost, "/tokens")
+	defer func() {
+		require.NoError(t, res.Body.Close(), errMsg+": failed to close HTTP response body")
+	}()
+	require.Equal(t, http.StatusCreated, res.StatusCode, errMsg+": HTTP status mismatch")
+
+	body, err := io.ReadAll(res.Body)
+	require.NoError(t, err)
+	require.Len(t, body, 0)
+
+	accessToken, err := findCookie(res, "accessToken")
+	require.NoError(t, err)
+	require.NotEmpty(t, accessToken.Value, "should return an access token")
+
+	refreshToken, err := findCookie(res, "refreshToken")
+	require.NoError(t, err)
+	require.NotEmpty(t, refreshToken.Value, "should return an access token")
+
+	return accessToken, refreshToken
+}
+
+func findCookie(res *http.Response, name string) (*http.Cookie, error) {
+	for _, cookie := range res.Cookies() {
+		if cookie.Name == name {
+			return cookie, nil
+		}
+	}
+	return nil, fmt.Errorf("cookie not found: %s", name)
+}
+
 func httpClientErrMessage(method, path string) string {
 	return fmt.Sprintf("failed %s %q", method, path)
 }

@@ -239,7 +239,7 @@ func (h Handler) SignIn(c *gin.Context) {
 	//   basicAuth:
 	//
 	// responses:
-	//   201: Tokens
+	//   201:
 	//   400: Error
 	//   401: Error
 	//   403: Error
@@ -265,7 +265,7 @@ func (h Handler) SignIn(c *gin.Context) {
 
 	h.setCookies(c, tokens, request.RememberMe)
 
-	c.JSON(http.StatusCreated, tokens)
+	c.Status(http.StatusCreated)
 }
 
 type RefreshTokenRequest struct {
@@ -281,7 +281,7 @@ func (h Handler) RefreshToken(c *gin.Context) {
 	// Refresh user tokens
 	//
 	// responses:
-	//   201: Tokens
+	//   201:
 	//   400: Error
 	//   415: Error
 
@@ -337,7 +337,7 @@ func (h Handler) RefreshToken(c *gin.Context) {
 
 	h.setCookies(c, tokens, rememberMe)
 
-	c.JSON(http.StatusCreated, tokens)
+	c.Status(http.StatusCreated)
 }
 
 func (h Handler) setCookies(c *gin.Context, tokens *token.Tokens, rememberMe bool) {
