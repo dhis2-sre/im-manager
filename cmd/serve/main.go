@@ -104,11 +104,10 @@ func run() (err error) {
 	userHandler := user.NewHandler(logger, cfg.Hostname, authConfig.SameSiteMode, authConfig.AccessTokenExpirationSeconds, authConfig.RefreshTokenExpirationSeconds, authConfig.RefreshTokenRememberMeExpirationSeconds, publicKey, userService, tokenService)
 
 	authentication := middleware.NewAuthentication(publicKey, userService)
-	// TODO: add to config
 	goth.UseProviders(
-		google.New("", "", "http://localhost:8080/auth/google/callback"),
+		google.New(authConfig.GoogleSSOProvider.Key, authConfig.GoogleSSOProvider.Secret, cfg.Hostname+"/auth/google/callback"),
 	)
-	ssoMiddleware := middleware.NewSSOMiddleware(userService, tokenService)
+	ssoMiddleware := middleware.NewSSOMiddleware(userService, tokenService, cfg.Hostname, authConfig.SameSiteMode, authConfig.AccessTokenExpirationSeconds, authConfig.RefreshTokenExpirationSeconds, authConfig.RefreshTokenRememberMeExpirationSeconds)
 
 	groupRepository := group.NewRepository(db)
 	groupService := group.NewService(groupRepository, userService)

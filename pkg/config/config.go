@@ -95,6 +95,10 @@ func New() Config {
 			AccessTokenExpirationSeconds:            requireEnvAsInt("ACCESS_TOKEN_EXPIRATION_IN_SECONDS"),
 			RefreshTokenExpirationSeconds:           requireEnvAsInt("REFRESH_TOKEN_EXPIRATION_IN_SECONDS"),
 			RefreshTokenRememberMeExpirationSeconds: requireEnvAsInt("REFRESH_TOKEN_REMEMBER_ME_EXPIRATION_IN_SECONDS"),
+			GoogleSSOProvider: SSOProvider{
+				Key:    requireEnv("GOOGLE_SSO_KEY"),
+				Secret: requireEnv("GOOGLE_SSO_SECRET"),
+			},
 		},
 		Groups:      newGroups(),
 		AdminUser:   newAdminUser(),
@@ -173,6 +177,12 @@ type Authentication struct {
 	AccessTokenExpirationSeconds            int
 	RefreshTokenExpirationSeconds           int
 	RefreshTokenRememberMeExpirationSeconds int
+	GoogleSSOProvider                       SSOProvider
+}
+
+type SSOProvider struct {
+	Key    string
+	Secret string
 }
 
 func GetPrivateKey(logger *slog.Logger) (*rsa.PrivateKey, error) {

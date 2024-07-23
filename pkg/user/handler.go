@@ -263,7 +263,7 @@ func (h Handler) SignIn(c *gin.Context) {
 		return
 	}
 
-	h.setCookies(c, tokens, request.RememberMe)
+	SetCookies(c, tokens, request.RememberMe, h.sameSiteMode, h.hostname, h.accessTokenExpirationSeconds, h.refreshTokenExpirationSeconds, h.refreshTokenRememberMeExpirationSeconds)
 
 	c.JSON(http.StatusCreated, tokens)
 }
@@ -335,21 +335,21 @@ func (h Handler) RefreshToken(c *gin.Context) {
 		return
 	}
 
-	h.setCookies(c, tokens, rememberMe)
+	SetCookies(c, tokens, rememberMe, h.sameSiteMode, h.hostname, h.accessTokenExpirationSeconds, h.refreshTokenExpirationSeconds, h.refreshTokenRememberMeExpirationSeconds)
 
 	c.JSON(http.StatusCreated, tokens)
 }
 
-func (h Handler) setCookies(c *gin.Context, tokens *token.Tokens, rememberMe bool) {
-	c.SetSameSite(h.sameSiteMode)
-	c.SetCookie("accessToken", tokens.AccessToken, h.accessTokenExpirationSeconds, "/", h.hostname, true, true)
-	if rememberMe {
-		c.SetCookie("refreshToken", tokens.RefreshToken, h.refreshTokenRememberMeExpirationSeconds, "/refresh", h.hostname, true, true)
-		c.SetCookie("rememberMe", "true", h.refreshTokenRememberMeExpirationSeconds, "/refresh", h.hostname, true, true)
-	} else {
-		c.SetCookie("refreshToken", tokens.RefreshToken, h.refreshTokenExpirationSeconds, "/refresh", h.hostname, true, true)
-	}
-}
+//func (h Handler) setCookies(c *gin.Context, tokens *token.Tokens, rememberMe bool) {
+//	c.SetSameSite(h.sameSiteMode)
+//	c.SetCookie("accessToken", tokens.AccessToken, h.accessTokenExpirationSeconds, "/", h.hostname, true, true)
+//	if rememberMe {
+//		c.SetCookie("refreshToken", tokens.RefreshToken, h.refreshTokenRememberMeExpirationSeconds, "/refresh", h.hostname, true, true)
+//		c.SetCookie("rememberMe", "true", h.refreshTokenRememberMeExpirationSeconds, "/refresh", h.hostname, true, true)
+//	} else {
+//		c.SetCookie("refreshToken", tokens.RefreshToken, h.refreshTokenExpirationSeconds, "/refresh", h.hostname, true, true)
+//	}
+//}
 
 // Me user
 func (h Handler) Me(c *gin.Context) {
