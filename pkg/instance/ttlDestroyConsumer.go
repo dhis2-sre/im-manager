@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"log/slog"
 
+	"github.com/dhis2-sre/im-manager/pkg/model"
+
 	"github.com/dhis2-sre/im-manager/internal/errdef"
 
 	"github.com/dhis2-sre/rabbitmq-client/pkg/rabbitmq"
@@ -13,19 +15,20 @@ import (
 type ttlDestroyConsumer struct {
 	logger          *slog.Logger
 	consumer        *rabbitmq.Consumer
-	instanceDeleter deleter
+	instanceService instanceService
 }
 
-type deleter interface {
+type instanceService interface {
 	Delete(id uint) error
+	FindDeploymentInstanceById(id uint) (*model.DeploymentInstance, error)
 }
 
 //goland:noinspection GoExportedFuncWithUnexportedType
-func NewTTLDestroyConsumer(logger *slog.Logger, consumer *rabbitmq.Consumer, instanceDeleter deleter) *ttlDestroyConsumer {
+func NewTTLDestroyConsumer(logger *slog.Logger, consumer *rabbitmq.Consumer, instanceService instanceService) *ttlDestroyConsumer {
 	return &ttlDestroyConsumer{
 		logger:          logger,
 		consumer:        consumer,
-		instanceDeleter: instanceDeleter,
+		instanceService: instanceService,
 	}
 }
 
@@ -43,23 +46,28 @@ func (c *ttlDestroyConsumer) Consume() error {
 			return
 		}
 
-		err := c.instanceDeleter.Delete(payload.ID)
+		instance, err := c.instanceService.FindDeploymentInstanceById(payload.ID)
+		if err != nil {
+			c.logger.Error("Error finding instance", "instanceId", payload.ID, "error", err)
+		}
+
+		err = c.instanceService.Delete(instance.ID)
 		if err != nil {
 			if errdef.IsNotFound(err) {
 				err := d.Ack(false)
 				if err != nil {
-					c.logger.Error("Error acknowledging ttl-destroy message after deleting instance", "instanceId", payload.ID, "error", err)
+					c.logger.Error("Error acknowledging ttl-destroy message after deleting instance", "instanceId", instance.ID, "error", err)
 					return
 				}
 			}
-			c.logger.Error("Error deleting instance", "instanceId", payload.ID, "error", err)
+			c.logger.Error("Error deleting instance", "instanceId", instance.ID, "error", err)
 			return
 		}
-		c.logger.Info("Deleted expired instance", "instanceId", payload.ID)
+		c.logger.Info("Deleted expired instance", "instanceId", instance.ID, "name", instance.Name, "group", instance.GroupName)
 
 		err = d.Ack(false)
 		if err != nil {
-			c.logger.Error("Error acknowledging ttl-destroy message for instance", "instanceId", payload.ID, "error", err)
+			c.logger.Error("Error acknowledging ttl-destroy message for instance", "instanceId", instance.ID, "error", err)
 		}
 	})
 	return err
