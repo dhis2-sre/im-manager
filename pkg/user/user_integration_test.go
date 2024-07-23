@@ -55,11 +55,13 @@ func TestUserHandler(t *testing.T) {
 	redis := inttest.SetupRedis(t)
 	tokenRepository := token.NewRepository(redis)
 	tokenService, err := token.NewService(logger, tokenRepository, key, 10, "secret", 20, 30)
+
+	ssoMiddleware := middleware.NewSSOMiddleware(userService, tokenService, "hostname", http.SameSiteStrictMode, 10, 20, 30)
 	require.NoError(t, err)
 
 	client := inttest.SetupHTTPServer(t, func(engine *gin.Engine) {
 		userHandler := user.NewHandler(logger, "hostname", http.SameSiteStrictMode, 10, 20, 30, key.PublicKey, userService, tokenService)
-		user.Routes(engine, authentication, authorization, userHandler)
+		user.Routes(engine, authentication, ssoMiddleware, authorization, userHandler)
 	})
 
 	t.Run("SignUp", func(t *testing.T) {

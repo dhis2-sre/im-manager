@@ -3,9 +3,9 @@ package middleware
 import (
 	"net/http"
 
+	"github.com/dhis2-sre/im-manager/internal/util"
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	"github.com/dhis2-sre/im-manager/pkg/token"
-	"github.com/dhis2-sre/im-manager/pkg/user"
 	"github.com/gin-gonic/gin"
 	"github.com/markbates/goth/gothic"
 )
@@ -58,9 +58,9 @@ func (m SSOMiddleware) SSOAuthentication(c *gin.Context) {
 		return
 	}
 
-	user.SetCookies(c, tokens, true, m.sameSiteMode, m.hostname, m.accessTokenExpirationSeconds, m.refreshTokenExpirationSeconds, m.refreshTokenRememberMeExpirationSeconds)
+	util.SetCookies(c, tokens, true, m.sameSiteMode, m.hostname, m.accessTokenExpirationSeconds, m.refreshTokenExpirationSeconds, m.refreshTokenRememberMeExpirationSeconds)
 
-	c.Redirect(http.StatusTemporaryRedirect, "/me")
+	c.Redirect(http.StatusTemporaryRedirect, "/instances")
 }
 
 // BeginAuthHandler initiates SSO authentication

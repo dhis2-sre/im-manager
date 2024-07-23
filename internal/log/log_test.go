@@ -198,6 +198,11 @@ type SignInService struct {
 	userID uint
 }
 
+func (s SignInService) FindOrCreate(email string, password string) (*model.User, error) {
+	// TODO implement me
+	panic("implement me")
+}
+
 func (s SignInService) SignIn(email string, password string) (*model.User, error) {
 	return &model.User{ID: s.userID, Email: email, Password: password}, nil
 }

@@ -16,6 +16,7 @@ import (
 
 	"github.com/dhis2-sre/im-manager/internal/errdef"
 	"github.com/dhis2-sre/im-manager/internal/handler"
+	"github.com/dhis2-sre/im-manager/internal/util"
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	"github.com/go-playground/validator/v10"
 
@@ -263,7 +264,7 @@ func (h Handler) SignIn(c *gin.Context) {
 		return
 	}
 
-	SetCookies(c, tokens, request.RememberMe, h.sameSiteMode, h.hostname, h.accessTokenExpirationSeconds, h.refreshTokenExpirationSeconds, h.refreshTokenRememberMeExpirationSeconds)
+	util.SetCookies(c, tokens, request.RememberMe, h.sameSiteMode, h.hostname, h.accessTokenExpirationSeconds, h.refreshTokenExpirationSeconds, h.refreshTokenRememberMeExpirationSeconds)
 
 	c.JSON(http.StatusCreated, tokens)
 }
@@ -335,21 +336,10 @@ func (h Handler) RefreshToken(c *gin.Context) {
 		return
 	}
 
-	SetCookies(c, tokens, rememberMe, h.sameSiteMode, h.hostname, h.accessTokenExpirationSeconds, h.refreshTokenExpirationSeconds, h.refreshTokenRememberMeExpirationSeconds)
+	util.SetCookies(c, tokens, rememberMe, h.sameSiteMode, h.hostname, h.accessTokenExpirationSeconds, h.refreshTokenExpirationSeconds, h.refreshTokenRememberMeExpirationSeconds)
 
 	c.JSON(http.StatusCreated, tokens)
 }
-
-//func (h Handler) setCookies(c *gin.Context, tokens *token.Tokens, rememberMe bool) {
-//	c.SetSameSite(h.sameSiteMode)
-//	c.SetCookie("accessToken", tokens.AccessToken, h.accessTokenExpirationSeconds, "/", h.hostname, true, true)
-//	if rememberMe {
-//		c.SetCookie("refreshToken", tokens.RefreshToken, h.refreshTokenRememberMeExpirationSeconds, "/refresh", h.hostname, true, true)
-//		c.SetCookie("rememberMe", "true", h.refreshTokenRememberMeExpirationSeconds, "/refresh", h.hostname, true, true)
-//	} else {
-//		c.SetCookie("refreshToken", tokens.RefreshToken, h.refreshTokenExpirationSeconds, "/refresh", h.hostname, true, true)
-//	}
-//}
 
 // Me user
 func (h Handler) Me(c *gin.Context) {
