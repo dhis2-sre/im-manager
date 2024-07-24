@@ -185,15 +185,15 @@ func (hc *HTTPClient) SignIn(t *testing.T, email, password string) (*http.Cookie
 	require.Equal(t, http.StatusCreated, res.StatusCode, errMsg+": HTTP status mismatch")
 
 	body, err := io.ReadAll(res.Body)
-	require.NoError(t, err)
+	require.NoError(t, err, errMsg+": reading response body error")
 	require.Len(t, body, 0)
 
 	accessToken, err := findCookie(res, "accessToken")
-	require.NoError(t, err)
+	require.NoError(t, err, errMsg+": access token cookie not found")
 	require.NotEmpty(t, accessToken.Value, "should return an access token")
 
 	refreshToken, err := findCookie(res, "refreshToken")
-	require.NoError(t, err)
+	require.NoError(t, err, errMsg+": refresh token cookie not found")
 	require.NotEmpty(t, refreshToken.Value, "should return an access token")
 
 	return accessToken, refreshToken
