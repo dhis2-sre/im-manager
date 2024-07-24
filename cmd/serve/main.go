@@ -216,8 +216,9 @@ func run() (err error) {
 	}
 
 	// TODO: This is a hack! Allowed origins for different environments should be applied using skaffold profiles... But I can't get it working!
+	// TODO: Further more it's not enough to allow localhost, we also need to allow various other domains when pointing frontend PR's to the dev backend
 	if cfg.Environment != "production" {
-		cfg.AllowedOrigins = append(cfg.AllowedOrigins, "http://localhost:3000", "http://localhost:5173")
+		cfg.AllowedOrigins = append(cfg.AllowedOrigins, "*")
 	}
 	r, err := server.GetEngine(logger, cfg.BasePath, cfg.AllowedOrigins)
 	if err != nil {
