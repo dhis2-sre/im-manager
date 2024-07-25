@@ -49,6 +49,7 @@ func (c *ttlDestroyConsumer) Consume() error {
 		instance, err := c.instanceService.FindDeploymentInstanceById(payload.ID)
 		if err != nil {
 			c.logger.Error("Error finding instance", "instanceId", payload.ID, "error", err)
+			return
 		}
 
 		err = c.instanceService.Delete(instance.ID)
