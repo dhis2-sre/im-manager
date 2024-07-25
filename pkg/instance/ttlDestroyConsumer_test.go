@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dhis2-sre/im-manager/pkg/model"
+
 	"github.com/dhis2-sre/im-manager/pkg/instance"
 	"github.com/dhis2-sre/im-manager/pkg/inttest"
 	"github.com/dhis2-sre/rabbitmq-client/pkg/rabbitmq"
@@ -30,6 +32,7 @@ func TestConsumeDeletesInstance(t *testing.T) {
 
 	is := &instanceService{}
 	is.On("Delete", uint(1)).Return(nil)
+	is.On("FindDeploymentInstanceById", uint(1)).Return(&model.DeploymentInstance{}, nil)
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	td := instance.NewTTLDestroyConsumer(logger, consumer, is)
@@ -47,6 +50,11 @@ func TestConsumeDeletesInstance(t *testing.T) {
 
 type instanceService struct {
 	mock.Mock
+}
+
+func (is *instanceService) FindDeploymentInstanceById(id uint) (*model.DeploymentInstance, error) {
+	args := is.Called(id)
+	return &model.DeploymentInstance{ID: 1}, args.Error(1)
 }
 
 func (is *instanceService) Delete(id uint) error {
