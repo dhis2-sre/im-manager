@@ -13,12 +13,12 @@ type groupService interface {
 }
 
 type userServiceUtil interface {
-	FindOrCreate(email, password string) (*model.User, error)
+	FindOrCreate(email, password string, sso bool) (*model.User, error)
 	Save(user *model.User) error
 }
 
 func CreateUser(email, password string, userService userServiceUtil, groupService groupService, groupName, userType string) error {
-	u, err := userService.FindOrCreate(email, password)
+	u, err := userService.FindOrCreate(email, password, false)
 	if err != nil {
 		return fmt.Errorf("error creating %s user: %v", userType, err)
 	}

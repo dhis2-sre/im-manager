@@ -370,6 +370,12 @@ func (h Handler) Me(c *gin.Context) {
 		return
 	}
 
+	aCookie, _ := c.Cookie("accessToken")
+	rCookie, _ := c.Cookie("refreshToken")
+
+	fmt.Println("accessToken cookie: ", aCookie)
+	fmt.Println("refreshToken cookie: ", rCookie)
+
 	c.JSON(http.StatusOK, userWithGroups)
 }
 

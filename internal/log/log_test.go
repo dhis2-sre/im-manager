@@ -198,7 +198,7 @@ type SignInService struct {
 	userID uint
 }
 
-func (s SignInService) FindOrCreate(email string, password string) (*model.User, error) {
+func (s SignInService) FindOrCreate(email string, password string, sso bool) (*model.User, error) {
 	// TODO implement me
 	panic("implement me")
 }

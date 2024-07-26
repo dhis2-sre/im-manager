@@ -15,9 +15,9 @@ func Routes(r *gin.Engine, authenticationMiddleware middleware.AuthenticationMid
 
 	ssoAuthenticationRouter := r.Group("")
 	//ssoAuthenticationRouter.Use(ssoMiddleware.SSOAuthentication)
-	ssoAuthenticationRouter.GET("/auth/:provider", ssoMiddleware.BeginAuthHandler)
-	ssoAuthenticationRouter.GET("/auth/:provider/callback", ssoMiddleware.SSOAuthentication)
-	ssoAuthenticationRouter.GET("/auth/logout", ssoMiddleware.LogoutHandler)
+	ssoAuthenticationRouter.GET("/auth/:provider", ssoMiddleware.BeginAuth)
+	ssoAuthenticationRouter.GET("/auth/:provider/callback", ssoMiddleware.ProviderCallback)
+	ssoAuthenticationRouter.GET("/auth/logout", ssoMiddleware.Logout)
 
 	basicAuthenticationRouter := r.Group("")
 	basicAuthenticationRouter.Use(authenticationMiddleware.BasicAuthentication)

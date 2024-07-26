@@ -28,7 +28,7 @@ type userRepository interface {
 	create(user *model.User) error
 	findByEmail(email string) (*model.User, error)
 	findById(ctx context.Context, id uint) (*model.User, error)
-	findOrCreate(email *model.User) (*model.User, error)
+	findOrCreate(user *model.User) (*model.User, error)
 	findAll(ctx context.Context) ([]*model.User, error)
 	delete(ctx context.Context, id uint) error
 	update(user *model.User) (*model.User, error)
@@ -129,6 +129,10 @@ func (s service) SignIn(email string, password string) (*model.User, error) {
 		return nil, err
 	}
 
+	if user.SSO {
+		return nil, errdef.NewUnauthorized(unauthorizedError)
+	}
+
 	match, err := comparePasswords(user.Password, password)
 	if err != nil {
 		return nil, fmt.Errorf("password hashing failed: %s", err)
@@ -172,7 +176,7 @@ func (s service) FindById(ctx context.Context, id uint) (*model.User, error) {
 	return s.repository.findById(ctx, id)
 }
 
-func (s service) FindOrCreate(email string, password string) (*model.User, error) {
+func (s service) FindOrCreate(email string, password string, sso bool) (*model.User, error) {
 	hashedPassword, err := hashPassword(password)
 	if err != nil {
 		return nil, fmt.Errorf("failed to hash password: %s", err)
@@ -182,6 +186,7 @@ func (s service) FindOrCreate(email string, password string) (*model.User, error
 		Email:      email,
 		EmailToken: uuid.New(),
 		Password:   hashedPassword,
+		SSO:        sso,
 	}
 
 	return s.repository.findOrCreate(user)
