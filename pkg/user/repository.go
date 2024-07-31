@@ -83,7 +83,7 @@ func (r repository) findOrCreate(user *model.User) (*model.User, error) {
 	var u *model.User
 	err := r.db.
 		Where(model.User{Email: user.Email}).
-		Attrs(model.User{EmailToken: user.EmailToken, Password: user.Password}).
+		Attrs(model.User{EmailToken: user.EmailToken, Password: user.Password, SSO: user.SSO}).
 		FirstOrCreate(&u).Error
 	return u, err
 }

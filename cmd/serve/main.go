@@ -53,6 +53,8 @@ import (
 	"github.com/dhis2-sre/im-manager/pkg/stack"
 	"github.com/dhis2-sre/im-manager/pkg/storage"
 	"github.com/dhis2-sre/rabbitmq-client/pkg/rabbitmq"
+	"github.com/markbates/goth"
+	"github.com/markbates/goth/providers/google"
 )
 
 func main() {
@@ -102,6 +104,11 @@ func run() (err error) {
 	userHandler := user.NewHandler(logger, cfg.Hostname, authConfig.SameSiteMode, authConfig.AccessTokenExpirationSeconds, authConfig.RefreshTokenExpirationSeconds, authConfig.RefreshTokenRememberMeExpirationSeconds, publicKey, userService, tokenService)
 
 	authentication := middleware.NewAuthentication(publicKey, userService)
+	goth.UseProviders(
+		google.New(authConfig.GoogleSSOProvider.Key, authConfig.GoogleSSOProvider.Secret, cfg.Hostname+"/auth/google/callback"),
+	)
+	ssoMiddleware := middleware.NewSSOMiddleware(userService, tokenService, cfg.Hostname, authConfig.SameSiteMode, authConfig.AccessTokenExpirationSeconds, authConfig.RefreshTokenExpirationSeconds, authConfig.RefreshTokenRememberMeExpirationSeconds)
+
 	groupRepository := group.NewRepository(db)
 	groupService := group.NewService(groupRepository, userService)
 	groupHandler := group.NewHandler(groupService)
@@ -225,7 +232,7 @@ func run() (err error) {
 	}
 
 	group.Routes(r, authentication, authorization, groupHandler)
-	user.Routes(r, authentication, authorization, userHandler)
+	user.Routes(r, authentication, ssoMiddleware, authorization, userHandler)
 	stack.Routes(r, authentication.TokenAuthentication, stackHandler)
 	integration.Routes(r, authentication, integrationHandler)
 	database.Routes(r, authentication.TokenAuthentication, databaseHandler)

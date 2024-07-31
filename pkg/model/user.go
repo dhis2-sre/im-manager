@@ -20,6 +20,7 @@ type User struct {
 	Password         string         `json:"-"`
 	PasswordToken    sql.NullString `json:"-"`
 	PasswordTokenTTL uint           `json:"-"`
+	SSO              bool           `json:"-"`
 	Groups           []Group        `json:"groups" gorm:"many2many:user_groups;constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
 	AdminGroups      []Group        `json:"adminGroups" gorm:"many2many:user_groups_admin;constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
 }
