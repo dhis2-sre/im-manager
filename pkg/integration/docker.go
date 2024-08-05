@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/dhis2-sre/im-manager/internal/errdef"
 	"io"
 	"net/http"
 )
@@ -60,6 +61,38 @@ func (d *dockerHubClient) GetTags(organization string, repository string) ([]str
 	}
 
 	return mapResponseToNames(body), nil
+}
+
+func (d *dockerHubClient) ImageExists(organization, repository, tag string) error {
+	token, err := d.getToken()
+	if err != nil {
+		return err
+	}
+
+	url := fmt.Sprintf("https://hub.docker.com/v2/repositories/%s/%s/tags/%s", organization, repository, tag)
+	req, err := http.NewRequest(http.MethodHead, url, nil)
+	if err != nil {
+		return err
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", fmt.Sprintf("JWT %s", token))
+
+	response, err := d.client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer response.Body.Close()
+
+	if response.StatusCode == http.StatusOK {
+		return nil
+	}
+
+	if response.StatusCode == http.StatusNotFound {
+		return errdef.NewNotFound("%s/%s:%s is not found", organization, repository, tag)
+	}
+
+	return fmt.Errorf("unexpected status code %d", response.StatusCode)
 }
 
 func mapResponseToNames(response dockerHubResponse) []string {
