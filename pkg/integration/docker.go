@@ -4,9 +4,10 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/dhis2-sre/im-manager/internal/errdef"
 	"io"
 	"net/http"
+
+	"github.com/dhis2-sre/im-manager/internal/errdef"
 )
 
 //goland:noinspection GoExportedFuncWithUnexportedType
