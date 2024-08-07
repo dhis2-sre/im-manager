@@ -10,4 +10,5 @@ func Routes(r *gin.Engine, authenticationMiddleware middleware.AuthenticationMid
 	tokenAuthenticationRouter.Use(authenticationMiddleware.TokenAuthentication)
 
 	tokenAuthenticationRouter.POST("/integrations", handler.Integrations)
+	tokenAuthenticationRouter.GET("/integrations/image-exists/:repository/:tag", handler.ImageExists)
 }

@@ -16,3 +16,14 @@ type _ struct {
 	// in: body
 	_ Response
 }
+
+// swagger:parameters imageExists
+type _ struct {
+	// in: path
+	// required: true
+	Repository string `json:"repository"`
+
+	// in: path
+	// required: true
+	Tag uint `json:"tag"`
+}

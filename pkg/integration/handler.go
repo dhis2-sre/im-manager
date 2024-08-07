@@ -23,11 +23,49 @@ type Handler struct {
 type DockerHubClient interface {
 	GetImages(organization string) ([]string, error)
 	GetTags(organization, repository string) ([]string, error)
+	ImageExists(organization, repository, tag string) error
 }
 
 type Request struct {
 	Key     string `json:"key" binding:"required"`
 	Payload any    `json:"payload"`
+}
+
+func (h Handler) ImageExists(c *gin.Context) {
+	// swagger:route GET /integrations/image-exists/{repository}/{tag} imageExists
+	//
+	// Assert if docker image exists
+	//
+	// Assert if docker image exists...
+	//
+	// security:
+	//   oauth2:
+	//
+	// responses:
+	//   200:
+	//   400: Error
+	//   401: Error
+	//   403: Error
+	//   415: Error
+	repository := c.Param("repository")
+	if repository == "" {
+		_ = c.Error(fmt.Errorf("required parameter \"repository\" not found"))
+		return
+	}
+
+	tag := c.Param("tag")
+	if tag == "" {
+		_ = c.Error(fmt.Errorf("required parameter \"tag\" not found"))
+		return
+	}
+
+	err := h.dockerHubClient.ImageExists("dhis2", repository, tag)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	c.Status(http.StatusOK)
 }
 
 // Integrations ...
