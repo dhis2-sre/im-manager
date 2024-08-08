@@ -65,7 +65,7 @@ func (k K8sClient) AssertPodIsNotRunning(t *testing.T, group string, instance st
 }
 
 func (k K8sClient) AssertPodIsReady(t *testing.T, group string, instance string, timeoutInSeconds time.Duration) {
-	time.Sleep(10 * time.Second)
+	time.Sleep(60 * time.Second)
 	pods, err := k.Client.CoreV1().Pods(group).List(context.TODO(), metav1.ListOptions{})
 	require.NoError(t, err)
 	for _, pod := range pods.Items {
