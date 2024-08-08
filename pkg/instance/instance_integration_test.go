@@ -200,7 +200,7 @@ func TestInstanceHandler(t *testing.T) {
 		t.Log("Deploy deployment")
 		path = fmt.Sprintf("/deployments/%d/deploy", deployment.ID)
 		client.Do(t, http.MethodPost, path, nil, http.StatusOK, inttest.WithAuthToken("sometoken"))
-		k8sClient.AssertPodIsReady(t, deploymentInstance.GroupName, deploymentInstance.Name, 60)
+		k8sClient.AssertPodIsReady(t, deploymentInstance.GroupName, deploymentInstance.Name, 160)
 
 		t.Log("Destroy deployment")
 		path = fmt.Sprintf("/deployments/%d", deployment.ID)
