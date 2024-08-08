@@ -2,6 +2,7 @@ package inttest
 
 import (
 	"context"
+	"encoding/json"
 	"slices"
 	"testing"
 	"time"
@@ -64,6 +65,17 @@ func (k K8sClient) AssertPodIsNotRunning(t *testing.T, group string, instance st
 }
 
 func (k K8sClient) AssertPodIsReady(t *testing.T, group string, instance string, timeoutInSeconds time.Duration) {
+	time.Sleep(10 * time.Second)
+	pods, err := k.Client.CoreV1().Pods(group).List(context.TODO(), metav1.ListOptions{})
+	require.NoError(t, err)
+	for _, pod := range pods.Items {
+		t.Logf("!!!%s:%s", pod.Namespace, pod.Name)
+		bytes, err := json.MarshalIndent(pod, "", "  ")
+		require.NoError(t, err)
+		t.Log(string(bytes))
+		t.Log("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+	}
+
 	ctx, cancel := context.WithCancel(context.Background())
 	watch, err := k.Client.CoreV1().Pods(group).Watch(ctx, metav1.ListOptions{
 		LabelSelector: "app.kubernetes.io/instance=" + instance,
