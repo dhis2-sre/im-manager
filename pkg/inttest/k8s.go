@@ -24,7 +24,7 @@ func SetupK8s(t *testing.T) *K8sClient {
 
 	container, err := gnomock.Start(
 		k3s.Preset(
-			k3s.WithVersion("v1.26.7-k3s1"),
+			k3s.WithVersion("v1.29.7+k3s1"),
 			func(p *k3s.P) {
 				p.K3sServerFlags = []string{"--debug"} // TODO(ivo) remove this flag before merging?
 			},
@@ -65,7 +65,7 @@ func (k K8sClient) AssertPodIsNotRunning(t *testing.T, group string, instance st
 }
 
 func (k K8sClient) AssertPodIsReady(t *testing.T, group string, instance string, timeoutInSeconds time.Duration) {
-	time.Sleep(60 * time.Second)
+	time.Sleep(20 * time.Second)
 	pods, err := k.Client.CoreV1().Pods(group).List(context.TODO(), metav1.ListOptions{})
 	require.NoError(t, err)
 	for _, pod := range pods.Items {
