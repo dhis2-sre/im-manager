@@ -54,4 +54,4 @@ sets:
         - name: "39-6-0"
           description: "stable 39"
           IMAGE_TAG: "39.6.0"
-          DATABASE_ID: "est-dbs-sierra-leone-2-39-6-sql-gz"
+          DATABASE_ID: "test-dbs-sierra-leone-2-39-6-sql-gz"
