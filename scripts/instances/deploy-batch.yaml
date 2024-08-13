@@ -1,0 +1,57 @@
+preferences:
+  # prefix for instance names in IM
+  IM_PREFIX_MULTI: "pld-"
+  # target group in IM (usually qa)
+  IM_GROUP_MULTI: "qa"
+  # other parameters that you might want to adjust (but usually don't need to)
+  IMAGE_PULL_POLICY: "Always"
+  INSTANCE_TTL: "86400" # 86400 = 1 day
+  DATABASE_SIZE: "20Gi"
+  DB_RESOURCES_REQUESTS_CPU: "250m"
+  DB_RESOURCES_REQUESTS_MEMORY: "256Mi"
+  MIN_READY_SECONDS: "120"
+  STARTUP_PROBE_FAILURE_THRESHOLD: "26"
+  STARTUP_PROBE_PERIOD_SECONDS: "5"
+  LIVENESS_PROBE_TIMEOUT_SECONDS: "1"
+  READINESS_PROBE_TIMEOUT_SECONDS: "1"
+  CORE_RESOURCES_REQUESTS_CPU: "250m"
+  CORE_RESOURCES_REQUESTS_MEMORY: "2500Mi"
+  FLYWAY_MIGRATE_OUT_OF_ORDER: "false"
+  FLYWAY_REPAIR_BEFORE_MIGRATION: "false"
+
+# define sets of instances that you want to deploy in bulk here
+sets:
+  - name: "dev"
+    IMAGE_REPOSITORY: "core-dev"
+    instances:
+        - name: "dev"
+          description: "dev instance"
+          IMAGE_TAG: "dev"
+          DATABASE_ID: "test-dbs-sierra-leone-dev-sql-gz"
+        - name: "dev-41"
+          description: "v41 dev instance"
+          IMAGE_TAG: "41dev"
+          DATABASE_ID: "test-dbs-sierra-leone-2-41-sql-gz"
+        - name: "dev-40"
+          description: "v40 dev instance"
+          IMAGE_TAG: "40dev"
+          DATABASE_ID: "test-dbs-sierra-leone-2-40-sql-gz"
+        - name: "dev-39"
+          description: "v39 dev instance"
+          IMAGE_TAG: "39dev"
+          DATABASE_ID: "test-dbs-sierra-leone-2-39-sql-gz"
+  - name: "stable"
+    IMAGE_REPOSITORY: "core"
+    instances:
+        - name: "41-0-1"
+          description: "stable 41"
+          IMAGE_TAG: "41.0.1"
+          DATABASE_ID: "test-dbs-sierra-leone-2-41-0-sql-gz"
+        - name: "40-4-0"
+          description: "stable 40"
+          IMAGE_TAG: "40.4.0"
+          DATABASE_ID: "test-dbs-sierra-leone-2-40-4-sql-gz"
+        - name: "39-6-0"
+          description: "stable 39"
+          IMAGE_TAG: "39.6.0"
+          DATABASE_ID: "est-dbs-sierra-leone-2-39-6-sql-gz"
