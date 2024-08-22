@@ -160,8 +160,10 @@ func (ks kubernetesService) getPod(instanceID uint, typeSelector string) (v1.Pod
 		return v1.Pod{}, fmt.Errorf("error getting pod for instance %d and selector %q: %v", instanceID, selector, err)
 	}
 
-	pods.Items = slices.DeleteFunc(pods.Items, func(p v1.Pod) bool {
-		return p.Status.Phase == v1.PodFailed && p.Status.Reason == "Evicted"
+	// 'Evicted' pods are safe to filter out, as for each pod
+	// there will be another pod created in a different state inplace of it.
+	pods.Items = slices.DeleteFunc(pods.Items, func(pod v1.Pod) bool {
+		return pod.Status.Phase == v1.PodFailed && pod.Status.Reason == "Evicted"
 	})
 
 	if len(pods.Items) == 0 {
