@@ -180,3 +180,10 @@ profiles:
           name: im-group-android
           namespace: android
           <<: [ *im-group-chart-config, *im-group-prod-service-account-config ]
+
+      - op: add
+        path: /deploy/helm/releases/-
+        value:
+          name: im-group-implement
+          namespace: implement
+          <<: [ *im-group-chart-config, *im-group-prod-service-account-config ]
