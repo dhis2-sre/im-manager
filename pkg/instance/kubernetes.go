@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"slices"
 	"strings"
 	"time"
 
@@ -159,9 +160,14 @@ func (ks kubernetesService) getPod(instanceID uint, typeSelector string) (v1.Pod
 		return v1.Pod{}, fmt.Errorf("error getting pod for instance %d and selector %q: %v", instanceID, selector, err)
 	}
 
+	pods.Items = slices.DeleteFunc(pods.Items, func(p v1.Pod) bool {
+		return p.Status.Phase == v1.PodFailed && p.Status.Reason == "Evicted"
+	})
+
 	if len(pods.Items) == 0 {
 		return v1.Pod{}, errdef.NewNotFound("failed to find pod using the selector: %q", selector)
 	}
+
 	if len(pods.Items) > 1 {
 		return v1.Pod{}, errdef.NewConflict("multiple pods found using the selector: %q", selector)
 	}
