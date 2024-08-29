@@ -24,7 +24,7 @@ require (
 	github.com/habx/pg-commands v0.6.1
 	github.com/lestrrat-go/jwx/v2 v2.0.19-0.20240309224501-3735e8aace59
 	github.com/lib/pq v1.10.9
-	github.com/orandin/slog-gorm v1.3.2
+	github.com/orandin/slog-gorm v1.4.0
 	github.com/orlangure/gnomock v0.30.0
 	github.com/rabbitmq/amqp091-go v1.10.0
 	github.com/rabbitmq/rabbitmq-stream-go-client v1.4.9
