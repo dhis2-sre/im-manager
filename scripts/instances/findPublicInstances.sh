@@ -2,4 +2,4 @@
 
 set -euo pipefail
 
-$HTTP get "$IM_HOST/deployments/public"
+$HTTP get "$IM_HOST/instances/public"

@@ -80,7 +80,13 @@ type _ struct {
 // swagger:response GroupsWithDeployments
 type _ struct {
 	// in: body
-	_ []GroupsWithDeployments
+	_ []GroupWithDeployments
+}
+
+// swagger:response GroupsWithPublicInstances
+type _ struct {
+	// in: body
+	_ []GroupWithPublicInstances
 }
 
 // swagger:parameters saveDeployment

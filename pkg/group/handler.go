@@ -24,7 +24,7 @@ type Handler struct {
 }
 
 type groupService interface {
-	Create(name string, hostname string, deployable bool) (*model.Group, error)
+	Create(name, description, hostname string, deployable bool) (*model.Group, error)
 	AddUser(ctx context.Context, groupName string, userId uint) error
 	RemoveUser(ctx context.Context, groupName string, userId uint) error
 	AddClusterConfiguration(clusterConfiguration *model.ClusterConfiguration) error
@@ -35,9 +35,10 @@ type groupService interface {
 }
 
 type CreateGroupRequest struct {
-	Name       string `json:"name" binding:"required"`
-	Hostname   string `json:"hostname" binding:"required"`
-	Deployable bool   `json:"deployable"`
+	Name        string `json:"name" binding:"required"`
+	Description string `json:"description" binding:"required"`
+	Hostname    string `json:"hostname" binding:"required"`
+	Deployable  bool   `json:"deployable"`
 }
 
 // Create group
@@ -64,7 +65,7 @@ func (h Handler) Create(c *gin.Context) {
 		return
 	}
 
-	group, err := h.groupService.Create(request.Name, request.Hostname, request.Deployable)
+	group, err := h.groupService.Create(request.Name, request.Description, request.Hostname, request.Deployable)
 	if err != nil {
 		_ = c.Error(err)
 		return

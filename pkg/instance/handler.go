@@ -35,7 +35,6 @@ type SaveDeploymentRequest struct {
 	Name        string `json:"name" binding:"required,dns_rfc1035_label"`
 	Description string `json:"description"`
 	Group       string `json:"group" binding:"required"`
-	Public      bool   `json:"public"`
 	TTL         uint   `json:"ttl"`
 }
 
@@ -149,7 +148,6 @@ func (h Handler) SaveDeployment(c *gin.Context) {
 		Name:        request.Name,
 		Description: request.Description,
 		GroupName:   request.Group,
-		Public:      request.Public,
 		TTL:         request.TTL,
 	}
 
@@ -222,6 +220,7 @@ type parameters map[string]parameter
 type SaveInstanceRequest struct {
 	StackName  string     `json:"stackName"`
 	Parameters parameters `json:"parameters"`
+	Public     bool       `json:"public"`
 }
 
 func (h Handler) SaveInstance(c *gin.Context) {
@@ -271,6 +270,7 @@ func (h Handler) SaveInstance(c *gin.Context) {
 		Group:        deployment.Group,
 		GroupName:    deployment.GroupName,
 		StackName:    request.StackName,
+		Public:       request.Public,
 		Parameters:   parameters,
 	}
 
@@ -661,7 +661,7 @@ func (h Handler) FindDeployments(c *gin.Context) {
 	//	oauth2:
 	//
 	// responses:
-	//	200: []GroupsWithDeployments
+	//	200: GroupsWithDeployments
 	//	401: Error
 	//	403: Error
 	//	415: Error
@@ -680,26 +680,26 @@ func (h Handler) FindDeployments(c *gin.Context) {
 	c.JSON(http.StatusOK, groupsWithDeployments)
 }
 
-// FindPublicDeployments list public available deployments
-func (h Handler) FindPublicDeployments(c *gin.Context) {
-	// swagger:route GET /deployments/public findPublicDeployments
+// FindPublicInstances list public available instances
+func (h Handler) FindPublicInstances(c *gin.Context) {
+	// swagger:route GET /deployments/public findPublicInstances
 	//
 	// Find public deployments
 	//
 	// Find all public deployments
 	//
 	// responses:
-	//	200: []GroupsWithDeployments
+	//	200: GroupsWithPublicInstances
 	//	401: Error
 	//	403: Error
 	//	415: Error
-	groupsWithDeployments, err := h.instanceService.FindPublicDeployments()
+	groupsWithInstances, err := h.instanceService.FindPublicInstances()
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
 
-	c.JSON(http.StatusOK, groupsWithDeployments)
+	c.JSON(http.StatusOK, groupsWithInstances)
 }
 
 // DeleteDeployment deployment by id

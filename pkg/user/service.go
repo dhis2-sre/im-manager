@@ -67,7 +67,7 @@ func (s service) SignUp(email string, password string) (*model.User, error) {
 
 	err = s.sendValidationEmail(user)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to send validation email: %s", err)
 	}
 
 	err = s.repository.create(user)

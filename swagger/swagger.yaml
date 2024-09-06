@@ -1,6 +1,18 @@
 consumes:
     - application/json
 definitions:
+    Category:
+        properties:
+            instances:
+                items:
+                    $ref: '#/definitions/PublicInstance'
+                type: array
+                x-go-name: Instances
+            label:
+                type: string
+                x-go-name: Label
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
     ClusterConfiguration:
         properties:
             createdAt:
@@ -50,6 +62,9 @@ definitions:
             deployable:
                 type: boolean
                 x-go-name: Deployable
+            description:
+                type: string
+                x-go-name: Description
             hostname:
                 type: string
                 x-go-name: Hostname
@@ -119,9 +134,6 @@ definitions:
             name:
                 type: string
                 x-go-name: Name
-            public:
-                type: boolean
-                x-go-name: Public
             ttl:
                 format: uint64
                 type: integer
@@ -168,6 +180,9 @@ definitions:
                 x-go-name: Name
             parameters:
                 $ref: '#/definitions/DeploymentInstanceParameters'
+            public:
+                type: boolean
+                x-go-name: Public
             stackName:
                 description: Stack     *Stack `json:"stack,omitempty"`
                 type: string
@@ -247,6 +262,9 @@ definitions:
             deployable:
                 type: boolean
                 x-go-name: Deployable
+            description:
+                type: string
+                x-go-name: Description
             hostname:
                 type: string
                 x-go-name: Hostname
@@ -264,19 +282,7 @@ definitions:
                 x-go-name: Users
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/model
-    GroupsWithDatabases:
-        properties:
-            databases:
-                items:
-                    $ref: '#/definitions/Database'
-                type: array
-                x-go-name: Databases
-            name:
-                type: string
-                x-go-name: Name
-        type: object
-        x-go-package: github.com/dhis2-sre/im-manager/pkg/database
-    GroupsWithDeployments:
+    GroupWithDeployments:
         properties:
             deployments:
                 items:
@@ -291,6 +297,33 @@ definitions:
                 x-go-name: Name
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
+    GroupWithPublicInstances:
+        properties:
+            categories:
+                items:
+                    $ref: '#/definitions/Category'
+                type: array
+                x-go-name: Categories
+            description:
+                type: string
+                x-go-name: Description
+            name:
+                type: string
+                x-go-name: Name
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
+    GroupsWithDatabases:
+        properties:
+            databases:
+                items:
+                    $ref: '#/definitions/Database'
+                type: array
+                x-go-name: Databases
+            name:
+                type: string
+                x-go-name: Name
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/database
     InstanceStatus:
         type: string
         x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
@@ -328,6 +361,19 @@ definitions:
             keys to sets of values.
         type: object
         x-go-package: net/textproto
+    PublicInstance:
+        properties:
+            description:
+                type: string
+                x-go-name: Description
+            hostname:
+                type: string
+                x-go-name: Hostname
+            name:
+                type: string
+                x-go-name: Name
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
     RefreshTokenRequest:
         properties:
             refreshToken:
@@ -376,9 +422,6 @@ definitions:
             name:
                 type: string
                 x-go-name: Name
-            public:
-                type: boolean
-                x-go-name: Public
             ttl:
                 format: uint64
                 type: integer
@@ -389,6 +432,9 @@ definitions:
         properties:
             parameters:
                 $ref: '#/definitions/parameters'
+            public:
+                type: boolean
+                x-go-name: Public
             stackName:
                 type: string
                 x-go-name: StackName
@@ -1075,10 +1121,10 @@ paths:
     /deployments/public:
         get:
             description: Find all public deployments
-            operationId: findPublicDeployments
+            operationId: findPublicInstances
             responses:
                 "200":
-                    $ref: '#/responses/GroupsWithDeployments'
+                    $ref: '#/responses/GroupsWithPublicInstances'
                 "401":
                     $ref: '#/responses/Error'
                 "403":
@@ -1855,7 +1901,13 @@ responses:
         description: ""
         schema:
             items:
-                $ref: '#/definitions/GroupsWithDeployments'
+                $ref: '#/definitions/GroupWithDeployments'
+            type: array
+    GroupsWithPublicInstances:
+        description: ""
+        schema:
+            items:
+                $ref: '#/definitions/GroupWithPublicInstances'
             type: array
     InstanceLogsResponse:
         description: ""
