@@ -242,8 +242,7 @@ func TestInstanceHandler(t *testing.T) {
 		body = strings.NewReader(`{
 			"name": "dev-public-deployment",
 			"group": "group-name",
-			"description": "some description",
-			"public": true
+			"description": "some description"
 		}`)
 
 		client.PostJSON(t, "/deployments", body, &deployment, inttest.WithAuthToken("sometoken"))
@@ -255,9 +254,11 @@ func TestInstanceHandler(t *testing.T) {
 		t.Log("Create public deployment instance")
 		var publicDeploymentInstance model.DeploymentInstance
 		body = strings.NewReader(`{
-			"stackName": "whoami-go"
+			"stackName": "whoami-go",
+			"public": true
 		}`)
 
+		path = fmt.Sprintf("/deployments/%d/instance", deployment.ID)
 		client.PostJSON(t, path, body, &publicDeploymentInstance, inttest.WithAuthToken("sometoken"))
 		assert.Equal(t, deployment.ID, publicDeploymentInstance.DeploymentID)
 		assert.Equal(t, "group-name", publicDeploymentInstance.GroupName)
@@ -268,13 +269,13 @@ func TestInstanceHandler(t *testing.T) {
 
 		client.GetJSON(t, "/instances/public", &groupsWithInstances)
 
-		assert.Len(t, groupsWithInstances, 1)
+		require.Len(t, groupsWithInstances, 1)
 		assert.Equal(t, "group-name", groupsWithInstances[0].Name)
-		deployments := groupsWithInstances[0].Categories[0].Instances
-		assert.Len(t, deployments, 1)
-		assert.Equal(t, "dev-public-deployment", deployments[0].Name)
-		assert.Equal(t, "some description", deployments[0].Description)
-		assert.Equal(t, "group-name", deployments[0].Hostname)
+		instances := groupsWithInstances[0].Categories[0].Instances
+		assert.Len(t, instances, 1)
+		assert.Equal(t, "dev-public-deployment", instances[0].Name)
+		assert.Equal(t, "some description", instances[0].Description)
+		assert.Equal(t, "https://some/dev-public-deployment", instances[0].Hostname)
 	})
 }
 
