@@ -44,7 +44,7 @@ releases:
       - dhisConfig: |
           connection.dialect = org.hibernate.dialect.PostgreSQLDialect
           connection.driver_class = org.postgresql.Driver
-          connection.url = jdbc:postgresql://{{ requiredEnv "DATABASE_HOSTNAME" }}/{{ requiredEnv "DATABASE_NAME" }}
+          connection.url = jdbc:postgresql://citus.citus.svc/{{ requiredEnv "DATABASE_NAME" }}
           connection.username = {{ requiredEnv "DATABASE_USERNAME" }}
           connection.password = {{ requiredEnv "DATABASE_PASSWORD" }}
           # Database schema behavior, can be validate, update, create, create-drop
@@ -55,6 +55,7 @@ releases:
           server.https = on
           flyway.migrate_out_of_order = {{ requiredEnv "FLYWAY_MIGRATE_OUT_OF_ORDER" }}
           flyway.repair_before_migration = {{ requiredEnv "FLYWAY_REPAIR_BEFORE_MIGRATION" }}
+          analytics.citus.extension = on
       - googleAuth:
           projectId: "{{ requiredEnv "GOOGLE_AUTH_PROJECT_ID" }}"
           privateKeyId: "{{ requiredEnv "GOOGLE_AUTH_PRIVATE_KEY_ID" }}"
