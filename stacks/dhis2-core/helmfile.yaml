@@ -55,6 +55,8 @@ releases:
           server.https = on
           flyway.migrate_out_of_order = {{ requiredEnv "FLYWAY_MIGRATE_OUT_OF_ORDER" }}
           flyway.repair_before_migration = {{ requiredEnv "FLYWAY_REPAIR_BEFORE_MIGRATION" }}
+          # Enables logging of all SQL queries.
+          enable.query.logging = {{ requiredEnv "ENABLE_QUERY_LOGGING" }}
       - googleAuth:
           projectId: "{{ requiredEnv "GOOGLE_AUTH_PROJECT_ID" }}"
           privateKeyId: "{{ requiredEnv "GOOGLE_AUTH_PRIVATE_KEY_ID" }}"
