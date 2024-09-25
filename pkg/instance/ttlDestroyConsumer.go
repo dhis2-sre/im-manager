@@ -34,6 +34,8 @@ func NewTTLDestroyConsumer(logger *slog.Logger, consumer *rabbitmq.Consumer, ins
 
 func (c *ttlDestroyConsumer) Consume() error {
 	_, err := c.consumer.Consume("ttl-destroy", func(d amqp.Delivery) {
+		c.logger = c.logger.With("correlationId", d.CorrelationId)
+
 		payload := struct{ ID uint }{}
 
 		if err := json.Unmarshal(d.Body, &payload); err != nil {
