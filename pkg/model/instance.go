@@ -19,8 +19,7 @@ type Deployment struct {
 	GroupName   string `json:"groupName" gorm:"index:deployment_name_group_idx,unique; references:Name"`
 	Group       *Group `json:"group,omitempty"`
 
-	Public bool `json:"public"`
-	TTL    uint `json:"ttl"`
+	TTL uint `json:"ttl"`
 
 	Instances []*DeploymentInstance `json:"instances" gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
 }
@@ -44,6 +43,8 @@ type DeploymentInstance struct {
 
 	GormParameters []DeploymentInstanceParameter `json:"-" gorm:"foreignKey:DeploymentInstanceID; constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
 	Parameters     DeploymentInstanceParameters  `json:"parameters" gorm:"-:all"`
+
+	Public bool `json:"public"`
 
 	DeployLog string `json:"deployLog" gorm:"type:text"`
 }

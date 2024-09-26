@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"os/exec"
 	"slices"
+	"strings"
 
 	"golang.org/x/exp/maps"
 
@@ -49,7 +50,7 @@ type Repository interface {
 	FindDeploymentInstanceById(id uint) (*model.DeploymentInstance, error)
 	FindDecryptedDeploymentInstanceById(id uint) (*model.DeploymentInstance, error)
 	FindDeployments(groupNames []string) ([]*model.Deployment, error)
-	FindPublicDeployments() ([]*model.Deployment, error)
+	FindPublicInstances() ([]*model.DeploymentInstance, error)
 }
 
 type groupService interface {
@@ -521,13 +522,13 @@ func (s service) Logs(instance *model.DeploymentInstance, group *model.Group, ty
 	return ks.getLogs(instance, typeSelector)
 }
 
-type GroupsWithDeployments struct {
+type GroupWithDeployments struct {
 	Name        string              `json:"name"`
 	Hostname    string              `json:"hostname"`
 	Deployments []*model.Deployment `json:"deployments"`
 }
 
-func (s service) FindDeployments(user *model.User) ([]GroupsWithDeployments, error) {
+func (s service) FindDeployments(user *model.User) ([]GroupWithDeployments, error) {
 	groups := append(user.Groups, user.AdminGroups...) //nolint:gocritic
 
 	groupsByName := make(map[string]model.Group)
@@ -542,45 +543,22 @@ func (s service) FindDeployments(user *model.User) ([]GroupsWithDeployments, err
 	}
 
 	if len(deployments) < 1 {
-		return []GroupsWithDeployments{}, nil
+		return []GroupWithDeployments{}, nil
 	}
 
 	return s.groupDeployments(deployments)
 }
 
-func (s service) FindPublicDeployments() ([]GroupsWithDeployments, error) {
-	deployments, err := s.instanceRepository.FindPublicDeployments()
-	if err != nil {
-		return nil, err
-	}
-
-	if len(deployments) < 1 {
-		return []GroupsWithDeployments{}, nil
-	}
-
-	return s.groupDeployments(deployments)
-}
-
-func (s service) groupDeployments(deployments []*model.Deployment) ([]GroupsWithDeployments, error) {
-	groupNamesMap := map[string]struct{}{}
+func (s service) groupDeployments(deployments []*model.Deployment) ([]GroupWithDeployments, error) {
+	groupsByName := map[string]*model.Group{}
 	for _, deployment := range deployments {
-		groupNamesMap[deployment.GroupName] = struct{}{}
+		for _, instance := range deployment.Instances {
+			groupsByName[instance.GroupName] = deployment.Group
+		}
 	}
 
-	groupNames := maps.Keys(groupNamesMap)
-
-	groups, err := s.groupService.FindByGroupNames(groupNames)
-	if err != nil {
-		return nil, err
-	}
-
-	groupsByName := map[string]model.Group{}
-	for _, group := range groups {
-		groupsByName[group.Name] = group
-	}
-
-	groupsWithDeployments := make([]GroupsWithDeployments, len(groupNames))
-	for i, name := range groupNames {
+	groupsWithDeployments := make([]GroupWithDeployments, len(groupsByName))
+	for i, name := range maps.Keys(groupsByName) {
 		groupWithDeployments := groupsWithDeployments[i]
 		groupWithDeployments.Name = name
 		groupWithDeployments.Hostname = groupsByName[name].Hostname
@@ -597,11 +575,96 @@ func (s service) groupDeployments(deployments []*model.Deployment) ([]GroupsWith
 		groupsWithDeployments[i] = groupWithDeployments
 	}
 
-	slices.SortFunc(groupsWithDeployments, func(a, b GroupsWithDeployments) int {
+	slices.SortFunc(groupsWithDeployments, func(a, b GroupWithDeployments) int {
 		return cmp.Compare(a.Name, b.Name)
 	})
 
 	return groupsWithDeployments, nil
+}
+
+type PublicInstance struct {
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Hostname    string `json:"hostname"`
+}
+
+type Category struct {
+	Label     string           `json:"label"`
+	Instances []PublicInstance `json:"instances"`
+}
+
+type GroupWithPublicInstances struct {
+	Name        string     `json:"name"`
+	Description string     `json:"description"`
+	Categories  []Category `json:"categories"`
+}
+
+func (s service) FindPublicInstances() ([]GroupWithPublicInstances, error) {
+	instances, err := s.instanceRepository.FindPublicInstances()
+	if err != nil {
+		return nil, err
+	}
+
+	if len(instances) < 1 {
+		return []GroupWithPublicInstances{}, nil
+	}
+
+	return s.groupPublicInstances(instances)
+}
+
+func (s service) groupPublicInstances(instances []*model.DeploymentInstance) ([]GroupWithPublicInstances, error) {
+	groupsByName := map[string]*model.Group{}
+	for _, instance := range instances {
+		groupsByName[instance.GroupName] = instance.Group
+	}
+
+	var groupsWithPublicInstances []GroupWithPublicInstances
+	for name, group := range groupsByName {
+		groupWithPublicInstances := GroupWithPublicInstances{
+			Name:        name,
+			Description: group.Description,
+			Categories:  nil,
+		}
+		devCategory := Category{Label: "Under Development"}
+		nightlyCategory := Category{Label: "Canary"}
+		stableCategory := Category{Label: "Stable"}
+		for _, instance := range instances {
+			if instance.GroupName == name {
+				publicInstance := PublicInstance{
+					Name:        instance.Name,
+					Description: instance.Deployment.Description,
+					Hostname:    fmt.Sprintf("https://%s/%s", instance.Group.Hostname, instance.Name),
+				}
+				if strings.HasPrefix(instance.Name, "dev") {
+					devCategory.Instances = append(devCategory.Instances, publicInstance)
+				}
+				if strings.HasPrefix(instance.Name, "nightly") {
+					nightlyCategory.Instances = append(nightlyCategory.Instances, publicInstance)
+				}
+				if strings.HasPrefix(instance.Name, "stable") {
+					stableCategory.Instances = append(stableCategory.Instances, publicInstance)
+				}
+			}
+		}
+
+		if len(devCategory.Instances) > 0 {
+			groupWithPublicInstances.Categories = append(groupWithPublicInstances.Categories, devCategory)
+		}
+
+		if len(nightlyCategory.Instances) > 0 {
+			groupWithPublicInstances.Categories = append(groupWithPublicInstances.Categories, nightlyCategory)
+		}
+
+		if len(stableCategory.Instances) > 0 {
+			groupWithPublicInstances.Categories = append(groupWithPublicInstances.Categories, stableCategory)
+		}
+
+		if len(groupWithPublicInstances.Categories) > 0 {
+			groupsWithPublicInstances = append(groupsWithPublicInstances, groupWithPublicInstances)
+		}
+	}
+
+	return groupsWithPublicInstances, nil
 }
 
 type InstanceStatus string

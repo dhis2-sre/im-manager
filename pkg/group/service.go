@@ -44,11 +44,12 @@ func (s *service) FindWithDetails(name string) (*model.Group, error) {
 	return s.groupRepository.findWithDetails(name)
 }
 
-func (s *service) Create(name string, hostname string, deployable bool) (*model.Group, error) {
+func (s *service) Create(name, description, hostname string, deployable bool) (*model.Group, error) {
 	group := &model.Group{
-		Name:       name,
-		Hostname:   hostname,
-		Deployable: deployable,
+		Name:        name,
+		Description: description,
+		Hostname:    hostname,
+		Deployable:  deployable,
 	}
 
 	err := s.groupRepository.create(group)

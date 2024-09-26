@@ -50,6 +50,7 @@ func TestGroupHandler(t *testing.T) {
 	{
 		requestBody := strings.NewReader(`{
 			"name": "test-group",
+			"description": "test-group-description",
 			"hostname": "test-hostname.com"
 		}`)
 
@@ -57,6 +58,7 @@ func TestGroupHandler(t *testing.T) {
 		client.PostJSON(t, "/groups", requestBody, &group)
 
 		require.Equal(t, "test-group", group.Name)
+		require.Equal(t, "test-group-description", group.Description)
 		require.Equal(t, "test-hostname.com", group.Hostname)
 		require.False(t, group.Deployable)
 		groupName = group.Name
@@ -103,6 +105,7 @@ func TestGroupHandler(t *testing.T) {
 
 			requestBody := strings.NewReader(`{
 				"name": "deployable-test-group",
+				"description": "deployable-test-group-description",
 				"hostname": "deployable-test-hostname.com",
 				"deployable": true
 			}`)
@@ -111,6 +114,7 @@ func TestGroupHandler(t *testing.T) {
 			client.PostJSON(t, "/groups", requestBody, &group)
 
 			assert.Equal(t, "deployable-test-group", group.Name)
+			assert.Equal(t, "deployable-test-group-description", group.Description)
 			assert.Equal(t, "deployable-test-hostname.com", group.Hostname)
 			assert.True(t, group.Deployable)
 		})

@@ -225,36 +225,57 @@ func TestInstanceHandler(t *testing.T) {
 		assert.Equal(t, "private-deployment", deployment.Name)
 		assert.Equal(t, "group-name", deployment.GroupName)
 		assert.Equal(t, "some description", deployment.Description)
-		assert.False(t, deployment.Public)
+
+		t.Log("Create deployment instance")
+		var deploymentInstance model.DeploymentInstance
+		body = strings.NewReader(`{
+			"stackName": "whoami-go"
+		}`)
+
+		path := fmt.Sprintf("/deployments/%d/instance", deployment.ID)
+		client.PostJSON(t, path, body, &deploymentInstance, inttest.WithAuthToken("sometoken"))
+		assert.Equal(t, deployment.ID, deploymentInstance.DeploymentID)
+		assert.Equal(t, "group-name", deploymentInstance.GroupName)
+		assert.Equal(t, "whoami-go", deploymentInstance.StackName)
 
 		t.Log("Create public deployment")
 		body = strings.NewReader(`{
-			"name": "public-deployment",
+			"name": "dev-public-deployment",
 			"group": "group-name",
-			"description": "some description",
-			"public": true
+			"description": "some description"
 		}`)
 
 		client.PostJSON(t, "/deployments", body, &deployment, inttest.WithAuthToken("sometoken"))
 
-		assert.Equal(t, "public-deployment", deployment.Name)
+		assert.Equal(t, "dev-public-deployment", deployment.Name)
 		assert.Equal(t, "group-name", deployment.GroupName)
 		assert.Equal(t, "some description", deployment.Description)
-		assert.True(t, deployment.Public)
 
-		t.Log("Get public deployments")
-		var groupsWithDeployments []instance.GroupsWithDeployments
+		t.Log("Create public deployment instance")
+		var publicDeploymentInstance model.DeploymentInstance
+		body = strings.NewReader(`{
+			"stackName": "whoami-go",
+			"public": true
+		}`)
 
-		client.GetJSON(t, "/deployments/public", &groupsWithDeployments)
+		path = fmt.Sprintf("/deployments/%d/instance", deployment.ID)
+		client.PostJSON(t, path, body, &publicDeploymentInstance, inttest.WithAuthToken("sometoken"))
+		assert.Equal(t, deployment.ID, publicDeploymentInstance.DeploymentID)
+		assert.Equal(t, "group-name", publicDeploymentInstance.GroupName)
+		assert.Equal(t, "whoami-go", publicDeploymentInstance.StackName)
 
-		assert.Len(t, groupsWithDeployments, 1)
-		assert.Equal(t, "group-name", groupsWithDeployments[0].Name)
-		deployments := groupsWithDeployments[0].Deployments
-		assert.Len(t, deployments, 1)
-		assert.Equal(t, "public-deployment", deployments[0].Name)
-		assert.Equal(t, "some description", deployments[0].Description)
-		assert.Equal(t, "group-name", deployments[0].GroupName)
-		assert.True(t, deployments[0].Public)
+		t.Log("Get public instances")
+		var groupsWithInstances []instance.GroupWithPublicInstances
+
+		client.GetJSON(t, "/instances/public", &groupsWithInstances)
+
+		require.Len(t, groupsWithInstances, 1)
+		assert.Equal(t, "group-name", groupsWithInstances[0].Name)
+		instances := groupsWithInstances[0].Categories[0].Instances
+		assert.Len(t, instances, 1)
+		assert.Equal(t, "dev-public-deployment", instances[0].Name)
+		assert.Equal(t, "some description", instances[0].Description)
+		assert.Equal(t, "https://some/dev-public-deployment", instances[0].Hostname)
 	})
 }
 
