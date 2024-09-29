@@ -34,15 +34,15 @@ func NewTTLDestroyConsumer(logger *slog.Logger, consumer *rabbitmq.Consumer, ins
 
 func (c *ttlDestroyConsumer) Consume() error {
 	_, err := c.consumer.Consume("ttl-destroy", func(d amqp.Delivery) {
-		c.logger = c.logger.With("correlationId", d.CorrelationId)
+		logger := c.logger.With("correlationId", d.CorrelationId)
 
 		payload := struct{ ID uint }{}
 
 		if err := json.Unmarshal(d.Body, &payload); err != nil {
-			c.logger.Error("Error unmarshalling ttl-destroy message", "error", err)
+			logger.Error("Error unmarshalling ttl-destroy message", "error", err)
 			err := d.Nack(false, false)
 			if err != nil {
-				c.logger.Error("Error negatively acknowledging ttl-destroy message", "error", err)
+				logger.Error("Error negatively acknowledging ttl-destroy message", "error", err)
 				return
 			}
 			return
@@ -50,7 +50,7 @@ func (c *ttlDestroyConsumer) Consume() error {
 
 		instance, err := c.instanceService.FindDeploymentInstanceById(payload.ID)
 		if err != nil {
-			c.logger.Error("Error finding instance", "instanceId", payload.ID, "error", err)
+			logger.Error("Error finding instance", "instanceId", payload.ID, "error", err)
 			return
 		}
 
@@ -59,18 +59,18 @@ func (c *ttlDestroyConsumer) Consume() error {
 			if errdef.IsNotFound(err) {
 				err := d.Ack(false)
 				if err != nil {
-					c.logger.Error("Error acknowledging ttl-destroy message after deleting instance", "instanceId", instance.ID, "error", err)
+					logger.Error("Error acknowledging ttl-destroy message after deleting instance", "instanceId", instance.ID, "error", err)
 					return
 				}
 			}
-			c.logger.Error("Error deleting instance", "instanceId", instance.ID, "error", err)
+			logger.Error("Error deleting instance", "instanceId", instance.ID, "error", err)
 			return
 		}
-		c.logger.Info("Deleted expired instance", "instanceId", instance.ID, "name", instance.Name, "group", instance.GroupName)
+		logger.Info("Deleted expired instance", "instanceId", instance.ID, "name", instance.Name, "group", instance.GroupName)
 
 		err = d.Ack(false)
 		if err != nil {
-			c.logger.Error("Error acknowledging ttl-destroy message for instance", "instanceId", instance.ID, "error", err)
+			logger.Error("Error acknowledging ttl-destroy message for instance", "instanceId", instance.ID, "error", err)
 		}
 	})
 	return err
