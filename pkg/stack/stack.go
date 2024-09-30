@@ -196,6 +196,7 @@ var DHIS2Core = model.Stack{
 		"STARTUP_PROBE_PERIOD_SECONDS":    {Priority: 13, DisplayName: "Startup Probe Period Seconds", DefaultValue: &dhis2CoreDefaults.startupProbePeriodSeconds},
 		"JAVA_OPTS":                       {Priority: 14, DisplayName: "JAVA_OPTS", DefaultValue: &dhis2CoreDefaults.javaOpts},
 		"CHART_VERSION":                   {Priority: 15, DisplayName: "Chart Version", DefaultValue: &dhis2CoreDefaults.chartVersion},
+		"ENABLE_QUERY_LOGGING":            {Priority: 16, DisplayName: "Enable Query Logging", DefaultValue: &dhis2CoreDefaults.enableQueryLogging},
 		"GOOGLE_AUTH_PROJECT_ID":          {Priority: 0, DisplayName: "Google auth project id", DefaultValue: &dhis2CoreDefaults.googleAuthClientId},
 		"GOOGLE_AUTH_PRIVATE_KEY":         {Priority: 0, DisplayName: "Google auth private key", DefaultValue: &dhis2CoreDefaults.googleAuthPrivateKey},
 		"GOOGLE_AUTH_PRIVATE_KEY_ID":      {Priority: 0, DisplayName: "Google auth private key id", DefaultValue: &dhis2CoreDefaults.googleAuthPrivateKeyId},
@@ -217,6 +218,7 @@ var dhis2CoreDefaults = struct {
 	dhis2Home                    string
 	flywayMigrateOutOfOrder      string
 	flywayRepairBeforeMigration  string
+	enableQueryLogging           string
 	imagePullPolicy              string
 	imageRepository              string
 	imageTag                     string
@@ -238,6 +240,7 @@ var dhis2CoreDefaults = struct {
 	dhis2Home:                    "/opt/dhis2",
 	flywayMigrateOutOfOrder:      "false",
 	flywayRepairBeforeMigration:  "false",
+	enableQueryLogging:           "false",
 	imagePullPolicy:              ifNotPresent,
 	imageRepository:              "core",
 	imageTag:                     "2.40.2",
@@ -286,6 +289,7 @@ var DHIS2 = model.Stack{
 		"STARTUP_PROBE_PERIOD_SECONDS":    {Priority: 22, DisplayName: "Startup Probe Period Seconds", DefaultValue: &dhis2CoreDefaults.startupProbePeriodSeconds},
 		"CHART_VERSION":                   {Priority: 23, DisplayName: "Chart Version", DefaultValue: &dhis2CoreDefaults.chartVersion},
 		"JAVA_OPTS":                       {Priority: 24, DisplayName: "JAVA Options", DefaultValue: &dhis2CoreDefaults.javaOpts},
+		"ENABLE_QUERY_LOGGING":            {Priority: 25, DisplayName: "Enable Query Logging", DefaultValue: &dhis2CoreDefaults.enableQueryLogging},
 		"GOOGLE_AUTH_PROJECT_ID":          {Priority: 0, DisplayName: "Google auth project id", DefaultValue: &dhis2CoreDefaults.googleAuthClientId},
 		"GOOGLE_AUTH_PRIVATE_KEY":         {Priority: 0, DisplayName: "Google auth private key", DefaultValue: &dhis2CoreDefaults.googleAuthPrivateKey},
 		"GOOGLE_AUTH_PRIVATE_KEY_ID":      {Priority: 0, DisplayName: "Google auth private key id", DefaultValue: &dhis2CoreDefaults.googleAuthPrivateKeyId},

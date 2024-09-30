@@ -56,6 +56,8 @@ releases:
           server.https = on
           flyway.migrate_out_of_order = {{ requiredEnv "FLYWAY_MIGRATE_OUT_OF_ORDER" }}
           flyway.repair_before_migration = {{ requiredEnv "FLYWAY_REPAIR_BEFORE_MIGRATION" }}
+          # Enables logging of all SQL queries.
+          enable.query.logging = {{ requiredEnv "ENABLE_QUERY_LOGGING" }}
           {{- if eq (requiredEnv "INSTALL_REDIS" | default "false") "true" }}
           redis.enabled = on
           redis.cache.invalidation.enabled = on

@@ -56,7 +56,7 @@ jobs:
           repo: im-web-client
           github_token: ${{ secrets.DHIS2_SRE_BOT_GITHUB_TOKEN }}
           workflow_file_name: playwright.yml
-          ref: master
+          ref: DEVOPS-456
           client_payload: '{"api_url": "${{ env.TARGET_URL }}"}'
 
   send-slack-message:
