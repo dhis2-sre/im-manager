@@ -99,6 +99,7 @@ deploy:
             DATABASE_MANAGER_SERVICE_BASE_PATH: /
             DATABASE_HOST: im-manager-postgresql-{{ .ENVIRONMENT }}.instance-manager-{{ .CLASSIFICATION }}.svc
             DATABASE_PORT: "5432"
+            DATABASE_SSL_MODE: required
             RABBITMQ_HOST: im-rabbitmq-{{ .ENVIRONMENT }}.instance-manager-{{ .CLASSIFICATION }}.svc
             RABBITMQ_PORT: "5672"
             RABBITMQ_STREAM_PORT: "5552"
