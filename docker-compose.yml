@@ -165,6 +165,7 @@ services:
         chown 70:70 server.key # Postgres user in the Alpine image"
     profiles:
       - dev
+      - prod
 
 volumes:
   database:
