@@ -44,7 +44,7 @@ releases:
       - dhisConfig: |
           connection.dialect = org.hibernate.dialect.PostgreSQLDialect
           connection.driver_class = org.postgresql.Driver
-          connection.url = jdbc:postgresql://{{ requiredEnv "DATABASE_HOSTNAME" }}/{{ requiredEnv "DATABASE_NAME" }}
+          connection.url = jdbc:postgresql://{{ requiredEnv "DATABASE_HOSTNAME" }}/{{ requiredEnv "DATABASE_NAME" }}?sslmode=require
           connection.username = {{ requiredEnv "DATABASE_USERNAME" }}
           connection.password = {{ requiredEnv "DATABASE_PASSWORD" }}
           # Database schema behavior, can be validate, update, create, create-drop

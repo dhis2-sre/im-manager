@@ -31,6 +31,7 @@ func SetupDB(t *testing.T) *gorm.DB {
 	db, err := storage.NewDatabase(logger, config.Postgresql{
 		Host:         container.Host,
 		Port:         container.DefaultPort(),
+		SslMode:      "disable",
 		Username:     "im",
 		Password:     "im",
 		DatabaseName: "test_im",

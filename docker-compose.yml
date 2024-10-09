@@ -56,7 +56,10 @@ services:
       - dev
 
   database:
-    image: postgres:13-alpine
+    image: postgres:17-alpine
+    depends_on:
+      database-certs:
+        condition: service_completed_successfully
     ports:
       - "5432:5432"
     environment:
@@ -69,6 +72,8 @@ services:
       timeout: 3s
       retries: 5
     volumes:
+      - ./postgres-initdb:/docker-entrypoint-initdb.d
+      - database-certs:/var/lib/postgresql/certs
       - database:/var/lib/postgresql/data
     profiles:
       - dev
@@ -146,7 +151,24 @@ services:
     profiles:
       - dev
 
+  database-certs:
+    image: alpine/openssl
+    volumes:
+      - database-certs:/certs
+    working_dir: /certs
+    entrypoint: >
+      /bin/sh -c "
+        openssl req -nodes -new -text -subj /CN=localhost -out server.req -keyout privkey.pem
+        openssl rsa -in privkey.pem -out server.key
+        openssl req -x509 -in server.req -text -key server.key -out server.crt
+        chmod 600 server.key
+        chown 70:70 server.key # Postgres user in the Alpine image"
+    profiles:
+      - dev
+      - prod
+
 volumes:
   database:
+  database-certs:
   redis:
   minio:

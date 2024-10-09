@@ -68,6 +68,7 @@ func New() Config {
 		Postgresql: Postgresql{
 			Host:         requireEnv("DATABASE_HOST"),
 			Port:         requireEnvAsInt("DATABASE_PORT"),
+			SslMode:      requireEnv("DATABASE_SSL_MODE"),
 			Username:     requireEnv("DATABASE_USERNAME"),
 			Password:     requireEnv("DATABASE_PASSWORD"),
 			DatabaseName: requireEnv("DATABASE_NAME"),
@@ -137,6 +138,7 @@ type DockerHub struct {
 type Postgresql struct {
 	Host         string
 	Port         int
+	SslMode      string
 	Username     string
 	Password     string
 	DatabaseName string
