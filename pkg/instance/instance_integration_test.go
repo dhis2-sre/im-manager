@@ -1,6 +1,7 @@
 package instance_test
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -10,20 +11,20 @@ import (
 	"testing"
 	"time"
 
-	"go.mozilla.org/sops/v3"
+	"github.com/getsops/sops/v3"
 
 	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
 	"github.com/dhis2-sre/im-manager/pkg/database"
 	"github.com/dhis2-sre/im-manager/pkg/storage"
 
 	"filippo.io/age"
-	"go.mozilla.org/sops/v3/aes"
-	sops_age "go.mozilla.org/sops/v3/age"
-	"go.mozilla.org/sops/v3/cmd/sops/common"
-	"go.mozilla.org/sops/v3/keys"
-	"go.mozilla.org/sops/v3/keyservice"
-	"go.mozilla.org/sops/v3/stores/yaml"
-	"go.mozilla.org/sops/v3/version"
+	"github.com/getsops/sops/v3/aes"
+	sops_age "github.com/getsops/sops/v3/age"
+	"github.com/getsops/sops/v3/cmd/sops/common"
+	"github.com/getsops/sops/v3/keys"
+	"github.com/getsops/sops/v3/keyservice"
+	"github.com/getsops/sops/v3/stores/yaml"
+	"github.com/getsops/sops/v3/version"
 
 	"github.com/dhis2-sre/im-manager/pkg/instance"
 	"github.com/dhis2-sre/im-manager/pkg/inttest"
@@ -32,6 +33,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	tc "github.com/testcontainers/testcontainers-go/modules/compose"
 )
 
 func TestInstanceHandler(t *testing.T) {
@@ -333,4 +335,26 @@ func (gs groupService) FindByGroupNames(groupNames []string) ([]model.Group, err
 
 func (gs groupService) Find(name string) (*model.Group, error) {
 	return gs.group, nil
+}
+
+func TestSomething(t *testing.T) {
+	compose, err := tc.NewDockerCompose("./docker-compose.yml")
+	require.NoError(t, err, "NewDockerComposeAPI()")
+
+	t.Cleanup(func() {
+		require.NoError(t, compose.Down(context.Background(), tc.RemoveOrphans(true), tc.RemoveImagesLocal), "compose.Down()")
+	})
+
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+
+	require.NoError(t, compose.Up(ctx, tc.RunServices("database"), tc.Wait(true)), "compose.Up()")
+
+	container, err := compose.ServiceContainer(ctx, "database")
+	require.NoError(t, err)
+
+	host, err := container.Host(ctx)
+	require.NoError(t, err)
+
+	println(host)
 }
