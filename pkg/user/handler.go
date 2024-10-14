@@ -391,9 +391,6 @@ func (h Handler) SignOut(c *gin.Context) {
 	//
 	// Sign out user... The authentication is done using oauth and JWT. A JWT can't easily be invalidated so even after calling this endpoint a user can still sign in assuming the JWT isn't expired. However, the token can't be refreshed using the refresh token supplied upon signin
 	//
-	// security:
-	//	oauth2:
-	//
 	// responses:
 	//	200:
 	//	401: Error
