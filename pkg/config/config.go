@@ -30,7 +30,6 @@ type Config struct {
 	RabbitMqURL                    rabbitmq
 	Redis                          Redis
 	Authentication                 Authentication
-	Groups                         []Group
 	AdminUser                      user
 	E2eTestUser                    user
 	S3Bucket                       string
@@ -81,7 +80,6 @@ func New() Config {
 			RefreshTokenExpirationSeconds:           requireEnvAsInt("REFRESH_TOKEN_EXPIRATION_IN_SECONDS"),
 			RefreshTokenRememberMeExpirationSeconds: requireEnvAsInt("REFRESH_TOKEN_REMEMBER_ME_EXPIRATION_IN_SECONDS"),
 		},
-		Groups:      newGroups(),
 		AdminUser:   newAdminUser(),
 		E2eTestUser: newE2eTestUser(),
 		S3Bucket:    requireEnv("S3_BUCKET"),
@@ -252,12 +250,17 @@ type Group struct {
 	Hostname string
 }
 
-func newGroups() []Group {
-	groupNames := requireEnvAsArray("GROUP_NAMES")
-	groupHostnames := requireEnvAsArray("GROUP_HOSTNAMES")
-
+func NewGroups() ([]Group, error) {
+	groupNames, err := requireEnvNewAsArray("GROUP_NAMES")
+	if err != nil {
+		return nil, err
+	}
+	groupHostnames, err := requireEnvNewAsArray("GROUP_HOSTNAMES")
+	if err != nil {
+		return nil, err
+	}
 	if len(groupNames) != len(groupHostnames) {
-		log.Fatalf("len(GROUP_NAMES) != len(GROUP_HOSTNAMES)")
+		return nil, fmt.Errorf("want arrays to be of equal size, instead got \"GROUP_NAMES\"=%v \"GROUP_HOSTNAMES\"=%v", groupNames, groupHostnames)
 	}
 
 	groups := make([]Group, len(groupNames))
@@ -266,7 +269,7 @@ func newGroups() []Group {
 		groups[i].Hostname = groupHostnames[i]
 	}
 
-	return groups
+	return groups, nil
 }
 
 type user struct {
@@ -339,4 +342,12 @@ func requireEnvAsInt(key string) int {
 func requireEnvAsArray(key string) []string {
 	value := requireEnv(key)
 	return strings.Split(value, ",")
+}
+
+func requireEnvNewAsArray(key string) ([]string, error) {
+	value, err := requireEnvNew(key)
+	if err != nil {
+		return nil, err
+	}
+	return strings.Split(value, ","), nil
 }

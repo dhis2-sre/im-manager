@@ -215,7 +215,11 @@ func run() (err error) {
 	if err != nil {
 		return err
 	}
-	err = createGroups(logger, groupService, cfg.Groups)
+	groups, err := config.NewGroups()
+	if err != nil {
+		return err
+	}
+	err = createGroups(logger, groupService, groups)
 	if err != nil {
 		return err
 	}
