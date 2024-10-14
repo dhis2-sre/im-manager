@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"math"
 	"net/http"
 	"os"
 	"strconv"
@@ -184,10 +185,6 @@ func NewRabbitMQ() (RabbitMQ, error) {
 	}, nil
 }
 
-type Service struct {
-	Host string
-}
-
 type DockerHub struct {
 	Username string
 	Password string
@@ -358,6 +355,9 @@ func RequireEnvAsUint(key string) (uint, error) {
 	value, err := strconv.ParseUint(valueStr, 10, 64)
 	if err != nil {
 		return 0, fmt.Errorf("failed to parse environment variable %q as int: %v", key, err)
+	}
+	if value > math.MaxUint {
+		return 0, fmt.Errorf("value of environment variable %q = %d exceeds uint max value %d", key, value, uint64(math.MaxUint))
 	}
 
 	return uint(value), nil
