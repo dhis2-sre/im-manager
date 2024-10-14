@@ -30,8 +30,6 @@ type Config struct {
 	RabbitMqURL                    rabbitmq
 	Redis                          Redis
 	Authentication                 Authentication
-	AdminUser                      user
-	E2eTestUser                    user
 	S3Bucket                       string
 	S3Region                       string
 	S3Endpoint                     string
@@ -80,10 +78,9 @@ func New() Config {
 			RefreshTokenExpirationSeconds:           requireEnvAsInt("REFRESH_TOKEN_EXPIRATION_IN_SECONDS"),
 			RefreshTokenRememberMeExpirationSeconds: requireEnvAsInt("REFRESH_TOKEN_REMEMBER_ME_EXPIRATION_IN_SECONDS"),
 		},
-		E2eTestUser: newE2eTestUser(),
-		S3Bucket:    requireEnv("S3_BUCKET"),
-		S3Region:    requireEnv("S3_REGION"),
-		S3Endpoint:  os.Getenv("S3_ENDPOINT"),
+		S3Bucket:   requireEnv("S3_BUCKET"),
+		S3Region:   requireEnv("S3_REGION"),
+		S3Endpoint: os.Getenv("S3_ENDPOINT"),
 	}
 }
 
@@ -292,14 +289,20 @@ func NewAdminUser() (user, error) {
 	}, nil
 }
 
-func newE2eTestUser() user {
-	email := requireEnv("E2E_TEST_USER_EMAIL")
-	pw := requireEnv("E2E_TEST_USER_PASSWORD")
+func NewE2eTestUser() (user, error) {
+	email, err := requireEnvNew("E2E_TEST_USER_EMAIL")
+	if err != nil {
+		return user{}, err
+	}
+	password, err := requireEnvNew("E2E_TEST_USER_PASSWORD")
+	if err != nil {
+		return user{}, err
+	}
 
 	return user{
 		Email:    email,
-		Password: pw,
-	}
+		Password: password,
+	}, nil
 }
 
 // Deprecated: requiredEnv is deprecated. Use requiredEnvNew instead.

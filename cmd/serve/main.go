@@ -227,7 +227,11 @@ func run() (err error) {
 	if err != nil {
 		return err
 	}
-	err = user.CreateUser(cfg.E2eTestUser.Email, cfg.E2eTestUser.Password, userService, groupService, model.DefaultGroupName, "e2e test")
+	testUser, err := config.NewE2eTestUser()
+	if err != nil {
+		return err
+	}
+	err = user.CreateUser(testUser.Email, testUser.Password, userService, groupService, model.DefaultGroupName, "e2e test")
 	if err != nil {
 		return err
 	}
