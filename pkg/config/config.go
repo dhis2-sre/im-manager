@@ -67,10 +67,6 @@ func New() Config {
 			Username:   requireEnv("RABBITMQ_USERNAME"),
 			Password:   requireEnv("RABBITMQ_PASSWORD"),
 		},
-		Redis: Redis{
-			Host: requireEnv("REDIS_HOST"),
-			Port: requireEnvAsInt("REDIS_PORT"),
-		},
 		Authentication: Authentication{
 			SameSiteMode:                            sameSiteMode(),
 			RefreshTokenSecretKey:                   requireEnv("REFRESH_TOKEN_SECRET_KEY"),
@@ -139,6 +135,21 @@ func NewSMTP() (SMTP, error) {
 		Port:     port,
 		Username: username,
 		Password: password,
+	}, nil
+}
+
+func NewRedis() (Redis, error) {
+	host, err := requireEnvNew("REDIS_HOST")
+	if err != nil {
+		return Redis{}, err
+	}
+	port, err := requireEnvNewAsInt("REDIS_PORT")
+	if err != nil {
+		return Redis{}, err
+	}
+	return Redis{
+		Host: host,
+		Port: port,
 	}, nil
 }
 

@@ -90,7 +90,11 @@ func run() (err error) {
 	userService := user.NewService(cfg.UIURL, cfg.PasswordTokenTTL, userRepository, dailer)
 	authorization := middleware.NewAuthorization(logger, userService)
 
-	redis, err := storage.NewRedis(cfg.Redis.Host, cfg.Redis.Port)
+	redisCfg, err := config.NewRedis()
+	if err != nil {
+		return err
+	}
+	redis, err := storage.NewRedis(redisCfg.Host, redisCfg.Port)
 	if err != nil {
 		return err
 	}
