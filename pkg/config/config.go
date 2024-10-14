@@ -6,7 +6,6 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
-	"log"
 	"log/slog"
 	"net/http"
 	"os"
@@ -15,23 +14,23 @@ import (
 )
 
 func NewPostgresqlConfig() (Postgresql, error) {
-	host, err := RequireEnvNew("DATABASE_HOST")
+	host, err := RequireEnv("DATABASE_HOST")
 	if err != nil {
 		return Postgresql{}, err
 	}
-	port, err := requireEnvNewAsInt("DATABASE_PORT")
+	port, err := requireEnvAsInt("DATABASE_PORT")
 	if err != nil {
 		return Postgresql{}, err
 	}
-	username, err := RequireEnvNew("DATABASE_USERNAME")
+	username, err := RequireEnv("DATABASE_USERNAME")
 	if err != nil {
 		return Postgresql{}, err
 	}
-	password, err := RequireEnvNew("DATABASE_PASSWORD")
+	password, err := RequireEnv("DATABASE_PASSWORD")
 	if err != nil {
 		return Postgresql{}, err
 	}
-	name, err := RequireEnvNew("DATABASE_NAME")
+	name, err := RequireEnv("DATABASE_NAME")
 	if err != nil {
 		return Postgresql{}, err
 	}
@@ -47,19 +46,19 @@ func NewPostgresqlConfig() (Postgresql, error) {
 }
 
 func NewSMTP() (SMTP, error) {
-	host, err := RequireEnvNew("SMTP_HOST")
+	host, err := RequireEnv("SMTP_HOST")
 	if err != nil {
 		return SMTP{}, err
 	}
-	port, err := requireEnvNewAsInt("SMTP_PORT")
+	port, err := requireEnvAsInt("SMTP_PORT")
 	if err != nil {
 		return SMTP{}, err
 	}
-	username, err := RequireEnvNew("SMTP_USERNAME")
+	username, err := RequireEnv("SMTP_USERNAME")
 	if err != nil {
 		return SMTP{}, err
 	}
-	password, err := RequireEnvNew("SMTP_PASSWORD")
+	password, err := RequireEnv("SMTP_PASSWORD")
 	if err != nil {
 		return SMTP{}, err
 	}
@@ -73,11 +72,11 @@ func NewSMTP() (SMTP, error) {
 }
 
 func NewRedis() (Redis, error) {
-	host, err := RequireEnvNew("REDIS_HOST")
+	host, err := RequireEnv("REDIS_HOST")
 	if err != nil {
 		return Redis{}, err
 	}
-	port, err := requireEnvNewAsInt("REDIS_PORT")
+	port, err := requireEnvAsInt("REDIS_PORT")
 	if err != nil {
 		return Redis{}, err
 	}
@@ -92,19 +91,19 @@ func NewAuthentication() (Authentication, error) {
 	if err != nil {
 		return Authentication{}, err
 	}
-	refreshTokenSecretKey, err := RequireEnvNew("REFRESH_TOKEN_SECRET_KEY")
+	refreshTokenSecretKey, err := RequireEnv("REFRESH_TOKEN_SECRET_KEY")
 	if err != nil {
 		return Authentication{}, err
 	}
-	accessTokenExpirationSeconds, err := requireEnvNewAsInt("ACCESS_TOKEN_EXPIRATION_IN_SECONDS")
+	accessTokenExpirationSeconds, err := requireEnvAsInt("ACCESS_TOKEN_EXPIRATION_IN_SECONDS")
 	if err != nil {
 		return Authentication{}, err
 	}
-	refreshTokenExpirationSeconds, err := requireEnvNewAsInt("REFRESH_TOKEN_EXPIRATION_IN_SECONDS")
+	refreshTokenExpirationSeconds, err := requireEnvAsInt("REFRESH_TOKEN_EXPIRATION_IN_SECONDS")
 	if err != nil {
 		return Authentication{}, err
 	}
-	refreshTokenRememberMeExpirationSeconds, err := requireEnvNewAsInt("REFRESH_TOKEN_REMEMBER_ME_EXPIRATION_IN_SECONDS")
+	refreshTokenRememberMeExpirationSeconds, err := requireEnvAsInt("REFRESH_TOKEN_REMEMBER_ME_EXPIRATION_IN_SECONDS")
 	if err != nil {
 		return Authentication{}, err
 	}
@@ -119,7 +118,7 @@ func NewAuthentication() (Authentication, error) {
 }
 
 func sameSiteMode() (http.SameSite, error) {
-	sameSiteMode, err := RequireEnvNew("SAME_SITE_MODE")
+	sameSiteMode, err := RequireEnv("SAME_SITE_MODE")
 	if err != nil {
 		return 0, err
 	}
@@ -139,11 +138,11 @@ func sameSiteMode() (http.SameSite, error) {
 }
 
 func NewDockerHub() (DockerHub, error) {
-	username, err := RequireEnvNew("DOCKER_HUB_USERNAME")
+	username, err := RequireEnv("DOCKER_HUB_USERNAME")
 	if err != nil {
 		return DockerHub{}, err
 	}
-	password, err := RequireEnvNew("DOCKER_HUB_PASSWORD")
+	password, err := RequireEnv("DOCKER_HUB_PASSWORD")
 	if err != nil {
 		return DockerHub{}, err
 	}
@@ -155,23 +154,23 @@ func NewDockerHub() (DockerHub, error) {
 }
 
 func NewRabbitMQ() (RabbitMQ, error) {
-	host, err := RequireEnvNew("RABBITMQ_HOST")
+	host, err := RequireEnv("RABBITMQ_HOST")
 	if err != nil {
 		return RabbitMQ{}, err
 	}
-	port, err := requireEnvNewAsInt("RABBITMQ_PORT")
+	port, err := requireEnvAsInt("RABBITMQ_PORT")
 	if err != nil {
 		return RabbitMQ{}, err
 	}
-	streamPort, err := requireEnvNewAsInt("RABBITMQ_STREAM_PORT")
+	streamPort, err := requireEnvAsInt("RABBITMQ_STREAM_PORT")
 	if err != nil {
 		return RabbitMQ{}, err
 	}
-	username, err := RequireEnvNew("RABBITMQ_USERNAME")
+	username, err := RequireEnv("RABBITMQ_USERNAME")
 	if err != nil {
 		return RabbitMQ{}, err
 	}
-	password, err := RequireEnvNew("RABBITMQ_PASSWORD")
+	password, err := RequireEnv("RABBITMQ_PASSWORD")
 	if err != nil {
 		return RabbitMQ{}, err
 	}
@@ -236,7 +235,7 @@ type Authentication struct {
 }
 
 func GetPrivateKey(logger *slog.Logger) (*rsa.PrivateKey, error) {
-	key, err := RequireEnvNew("PRIVATE_KEY")
+	key, err := RequireEnv("PRIVATE_KEY")
 	if err != nil {
 		return nil, err
 	}
@@ -270,11 +269,11 @@ type Group struct {
 }
 
 func NewGroups() ([]Group, error) {
-	groupNames, err := RequireEnvNewAsArray("GROUP_NAMES")
+	groupNames, err := RequireEnvAsArray("GROUP_NAMES")
 	if err != nil {
 		return nil, err
 	}
-	groupHostnames, err := RequireEnvNewAsArray("GROUP_HOSTNAMES")
+	groupHostnames, err := RequireEnvAsArray("GROUP_HOSTNAMES")
 	if err != nil {
 		return nil, err
 	}
@@ -297,11 +296,11 @@ type user struct {
 }
 
 func NewAdminUser() (user, error) {
-	email, err := RequireEnvNew("ADMIN_USER_EMAIL")
+	email, err := RequireEnv("ADMIN_USER_EMAIL")
 	if err != nil {
 		return user{}, err
 	}
-	password, err := RequireEnvNew("ADMIN_USER_PASSWORD")
+	password, err := RequireEnv("ADMIN_USER_PASSWORD")
 	if err != nil {
 		return user{}, err
 	}
@@ -313,11 +312,11 @@ func NewAdminUser() (user, error) {
 }
 
 func NewE2eTestUser() (user, error) {
-	email, err := RequireEnvNew("E2E_TEST_USER_EMAIL")
+	email, err := RequireEnv("E2E_TEST_USER_EMAIL")
 	if err != nil {
 		return user{}, err
 	}
-	password, err := RequireEnvNew("E2E_TEST_USER_PASSWORD")
+	password, err := RequireEnv("E2E_TEST_USER_PASSWORD")
 	if err != nil {
 		return user{}, err
 	}
@@ -328,18 +327,7 @@ func NewE2eTestUser() (user, error) {
 	}, nil
 }
 
-// Deprecated: requiredEnv is deprecated. Use requiredEnvNew instead.
-// TODO(DEVOPS-394) replace this function with requiredEnvNew, renaming requiredEnvNew to
-// requiredEnv
-func requireEnv(key string) string {
-	value, exists := os.LookupEnv(key)
-	if !exists {
-		log.Fatalf("Can't find environment variable: %s\n", key)
-	}
-	return value
-}
-
-func RequireEnvNew(key string) (string, error) {
+func RequireEnv(key string) (string, error) {
 	value, exists := os.LookupEnv(key)
 	if !exists {
 		return "", fmt.Errorf("required environment variable %q not set", key)
@@ -347,8 +335,8 @@ func RequireEnvNew(key string) (string, error) {
 	return value, nil
 }
 
-func requireEnvNewAsInt(key string) (int, error) {
-	valueStr, err := RequireEnvNew(key)
+func requireEnvAsInt(key string) (int, error) {
+	valueStr, err := RequireEnv(key)
 	if err != nil {
 		return 0, err
 	}
@@ -361,8 +349,8 @@ func requireEnvNewAsInt(key string) (int, error) {
 	return value, nil
 }
 
-func RequireEnvNewAsUint(key string) (uint, error) {
-	valueStr, err := RequireEnvNew(key)
+func RequireEnvAsUint(key string) (uint, error) {
+	valueStr, err := RequireEnv(key)
 	if err != nil {
 		return 0, err
 	}
@@ -375,8 +363,8 @@ func RequireEnvNewAsUint(key string) (uint, error) {
 	return uint(value), nil
 }
 
-func RequireEnvNewAsArray(key string) ([]string, error) {
-	value, err := RequireEnvNew(key)
+func RequireEnvAsArray(key string) ([]string, error) {
+	value, err := RequireEnv(key)
 	if err != nil {
 		return nil, err
 	}

@@ -87,11 +87,11 @@ func run() (err error) {
 	}
 	dailer := mail.NewDialer(smtpConfig.Host, smtpConfig.Port, smtpConfig.Username, smtpConfig.Password)
 
-	uiURL, err := config.RequireEnvNew("UI_URL")
+	uiURL, err := config.RequireEnv("UI_URL")
 	if err != nil {
 		return err
 	}
-	passwordTokenTTL, err := config.RequireEnvNewAsUint("PASSWORD_TOKEN_TTL")
+	passwordTokenTTL, err := config.RequireEnvAsUint("PASSWORD_TOKEN_TTL")
 	if err != nil {
 		return err
 	}
@@ -122,7 +122,7 @@ func run() (err error) {
 	}
 
 	publicKey := privateKey.PublicKey
-	hostname, err := config.RequireEnvNew("HOSTNAME")
+	hostname, err := config.RequireEnv("HOSTNAME")
 	if err != nil {
 		return err
 	}
@@ -147,12 +147,12 @@ func run() (err error) {
 
 	stackService := stack.NewService(stacks)
 
-	instanceParameterEncryptionKey, err := config.RequireEnvNew("INSTANCE_PARAMETER_ENCRYPTION_KEY")
+	instanceParameterEncryptionKey, err := config.RequireEnv("INSTANCE_PARAMETER_ENCRYPTION_KEY")
 	if err != nil {
 		return err
 	}
 	instanceRepository := instance.NewRepository(db, instanceParameterEncryptionKey)
-	classification, err := config.RequireEnvNew("CLASSIFICATION")
+	classification, err := config.RequireEnv("CLASSIFICATION")
 	if err != nil {
 		return err
 	}
@@ -185,13 +185,13 @@ func run() (err error) {
 
 	stackHandler := stack.NewHandler(stackService)
 
-	defaultTTL, err := config.RequireEnvNewAsUint("DEFAULT_TTL")
+	defaultTTL, err := config.RequireEnvAsUint("DEFAULT_TTL")
 	if err != nil {
 		return err
 	}
 	instanceHandler := instance.NewHandler(groupService, instanceService, defaultTTL)
 
-	s3Region, err := config.RequireEnvNew("S3_REGION")
+	s3Region, err := config.RequireEnv("S3_REGION")
 	if err != nil {
 		return err
 	}
@@ -209,7 +209,7 @@ func run() (err error) {
 	s3AWSClient := s3.NewFromConfig(s3Config, func(o *s3.Options) {
 		o.UsePathStyle = true
 	})
-	s3Bucket, err := config.RequireEnvNew("S3_BUCKET")
+	s3Bucket, err := config.RequireEnv("S3_BUCKET")
 	if err != nil {
 		return err
 	}
@@ -226,7 +226,7 @@ func run() (err error) {
 		return err
 	}
 
-	instanceServiceHost, err := config.RequireEnvNew("INSTANCE_SERVICE_HOST")
+	instanceServiceHost, err := config.RequireEnv("INSTANCE_SERVICE_HOST")
 	if err != nil {
 		return err
 	}
@@ -281,15 +281,15 @@ func run() (err error) {
 	}
 
 	// TODO: This is a hack! Allowed origins for different environments should be applied using skaffold profiles... But I can't get it working!
-	allowedOrigins, err := config.RequireEnvNewAsArray("CORS_ALLOWED_ORIGINS")
+	allowedOrigins, err := config.RequireEnvAsArray("CORS_ALLOWED_ORIGINS")
 	if err != nil {
 		return err
 	}
-	basePath, err := config.RequireEnvNew("BASE_PATH")
+	basePath, err := config.RequireEnv("BASE_PATH")
 	if err != nil {
 		return err
 	}
-	environment, err := config.RequireEnvNew("ENVIRONMENT")
+	environment, err := config.RequireEnv("ENVIRONMENT")
 	if err != nil {
 		return err
 	}
