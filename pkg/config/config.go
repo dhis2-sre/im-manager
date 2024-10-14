@@ -25,7 +25,6 @@ type Config struct {
 	DefaultTTL                     uint
 	PasswordTokenTTL               uint
 	InstanceService                Service
-	DatabaseManagerService         Service
 	S3Bucket                       string
 	S3Region                       string
 	S3Endpoint                     string
@@ -43,14 +42,7 @@ func New() Config {
 		DefaultTTL:                     uint(requireEnvAsInt("DEFAULT_TTL")),
 		PasswordTokenTTL:               uint(requireEnvAsInt("PASSWORD_TOKEN_TTL")),
 		InstanceService: Service{
-			Host:     requireEnv("INSTANCE_SERVICE_HOST"),
-			BasePath: requireEnv("INSTANCE_SERVICE_BASE_PATH"),
-		},
-		DatabaseManagerService: Service{
-			Host:     requireEnv("DATABASE_MANAGER_SERVICE_HOST"),
-			BasePath: requireEnv("DATABASE_MANAGER_SERVICE_BASE_PATH"),
-			//			Username: requireEnv("DATABASE_MANAGER_SERVICE_USERNAME"),
-			//			Password: requireEnv("DATABASE_MANAGER_SERVICE_PASSWORD"),
+			Host: requireEnv("INSTANCE_SERVICE_HOST"),
 		},
 		S3Bucket:   requireEnv("S3_BUCKET"),
 		S3Region:   requireEnv("S3_REGION"),
@@ -230,10 +222,7 @@ func NewRabbitMQ() (RabbitMQ, error) {
 }
 
 type Service struct {
-	Host     string
-	BasePath string
-	Username string
-	Password string
+	Host string
 }
 
 type DockerHub struct {

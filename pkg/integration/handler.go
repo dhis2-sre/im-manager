@@ -11,13 +11,16 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func NewHandler(client DockerHubClient, instanceManagerHost, databaseManagerHost string) Handler {
-	return Handler{client, instanceManagerHost, databaseManagerHost}
+func NewHandler(client DockerHubClient, instanceManagerHost string) Handler {
+	return Handler{
+		dockerHubClient:     client,
+		instanceManagerHost: instanceManagerHost,
+	}
 }
 
 type Handler struct {
-	dockerHubClient                          DockerHubClient
-	instanceManagerHost, databaseManagerHost string
+	dockerHubClient     DockerHubClient
+	instanceManagerHost string
 }
 
 type DockerHubClient interface {
@@ -168,7 +171,7 @@ func (h Handler) Integrations(c *gin.Context) {
 			return
 		}
 
-		url := fmt.Sprintf("http://%s/databases", h.databaseManagerHost)
+		url := fmt.Sprintf("http://%s/databases", h.instanceManagerHost)
 		databases, err := getDatabases(token, url)
 		if err != nil {
 			_ = c.Error(err)

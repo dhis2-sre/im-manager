@@ -197,7 +197,7 @@ func run() (err error) {
 		return err
 	}
 
-	integrationHandler := integration.NewHandler(dockerHubClient, cfg.InstanceService.Host, cfg.DatabaseManagerService.Host)
+	integrationHandler := integration.NewHandler(dockerHubClient, cfg.InstanceService.Host)
 
 	logger.Info("Connecting with RabbitMQ stream client", "host", rabbitmqConfig.Host, "port", rabbitmqConfig.StreamPort)
 	env, err := stream.NewEnvironment(
