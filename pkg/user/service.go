@@ -19,9 +19,8 @@ import (
 	"golang.org/x/crypto/scrypt"
 )
 
-//goland:noinspection GoExportedFuncWithUnexportedType
-func NewService(uiUrl string, passwordTokenTtl uint, repository userRepository, dailer dailer) *service {
-	return &service{uiUrl, passwordTokenTtl, repository, dailer}
+func NewService(uiUrl string, passwordTokenTtl uint, repository userRepository, dailer dailer) *Service {
+	return &Service{uiUrl, passwordTokenTtl, repository, dailer}
 }
 
 type userRepository interface {
@@ -42,18 +41,18 @@ type dailer interface {
 	DialAndSend(m ...*mail.Message) error
 }
 
-type service struct {
+type Service struct {
 	uiUrl            string
 	passwordTokenTtl uint
 	repository       userRepository
 	dailer           dailer
 }
 
-func (s service) Save(user *model.User) error {
+func (s Service) Save(user *model.User) error {
 	return s.repository.save(user)
 }
 
-func (s service) SignUp(email string, password string) (*model.User, error) {
+func (s Service) SignUp(email string, password string) (*model.User, error) {
 	hashedPassword, err := hashPassword(password)
 	if err != nil {
 		return nil, fmt.Errorf("password hashing failed: %s", err)
@@ -78,7 +77,7 @@ func (s service) SignUp(email string, password string) (*model.User, error) {
 	return user, nil
 }
 
-func (s service) sendValidationEmail(user *model.User) error {
+func (s Service) sendValidationEmail(user *model.User) error {
 	m := mail.NewMessage()
 	m.SetHeader("From", "DHIS2 Instance Manager <no-reply@dhis2.org>")
 	m.SetHeader("To", user.Email)
@@ -108,7 +107,7 @@ func hashPassword(password string) (string, error) {
 	return hashedPassword, nil
 }
 
-func (s service) ValidateEmail(token uuid.UUID) error {
+func (s Service) ValidateEmail(token uuid.UUID) error {
 	user, err := s.repository.findByEmailToken(token)
 	if err != nil {
 		return err
@@ -118,7 +117,7 @@ func (s service) ValidateEmail(token uuid.UUID) error {
 	return s.repository.save(user)
 }
 
-func (s service) SignIn(email string, password string) (*model.User, error) {
+func (s Service) SignIn(email string, password string) (*model.User, error) {
 	unauthorizedError := "invalid email and password combination"
 
 	user, err := s.repository.findByEmail(email)
@@ -164,15 +163,15 @@ func comparePasswords(storedPassword string, suppliedPassword string) (bool, err
 	return hex.EncodeToString(hash) == passwordAndSalt[0], nil
 }
 
-func (s service) FindAll(ctx context.Context) ([]*model.User, error) {
+func (s Service) FindAll(ctx context.Context) ([]*model.User, error) {
 	return s.repository.findAll(ctx)
 }
 
-func (s service) FindById(ctx context.Context, id uint) (*model.User, error) {
+func (s Service) FindById(ctx context.Context, id uint) (*model.User, error) {
 	return s.repository.findById(ctx, id)
 }
 
-func (s service) FindOrCreate(email string, password string) (*model.User, error) {
+func (s Service) FindOrCreate(email string, password string) (*model.User, error) {
 	hashedPassword, err := hashPassword(password)
 	if err != nil {
 		return nil, fmt.Errorf("failed to hash password: %s", err)
@@ -187,11 +186,11 @@ func (s service) FindOrCreate(email string, password string) (*model.User, error
 	return s.repository.findOrCreate(user)
 }
 
-func (s service) Delete(ctx context.Context, id uint) error {
+func (s Service) Delete(ctx context.Context, id uint) error {
 	return s.repository.delete(ctx, id)
 }
 
-func (s service) Update(ctx context.Context, id uint, email, password string) (*model.User, error) {
+func (s Service) Update(ctx context.Context, id uint, email, password string) (*model.User, error) {
 	user, err := s.repository.findById(ctx, id)
 	if err != nil {
 		return nil, err
@@ -212,7 +211,7 @@ func (s service) Update(ctx context.Context, id uint, email, password string) (*
 	return s.repository.update(user)
 }
 
-func (s service) sendResetPasswordEmail(user *model.User) error {
+func (s Service) sendResetPasswordEmail(user *model.User) error {
 	_, err := s.repository.findByEmail(user.Email)
 	if err != nil {
 		if errdef.IsNotFound(err) {
@@ -231,9 +230,8 @@ func (s service) sendResetPasswordEmail(user *model.User) error {
 	return s.dailer.DialAndSend(m)
 }
 
-func (s service) RequestPasswordReset(email string) error {
+func (s Service) RequestPasswordReset(email string) error {
 	user, err := s.repository.findByEmail(email)
-
 	if err != nil {
 		if errdef.IsNotFound(err) {
 			return nil
@@ -258,7 +256,7 @@ func (s service) RequestPasswordReset(email string) error {
 	return s.repository.save(user)
 }
 
-func (s service) ResetPassword(token string, password string) error {
+func (s Service) ResetPassword(token string, password string) error {
 	user, err := s.repository.findByPasswordResetToken(token)
 	if err != nil {
 		return err

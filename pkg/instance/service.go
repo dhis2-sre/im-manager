@@ -22,15 +22,14 @@ import (
 	"github.com/dhis2-sre/im-manager/pkg/model"
 )
 
-//goland:noinspection GoExportedFuncWithUnexportedType
 func NewService(
 	logger *slog.Logger,
 	instanceRepository Repository,
 	groupService groupService,
 	stackService stack.Service,
 	helmfileService helmfile,
-) *service {
-	return &service{
+) *Service {
+	return &Service{
 		logger:             logger,
 		instanceRepository: instanceRepository,
 		groupService:       groupService,
@@ -63,7 +62,7 @@ type helmfile interface {
 	destroy(instance *model.DeploymentInstance, group *model.Group) (*exec.Cmd, error)
 }
 
-type service struct {
+type Service struct {
 	logger             *slog.Logger
 	instanceRepository Repository
 	groupService       groupService
@@ -71,27 +70,27 @@ type service struct {
 	helmfileService    helmfile
 }
 
-func (s service) SaveDeployment(deployment *model.Deployment) error {
+func (s Service) SaveDeployment(deployment *model.Deployment) error {
 	return s.instanceRepository.SaveDeployment(deployment)
 }
 
-func (s service) FindDeploymentById(id uint) (*model.Deployment, error) {
+func (s Service) FindDeploymentById(id uint) (*model.Deployment, error) {
 	return s.instanceRepository.FindDeploymentById(id)
 }
 
-func (s service) FindDecryptedDeploymentById(id uint) (*model.Deployment, error) {
+func (s Service) FindDecryptedDeploymentById(id uint) (*model.Deployment, error) {
 	return s.instanceRepository.FindDecryptedDeploymentById(id)
 }
 
-func (s service) FindDeploymentInstanceById(id uint) (*model.DeploymentInstance, error) {
+func (s Service) FindDeploymentInstanceById(id uint) (*model.DeploymentInstance, error) {
 	return s.instanceRepository.FindDeploymentInstanceById(id)
 }
 
-func (s service) FindDecryptedDeploymentInstanceById(id uint) (*model.DeploymentInstance, error) {
+func (s Service) FindDecryptedDeploymentInstanceById(id uint) (*model.DeploymentInstance, error) {
 	return s.instanceRepository.FindDecryptedDeploymentInstanceById(id)
 }
 
-func (s service) SaveInstance(instance *model.DeploymentInstance) error {
+func (s Service) SaveInstance(instance *model.DeploymentInstance) error {
 	err := s.rejectConsumedParameters(instance)
 	if err != nil {
 		return err
@@ -117,7 +116,7 @@ func (s service) SaveInstance(instance *model.DeploymentInstance) error {
 	return s.instanceRepository.SaveInstance(instance)
 }
 
-func (s service) rejectConsumedParameters(instance *model.DeploymentInstance) error {
+func (s Service) rejectConsumedParameters(instance *model.DeploymentInstance) error {
 	stack, err := s.stackService.Find(instance.StackName)
 	if err != nil {
 		return err
@@ -132,7 +131,7 @@ func (s service) rejectConsumedParameters(instance *model.DeploymentInstance) er
 	return errors.Join(errs...)
 }
 
-func (s service) DeleteInstance(deploymentId, instanceId uint) error {
+func (s Service) DeleteInstance(deploymentId, instanceId uint) error {
 	deployment, err := s.FindDeploymentById(deploymentId)
 	if err != nil {
 		return err
@@ -163,7 +162,7 @@ func (s service) DeleteInstance(deploymentId, instanceId uint) error {
 	return s.instanceRepository.DeleteDeploymentInstance(instance)
 }
 
-func (s service) validateNoCycles(instances []*model.DeploymentInstance) (graph.Graph[string, *model.DeploymentInstance], error) {
+func (s Service) validateNoCycles(instances []*model.DeploymentInstance) (graph.Graph[string, *model.DeploymentInstance], error) {
 	g := graph.New(func(instance *model.DeploymentInstance) string {
 		return instance.StackName
 	}, graph.Directed(), graph.PreventCycles())
@@ -201,7 +200,7 @@ func (s service) validateNoCycles(instances []*model.DeploymentInstance) (graph.
 	return g, nil
 }
 
-func (s service) resolveParameters(deployment *model.Deployment) error {
+func (s Service) resolveParameters(deployment *model.Deployment) error {
 	for _, instance := range deployment.Instances {
 		stack, err := s.stackService.Find(instance.StackName)
 		if err != nil {
@@ -312,7 +311,7 @@ func addDefaultParameterValues(instanceParameters model.DeploymentInstanceParame
 	}
 }
 
-func (s service) DeployDeployment(token string, deployment *model.Deployment) error {
+func (s Service) DeployDeployment(token string, deployment *model.Deployment) error {
 	deploymentGraph, err := s.validateNoCycles(deployment.Instances)
 	if err != nil {
 		return err
@@ -335,7 +334,7 @@ func (s service) DeployDeployment(token string, deployment *model.Deployment) er
 	return nil
 }
 
-func (s service) deployDeploymentInstance(token string, instance *model.DeploymentInstance, ttl uint) error {
+func (s Service) deployDeploymentInstance(token string, instance *model.DeploymentInstance, ttl uint) error {
 	group, err := s.groupService.Find(instance.GroupName)
 	if err != nil {
 		return err
@@ -367,7 +366,7 @@ func (s service) deployDeploymentInstance(token string, instance *model.Deployme
 	return nil
 }
 
-func (s service) Delete(deploymentInstanceId uint) error {
+func (s Service) Delete(deploymentInstanceId uint) error {
 	deploymentInstance, err := s.FindDeploymentInstanceById(deploymentInstanceId)
 	if err != nil {
 		return err
@@ -390,7 +389,7 @@ func (s service) Delete(deploymentInstanceId uint) error {
 	return nil
 }
 
-func (s service) DeleteDeployment(deployment *model.Deployment) error {
+func (s Service) DeleteDeployment(deployment *model.Deployment) error {
 	deploymentGraph, err := s.validateNoCycles(deployment.Instances)
 	if err != nil {
 		return err
@@ -421,7 +420,7 @@ func (s service) DeleteDeployment(deployment *model.Deployment) error {
 	return s.instanceRepository.DeleteDeployment(deployment)
 }
 
-func (s service) destroyDeploymentInstance(instance *model.DeploymentInstance) error {
+func (s Service) destroyDeploymentInstance(instance *model.DeploymentInstance) error {
 	if instance.DeployLog == "" {
 		return nil
 	}
@@ -466,7 +465,7 @@ func deploymentOrder(deployment *model.Deployment, g graph.Graph[string, *model.
 	return orderedInstances, nil
 }
 
-func (s service) Pause(instance *model.DeploymentInstance) error {
+func (s Service) Pause(instance *model.DeploymentInstance) error {
 	group, err := s.groupService.Find(instance.GroupName)
 	if err != nil {
 		return err
@@ -480,7 +479,7 @@ func (s service) Pause(instance *model.DeploymentInstance) error {
 	return ks.pause(instance)
 }
 
-func (s service) Resume(instance *model.DeploymentInstance) error {
+func (s Service) Resume(instance *model.DeploymentInstance) error {
 	group, err := s.groupService.Find(instance.GroupName)
 	if err != nil {
 		return err
@@ -494,7 +493,7 @@ func (s service) Resume(instance *model.DeploymentInstance) error {
 	return ks.resume(instance)
 }
 
-func (s service) Restart(instance *model.DeploymentInstance, typeSelector string) error {
+func (s Service) Restart(instance *model.DeploymentInstance, typeSelector string) error {
 	group, err := s.groupService.Find(instance.GroupName)
 	if err != nil {
 		return err
@@ -513,7 +512,7 @@ func (s service) Restart(instance *model.DeploymentInstance, typeSelector string
 	return ks.restart(instance, typeSelector, stack)
 }
 
-func (s service) Logs(instance *model.DeploymentInstance, group *model.Group, typeSelector string) (io.ReadCloser, error) {
+func (s Service) Logs(instance *model.DeploymentInstance, group *model.Group, typeSelector string) (io.ReadCloser, error) {
 	ks, err := NewKubernetesService(group.ClusterConfiguration)
 	if err != nil {
 		return nil, err
@@ -528,7 +527,7 @@ type GroupWithDeployments struct {
 	Deployments []*model.Deployment `json:"deployments"`
 }
 
-func (s service) FindDeployments(user *model.User) ([]GroupWithDeployments, error) {
+func (s Service) FindDeployments(user *model.User) ([]GroupWithDeployments, error) {
 	groups := append(user.Groups, user.AdminGroups...) //nolint:gocritic
 
 	groupsByName := make(map[string]model.Group)
@@ -549,7 +548,7 @@ func (s service) FindDeployments(user *model.User) ([]GroupWithDeployments, erro
 	return s.groupDeployments(deployments)
 }
 
-func (s service) groupDeployments(deployments []*model.Deployment) ([]GroupWithDeployments, error) {
+func (s Service) groupDeployments(deployments []*model.Deployment) ([]GroupWithDeployments, error) {
 	groupsByName := map[string]*model.Group{}
 	for _, deployment := range deployments {
 		for _, instance := range deployment.Instances {
@@ -599,7 +598,7 @@ type GroupWithPublicInstances struct {
 	Categories  []Category `json:"categories"`
 }
 
-func (s service) FindPublicInstances() ([]GroupWithPublicInstances, error) {
+func (s Service) FindPublicInstances() ([]GroupWithPublicInstances, error) {
 	instances, err := s.instanceRepository.FindPublicInstances()
 	if err != nil {
 		return nil, err
@@ -612,7 +611,7 @@ func (s service) FindPublicInstances() ([]GroupWithPublicInstances, error) {
 	return s.groupPublicInstances(instances)
 }
 
-func (s service) groupPublicInstances(instances []*model.DeploymentInstance) ([]GroupWithPublicInstances, error) {
+func (s Service) groupPublicInstances(instances []*model.DeploymentInstance) ([]GroupWithPublicInstances, error) {
 	groupsByName := map[string]*model.Group{}
 	for _, instance := range instances {
 		groupsByName[instance.GroupName] = instance.Group
@@ -678,7 +677,7 @@ const (
 	Error              InstanceStatus = "Error"
 )
 
-func (s service) GetStatus(instance *model.DeploymentInstance) (InstanceStatus, error) {
+func (s Service) GetStatus(instance *model.DeploymentInstance) (InstanceStatus, error) {
 	ks, err := NewKubernetesService(instance.Group.ClusterConfiguration)
 	if err != nil {
 		return "", err
@@ -743,7 +742,7 @@ func (s service) GetStatus(instance *model.DeploymentInstance) (InstanceStatus, 
 	return "", fmt.Errorf("failed to get instance status")
 }
 
-func (s service) Reset(token string, instance *model.DeploymentInstance, ttl uint) error {
+func (s Service) Reset(token string, instance *model.DeploymentInstance, ttl uint) error {
 	err := s.destroyDeploymentInstance(instance)
 	if err != nil {
 		return err
