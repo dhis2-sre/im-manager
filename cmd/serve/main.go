@@ -211,7 +211,11 @@ func run() (err error) {
 	}
 	eventHandler := event.NewHandler(logger, env, streamName)
 
-	err = user.CreateUser(cfg.AdminUser.Email, cfg.AdminUser.Password, userService, groupService, model.AdministratorGroupName, "admin")
+	admin, err := config.NewAdminUser()
+	if err != nil {
+		return err
+	}
+	err = user.CreateUser(admin.Email, admin.Password, userService, groupService, model.AdministratorGroupName, "admin")
 	if err != nil {
 		return err
 	}

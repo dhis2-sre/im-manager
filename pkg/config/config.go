@@ -80,7 +80,6 @@ func New() Config {
 			RefreshTokenExpirationSeconds:           requireEnvAsInt("REFRESH_TOKEN_EXPIRATION_IN_SECONDS"),
 			RefreshTokenRememberMeExpirationSeconds: requireEnvAsInt("REFRESH_TOKEN_REMEMBER_ME_EXPIRATION_IN_SECONDS"),
 		},
-		AdminUser:   newAdminUser(),
 		E2eTestUser: newE2eTestUser(),
 		S3Bucket:    requireEnv("S3_BUCKET"),
 		S3Region:    requireEnv("S3_REGION"),
@@ -277,14 +276,20 @@ type user struct {
 	Password string
 }
 
-func newAdminUser() user {
-	email := requireEnv("ADMIN_USER_EMAIL")
-	pw := requireEnv("ADMIN_USER_PASSWORD")
+func NewAdminUser() (user, error) {
+	email, err := requireEnvNew("ADMIN_USER_EMAIL")
+	if err != nil {
+		return user{}, err
+	}
+	password, err := requireEnvNew("ADMIN_USER_PASSWORD")
+	if err != nil {
+		return user{}, err
+	}
 
 	return user{
 		Email:    email,
-		Password: pw,
-	}
+		Password: password,
+	}, nil
 }
 
 func newE2eTestUser() user {
