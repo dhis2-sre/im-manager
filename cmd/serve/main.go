@@ -191,27 +191,34 @@ func run() (err error) {
 	}
 	instanceHandler := instance.NewHandler(groupService, instanceService, defaultTTL)
 
-	cfg := config.New()
+	s3Region, err := config.RequireEnvNew("S3_REGION")
+	if err != nil {
+		return err
+	}
+	// nolint:staticcheck
 	s3Endpoint := aws.EndpointResolverWithOptionsFunc(func(service, region string, options ...any) (aws.Endpoint, error) {
-		if cfg.S3Endpoint != "" {
-			return aws.Endpoint{URL: cfg.S3Endpoint}, nil
+		if endpoint := os.Getenv("S3_ENDPOINT"); endpoint != "" {
+			return aws.Endpoint{URL: endpoint}, nil
 		}
 		return aws.Endpoint{}, &aws.EndpointNotFoundError{}
 	})
-
-	s3Config, err := newS3Config(cfg.S3Region, s3Endpoint)
+	s3Config, err := newS3Config(s3Region, s3Endpoint)
 	if err != nil {
 		return fmt.Errorf("failed to setup S3 config: %v", err)
 	}
-
 	s3AWSClient := s3.NewFromConfig(s3Config, func(o *s3.Options) {
 		o.UsePathStyle = true
 	})
+	s3Bucket, err := config.RequireEnvNew("S3_BUCKET")
+	if err != nil {
+		return err
+	}
+
 	uploader := manager.NewUploader(s3AWSClient)
 	s3Client := storage.NewS3Client(logger, s3AWSClient, uploader)
 
 	databaseRepository := database.NewRepository(db)
-	databaseService := database.NewService(logger, cfg.S3Bucket, s3Client, groupService, databaseRepository)
+	databaseService := database.NewService(logger, s3Bucket, s3Client, groupService, databaseRepository)
 	databaseHandler := database.NewHandler(logger, databaseService, groupService, instanceService, stackService)
 
 	err = handler.RegisterValidation()
@@ -219,6 +226,7 @@ func run() (err error) {
 		return err
 	}
 
+	cfg := config.New()
 	integrationHandler := integration.NewHandler(dockerHubClient, cfg.InstanceService.Host)
 
 	logger.Info("Connecting with RabbitMQ stream client", "host", rabbitmqConfig.Host, "port", rabbitmqConfig.StreamPort)

@@ -18,9 +18,6 @@ type Config struct {
 	Environment                    string
 	InstanceParameterEncryptionKey string
 	InstanceService                Service
-	S3Bucket                       string
-	S3Region                       string
-	S3Endpoint                     string
 }
 
 func New() Config {
@@ -29,9 +26,6 @@ func New() Config {
 		InstanceService: Service{
 			Host: requireEnv("INSTANCE_SERVICE_HOST"),
 		},
-		S3Bucket:   requireEnv("S3_BUCKET"),
-		S3Region:   requireEnv("S3_REGION"),
-		S3Endpoint: os.Getenv("S3_ENDPOINT"),
 	}
 }
 
