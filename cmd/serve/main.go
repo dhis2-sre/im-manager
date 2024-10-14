@@ -226,8 +226,11 @@ func run() (err error) {
 		return err
 	}
 
-	cfg := config.New()
-	integrationHandler := integration.NewHandler(dockerHubClient, cfg.InstanceService.Host)
+	instanceServiceHost, err := config.RequireEnvNew("INSTANCE_SERVICE_HOST")
+	if err != nil {
+		return err
+	}
+	integrationHandler := integration.NewHandler(dockerHubClient, instanceServiceHost)
 
 	logger.Info("Connecting with RabbitMQ stream client", "host", rabbitmqConfig.Host, "port", rabbitmqConfig.StreamPort)
 	env, err := stream.NewEnvironment(
@@ -286,7 +289,11 @@ func run() (err error) {
 	if err != nil {
 		return err
 	}
-	if cfg.Environment != "production" {
+	environment, err := config.RequireEnvNew("ENVIRONMENT")
+	if err != nil {
+		return err
+	}
+	if environment != "production" {
 		allowedOrigins = append(allowedOrigins, "http://localhost:3000", "http://localhost:5173")
 	}
 	r, err := server.GetEngine(logger, basePath, allowedOrigins)

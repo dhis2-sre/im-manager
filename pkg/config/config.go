@@ -14,21 +14,6 @@ import (
 	"strings"
 )
 
-type Config struct {
-	Environment                    string
-	InstanceParameterEncryptionKey string
-	InstanceService                Service
-}
-
-func New() Config {
-	return Config{
-		Environment: requireEnv("ENVIRONMENT"),
-		InstanceService: Service{
-			Host: requireEnv("INSTANCE_SERVICE_HOST"),
-		},
-	}
-}
-
 func NewPostgresqlConfig() (Postgresql, error) {
 	host, err := RequireEnvNew("DATABASE_HOST")
 	if err != nil {
