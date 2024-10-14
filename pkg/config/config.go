@@ -25,7 +25,6 @@ type Config struct {
 	DefaultTTL                     uint
 	PasswordTokenTTL               uint
 	InstanceService                Service
-	DockerHub                      DockerHub
 	DatabaseManagerService         Service
 	RabbitMqURL                    rabbitmq
 	Redis                          Redis
@@ -48,10 +47,6 @@ func New() Config {
 		InstanceService: Service{
 			Host:     requireEnv("INSTANCE_SERVICE_HOST"),
 			BasePath: requireEnv("INSTANCE_SERVICE_BASE_PATH"),
-		},
-		DockerHub: DockerHub{
-			Username: requireEnv("DOCKER_HUB_USERNAME"),
-			Password: requireEnv("DOCKER_HUB_PASSWORD"),
 		},
 		DatabaseManagerService: Service{
 			Host:     requireEnv("DATABASE_MANAGER_SERVICE_HOST"),
@@ -194,6 +189,22 @@ func sameSiteMode() (http.SameSite, error) {
 	}
 
 	return -1, fmt.Errorf("failed to parse \"SAME_SITE_MODE\": %q", sameSiteMode)
+}
+
+func NewDockerHub() (DockerHub, error) {
+	username, err := requireEnvNew("DOCKER_HUB_USERNAME")
+	if err != nil {
+		return DockerHub{}, err
+	}
+	password, err := requireEnvNew("DOCKER_HUB_PASSWORD")
+	if err != nil {
+		return DockerHub{}, err
+	}
+
+	return DockerHub{
+		Username: username,
+		Password: password,
+	}, nil
 }
 
 type Service struct {

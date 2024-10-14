@@ -139,7 +139,8 @@ func run() (err error) {
 	helmfileService := instance.NewHelmfileService(logger, stackService, "./stacks", cfg.Classification)
 	instanceService := instance.NewService(logger, instanceRepository, groupService, stackService, helmfileService)
 
-	dockerHubClient := integration.NewDockerHubClient(cfg.DockerHub.Username, cfg.DockerHub.Password)
+	dockerHubCfg, err := config.NewDockerHub()
+	dockerHubClient := integration.NewDockerHubClient(dockerHubCfg.Username, dockerHubCfg.Password)
 
 	hostname, err := os.Hostname()
 	if err != nil {
