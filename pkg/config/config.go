@@ -16,14 +16,9 @@ import (
 
 type Config struct {
 	Environment                    string
-	Classification                 string
-	Hostname                       string
-	UIURL                          string
 	AllowedOrigins                 []string
 	InstanceParameterEncryptionKey string
 	BasePath                       string
-	DefaultTTL                     uint
-	PasswordTokenTTL               uint
 	InstanceService                Service
 	S3Bucket                       string
 	S3Region                       string
@@ -32,15 +27,9 @@ type Config struct {
 
 func New() Config {
 	return Config{
-		Environment:                    requireEnv("ENVIRONMENT"),
-		Classification:                 requireEnv("CLASSIFICATION"),
-		Hostname:                       requireEnv("HOSTNAME"),
-		UIURL:                          requireEnv("UI_URL"),
-		AllowedOrigins:                 requireEnvAsArray("CORS_ALLOWED_ORIGINS"),
-		BasePath:                       requireEnv("BASE_PATH"),
-		InstanceParameterEncryptionKey: requireEnv("INSTANCE_PARAMETER_ENCRYPTION_KEY"),
-		DefaultTTL:                     uint(requireEnvAsInt("DEFAULT_TTL")),
-		PasswordTokenTTL:               uint(requireEnvAsInt("PASSWORD_TOKEN_TTL")),
+		Environment:    requireEnv("ENVIRONMENT"),
+		AllowedOrigins: requireEnvAsArray("CORS_ALLOWED_ORIGINS"),
+		BasePath:       requireEnv("BASE_PATH"),
 		InstanceService: Service{
 			Host: requireEnv("INSTANCE_SERVICE_HOST"),
 		},
@@ -51,7 +40,7 @@ func New() Config {
 }
 
 func NewPostgresqlConfig() (Postgresql, error) {
-	host, err := requireEnvNew("DATABASE_HOST")
+	host, err := RequireEnvNew("DATABASE_HOST")
 	if err != nil {
 		return Postgresql{}, err
 	}
@@ -59,15 +48,15 @@ func NewPostgresqlConfig() (Postgresql, error) {
 	if err != nil {
 		return Postgresql{}, err
 	}
-	username, err := requireEnvNew("DATABASE_USERNAME")
+	username, err := RequireEnvNew("DATABASE_USERNAME")
 	if err != nil {
 		return Postgresql{}, err
 	}
-	password, err := requireEnvNew("DATABASE_PASSWORD")
+	password, err := RequireEnvNew("DATABASE_PASSWORD")
 	if err != nil {
 		return Postgresql{}, err
 	}
-	name, err := requireEnvNew("DATABASE_NAME")
+	name, err := RequireEnvNew("DATABASE_NAME")
 	if err != nil {
 		return Postgresql{}, err
 	}
@@ -83,7 +72,7 @@ func NewPostgresqlConfig() (Postgresql, error) {
 }
 
 func NewSMTP() (SMTP, error) {
-	host, err := requireEnvNew("SMTP_HOST")
+	host, err := RequireEnvNew("SMTP_HOST")
 	if err != nil {
 		return SMTP{}, err
 	}
@@ -91,11 +80,11 @@ func NewSMTP() (SMTP, error) {
 	if err != nil {
 		return SMTP{}, err
 	}
-	username, err := requireEnvNew("SMTP_USERNAME")
+	username, err := RequireEnvNew("SMTP_USERNAME")
 	if err != nil {
 		return SMTP{}, err
 	}
-	password, err := requireEnvNew("SMTP_PASSWORD")
+	password, err := RequireEnvNew("SMTP_PASSWORD")
 	if err != nil {
 		return SMTP{}, err
 	}
@@ -109,7 +98,7 @@ func NewSMTP() (SMTP, error) {
 }
 
 func NewRedis() (Redis, error) {
-	host, err := requireEnvNew("REDIS_HOST")
+	host, err := RequireEnvNew("REDIS_HOST")
 	if err != nil {
 		return Redis{}, err
 	}
@@ -128,7 +117,7 @@ func NewAuthentication() (Authentication, error) {
 	if err != nil {
 		return Authentication{}, err
 	}
-	refreshTokenSecretKey, err := requireEnvNew("REFRESH_TOKEN_SECRET_KEY")
+	refreshTokenSecretKey, err := RequireEnvNew("REFRESH_TOKEN_SECRET_KEY")
 	if err != nil {
 		return Authentication{}, err
 	}
@@ -155,7 +144,7 @@ func NewAuthentication() (Authentication, error) {
 }
 
 func sameSiteMode() (http.SameSite, error) {
-	sameSiteMode, err := requireEnvNew("SAME_SITE_MODE")
+	sameSiteMode, err := RequireEnvNew("SAME_SITE_MODE")
 	if err != nil {
 		return 0, err
 	}
@@ -175,11 +164,11 @@ func sameSiteMode() (http.SameSite, error) {
 }
 
 func NewDockerHub() (DockerHub, error) {
-	username, err := requireEnvNew("DOCKER_HUB_USERNAME")
+	username, err := RequireEnvNew("DOCKER_HUB_USERNAME")
 	if err != nil {
 		return DockerHub{}, err
 	}
-	password, err := requireEnvNew("DOCKER_HUB_PASSWORD")
+	password, err := RequireEnvNew("DOCKER_HUB_PASSWORD")
 	if err != nil {
 		return DockerHub{}, err
 	}
@@ -191,7 +180,7 @@ func NewDockerHub() (DockerHub, error) {
 }
 
 func NewRabbitMQ() (RabbitMQ, error) {
-	host, err := requireEnvNew("RABBITMQ_HOST")
+	host, err := RequireEnvNew("RABBITMQ_HOST")
 	if err != nil {
 		return RabbitMQ{}, err
 	}
@@ -203,11 +192,11 @@ func NewRabbitMQ() (RabbitMQ, error) {
 	if err != nil {
 		return RabbitMQ{}, err
 	}
-	username, err := requireEnvNew("RABBITMQ_USERNAME")
+	username, err := RequireEnvNew("RABBITMQ_USERNAME")
 	if err != nil {
 		return RabbitMQ{}, err
 	}
-	password, err := requireEnvNew("RABBITMQ_PASSWORD")
+	password, err := RequireEnvNew("RABBITMQ_PASSWORD")
 	if err != nil {
 		return RabbitMQ{}, err
 	}
@@ -272,7 +261,7 @@ type Authentication struct {
 }
 
 func GetPrivateKey(logger *slog.Logger) (*rsa.PrivateKey, error) {
-	key, err := requireEnvNew("PRIVATE_KEY")
+	key, err := RequireEnvNew("PRIVATE_KEY")
 	if err != nil {
 		return nil, err
 	}
@@ -333,11 +322,11 @@ type user struct {
 }
 
 func NewAdminUser() (user, error) {
-	email, err := requireEnvNew("ADMIN_USER_EMAIL")
+	email, err := RequireEnvNew("ADMIN_USER_EMAIL")
 	if err != nil {
 		return user{}, err
 	}
-	password, err := requireEnvNew("ADMIN_USER_PASSWORD")
+	password, err := RequireEnvNew("ADMIN_USER_PASSWORD")
 	if err != nil {
 		return user{}, err
 	}
@@ -349,11 +338,11 @@ func NewAdminUser() (user, error) {
 }
 
 func NewE2eTestUser() (user, error) {
-	email, err := requireEnvNew("E2E_TEST_USER_EMAIL")
+	email, err := RequireEnvNew("E2E_TEST_USER_EMAIL")
 	if err != nil {
 		return user{}, err
 	}
-	password, err := requireEnvNew("E2E_TEST_USER_PASSWORD")
+	password, err := RequireEnvNew("E2E_TEST_USER_PASSWORD")
 	if err != nil {
 		return user{}, err
 	}
@@ -375,7 +364,7 @@ func requireEnv(key string) string {
 	return value
 }
 
-func requireEnvNew(key string) (string, error) {
+func RequireEnvNew(key string) (string, error) {
 	value, exists := os.LookupEnv(key)
 	if !exists {
 		return "", fmt.Errorf("required environment variable %q not set", key)
@@ -384,7 +373,7 @@ func requireEnvNew(key string) (string, error) {
 }
 
 func requireEnvNewAsInt(key string) (int, error) {
-	valueStr, err := requireEnvNew(key)
+	valueStr, err := RequireEnvNew(key)
 	if err != nil {
 		return 0, err
 	}
@@ -397,13 +386,18 @@ func requireEnvNewAsInt(key string) (int, error) {
 	return value, nil
 }
 
-func requireEnvAsInt(key string) int {
-	valueStr := requireEnv(key)
-	value, err := strconv.Atoi(valueStr)
+func RequireEnvNewAsUint(key string) (uint, error) {
+	valueStr, err := RequireEnvNew(key)
 	if err != nil {
-		log.Fatalf("Can't parse value as integer: %s", err.Error())
+		return 0, err
 	}
-	return value
+
+	value, err := strconv.ParseUint(valueStr, 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("failed to parse environment variable %q as int: %v", key, err)
+	}
+
+	return uint(value), nil
 }
 
 func requireEnvAsArray(key string) []string {
@@ -412,7 +406,7 @@ func requireEnvAsArray(key string) []string {
 }
 
 func requireEnvNewAsArray(key string) ([]string, error) {
-	value, err := requireEnvNew(key)
+	value, err := RequireEnvNew(key)
 	if err != nil {
 		return nil, err
 	}

@@ -86,8 +86,16 @@ func run() (err error) {
 		return err
 	}
 	dailer := mail.NewDialer(smtpConfig.Host, smtpConfig.Port, smtpConfig.Username, smtpConfig.Password)
-	cfg := config.New()
-	userService := user.NewService(cfg.UIURL, cfg.PasswordTokenTTL, userRepository, dailer)
+
+	uiURL, err := config.RequireEnvNew("UI_URL")
+	if err != nil {
+		return err
+	}
+	passwordTokenTTL, err := config.RequireEnvNewAsUint("PASSWORD_TOKEN_TTL")
+	if err != nil {
+		return err
+	}
+	userService := user.NewService(uiURL, passwordTokenTTL, userRepository, dailer)
 	authorization := middleware.NewAuthorization(logger, userService)
 
 	redisConfig, err := config.NewRedis()
@@ -114,7 +122,11 @@ func run() (err error) {
 	}
 
 	publicKey := privateKey.PublicKey
-	userHandler := user.NewHandler(logger, cfg.Hostname, authConfig.SameSiteMode, authConfig.AccessTokenExpirationSeconds, authConfig.RefreshTokenExpirationSeconds, authConfig.RefreshTokenRememberMeExpirationSeconds, publicKey, userService, tokenService)
+	hostname, err := config.RequireEnvNew("HOSTNAME")
+	if err != nil {
+		return err
+	}
+	userHandler := user.NewHandler(logger, hostname, authConfig.SameSiteMode, authConfig.AccessTokenExpirationSeconds, authConfig.RefreshTokenExpirationSeconds, authConfig.RefreshTokenRememberMeExpirationSeconds, publicKey, userService, tokenService)
 
 	authentication := middleware.NewAuthentication(publicKey, userService)
 	groupRepository := group.NewRepository(db)
@@ -135,17 +147,21 @@ func run() (err error) {
 
 	stackService := stack.NewService(stacks)
 
-	instanceRepository := instance.NewRepository(db, cfg.InstanceParameterEncryptionKey)
-	helmfileService := instance.NewHelmfileService(logger, stackService, "./stacks", cfg.Classification)
+	instanceParameterEncryptionKey, err := config.RequireEnvNew("INSTANCE_PARAMETER_ENCRYPTION_KEY")
+	if err != nil {
+		return err
+	}
+	instanceRepository := instance.NewRepository(db, instanceParameterEncryptionKey)
+	classification, err := config.RequireEnvNew("CLASSIFICATION")
+	if err != nil {
+		return err
+	}
+	helmfileService := instance.NewHelmfileService(logger, stackService, "./stacks", classification)
 	instanceService := instance.NewService(logger, instanceRepository, groupService, stackService, helmfileService)
 
 	dockerHubConfig, err := config.NewDockerHub()
 	dockerHubClient := integration.NewDockerHubClient(dockerHubConfig.Username, dockerHubConfig.Password)
 
-	hostname, err := os.Hostname()
-	if err != nil {
-		return fmt.Errorf("failed to get hostname: %v", err)
-	}
 	rabbitmqConfig, err := config.NewRabbitMQ()
 	if err != nil {
 		return err
@@ -168,8 +184,14 @@ func run() (err error) {
 	}
 
 	stackHandler := stack.NewHandler(stackService)
-	instanceHandler := instance.NewHandler(groupService, instanceService, cfg.DefaultTTL)
 
+	defaultTTL, err := config.RequireEnvNewAsUint("DEFAULT_TTL")
+	if err != nil {
+		return err
+	}
+	instanceHandler := instance.NewHandler(groupService, instanceService, defaultTTL)
+
+	cfg := config.New()
 	s3Endpoint := aws.EndpointResolverWithOptionsFunc(func(service, region string, options ...any) (aws.Endpoint, error) {
 		if cfg.S3Endpoint != "" {
 			return aws.Endpoint{URL: cfg.S3Endpoint}, nil
