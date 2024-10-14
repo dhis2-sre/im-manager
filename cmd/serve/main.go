@@ -270,10 +270,18 @@ func run() (err error) {
 	}
 
 	// TODO: This is a hack! Allowed origins for different environments should be applied using skaffold profiles... But I can't get it working!
-	if cfg.Environment != "production" {
-		cfg.AllowedOrigins = append(cfg.AllowedOrigins, "http://localhost:3000", "http://localhost:5173")
+	allowedOrigins, err := config.RequireEnvNewAsArray("CORS_ALLOWED_ORIGINS")
+	if err != nil {
+		return err
 	}
-	r, err := server.GetEngine(logger, cfg.BasePath, cfg.AllowedOrigins)
+	basePath, err := config.RequireEnvNew("BASE_PATH")
+	if err != nil {
+		return err
+	}
+	if cfg.Environment != "production" {
+		allowedOrigins = append(allowedOrigins, "http://localhost:3000", "http://localhost:5173")
+	}
+	r, err := server.GetEngine(logger, basePath, allowedOrigins)
 	if err != nil {
 		return err
 	}

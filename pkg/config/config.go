@@ -16,9 +16,7 @@ import (
 
 type Config struct {
 	Environment                    string
-	AllowedOrigins                 []string
 	InstanceParameterEncryptionKey string
-	BasePath                       string
 	InstanceService                Service
 	S3Bucket                       string
 	S3Region                       string
@@ -27,9 +25,7 @@ type Config struct {
 
 func New() Config {
 	return Config{
-		Environment:    requireEnv("ENVIRONMENT"),
-		AllowedOrigins: requireEnvAsArray("CORS_ALLOWED_ORIGINS"),
-		BasePath:       requireEnv("BASE_PATH"),
+		Environment: requireEnv("ENVIRONMENT"),
 		InstanceService: Service{
 			Host: requireEnv("INSTANCE_SERVICE_HOST"),
 		},
@@ -295,11 +291,11 @@ type Group struct {
 }
 
 func NewGroups() ([]Group, error) {
-	groupNames, err := requireEnvNewAsArray("GROUP_NAMES")
+	groupNames, err := RequireEnvNewAsArray("GROUP_NAMES")
 	if err != nil {
 		return nil, err
 	}
-	groupHostnames, err := requireEnvNewAsArray("GROUP_HOSTNAMES")
+	groupHostnames, err := RequireEnvNewAsArray("GROUP_HOSTNAMES")
 	if err != nil {
 		return nil, err
 	}
@@ -400,12 +396,7 @@ func RequireEnvNewAsUint(key string) (uint, error) {
 	return uint(value), nil
 }
 
-func requireEnvAsArray(key string) []string {
-	value := requireEnv(key)
-	return strings.Split(value, ",")
-}
-
-func requireEnvNewAsArray(key string) ([]string, error) {
+func RequireEnvNewAsArray(key string) ([]string, error) {
 	value, err := RequireEnvNew(key)
 	if err != nil {
 		return nil, err
