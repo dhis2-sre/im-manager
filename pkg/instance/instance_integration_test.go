@@ -1,7 +1,6 @@
 package instance_test
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -33,7 +32,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	tc "github.com/testcontainers/testcontainers-go/modules/compose"
 )
 
 func TestInstanceHandler(t *testing.T) {
@@ -335,26 +333,4 @@ func (gs groupService) FindByGroupNames(groupNames []string) ([]model.Group, err
 
 func (gs groupService) Find(name string) (*model.Group, error) {
 	return gs.group, nil
-}
-
-func TestSomething(t *testing.T) {
-	compose, err := tc.NewDockerCompose("./docker-compose.yml")
-	require.NoError(t, err, "NewDockerComposeAPI()")
-
-	t.Cleanup(func() {
-		require.NoError(t, compose.Down(context.Background(), tc.RemoveOrphans(true), tc.RemoveImagesLocal), "compose.Down()")
-	})
-
-	ctx, cancel := context.WithCancel(context.Background())
-	t.Cleanup(cancel)
-
-	require.NoError(t, compose.Up(ctx, tc.RunServices("database"), tc.Wait(true)), "compose.Up()")
-
-	container, err := compose.ServiceContainer(ctx, "database")
-	require.NoError(t, err)
-
-	host, err := container.Host(ctx)
-	require.NoError(t, err)
-
-	println(host)
 }
