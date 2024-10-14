@@ -71,36 +71,36 @@ func run() (err error) {
 	}()
 
 	logger := slog.New(log.New(slog.NewJSONHandler(os.Stdout, nil)))
-	postgresCfg, err := config.NewPostgresqlConfig()
+	postgresConfig, err := config.NewPostgresqlConfig()
 	if err != nil {
 		return err
 	}
-	db, err := storage.NewDatabase(logger, postgresCfg)
+	db, err := storage.NewDatabase(logger, postgresConfig)
 	if err != nil {
 		return fmt.Errorf("failed to setup DB: %v", err)
 	}
 
 	userRepository := user.NewRepository(db)
-	smtpCfg, err := config.NewSMTP()
+	smtpConfig, err := config.NewSMTP()
 	if err != nil {
 		return err
 	}
-	dailer := mail.NewDialer(smtpCfg.Host, smtpCfg.Port, smtpCfg.Username, smtpCfg.Password)
+	dailer := mail.NewDialer(smtpConfig.Host, smtpConfig.Port, smtpConfig.Username, smtpConfig.Password)
 	cfg := config.New()
 	userService := user.NewService(cfg.UIURL, cfg.PasswordTokenTTL, userRepository, dailer)
 	authorization := middleware.NewAuthorization(logger, userService)
 
-	redisCfg, err := config.NewRedis()
+	redisConfig, err := config.NewRedis()
 	if err != nil {
 		return err
 	}
-	redis, err := storage.NewRedis(redisCfg.Host, redisCfg.Port)
+	redis, err := storage.NewRedis(redisConfig.Host, redisConfig.Port)
 	if err != nil {
 		return err
 	}
 	tokenRepository := token.NewRepository(redis)
 
-	authCfg, err := config.NewAuthentication()
+	authConfig, err := config.NewAuthentication()
 	if err != nil {
 		return err
 	}
@@ -108,13 +108,13 @@ func run() (err error) {
 	if err != nil {
 		return err
 	}
-	tokenService, err := token.NewService(logger, tokenRepository, privateKey, authCfg.AccessTokenExpirationSeconds, authCfg.RefreshTokenSecretKey, authCfg.RefreshTokenExpirationSeconds, authCfg.RefreshTokenRememberMeExpirationSeconds)
+	tokenService, err := token.NewService(logger, tokenRepository, privateKey, authConfig.AccessTokenExpirationSeconds, authConfig.RefreshTokenSecretKey, authConfig.RefreshTokenExpirationSeconds, authConfig.RefreshTokenRememberMeExpirationSeconds)
 	if err != nil {
 		return err
 	}
 
 	publicKey := privateKey.PublicKey
-	userHandler := user.NewHandler(logger, cfg.Hostname, authCfg.SameSiteMode, authCfg.AccessTokenExpirationSeconds, authCfg.RefreshTokenExpirationSeconds, authCfg.RefreshTokenRememberMeExpirationSeconds, publicKey, userService, tokenService)
+	userHandler := user.NewHandler(logger, cfg.Hostname, authConfig.SameSiteMode, authConfig.AccessTokenExpirationSeconds, authConfig.RefreshTokenExpirationSeconds, authConfig.RefreshTokenRememberMeExpirationSeconds, publicKey, userService, tokenService)
 
 	authentication := middleware.NewAuthentication(publicKey, userService)
 	groupRepository := group.NewRepository(db)
@@ -139,19 +139,19 @@ func run() (err error) {
 	helmfileService := instance.NewHelmfileService(logger, stackService, "./stacks", cfg.Classification)
 	instanceService := instance.NewService(logger, instanceRepository, groupService, stackService, helmfileService)
 
-	dockerHubCfg, err := config.NewDockerHub()
-	dockerHubClient := integration.NewDockerHubClient(dockerHubCfg.Username, dockerHubCfg.Password)
+	dockerHubConfig, err := config.NewDockerHub()
+	dockerHubClient := integration.NewDockerHubClient(dockerHubConfig.Username, dockerHubConfig.Password)
 
 	hostname, err := os.Hostname()
 	if err != nil {
 		return fmt.Errorf("failed to get hostname: %v", err)
 	}
-	rabbitmqCfg, err := config.NewRabbitMQ()
+	rabbitmqConfig, err := config.NewRabbitMQ()
 	if err != nil {
 		return err
 	}
 	consumer, err := rabbitmq.NewConsumer(
-		rabbitmqCfg.GetURI(),
+		rabbitmqConfig.GetURI(),
 		rabbitmq.WithConnectionName(hostname),
 		rabbitmq.WithConsumerTagPrefix(hostname),
 		rabbitmq.WithLogger(logger.WithGroup("rabbitmq")),
@@ -199,19 +199,19 @@ func run() (err error) {
 
 	integrationHandler := integration.NewHandler(dockerHubClient, cfg.InstanceService.Host, cfg.DatabaseManagerService.Host)
 
-	logger.Info("Connecting with RabbitMQ stream client", "host", rabbitmqCfg.Host, "port", rabbitmqCfg.StreamPort)
+	logger.Info("Connecting with RabbitMQ stream client", "host", rabbitmqConfig.Host, "port", rabbitmqConfig.StreamPort)
 	env, err := stream.NewEnvironment(
 		stream.NewEnvironmentOptions().
-			SetHost(rabbitmqCfg.Host).
-			SetPort(rabbitmqCfg.StreamPort).
-			SetUser(rabbitmqCfg.Username).
-			SetPassword(rabbitmqCfg.Password).
-			SetAddressResolver(stream.AddressResolver{Host: rabbitmqCfg.Host, Port: rabbitmqCfg.StreamPort}),
+			SetHost(rabbitmqConfig.Host).
+			SetPort(rabbitmqConfig.StreamPort).
+			SetUser(rabbitmqConfig.Username).
+			SetPassword(rabbitmqConfig.Password).
+			SetAddressResolver(stream.AddressResolver{Host: rabbitmqConfig.Host, Port: rabbitmqConfig.StreamPort}),
 	)
 	if err != nil {
 		return fmt.Errorf("failed to connect with RabbitMQ stream client: %v", err)
 	}
-	logger.Info("Connected with RabbitMQ stream client", "host", rabbitmqCfg.Host, "port", rabbitmqCfg.StreamPort)
+	logger.Info("Connected with RabbitMQ stream client", "host", rabbitmqConfig.Host, "port", rabbitmqConfig.StreamPort)
 	streamName := "events"
 	err = env.DeclareStream(streamName,
 		stream.NewStreamOptions().
