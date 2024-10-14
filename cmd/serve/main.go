@@ -70,23 +70,32 @@ func run() (err error) {
 		}
 	}()
 
-	cfg := config.New()
-
 	logger := slog.New(log.New(slog.NewJSONHandler(os.Stdout, nil)))
-	db, err := storage.NewDatabase(logger, cfg.Postgresql)
+	postgresCfg, err := config.NewPostgresqlConfig()
+	if err != nil {
+		return err
+	}
+	db, err := storage.NewDatabase(logger, postgresCfg)
 	if err != nil {
 		return fmt.Errorf("failed to setup DB: %v", err)
 	}
 
 	userRepository := user.NewRepository(db)
-	dailer := mail.NewDialer(cfg.SMTP.Host, cfg.SMTP.Port, cfg.SMTP.Username, cfg.SMTP.Password)
+	smtpCfg, err := config.NewSMTP()
+	if err != nil {
+		return err
+	}
+	dailer := mail.NewDialer(smtpCfg.Host, smtpCfg.Port, smtpCfg.Username, smtpCfg.Password)
+	cfg := config.New()
 	userService := user.NewService(cfg.UIURL, cfg.PasswordTokenTTL, userRepository, dailer)
 	authorization := middleware.NewAuthorization(logger, userService)
+
 	redis, err := storage.NewRedis(cfg.Redis.Host, cfg.Redis.Port)
 	if err != nil {
 		return err
 	}
 	tokenRepository := token.NewRepository(redis)
+
 	authConfig := cfg.Authentication
 	privateKey, err := config.GetPrivateKey(logger)
 	if err != nil {

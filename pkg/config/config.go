@@ -27,9 +27,7 @@ type Config struct {
 	InstanceService                Service
 	DockerHub                      DockerHub
 	DatabaseManagerService         Service
-	Postgresql                     Postgresql
 	RabbitMqURL                    rabbitmq
-	SMTP                           smtp
 	Redis                          Redis
 	Authentication                 Authentication
 	Groups                         []Group
@@ -65,19 +63,6 @@ func New() Config {
 			//			Username: requireEnv("DATABASE_MANAGER_SERVICE_USERNAME"),
 			//			Password: requireEnv("DATABASE_MANAGER_SERVICE_PASSWORD"),
 		},
-		Postgresql: Postgresql{
-			Host:         requireEnv("DATABASE_HOST"),
-			Port:         requireEnvAsInt("DATABASE_PORT"),
-			Username:     requireEnv("DATABASE_USERNAME"),
-			Password:     requireEnv("DATABASE_PASSWORD"),
-			DatabaseName: requireEnv("DATABASE_NAME"),
-		},
-		SMTP: smtp{
-			Host:     requireEnv("SMTP_HOST"),
-			Port:     requireEnvAsInt("SMTP_PORT"),
-			Username: requireEnv("SMTP_USERNAME"),
-			Password: requireEnv("SMTP_PASSWORD"),
-		},
 		RabbitMqURL: rabbitmq{
 			Host:       requireEnv("RABBITMQ_HOST"),
 			Port:       requireEnvAsInt("RABBITMQ_PORT"),
@@ -103,6 +88,64 @@ func New() Config {
 		S3Region:    requireEnv("S3_REGION"),
 		S3Endpoint:  os.Getenv("S3_ENDPOINT"),
 	}
+}
+
+func NewPostgresqlConfig() (Postgresql, error) {
+	host, err := requireEnvNew("DATABASE_HOST")
+	if err != nil {
+		return Postgresql{}, err
+	}
+	port, err := requireEnvNewAsInt("DATABASE_PORT")
+	if err != nil {
+		return Postgresql{}, err
+	}
+	username, err := requireEnvNew("DATABASE_USERNAME")
+	if err != nil {
+		return Postgresql{}, err
+	}
+	password, err := requireEnvNew("DATABASE_PASSWORD")
+	if err != nil {
+		return Postgresql{}, err
+	}
+	name, err := requireEnvNew("DATABASE_NAME")
+	if err != nil {
+		return Postgresql{}, err
+	}
+
+	return Postgresql{
+			Host:         host,
+			Port:         port,
+			Username:     username,
+			Password:     password,
+			DatabaseName: name,
+		},
+		nil
+}
+
+func NewSMTP() (SMTP, error) {
+	host, err := requireEnvNew("SMTP_HOST")
+	if err != nil {
+		return SMTP{}, err
+	}
+	port, err := requireEnvNewAsInt("SMTP_PORT")
+	if err != nil {
+		return SMTP{}, err
+	}
+	username, err := requireEnvNew("SMTP_USERNAME")
+	if err != nil {
+		return SMTP{}, err
+	}
+	password, err := requireEnvNew("SMTP_PASSWORD")
+	if err != nil {
+		return SMTP{}, err
+	}
+
+	return SMTP{
+		Host:     host,
+		Port:     port,
+		Username: username,
+		Password: password,
+	}, nil
 }
 
 func sameSiteMode() http.SameSite {
@@ -150,7 +193,7 @@ type rabbitmq struct {
 	Password   string
 }
 
-type smtp struct {
+type SMTP struct {
 	Host     string
 	Port     int
 	Username string
@@ -267,6 +310,20 @@ func requireEnvNew(key string) (string, error) {
 	if !exists {
 		return "", fmt.Errorf("required environment variable %q not set", key)
 	}
+	return value, nil
+}
+
+func requireEnvNewAsInt(key string) (int, error) {
+	valueStr, err := requireEnvNew(key)
+	if err != nil {
+		return 0, err
+	}
+
+	value, err := strconv.Atoi(valueStr)
+	if err != nil {
+		return 0, fmt.Errorf("failed to parse environment variable %q as int: %v", key, err)
+	}
+
 	return value, nil
 }
 
