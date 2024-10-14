@@ -29,7 +29,6 @@ type Config struct {
 	DatabaseManagerService         Service
 	RabbitMqURL                    rabbitmq
 	Redis                          Redis
-	Authentication                 Authentication
 	S3Bucket                       string
 	S3Region                       string
 	S3Endpoint                     string
@@ -66,13 +65,6 @@ func New() Config {
 			StreamPort: requireEnvAsInt("RABBITMQ_STREAM_PORT"),
 			Username:   requireEnv("RABBITMQ_USERNAME"),
 			Password:   requireEnv("RABBITMQ_PASSWORD"),
-		},
-		Authentication: Authentication{
-			SameSiteMode:                            sameSiteMode(),
-			RefreshTokenSecretKey:                   requireEnv("REFRESH_TOKEN_SECRET_KEY"),
-			AccessTokenExpirationSeconds:            requireEnvAsInt("ACCESS_TOKEN_EXPIRATION_IN_SECONDS"),
-			RefreshTokenExpirationSeconds:           requireEnvAsInt("REFRESH_TOKEN_EXPIRATION_IN_SECONDS"),
-			RefreshTokenRememberMeExpirationSeconds: requireEnvAsInt("REFRESH_TOKEN_REMEMBER_ME_EXPIRATION_IN_SECONDS"),
 		},
 		S3Bucket:   requireEnv("S3_BUCKET"),
 		S3Region:   requireEnv("S3_REGION"),
@@ -153,21 +145,55 @@ func NewRedis() (Redis, error) {
 	}, nil
 }
 
-func sameSiteMode() http.SameSite {
-	sameSiteMode := requireEnv("SAME_SITE_MODE")
-	switch sameSiteMode {
-	case "default":
-		return http.SameSiteDefaultMode
-	case "lax":
-		return http.SameSiteLaxMode
-	case "strict":
-		return http.SameSiteStrictMode
-	case "none":
-		return http.SameSiteNoneMode
+func NewAuthentication() (Authentication, error) {
+	mode, err := sameSiteMode()
+	if err != nil {
+		return Authentication{}, err
+	}
+	refreshTokenSecretKey, err := requireEnvNew("REFRESH_TOKEN_SECRET_KEY")
+	if err != nil {
+		return Authentication{}, err
+	}
+	accessTokenExpirationSeconds, err := requireEnvNewAsInt("ACCESS_TOKEN_EXPIRATION_IN_SECONDS")
+	if err != nil {
+		return Authentication{}, err
+	}
+	refreshTokenExpirationSeconds, err := requireEnvNewAsInt("REFRESH_TOKEN_EXPIRATION_IN_SECONDS")
+	if err != nil {
+		return Authentication{}, err
+	}
+	refreshTokenRememberMeExpirationSeconds, err := requireEnvNewAsInt("REFRESH_TOKEN_REMEMBER_ME_EXPIRATION_IN_SECONDS")
+	if err != nil {
+		return Authentication{}, err
 	}
 
-	log.Fatalf("Can't parse same site mode: %s\n", sameSiteMode)
-	return -1
+	return Authentication{
+		SameSiteMode:                            mode,
+		RefreshTokenSecretKey:                   refreshTokenSecretKey,
+		AccessTokenExpirationSeconds:            accessTokenExpirationSeconds,
+		RefreshTokenExpirationSeconds:           refreshTokenExpirationSeconds,
+		RefreshTokenRememberMeExpirationSeconds: refreshTokenRememberMeExpirationSeconds,
+	}, nil
+}
+
+func sameSiteMode() (http.SameSite, error) {
+	sameSiteMode, err := requireEnvNew("SAME_SITE_MODE")
+	if err != nil {
+		return 0, err
+	}
+
+	switch sameSiteMode {
+	case "default":
+		return http.SameSiteDefaultMode, nil
+	case "lax":
+		return http.SameSiteLaxMode, nil
+	case "strict":
+		return http.SameSiteStrictMode, nil
+	case "none":
+		return http.SameSiteNoneMode, nil
+	}
+
+	return -1, fmt.Errorf("failed to parse \"SAME_SITE_MODE\": %q", sameSiteMode)
 }
 
 type Service struct {
