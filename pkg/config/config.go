@@ -27,7 +27,6 @@ type Config struct {
 	InstanceService                Service
 	DatabaseManagerService         Service
 	RabbitMqURL                    rabbitmq
-	Redis                          Redis
 	S3Bucket                       string
 	S3Region                       string
 	S3Endpoint                     string
