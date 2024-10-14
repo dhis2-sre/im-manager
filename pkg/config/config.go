@@ -26,7 +26,6 @@ type Config struct {
 	PasswordTokenTTL               uint
 	InstanceService                Service
 	DatabaseManagerService         Service
-	RabbitMqURL                    rabbitmq
 	S3Bucket                       string
 	S3Region                       string
 	S3Endpoint                     string
@@ -52,13 +51,6 @@ func New() Config {
 			BasePath: requireEnv("DATABASE_MANAGER_SERVICE_BASE_PATH"),
 			//			Username: requireEnv("DATABASE_MANAGER_SERVICE_USERNAME"),
 			//			Password: requireEnv("DATABASE_MANAGER_SERVICE_PASSWORD"),
-		},
-		RabbitMqURL: rabbitmq{
-			Host:       requireEnv("RABBITMQ_HOST"),
-			Port:       requireEnvAsInt("RABBITMQ_PORT"),
-			StreamPort: requireEnvAsInt("RABBITMQ_STREAM_PORT"),
-			Username:   requireEnv("RABBITMQ_USERNAME"),
-			Password:   requireEnv("RABBITMQ_PASSWORD"),
 		},
 		S3Bucket:   requireEnv("S3_BUCKET"),
 		S3Region:   requireEnv("S3_REGION"),
@@ -206,6 +198,37 @@ func NewDockerHub() (DockerHub, error) {
 	}, nil
 }
 
+func NewRabbitMQ() (RabbitMQ, error) {
+	host, err := requireEnvNew("RABBITMQ_HOST")
+	if err != nil {
+		return RabbitMQ{}, err
+	}
+	port, err := requireEnvNewAsInt("RABBITMQ_PORT")
+	if err != nil {
+		return RabbitMQ{}, err
+	}
+	streamPort, err := requireEnvNewAsInt("RABBITMQ_STREAM_PORT")
+	if err != nil {
+		return RabbitMQ{}, err
+	}
+	username, err := requireEnvNew("RABBITMQ_USERNAME")
+	if err != nil {
+		return RabbitMQ{}, err
+	}
+	password, err := requireEnvNew("RABBITMQ_PASSWORD")
+	if err != nil {
+		return RabbitMQ{}, err
+	}
+
+	return RabbitMQ{
+		Host:       host,
+		Port:       port,
+		StreamPort: streamPort,
+		Username:   username,
+		Password:   password,
+	}, nil
+}
+
 type Service struct {
 	Host     string
 	BasePath string
@@ -226,7 +249,7 @@ type Postgresql struct {
 	DatabaseName string
 }
 
-type rabbitmq struct {
+type RabbitMQ struct {
 	Host       string
 	Port       int
 	StreamPort int
@@ -242,7 +265,7 @@ type SMTP struct {
 }
 
 // GetURI returns the AMQP URI for RabbitMQ.
-func (r rabbitmq) GetURI() string {
+func (r RabbitMQ) GetURI() string {
 	return fmt.Sprintf("amqp://%s:%s@%s:%d/", r.Username, r.Password, r.Host, r.Port)
 }
 

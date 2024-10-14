@@ -146,8 +146,12 @@ func run() (err error) {
 	if err != nil {
 		return fmt.Errorf("failed to get hostname: %v", err)
 	}
+	rabbitmqCfg, err := config.NewRabbitMQ()
+	if err != nil {
+		return err
+	}
 	consumer, err := rabbitmq.NewConsumer(
-		cfg.RabbitMqURL.GetURI(),
+		rabbitmqCfg.GetURI(),
 		rabbitmq.WithConnectionName(hostname),
 		rabbitmq.WithConsumerTagPrefix(hostname),
 		rabbitmq.WithLogger(logger.WithGroup("rabbitmq")),
@@ -195,19 +199,19 @@ func run() (err error) {
 
 	integrationHandler := integration.NewHandler(dockerHubClient, cfg.InstanceService.Host, cfg.DatabaseManagerService.Host)
 
-	logger.Info("Connecting with RabbitMQ stream client", "host", cfg.RabbitMqURL.Host, "port", cfg.RabbitMqURL.StreamPort)
+	logger.Info("Connecting with RabbitMQ stream client", "host", rabbitmqCfg.Host, "port", rabbitmqCfg.StreamPort)
 	env, err := stream.NewEnvironment(
 		stream.NewEnvironmentOptions().
-			SetHost(cfg.RabbitMqURL.Host).
-			SetPort(cfg.RabbitMqURL.StreamPort).
-			SetUser(cfg.RabbitMqURL.Username).
-			SetPassword(cfg.RabbitMqURL.Password).
-			SetAddressResolver(stream.AddressResolver{Host: cfg.RabbitMqURL.Host, Port: cfg.RabbitMqURL.StreamPort}),
+			SetHost(rabbitmqCfg.Host).
+			SetPort(rabbitmqCfg.StreamPort).
+			SetUser(rabbitmqCfg.Username).
+			SetPassword(rabbitmqCfg.Password).
+			SetAddressResolver(stream.AddressResolver{Host: rabbitmqCfg.Host, Port: rabbitmqCfg.StreamPort}),
 	)
 	if err != nil {
 		return fmt.Errorf("failed to connect with RabbitMQ stream client: %v", err)
 	}
-	logger.Info("Connected with RabbitMQ stream client", "host", cfg.RabbitMqURL.Host, "port", cfg.RabbitMqURL.StreamPort)
+	logger.Info("Connected with RabbitMQ stream client", "host", rabbitmqCfg.Host, "port", rabbitmqCfg.StreamPort)
 	streamName := "events"
 	err = env.DeclareStream(streamName,
 		stream.NewStreamOptions().
