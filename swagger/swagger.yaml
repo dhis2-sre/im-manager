@@ -1685,8 +1685,6 @@ paths:
                     $ref: '#/responses/Error'
                 "415":
                     $ref: '#/responses/Error'
-            security:
-                - oauth2: []
             summary: Sign out
         get:
             description: Find all users with the groups they belong to
