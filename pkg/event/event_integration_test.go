@@ -76,16 +76,18 @@ func TestEventHandler(t *testing.T) {
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	// this is only to allow testing using multiple users without bringing in all our auth stack
-	authenticator := func(ctx *gin.Context) {
-		userParam := ctx.Query("user")
+	authenticator := func(c *gin.Context) {
+		userParam := c.Query("user")
 		userID, err := strconv.ParseUint(userParam, 10, 64)
 		require.NoErrorf(t, err, "failed to parse query param user=%q into user ID", userParam)
 
 		if userID == uint64(user1.ID) {
-			ctx.Set("user", user1)
+			ctx := model.NewContextWithUser(c.Request.Context(), user1)
+			c.Request = c.Request.WithContext(ctx)
 			return
 		} else if userID == uint64(user2.ID) {
-			ctx.Set("user", user2)
+			ctx := model.NewContextWithUser(c.Request.Context(), user2)
+			c.Request = c.Request.WithContext(ctx)
 			return
 		}
 
@@ -107,7 +109,7 @@ func TestEventHandler(t *testing.T) {
 	eventEmitter.emit(t, "db-update", sharedGroup.Name, nil)
 	eventEmitter.emit(t, "instance-update", sharedGroup.Name, nil)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Second)
+	ctx, cancel := context.WithTimeoutCause(context.Background(), 100*time.Second, errors.New("test timed out"))
 	defer cancel()
 	ctxUser1, cancelUser1 := context.WithCancelCause(ctx)
 	defer cancelUser1(nil)
@@ -132,8 +134,9 @@ func TestEventHandler(t *testing.T) {
 		}
 	}
 	require.EqualValuesf(t, wantUser1Messages, gotUser1Messages, "mismatch in expected messages for user %d", user1.ID)
+	t.Log("Got correct messages for user1")
 
-	ctxUser2, cancelUser2 := context.WithTimeout(context.Background(), 50*time.Second)
+	ctxUser2, cancelUser2 := context.WithTimeoutCause(ctx, 50*time.Second, errors.New("user2 context timed out"))
 	defer cancelUser2()
 	user2Messages := streamEvents(t, ctxUser2, client, user2, nil)
 
@@ -162,6 +165,7 @@ func TestEventHandler(t *testing.T) {
 	}
 	require.EqualValuesf(t, wantUser1Messages, gotUser1Messages, "mismatch in expected messages for user %d", user1.ID)
 	require.EqualValuesf(t, wantUser2Messages, gotUser2Messages, "mismatch in expected messages for user %d", user2.ID)
+	t.Log("Got correct messages for both users")
 
 	cancelUser1(errors.New("drop connection"))
 	<-user1Messages // wait for user1 to be unsubscribed before sending new messages to test Last-Event-ID
@@ -171,7 +175,7 @@ func TestEventHandler(t *testing.T) {
 	event14 := eventEmitter.emit(t, "db-update", sharedGroup.Name, nil)
 	event15 := eventEmitter.emit(t, "instance-update", sharedGroup.Name, nil)
 
-	// When a SSE client disconnects it will send the HTTP header Last-Event-ID with the ID of the
+	// When an SSE client disconnects it will send the HTTP header Last-Event-ID with the ID of the
 	// event it last received. We want to then send the event after that.
 	user1Messages = streamEvents(t, ctxUser2, client, user1, &event11.ID)
 
@@ -192,6 +196,7 @@ func TestEventHandler(t *testing.T) {
 	}
 	assert.EqualValuesf(t, wantUser1Messages, gotUser1Messages, "mismatch in expected messages for user %d", user1.ID)
 	assert.EqualValuesf(t, wantUser2Messages, gotUser2Messages, "mismatch in expected messages for user %d", user2.ID)
+	t.Log("Got correct messages for both users")
 }
 
 func streamEvents(t *testing.T, ctx context.Context, client *inttest.HTTPClient, user *model.User, lastEventId *int64) <-chan sseEvent {
@@ -245,10 +250,12 @@ func streamEvents(t *testing.T, ctx context.Context, client *inttest.HTTPClient,
 		}
 
 		close(out)
-		if !errors.Is(sc.Err(), context.Canceled) {
+		t.Logf("User %d stops to stream from %q due to: %v", user.ID, url, context.Cause(ctx))
+		// sc.Err() is set to the cancellation cause or [context.Canceled] if the req ctx was
+		// cancelled. We are only interested in any issues with reading the SSE event.
+		if sc.Err() != context.Cause(ctx) && sc.Err() != ctx.Err() {
 			require.NoErrorf(t, sc.Err(), "error scanning event stream from %q for user %d", url, user.ID)
 		}
-		t.Logf("User %d stops to stream from %q due: %v", user.ID, url, context.Cause(ctx))
 	}()
 
 	return out

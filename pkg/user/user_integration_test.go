@@ -42,7 +42,7 @@ func TestUserHandler(t *testing.T) {
 	groupService := group.NewService(groupRepository, userService)
 
 	userCount.Increment()
-	err := user.CreateUser("admin", "admin", userService, groupService, model.AdministratorGroupName, "admin")
+	err := user.CreateUser(context.Background(), "admin", "admin", userService, groupService, model.AdministratorGroupName, "admin")
 	require.NoError(t, err, "failed to create admin user and group")
 	userCount.Done()
 
@@ -394,7 +394,6 @@ func TestUserHandler(t *testing.T) {
 				require.NotNil(t, refreshTokenCookie)
 				assertCookie(t, refreshTokenCookie, "/refresh", 20, http.SameSiteStrictMode)
 			}
-
 		})
 
 		t.Run("SignInFailed", func(t *testing.T) {
@@ -589,7 +588,7 @@ func (uc *userCounter) Value() int {
 	return int(uc.count.Load())
 }
 
-func createUser(t *testing.T, client *inttest.HTTPClient, userService userService) (uint, string, string) {
+func createUser(t *testing.T, client *inttest.HTTPClient, userService *user.Service) (uint, string, string) {
 	t.Helper()
 
 	userCount.Increment()
@@ -606,7 +605,7 @@ func createUser(t *testing.T, client *inttest.HTTPClient, userService userServic
 
 	u, err := userService.FindById(context.Background(), user.ID)
 	require.NoError(t, err)
-	err = userService.ValidateEmail(u.EmailToken)
+	err = userService.ValidateEmail(context.Background(), u.EmailToken)
 	require.NoError(t, err)
 
 	return user.ID, email, password
