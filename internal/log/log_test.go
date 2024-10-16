@@ -3,6 +3,7 @@ package log
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"crypto/rsa"
 	"encoding/json"
 	"errors"
@@ -12,6 +13,7 @@ import (
 	"testing"
 
 	"github.com/dhis2-sre/im-manager/internal/middleware"
+	"github.com/dhis2-sre/im-manager/internal/server"
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
@@ -19,14 +21,12 @@ import (
 )
 
 func TestLogs(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-
-	r := gin.New()
-	r.Use(middleware.RequestID())
-
 	var b bytes.Buffer
 	logger := slog.New(New(slog.NewJSONHandler(&b, nil)))
-	r.Use(middleware.RequestLogger(logger))
+
+	r, err := server.GetEngine(logger, "", []string{"http://localhost"})
+	require.NoError(t, err, "failed to set up up Gin")
+	gin.SetMode(gin.TestMode)
 
 	var userID uint = 1
 	auth := middleware.NewAuthentication(rsa.PublicKey{}, SignInService{userID: userID})
@@ -35,10 +35,11 @@ func TestLogs(t *testing.T) {
 	t.Run("ContainRequestIDAndUserID", func(t *testing.T) {
 		var requestID string
 		r.GET("/test1/:id", func(c *gin.Context) {
-			requestID = middleware.GetRequestID(c)
+			requestID, _ = middleware.GetRequestID(c.Request.Context())
+
 			// middleware.RequestLogger() and our call to InfoContext should add log lines with
 			// attribute id=<requestID> and user=<userID>
-			logger.InfoContext(c, "info")
+			logger.InfoContext(c.Request.Context(), "info")
 			c.String(http.StatusOK, "success")
 		})
 
@@ -179,16 +180,19 @@ func TestLogs(t *testing.T) {
 }
 
 func assertLogAttributeEquals(t *testing.T, got map[string]any, wantKey string, wantValue any) {
+	t.Helper()
 	v := assertLogAttributeKey(t, got, wantKey)
 	assert.EqualValuesf(t, wantValue, v, "want log line to have key %q", wantKey)
 }
 
 func assertLogAttributeContains(t *testing.T, got map[string]any, wantKey string, wantValue any) {
+	t.Helper()
 	v := assertLogAttributeKey(t, got, wantKey)
 	assert.Containsf(t, v, wantValue, "want log line to have key %q", wantKey)
 }
 
 func assertLogAttributeKey(t *testing.T, got map[string]any, wantKey string) any {
+	t.Helper()
 	v, ok := got[wantKey]
 	assert.Truef(t, ok, "want log line to have key %q", wantKey)
 	return v
@@ -198,6 +202,6 @@ type SignInService struct {
 	userID uint
 }
 
-func (s SignInService) SignIn(email string, password string) (*model.User, error) {
+func (s SignInService) SignIn(ctx context.Context, email string, password string) (*model.User, error) {
 	return &model.User{ID: s.userID, Email: email, Password: password}, nil
 }

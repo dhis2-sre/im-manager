@@ -8,34 +8,29 @@ import (
 )
 
 type groupService interface {
-	FindOrCreate(group, hostname string, deployable bool) (*model.Group, error)
+	FindOrCreate(ctx context.Context, group, hostname string, deployable bool) (*model.Group, error)
 	AddUser(ctx context.Context, group string, userId uint) error
 }
 
-type userServiceUtil interface {
-	FindOrCreate(email, password string) (*model.User, error)
-	Save(user *model.User) error
-}
-
-func CreateUser(email, password string, userService userServiceUtil, groupService groupService, groupName, userType string) error {
-	u, err := userService.FindOrCreate(email, password)
+func CreateUser(ctx context.Context, email, password string, userService *Service, groupService groupService, groupName, userType string) error {
+	u, err := userService.FindOrCreate(ctx, email, password)
 	if err != nil {
 		return fmt.Errorf("error creating %s user: %v", userType, err)
 	}
 
 	u.Validated = true
 
-	err = userService.Save(u)
+	err = userService.Save(ctx, u)
 	if err != nil {
 		return fmt.Errorf("error saving %s user: %v", userType, err)
 	}
 
-	g, err := groupService.FindOrCreate(groupName, "", false)
+	g, err := groupService.FindOrCreate(ctx, groupName, "", false)
 	if err != nil {
 		return fmt.Errorf("error creating %s group: %v", groupName, err)
 	}
 
-	err = groupService.AddUser(context.Background(), g.Name, u.ID)
+	err = groupService.AddUser(ctx, g.Name, u.ID)
 	if err != nil {
 		return fmt.Errorf("error adding %s user to %s group: %v", userType, groupName, err)
 	}

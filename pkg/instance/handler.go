@@ -2,6 +2,7 @@ package instance
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -15,9 +16,9 @@ import (
 
 func NewHandler(groupService groupServiceHandler, instanceService *Service, defaultTTL uint) Handler {
 	return Handler{
-		groupService,
-		instanceService,
-		defaultTTL,
+		groupService:    groupService,
+		instanceService: instanceService,
+		defaultTTL:      defaultTTL,
 	}
 }
 
@@ -28,7 +29,7 @@ type Handler struct {
 }
 
 type groupServiceHandler interface {
-	Find(name string) (*model.Group, error)
+	Find(ctx context.Context, name string) (*model.Group, error)
 }
 
 type SaveDeploymentRequest struct {
@@ -59,13 +60,14 @@ func (h Handler) DeployDeployment(c *gin.Context) {
 		return
 	}
 
-	user, err := handler.GetUserFromContext(c)
+	ctx := c.Request.Context()
+	user, err := handler.GetUserFromContext(ctx)
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
 
-	deployment, err := h.instanceService.FindDecryptedDeploymentById(id)
+	deployment, err := h.instanceService.FindDecryptedDeploymentById(ctx, id)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -90,7 +92,7 @@ func (h Handler) DeployDeployment(c *gin.Context) {
 		return
 	}
 
-	err = h.instanceService.DeployDeployment(token, deployment)
+	err = h.instanceService.DeployDeployment(ctx, token, deployment)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -121,7 +123,8 @@ func (h Handler) SaveDeployment(c *gin.Context) {
 		return
 	}
 
-	group, err := h.groupService.Find(request.Group)
+	ctx := c.Request.Context()
+	group, err := h.groupService.Find(ctx, request.Group)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -133,7 +136,7 @@ func (h Handler) SaveDeployment(c *gin.Context) {
 		return
 	}
 
-	user, err := handler.GetUserFromContext(c)
+	user, err := handler.GetUserFromContext(ctx)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -158,7 +161,7 @@ func (h Handler) SaveDeployment(c *gin.Context) {
 		return
 	}
 
-	err = h.instanceService.SaveDeployment(deployment)
+	err = h.instanceService.SaveDeployment(ctx, deployment)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -189,13 +192,14 @@ func (h Handler) FindDeploymentById(c *gin.Context) {
 		return
 	}
 
-	user, err := handler.GetUserFromContext(c)
+	ctx := c.Request.Context()
+	user, err := handler.GetUserFromContext(ctx)
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
 
-	deployment, err := h.instanceService.FindDeploymentById(id)
+	deployment, err := h.instanceService.FindDeploymentById(ctx, id)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -250,7 +254,8 @@ func (h Handler) SaveInstance(c *gin.Context) {
 		return
 	}
 
-	deployment, err := h.instanceService.FindDeploymentById(deploymentId)
+	ctx := c.Request.Context()
+	deployment, err := h.instanceService.FindDeploymentById(ctx, deploymentId)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -274,7 +279,7 @@ func (h Handler) SaveInstance(c *gin.Context) {
 		Parameters:   parameters,
 	}
 
-	err = h.instanceService.SaveInstance(instance)
+	err = h.instanceService.SaveInstance(ctx, instance)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -306,19 +311,20 @@ func (h Handler) Pause(c *gin.Context) {
 		return
 	}
 
-	user, err := handler.GetUserFromContext(c)
+	ctx := c.Request.Context()
+	user, err := handler.GetUserFromContext(ctx)
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
 
-	instance, err := h.instanceService.FindDeploymentInstanceById(id)
+	instance, err := h.instanceService.FindDeploymentInstanceById(ctx, id)
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
 
-	deployment, err := h.instanceService.FindDeploymentById(instance.DeploymentID)
+	deployment, err := h.instanceService.FindDeploymentById(ctx, instance.DeploymentID)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -330,7 +336,7 @@ func (h Handler) Pause(c *gin.Context) {
 		return
 	}
 
-	err = h.instanceService.Pause(instance)
+	err = h.instanceService.Pause(ctx, instance)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -367,19 +373,20 @@ func (h Handler) Reset(c *gin.Context) {
 		return
 	}
 
-	user, err := handler.GetUserFromContext(c)
+	ctx := c.Request.Context()
+	user, err := handler.GetUserFromContext(ctx)
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
 
-	instance, err := h.instanceService.FindDecryptedDeploymentInstanceById(id)
+	instance, err := h.instanceService.FindDecryptedDeploymentInstanceById(ctx, id)
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
 
-	deployment, err := h.instanceService.FindDeploymentById(instance.DeploymentID)
+	deployment, err := h.instanceService.FindDeploymentById(ctx, instance.DeploymentID)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -391,7 +398,7 @@ func (h Handler) Reset(c *gin.Context) {
 		return
 	}
 
-	err = h.instanceService.Reset(token, instance, deployment.TTL)
+	err = h.instanceService.Reset(ctx, token, instance, deployment.TTL)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -423,19 +430,20 @@ func (h Handler) Resume(c *gin.Context) {
 		return
 	}
 
-	user, err := handler.GetUserFromContext(c)
+	ctx := c.Request.Context()
+	user, err := handler.GetUserFromContext(ctx)
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
 
-	instance, err := h.instanceService.FindDecryptedDeploymentInstanceById(id)
+	instance, err := h.instanceService.FindDecryptedDeploymentInstanceById(ctx, id)
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
 
-	deployment, err := h.instanceService.FindDeploymentById(instance.DeploymentID)
+	deployment, err := h.instanceService.FindDeploymentById(ctx, instance.DeploymentID)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -447,7 +455,7 @@ func (h Handler) Resume(c *gin.Context) {
 		return
 	}
 
-	err = h.instanceService.Resume(instance)
+	err = h.instanceService.Resume(ctx, instance)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -478,19 +486,20 @@ func (h Handler) Restart(c *gin.Context) {
 		return
 	}
 
-	user, err := handler.GetUserFromContext(c)
+	ctx := c.Request.Context()
+	user, err := handler.GetUserFromContext(ctx)
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
 
-	instance, err := h.instanceService.FindDeploymentInstanceById(id)
+	instance, err := h.instanceService.FindDeploymentInstanceById(ctx, id)
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
 
-	deployment, err := h.instanceService.FindDeploymentById(instance.DeploymentID)
+	deployment, err := h.instanceService.FindDeploymentById(ctx, instance.DeploymentID)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -503,7 +512,7 @@ func (h Handler) Restart(c *gin.Context) {
 	}
 
 	selector := c.Query("selector")
-	err = h.instanceService.Restart(instance, selector)
+	err = h.instanceService.Restart(ctx, instance, selector)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -539,13 +548,14 @@ func (h Handler) DeleteDeploymentInstance(c *gin.Context) {
 		return
 	}
 
-	user, err := handler.GetUserFromContext(c)
+	ctx := c.Request.Context()
+	user, err := handler.GetUserFromContext(ctx)
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
 
-	deployment, err := h.instanceService.FindDeploymentById(deploymentId)
+	deployment, err := h.instanceService.FindDeploymentById(ctx, deploymentId)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -558,7 +568,7 @@ func (h Handler) DeleteDeploymentInstance(c *gin.Context) {
 		return
 	}
 
-	err = h.instanceService.DeleteInstance(deploymentId, instanceId)
+	err = h.instanceService.DeleteInstance(ctx, deploymentId, instanceId)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -589,19 +599,20 @@ func (h Handler) Logs(c *gin.Context) {
 		return
 	}
 
-	user, err := handler.GetUserFromContext(c)
+	ctx := c.Request.Context()
+	user, err := handler.GetUserFromContext(ctx)
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
 
-	instance, err := h.instanceService.FindDeploymentInstanceById(id)
+	instance, err := h.instanceService.FindDeploymentInstanceById(ctx, id)
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
 
-	deployment, err := h.instanceService.FindDeploymentById(instance.DeploymentID)
+	deployment, err := h.instanceService.FindDeploymentById(ctx, instance.DeploymentID)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -614,7 +625,7 @@ func (h Handler) Logs(c *gin.Context) {
 		return
 	}
 
-	group, err := h.groupService.Find(instance.GroupName)
+	group, err := h.groupService.Find(ctx, instance.GroupName)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -665,13 +676,14 @@ func (h Handler) FindDeployments(c *gin.Context) {
 	//	401: Error
 	//	403: Error
 	//	415: Error
-	user, err := handler.GetUserFromContext(c)
+	ctx := c.Request.Context()
+	user, err := handler.GetUserFromContext(ctx)
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
 
-	groupsWithDeployments, err := h.instanceService.FindDeployments(user)
+	groupsWithDeployments, err := h.instanceService.FindDeployments(ctx, user)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -693,7 +705,7 @@ func (h Handler) FindPublicInstances(c *gin.Context) {
 	//	401: Error
 	//	403: Error
 	//	415: Error
-	groupsWithInstances, err := h.instanceService.FindPublicInstances()
+	groupsWithInstances, err := h.instanceService.FindPublicInstances(c.Request.Context())
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -724,13 +736,14 @@ func (h Handler) DeleteDeployment(c *gin.Context) {
 		return
 	}
 
-	user, err := handler.GetUserFromContext(c)
+	ctx := c.Request.Context()
+	user, err := handler.GetUserFromContext(ctx)
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
 
-	deployment, err := h.instanceService.FindDeploymentById(id)
+	deployment, err := h.instanceService.FindDeploymentById(ctx, id)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -743,7 +756,7 @@ func (h Handler) DeleteDeployment(c *gin.Context) {
 		return
 	}
 
-	err = h.instanceService.DeleteDeployment(deployment)
+	err = h.instanceService.DeleteDeployment(ctx, deployment)
 	if err != nil {
 		_ = c.Error(fmt.Errorf("unable to delete deployment: %v", err))
 		return
@@ -775,19 +788,20 @@ func (h Handler) Status(c *gin.Context) {
 		return
 	}
 
-	user, err := handler.GetUserFromContext(c)
+	ctx := c.Request.Context()
+	user, err := handler.GetUserFromContext(ctx)
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
 
-	instance, err := h.instanceService.FindDeploymentInstanceById(id)
+	instance, err := h.instanceService.FindDeploymentInstanceById(ctx, id)
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
 
-	deployment, err := h.instanceService.FindDeploymentById(instance.DeploymentID)
+	deployment, err := h.instanceService.FindDeploymentById(ctx, instance.DeploymentID)
 	if err != nil {
 		_ = c.Error(err)
 		return

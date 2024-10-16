@@ -80,6 +80,7 @@ func run() (err error) {
 		}
 	}()
 
+	ctx := context.Background()
 	logger := slog.New(log.New(slog.NewJSONHandler(os.Stdout, nil)))
 
 	db, err := newDB(logger)
@@ -168,7 +169,7 @@ func run() (err error) {
 		return err
 	}
 
-	databaseHandler, err := newDatabaseHandler(logger, db, groupService, instanceService, stackService)
+	databaseHandler, err := newDatabaseHandler(ctx, logger, db, groupService, instanceService, stackService)
 	if err != nil {
 		return err
 	}
@@ -188,17 +189,17 @@ func run() (err error) {
 		return err
 	}
 
-	err = createGroups(logger, groupService)
+	err = createGroups(ctx, logger, groupService)
 	if err != nil {
 		return err
 	}
 
-	err = createAdminUser(userService, groupService)
+	err = createAdminUser(ctx, userService, groupService)
 	if err != nil {
 		return err
 	}
 
-	err = createE2ETestUser(userService, groupService)
+	err = createE2ETestUser(ctx, userService, groupService)
 	if err != nil {
 		return err
 	}
@@ -476,12 +477,12 @@ func newInstanceHandler(groupService *group.Service, instanceService *instance.S
 	return instance.NewHandler(groupService, instanceService, defaultTTL), nil
 }
 
-func newDatabaseHandler(logger *slog.Logger, db *gorm.DB, groupService *group.Service, instanceService *instance.Service, stackService stack.Service) (database.Handler, error) {
+func newDatabaseHandler(ctx context.Context, logger *slog.Logger, db *gorm.DB, groupService *group.Service, instanceService *instance.Service, stackService stack.Service) (database.Handler, error) {
 	s3Bucket, err := requireEnv("S3_BUCKET")
 	if err != nil {
 		return database.Handler{}, err
 	}
-	s3Client, err := newS3Client(logger)
+	s3Client, err := newS3Client(ctx, logger)
 	if err != nil {
 		return database.Handler{}, err
 	}
@@ -491,7 +492,7 @@ func newDatabaseHandler(logger *slog.Logger, db *gorm.DB, groupService *group.Se
 	return database.NewHandler(logger, databaseService, groupService, instanceService, stackService), nil
 }
 
-func newS3Client(logger *slog.Logger) (*storage.S3Client, error) {
+func newS3Client(ctx context.Context, logger *slog.Logger) (*storage.S3Client, error) {
 	s3Region, err := requireEnv("S3_REGION")
 	if err != nil {
 		return nil, err
@@ -505,7 +506,7 @@ func newS3Client(logger *slog.Logger) (*storage.S3Client, error) {
 		return aws.Endpoint{}, &aws.EndpointNotFoundError{}
 	})
 	s3Config, err := s3config.LoadDefaultConfig(
-		context.TODO(),
+		ctx,
 		s3config.WithRegion(s3Region),
 		// nolint:staticcheck
 		s3config.WithEndpointResolverWithOptions(aws.EndpointResolverWithOptions(s3Endpoint)),
@@ -572,10 +573,10 @@ func newEventHandler(logger *slog.Logger, rabbitmqConfig rabbitMQConfig) (event.
 }
 
 type groupService interface {
-	FindOrCreate(name string, hostname string, deployable bool) (*model.Group, error)
+	FindOrCreate(ctx context.Context, name string, hostname string, deployable bool) (*model.Group, error)
 }
 
-func createGroups(logger *slog.Logger, groupService groupService) error {
+func createGroups(ctx context.Context, logger *slog.Logger, groupService groupService) error {
 	groupNames, err := requireEnvAsArray("GROUP_NAMES")
 	if err != nil {
 		return err
@@ -596,7 +597,7 @@ func createGroups(logger *slog.Logger, groupService groupService) error {
 
 	logger.Info("Creating groups...")
 	for _, g := range groups {
-		newGroup, err := groupService.FindOrCreate(g.Name, g.Hostname, true)
+		newGroup, err := groupService.FindOrCreate(ctx, g.Name, g.Hostname, true)
 		if err != nil {
 			return fmt.Errorf("error creating group: %v", err)
 		}
@@ -608,7 +609,7 @@ func createGroups(logger *slog.Logger, groupService groupService) error {
 	return nil
 }
 
-func createAdminUser(userService *user.Service, groupService *group.Service) error {
+func createAdminUser(ctx context.Context, userService *user.Service, groupService *group.Service) error {
 	adminEmail, err := requireEnv("ADMIN_USER_EMAIL")
 	if err != nil {
 		return err
@@ -618,10 +619,10 @@ func createAdminUser(userService *user.Service, groupService *group.Service) err
 		return err
 	}
 
-	return user.CreateUser(adminEmail, adminPassword, userService, groupService, model.AdministratorGroupName, "admin")
+	return user.CreateUser(ctx, adminEmail, adminPassword, userService, groupService, model.AdministratorGroupName, "admin")
 }
 
-func createE2ETestUser(userService *user.Service, groupService *group.Service) error {
+func createE2ETestUser(ctx context.Context, userService *user.Service, groupService *group.Service) error {
 	testEmail, err := requireEnv("E2E_TEST_USER_EMAIL")
 	if err != nil {
 		return err
@@ -631,7 +632,7 @@ func createE2ETestUser(userService *user.Service, groupService *group.Service) e
 		return err
 	}
 
-	return user.CreateUser(testEmail, testPassword, userService, groupService, model.DefaultGroupName, "e2e test")
+	return user.CreateUser(ctx, testEmail, testPassword, userService, groupService, model.DefaultGroupName, "e2e test")
 }
 
 func newGinEngine(logger *slog.Logger) (*gin.Engine, error) {
