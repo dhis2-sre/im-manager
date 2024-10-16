@@ -572,7 +572,7 @@ func newEventHandler(logger *slog.Logger, rabbitmqConfig rabbitMQConfig) (event.
 }
 
 type groupService interface {
-	FindOrCreate(name string, hostname string, deployable bool) (*model.Group, error)
+	FindOrCreate(ctx context.Context, name string, hostname string, deployable bool) (*model.Group, error)
 }
 
 func createGroups(logger *slog.Logger, groupService groupService) error {
@@ -596,7 +596,7 @@ func createGroups(logger *slog.Logger, groupService groupService) error {
 
 	logger.Info("Creating groups...")
 	for _, g := range groups {
-		newGroup, err := groupService.FindOrCreate(g.Name, g.Hostname, true)
+		newGroup, err := groupService.FindOrCreate(context.Background(), g.Name, g.Hostname, true)
 		if err != nil {
 			return fmt.Errorf("error creating group: %v", err)
 		}

@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"context"
 	"crypto/rsa"
 	"errors"
 	"net/http"
@@ -22,7 +23,7 @@ func NewAuthentication(publicKey rsa.PublicKey, signInService signInService) Aut
 }
 
 type signInService interface {
-	SignIn(email string, password string) (*model.User, error)
+	SignIn(ctx context.Context, email string, password string) (*model.User, error)
 }
 
 type AuthenticationMiddleware struct {
@@ -38,13 +39,14 @@ func (m AuthenticationMiddleware) BasicAuthentication(c *gin.Context) {
 		return
 	}
 
-	u, err := m.signInService.SignIn(username, password)
+	user, err := m.signInService.SignIn(c.Request.Context(), username, password)
 	if err != nil {
 		m.handleError(c, err)
 		return
 	}
 
-	c.Set("user", u)
+	ctx := model.NewContextWithUser(c.Request.Context(), user)
+	c.Request = c.Request.WithContext(ctx)
 	c.Next()
 }
 
@@ -65,7 +67,8 @@ func (m AuthenticationMiddleware) TokenAuthentication(c *gin.Context) {
 		c.Abort()
 		return
 	} else {
-		c.Set("user", user)
+		ctx := model.NewContextWithUser(c.Request.Context(), user)
+		c.Request = c.Request.WithContext(ctx)
 		c.Next()
 	}
 }

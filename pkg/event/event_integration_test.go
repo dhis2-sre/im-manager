@@ -3,7 +3,6 @@ package event_test
 import (
 	"bufio"
 	"context"
-	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -76,16 +75,18 @@ func TestEventHandler(t *testing.T) {
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	// this is only to allow testing using multiple users without bringing in all our auth stack
-	authenticator := func(ctx *gin.Context) {
-		userParam := ctx.Query("user")
+	authenticator := func(c *gin.Context) {
+		userParam := c.Query("user")
 		userID, err := strconv.ParseUint(userParam, 10, 64)
 		require.NoErrorf(t, err, "failed to parse query param user=%q into user ID", userParam)
 
 		if userID == uint64(user1.ID) {
-			ctx.Set("user", user1)
+			ctx := model.NewContextWithUser(c.Request.Context(), user1)
+			c.Request = c.Request.WithContext(ctx)
 			return
 		} else if userID == uint64(user2.ID) {
-			ctx.Set("user", user2)
+			ctx := model.NewContextWithUser(c.Request.Context(), user2)
+			c.Request = c.Request.WithContext(ctx)
 			return
 		}
 
@@ -163,7 +164,7 @@ func TestEventHandler(t *testing.T) {
 	require.EqualValuesf(t, wantUser1Messages, gotUser1Messages, "mismatch in expected messages for user %d", user1.ID)
 	require.EqualValuesf(t, wantUser2Messages, gotUser2Messages, "mismatch in expected messages for user %d", user2.ID)
 
-	cancelUser1(errors.New("drop connection"))
+	cancelUser1(nil)
 	<-user1Messages // wait for user1 to be unsubscribed before sending new messages to test Last-Event-ID
 
 	t.Log("Sending messages after user1 dropped its connection")
@@ -245,7 +246,9 @@ func streamEvents(t *testing.T, ctx context.Context, client *inttest.HTTPClient,
 		}
 
 		close(out)
-		if !errors.Is(sc.Err(), context.Canceled) {
+		// sc.Err() is set to the cancellation cause/error if the req ctx was cancelled. We are only
+		// interested in any issues with reading the SSE event.
+		if sc.Err() != context.Cause(ctx) {
 			require.NoErrorf(t, sc.Err(), "error scanning event stream from %q for user %d", url, user.ID)
 		}
 		t.Logf("User %d stops to stream from %q due: %v", user.ID, url, context.Cause(ctx))

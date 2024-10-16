@@ -1,7 +1,6 @@
 package user
 
 import (
-	"context"
 	"crypto/rsa"
 	"errors"
 	"fmt"
@@ -23,17 +22,17 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func NewHandler(logger *slog.Logger, hostname string, sameSiteMode http.SameSite, accessTokenExpirationSeconds int, refreshTokenExpirationSeconds int, refreshTokenRememberMeExpirationSeconds int, publicKey rsa.PublicKey, userService userService, tokenService tokenService) Handler {
+func NewHandler(logger *slog.Logger, hostname string, sameSiteMode http.SameSite, accessTokenExpirationSeconds int, refreshTokenExpirationSeconds int, refreshTokenRememberMeExpirationSeconds int, publicKey rsa.PublicKey, userService *Service, tokenService tokenService) Handler {
 	return Handler{
-		logger,
-		hostname,
-		sameSiteMode,
-		accessTokenExpirationSeconds,
-		refreshTokenExpirationSeconds,
-		refreshTokenRememberMeExpirationSeconds,
-		publicKey,
-		userService,
-		tokenService,
+		logger:                                  logger,
+		hostname:                                hostname,
+		sameSiteMode:                            sameSiteMode,
+		accessTokenExpirationSeconds:            accessTokenExpirationSeconds,
+		refreshTokenExpirationSeconds:           refreshTokenExpirationSeconds,
+		refreshTokenRememberMeExpirationSeconds: refreshTokenRememberMeExpirationSeconds,
+		publicKey:                               publicKey,
+		userService:                             userService,
+		tokenService:                            tokenService,
 	}
 }
 
@@ -45,20 +44,8 @@ type Handler struct {
 	refreshTokenExpirationSeconds           int
 	refreshTokenRememberMeExpirationSeconds int
 	publicKey                               rsa.PublicKey
-	userService                             userService
+	userService                             *Service
 	tokenService                            tokenService
-}
-
-type userService interface {
-	SignUp(email string, password string) (*model.User, error)
-	SignIn(email string, password string) (*model.User, error)
-	FindById(ctx context.Context, id uint) (*model.User, error)
-	FindAll(ctx context.Context) ([]*model.User, error)
-	Delete(ctx context.Context, id uint) error
-	Update(ctx context.Context, id uint, email, password string) (*model.User, error)
-	ValidateEmail(token uuid.UUID) error
-	RequestPasswordReset(email string) error
-	ResetPassword(token string, password string) error
 }
 
 type tokenService interface {
@@ -90,7 +77,7 @@ func (h Handler) SignUp(c *gin.Context) {
 		return
 	}
 
-	user, err := h.userService.SignUp(request.Email, request.Password)
+	user, err := h.userService.SignUp(c.Request.Context(), request.Email, request.Password)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -151,7 +138,7 @@ func (h Handler) ValidateEmail(c *gin.Context) {
 		return
 	}
 
-	err = h.userService.ValidateEmail(token)
+	err = h.userService.ValidateEmail(c.Request.Context(), token)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -182,7 +169,7 @@ func (h Handler) RequestPasswordReset(c *gin.Context) {
 		return
 	}
 
-	err := h.userService.RequestPasswordReset(request.Email)
+	err := h.userService.RequestPasswordReset(c.Request.Context(), request.Email)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -214,7 +201,7 @@ func (h Handler) ResetPassword(c *gin.Context) {
 		return
 	}
 
-	err := h.userService.ResetPassword(request.Token, request.Password)
+	err := h.userService.ResetPassword(c.Request.Context(), request.Token, request.Password)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -245,7 +232,7 @@ func (h Handler) SignIn(c *gin.Context) {
 	//   403: Error
 	//   404: Error
 	//   415: Error
-	user, err := handler.GetUserFromContext(c)
+	user, err := model.GetUserFromContextMiddleware(c.Request.Context())
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -313,7 +300,7 @@ func (h Handler) RefreshToken(c *gin.Context) {
 		return
 	}
 
-	user, err := h.userService.FindById(c, refreshToken.UserId)
+	user, err := h.userService.FindById(c.Request.Context(), refreshToken.UserId)
 	if err != nil {
 		if errdef.IsNotFound(err) {
 			_ = c.AbortWithError(http.StatusUnauthorized, err)
@@ -368,13 +355,13 @@ func (h Handler) Me(c *gin.Context) {
 	//   403: Error
 	//   404: Error
 	//   415: Error
-	user, err := handler.GetUserFromContext(c)
+	user, err := model.GetUserFromContextMiddleware(c.Request.Context())
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
 
-	userWithGroups, err := h.userService.FindById(c, user.ID)
+	userWithGroups, err := h.userService.FindById(c.Request.Context(), user.ID)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -474,7 +461,7 @@ func (h Handler) FindById(c *gin.Context) {
 		return
 	}
 
-	userWithGroups, err := h.userService.FindById(c, id)
+	userWithGroups, err := h.userService.FindById(c.Request.Context(), id)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -500,7 +487,7 @@ func (h Handler) FindAll(c *gin.Context) {
 	//	403: Error
 	//	404: Error
 	//	415: Error
-	users, err := h.userService.FindAll(c)
+	users, err := h.userService.FindAll(c.Request.Context())
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -531,13 +518,13 @@ func (h Handler) Delete(c *gin.Context) {
 		return
 	}
 
-	user, err := handler.GetUserFromContext(c)
+	user, err := model.GetUserFromContextMiddleware(c.Request.Context())
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
 
-	_, err = h.userService.FindById(c, id)
+	_, err = h.userService.FindById(c.Request.Context(), id)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -548,7 +535,7 @@ func (h Handler) Delete(c *gin.Context) {
 		return
 	}
 
-	err = h.userService.Delete(c, id)
+	err = h.userService.Delete(c.Request.Context(), id)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -595,7 +582,7 @@ func (h Handler) Update(c *gin.Context) {
 		return
 	}
 
-	user, err := h.userService.Update(c, id, request.Email, request.Password)
+	user, err := h.userService.Update(c.Request.Context(), id, request.Email, request.Password)
 	if err != nil {
 		_ = c.Error(err)
 		return
