@@ -1,6 +1,7 @@
 package group
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
@@ -18,12 +19,15 @@ type repository struct {
 
 //goland:noinspection GoExportedFuncWithUnexportedType
 func NewRepository(db *gorm.DB) *repository {
-	return &repository{db}
+	return &repository{
+		db: db,
+	}
 }
 
-func (r repository) find(name string) (*model.Group, error) {
+func (r repository) find(ctx context.Context, name string) (*model.Group, error) {
 	var group *model.Group
 	err := r.db.
+		WithContext(ctx).
 		Joins("ClusterConfiguration").
 		Where("name = ?", name).
 		First(&group).Error
@@ -38,9 +42,10 @@ func (r repository) find(name string) (*model.Group, error) {
 	return group, nil
 }
 
-func (r repository) findWithDetails(name string) (*model.Group, error) {
+func (r repository) findWithDetails(ctx context.Context, name string) (*model.Group, error) {
 	var group *model.Group
 	err := r.db.
+		WithContext(ctx).
 		Where("name = ?", name).
 		Joins("ClusterConfiguration").
 		Preload("Users").
@@ -59,7 +64,7 @@ func (r repository) findWithDetails(name string) (*model.Group, error) {
 
 const AdministratorGroupName = "administrators"
 
-func (r repository) findAll(user *model.User, deployable bool) ([]model.Group, error) {
+func (r repository) findAll(ctx context.Context, user *model.User, deployable bool) ([]model.Group, error) {
 	groupsByName := make(map[string]struct{})
 	for _, group := range user.Groups {
 		groupsByName[group.Name] = struct{}{}
@@ -71,11 +76,12 @@ func (r repository) findAll(user *model.User, deployable bool) ([]model.Group, e
 		var groups []model.Group
 		if deployable {
 			err := r.db.
+				WithContext(ctx).
 				Where("deployable = true").
 				Find(&groups).Error
 			return groups, err
 		}
-		err := r.db.Find(&groups).Error
+		err := r.db.WithContext(ctx).Find(&groups).Error
 		return groups, err
 	}
 
@@ -106,8 +112,12 @@ func findAllFromUser(user *model.User, deployable bool) []model.Group {
 	return maps.Values(groupsByName)
 }
 
-func (r repository) create(group *model.Group) error {
-	err := r.db.Create(&group).Error
+func (r repository) create(ctx context.Context, group *model.Group) error {
+	// only use ctx for values (logging) and not cancellation signals on cud operations for now. ctx
+	// cancellation can lead to rollbacks which we should decide individually.
+	ctx = context.WithoutCancel(ctx)
+
+	err := r.db.WithContext(ctx).Create(&group).Error
 	if errors.Is(err, gorm.ErrDuplicatedKey) {
 		// TODO how to check if name or hostname is duplicated?
 		return errdef.NewDuplicated("group name/hostname already exists: %s", err)
@@ -116,30 +126,48 @@ func (r repository) create(group *model.Group) error {
 	return err
 }
 
-func (r repository) findOrCreate(group *model.Group) (*model.Group, error) {
+func (r repository) findOrCreate(ctx context.Context, group *model.Group) (*model.Group, error) {
+	// only use ctx for values (logging) and not cancellation signals on cud operations for now. ctx
+	// cancellation can lead to rollbacks which we should decide individually.
+	ctx = context.WithoutCancel(ctx)
+
 	var g *model.Group
 	err := r.db.
+		WithContext(ctx).
 		Where(model.Group{Name: group.Name}).
 		Attrs(model.Group{Hostname: group.Hostname, Deployable: group.Deployable}).
 		FirstOrCreate(&g).Error
 	return g, err
 }
 
-func (r repository) addUser(group *model.Group, user *model.User) error {
-	return r.db.Model(&group).Association("Users").Append([]*model.User{user})
+func (r repository) addUser(ctx context.Context, group *model.Group, user *model.User) error {
+	// only use ctx for values (logging) and not cancellation signals on cud operations for now. ctx
+	// cancellation can lead to rollbacks which we should decide individually.
+	ctx = context.WithoutCancel(ctx)
+
+	return r.db.WithContext(ctx).Model(&group).Association("Users").Append([]*model.User{user})
 }
 
-func (r repository) removeUser(group *model.Group, user *model.User) error {
-	return r.db.Model(&group).Association("Users").Delete([]*model.User{user})
+func (r repository) removeUser(ctx context.Context, group *model.Group, user *model.User) error {
+	// only use ctx for values (logging) and not cancellation signals on cud operations for now. ctx
+	// cancellation can lead to rollbacks which we should decide individually.
+	ctx = context.WithoutCancel(ctx)
+
+	return r.db.WithContext(ctx).Model(&group).Association("Users").Delete([]*model.User{user})
 }
 
-func (r repository) addClusterConfiguration(configuration *model.ClusterConfiguration) error {
-	return r.db.Create(&configuration).Error
+func (r repository) addClusterConfiguration(ctx context.Context, configuration *model.ClusterConfiguration) error {
+	// only use ctx for values (logging) and not cancellation signals on cud operations for now. ctx
+	// cancellation can lead to rollbacks which we should decide individually.
+	ctx = context.WithoutCancel(ctx)
+
+	return r.db.WithContext(ctx).Create(&configuration).Error
 }
 
-func (r repository) getClusterConfiguration(groupName string) (*model.ClusterConfiguration, error) {
+func (r repository) getClusterConfiguration(ctx context.Context, groupName string) (*model.ClusterConfiguration, error) {
 	var configuration *model.ClusterConfiguration
 	err := r.db.
+		WithContext(ctx).
 		Where("group_name = ?", groupName).
 		First(&configuration).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -148,9 +176,10 @@ func (r repository) getClusterConfiguration(groupName string) (*model.ClusterCon
 	return configuration, err
 }
 
-func (r repository) findByGroupNames(groupNames []string) ([]model.Group, error) {
+func (r repository) findByGroupNames(ctx context.Context, groupNames []string) ([]model.Group, error) {
 	var databases []model.Group
 	err := r.db.
+		WithContext(ctx).
 		Where("name IN ?", groupNames).
 		Order("updated_at desc").
 		Find(&databases).Error

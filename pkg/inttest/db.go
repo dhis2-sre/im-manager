@@ -5,7 +5,6 @@ import (
 	"os"
 	"testing"
 
-	"github.com/dhis2-sre/im-manager/pkg/config"
 	"github.com/dhis2-sre/im-manager/pkg/storage"
 	_ "github.com/lib/pq" // postgres driver
 	"github.com/orlangure/gnomock"
@@ -28,7 +27,7 @@ func SetupDB(t *testing.T) *gorm.DB {
 	t.Cleanup(func() { require.NoError(t, gnomock.Stop(container), "failed to stop DB") })
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	db, err := storage.NewDatabase(logger, config.Postgresql{
+	db, err := storage.NewDatabase(logger, storage.PostgresqlConfig{
 		Host:         container.Host,
 		Port:         container.DefaultPort(),
 		Username:     "im",

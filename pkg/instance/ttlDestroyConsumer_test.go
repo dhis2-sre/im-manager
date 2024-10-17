@@ -52,12 +52,12 @@ type instanceService struct {
 	mock.Mock
 }
 
-func (is *instanceService) FindDeploymentInstanceById(id uint) (*model.DeploymentInstance, error) {
+func (is *instanceService) FindDeploymentInstanceById(ctx context.Context, id uint) (*model.DeploymentInstance, error) {
 	args := is.Called(id)
 	return &model.DeploymentInstance{ID: 1}, args.Error(1)
 }
 
-func (is *instanceService) Delete(id uint) error {
+func (is *instanceService) Delete(ctx context.Context, id uint) error {
 	args := is.Called(id)
 	return args.Error(0)
 }

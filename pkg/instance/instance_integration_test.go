@@ -1,6 +1,7 @@
 package instance_test
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -84,8 +85,9 @@ func TestInstanceHandler(t *testing.T) {
 	databaseRepository := database.NewRepository(db)
 	databaseService := database.NewService(logger, s3Bucket, s3Client, groupService, databaseRepository)
 
-	authenticator := func(ctx *gin.Context) {
-		ctx.Set("user", user)
+	authenticator := func(c *gin.Context) {
+		ctx := model.NewContextWithUser(c.Request.Context(), user)
+		c.Request = c.Request.WithContext(ctx)
 	}
 	client := inttest.SetupHTTPServer(t, func(engine *gin.Engine) {
 		var twoDayTTL uint = 172800
@@ -327,10 +329,10 @@ type groupService struct {
 	group *model.Group
 }
 
-func (gs groupService) FindByGroupNames(groupNames []string) ([]model.Group, error) {
+func (gs groupService) FindByGroupNames(ctx context.Context, groupNames []string) ([]model.Group, error) {
 	return []model.Group{*gs.group}, nil
 }
 
-func (gs groupService) Find(name string) (*model.Group, error) {
+func (gs groupService) Find(ctx context.Context, name string) (*model.Group, error) {
 	return gs.group, nil
 }

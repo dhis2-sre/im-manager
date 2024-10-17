@@ -13,6 +13,8 @@ import (
 
 func GetEngine(logger *slog.Logger, basePath string, allowedOrigins []string) (*gin.Engine, error) {
 	r := gin.New()
+	// so that the gin.Context is cancelled when the stdlib HTTP Request.Context() is
+	r.ContextWithFallback = true
 	r.Use(gin.Recovery())
 	r.Use(middleware.RequestID())
 	r.Use(middleware.RequestLogger(logger))

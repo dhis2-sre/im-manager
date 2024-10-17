@@ -1,7 +1,9 @@
 package model
 
 import (
+	"context"
 	"database/sql"
+	"errors"
 	"log/slog"
 	"time"
 
@@ -47,4 +49,29 @@ func (u *User) IsAdministrator() bool {
 
 func (u *User) LogValue() slog.Value {
 	return slog.Uint64Value(uint64(u.ID))
+}
+
+type ctxKey int
+
+var userKey ctxKey
+
+// NewContext returns a new [context.Context] that carries value user.
+func NewContextWithUser(ctx context.Context, user *User) context.Context {
+	return context.WithValue(ctx, userKey, user)
+}
+
+// GetUserFromContext returns the User value stored in ctx, if any.
+func GetUserFromContext(ctx context.Context) (*User, bool) {
+	user, ok := ctx.Value(userKey).(*User)
+	return user, ok
+}
+
+// GetUserFromContextMiddleware returns the User value stored in ctx, if any otherwise it returns an error.
+func GetUserFromContextMiddleware(ctx context.Context) (*User, error) {
+	user, ok := GetUserFromContext(ctx)
+	if !ok {
+		return nil, errors.New("user not found on context")
+	}
+
+	return user, nil
 }

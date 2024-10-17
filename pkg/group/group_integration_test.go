@@ -1,6 +1,7 @@
 package group_test
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -41,7 +42,7 @@ func TestGroupHandler(t *testing.T) {
 	var userId string
 	var user *model.User
 	{
-		user, err = userService.FindOrCreate("user@dhis2.org", "oneoneoneoneoneoneone111")
+		user, err = userService.FindOrCreate(context.Background(), "user@dhis2.org", "oneoneoneoneoneoneone111")
 		require.NoError(t, err)
 		userId = strconv.FormatUint(uint64(user.ID), 10)
 	}

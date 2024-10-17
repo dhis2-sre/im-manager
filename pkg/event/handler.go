@@ -1,6 +1,7 @@
 package event
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -9,7 +10,6 @@ import (
 	"strconv"
 
 	"github.com/dhis2-sre/im-manager/internal/errdef"
-	"github.com/dhis2-sre/im-manager/internal/handler"
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	"github.com/gin-contrib/sse"
 	"github.com/gin-gonic/gin"
@@ -50,7 +50,7 @@ func (h Handler) StreamEvents(c *gin.Context) {
 	//
 	// security:
 	//   oauth2:
-	user, err := handler.GetUserFromContext(c)
+	user, err := model.GetUserFromContextMiddleware(c.Request.Context())
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -76,14 +76,14 @@ func (h Handler) StreamEvents(c *gin.Context) {
 		With("consumerOffsetSpec", offsetSpec.String()).
 		With("sseRetry", retry)
 
-	filter := stream.NewConsumerFilter(maps.Keys(userGroups), false, postFilter(c, logger, user.ID, userGroups))
+	filter := stream.NewConsumerFilter(maps.Keys(userGroups), false, postFilter(c.Request.Context(), logger, user.ID, userGroups))
 	opts := stream.NewConsumerOptions().
 		SetConsumerName(consumerName).
 		SetClientProvidedName(consumerName).
 		SetManualCommit().
 		SetOffset(offsetSpec).
 		SetFilter(filter)
-	sseEvents, messageHandler := createMessageHandler(c, logger, retry)
+	sseEvents, messageHandler := createMessageHandler(c.Request.Context(), logger, retry)
 	consumer, err := ha.NewReliableConsumer(h.env, h.streamName, opts, messageHandler)
 	if err != nil {
 		logger.ErrorContext(c, "Failed to create RabbitMQ consumer", "error", err)
@@ -151,16 +151,16 @@ func mapUserGroups(user *model.User) map[string]struct{} {
 // postFilter is a RabbitMQ stream post filter that is applied client side. This is necessary as the
 // server side filter is probabilistic and can let false positives through. (see
 // https://www.rabbitmq.com/blog/2023/10/16/stream-filtering) The filter must be simple and fast.
-func postFilter(c *gin.Context, logger *slog.Logger, userID uint, userGroups map[string]struct{}) stream.PostFilter {
+func postFilter(ctx context.Context, logger *slog.Logger, userID uint, userGroups map[string]struct{}) stream.PostFilter {
 	return func(message *amqp.Message) bool {
 		isOwner, err := isUserMessageOwner(userID, message.ApplicationProperties)
 		if err != nil {
-			logger.ErrorContext(c, "Failed to post filter RabbitMQ message", "error", err, "applicationProperties", message.ApplicationProperties)
+			logger.ErrorContext(ctx, "Failed to post filter RabbitMQ message", "error", err, "applicationProperties", message.ApplicationProperties)
 			return false
 		}
 		isInGroup, err := isInMessageGroup(userGroups, message.ApplicationProperties)
 		if err != nil {
-			logger.ErrorContext(c, "Failed to post filter RabbitMQ message", "error", err, "applicationProperties", message.ApplicationProperties)
+			logger.ErrorContext(ctx, "Failed to post filter RabbitMQ message", "error", err, "applicationProperties", message.ApplicationProperties)
 			return false
 		}
 		return isOwner && isInGroup
@@ -214,12 +214,12 @@ func isInMessageGroup(userGroups map[string]struct{}, applicationProperties map[
 // returned. This is to avoid race conditions when writing the data out to the HTTP response writer.
 // Only one Go routine should write to the HTTP response writer. The RabbitMQ stream client runs our
 // stream.MessagesHandler in a separate Go routine.
-func createMessageHandler(c *gin.Context, logger *slog.Logger, retry uint) (<-chan sse.Event, stream.MessagesHandler) {
+func createMessageHandler(ctx context.Context, logger *slog.Logger, retry uint) (<-chan sse.Event, stream.MessagesHandler) {
 	out := make(chan sse.Event)
 	return out, func(consumerContext stream.ConsumerContext, message *amqp.Message) {
 		defer func() {
 			if r := recover(); r != nil {
-				logger.ErrorContext(c, "RabbitMQ message handler panicked", "recover", r)
+				logger.ErrorContext(ctx, "RabbitMQ message handler panicked", "recover", r)
 				// We assume that we cannot recover from a panic in a message handler. We thus panic
 				// again. We do want to log any panic to be notified.
 				panic(r)
@@ -227,20 +227,20 @@ func createMessageHandler(c *gin.Context, logger *slog.Logger, retry uint) (<-ch
 		}()
 
 		select {
-		case <-c.Request.Context().Done():
-			logger.InfoContext(c, "Request canceled, returning from /events messageHandler")
+		case <-ctx.Done():
+			logger.InfoContext(ctx, "Request canceled, returning from /events messageHandler")
 			close(out)
 			return
 		default:
 			sseEvent, err := mapMessageToEvent(retry, consumerContext.Consumer.GetOffset(), message)
 			if err != nil {
-				logger.ErrorContext(c, "Failed to map AMQP message", "error", err)
+				logger.ErrorContext(ctx, "Failed to map AMQP message", "error", err)
 				return
 			}
 
 			select {
-			case <-c.Request.Context().Done():
-				logger.InfoContext(c, "Request canceled, returning from messageHandler")
+			case <-ctx.Done():
+				logger.InfoContext(ctx, "Request canceled, returning from messageHandler")
 				close(out)
 				return
 			case out <- sseEvent:

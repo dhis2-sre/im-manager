@@ -3,6 +3,7 @@ package log
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"crypto/rsa"
 	"encoding/json"
 	"errors"
@@ -12,6 +13,7 @@ import (
 	"testing"
 
 	"github.com/dhis2-sre/im-manager/internal/middleware"
+	"github.com/dhis2-sre/im-manager/internal/server"
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
@@ -19,57 +21,94 @@ import (
 )
 
 func TestLogs(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-
-	r := gin.New()
-	r.Use(middleware.RequestID())
-
 	var b bytes.Buffer
 	logger := slog.New(New(slog.NewJSONHandler(&b, nil)))
-	r.Use(middleware.RequestLogger(logger))
+
+	r, err := server.GetEngine(logger, "", []string{"http://localhost"})
+	require.NoError(t, err, "failed to set up up Gin")
+	gin.SetMode(gin.TestMode)
 
 	var userID uint = 1
 	auth := middleware.NewAuthentication(rsa.PublicKey{}, SignInService{userID: userID})
 	r.Use(auth.BasicAuthentication)
 
 	t.Run("ContainRequestIDAndUserID", func(t *testing.T) {
-		var requestID string
-		r.GET("/test1/:id", func(c *gin.Context) {
-			requestID = middleware.GetRequestID(c)
-			// middleware.RequestLogger() and our call to InfoContext should add log lines with
-			// attribute id=<requestID> and user=<userID>
-			logger.InfoContext(c, "info")
-			c.String(http.StatusOK, "success")
+		// This test ensures we are at least safe when it comes to retrieving [context.Context]
+		// values. For this to work Gin needs to be configured with
+		// [gin.Engine.ContextWithFallback]=true. Values should still only be set on the
+		// [http.Request.Context]. Cancellation should also only be relied on using the
+		// [http.Request.Context].
+		t.Run("UsingGinContext", func(t *testing.T) {
+			var requestID string
+			r.GET("/test1/:id", func(c *gin.Context) {
+				requestID, _ = middleware.GetRequestID(c)
+
+				// middleware.RequestLogger() and our call to InfoContext should add log lines with
+				// attribute id=<requestID> and user=<userID>
+				logger.InfoContext(c, "info")
+				c.String(http.StatusOK, "success")
+			})
+
+			w := httptest.NewRecorder()
+			req, err := http.NewRequest("GET", "/test1/100", nil)
+			require.NoError(t, err)
+			req.SetBasicAuth("someUser", "somePassword")
+			r.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code)
+
+			sc := bufio.NewScanner(&b)
+			for sc.Scan() {
+				line := sc.Text()
+				got := make(map[string]any)
+
+				err = json.Unmarshal([]byte(line), &got)
+
+				assert.NoError(t, err)
+				t.Log("log line:", line)
+				assertLogAttributeEquals(t, got, "id", requestID)
+				assertLogAttributeEquals(t, got, "user", userID)
+			}
 		})
+		t.Run("UsingRequestContext", func(t *testing.T) {
+			var requestID string
+			r.GET("/test2/:id", func(c *gin.Context) {
+				requestID, _ = middleware.GetRequestID(c.Request.Context())
 
-		w := httptest.NewRecorder()
-		req, err := http.NewRequest("GET", "/test1/100", nil)
-		require.NoError(t, err)
-		req.SetBasicAuth("someUser", "somePassword")
-		r.ServeHTTP(w, req)
-		require.Equal(t, http.StatusOK, w.Code)
+				// middleware.RequestLogger() and our call to InfoContext should add log lines with
+				// attribute id=<requestID> and user=<userID>
+				logger.InfoContext(c.Request.Context(), "info")
+				c.String(http.StatusOK, "success")
+			})
 
-		sc := bufio.NewScanner(&b)
-		for sc.Scan() {
-			line := sc.Text()
-			got := make(map[string]any)
+			w := httptest.NewRecorder()
+			req, err := http.NewRequest("GET", "/test2/100", nil)
+			require.NoError(t, err)
+			req.SetBasicAuth("someUser", "somePassword")
+			r.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code)
 
-			err = json.Unmarshal([]byte(line), &got)
+			sc := bufio.NewScanner(&b)
+			for sc.Scan() {
+				line := sc.Text()
+				got := make(map[string]any)
 
-			assert.NoError(t, err)
-			t.Log("log line:", line)
-			assertLogAttributeEquals(t, got, "id", requestID)
-			assertLogAttributeEquals(t, got, "user", userID)
-		}
+				err = json.Unmarshal([]byte(line), &got)
+
+				assert.NoError(t, err)
+				t.Log("log line:", line)
+				assertLogAttributeEquals(t, got, "id", requestID)
+				assertLogAttributeEquals(t, got, "user", userID)
+			}
+		})
 	})
 
 	t.Run("ContainsQueryAndURLParameters", func(t *testing.T) {
-		r.GET("/test2/:urlParam", func(c *gin.Context) {
+		r.GET("/test3/:urlParam", func(c *gin.Context) {
 			c.String(http.StatusOK, "success")
 		})
 
 		w := httptest.NewRecorder()
-		req, err := http.NewRequest("GET", "/test2/100", nil)
+		req, err := http.NewRequest("GET", "/test3/100", nil)
 		require.NoError(t, err)
 		req.SetBasicAuth("someUser", "somePassword")
 		q := req.URL.Query()
@@ -92,8 +131,8 @@ func TestLogs(t *testing.T) {
 			gotRequest, ok := v.(map[string]any)
 			assert.True(t, ok, "want log line to have key `request` of type map[string]any")
 
-			assertLogAttributeEquals(t, gotRequest, "path", "/test2/100")
-			assertLogAttributeEquals(t, gotRequest, "route", "/test2/:urlParam")
+			assertLogAttributeEquals(t, gotRequest, "path", "/test3/100")
+			assertLogAttributeEquals(t, gotRequest, "route", "/test3/:urlParam")
 			assertLogAttributeEquals(t, gotRequest, "query", "query1=true")
 			assertLogAttributeEquals(t, gotRequest, "params", map[string]any{"urlParam": "100"})
 		}
@@ -198,6 +237,6 @@ type SignInService struct {
 	userID uint
 }
 
-func (s SignInService) SignIn(email string, password string) (*model.User, error) {
+func (s SignInService) SignIn(ctx context.Context, email string, password string) (*model.User, error) {
 	return &model.User{ID: s.userID, Email: email, Password: password}, nil
 }
