@@ -6,16 +6,15 @@ import (
 	"golang.org/x/exp/maps"
 )
 
-//goland:noinspection GoExportedFuncWithUnexportedType
-func NewService(stacks Stacks) *service {
-	return &service{stacks}
+func NewService(stacks Stacks) Service {
+	return Service{stacks}
 }
 
-type service struct {
+type Service struct {
 	stacks Stacks
 }
 
-func (s service) Find(name string) (*model.Stack, error) {
+func (s Service) Find(name string) (*model.Stack, error) {
 	stack, ok := s.stacks[name]
 	if !ok {
 		return nil, errdef.NewNotFound("stack not found")
@@ -23,6 +22,6 @@ func (s service) Find(name string) (*model.Stack, error) {
 	return &stack, nil
 }
 
-func (s service) FindAll() ([]model.Stack, error) {
+func (s Service) FindAll() ([]model.Stack, error) {
 	return maps.Values(s.stacks), nil
 }

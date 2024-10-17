@@ -6,9 +6,8 @@ import (
 	"github.com/dhis2-sre/im-manager/pkg/model"
 )
 
-//goland:noinspection GoExportedFuncWithUnexportedType
-func NewService(groupRepository groupRepository, userService userService) *service {
-	return &service{
+func NewService(groupRepository groupRepository, userService userService) *Service {
+	return &Service{
 		groupRepository,
 		userService,
 	}
@@ -31,20 +30,20 @@ type userService interface {
 	FindById(ctx context.Context, id uint) (*model.User, error)
 }
 
-type service struct {
+type Service struct {
 	groupRepository groupRepository
 	userService     userService
 }
 
-func (s *service) Find(name string) (*model.Group, error) {
+func (s *Service) Find(name string) (*model.Group, error) {
 	return s.groupRepository.find(name)
 }
 
-func (s *service) FindWithDetails(name string) (*model.Group, error) {
+func (s *Service) FindWithDetails(name string) (*model.Group, error) {
 	return s.groupRepository.findWithDetails(name)
 }
 
-func (s *service) Create(name, description, hostname string, deployable bool) (*model.Group, error) {
+func (s *Service) Create(name, description, hostname string, deployable bool) (*model.Group, error) {
 	group := &model.Group{
 		Name:        name,
 		Description: description,
@@ -60,7 +59,7 @@ func (s *service) Create(name, description, hostname string, deployable bool) (*
 	return group, err
 }
 
-func (s *service) FindOrCreate(name string, hostname string, deployable bool) (*model.Group, error) {
+func (s *Service) FindOrCreate(name string, hostname string, deployable bool) (*model.Group, error) {
 	group := &model.Group{
 		Name:       name,
 		Hostname:   hostname,
@@ -75,7 +74,7 @@ func (s *service) FindOrCreate(name string, hostname string, deployable bool) (*
 	return g, err
 }
 
-func (s *service) AddUser(ctx context.Context, groupName string, userId uint) error {
+func (s *Service) AddUser(ctx context.Context, groupName string, userId uint) error {
 	group, err := s.Find(groupName)
 	if err != nil {
 		return err
@@ -89,7 +88,7 @@ func (s *service) AddUser(ctx context.Context, groupName string, userId uint) er
 	return s.groupRepository.addUser(group, u)
 }
 
-func (s *service) RemoveUser(c context.Context, groupName string, userId uint) error {
+func (s *Service) RemoveUser(c context.Context, groupName string, userId uint) error {
 	group, err := s.Find(groupName)
 	if err != nil {
 		return err
@@ -103,18 +102,18 @@ func (s *service) RemoveUser(c context.Context, groupName string, userId uint) e
 	return s.groupRepository.removeUser(group, u)
 }
 
-func (s *service) AddClusterConfiguration(clusterConfiguration *model.ClusterConfiguration) error {
+func (s *Service) AddClusterConfiguration(clusterConfiguration *model.ClusterConfiguration) error {
 	return s.groupRepository.addClusterConfiguration(clusterConfiguration)
 }
 
-func (s *service) GetClusterConfiguration(groupName string) (*model.ClusterConfiguration, error) {
+func (s *Service) GetClusterConfiguration(groupName string) (*model.ClusterConfiguration, error) {
 	return s.groupRepository.getClusterConfiguration(groupName)
 }
 
-func (s *service) FindAll(user *model.User, deployable bool) ([]model.Group, error) {
+func (s *Service) FindAll(user *model.User, deployable bool) ([]model.Group, error) {
 	return s.groupRepository.findAll(user, deployable)
 }
 
-func (s *service) FindByGroupNames(groupNames []string) ([]model.Group, error) {
+func (s *Service) FindByGroupNames(groupNames []string) ([]model.Group, error) {
 	return s.groupRepository.findByGroupNames(groupNames)
 }

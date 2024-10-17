@@ -24,13 +24,24 @@ package main
 
 import (
 	"context"
+	"crypto/rsa"
+	"crypto/x509"
+	"encoding/pem"
+	"errors"
 	"fmt"
 	"log/slog"
+	"math"
+	"net/http"
 	"os"
+	"strconv"
+	"strings"
 	"time"
 
+	"github.com/gin-gonic/gin"
 	"github.com/go-mail/mail"
+	"github.com/go-redis/redis"
 	"github.com/rabbitmq/rabbitmq-stream-go-client/pkg/stream"
+	"gorm.io/gorm"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
@@ -47,7 +58,6 @@ import (
 	s3config "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/dhis2-sre/im-manager/internal/handler"
 	"github.com/dhis2-sre/im-manager/internal/server"
-	"github.com/dhis2-sre/im-manager/pkg/config"
 	"github.com/dhis2-sre/im-manager/pkg/instance"
 	"github.com/dhis2-sre/im-manager/pkg/integration"
 	"github.com/dhis2-sre/im-manager/pkg/stack"
@@ -70,25 +80,36 @@ func run() (err error) {
 		}
 	}()
 
-	cfg := config.New()
-
 	logger := slog.New(log.New(slog.NewJSONHandler(os.Stdout, nil)))
-	db, err := storage.NewDatabase(logger, cfg.Postgresql)
+
+	db, err := newDB(logger)
 	if err != nil {
-		return fmt.Errorf("failed to setup DB: %v", err)
+		return err
 	}
 
-	userRepository := user.NewRepository(db)
-	dailer := mail.NewDialer(cfg.SMTP.Host, cfg.SMTP.Port, cfg.SMTP.Username, cfg.SMTP.Password)
-	userService := user.NewService(cfg.UIURL, cfg.PasswordTokenTTL, userRepository, dailer)
+	dialer, err := newDialer()
+	if err != nil {
+		return err
+	}
+
+	userService, err := newUserService(db, dialer)
+	if err != nil {
+		return err
+	}
+
 	authorization := middleware.NewAuthorization(logger, userService)
-	redis, err := storage.NewRedis(cfg.Redis.Host, cfg.Redis.Port)
+
+	redis, err := newRedis()
 	if err != nil {
 		return err
 	}
 	tokenRepository := token.NewRepository(redis)
-	authConfig := cfg.Authentication
-	privateKey, err := config.GetPrivateKey(logger)
+
+	authConfig, err := newAuthenticationConfig()
+	if err != nil {
+		return err
+	}
+	privateKey, err := GetPrivateKey(logger)
 	if err != nil {
 		return err
 	}
@@ -97,41 +118,34 @@ func run() (err error) {
 		return err
 	}
 
-	// TODO: Assert authConfig.SameSiteMode not -1
 	publicKey := privateKey.PublicKey
-	userHandler := user.NewHandler(logger, cfg.Hostname, authConfig.SameSiteMode, authConfig.AccessTokenExpirationSeconds, authConfig.RefreshTokenExpirationSeconds, authConfig.RefreshTokenRememberMeExpirationSeconds, publicKey, userService, tokenService)
+	hostname, err := requireEnv("HOSTNAME")
+	if err != nil {
+		return err
+	}
+	userHandler := user.NewHandler(logger, hostname, authConfig.SameSiteMode, authConfig.AccessTokenExpirationSeconds, authConfig.RefreshTokenExpirationSeconds, authConfig.RefreshTokenRememberMeExpirationSeconds, publicKey, userService, tokenService)
 
 	authentication := middleware.NewAuthentication(publicKey, userService)
 	groupRepository := group.NewRepository(db)
 	groupService := group.NewService(groupRepository, userService)
 	groupHandler := group.NewHandler(groupService)
 
-	stacks, err := stack.New(
-		stack.DHIS2DB,
-		stack.DHIS2Core,
-		stack.DHIS2,
-		stack.PgAdmin,
-		stack.WhoamiGo,
-		stack.IMJobRunner,
-	)
+	stackService, err := newStackService()
 	if err != nil {
-		return fmt.Errorf("error in stack config: %v", err)
+		return err
 	}
 
-	stackService := stack.NewService(stacks)
-
-	instanceRepository := instance.NewRepository(db, cfg.InstanceParameterEncryptionKey)
-	helmfileService := instance.NewHelmfileService(logger, stackService, "./stacks", cfg.Classification)
-	instanceService := instance.NewService(logger, instanceRepository, groupService, stackService, helmfileService)
-
-	dockerHubClient := integration.NewDockerHubClient(cfg.DockerHub.Username, cfg.DockerHub.Password)
-
-	hostname, err := os.Hostname()
+	instanceService, err := newInstanceService(logger, db, stackService, groupService)
 	if err != nil {
-		return fmt.Errorf("failed to get hostname: %v", err)
+		return err
+	}
+
+	rabbitmqConfig, err := newRabbitMQ()
+	if err != nil {
+		return err
 	}
 	consumer, err := rabbitmq.NewConsumer(
-		cfg.RabbitMqURL.GetURI(),
+		rabbitmqConfig.GetURI(),
 		rabbitmq.WithConnectionName(hostname),
 		rabbitmq.WithConsumerTagPrefix(hostname),
 		rabbitmq.WithLogger(logger.WithGroup("rabbitmq")),
@@ -148,78 +162,48 @@ func run() (err error) {
 	}
 
 	stackHandler := stack.NewHandler(stackService)
-	instanceHandler := instance.NewHandler(groupService, instanceService, cfg.DefaultTTL)
 
-	s3Endpoint := aws.EndpointResolverWithOptionsFunc(func(service, region string, options ...any) (aws.Endpoint, error) {
-		if cfg.S3Endpoint != "" {
-			return aws.Endpoint{URL: cfg.S3Endpoint}, nil
-		}
-		return aws.Endpoint{}, &aws.EndpointNotFoundError{}
-	})
-
-	s3Config, err := newS3Config(cfg.S3Region, s3Endpoint)
+	instanceHandler, err := newInstanceHandler(groupService, instanceService)
 	if err != nil {
-		return fmt.Errorf("failed to setup S3 config: %v", err)
+		return err
 	}
 
-	s3AWSClient := s3.NewFromConfig(s3Config, func(o *s3.Options) {
-		o.UsePathStyle = true
-	})
-	uploader := manager.NewUploader(s3AWSClient)
-	s3Client := storage.NewS3Client(logger, s3AWSClient, uploader)
-
-	databaseRepository := database.NewRepository(db)
-	databaseService := database.NewService(logger, cfg.S3Bucket, s3Client, groupService, databaseRepository)
-	databaseHandler := database.NewHandler(logger, databaseService, groupService, instanceService, stackService)
+	databaseHandler, err := newDatabaseHandler(logger, db, groupService, instanceService, stackService)
+	if err != nil {
+		return err
+	}
 
 	err = handler.RegisterValidation()
 	if err != nil {
 		return err
 	}
 
-	integrationHandler := integration.NewHandler(dockerHubClient, cfg.InstanceService.Host, cfg.DatabaseManagerService.Host)
-
-	logger.Info("Connecting with RabbitMQ stream client", "host", cfg.RabbitMqURL.Host, "port", cfg.RabbitMqURL.StreamPort)
-	env, err := stream.NewEnvironment(
-		stream.NewEnvironmentOptions().
-			SetHost(cfg.RabbitMqURL.Host).
-			SetPort(cfg.RabbitMqURL.StreamPort).
-			SetUser(cfg.RabbitMqURL.Username).
-			SetPassword(cfg.RabbitMqURL.Password).
-			SetAddressResolver(stream.AddressResolver{Host: cfg.RabbitMqURL.Host, Port: cfg.RabbitMqURL.StreamPort}),
-	)
-	if err != nil {
-		return fmt.Errorf("failed to connect with RabbitMQ stream client: %v", err)
-	}
-	logger.Info("Connected with RabbitMQ stream client", "host", cfg.RabbitMqURL.Host, "port", cfg.RabbitMqURL.StreamPort)
-	streamName := "events"
-	err = env.DeclareStream(streamName,
-		stream.NewStreamOptions().
-			SetMaxSegmentSizeBytes(stream.ByteCapacity{}.MB(1)).
-			SetMaxAge(1*time.Hour))
-	if err != nil {
-		return fmt.Errorf("failed to declare RabbitMQ stream %q: %v", streamName, err)
-	}
-	eventHandler := event.NewHandler(logger, env, streamName)
-
-	err = user.CreateUser(cfg.AdminUser.Email, cfg.AdminUser.Password, userService, groupService, model.AdministratorGroupName, "admin")
-	if err != nil {
-		return err
-	}
-	err = createGroups(logger, groupService, cfg.Groups)
-	if err != nil {
-		return err
-	}
-	err = user.CreateUser(cfg.E2eTestUser.Email, cfg.E2eTestUser.Password, userService, groupService, model.DefaultGroupName, "e2e test")
+	integrationHandler, err := newIntegrationHandler()
 	if err != nil {
 		return err
 	}
 
-	// TODO: This is a hack! Allowed origins for different environments should be applied using skaffold profiles... But I can't get it working!
-	if cfg.Environment != "production" {
-		cfg.AllowedOrigins = append(cfg.AllowedOrigins, "http://localhost:3000", "http://localhost:5173")
+	eventHandler, err := newEventHandler(logger, rabbitmqConfig)
+	if err != nil {
+		return err
 	}
-	r, err := server.GetEngine(logger, cfg.BasePath, cfg.AllowedOrigins)
+
+	err = createGroups(logger, groupService)
+	if err != nil {
+		return err
+	}
+
+	err = createAdminUser(userService, groupService)
+	if err != nil {
+		return err
+	}
+
+	err = createE2ETestUser(userService, groupService)
+	if err != nil {
+		return err
+	}
+
+	r, err := newGinEngine(logger)
 	if err != nil {
 		return err
 	}
@@ -239,11 +223,377 @@ func run() (err error) {
 	return nil
 }
 
+func newDB(logger *slog.Logger) (*gorm.DB, error) {
+	host, err := requireEnv("DATABASE_HOST")
+	if err != nil {
+		return nil, err
+	}
+	port, err := requireEnvAsInt("DATABASE_PORT")
+	if err != nil {
+		return nil, err
+	}
+	username, err := requireEnv("DATABASE_USERNAME")
+	if err != nil {
+		return nil, err
+	}
+	password, err := requireEnv("DATABASE_PASSWORD")
+	if err != nil {
+		return nil, err
+	}
+	name, err := requireEnv("DATABASE_NAME")
+	if err != nil {
+		return nil, err
+	}
+
+	db, err := storage.NewDatabase(
+		logger,
+		storage.PostgresqlConfig{Host: host, Port: port, Username: username, Password: password, DatabaseName: name},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to setup DB: %v", err)
+	}
+
+	return db, nil
+}
+
+func newDialer() (*mail.Dialer, error) {
+	host, err := requireEnv("SMTP_HOST")
+	if err != nil {
+		return nil, err
+	}
+	port, err := requireEnvAsInt("SMTP_PORT")
+	if err != nil {
+		return nil, err
+	}
+	username, err := requireEnv("SMTP_USERNAME")
+	if err != nil {
+		return nil, err
+	}
+	password, err := requireEnv("SMTP_PASSWORD")
+	if err != nil {
+		return nil, err
+	}
+
+	return mail.NewDialer(host, port, username, password), nil
+}
+
+func newUserService(db *gorm.DB, dialer *mail.Dialer) (*user.Service, error) {
+	uiURL, err := requireEnv("UI_URL")
+	if err != nil {
+		return nil, err
+	}
+	passwordTokenTTL, err := requireEnvAsUint("PASSWORD_TOKEN_TTL")
+	if err != nil {
+		return nil, err
+	}
+	userRepository := user.NewRepository(db)
+
+	return user.NewService(uiURL, passwordTokenTTL, userRepository, dialer), nil
+}
+
+func newRedis() (*redis.Client, error) {
+	host, err := requireEnv("REDIS_HOST")
+	if err != nil {
+		return nil, err
+	}
+	port, err := requireEnvAsInt("REDIS_PORT")
+	if err != nil {
+		return nil, err
+	}
+
+	return storage.NewRedis(host, port)
+}
+
+type authenticationConfig struct {
+	SameSiteMode                            http.SameSite
+	RefreshTokenSecretKey                   string
+	AccessTokenExpirationSeconds            int
+	RefreshTokenExpirationSeconds           int
+	RefreshTokenRememberMeExpirationSeconds int
+}
+
+func newAuthenticationConfig() (authenticationConfig, error) {
+	mode, err := sameSiteMode()
+	if err != nil {
+		return authenticationConfig{}, err
+	}
+	refreshTokenSecretKey, err := requireEnv("REFRESH_TOKEN_SECRET_KEY")
+	if err != nil {
+		return authenticationConfig{}, err
+	}
+	accessTokenExpirationSeconds, err := requireEnvAsInt("ACCESS_TOKEN_EXPIRATION_IN_SECONDS")
+	if err != nil {
+		return authenticationConfig{}, err
+	}
+	refreshTokenExpirationSeconds, err := requireEnvAsInt("REFRESH_TOKEN_EXPIRATION_IN_SECONDS")
+	if err != nil {
+		return authenticationConfig{}, err
+	}
+	refreshTokenRememberMeExpirationSeconds, err := requireEnvAsInt("REFRESH_TOKEN_REMEMBER_ME_EXPIRATION_IN_SECONDS")
+	if err != nil {
+		return authenticationConfig{}, err
+	}
+
+	return authenticationConfig{
+		SameSiteMode:                            mode,
+		RefreshTokenSecretKey:                   refreshTokenSecretKey,
+		AccessTokenExpirationSeconds:            accessTokenExpirationSeconds,
+		RefreshTokenExpirationSeconds:           refreshTokenExpirationSeconds,
+		RefreshTokenRememberMeExpirationSeconds: refreshTokenRememberMeExpirationSeconds,
+	}, nil
+}
+
+func sameSiteMode() (http.SameSite, error) {
+	sameSiteMode, err := requireEnv("SAME_SITE_MODE")
+	if err != nil {
+		return 0, err
+	}
+
+	switch sameSiteMode {
+	case "default":
+		return http.SameSiteDefaultMode, nil
+	case "lax":
+		return http.SameSiteLaxMode, nil
+	case "strict":
+		return http.SameSiteStrictMode, nil
+	case "none":
+		return http.SameSiteNoneMode, nil
+	}
+
+	return -1, fmt.Errorf("failed to parse \"SAME_SITE_MODE\": %q", sameSiteMode)
+}
+
+func GetPrivateKey(logger *slog.Logger) (*rsa.PrivateKey, error) {
+	key, err := requireEnv("PRIVATE_KEY")
+	if err != nil {
+		return nil, err
+	}
+	decode, _ := pem.Decode([]byte(key))
+	if decode == nil {
+		return nil, errors.New("failed to decode private key")
+	}
+
+	// Openssl generates keys formatted as PKCS8 but terraform tls_private_key is producing PKCS1
+	// So if parsing of PKCS8 fails we try PKCS1
+	privateKey, err := x509.ParsePKCS8PrivateKey(decode.Bytes)
+	if err != nil {
+		if err.Error() == "x509: failed to parse private key (use ParsePKCS1PrivateKey instead for this key format)" {
+			logger.Info("Trying to parse PKCS1 format...")
+			privateKey, err = x509.ParsePKCS1PrivateKey(decode.Bytes)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			return nil, err
+		}
+		logger.Info("Successfully parsed private key")
+	}
+
+	return privateKey.(*rsa.PrivateKey), nil
+}
+
+func newStackService() (stack.Service, error) {
+	stacks, err := stack.New(
+		stack.DHIS2DB,
+		stack.DHIS2Core,
+		stack.DHIS2,
+		stack.PgAdmin,
+		stack.WhoamiGo,
+		stack.IMJobRunner,
+	)
+	if err != nil {
+		return stack.Service{}, fmt.Errorf("error in stack config: %v", err)
+	}
+
+	return stack.NewService(stacks), nil
+}
+
+func newInstanceService(logger *slog.Logger, db *gorm.DB, stackService stack.Service, groupService *group.Service) (*instance.Service, error) {
+	instanceParameterEncryptionKey, err := requireEnv("INSTANCE_PARAMETER_ENCRYPTION_KEY")
+	if err != nil {
+		return nil, err
+	}
+	instanceRepository := instance.NewRepository(db, instanceParameterEncryptionKey)
+	classification, err := requireEnv("CLASSIFICATION")
+	if err != nil {
+		return nil, err
+	}
+	helmfileService := instance.NewHelmfileService(logger, stackService, "./stacks", classification)
+
+	return instance.NewService(logger, instanceRepository, groupService, stackService, helmfileService), nil
+}
+
+type rabbitMQConfig struct {
+	Host       string
+	Port       int
+	StreamPort int
+	Username   string
+	Password   string
+}
+
+// GetURI returns the AMQP URI for RabbitMQ.
+func (r rabbitMQConfig) GetURI() string {
+	return fmt.Sprintf("amqp://%s:%s@%s:%d/", r.Username, r.Password, r.Host, r.Port)
+}
+
+func newRabbitMQ() (rabbitMQConfig, error) {
+	host, err := requireEnv("RABBITMQ_HOST")
+	if err != nil {
+		return rabbitMQConfig{}, err
+	}
+	port, err := requireEnvAsInt("RABBITMQ_PORT")
+	if err != nil {
+		return rabbitMQConfig{}, err
+	}
+	streamPort, err := requireEnvAsInt("RABBITMQ_STREAM_PORT")
+	if err != nil {
+		return rabbitMQConfig{}, err
+	}
+	username, err := requireEnv("RABBITMQ_USERNAME")
+	if err != nil {
+		return rabbitMQConfig{}, err
+	}
+	password, err := requireEnv("RABBITMQ_PASSWORD")
+	if err != nil {
+		return rabbitMQConfig{}, err
+	}
+
+	return rabbitMQConfig{
+		Host:       host,
+		Port:       port,
+		StreamPort: streamPort,
+		Username:   username,
+		Password:   password,
+	}, nil
+}
+
+func newInstanceHandler(groupService *group.Service, instanceService *instance.Service) (instance.Handler, error) {
+	defaultTTL, err := requireEnvAsUint("DEFAULT_TTL")
+	if err != nil {
+		return instance.Handler{}, err
+	}
+
+	return instance.NewHandler(groupService, instanceService, defaultTTL), nil
+}
+
+func newDatabaseHandler(logger *slog.Logger, db *gorm.DB, groupService *group.Service, instanceService *instance.Service, stackService stack.Service) (database.Handler, error) {
+	s3Bucket, err := requireEnv("S3_BUCKET")
+	if err != nil {
+		return database.Handler{}, err
+	}
+	s3Client, err := newS3Client(logger)
+	if err != nil {
+		return database.Handler{}, err
+	}
+	databaseRepository := database.NewRepository(db)
+	databaseService := database.NewService(logger, s3Bucket, s3Client, groupService, databaseRepository)
+
+	return database.NewHandler(logger, databaseService, groupService, instanceService, stackService), nil
+}
+
+func newS3Client(logger *slog.Logger) (*storage.S3Client, error) {
+	s3Region, err := requireEnv("S3_REGION")
+	if err != nil {
+		return nil, err
+	}
+
+	// nolint:staticcheck
+	s3Endpoint := aws.EndpointResolverWithOptionsFunc(func(service, region string, options ...any) (aws.Endpoint, error) {
+		if endpoint := os.Getenv("S3_ENDPOINT"); endpoint != "" {
+			return aws.Endpoint{URL: endpoint}, nil
+		}
+		return aws.Endpoint{}, &aws.EndpointNotFoundError{}
+	})
+	s3Config, err := s3config.LoadDefaultConfig(
+		context.TODO(),
+		s3config.WithRegion(s3Region),
+		// nolint:staticcheck
+		s3config.WithEndpointResolverWithOptions(aws.EndpointResolverWithOptions(s3Endpoint)),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to setup S3 config: %v", err)
+	}
+	s3AWSClient := s3.NewFromConfig(s3Config, func(o *s3.Options) {
+		o.UsePathStyle = true
+	})
+	uploader := manager.NewUploader(s3AWSClient)
+
+	return storage.NewS3Client(logger, s3AWSClient, uploader), nil
+}
+
+func newIntegrationHandler() (integration.Handler, error) {
+	username, err := requireEnv("DOCKER_HUB_USERNAME")
+	if err != nil {
+		return integration.Handler{}, err
+	}
+	password, err := requireEnv("DOCKER_HUB_PASSWORD")
+	if err != nil {
+		return integration.Handler{}, err
+	}
+	dockerHubClient := integration.NewDockerHubClient(
+		integration.DockerHubConfig{
+			Username: username,
+			Password: password,
+		})
+
+	instanceServiceHost, err := requireEnv("INSTANCE_SERVICE_HOST")
+	if err != nil {
+		return integration.Handler{}, err
+	}
+
+	return integration.NewHandler(dockerHubClient, instanceServiceHost), nil
+}
+
+func newEventHandler(logger *slog.Logger, rabbitmqConfig rabbitMQConfig) (event.Handler, error) {
+	logger.Info("Connecting with RabbitMQ stream client", "host", rabbitmqConfig.Host, "port", rabbitmqConfig.StreamPort)
+	env, err := stream.NewEnvironment(
+		stream.NewEnvironmentOptions().
+			SetHost(rabbitmqConfig.Host).
+			SetPort(rabbitmqConfig.StreamPort).
+			SetUser(rabbitmqConfig.Username).
+			SetPassword(rabbitmqConfig.Password).
+			SetAddressResolver(stream.AddressResolver{Host: rabbitmqConfig.Host, Port: rabbitmqConfig.StreamPort}),
+	)
+	if err != nil {
+		return event.Handler{}, fmt.Errorf("failed to connect with RabbitMQ stream client: %v", err)
+	}
+	logger.Info("Connected with RabbitMQ stream client", "host", rabbitmqConfig.Host, "port", rabbitmqConfig.StreamPort)
+
+	streamName := "events"
+	err = env.DeclareStream(streamName,
+		stream.NewStreamOptions().
+			SetMaxSegmentSizeBytes(stream.ByteCapacity{}.MB(1)).
+			SetMaxAge(1*time.Hour))
+	if err != nil {
+		return event.Handler{}, fmt.Errorf("failed to declare RabbitMQ stream %q: %v", streamName, err)
+	}
+
+	return event.NewHandler(logger, env, streamName), nil
+}
+
 type groupService interface {
 	FindOrCreate(name string, hostname string, deployable bool) (*model.Group, error)
 }
 
-func createGroups(logger *slog.Logger, groupService groupService, groups []config.Group) error {
+func createGroups(logger *slog.Logger, groupService groupService) error {
+	groupNames, err := requireEnvAsArray("GROUP_NAMES")
+	if err != nil {
+		return err
+	}
+	groupHostnames, err := requireEnvAsArray("GROUP_HOSTNAMES")
+	if err != nil {
+		return err
+	}
+	if len(groupNames) != len(groupHostnames) {
+		return fmt.Errorf("want arrays to be of equal size, instead got \"GROUP_NAMES\"=%v \"GROUP_HOSTNAMES\"=%v", groupNames, groupHostnames)
+	}
+
+	groups := make([]struct{ Name, Hostname string }, len(groupNames))
+	for i := 0; i < len(groupNames); i++ {
+		groups[i].Name = groupNames[i]
+		groups[i].Hostname = groupHostnames[i]
+	}
+
 	logger.Info("Creating groups...")
 	for _, g := range groups {
 		newGroup, err := groupService.FindOrCreate(g.Name, g.Hostname, true)
@@ -258,15 +608,101 @@ func createGroups(logger *slog.Logger, groupService groupService, groups []confi
 	return nil
 }
 
-func newS3Config(region string, endpoint aws.EndpointResolverWithOptionsFunc) (aws.Config, error) {
-	config, err := s3config.LoadDefaultConfig(
-		context.TODO(),
-		s3config.WithRegion(region),
-		s3config.WithEndpointResolverWithOptions(aws.EndpointResolverWithOptions(endpoint)),
-	)
+func createAdminUser(userService *user.Service, groupService *group.Service) error {
+	adminEmail, err := requireEnv("ADMIN_USER_EMAIL")
 	if err != nil {
-		return aws.Config{}, err
+		return err
+	}
+	adminPassword, err := requireEnv("ADMIN_USER_PASSWORD")
+	if err != nil {
+		return err
 	}
 
-	return config, nil
+	return user.CreateUser(adminEmail, adminPassword, userService, groupService, model.AdministratorGroupName, "admin")
+}
+
+func createE2ETestUser(userService *user.Service, groupService *group.Service) error {
+	testEmail, err := requireEnv("E2E_TEST_USER_EMAIL")
+	if err != nil {
+		return err
+	}
+	testPassword, err := requireEnv("E2E_TEST_USER_PASSWORD")
+	if err != nil {
+		return err
+	}
+
+	return user.CreateUser(testEmail, testPassword, userService, groupService, model.DefaultGroupName, "e2e test")
+}
+
+func newGinEngine(logger *slog.Logger) (*gin.Engine, error) {
+	// TODO: This is a hack! Allowed origins for different environments should be applied using skaffold profiles... But I can't get it working!
+	allowedOrigins, err := requireEnvAsArray("CORS_ALLOWED_ORIGINS")
+	if err != nil {
+		return nil, err
+	}
+	basePath, err := requireEnv("BASE_PATH")
+	if err != nil {
+		return nil, err
+	}
+	environment, err := requireEnv("ENVIRONMENT")
+	if err != nil {
+		return nil, err
+	}
+	if environment != "production" {
+		allowedOrigins = append(allowedOrigins, "http://localhost:3000", "http://localhost:5173")
+	}
+
+	r, err := server.GetEngine(logger, basePath, allowedOrigins)
+	if err != nil {
+		return nil, fmt.Errorf("failed to setup Gin engine: %v", err)
+	}
+
+	return r, nil
+}
+
+func requireEnv(key string) (string, error) {
+	value, exists := os.LookupEnv(key)
+	if !exists {
+		return "", fmt.Errorf("required environment variable %q not set", key)
+	}
+	return value, nil
+}
+
+func requireEnvAsUint(key string) (uint, error) {
+	valueStr, err := requireEnv(key)
+	if err != nil {
+		return 0, err
+	}
+
+	value, err := strconv.ParseUint(valueStr, 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("failed to parse environment variable %q as int: %v", key, err)
+	}
+	if value > math.MaxUint {
+		return 0, fmt.Errorf("value of environment variable %q = %d exceeds uint max value %d", key, value, uint64(math.MaxUint))
+	}
+
+	return uint(value), nil
+}
+
+func requireEnvAsInt(key string) (int, error) {
+	valueStr, err := requireEnv(key)
+	if err != nil {
+		return 0, err
+	}
+
+	value, err := strconv.Atoi(valueStr)
+	if err != nil {
+		return 0, fmt.Errorf("failed to parse environment variable %q as int: %v", key, err)
+	}
+
+	return value, nil
+}
+
+func requireEnvAsArray(key string) ([]string, error) {
+	value, err := requireEnv(key)
+	if err != nil {
+		return nil, err
+	}
+	return strings.Split(value, ","), nil
 }

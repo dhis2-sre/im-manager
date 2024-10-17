@@ -13,7 +13,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func NewHandler(groupService groupServiceHandler, instanceService *service, defaultTTL uint) Handler {
+func NewHandler(groupService groupServiceHandler, instanceService *Service, defaultTTL uint) Handler {
 	return Handler{
 		groupService,
 		instanceService,
@@ -23,7 +23,7 @@ func NewHandler(groupService groupServiceHandler, instanceService *service, defa
 
 type Handler struct {
 	groupService    groupServiceHandler
-	instanceService *service
+	instanceService *Service
 	defaultTTL      uint
 }
 

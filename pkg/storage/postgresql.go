@@ -5,14 +5,21 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/dhis2-sre/im-manager/pkg/config"
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	slogGorm "github.com/orandin/slog-gorm"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
 
-func NewDatabase(logger *slog.Logger, c config.Postgresql) (*gorm.DB, error) {
+type PostgresqlConfig struct {
+	Host         string
+	Port         int
+	Username     string
+	Password     string
+	DatabaseName string
+}
+
+func NewDatabase(logger *slog.Logger, c PostgresqlConfig) (*gorm.DB, error) {
 	gormLogger := slogGorm.New(
 		slogGorm.WithHandler(logger.Handler()),
 		slogGorm.WithRecordNotFoundError(),
@@ -48,7 +55,6 @@ func NewDatabase(logger *slog.Logger, c config.Postgresql) (*gorm.DB, error) {
 		&model.Lock{},
 		&model.ExternalDownload{},
 	)
-
 	if err != nil {
 		return nil, fmt.Errorf("failed to open Gorm session: %v", err)
 	}

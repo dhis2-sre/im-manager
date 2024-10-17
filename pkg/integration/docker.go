@@ -10,11 +10,16 @@ import (
 	"github.com/dhis2-sre/im-manager/internal/errdef"
 )
 
+type DockerHubConfig struct {
+	Username string
+	Password string
+}
+
 //goland:noinspection GoExportedFuncWithUnexportedType
-func NewDockerHubClient(username, password string) *dockerHubClient {
+func NewDockerHubClient(config DockerHubConfig) *dockerHubClient {
 	return &dockerHubClient{
-		username: username,
-		password: password,
+		username: config.Username,
+		password: config.Password,
 		client:   &http.Client{},
 	}
 }
