@@ -1,6 +1,9 @@
 package handler
 
 import (
+	"context"
+	"errors"
+
 	"github.com/dhis2-sre/im-manager/pkg/model"
 )
 
@@ -52,4 +55,14 @@ func IsAdministrator(user *model.User) bool {
 
 func IsGroupAdministrator(groupName string, groups []model.Group) bool {
 	return isMemberOf(groupName, groups)
+}
+
+// GetUserFromContext returns the User value stored in ctx, if any otherwise it returns an error.
+func GetUserFromContext(ctx context.Context) (*model.User, error) {
+	user, ok := model.GetUserFromContext(ctx)
+	if !ok {
+		return nil, errors.New("user not found on context")
+	}
+
+	return user, nil
 }

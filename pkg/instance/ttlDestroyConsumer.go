@@ -1,12 +1,14 @@
 package instance
 
 import (
+	"context"
 	"encoding/json"
 	"log/slog"
 
 	"github.com/dhis2-sre/im-manager/pkg/model"
 
 	"github.com/dhis2-sre/im-manager/internal/errdef"
+	"github.com/dhis2-sre/im-manager/internal/middleware"
 
 	"github.com/dhis2-sre/rabbitmq-client/pkg/rabbitmq"
 	amqp "github.com/rabbitmq/amqp091-go"
@@ -19,8 +21,8 @@ type ttlDestroyConsumer struct {
 }
 
 type instanceService interface {
-	Delete(id uint) error
-	FindDeploymentInstanceById(id uint) (*model.DeploymentInstance, error)
+	Delete(ctx context.Context, id uint) error
+	FindDeploymentInstanceById(ctx context.Context, id uint) (*model.DeploymentInstance, error)
 }
 
 //goland:noinspection GoExportedFuncWithUnexportedType
@@ -34,6 +36,8 @@ func NewTTLDestroyConsumer(logger *slog.Logger, consumer *rabbitmq.Consumer, ins
 
 func (c *ttlDestroyConsumer) Consume() error {
 	_, err := c.consumer.Consume("ttl-destroy", func(d amqp.Delivery) {
+		ctx := context.Background()
+		ctx = middleware.NewContextWithRequestID(ctx, d.CorrelationId)
 		logger := c.logger.With("correlationId", d.CorrelationId)
 
 		payload := struct{ ID uint }{}
@@ -48,13 +52,13 @@ func (c *ttlDestroyConsumer) Consume() error {
 			return
 		}
 
-		instance, err := c.instanceService.FindDeploymentInstanceById(payload.ID)
+		instance, err := c.instanceService.FindDeploymentInstanceById(ctx, payload.ID)
 		if err != nil {
 			logger.Error("Error finding instance", "instanceId", payload.ID, "error", err)
 			return
 		}
 
-		err = c.instanceService.Delete(instance.ID)
+		err = c.instanceService.Delete(ctx, instance.ID)
 		if err != nil {
 			if errdef.IsNotFound(err) {
 				err := d.Ack(false)

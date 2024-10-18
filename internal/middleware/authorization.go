@@ -30,12 +30,12 @@ type userService interface {
 }
 
 func (m AuthorizationMiddleware) RequireAdministrator(c *gin.Context) {
-	u, err := handler.GetUserFromContext(c)
+	u, err := handler.GetUserFromContext(c.Request.Context())
 	if err != nil {
 		return
 	}
 
-	userWithGroups, err := m.userService.FindById(c, u.ID)
+	userWithGroups, err := m.userService.FindById(c.Request.Context(), u.ID)
 	if err != nil {
 		if errdef.IsNotFound(err) {
 			_ = c.AbortWithError(http.StatusUnauthorized, err)
@@ -46,7 +46,7 @@ func (m AuthorizationMiddleware) RequireAdministrator(c *gin.Context) {
 	}
 
 	if !userWithGroups.IsAdministrator() {
-		m.logger.ErrorContext(c, "User tried to access administrator restricted endpoint", "user", u)
+		m.logger.ErrorContext(c.Request.Context(), "User tried to access administrator restricted endpoint", "user", u)
 		_ = c.AbortWithError(http.StatusUnauthorized, errors.New("administrator access denied"))
 		return
 	}

@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"context"
 	"log/slog"
 	"net/http"
 	"time"
@@ -10,9 +11,9 @@ import (
 	"github.com/google/uuid"
 )
 
-// gin.Context only allows string keys so the best we can do is to use a prefix to avoid name
-// clashes
-const requestIDKey = "im-manager.requestID"
+type ctxKey int
+
+var requestIDKey ctxKey
 
 const (
 	// slog key under which to log the request id
@@ -21,41 +22,51 @@ const (
 	RequestLoggerKeyUser = "user"
 )
 
-// RequestID adds a request ID to each request.
+// RequestID adds a generated request ID to the [http.Request.Context].
 func RequestID() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		c.Set(requestIDKey, uuid.NewString())
+		ctx := c.Request.Context()
+		ctx = NewContextWithRequestID(ctx, uuid.NewString())
+		c.Request = c.Request.WithContext(ctx)
 
 		c.Next()
 	}
 }
 
-// GetRequestID gets the request ID added by the RequestID middleware out of the request context.
-func GetRequestID(c *gin.Context) string {
-	v, ok := c.Get(requestIDKey)
-	if !ok {
-		return ""
-	}
+// NewContextWithRequestID returns a new [context.Context] that carries value id.
+func NewContextWithRequestID(ctx context.Context, id string) context.Context {
+	return context.WithValue(ctx, requestIDKey, id)
+}
 
-	ID, ok := v.(string)
-	if !ok {
-		return ""
-	}
-
-	return ID
+// GetRequestID returns the request ID stored in the ctx, if any. It had to have been set by the
+// [RequestID] middleware before.
+func GetRequestID(ctx context.Context) (string, bool) {
+	id, ok := ctx.Value(requestIDKey).(string)
+	return id, ok
 }
 
 // RequestLogger logs details like request time, response time, latency and more about every
 // request.
 func RequestLogger(logger *slog.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		ctx := c.Request.Context()
+
 		requestTime := time.Now()
 
 		c.Next()
 
 		responseTime := time.Now()
 
-		idAttribute := slog.String(RequestLoggerKeyID, GetRequestID(c))
+		var idAttribute slog.Attr
+		if id, ok := GetRequestID(ctx); ok {
+			idAttribute = slog.String(RequestLoggerKeyID, id)
+		} else {
+			// In theory this never happens as we register the [RequestID] middleware and we have a
+			// test for it. We do need the GetRequestID signature though as there is no request ID
+			// outside of an HTTP context.
+			idAttribute = slog.String(RequestLoggerKeyID, "MISSING")
+		}
+
 		var userAttribute slog.Attr
 		if ctxUser, ok := c.Get("user"); ok {
 			if user, ok := ctxUser.(*model.User); ok {
@@ -83,8 +94,8 @@ func RequestLogger(logger *slog.Logger) gin.HandlerFunc {
 			slog.Int("status", c.Writer.Status()),
 		)
 
-		msg := "Processed HTTP request"
 		level := slog.LevelInfo
+		msg := "Processed HTTP request"
 		var errorAttribute slog.Attr
 		if status := c.Writer.Status(); status >= http.StatusBadRequest && status < http.StatusInternalServerError {
 			level = slog.LevelWarn

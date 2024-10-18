@@ -7,10 +7,13 @@ import (
 
 	"github.com/dhis2-sre/im-manager/internal/middleware"
 	"github.com/dhis2-sre/im-manager/pkg/model"
-	"github.com/gin-gonic/gin"
 )
 
-// ContextHandler adds values from the Gin context to the slog.Record.
+// ContextHandler adds values from the [context.Context] to the [slog.Record]. [slog.Handler] is
+// passed to [slog.Logger] which is then used throughout the app. It has to use the same attribute
+// keys as the Gin [middleware.RequestLogger] so we can find logs created by the middleware and the
+// [slog.Logger] context aware methods. As not every use of the logger will be within the context of
+// an HTTP request it needs to be ok with keys not being set in the [context.Context].
 type ContextHandler struct {
 	slog.Handler
 }
@@ -26,18 +29,16 @@ func (rh *ContextHandler) Enabled(ctx context.Context, level slog.Level) bool {
 }
 
 func (rh *ContextHandler) Handle(ctx context.Context, r slog.Record) error {
-	// We are logging the request id/user under the same keys as in middleware.RequestLogger. This
-	// is to find logs we make via the context aware logger functions like logger.InfoContext as
-	// well as the ones made by the Gin middleware.RequestLogger.
-	if ginCtx, ok := ctx.(*gin.Context); ok {
-		r.AddAttrs(slog.String(middleware.RequestLoggerKeyID, middleware.GetRequestID(ginCtx)))
-
-		if user, ok := ginCtx.Get("user"); ok {
-			if user, ok := user.(*model.User); ok {
-				r.AddAttrs(slog.Any(middleware.RequestLoggerKeyUser, user))
-			}
-		}
+	// logs outside of an HTTP request do not have a RequestID set
+	if id, ok := middleware.GetRequestID(ctx); ok {
+		r.AddAttrs(slog.String(middleware.RequestLoggerKeyID, id))
 	}
+
+	// public HTTP routes do not have a user in the context
+	if user, ok := model.GetUserFromContext(ctx); ok {
+		r.AddAttrs(slog.Any(middleware.RequestLoggerKeyUser, user))
+	}
+
 	return rh.Handler.Handle(ctx, r)
 }
 

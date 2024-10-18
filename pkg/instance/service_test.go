@@ -1,6 +1,7 @@
 package instance
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
@@ -35,7 +36,7 @@ func TestResolveParameters(t *testing.T) {
 			},
 		}
 
-		err := service.SaveInstance(instance)
+		err := service.SaveInstance(context.Background(), instance)
 
 		require.ErrorContains(t, err, "consumed parameters can't be supplied by the user: parameter")
 	})

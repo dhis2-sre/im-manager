@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/dhis2-sre/im-manager/pkg/model"
-
 	"github.com/dhis2-sre/im-manager/internal/errdef"
 
 	"github.com/gin-gonic/gin"
@@ -15,11 +13,6 @@ func NewHandler(service Service) Handler {
 	return Handler{
 		service,
 	}
-}
-
-type Service interface {
-	Find(name string) (*model.Stack, error)
-	FindAll() ([]model.Stack, error)
 }
 
 type Handler struct {

@@ -1,6 +1,7 @@
 package group_test
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -28,7 +29,7 @@ func TestGroupHandler(t *testing.T) {
 	groupRepository := group.NewRepository(db)
 	groupService := group.NewService(groupRepository, userService)
 
-	err := user.CreateUser("admin", "admin", userService, groupService, model.AdministratorGroupName, "admin")
+	err := user.CreateUser(context.Background(), "admin", "admin", userService, groupService, model.AdministratorGroupName, "admin")
 	require.NoError(t, err, "failed to create admin user and group")
 
 	client := inttest.SetupHTTPServer(t, func(engine *gin.Engine) {
@@ -41,7 +42,7 @@ func TestGroupHandler(t *testing.T) {
 	var userId string
 	var user *model.User
 	{
-		user, err = userService.FindOrCreate("user@dhis2.org", "oneoneoneoneoneoneone111")
+		user, err = userService.FindOrCreate(context.Background(), "user@dhis2.org", "oneoneoneoneoneoneone111")
 		require.NoError(t, err)
 		userId = strconv.FormatUint(uint64(user.ID), 10)
 	}

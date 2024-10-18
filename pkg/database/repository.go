@@ -1,6 +1,7 @@
 package database
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"time"
@@ -20,22 +21,32 @@ import (
 
 //goland:noinspection GoExportedFuncWithUnexportedType
 func NewRepository(db *gorm.DB) *repository {
-	return &repository{db}
+	return &repository{
+		db: db,
+	}
 }
 
 type repository struct {
 	db *gorm.DB
 }
 
-func (r repository) Create(d *model.Database) error {
-	return r.db.Create(&d).Error
+func (r repository) Create(ctx context.Context, d *model.Database) error {
+	// only use ctx for values (logging) and not cancellation signals on cud operations for now. ctx
+	// cancellation can lead to rollbacks which we should decide individually.
+	ctx = context.WithoutCancel(ctx)
+
+	return r.db.WithContext(ctx).Create(&d).Error
 }
 
-func (r repository) Save(d *model.Database) error {
+func (r repository) Save(ctx context.Context, d *model.Database) error {
+	// only use ctx for values (logging) and not cancellation signals on cud operations for now. ctx
+	// cancellation can lead to rollbacks which we should decide individually.
+	ctx = context.WithoutCancel(ctx)
+
 	s := fmt.Sprintf("%s/%s", d.GroupName, d.Name)
 	d.Slug = slug.Make(s)
 
-	err := r.db.Save(&d).Error
+	err := r.db.WithContext(ctx).Save(&d).Error
 	if errors.Is(err, gorm.ErrDuplicatedKey) {
 		return errdef.NewDuplicated("database named %q already exists", d.Name)
 	}
@@ -43,9 +54,10 @@ func (r repository) Save(d *model.Database) error {
 	return err
 }
 
-func (r repository) FindById(id uint) (*model.Database, error) {
+func (r repository) FindById(ctx context.Context, id uint) (*model.Database, error) {
 	var d *model.Database
 	err := r.db.
+		WithContext(ctx).
 		Preload("Lock").
 		First(&d, id).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -54,17 +66,19 @@ func (r repository) FindById(id uint) (*model.Database, error) {
 	return d, err
 }
 
-func (r repository) UpdateId(old, new uint) error {
+func (r repository) UpdateId(ctx context.Context, oldID, newID uint) error {
 	return r.db.
+		WithContext(ctx).
 		Model(&model.Database{}).
-		Where("id = ?", old).
-		Update("id", new).
+		Where("id = ?", oldID).
+		Update("id", newID).
 		Error
 }
 
-func (r repository) FindBySlug(slug string) (*model.Database, error) {
+func (r repository) FindBySlug(ctx context.Context, slug string) (*model.Database, error) {
 	var d *model.Database
 	err := r.db.
+		WithContext(ctx).
 		Preload("Lock").
 		Where("slug = ?", slug).
 		First(&d).Error
@@ -74,10 +88,13 @@ func (r repository) FindBySlug(slug string) (*model.Database, error) {
 	return d, err
 }
 
-func (r repository) Lock(databaseId, instanceId, userId uint) (*model.Lock, error) {
-	var lock *model.Lock
+func (r repository) Lock(ctx context.Context, databaseId, instanceId, userId uint) (*model.Lock, error) {
+	// only use ctx for values (logging) and not cancellation signals on cud operations for now. ctx
+	// cancellation can lead to rollbacks which we should decide individually.
+	ctx = context.WithoutCancel(ctx)
 
-	errTx := r.db.Transaction(func(tx *gorm.DB) error {
+	var lock *model.Lock
+	errTx := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var d *model.Database
 		err := tx.
 			Preload("Lock").
@@ -104,8 +121,12 @@ func (r repository) Lock(databaseId, instanceId, userId uint) (*model.Lock, erro
 	return lock, errTx
 }
 
-func (r repository) Unlock(databaseId uint) error {
-	db := r.db.Unscoped().Delete(&model.Lock{}, "database_id = ?", databaseId)
+func (r repository) Unlock(ctx context.Context, databaseId uint) error {
+	// only use ctx for values (logging) and not cancellation signals on cud operations for now. ctx
+	// cancellation can lead to rollbacks which we should decide individually.
+	ctx = context.WithoutCancel(ctx)
+
+	db := r.db.WithContext(ctx).Unscoped().Delete(&model.Lock{}, "database_id = ?", databaseId)
 	if db.Error != nil {
 		return db.Error
 	}
@@ -117,8 +138,12 @@ func (r repository) Unlock(databaseId uint) error {
 	return nil
 }
 
-func (r repository) Delete(id uint) error {
-	database, err := r.FindById(id)
+func (r repository) Delete(ctx context.Context, id uint) error {
+	// only use ctx for values (logging) and not cancellation signals on cud operations for now. ctx
+	// cancellation can lead to rollbacks which we should decide individually.
+	ctx = context.WithoutCancel(ctx)
+
+	database, err := r.FindById(ctx, id)
 	if err != nil {
 		return err
 	}
@@ -127,7 +152,7 @@ func (r repository) Delete(id uint) error {
 		return errdef.NewBadRequest("database is locked")
 	}
 
-	return r.db.Transaction(func(tx *gorm.DB) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		// Delete external downloads
 		var downloads []model.ExternalDownload
 		err := tx.
@@ -153,7 +178,7 @@ func (r repository) Delete(id uint) error {
 	})
 }
 
-func (r repository) FindByGroupNames(groupNames []string) ([]model.Database, error) {
+func (r repository) FindByGroupNames(ctx context.Context, groupNames []string) ([]model.Database, error) {
 	var databases []model.Database
 
 	query := r.db
@@ -169,25 +194,34 @@ func (r repository) FindByGroupNames(groupNames []string) ([]model.Database, err
 	return databases, err
 }
 
-func (r repository) Update(d *model.Database) error {
-	return r.db.Save(d).Error
+func (r repository) Update(ctx context.Context, d *model.Database) error {
+	// only use ctx for values (logging) and not cancellation signals on cud operations for now. ctx
+	// cancellation can lead to rollbacks which we should decide individually.
+	ctx = context.WithoutCancel(ctx)
+
+	return r.db.WithContext(ctx).Save(d).Error
 }
 
-func (r repository) CreateExternalDownload(databaseID uint, expirationInSeconds uint) (*model.ExternalDownload, error) {
+func (r repository) CreateExternalDownload(ctx context.Context, databaseID uint, expirationInSeconds uint) (*model.ExternalDownload, error) {
+	// only use ctx for values (logging) and not cancellation signals on cud operations for now. ctx
+	// cancellation can lead to rollbacks which we should decide individually.
+	ctx = context.WithoutCancel(ctx)
+
 	externalDownload := &model.ExternalDownload{
 		UUID:       uuid.New(),
 		Expiration: uint(time.Now().Unix()) + expirationInSeconds,
 		DatabaseID: databaseID,
 	}
 
-	err := r.db.Save(externalDownload).Error
+	err := r.db.WithContext(ctx).Save(externalDownload).Error
 
 	return externalDownload, err
 }
 
-func (r repository) FindExternalDownload(uuid uuid.UUID) (*model.ExternalDownload, error) {
+func (r repository) FindExternalDownload(ctx context.Context, uuid uuid.UUID) (*model.ExternalDownload, error) {
 	var d *model.ExternalDownload
 	err := r.db.
+		WithContext(ctx).
 		Where("expiration > ?", time.Now().Unix()).
 		First(&d, uuid).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -196,9 +230,14 @@ func (r repository) FindExternalDownload(uuid uuid.UUID) (*model.ExternalDownloa
 	return d, err
 }
 
-func (r repository) PurgeExternalDownload() error {
+func (r repository) PurgeExternalDownload(ctx context.Context) error {
+	// only use ctx for values (logging) and not cancellation signals on cud operations for now. ctx
+	// cancellation can lead to rollbacks which we should decide individually.
+	ctx = context.WithoutCancel(ctx)
+
 	var d *model.ExternalDownload
 	err := r.db.
+		WithContext(ctx).
 		Where("expiration < ?", time.Now().Unix()).
 		Delete(&d).Error
 	return err
