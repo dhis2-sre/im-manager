@@ -30,8 +30,8 @@ func (rh *ContextHandler) Enabled(ctx context.Context, level slog.Level) bool {
 
 func (rh *ContextHandler) Handle(ctx context.Context, r slog.Record) error {
 	// logs outside of an HTTP request do not have a RequestID set
-	if id, ok := middleware.GetRequestID(ctx); ok {
-		r.AddAttrs(slog.String(middleware.RequestLoggerKeyID, id))
+	if id, ok := middleware.GetCorrelationID(ctx); ok {
+		r.AddAttrs(slog.String(middleware.RequestLoggerKeyCorrelationID, id))
 	}
 
 	// public HTTP routes do not have a user in the context

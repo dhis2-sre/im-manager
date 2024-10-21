@@ -37,16 +37,15 @@ func NewTTLDestroyConsumer(logger *slog.Logger, consumer *rabbitmq.Consumer, ins
 func (c *ttlDestroyConsumer) Consume() error {
 	_, err := c.consumer.Consume("ttl-destroy", func(d amqp.Delivery) {
 		ctx := context.Background()
-		ctx = middleware.NewContextWithRequestID(ctx, d.CorrelationId)
-		logger := c.logger.With("correlationId", d.CorrelationId)
+		ctx = middleware.NewContextWithCorrelationID(ctx, d.CorrelationId)
 
 		payload := struct{ ID uint }{}
 
 		if err := json.Unmarshal(d.Body, &payload); err != nil {
-			logger.ErrorContext(ctx, "Error unmarshalling ttl-destroy message", "error", err)
+			c.logger.ErrorContext(ctx, "Error unmarshalling ttl-destroy message", "error", err)
 			err := d.Nack(false, false)
 			if err != nil {
-				logger.ErrorContext(ctx, "Error negatively acknowledging ttl-destroy message", "error", err)
+				c.logger.ErrorContext(ctx, "Error negatively acknowledging ttl-destroy message", "error", err)
 				return
 			}
 			return
@@ -54,7 +53,7 @@ func (c *ttlDestroyConsumer) Consume() error {
 
 		instance, err := c.instanceService.FindDeploymentInstanceById(ctx, payload.ID)
 		if err != nil {
-			logger.ErrorContext(ctx, "Error finding instance", "instanceId", payload.ID, "error", err)
+			c.logger.ErrorContext(ctx, "Error finding instance", "instanceId", payload.ID, "error", err)
 			return
 		}
 
@@ -63,18 +62,18 @@ func (c *ttlDestroyConsumer) Consume() error {
 			if errdef.IsNotFound(err) {
 				err := d.Ack(false)
 				if err != nil {
-					logger.ErrorContext(ctx, "Error acknowledging ttl-destroy message after deleting instance", "instanceId", instance.ID, "error", err)
+					c.logger.ErrorContext(ctx, "Error acknowledging ttl-destroy message after deleting instance", "instanceId", instance.ID, "error", err)
 					return
 				}
 			}
-			logger.ErrorContext(ctx, "Error deleting instance", "instanceId", instance.ID, "error", err)
+			c.logger.ErrorContext(ctx, "Error deleting instance", "instanceId", instance.ID, "error", err)
 			return
 		}
-		logger.InfoContext(ctx, "Deleted expired instance", "instanceId", instance.ID, "name", instance.Name, "group", instance.GroupName)
+		c.logger.InfoContext(ctx, "Deleted expired instance", "instanceId", instance.ID, "name", instance.Name, "group", instance.GroupName)
 
 		err = d.Ack(false)
 		if err != nil {
-			logger.ErrorContext(ctx, "Error acknowledging ttl-destroy message for instance", "instanceId", instance.ID, "error", err)
+			c.logger.ErrorContext(ctx, "Error acknowledging ttl-destroy message for instance", "instanceId", instance.ID, "error", err)
 		}
 	})
 	return err

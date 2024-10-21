@@ -33,9 +33,9 @@ func TestLogs(t *testing.T) {
 	r.Use(auth.BasicAuthentication)
 
 	t.Run("ContainRequestIDAndUserID", func(t *testing.T) {
-		var requestID string
+		var correlationID string
 		r.GET("/test1/:id", func(c *gin.Context) {
-			requestID, _ = middleware.GetRequestID(c.Request.Context())
+			correlationID, _ = middleware.GetCorrelationID(c.Request.Context())
 
 			// middleware.RequestLogger() and our call to InfoContext should add log lines with
 			// attribute id=<requestID> and user=<userID>
@@ -59,7 +59,7 @@ func TestLogs(t *testing.T) {
 
 			assert.NoError(t, err)
 			t.Log("log line:", line)
-			assertLogAttributeEquals(t, got, "id", requestID)
+			assertLogAttributeEquals(t, got, "correlationId", correlationID)
 			assertLogAttributeEquals(t, got, "user", userID)
 		}
 	})

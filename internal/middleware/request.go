@@ -13,35 +13,36 @@ import (
 
 type ctxKey int
 
-var requestIDKey ctxKey
+var correlationIDKey ctxKey
 
 const (
-	// slog key under which to log the request id
-	RequestLoggerKeyID = "id"
+	// slog key under which to log the correlation id
+	RequestLoggerKeyCorrelationID = "correlationId"
 	// slog key under which to log the request user
 	RequestLoggerKeyUser = "user"
 )
 
-// RequestID adds a generated request ID to the [http.Request.Context].
-func RequestID() gin.HandlerFunc {
+// CorrelationID is a Gin middleware that adds a generated correlation ID to the
+// [http.Request.Context].
+func CorrelationID() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ctx := c.Request.Context()
-		ctx = NewContextWithRequestID(ctx, uuid.NewString())
+		ctx = NewContextWithCorrelationID(ctx, uuid.NewString())
 		c.Request = c.Request.WithContext(ctx)
 
 		c.Next()
 	}
 }
 
-// NewContextWithRequestID returns a new [context.Context] that carries value id.
-func NewContextWithRequestID(ctx context.Context, id string) context.Context {
-	return context.WithValue(ctx, requestIDKey, id)
+// NewContextWithCorrelationID returns a new [context.Context] that carries value correlationID.
+func NewContextWithCorrelationID(ctx context.Context, correlationID string) context.Context {
+	return context.WithValue(ctx, correlationIDKey, correlationID)
 }
 
-// GetRequestID returns the request ID stored in the ctx, if any. It had to have been set by the
-// [RequestID] middleware before.
-func GetRequestID(ctx context.Context) (string, bool) {
-	id, ok := ctx.Value(requestIDKey).(string)
+// GetCorrelationID returns the correlation ID stored in the ctx, if any. It had to have been set by
+// the [CorrelationID] middleware before.
+func GetCorrelationID(ctx context.Context) (string, bool) {
+	id, ok := ctx.Value(correlationIDKey).(string)
 	return id, ok
 }
 
@@ -58,20 +59,18 @@ func RequestLogger(logger *slog.Logger) gin.HandlerFunc {
 		responseTime := time.Now()
 
 		var idAttribute slog.Attr
-		if id, ok := GetRequestID(ctx); ok {
-			idAttribute = slog.String(RequestLoggerKeyID, id)
+		if correlationID, ok := GetCorrelationID(ctx); ok {
+			idAttribute = slog.String(RequestLoggerKeyCorrelationID, correlationID)
 		} else {
 			// In theory this never happens as we register the [RequestID] middleware and we have a
 			// test for it. We do need the GetRequestID signature though as there is no request ID
 			// outside of an HTTP context.
-			idAttribute = slog.String(RequestLoggerKeyID, "MISSING")
+			idAttribute = slog.String(RequestLoggerKeyCorrelationID, "MISSING")
 		}
 
 		var userAttribute slog.Attr
-		if ctxUser, ok := c.Get("user"); ok {
-			if user, ok := ctxUser.(*model.User); ok {
-				userAttribute = slog.Any(RequestLoggerKeyUser, user)
-			}
+		if user, ok := model.GetUserFromContext(ctx); ok {
+			userAttribute = slog.Any(RequestLoggerKeyUser, user)
 		}
 		params := make(map[string]string, len(c.Params))
 		for _, param := range c.Params {
