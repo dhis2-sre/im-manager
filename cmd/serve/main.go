@@ -27,9 +27,12 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/go-mail/mail"
+	"github.com/rabbitmq/rabbitmq-stream-go-client/pkg/amqp"
+	"github.com/rabbitmq/rabbitmq-stream-go-client/pkg/ha"
 	"github.com/rabbitmq/rabbitmq-stream-go-client/pkg/stream"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -232,11 +235,91 @@ func run() (err error) {
 	instance.Routes(r, authentication.TokenAuthentication, instanceHandler)
 	event.Routes(r, authentication.TokenAuthentication, eventHandler)
 
+	go setupProducer(context.Background(), logger.WithGroup("producer"), cfg.RabbitMqURL)
+
 	logger.Info("Listening and serving HTTP")
 	if err := r.Run(); err != nil {
 		return fmt.Errorf("failed to start the HTTP server: %v", err)
 	}
 	return nil
+}
+
+func setupProducer(ctx context.Context, logger *slog.Logger, rabbitmqConfig config.Rabbitmq) {
+	logger.InfoContext(ctx, "Connecting with RabbitMQ stream client", "host", rabbitmqConfig.Host, "port", rabbitmqConfig.StreamPort)
+	env, err := stream.NewEnvironment(
+		stream.NewEnvironmentOptions().
+			SetHost(rabbitmqConfig.Host).
+			SetPort(rabbitmqConfig.StreamPort).
+			SetUser(rabbitmqConfig.Username).
+			SetPassword(rabbitmqConfig.Password).
+			SetAddressResolver(stream.AddressResolver{Host: rabbitmqConfig.Host, Port: rabbitmqConfig.StreamPort}),
+	)
+	if err != nil {
+		logger.ErrorContext(ctx, "Failed to create RabbitMQ producer", "error", err)
+		return
+	}
+	logger.InfoContext(ctx, "Connected with RabbitMQ stream client", "host", rabbitmqConfig.Host, "port", rabbitmqConfig.StreamPort)
+
+	streamName := "events"
+	err = env.DeclareStream(streamName,
+		stream.NewStreamOptions().
+			SetMaxSegmentSizeBytes(stream.ByteCapacity{}.MB(1)).
+			SetMaxAge(1*time.Hour))
+	if err != nil {
+		logger.ErrorContext(ctx, "Failed to create RabbitMQ producer", "error", err)
+		return
+	}
+
+	producerName := "testmanager"
+	logger.WithGroup("producer").With("name", producerName)
+	opts := stream.NewProducerOptions().
+		SetProducerName(producerName).
+		SetClientProvidedName(producerName)
+	producer, err := ha.NewReliableProducer(env, streamName, opts, func(messageStatus []*stream.ConfirmationStatus) {
+		go func() {
+			for _, msgStatus := range messageStatus {
+				if msgStatus.IsConfirmed() {
+					logger.Info("Plublishing confirmed", "publishingId", msgStatus.GetMessage().GetPublishingId())
+				} else {
+					logger.Error("Plublishing not confirmed", "error", msgStatus.GetError())
+				}
+			}
+		}()
+	})
+	if err != nil {
+		logger.ErrorContext(ctx, "Failed to create RabbitMQ producer", "error", err)
+		return
+	}
+	defer producer.Close()
+	logger.InfoContext(ctx, "Started producer")
+
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
+
+	msgCount := 0
+	for {
+		select {
+		case <-ticker.C:
+			data := []byte(strconv.FormatInt(int64(msgCount), 10))
+			message := amqp.NewMessage(data)
+			// set a publishing id for deduplication
+			message.SetPublishingId(int64(msgCount))
+			// set properties used for filtering
+			message.ApplicationProperties = map[string]interface{}{"group": "whoami"}
+			// message.ApplicationProperties["owner"] = strconv.Itoa(int(owner.ID))
+			// set property that dictates the SSE event field
+			message.ApplicationProperties["kind"] = "instance-update"
+
+			err = producer.Send(message)
+			if err != nil {
+				logger.ErrorContext(ctx, "Failed to send message", "error", err)
+			}
+			logger.InfoContext(ctx, "Sent message", "publishingId", msgCount)
+			msgCount++
+		case <-ctx.Done():
+			return
+		}
+	}
 }
 
 type groupService interface {

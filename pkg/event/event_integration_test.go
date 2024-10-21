@@ -245,7 +245,7 @@ func streamEvents(t *testing.T, ctx context.Context, client *inttest.HTTPClient,
 		}
 
 		close(out)
-		if !errors.Is(sc.Err(), context.Canceled) {
+		if sc.Err() != context.Cause(ctx) && sc.Err() != ctx.Err() {
 			require.NoErrorf(t, sc.Err(), "error scanning event stream from %q for user %d", url, user.ID)
 		}
 		t.Logf("User %d stops to stream from %q due: %v", user.ID, url, context.Cause(ctx))

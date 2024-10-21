@@ -28,7 +28,7 @@ type Config struct {
 	DockerHub                      DockerHub
 	DatabaseManagerService         Service
 	Postgresql                     Postgresql
-	RabbitMqURL                    rabbitmq
+	RabbitMqURL                    Rabbitmq
 	SMTP                           smtp
 	Redis                          Redis
 	Authentication                 Authentication
@@ -78,7 +78,7 @@ func New() Config {
 			Username: requireEnv("SMTP_USERNAME"),
 			Password: requireEnv("SMTP_PASSWORD"),
 		},
-		RabbitMqURL: rabbitmq{
+		RabbitMqURL: Rabbitmq{
 			Host:       requireEnv("RABBITMQ_HOST"),
 			Port:       requireEnvAsInt("RABBITMQ_PORT"),
 			StreamPort: requireEnvAsInt("RABBITMQ_STREAM_PORT"),
@@ -142,7 +142,7 @@ type Postgresql struct {
 	DatabaseName string
 }
 
-type rabbitmq struct {
+type Rabbitmq struct {
 	Host       string
 	Port       int
 	StreamPort int
@@ -158,7 +158,7 @@ type smtp struct {
 }
 
 // GetURI returns the AMQP URI for RabbitMQ.
-func (r rabbitmq) GetURI() string {
+func (r Rabbitmq) GetURI() string {
 	return fmt.Sprintf("amqp://%s:%s@%s:%d/", r.Username, r.Password, r.Host, r.Port)
 }
 
