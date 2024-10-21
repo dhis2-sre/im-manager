@@ -21,25 +21,22 @@ import (
 )
 
 func TestLogs(t *testing.T) {
-	var b bytes.Buffer
-	logger := slog.New(New(slog.NewJSONHandler(&b, nil)))
-
-	r, err := server.GetEngine(logger, "", []string{"http://localhost"})
-	require.NoError(t, err, "failed to set up up Gin")
-	gin.SetMode(gin.TestMode)
-
 	var userID uint = 1
-	auth := middleware.NewAuthentication(rsa.PublicKey{}, SignInService{userID: userID})
-	r.Use(auth.BasicAuthentication)
+	t.Run("ContainCorrelationIDAndUserID", func(t *testing.T) {
+		t.Parallel()
 
-	t.Run("ContainRequestIDAndUserID", func(t *testing.T) {
+		var b bytes.Buffer
+		logger := slog.New(New(slog.NewJSONHandler(&b, nil)))
+		r := newGinEngine(t, logger, userID)
+
 		var correlationID string
 		r.GET("/test1/:id", func(c *gin.Context) {
 			correlationID, _ = middleware.GetCorrelationID(c.Request.Context())
 
-			// middleware.RequestLogger() and our call to InfoContext should add log lines with
-			// attribute id=<requestID> and user=<userID>
-			logger.InfoContext(c.Request.Context(), "info")
+			// our call to InfoContext here and the log line added from [middleware.RequestLogger]
+			// should have log attribute id=<requestID> and user=<userID> added by
+			// log.ContextHandler
+			logger.InfoContext(c.Request.Context(), "logged by handler")
 			c.String(http.StatusOK, "success")
 		})
 
@@ -50,9 +47,12 @@ func TestLogs(t *testing.T) {
 		r.ServeHTTP(w, req)
 		require.Equal(t, http.StatusOK, w.Code)
 
+		var gotNrLines int
+		wantNrLines := 2 // one from our test handler and one from the [middleware.RequestLogger]
 		sc := bufio.NewScanner(&b)
 		for sc.Scan() {
 			line := sc.Text()
+			gotNrLines++
 			got := make(map[string]any)
 
 			err = json.Unmarshal([]byte(line), &got)
@@ -62,15 +62,23 @@ func TestLogs(t *testing.T) {
 			assertLogAttributeEquals(t, got, "correlationId", correlationID)
 			assertLogAttributeEquals(t, got, "user", userID)
 		}
+		assert.Equal(t, wantNrLines, gotNrLines)
+		require.NoError(t, sc.Err(), "error reading log lines")
 	})
 
 	t.Run("ContainsQueryAndURLParameters", func(t *testing.T) {
-		r.GET("/test2/:urlParam", func(c *gin.Context) {
+		t.Parallel()
+
+		var b bytes.Buffer
+		logger := slog.New(New(slog.NewJSONHandler(&b, nil)))
+		r := newGinEngine(t, logger, userID)
+
+		r.GET("/test1/:urlParam", func(c *gin.Context) {
 			c.String(http.StatusOK, "success")
 		})
 
 		w := httptest.NewRecorder()
-		req, err := http.NewRequest("GET", "/test2/100", nil)
+		req, err := http.NewRequest("GET", "/test1/100", nil)
 		require.NoError(t, err)
 		req.SetBasicAuth("someUser", "somePassword")
 		q := req.URL.Query()
@@ -79,9 +87,12 @@ func TestLogs(t *testing.T) {
 		r.ServeHTTP(w, req)
 		require.Equal(t, http.StatusOK, w.Code)
 
+		var gotNrLines int
+		wantNrLines := 1
 		sc := bufio.NewScanner(&b)
 		for sc.Scan() {
 			line := sc.Text()
+			gotNrLines++
 			got := make(map[string]any)
 
 			err = json.Unmarshal([]byte(line), &got)
@@ -93,28 +104,39 @@ func TestLogs(t *testing.T) {
 			gotRequest, ok := v.(map[string]any)
 			assert.True(t, ok, "want log line to have key `request` of type map[string]any")
 
-			assertLogAttributeEquals(t, gotRequest, "path", "/test2/100")
-			assertLogAttributeEquals(t, gotRequest, "route", "/test2/:urlParam")
+			assertLogAttributeEquals(t, gotRequest, "path", "/test1/100")
+			assertLogAttributeEquals(t, gotRequest, "route", "/test1/:urlParam")
 			assertLogAttributeEquals(t, gotRequest, "query", "query1=true")
 			assertLogAttributeEquals(t, gotRequest, "params", map[string]any{"urlParam": "100"})
 		}
+		assert.Equal(t, wantNrLines, gotNrLines)
+		require.NoError(t, sc.Err(), "error reading log lines")
 	})
 
 	t.Run("UseLogLevelInfoByDefault", func(t *testing.T) {
-		r.GET("/test3", func(c *gin.Context) {
+		t.Parallel()
+
+		var b bytes.Buffer
+		logger := slog.New(New(slog.NewJSONHandler(&b, nil)))
+		r := newGinEngine(t, logger, userID)
+
+		r.GET("/test1", func(c *gin.Context) {
 			c.String(http.StatusOK, "success")
 		})
 
 		w := httptest.NewRecorder()
-		req, err := http.NewRequest("GET", "/test3", nil)
+		req, err := http.NewRequest("GET", "/test1", nil)
 		require.NoError(t, err)
 		req.SetBasicAuth("someUser", "somePassword")
 		r.ServeHTTP(w, req)
 		require.Equal(t, http.StatusOK, w.Code)
 
+		var gotNrLines int
+		wantNrLines := 1
 		sc := bufio.NewScanner(&b)
 		for sc.Scan() {
 			line := sc.Text()
+			gotNrLines++
 			got := make(map[string]any)
 
 			err = json.Unmarshal([]byte(line), &got)
@@ -125,22 +147,33 @@ func TestLogs(t *testing.T) {
 			_, ok := got["error"]
 			assert.False(t, ok, "want no key `error` for non warn/error levels")
 		}
+		assert.Equal(t, wantNrLines, gotNrLines)
+		require.NoError(t, sc.Err(), "error reading log lines")
 	})
 
 	t.Run("UseLogLevelWarningOnClientError", func(t *testing.T) {
-		r.GET("/test4", func(c *gin.Context) {
+		t.Parallel()
+
+		var b bytes.Buffer
+		logger := slog.New(New(slog.NewJSONHandler(&b, nil)))
+		r := newGinEngine(t, logger, userID)
+
+		r.GET("/test1", func(c *gin.Context) {
 			c.String(http.StatusOK, "success")
 		})
 
 		w := httptest.NewRecorder()
-		req, err := http.NewRequest("GET", "/test4", nil)
+		req, err := http.NewRequest("GET", "/test1", nil)
 		require.NoError(t, err)
 		r.ServeHTTP(w, req)
 		require.Equal(t, http.StatusUnauthorized, w.Code)
 
+		var gotNrLines int
+		wantNrLines := 1
 		sc := bufio.NewScanner(&b)
 		for sc.Scan() {
 			line := sc.Text()
+			gotNrLines++
 			got := make(map[string]any)
 
 			err = json.Unmarshal([]byte(line), &got)
@@ -150,23 +183,34 @@ func TestLogs(t *testing.T) {
 			assertLogAttributeEquals(t, got, "level", "WARN")
 			assertLogAttributeContains(t, got, "error", "invalid Authorization header")
 		}
+		assert.Equal(t, wantNrLines, gotNrLines)
+		require.NoError(t, sc.Err(), "error reading log lines")
 	})
 
 	t.Run("UseLogLevelErrorOnServerError", func(t *testing.T) {
-		r.GET("/test5", func(c *gin.Context) {
+		t.Parallel()
+
+		var b bytes.Buffer
+		logger := slog.New(New(slog.NewJSONHandler(&b, nil)))
+		r := newGinEngine(t, logger, userID)
+
+		r.GET("/test1", func(c *gin.Context) {
 			_ = c.AbortWithError(http.StatusInternalServerError, errors.New("unknown error"))
 		})
 
 		w := httptest.NewRecorder()
-		req, err := http.NewRequest("GET", "/test5", nil)
+		req, err := http.NewRequest("GET", "/test1", nil)
 		require.NoError(t, err)
 		req.SetBasicAuth("someUser", "somePassword")
 		r.ServeHTTP(w, req)
 		require.Equal(t, http.StatusInternalServerError, w.Code)
 
+		var gotNrLines int
+		wantNrLines := 1
 		sc := bufio.NewScanner(&b)
 		for sc.Scan() {
 			line := sc.Text()
+			gotNrLines++
 			got := make(map[string]any)
 
 			err = json.Unmarshal([]byte(line), &got)
@@ -176,7 +220,22 @@ func TestLogs(t *testing.T) {
 			assertLogAttributeEquals(t, got, "level", "ERROR")
 			assertLogAttributeContains(t, got, "error", "unknown error")
 		}
+		assert.Equal(t, wantNrLines, gotNrLines)
+		require.NoError(t, sc.Err(), "error reading log lines")
 	})
+}
+
+func newGinEngine(t *testing.T, logger *slog.Logger, userID uint) *gin.Engine {
+	t.Helper()
+
+	gin.SetMode(gin.TestMode)
+	r, err := server.GetEngine(logger, "", []string{"http://localhost"})
+	require.NoError(t, err, "failed to set up up Gin")
+
+	auth := middleware.NewAuthentication(rsa.PublicKey{}, SignInService{userID: userID})
+	r.Use(auth.BasicAuthentication)
+
+	return r
 }
 
 func assertLogAttributeEquals(t *testing.T, got map[string]any, wantKey string, wantValue any) {

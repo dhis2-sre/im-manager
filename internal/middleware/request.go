@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/dhis2-sre/im-manager/pkg/model"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
@@ -14,13 +13,6 @@ import (
 type ctxKey int
 
 var correlationIDKey ctxKey
-
-const (
-	// slog key under which to log the correlation id
-	RequestLoggerKeyCorrelationID = "correlationId"
-	// slog key under which to log the request user
-	RequestLoggerKeyUser = "user"
-)
 
 // CorrelationID is a Gin middleware that adds a generated correlation ID to the
 // [http.Request.Context].
@@ -50,28 +42,12 @@ func GetCorrelationID(ctx context.Context) (string, bool) {
 // request.
 func RequestLogger(logger *slog.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		ctx := c.Request.Context()
-
 		requestTime := time.Now()
 
 		c.Next()
 
 		responseTime := time.Now()
 
-		var idAttribute slog.Attr
-		if correlationID, ok := GetCorrelationID(ctx); ok {
-			idAttribute = slog.String(RequestLoggerKeyCorrelationID, correlationID)
-		} else {
-			// In theory this never happens as we register the [RequestID] middleware and we have a
-			// test for it. We do need the GetRequestID signature though as there is no request ID
-			// outside of an HTTP context.
-			idAttribute = slog.String(RequestLoggerKeyCorrelationID, "MISSING")
-		}
-
-		var userAttribute slog.Attr
-		if user, ok := model.GetUserFromContext(ctx); ok {
-			userAttribute = slog.Any(RequestLoggerKeyUser, user)
-		}
 		params := make(map[string]string, len(c.Params))
 		for _, param := range c.Params {
 			params[param.Key] = param.Value
@@ -94,7 +70,7 @@ func RequestLogger(logger *slog.Logger) gin.HandlerFunc {
 		)
 
 		level := slog.LevelInfo
-		msg := "Processed HTTP request"
+		const msg = "Processed HTTP request"
 		var errorAttribute slog.Attr
 		if status := c.Writer.Status(); status >= http.StatusBadRequest && status < http.StatusInternalServerError {
 			level = slog.LevelWarn
@@ -104,7 +80,6 @@ func RequestLogger(logger *slog.Logger) gin.HandlerFunc {
 			errorAttribute = slog.String("error", c.Errors.String())
 		}
 
-		logger.LogAttrs(c.Request.Context(), level, msg, idAttribute, userAttribute,
-			errorAttribute, requestAttribute, responseAttribute)
+		logger.LogAttrs(c.Request.Context(), level, msg, errorAttribute, requestAttribute, responseAttribute)
 	}
 }

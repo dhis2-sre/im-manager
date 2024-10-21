@@ -9,11 +9,15 @@ import (
 	"github.com/dhis2-sre/im-manager/pkg/model"
 )
 
+const (
+	// slog key under which to log the correlation id
+	requestLoggerKeyCorrelationID = "correlationId"
+	// slog key under which to log the request user
+	requestLoggerKeyUser = "user"
+)
+
 // ContextHandler adds values from the [context.Context] to the [slog.Record]. [slog.Handler] is
-// passed to [slog.Logger] which is then used throughout the app. It has to use the same attribute
-// keys as the Gin [middleware.RequestLogger] so we can find logs created by the middleware and the
-// [slog.Logger] context aware methods. As not every use of the logger will be within the context of
-// an HTTP request it needs to be ok with keys not being set in the [context.Context].
+// passed to [slog.Logger] which is then used throughout the app.
 type ContextHandler struct {
 	slog.Handler
 }
@@ -29,14 +33,14 @@ func (rh *ContextHandler) Enabled(ctx context.Context, level slog.Level) bool {
 }
 
 func (rh *ContextHandler) Handle(ctx context.Context, r slog.Record) error {
-	// logs outside of an HTTP request or a RabbitMQ TTL message
+	// logs outside of an HTTP request or a RabbitMQ TTL message might not have a correlationID
 	if id, ok := middleware.GetCorrelationID(ctx); ok {
-		r.AddAttrs(slog.String(middleware.RequestLoggerKeyCorrelationID, id))
+		r.AddAttrs(slog.String(requestLoggerKeyCorrelationID, id))
 	}
 
 	// public HTTP routes do not have a user in the context
 	if user, ok := model.GetUserFromContext(ctx); ok {
-		r.AddAttrs(slog.Any(middleware.RequestLoggerKeyUser, user))
+		r.AddAttrs(slog.Any(requestLoggerKeyUser, user))
 	}
 
 	return rh.Handler.Handle(ctx, r)
