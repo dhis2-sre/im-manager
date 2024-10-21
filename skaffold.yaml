@@ -22,7 +22,7 @@ build:
   artifacts:
     - image: dhis2/im-manager
   tagPolicy:
-    inputDigest: {}
+    inputDigest: { }
 deploy:
   statusCheckDeadlineSeconds: 240
   tolerateFailuresUntilDeadline: true
@@ -40,9 +40,9 @@ deploy:
           extraPlugins: "rabbitmq_stream rabbitmq_stream_management"
           service:
             extraPorts:
-              - name: streams
-                port: 5552
-                targetPort: 5552
+            - name: streams
+              port: 5552
+              targetPort: 5552
         valuesFiles:
           - helm/data/secrets/{{ .CLASSIFICATION }}/rabbitmq.yaml
 
@@ -119,11 +119,11 @@ profiles:
           namespace: whoami
           <<: *im-group-chart-config
           setValueTemplates:
-            ## TODO: Once we get Skaffold profiles working this should be uncommented
-            #            corsAllowOrigins:
-            #              - "http://localhost:3000"
-            #              - "http://localhost:5173"
-            #              - "{{ .UI_URL }}"
+## TODO: Once we get Skaffold profiles working this should be uncommented
+#            corsAllowOrigins:
+#              - "http://localhost:3000"
+#              - "http://localhost:5173"
+#              - "{{ .UI_URL }}"
             serviceAccount:
               name: im-manager-{{ .ENVIRONMENT }}
               namespace: instance-manager-{{ .CLASSIFICATION }}
@@ -163,25 +163,25 @@ profiles:
         value:
           name: im-group-design
           namespace: design
-          <<: [*im-group-chart-config, *im-group-prod-service-account-config]
+          <<: [ *im-group-chart-config, *im-group-prod-service-account-config ]
 
       - op: add
         path: /deploy/helm/releases/-
         value:
           name: im-group-research
           namespace: research
-          <<: [*im-group-chart-config, *im-group-prod-service-account-config]
+          <<: [ *im-group-chart-config, *im-group-prod-service-account-config ]
 
       - op: add
         path: /deploy/helm/releases/-
         value:
           name: im-group-android
           namespace: android
-          <<: [*im-group-chart-config, *im-group-prod-service-account-config]
+          <<: [ *im-group-chart-config, *im-group-prod-service-account-config ]
 
       - op: add
         path: /deploy/helm/releases/-
         value:
           name: im-group-implement
           namespace: implement
-          <<: [*im-group-chart-config, *im-group-prod-service-account-config]
+          <<: [ *im-group-chart-config, *im-group-prod-service-account-config ]

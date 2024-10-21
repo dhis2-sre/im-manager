@@ -31,12 +31,7 @@ func NewDatabase(logger *slog.Logger, c PostgresqlConfig) (*gorm.DB, error) {
 		TranslateError: true,
 	}
 
-	host := c.Host
-	port := c.Port
-	username := c.Username
-	password := c.Password
-	name := c.DatabaseName
-	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%d sslmode=disable", host, username, password, name, port)
+	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%d sslmode=disable", c.Host, c.Username, c.Password, c.DatabaseName, c.Port)
 	db, err := gorm.Open(postgres.Open(dsn), &databaseConfig)
 	if err != nil {
 		return nil, err
