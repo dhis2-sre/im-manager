@@ -34,7 +34,7 @@ func TestLogs(t *testing.T) {
 			correlationID, _ = middleware.GetCorrelationID(c.Request.Context())
 
 			// our call to InfoContext here and the log line added from [middleware.RequestLogger]
-			// should have log attribute id=<requestID> and user=<userID> added by
+			// should have log attribute correlationId=<correlationID> and user=<userID> added by
 			// log.ContextHandler
 			logger.InfoContext(c.Request.Context(), "logged by handler")
 			c.String(http.StatusOK, "success")
@@ -62,7 +62,7 @@ func TestLogs(t *testing.T) {
 			assertLogAttributeEquals(t, got, "correlationId", correlationID)
 			assertLogAttributeEquals(t, got, "user", userID)
 		}
-		assert.Equal(t, wantNrLines, gotNrLines)
+		assert.Equal(t, wantNrLines, gotNrLines, "mismatch in number of expected log lines")
 		require.NoError(t, sc.Err(), "error reading log lines")
 	})
 
@@ -109,7 +109,7 @@ func TestLogs(t *testing.T) {
 			assertLogAttributeEquals(t, gotRequest, "query", "query1=true")
 			assertLogAttributeEquals(t, gotRequest, "params", map[string]any{"urlParam": "100"})
 		}
-		assert.Equal(t, wantNrLines, gotNrLines)
+		assert.Equal(t, wantNrLines, gotNrLines, "mismatch in number of expected log lines")
 		require.NoError(t, sc.Err(), "error reading log lines")
 	})
 
@@ -147,7 +147,7 @@ func TestLogs(t *testing.T) {
 			_, ok := got["error"]
 			assert.False(t, ok, "want no key `error` for non warn/error levels")
 		}
-		assert.Equal(t, wantNrLines, gotNrLines)
+		assert.Equal(t, wantNrLines, gotNrLines, "mismatch in number of expected log lines")
 		require.NoError(t, sc.Err(), "error reading log lines")
 	})
 
@@ -183,7 +183,7 @@ func TestLogs(t *testing.T) {
 			assertLogAttributeEquals(t, got, "level", "WARN")
 			assertLogAttributeContains(t, got, "error", "invalid Authorization header")
 		}
-		assert.Equal(t, wantNrLines, gotNrLines)
+		assert.Equal(t, wantNrLines, gotNrLines, "mismatch in number of expected log lines")
 		require.NoError(t, sc.Err(), "error reading log lines")
 	})
 
@@ -220,7 +220,7 @@ func TestLogs(t *testing.T) {
 			assertLogAttributeEquals(t, got, "level", "ERROR")
 			assertLogAttributeContains(t, got, "error", "unknown error")
 		}
-		assert.Equal(t, wantNrLines, gotNrLines)
+		assert.Equal(t, wantNrLines, gotNrLines, "mismatch in number of expected log lines")
 		require.NoError(t, sc.Err(), "error reading log lines")
 	})
 }
@@ -228,7 +228,6 @@ func TestLogs(t *testing.T) {
 func newGinEngine(t *testing.T, logger *slog.Logger, userID uint) *gin.Engine {
 	t.Helper()
 
-	gin.SetMode(gin.TestMode)
 	r, err := server.GetEngine(logger, "", []string{"http://localhost"})
 	require.NoError(t, err, "failed to set up up Gin")
 

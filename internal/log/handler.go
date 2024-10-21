@@ -11,9 +11,9 @@ import (
 
 const (
 	// slog key under which to log the correlation id
-	requestLoggerKeyCorrelationID = "correlationId"
-	// slog key under which to log the request user
-	requestLoggerKeyUser = "user"
+	loggerKeyCorrelationID = "correlationId"
+	// slog key under which to log the user
+	loggerKeyUser = "user"
 )
 
 // ContextHandler adds values from the [context.Context] to the [slog.Record]. [slog.Handler] is
@@ -35,12 +35,12 @@ func (rh *ContextHandler) Enabled(ctx context.Context, level slog.Level) bool {
 func (rh *ContextHandler) Handle(ctx context.Context, r slog.Record) error {
 	// logs outside of an HTTP request or a RabbitMQ TTL message might not have a correlationID
 	if id, ok := middleware.GetCorrelationID(ctx); ok {
-		r.AddAttrs(slog.String(requestLoggerKeyCorrelationID, id))
+		r.AddAttrs(slog.String(loggerKeyCorrelationID, id))
 	}
 
 	// public HTTP routes do not have a user in the context
 	if user, ok := model.GetUserFromContext(ctx); ok {
-		r.AddAttrs(slog.Any(requestLoggerKeyUser, user))
+		r.AddAttrs(slog.Any(loggerKeyUser, user))
 	}
 
 	return rh.Handler.Handle(ctx, r)
