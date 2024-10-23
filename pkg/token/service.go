@@ -1,6 +1,7 @@
 package token
 
 import (
+	"context"
 	"crypto/rsa"
 	"errors"
 	"fmt"
@@ -101,16 +102,16 @@ func (t tokenService) GetTokens(user *model.User, previousRefreshTokenId string,
 	}, nil
 }
 
-func (t tokenService) ValidateRefreshToken(tokenString string) (*RefreshTokenData, error) {
+func (t tokenService) ValidateRefreshToken(ctx context.Context, tokenString string) (*RefreshTokenData, error) {
 	claims, err := helper.ValidateRefreshToken(tokenString, t.refreshTokenSecretKey)
 	if err != nil {
-		t.logger.Error("Unable to validate token", "error", err, "token", tokenString)
+		t.logger.ErrorContext(ctx, "Unable to validate token", "error", err, "token", tokenString)
 		return nil, errors.New("unable to verify refresh token")
 	}
 
 	tokenId, err := uuid.Parse(claims.ID)
 	if err != nil {
-		t.logger.Error("Couldn't parse token id", "error", err, "claimsId", claims.ID)
+		t.logger.ErrorContext(ctx, "Couldn't parse token id", "error", err, "claimsId", claims.ID)
 		return nil, errors.New("unable to verify refresh token")
 	}
 

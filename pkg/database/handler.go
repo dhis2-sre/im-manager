@@ -1,9 +1,9 @@
 package database
 
 import (
+	"context"
 	"errors"
 	"fmt"
-	"io"
 	"log/slog"
 	"mime/multipart"
 	"net/http"
@@ -20,7 +20,7 @@ import (
 	"github.com/google/uuid"
 )
 
-func NewHandler(logger *slog.Logger, databaseService Service, groupService groupService, instanceService instanceService, stackService stackService) Handler {
+func NewHandler(logger *slog.Logger, databaseService *service, groupService groupService, instanceService instanceService, stackService stackService) Handler {
 	return Handler{
 		logger:          logger,
 		databaseService: databaseService,
@@ -32,31 +32,14 @@ func NewHandler(logger *slog.Logger, databaseService Service, groupService group
 
 type Handler struct {
 	logger          *slog.Logger
-	databaseService Service
+	databaseService *service
 	groupService    groupService
 	instanceService instanceService
 	stackService    stackService
 }
 
-type Service interface {
-	Copy(id uint, d *model.Database, group *model.Group) error
-	FindById(id uint) (*model.Database, error)
-	FindByIdentifier(identifier string) (*model.Database, error)
-	Lock(id uint, instanceId uint, userId uint) (*model.Lock, error)
-	Unlock(id uint) error
-	Upload(d *model.Database, group *model.Group, reader ReadAtSeeker, size int64) (*model.Database, error)
-	Download(id uint, dst io.Writer, headers func(contentLength int64)) error
-	Delete(id uint) error
-	List(user *model.User) ([]GroupsWithDatabases, error)
-	Update(d *model.Database) error
-	CreateExternalDownload(databaseID uint, expiration uint) (*model.ExternalDownload, error)
-	FindExternalDownload(uuid uuid.UUID) (*model.ExternalDownload, error)
-	SaveAs(database *model.Database, instance *model.DeploymentInstance, stack *model.Stack, newName string, format string, done func(saved *model.Database)) (*model.Database, error)
-	Save(userId uint, database *model.Database, instance *model.DeploymentInstance, stack *model.Stack) error
-}
-
 type instanceService interface {
-	FindDecryptedDeploymentInstanceById(id uint) (*model.DeploymentInstance, error)
+	FindDecryptedDeploymentInstanceById(ctx context.Context, id uint) (*model.DeploymentInstance, error)
 }
 
 type stackService interface {
@@ -114,7 +97,8 @@ func (h Handler) Upload(c *gin.Context) {
 		return
 	}
 
-	group, err := h.groupService.Find(d.GroupName)
+	ctx := c.Request.Context()
+	group, err := h.groupService.Find(ctx, d.GroupName)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -141,7 +125,7 @@ func (h Handler) Upload(c *gin.Context) {
 		return
 	}
 
-	save, err := h.databaseService.Upload(d, group, f, int64(contentLength))
+	save, err := h.databaseService.Upload(ctx, d, group, f, int64(contentLength))
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -190,7 +174,8 @@ func (h Handler) SaveAs(c *gin.Context) {
 	}
 
 	//goland:noinspection GoImportUsedAsName
-	instance, err := h.instanceService.FindDecryptedDeploymentInstanceById(instanceId)
+	ctx := c.Request.Context()
+	instance, err := h.instanceService.FindDecryptedDeploymentInstanceById(ctx, instanceId)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -209,7 +194,7 @@ func (h Handler) SaveAs(c *gin.Context) {
 		_ = c.Error(fmt.Errorf("parameter %q not found", parameter))
 	}
 
-	database, err := h.databaseService.FindByIdentifier(databaseId.Value)
+	database, err := h.databaseService.FindByIdentifier(ctx, databaseId.Value)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -221,8 +206,8 @@ func (h Handler) SaveAs(c *gin.Context) {
 		return
 	}
 
-	save, err := h.databaseService.SaveAs(database, instance, stack, request.Name, request.Format, func(saved *model.Database) {
-		h.logger.Info("Save an instances database as", "groupName", saved.GroupName, "databaseName", saved.Name, "instanceName", instance.Name)
+	save, err := h.databaseService.SaveAs(ctx, database, instance, stack, request.Name, request.Format, func(ctx context.Context, saved *model.Database) {
+		h.logger.InfoContext(ctx, "Save an instances database as", "groupName", saved.GroupName, "databaseName", saved.Name, "instanceName", instance.Name)
 	})
 	if err != nil {
 		_ = c.Error(err)
@@ -255,7 +240,8 @@ func (h Handler) Save(c *gin.Context) {
 	}
 
 	//goland:noinspection GoImportUsedAsName
-	instance, err := h.instanceService.FindDecryptedDeploymentInstanceById(instanceId)
+	ctx := c.Request.Context()
+	instance, err := h.instanceService.FindDecryptedDeploymentInstanceById(ctx, instanceId)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -274,7 +260,7 @@ func (h Handler) Save(c *gin.Context) {
 		_ = c.Error(fmt.Errorf("parameter %q not found", parameter))
 	}
 
-	database, err := h.databaseService.FindByIdentifier(databaseId.Value)
+	database, err := h.databaseService.FindByIdentifier(ctx, databaseId.Value)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -286,13 +272,13 @@ func (h Handler) Save(c *gin.Context) {
 		return
 	}
 
-	user, err := handler.GetUserFromContext(c)
+	user, err := handler.GetUserFromContext(ctx)
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
 
-	err = h.databaseService.Save(user.ID, database, instance, stack)
+	err = h.databaseService.Save(ctx, user.ID, database, instance, stack)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -344,13 +330,14 @@ func (h Handler) Copy(c *gin.Context) {
 		return
 	}
 
-	group, err := h.groupService.Find(d.GroupName)
+	ctx := c.Request.Context()
+	group, err := h.groupService.Find(ctx, d.GroupName)
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
 
-	if err := h.databaseService.Copy(id, d, group); err != nil {
+	if err := h.databaseService.Copy(ctx, id, d, group); err != nil {
 		_ = c.Error(err)
 		return
 	}
@@ -377,7 +364,7 @@ func (h Handler) FindByIdentifier(c *gin.Context) {
 	//	404: Error
 	//	415: Error
 	identifier := c.Param("id")
-	d, err := h.databaseService.FindByIdentifier(identifier)
+	d, err := h.databaseService.FindByIdentifier(c.Request.Context(), identifier)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -425,13 +412,14 @@ func (h Handler) Lock(c *gin.Context) {
 		return
 	}
 
-	d, err := h.databaseService.FindById(id)
+	ctx := c.Request.Context()
+	d, err := h.databaseService.FindById(ctx, id)
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
 
-	user, err := handler.GetUserFromContext(c)
+	user, err := handler.GetUserFromContext(ctx)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -443,7 +431,7 @@ func (h Handler) Lock(c *gin.Context) {
 		return
 	}
 
-	lock, err := h.databaseService.Lock(id, request.InstanceId, user.ID)
+	lock, err := h.databaseService.Lock(ctx, id, request.InstanceId, user.ID)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -474,13 +462,14 @@ func (h Handler) Unlock(c *gin.Context) {
 		return
 	}
 
-	d, err := h.databaseService.FindById(id)
+	ctx := c.Request.Context()
+	d, err := h.databaseService.FindById(ctx, id)
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
 
-	user, err := handler.GetUserFromContext(c)
+	user, err := handler.GetUserFromContext(ctx)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -498,7 +487,7 @@ func (h Handler) Unlock(c *gin.Context) {
 		return
 	}
 
-	err = h.databaseService.Unlock(id)
+	err = h.databaseService.Unlock(ctx, id)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -525,7 +514,8 @@ func (h Handler) Download(c *gin.Context) {
 	//	404: Error
 	//	415: Error
 	identifier := c.Param("id")
-	d, err := h.databaseService.FindByIdentifier(identifier)
+	ctx := c.Request.Context()
+	d, err := h.databaseService.FindByIdentifier(ctx, identifier)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -543,7 +533,7 @@ func (h Handler) Download(c *gin.Context) {
 	c.Header("Content-Transfer-Encoding", "binary")
 	c.Header("Content-Type", "application/octet-stream")
 
-	err = h.databaseService.Download(d.ID, c.Writer, func(contentLength int64) {
+	err = h.databaseService.Download(ctx, d.ID, c.Writer, func(contentLength int64) {
 		c.Header("Content-Length", strconv.FormatInt(contentLength, 10))
 	})
 	if err != nil {
@@ -574,7 +564,8 @@ func (h Handler) Delete(c *gin.Context) {
 		return
 	}
 
-	d, err := h.databaseService.FindById(id)
+	ctx := c.Request.Context()
+	d, err := h.databaseService.FindById(ctx, id)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -586,7 +577,7 @@ func (h Handler) Delete(c *gin.Context) {
 		return
 	}
 
-	err = h.databaseService.Delete(id)
+	err = h.databaseService.Delete(ctx, id)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -617,13 +608,14 @@ func (h Handler) List(c *gin.Context) {
 	//	401: Error
 	//	403: Error
 	//	415: Error
-	user, err := handler.GetUserFromContext(c)
+	ctx := c.Request.Context()
+	user, err := handler.GetUserFromContext(ctx)
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
 
-	databases, err := h.databaseService.List(user)
+	databases, err := h.databaseService.List(ctx, user)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -664,7 +656,8 @@ func (h Handler) Update(c *gin.Context) {
 		return
 	}
 
-	d, err := h.databaseService.FindById(id)
+	ctx := c.Request.Context()
+	d, err := h.databaseService.FindById(ctx, id)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -678,7 +671,7 @@ func (h Handler) Update(c *gin.Context) {
 
 	d.Name = request.Name
 
-	err = h.databaseService.Update(d)
+	err = h.databaseService.Update(ctx, d)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -688,7 +681,7 @@ func (h Handler) Update(c *gin.Context) {
 }
 
 func (h Handler) canAccess(c *gin.Context, d *model.Database) error {
-	user, err := handler.GetUserFromContext(c)
+	user, err := handler.GetUserFromContext(c.Request.Context())
 	if err != nil {
 		_ = c.Error(err)
 		return err
@@ -735,7 +728,8 @@ func (h Handler) CreateExternalDownload(c *gin.Context) {
 		return
 	}
 
-	d, err := h.databaseService.FindById(id)
+	ctx := c.Request.Context()
+	d, err := h.databaseService.FindById(ctx, id)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -747,7 +741,7 @@ func (h Handler) CreateExternalDownload(c *gin.Context) {
 		return
 	}
 
-	externalDownload, err := h.databaseService.CreateExternalDownload(d.ID, request.Expiration)
+	externalDownload, err := h.databaseService.CreateExternalDownload(ctx, d.ID, request.Expiration)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -786,13 +780,14 @@ func (h Handler) ExternalDownload(c *gin.Context) {
 		return
 	}
 
-	download, err := h.databaseService.FindExternalDownload(id)
+	ctx := c.Request.Context()
+	download, err := h.databaseService.FindExternalDownload(ctx, id)
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
 
-	d, err := h.databaseService.FindById(download.DatabaseID)
+	d, err := h.databaseService.FindById(ctx, download.DatabaseID)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -804,7 +799,7 @@ func (h Handler) ExternalDownload(c *gin.Context) {
 	c.Header("Content-Transfer-Encoding", "binary")
 	c.Header("Content-Type", "application/octet-stream")
 
-	err = h.databaseService.Download(d.ID, c.Writer, func(contentLength int64) {
+	err = h.databaseService.Download(ctx, d.ID, c.Writer, func(contentLength int64) {
 		c.Header("Content-Length", strconv.FormatInt(contentLength, 10))
 	})
 	if err != nil {

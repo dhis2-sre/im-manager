@@ -80,6 +80,7 @@ func run() (err error) {
 		}
 	}()
 
+	ctx := context.Background()
 	logger := slog.New(log.New(slog.NewJSONHandler(os.Stdout, nil)))
 
 	db, err := newDB(logger)
@@ -109,7 +110,7 @@ func run() (err error) {
 	if err != nil {
 		return err
 	}
-	privateKey, err := GetPrivateKey(logger)
+	privateKey, err := getPrivateKey(ctx, logger)
 	if err != nil {
 		return err
 	}
@@ -168,7 +169,7 @@ func run() (err error) {
 		return err
 	}
 
-	databaseHandler, err := newDatabaseHandler(logger, db, groupService, instanceService, stackService)
+	databaseHandler, err := newDatabaseHandler(ctx, logger, db, groupService, instanceService, stackService)
 	if err != nil {
 		return err
 	}
@@ -183,22 +184,22 @@ func run() (err error) {
 		return err
 	}
 
-	eventHandler, err := newEventHandler(logger, rabbitmqConfig)
+	eventHandler, err := newEventHandler(ctx, logger, rabbitmqConfig)
 	if err != nil {
 		return err
 	}
 
-	err = createGroups(logger, groupService)
+	err = createGroups(ctx, logger, groupService)
 	if err != nil {
 		return err
 	}
 
-	err = createAdminUser(userService, groupService)
+	err = createAdminUser(ctx, userService, groupService)
 	if err != nil {
 		return err
 	}
 
-	err = createE2ETestUser(userService, groupService)
+	err = createE2ETestUser(ctx, userService, groupService)
 	if err != nil {
 		return err
 	}
@@ -216,7 +217,7 @@ func run() (err error) {
 	instance.Routes(r, authentication.TokenAuthentication, instanceHandler)
 	event.Routes(r, authentication.TokenAuthentication, eventHandler)
 
-	logger.Info("Listening and serving HTTP")
+	logger.InfoContext(ctx, "Listening and serving HTTP")
 	if err := r.Run(); err != nil {
 		return fmt.Errorf("failed to start the HTTP server: %v", err)
 	}
@@ -363,7 +364,7 @@ func sameSiteMode() (http.SameSite, error) {
 	return -1, fmt.Errorf("failed to parse \"SAME_SITE_MODE\": %q", sameSiteMode)
 }
 
-func GetPrivateKey(logger *slog.Logger) (*rsa.PrivateKey, error) {
+func getPrivateKey(ctx context.Context, logger *slog.Logger) (*rsa.PrivateKey, error) {
 	key, err := requireEnv("PRIVATE_KEY")
 	if err != nil {
 		return nil, err
@@ -378,7 +379,7 @@ func GetPrivateKey(logger *slog.Logger) (*rsa.PrivateKey, error) {
 	privateKey, err := x509.ParsePKCS8PrivateKey(decode.Bytes)
 	if err != nil {
 		if err.Error() == "x509: failed to parse private key (use ParsePKCS1PrivateKey instead for this key format)" {
-			logger.Info("Trying to parse PKCS1 format...")
+			logger.InfoContext(ctx, "Trying to parse PKCS1 format...")
 			privateKey, err = x509.ParsePKCS1PrivateKey(decode.Bytes)
 			if err != nil {
 				return nil, err
@@ -386,7 +387,7 @@ func GetPrivateKey(logger *slog.Logger) (*rsa.PrivateKey, error) {
 		} else {
 			return nil, err
 		}
-		logger.Info("Successfully parsed private key")
+		logger.InfoContext(ctx, "Successfully parsed private key")
 	}
 
 	return privateKey.(*rsa.PrivateKey), nil
@@ -476,12 +477,12 @@ func newInstanceHandler(groupService *group.Service, instanceService *instance.S
 	return instance.NewHandler(groupService, instanceService, defaultTTL), nil
 }
 
-func newDatabaseHandler(logger *slog.Logger, db *gorm.DB, groupService *group.Service, instanceService *instance.Service, stackService stack.Service) (database.Handler, error) {
+func newDatabaseHandler(ctx context.Context, logger *slog.Logger, db *gorm.DB, groupService *group.Service, instanceService *instance.Service, stackService stack.Service) (database.Handler, error) {
 	s3Bucket, err := requireEnv("S3_BUCKET")
 	if err != nil {
 		return database.Handler{}, err
 	}
-	s3Client, err := newS3Client(logger)
+	s3Client, err := newS3Client(ctx, logger)
 	if err != nil {
 		return database.Handler{}, err
 	}
@@ -491,7 +492,7 @@ func newDatabaseHandler(logger *slog.Logger, db *gorm.DB, groupService *group.Se
 	return database.NewHandler(logger, databaseService, groupService, instanceService, stackService), nil
 }
 
-func newS3Client(logger *slog.Logger) (*storage.S3Client, error) {
+func newS3Client(ctx context.Context, logger *slog.Logger) (*storage.S3Client, error) {
 	s3Region, err := requireEnv("S3_REGION")
 	if err != nil {
 		return nil, err
@@ -505,7 +506,7 @@ func newS3Client(logger *slog.Logger) (*storage.S3Client, error) {
 		return aws.Endpoint{}, &aws.EndpointNotFoundError{}
 	})
 	s3Config, err := s3config.LoadDefaultConfig(
-		context.TODO(),
+		ctx,
 		s3config.WithRegion(s3Region),
 		// nolint:staticcheck
 		s3config.WithEndpointResolverWithOptions(aws.EndpointResolverWithOptions(s3Endpoint)),
@@ -544,8 +545,8 @@ func newIntegrationHandler() (integration.Handler, error) {
 	return integration.NewHandler(dockerHubClient, instanceServiceHost), nil
 }
 
-func newEventHandler(logger *slog.Logger, rabbitmqConfig rabbitMQConfig) (event.Handler, error) {
-	logger.Info("Connecting with RabbitMQ stream client", "host", rabbitmqConfig.Host, "port", rabbitmqConfig.StreamPort)
+func newEventHandler(ctx context.Context, logger *slog.Logger, rabbitmqConfig rabbitMQConfig) (event.Handler, error) {
+	logger.InfoContext(ctx, "Connecting with RabbitMQ stream client", "host", rabbitmqConfig.Host, "port", rabbitmqConfig.StreamPort)
 	env, err := stream.NewEnvironment(
 		stream.NewEnvironmentOptions().
 			SetHost(rabbitmqConfig.Host).
@@ -557,7 +558,7 @@ func newEventHandler(logger *slog.Logger, rabbitmqConfig rabbitMQConfig) (event.
 	if err != nil {
 		return event.Handler{}, fmt.Errorf("failed to connect with RabbitMQ stream client: %v", err)
 	}
-	logger.Info("Connected with RabbitMQ stream client", "host", rabbitmqConfig.Host, "port", rabbitmqConfig.StreamPort)
+	logger.InfoContext(ctx, "Connected with RabbitMQ stream client", "host", rabbitmqConfig.Host, "port", rabbitmqConfig.StreamPort)
 
 	streamName := "events"
 	err = env.DeclareStream(streamName,
@@ -572,10 +573,10 @@ func newEventHandler(logger *slog.Logger, rabbitmqConfig rabbitMQConfig) (event.
 }
 
 type groupService interface {
-	FindOrCreate(name string, hostname string, deployable bool) (*model.Group, error)
+	FindOrCreate(ctx context.Context, name string, hostname string, deployable bool) (*model.Group, error)
 }
 
-func createGroups(logger *slog.Logger, groupService groupService) error {
+func createGroups(ctx context.Context, logger *slog.Logger, groupService groupService) error {
 	groupNames, err := requireEnvAsArray("GROUP_NAMES")
 	if err != nil {
 		return err
@@ -594,21 +595,21 @@ func createGroups(logger *slog.Logger, groupService groupService) error {
 		groups[i].Hostname = groupHostnames[i]
 	}
 
-	logger.Info("Creating groups...")
+	logger.InfoContext(ctx, "Creating groups...")
 	for _, g := range groups {
-		newGroup, err := groupService.FindOrCreate(g.Name, g.Hostname, true)
+		newGroup, err := groupService.FindOrCreate(ctx, g.Name, g.Hostname, true)
 		if err != nil {
 			return fmt.Errorf("error creating group: %v", err)
 		}
 		if newGroup != nil {
-			logger.Info("Created group", "group", newGroup.Name)
+			logger.InfoContext(ctx, "Created group", "group", newGroup.Name)
 		}
 	}
 
 	return nil
 }
 
-func createAdminUser(userService *user.Service, groupService *group.Service) error {
+func createAdminUser(ctx context.Context, userService *user.Service, groupService *group.Service) error {
 	adminEmail, err := requireEnv("ADMIN_USER_EMAIL")
 	if err != nil {
 		return err
@@ -618,10 +619,10 @@ func createAdminUser(userService *user.Service, groupService *group.Service) err
 		return err
 	}
 
-	return user.CreateUser(adminEmail, adminPassword, userService, groupService, model.AdministratorGroupName, "admin")
+	return user.CreateUser(ctx, adminEmail, adminPassword, userService, groupService, model.AdministratorGroupName, "admin")
 }
 
-func createE2ETestUser(userService *user.Service, groupService *group.Service) error {
+func createE2ETestUser(ctx context.Context, userService *user.Service, groupService *group.Service) error {
 	testEmail, err := requireEnv("E2E_TEST_USER_EMAIL")
 	if err != nil {
 		return err
@@ -631,7 +632,7 @@ func createE2ETestUser(userService *user.Service, groupService *group.Service) e
 		return err
 	}
 
-	return user.CreateUser(testEmail, testPassword, userService, groupService, model.DefaultGroupName, "e2e test")
+	return user.CreateUser(ctx, testEmail, testPassword, userService, groupService, model.DefaultGroupName, "e2e test")
 }
 
 func newGinEngine(logger *slog.Logger) (*gin.Engine, error) {

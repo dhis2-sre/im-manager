@@ -47,8 +47,8 @@ func TestDatabaseHandler(t *testing.T) {
 
 	client := inttest.SetupHTTPServer(t, func(engine *gin.Engine) {
 		databaseHandler := database.NewHandler(logger, databaseService, groupService{groupName: "packages"}, instanceService{}, stackService{})
-		authenticator := func(ctx *gin.Context) {
-			ctx.Set("user", &model.User{
+		authenticator := func(c *gin.Context) {
+			ctx := model.NewContextWithUser(c.Request.Context(), &model.User{
 				ID:    1,
 				Email: "user1@dhis2.org",
 				Groups: []model.Group{
@@ -57,6 +57,7 @@ func TestDatabaseHandler(t *testing.T) {
 					},
 				},
 			})
+			c.Request = c.Request.WithContext(ctx)
 		}
 		database.Routes(engine, authenticator, databaseHandler)
 	})
@@ -246,7 +247,7 @@ type groupService struct {
 	groupName string
 }
 
-func (gs groupService) Find(name string) (*model.Group, error) {
+func (gs groupService) Find(ctx context.Context, name string) (*model.Group, error) {
 	return &model.Group{
 		Name: gs.groupName,
 	}, nil
@@ -254,8 +255,7 @@ func (gs groupService) Find(name string) (*model.Group, error) {
 
 type instanceService struct{}
 
-func (is instanceService) FindDecryptedDeploymentInstanceById(id uint) (*model.DeploymentInstance, error) {
-	//TODO implement me
+func (is instanceService) FindDecryptedDeploymentInstanceById(ctx context.Context, id uint) (*model.DeploymentInstance, error) {
 	panic("implement me")
 }
 
