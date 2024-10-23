@@ -256,7 +256,6 @@ func (gs groupService) Find(ctx context.Context, name string) (*model.Group, err
 type instanceService struct{}
 
 func (is instanceService) FindDecryptedDeploymentInstanceById(ctx context.Context, id uint) (*model.DeploymentInstance, error) {
-	// TODO implement me
 	panic("implement me")
 }
 

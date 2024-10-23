@@ -10,9 +10,9 @@ import (
 )
 
 const (
-	// slog key under which to log the correlation id
+	// loggerKeyCorrelationID is the slog key under which to log the correlation id
 	loggerKeyCorrelationID = "correlationId"
-	// slog key under which to log the user
+	// loggerKeyUser is the slog key under which to log the user
 	loggerKeyUser = "user"
 )
 
