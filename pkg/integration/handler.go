@@ -164,6 +164,13 @@ func (h Handler) Integrations(c *gin.Context) {
 		return
 	}
 
+	if request.Key == "STORAGE_TYPE" {
+		storageTypes := []string{"filesystem", "minio (currently not support. DO NOT SELECT!)"}
+
+		c.JSON(http.StatusOK, storageTypes)
+		return
+	}
+
 	if request.Key == "DATABASE_ID" {
 		token, err := handler.GetTokenFromRequest(c)
 		if err != nil {
