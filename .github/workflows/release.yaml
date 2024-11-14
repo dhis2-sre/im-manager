@@ -19,6 +19,8 @@ jobs:
           ssh-add ~/.ssh/id_ed25519
           git config --global user.signingkey ~/.ssh/id_ed25519
           git config --global commit.gpgSign true
+          git config --global user.name "dhis2-sre-bot"
+          git config --global user.email "devops@dhis2.org"
         env:
           SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
 
