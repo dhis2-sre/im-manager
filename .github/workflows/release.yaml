@@ -1,0 +1,49 @@
+name: Release
+
+on:
+  workflow_dispatch:
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Set up SSH for Git signing
+        run: |
+          mkdir --parents ~/.ssh
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
+          chmod --changes 600 ~/.ssh/id_ed25519
+          ssh-add ~/.ssh/id_ed25519
+          git config --global user.signingkey ~/.ssh/id_ed25519
+          git config --global commit.gpgSign true
+          git config --global user.name "dhis2-sre-bot"
+          git config --global user.email "devops@dhis2.org"
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Get the latest Git tag
+        id: get_latest_tag
+        run: |
+          git fetch --tags
+          latest_tag=$(git describe --tags --abbrev=0)
+          echo "::set-output name=latest_tag::$latest_tag"
+
+      - name: Calculate the next minor version
+        id: calculate_next_version
+        run: |
+          version=${{ steps.get_latest_tag.outputs.latest_tag }}
+          version="${version#v}"
+          major=$(echo "$version" | cut --delimiter='.' --fields=1)
+          minor=$(echo "$version" | cut --delimiter='.' --fields=2)
+          patch=$(echo "$version" | cut --delimiter='.' --fields=3)
+          next_minor=$((minor + 1))
+          next_version="v${major}.${next_minor}.0"
+          echo "::set-output name=next_version::$next_version"
+
+      - name: Tag the latest commit with a signed tag
+        run: |
+          git tag --sign ${{ steps.calculate_next_version.outputs.next_version }} --message "Release ${{ steps.calculate_next_version.outputs.next_version }}"
+          git push origin ${{ steps.calculate_next_version.outputs.next_version }}
