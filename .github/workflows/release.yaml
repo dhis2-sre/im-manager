@@ -16,8 +16,8 @@ jobs:
           mkdir --parents ~/.ssh
           echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
           chmod --changes 600 ~/.ssh/id_ed25519
-          ssh-add ~/.ssh/id_ed25519
           eval $(ssh-agent)
+          ssh-add ~/.ssh/id_ed25519
           git config --global user.signingkey ~/.ssh/id_ed25519
           git config --global commit.gpgSign true
           git config --global user.name "dhis2-sre-bot"
