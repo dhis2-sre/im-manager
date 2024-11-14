@@ -29,7 +29,7 @@ jobs:
         id: get_latest_tag
         run: |
           git fetch --tags
-          latest_tag=$(git describe --tags --abbrev=0)
+          latest_tag=$(git tag --sort=-creatordate | head --lines=1)
           echo "::set-output name=latest_tag::$latest_tag"
 
       - name: Calculate the next minor version
