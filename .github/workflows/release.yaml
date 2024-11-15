@@ -47,5 +47,5 @@ jobs:
 
       - name: Tag the latest commit with a signed tag
         run: |
-          git tag --sign ${{ steps.calculate_next_version.outputs.next_version }} --message "Release ${{ steps.calculate_next_version.outputs.next_version }}"
+          git tag ${{ steps.calculate_next_version.outputs.next_version }}
           git push --tags
