@@ -615,6 +615,9 @@ func (s Service) groupPublicInstances(instances []*model.DeploymentInstance) ([]
 		nightlyCategory := Category{Label: "Canary"}
 		stableCategory := Category{Label: "Stable"}
 		for _, instance := range instances {
+			if instance.StackName != "dhis2-core" {
+				continue
+			}
 			if instance.GroupName == name {
 				publicInstance := PublicInstance{
 					Name:        instance.Name,
