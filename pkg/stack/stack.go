@@ -184,19 +184,20 @@ var DHIS2Core = model.Stack{
 		"IMAGE_TAG":                       {Priority: 1, DisplayName: "Image Tag", DefaultValue: &dhis2CoreDefaults.imageTag},
 		"IMAGE_REPOSITORY":                {Priority: 2, DisplayName: "Image Repository", DefaultValue: &dhis2CoreDefaults.imageRepository},
 		"IMAGE_PULL_POLICY":               {Priority: 3, DisplayName: "Image Pull Policy", DefaultValue: &dhis2CoreDefaults.imagePullPolicy, Validator: imagePullPolicy},
-		"DHIS2_HOME":                      {Priority: 4, DisplayName: "DHIS2 Home Directory", DefaultValue: &dhis2CoreDefaults.dhis2Home},
-		"FLYWAY_MIGRATE_OUT_OF_ORDER":     {Priority: 5, DisplayName: "Flyway Migrate Out Of Order", DefaultValue: &dhis2CoreDefaults.flywayMigrateOutOfOrder},
-		"FLYWAY_REPAIR_BEFORE_MIGRATION":  {Priority: 6, DisplayName: "Flyway Repair Before Migration", DefaultValue: &dhis2CoreDefaults.flywayRepairBeforeMigration},
-		"RESOURCES_REQUESTS_CPU":          {Priority: 7, DisplayName: "Resources Requests CPU", DefaultValue: &dhis2CoreDefaults.resourcesRequestsCPU},
-		"RESOURCES_REQUESTS_MEMORY":       {Priority: 8, DisplayName: "Resources Requests Memory", DefaultValue: &dhis2CoreDefaults.resourcesRequestsMemory},
-		"MIN_READY_SECONDS":               {Priority: 9, DisplayName: "Minimum Ready Seconds", DefaultValue: &dhis2CoreDefaults.minReadySeconds},
-		"LIVENESS_PROBE_TIMEOUT_SECONDS":  {Priority: 10, DisplayName: "Liveness Probe Timeout Seconds", DefaultValue: &dhis2CoreDefaults.livenessProbeTimeoutSeconds},
-		"READINESS_PROBE_TIMEOUT_SECONDS": {Priority: 11, DisplayName: "Readiness Probe Timeout Seconds", DefaultValue: &dhis2CoreDefaults.readinessProbeTimeoutSeconds},
-		"STARTUP_PROBE_FAILURE_THRESHOLD": {Priority: 12, DisplayName: "Startup Probe Failure Threshold", DefaultValue: &dhis2CoreDefaults.startupProbeFailureThreshold},
-		"STARTUP_PROBE_PERIOD_SECONDS":    {Priority: 13, DisplayName: "Startup Probe Period Seconds", DefaultValue: &dhis2CoreDefaults.startupProbePeriodSeconds},
-		"JAVA_OPTS":                       {Priority: 14, DisplayName: "JAVA_OPTS", DefaultValue: &dhis2CoreDefaults.javaOpts},
-		"CHART_VERSION":                   {Priority: 15, DisplayName: "Chart Version", DefaultValue: &dhis2CoreDefaults.chartVersion},
-		"ENABLE_QUERY_LOGGING":            {Priority: 16, DisplayName: "Enable Query Logging", DefaultValue: &dhis2CoreDefaults.enableQueryLogging},
+		"STORAGE_TYPE":                    {Priority: 4, DisplayName: "Storage type", DefaultValue: &dhis2CoreDefaults.storageType, Validator: storage},
+		"DHIS2_HOME":                      {Priority: 5, DisplayName: "DHIS2 Home Directory", DefaultValue: &dhis2CoreDefaults.dhis2Home},
+		"FLYWAY_MIGRATE_OUT_OF_ORDER":     {Priority: 6, DisplayName: "Flyway Migrate Out Of Order", DefaultValue: &dhis2CoreDefaults.flywayMigrateOutOfOrder},
+		"FLYWAY_REPAIR_BEFORE_MIGRATION":  {Priority: 7, DisplayName: "Flyway Repair Before Migration", DefaultValue: &dhis2CoreDefaults.flywayRepairBeforeMigration},
+		"RESOURCES_REQUESTS_CPU":          {Priority: 8, DisplayName: "Resources Requests CPU", DefaultValue: &dhis2CoreDefaults.resourcesRequestsCPU},
+		"RESOURCES_REQUESTS_MEMORY":       {Priority: 9, DisplayName: "Resources Requests Memory", DefaultValue: &dhis2CoreDefaults.resourcesRequestsMemory},
+		"MIN_READY_SECONDS":               {Priority: 10, DisplayName: "Minimum Ready Seconds", DefaultValue: &dhis2CoreDefaults.minReadySeconds},
+		"LIVENESS_PROBE_TIMEOUT_SECONDS":  {Priority: 11, DisplayName: "Liveness Probe Timeout Seconds", DefaultValue: &dhis2CoreDefaults.livenessProbeTimeoutSeconds},
+		"READINESS_PROBE_TIMEOUT_SECONDS": {Priority: 12, DisplayName: "Readiness Probe Timeout Seconds", DefaultValue: &dhis2CoreDefaults.readinessProbeTimeoutSeconds},
+		"STARTUP_PROBE_FAILURE_THRESHOLD": {Priority: 13, DisplayName: "Startup Probe Failure Threshold", DefaultValue: &dhis2CoreDefaults.startupProbeFailureThreshold},
+		"STARTUP_PROBE_PERIOD_SECONDS":    {Priority: 14, DisplayName: "Startup Probe Period Seconds", DefaultValue: &dhis2CoreDefaults.startupProbePeriodSeconds},
+		"JAVA_OPTS":                       {Priority: 15, DisplayName: "JAVA_OPTS", DefaultValue: &dhis2CoreDefaults.javaOpts},
+		"CHART_VERSION":                   {Priority: 16, DisplayName: "Chart Version", DefaultValue: &dhis2CoreDefaults.chartVersion},
+		"ENABLE_QUERY_LOGGING":            {Priority: 17, DisplayName: "Enable Query Logging", DefaultValue: &dhis2CoreDefaults.enableQueryLogging},
 		"GOOGLE_AUTH_PROJECT_ID":          {Priority: 0, DisplayName: "Google auth project id", DefaultValue: &dhis2CoreDefaults.googleAuthClientId},
 		"GOOGLE_AUTH_PRIVATE_KEY":         {Priority: 0, DisplayName: "Google auth private key", DefaultValue: &dhis2CoreDefaults.googleAuthPrivateKey},
 		"GOOGLE_AUTH_PRIVATE_KEY_ID":      {Priority: 0, DisplayName: "Google auth private key id", DefaultValue: &dhis2CoreDefaults.googleAuthPrivateKeyId},
@@ -215,6 +216,7 @@ var DHIS2Core = model.Stack{
 
 var dhis2CoreDefaults = struct {
 	chartVersion                 string
+	storageType                  string
 	dhis2Home                    string
 	flywayMigrateOutOfOrder      string
 	flywayRepairBeforeMigration  string
@@ -236,7 +238,8 @@ var dhis2CoreDefaults = struct {
 	googleAuthClientEmail        string
 	googleAuthClientId           string
 }{
-	chartVersion:                 "0.16.1",
+	chartVersion:                 "0.19.4",
+	storageType:                  filesystemStorage,
 	dhis2Home:                    "/opt/dhis2",
 	flywayMigrateOutOfOrder:      "false",
 	flywayRepairBeforeMigration:  "false",
@@ -395,6 +398,14 @@ var postgresHostnameProvider = model.ParameterProviderFunc(func(instance model.D
 // imagePullPolicy validates a value is a valid Kubernetes image pull policy.
 var imagePullPolicy = OneOf(string(k8s.PullAlways), string(k8s.PullNever), string(k8s.PullIfNotPresent))
 
+const (
+	filesystemStorage = "filesystem"
+	minIOStorage      = "minio"
+)
+
+// storage validates the value is one of our storage types.
+var storage = OneOf(filesystemStorage, minIOStorage)
+
 // OneOf creates a function returning an error when called with a value that is not any of the given
 // validValues.
 func OneOf(validValues ...string) func(value string) error {
@@ -409,7 +420,7 @@ func OneOf(validValues ...string) func(value string) error {
 	}
 }
 
-// qotesStrings quotes values and comma separates them into a joint string.
+// quotesStrings quotes values and comma separates them into a joint string.
 func quoteStrings(values []string) string {
 	var result strings.Builder
 	for i, validValue := range values {
