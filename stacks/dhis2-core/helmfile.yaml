@@ -41,6 +41,26 @@ releases:
           im-type: "dhis2"
           im-creation-timestamp: "{{ requiredEnv "INSTANCE_CREATION_TIMESTAMP" }}"
           im-ttl: "{{ requiredEnv "INSTANCE_TTL" }}"
+
+      {{- if eq (requiredEnv "STORAGE_TYPE") "minio" }}
+      - minIOConfig: |
+          filestore.provider = s3
+          filestore.container = dhis2
+          filestore.endpoint = http://{{ requiredEnv "INSTANCE_NAME" }}-minio.{{ requiredEnv "INSTANCE_NAMESPACE" }}.svc:9000
+          filestore.location = eu-west-1
+          filestore.identity = dhisdhis
+          filestore.secret = dhisdhis
+      {{- end }}
+
+      {{- if eq (requiredEnv "STORAGE_TYPE") "s3" }}
+      - S3Config: |
+          filestore.provider = aws-s3
+          filestore.container = {{ requiredEnv "S3_BUCKET" }}
+          filestore.location = {{ requiredEnv "S3_REGION" }}
+          filestore.identity = {{ requiredEnv "S3_IDENTITY" }}
+          filestore.secret = {{ requiredEnv "S3_SECRET" }}
+      {{- end }}
+
       - dhisConfig: |
           connection.dialect = org.hibernate.dialect.PostgreSQLDialect
           connection.driver_class = org.postgresql.Driver
@@ -57,21 +77,6 @@ releases:
           flyway.repair_before_migration = {{ requiredEnv "FLYWAY_REPAIR_BEFORE_MIGRATION" }}
           # Enables logging of all SQL queries.
           enable.query.logging = {{ requiredEnv "ENABLE_QUERY_LOGGING" }}
-          {{- if eq (requiredEnv "STORAGE_TYPE") "s3" }}
-          filestore.provider = aws-s3
-          filestore.container = {{ requiredEnv "S3_BUCKET" }}
-          filestore.location = {{ requiredEnv "S3_REGION" }}
-          filestore.identity = {{ requiredEnv "S3_IDENTITY" }}
-          filestore.secret = {{ requiredEnv "S3_SECRET" }}
-          {{- end }}
-          {{- if eq (requiredEnv "STORAGE_TYPE") "minio" }}
-          filestore.provider = s3
-          filestore.container = dhis2
-          filestore.endpoint = http://{{ requiredEnv "INSTANCE_NAME" }}-minio.{{ requiredEnv "INSTANCE_NAMESPACE" }}.svc:9000
-          filestore.location = eu-west-1
-          filestore.identity = dhisdhis
-          filestore.secret = dhisdhis
-          {{- end }}
       - googleAuth:
           projectId: "{{ requiredEnv "GOOGLE_AUTH_PROJECT_ID" }}"
           privateKeyId: "{{ requiredEnv "GOOGLE_AUTH_PRIVATE_KEY_ID" }}"

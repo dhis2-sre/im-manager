@@ -260,7 +260,7 @@ var dhis2CoreDefaults = struct {
 	imageRepository:              "core",
 	imageTag:                     "2.40.2",
 	javaOpts:                     " ", // " " is used here since an empty string would be interpreted by helmfile as the environment variable not being set. And since all variables are required an empty string would result in an error
-	minReadySeconds:              "120",
+	minReadySeconds:              "20",
 	livenessProbeTimeoutSeconds:  "1",
 	readinessProbeTimeoutSeconds: "1",
 	resourcesRequestsCPU:         "250m",
