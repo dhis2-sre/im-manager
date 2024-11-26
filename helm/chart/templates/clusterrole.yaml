@@ -17,3 +17,10 @@ rules:
       - pods
     verbs:
       - list
+  - verbs:
+      - get
+      - create
+    apiGroups:
+      - policy
+    resources:
+      - poddisruptionbudgets

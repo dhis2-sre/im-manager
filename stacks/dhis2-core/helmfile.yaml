@@ -57,14 +57,21 @@ releases:
           flyway.repair_before_migration = {{ requiredEnv "FLYWAY_REPAIR_BEFORE_MIGRATION" }}
           # Enables logging of all SQL queries.
           enable.query.logging = {{ requiredEnv "ENABLE_QUERY_LOGGING" }}
-#          # If STORAGE_TYPE == minio... {{ requiredEnv "STORAGE_TYPE" }}
-#          filestore.provider = s3
-#          filestore.container = dhis2
-#          filestore.endpoint = http://{{ requiredEnv "INSTANCE_NAME" }}-minio.{{ requiredEnv "INSTANCE_NAMESPACE" }}.svc:9000
-#          filestore.location = eu-west-1
-#          filestore.identity = dhisdhis
-#          filestore.secret = dhisdhis
-
+          {{- if eq (requiredEnv "STORAGE_TYPE") "s3" }}
+          filestore.provider = aws-s3
+          filestore.container = {{ requiredEnv "S3_BUCKET" }}
+          filestore.location = {{ requiredEnv "S3_REGION" }}
+          filestore.identity = {{ requiredEnv "S3_IDENTITY" }}
+          filestore.secret = {{ requiredEnv "S3_SECRET" }}
+          {{- end }}
+          {{- if eq (requiredEnv "STORAGE_TYPE") "minio" }}
+          filestore.provider = s3
+          filestore.container = dhis2
+          filestore.endpoint = http://{{ requiredEnv "INSTANCE_NAME" }}-minio.{{ requiredEnv "INSTANCE_NAMESPACE" }}.svc:9000
+          filestore.location = eu-west-1
+          filestore.identity = dhisdhis
+          filestore.secret = dhisdhis
+          {{- end }}
       - googleAuth:
           projectId: "{{ requiredEnv "GOOGLE_AUTH_PROJECT_ID" }}"
           privateKeyId: "{{ requiredEnv "GOOGLE_AUTH_PRIVATE_KEY_ID" }}"
@@ -76,23 +83,24 @@ releases:
             cpu: {{ requiredEnv "RESOURCES_REQUESTS_CPU" }}
             memory: {{ requiredEnv "RESOURCES_REQUESTS_MEMORY" }}
 
-#  - name: "{{ requiredEnv "INSTANCE_NAME" }}"-minio
-#    namespace: "{{ requiredEnv "INSTANCE_NAMESPACE" }}"
-#    chart: bitnami/minio
-#    version: "{{ requiredEnv "CHART_VERSION" }}"
-#    values:
-#      - persistence:
-#        #  size: 8Gi
-#        annotations:
-#          helm.sh/resource-policy: keep
-#      - auth:
-#        rootUser: dhisdhis
-#        rootPassword: dhisdhis
-#        forcePassword: true
-#      - defaultBuckets: dhis2
+  - name: "{{ requiredEnv "INSTANCE_NAME" }}-minio"
+    namespace: "{{ requiredEnv "INSTANCE_NAMESPACE" }}"
+    chart: bitnami/minio
+    version: 14.7.5
+    installed: {{ eq (requiredEnv "STORAGE_TYPE") "minio" }}
+    values:
+      - persistence:
+          size: 8Gi
+        annotations:
+          helm.sh/resource-policy: keep
+      - auth:
+          rootUser: dhisdhis
+          rootPassword: dhisdhis
+          forcePassword: true
+      - defaultBuckets: dhis2
 
 repositories:
   - name: dhis2
     url: https://dhis2-sre.github.io/dhis2-core-helm
-#  - name: bitnami
-#    url: https://charts.bitnami.com/bitnami
+  - name: bitnami
+    url: https://charts.bitnami.com/bitnami
