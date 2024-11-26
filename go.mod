@@ -7,8 +7,8 @@ require (
 	github.com/anthhub/forwarder v1.1.0
 	github.com/aws/aws-sdk-go-v2 v1.32.5
 	github.com/aws/aws-sdk-go-v2/config v1.28.5
-	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.17.39
-	github.com/aws/aws-sdk-go-v2/service/s3 v1.67.1
+	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.17.40
+	github.com/aws/aws-sdk-go-v2/service/s3 v1.68.0
 	github.com/dhis2-sre/rabbitmq-client v0.3.1
 	github.com/docker/go-connections v0.5.0
 	github.com/dominikbraun/graph v0.23.0
@@ -28,12 +28,12 @@ require (
 	github.com/orlangure/gnomock v0.30.0
 	github.com/rabbitmq/amqp091-go v1.10.0
 	github.com/rabbitmq/rabbitmq-stream-go-client v1.4.10
-	github.com/stretchr/testify v1.9.0
+	github.com/stretchr/testify v1.10.0
 	github.com/testcontainers/testcontainers-go v0.31.0
 	go.mozilla.org/sops/v3 v3.7.3
 	golang.org/x/crypto v0.29.0
 	golang.org/x/exp v0.0.0-20231108232855-2478ac86f678
-	gorm.io/driver/postgres v1.5.9
+	gorm.io/driver/postgres v1.5.10
 	gorm.io/gorm v1.25.12
 	k8s.io/api v0.28.3
 	k8s.io/apimachinery v0.28.3
