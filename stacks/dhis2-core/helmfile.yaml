@@ -88,11 +88,11 @@ releases:
             cpu: {{ requiredEnv "RESOURCES_REQUESTS_CPU" }}
             memory: {{ requiredEnv "RESOURCES_REQUESTS_MEMORY" }}
 
+  {{- if eq (requiredEnv "STORAGE_TYPE") "minio" }}
   - name: "{{ requiredEnv "INSTANCE_NAME" }}-minio"
     namespace: "{{ requiredEnv "INSTANCE_NAMESPACE" }}"
     chart: bitnami/minio
     version: 14.7.5
-    installed: {{ eq (requiredEnv "STORAGE_TYPE") "minio" }}
     values:
       - persistence:
           size: 8Gi
@@ -103,6 +103,7 @@ releases:
           rootPassword: dhisdhis
           forcePassword: true
       - defaultBuckets: dhis2
+  {{- end }}
 
 repositories:
   - name: dhis2
