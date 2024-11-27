@@ -48,4 +48,10 @@ jobs:
       - name: Tag the latest commit with a signed tag
         run: |
           git tag ${{ steps.calculate_next_version.outputs.next_version }}
-          git push --tags
+
+      - name: Push the new tag
+        env:
+          PAT: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+        run: |
+          git remote set-url origin https://x-access-token:${PAT}@github.com/${{ github.repository }}
+          git push origin --tags
