@@ -92,10 +92,10 @@ releases:
   - name: "{{ requiredEnv "INSTANCE_NAME" }}-minio"
     namespace: "{{ requiredEnv "INSTANCE_NAMESPACE" }}"
     chart: bitnami/minio
-    version: 14.7.5
+    version: "{{ requiredEnv "MINIO_CHART_VERSION" }}"
     values:
       - persistence:
-          size: 8Gi
+          size: {{ requiredEnv "MINIO_STORAGE_SIZE" }}
         annotations:
           helm.sh/resource-policy: keep
       - auth:
