@@ -633,16 +633,16 @@ func (s Service) groupPublicInstances(instances []*model.DeploymentInstance) ([]
 			}
 		}
 
+		if len(stableCategory.Instances) > 0 {
+			groupWithPublicInstances.Categories = append(groupWithPublicInstances.Categories, stableCategory)
+		}
+
 		if len(devCategory.Instances) > 0 {
 			groupWithPublicInstances.Categories = append(groupWithPublicInstances.Categories, devCategory)
 		}
 
 		if len(nightlyCategory.Instances) > 0 {
 			groupWithPublicInstances.Categories = append(groupWithPublicInstances.Categories, nightlyCategory)
-		}
-
-		if len(stableCategory.Instances) > 0 {
-			groupWithPublicInstances.Categories = append(groupWithPublicInstances.Categories, stableCategory)
 		}
 
 		if len(groupWithPublicInstances.Categories) > 0 {
