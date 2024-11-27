@@ -611,9 +611,9 @@ func (s Service) groupPublicInstances(instances []*model.DeploymentInstance) ([]
 			Description: group.Description,
 			Categories:  nil,
 		}
+		stableCategory := Category{Label: "Stable"}
 		devCategory := Category{Label: "Under Development"}
 		nightlyCategory := Category{Label: "Canary"}
-		stableCategory := Category{Label: "Stable"}
 		for _, instance := range instances {
 			if instance.GroupName == name {
 				publicInstance := PublicInstance{
