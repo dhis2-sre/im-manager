@@ -439,7 +439,7 @@ func OneOf(validValues ...string) func(value string) error {
 	}
 }
 
-// quotesStrings quotes values and comma separates them into a joint string.
+// quoteStrings quotes values and comma separates them into a joint string.
 func quoteStrings(values []string) string {
 	var result strings.Builder
 	for i, validValue := range values {
