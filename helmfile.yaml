@@ -1,0 +1,10 @@
+releases:
+  - name: doris-cluster
+    namespace: doris
+    chart: doris/doris
+    version: 1.6.1
+    values:
+      - values-doris.yaml
+repositories:
+  - name: doris
+    url: https://charts.selectdb.com
