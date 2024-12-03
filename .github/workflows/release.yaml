@@ -30,7 +30,7 @@ jobs:
         id: get_latest_tag
         run: |
           git fetch --tags
-          latest_tag=$(git tag --sort=-creatordate | head --lines=1)
+          latest_tag=$(git tag -l | sort --version-sort --reverse)
           echo "::set-output name=latest_tag::$latest_tag"
 
       - name: Calculate the next minor version
@@ -48,4 +48,10 @@ jobs:
       - name: Tag the latest commit with a signed tag
         run: |
           git tag ${{ steps.calculate_next_version.outputs.next_version }}
-          git push --tags
+
+      - name: Push the new tag
+        env:
+          PAT: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+        run: |
+          git remote set-url origin https://x-access-token:${PAT}@github.com/${{ github.repository }}
+          git push origin --tags

@@ -611,11 +611,11 @@ func (s Service) groupPublicInstances(instances []*model.DeploymentInstance) ([]
 			Description: group.Description,
 			Categories:  nil,
 		}
+		stableCategory := Category{Label: "Stable"}
 		devCategory := Category{Label: "Under Development"}
 		nightlyCategory := Category{Label: "Canary"}
-		stableCategory := Category{Label: "Stable"}
 		for _, instance := range instances {
-			if instance.GroupName == name {
+			if instance.GroupName == name && instance.StackName == "dhis2-core" {
 				publicInstance := PublicInstance{
 					Name:        instance.Name,
 					Description: instance.Deployment.Description,
@@ -633,16 +633,16 @@ func (s Service) groupPublicInstances(instances []*model.DeploymentInstance) ([]
 			}
 		}
 
+		if len(stableCategory.Instances) > 0 {
+			groupWithPublicInstances.Categories = append(groupWithPublicInstances.Categories, stableCategory)
+		}
+
 		if len(devCategory.Instances) > 0 {
 			groupWithPublicInstances.Categories = append(groupWithPublicInstances.Categories, devCategory)
 		}
 
 		if len(nightlyCategory.Instances) > 0 {
 			groupWithPublicInstances.Categories = append(groupWithPublicInstances.Categories, nightlyCategory)
-		}
-
-		if len(stableCategory.Instances) > 0 {
-			groupWithPublicInstances.Categories = append(groupWithPublicInstances.Categories, stableCategory)
 		}
 
 		if len(groupWithPublicInstances.Categories) > 0 {

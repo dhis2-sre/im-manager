@@ -67,8 +67,9 @@ func TestInstanceHandler(t *testing.T) {
 	instanceRepo := instance.NewRepository(db, encryptionKey)
 	groupService := groupService{group: group}
 	stacks := stack.Stacks{
-		"whoami-go": stack.WhoamiGo,
-		"dhis2":     stack.DHIS2,
+		"whoami-go":  stack.WhoamiGo,
+		"dhis2-core": stack.WhoamiGo, // Used to test public instance view - stack.WhoamiGo because it has no dependencies
+		"dhis2":      stack.DHIS2,
 	}
 	stackService := stack.NewService(stacks)
 	// classification 'test' does not actually exist, this is used to decrypt the stack parameters
@@ -231,14 +232,14 @@ func TestInstanceHandler(t *testing.T) {
 		t.Log("Create deployment instance")
 		var deploymentInstance model.DeploymentInstance
 		body = strings.NewReader(`{
-			"stackName": "whoami-go"
+			"stackName": "dhis2-core"
 		}`)
 
 		path := fmt.Sprintf("/deployments/%d/instance", deployment.ID)
 		client.PostJSON(t, path, body, &deploymentInstance, inttest.WithAuthToken("sometoken"))
 		assert.Equal(t, deployment.ID, deploymentInstance.DeploymentID)
 		assert.Equal(t, "group-name", deploymentInstance.GroupName)
-		assert.Equal(t, "whoami-go", deploymentInstance.StackName)
+		assert.Equal(t, "dhis2-core", deploymentInstance.StackName)
 
 		t.Log("Create public deployment")
 		body = strings.NewReader(`{
@@ -256,7 +257,7 @@ func TestInstanceHandler(t *testing.T) {
 		t.Log("Create public deployment instance")
 		var publicDeploymentInstance model.DeploymentInstance
 		body = strings.NewReader(`{
-			"stackName": "whoami-go",
+			"stackName": "dhis2-core",
 			"public": true
 		}`)
 
@@ -264,7 +265,7 @@ func TestInstanceHandler(t *testing.T) {
 		client.PostJSON(t, path, body, &publicDeploymentInstance, inttest.WithAuthToken("sometoken"))
 		assert.Equal(t, deployment.ID, publicDeploymentInstance.DeploymentID)
 		assert.Equal(t, "group-name", publicDeploymentInstance.GroupName)
-		assert.Equal(t, "whoami-go", publicDeploymentInstance.StackName)
+		assert.Equal(t, "dhis2-core", publicDeploymentInstance.StackName)
 
 		t.Log("Get public instances")
 		var groupsWithInstances []instance.GroupWithPublicInstances
