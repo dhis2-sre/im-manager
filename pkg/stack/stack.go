@@ -185,19 +185,25 @@ var DHIS2Core = model.Stack{
 		"IMAGE_REPOSITORY":                {Priority: 2, DisplayName: "Image Repository", DefaultValue: &dhis2CoreDefaults.imageRepository},
 		"IMAGE_PULL_POLICY":               {Priority: 3, DisplayName: "Image Pull Policy", DefaultValue: &dhis2CoreDefaults.imagePullPolicy, Validator: imagePullPolicy},
 		"STORAGE_TYPE":                    {Priority: 4, DisplayName: "Storage type", DefaultValue: &dhis2CoreDefaults.storageType, Validator: storage},
-		"DHIS2_HOME":                      {Priority: 5, DisplayName: "DHIS2 Home Directory", DefaultValue: &dhis2CoreDefaults.dhis2Home},
-		"FLYWAY_MIGRATE_OUT_OF_ORDER":     {Priority: 6, DisplayName: "Flyway Migrate Out Of Order", DefaultValue: &dhis2CoreDefaults.flywayMigrateOutOfOrder},
-		"FLYWAY_REPAIR_BEFORE_MIGRATION":  {Priority: 7, DisplayName: "Flyway Repair Before Migration", DefaultValue: &dhis2CoreDefaults.flywayRepairBeforeMigration},
-		"RESOURCES_REQUESTS_CPU":          {Priority: 8, DisplayName: "Resources Requests CPU", DefaultValue: &dhis2CoreDefaults.resourcesRequestsCPU},
-		"RESOURCES_REQUESTS_MEMORY":       {Priority: 9, DisplayName: "Resources Requests Memory", DefaultValue: &dhis2CoreDefaults.resourcesRequestsMemory},
-		"MIN_READY_SECONDS":               {Priority: 10, DisplayName: "Minimum Ready Seconds", DefaultValue: &dhis2CoreDefaults.minReadySeconds},
-		"LIVENESS_PROBE_TIMEOUT_SECONDS":  {Priority: 11, DisplayName: "Liveness Probe Timeout Seconds", DefaultValue: &dhis2CoreDefaults.livenessProbeTimeoutSeconds},
-		"READINESS_PROBE_TIMEOUT_SECONDS": {Priority: 12, DisplayName: "Readiness Probe Timeout Seconds", DefaultValue: &dhis2CoreDefaults.readinessProbeTimeoutSeconds},
-		"STARTUP_PROBE_FAILURE_THRESHOLD": {Priority: 13, DisplayName: "Startup Probe Failure Threshold", DefaultValue: &dhis2CoreDefaults.startupProbeFailureThreshold},
-		"STARTUP_PROBE_PERIOD_SECONDS":    {Priority: 14, DisplayName: "Startup Probe Period Seconds", DefaultValue: &dhis2CoreDefaults.startupProbePeriodSeconds},
-		"JAVA_OPTS":                       {Priority: 15, DisplayName: "JAVA_OPTS", DefaultValue: &dhis2CoreDefaults.javaOpts},
-		"CHART_VERSION":                   {Priority: 16, DisplayName: "Chart Version", DefaultValue: &dhis2CoreDefaults.chartVersion},
-		"ENABLE_QUERY_LOGGING":            {Priority: 17, DisplayName: "Enable Query Logging", DefaultValue: &dhis2CoreDefaults.enableQueryLogging},
+		"S3_BUCKET":                       {Priority: 5, DisplayName: "S3 bucket", DefaultValue: &dhis2CoreDefaults.s3Bucket},
+		"S3_REGION":                       {Priority: 6, DisplayName: "S3 region", DefaultValue: &dhis2CoreDefaults.s3Region},
+		"S3_IDENTITY":                     {Priority: 7, DisplayName: "S3 identity", DefaultValue: &dhis2CoreDefaults.s3Identity},
+		"S3_SECRET":                       {Priority: 8, DisplayName: "S3 secret", DefaultValue: &dhis2CoreDefaults.s3Secret},
+		"DHIS2_HOME":                      {Priority: 9, DisplayName: "DHIS2 Home Directory", DefaultValue: &dhis2CoreDefaults.dhis2Home},
+		"FLYWAY_MIGRATE_OUT_OF_ORDER":     {Priority: 10, DisplayName: "Flyway Migrate Out Of Order", DefaultValue: &dhis2CoreDefaults.flywayMigrateOutOfOrder},
+		"FLYWAY_REPAIR_BEFORE_MIGRATION":  {Priority: 11, DisplayName: "Flyway Repair Before Migration", DefaultValue: &dhis2CoreDefaults.flywayRepairBeforeMigration},
+		"RESOURCES_REQUESTS_CPU":          {Priority: 12, DisplayName: "Resources Requests CPU", DefaultValue: &dhis2CoreDefaults.resourcesRequestsCPU},
+		"RESOURCES_REQUESTS_MEMORY":       {Priority: 13, DisplayName: "Resources Requests Memory", DefaultValue: &dhis2CoreDefaults.resourcesRequestsMemory},
+		"MIN_READY_SECONDS":               {Priority: 14, DisplayName: "Minimum Ready Seconds", DefaultValue: &dhis2CoreDefaults.minReadySeconds},
+		"LIVENESS_PROBE_TIMEOUT_SECONDS":  {Priority: 15, DisplayName: "Liveness Probe Timeout Seconds", DefaultValue: &dhis2CoreDefaults.livenessProbeTimeoutSeconds},
+		"READINESS_PROBE_TIMEOUT_SECONDS": {Priority: 16, DisplayName: "Readiness Probe Timeout Seconds", DefaultValue: &dhis2CoreDefaults.readinessProbeTimeoutSeconds},
+		"STARTUP_PROBE_FAILURE_THRESHOLD": {Priority: 17, DisplayName: "Startup Probe Failure Threshold", DefaultValue: &dhis2CoreDefaults.startupProbeFailureThreshold},
+		"STARTUP_PROBE_PERIOD_SECONDS":    {Priority: 18, DisplayName: "Startup Probe Period Seconds", DefaultValue: &dhis2CoreDefaults.startupProbePeriodSeconds},
+		"JAVA_OPTS":                       {Priority: 19, DisplayName: "JAVA_OPTS", DefaultValue: &dhis2CoreDefaults.javaOpts},
+		"CHART_VERSION":                   {Priority: 20, DisplayName: "Chart Version", DefaultValue: &dhis2CoreDefaults.chartVersion},
+		"MINIO_CHART_VERSION":             {Priority: 21, DisplayName: "MinIO Chart Version", DefaultValue: &dhis2CoreDefaults.minIOChartVersion},
+		"MINIO_STORAGE_SIZE":              {Priority: 22, DisplayName: "MinIO Storage Size", DefaultValue: &dhis2CoreDefaults.minIOStorageSize},
+		"ENABLE_QUERY_LOGGING":            {Priority: 23, DisplayName: "Enable Query Logging", DefaultValue: &dhis2CoreDefaults.enableQueryLogging},
 		"GOOGLE_AUTH_PROJECT_ID":          {Priority: 0, DisplayName: "Google auth project id", DefaultValue: &dhis2CoreDefaults.googleAuthClientId},
 		"GOOGLE_AUTH_PRIVATE_KEY":         {Priority: 0, DisplayName: "Google auth private key", DefaultValue: &dhis2CoreDefaults.googleAuthPrivateKey},
 		"GOOGLE_AUTH_PRIVATE_KEY_ID":      {Priority: 0, DisplayName: "Google auth private key id", DefaultValue: &dhis2CoreDefaults.googleAuthPrivateKeyId},
@@ -216,7 +222,13 @@ var DHIS2Core = model.Stack{
 
 var dhis2CoreDefaults = struct {
 	chartVersion                 string
+	minIOChartVersion            string
+	minIOStorageSize             string
 	storageType                  string
+	s3Bucket                     string
+	s3Region                     string
+	s3Identity                   string
+	s3Secret                     string
 	dhis2Home                    string
 	flywayMigrateOutOfOrder      string
 	flywayRepairBeforeMigration  string
@@ -238,8 +250,14 @@ var dhis2CoreDefaults = struct {
 	googleAuthClientEmail        string
 	googleAuthClientId           string
 }{
-	chartVersion:                 "0.19.4",
-	storageType:                  filesystemStorage,
+	chartVersion:                 "0.20.0",
+	minIOChartVersion:            "14.7.5",
+	minIOStorageSize:             "8Gi",
+	storageType:                  minIOStorage,
+	s3Bucket:                     "dhis2",
+	s3Region:                     "eu-west-1",
+	s3Identity:                   "-",
+	s3Secret:                     "-",
 	dhis2Home:                    "/opt/dhis2",
 	flywayMigrateOutOfOrder:      "false",
 	flywayRepairBeforeMigration:  "false",
@@ -248,7 +266,7 @@ var dhis2CoreDefaults = struct {
 	imageRepository:              "core",
 	imageTag:                     "2.40.2",
 	javaOpts:                     " ", // " " is used here since an empty string would be interpreted by helmfile as the environment variable not being set. And since all variables are required an empty string would result in an error
-	minReadySeconds:              "120",
+	minReadySeconds:              "5",
 	livenessProbeTimeoutSeconds:  "1",
 	readinessProbeTimeoutSeconds: "1",
 	resourcesRequestsCPU:         "250m",
@@ -401,10 +419,11 @@ var imagePullPolicy = OneOf(string(k8s.PullAlways), string(k8s.PullNever), strin
 const (
 	filesystemStorage = "filesystem"
 	minIOStorage      = "minio"
+	s3Storage         = "s3"
 )
 
 // storage validates the value is one of our storage types.
-var storage = OneOf(filesystemStorage, minIOStorage)
+var storage = OneOf(minIOStorage, s3Storage)
 
 // OneOf creates a function returning an error when called with a value that is not any of the given
 // validValues.
@@ -420,7 +439,7 @@ func OneOf(validValues ...string) func(value string) error {
 	}
 }
 
-// quotesStrings quotes values and comma separates them into a joint string.
+// quoteStrings quotes values and comma separates them into a joint string.
 func quoteStrings(values []string) string {
 	var result strings.Builder
 	for i, validValue := range values {

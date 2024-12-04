@@ -157,7 +157,7 @@ func extractMetadataParameters(file []byte, identifier string) []string {
 }
 
 func extractRequiredParameters(file []byte, stackParameters []string) []string {
-	regexStr := `{{[ ]requiredEnv[ ]"(.*?)".*?}}`
+	regexStr := `requiredEnv "([\w_]+)"`
 	return extractParameters(file, regexStr, stackParameters)
 }
 
