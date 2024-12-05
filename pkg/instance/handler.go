@@ -743,7 +743,7 @@ func (h Handler) DeleteDeployment(c *gin.Context) {
 		return
 	}
 
-	deployment, err := h.instanceService.FindDeploymentById(ctx, id)
+	deployment, err := h.instanceService.FindDecryptedDeploymentById(ctx, id)
 	if err != nil {
 		_ = c.Error(err)
 		return
