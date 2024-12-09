@@ -1,0 +1,130 @@
+releases:
+#  - name: dhis2-doris-cluster
+#    namespace: doris
+#    chart: doris/doris
+#    version: 1.6.1
+#    values:
+#      - ./values-doris.yaml
+
+  - name: dhis2-doris-database
+    namespace: doris
+    chart: bitnami/postgresql
+    version: 12.6.2
+    verify: false
+    values:
+      - primary:
+          extraEnvVars:
+            - name: DATABASE_ID
+              value: "1"
+            - name: DATABASE_USERNAME
+              value: dhis
+            - name: DATABASE_PASSWORD
+              value: dhis
+            - name: DATABASE_NAME
+              value: dhis2
+          persistence:
+            size: 20Gi
+          initdb:
+            scripts:
+              seed.sh: |
+                #!/usr/bin/env bash
+  
+                set -euo pipefail
+                
+                export PGPASSWORD=$POSTGRES_POSTGRES_PASSWORD
+                
+                function exec_psql() {
+                  psql -U postgres -qAt -d "$DATABASE_NAME" -c "$1"
+                }
+                
+                DATABASE_DOWNLOAD_URL="https://databases.dhis2.org/sierra-leone/2.41/dhis2-db-sierra-leone.sql.gz"
+                
+                exec_psql "create extension if not exists postgis"
+                exec_psql "create extension if not exists pg_trgm"
+                exec_psql "create extension if not exists btree_gin"
+                
+                tmp_file=$(mktemp)
+                curl --connect-timeout 10 --retry 5 --retry-delay 1 --fail -L "$DATABASE_DOWNLOAD_URL" >"$tmp_file"
+                
+                (pg_restore --verbose -U postgres -d "$DATABASE_NAME" -j 4 "$tmp_file") || (gunzip -v -c "$tmp_file" | psql -U postgres -d "$DATABASE_NAME") || true
+                rm "$tmp_file"
+                
+                entities=$(exec_psql "select tablename from pg_tables where schemaname = 'public'")
+                for entity in $entities; do
+                  echo "Changing owner of $entity to $DATABASE_USERNAME"
+                  exec_psql "alter table \"$entity\" owner to $DATABASE_USERNAME"
+                done
+                
+                entities=$(exec_psql "select sequence_name from information_schema.sequences where sequence_schema = 'public'")
+                for entity in $entities; do
+                  echo "Changing owner of $entity to $DATABASE_USERNAME"
+                  exec_psql "alter sequence \"$entity\" owner to $DATABASE_USERNAME"
+                done
+                
+                entities=$(exec_psql "select table_name from information_schema.views where table_schema = 'public'")
+                for entity in $entities; do
+                  echo "Changing owner of $entity to $DATABASE_USERNAME"
+                  exec_psql "alter view \"$entity\" owner to $DATABASE_USERNAME"
+                done
+      - image:
+          repository: dhis2/postgresql-curl
+          tag: 13
+      - auth:
+          username: dhis
+          password: dhis
+          database: dhis2
+
+  - name: dhis2-doris-core
+    namespace: doris
+    chart: dhis2/core
+    version: 0.20.0
+    values:
+      - image:
+          repository: dhis2/core-dev
+          tag: "latest"
+          pullPolicy: Always
+      - ingress:
+          enabled: true
+          hostname: doris.im.dhis2.org
+          path: /test1
+          certIssuer: cert-issuer-prod
+          annotations:
+            nginx.ingress.kubernetes.io/proxy-body-size: 128m
+      - dhis2Home: "/opt/dhis2"
+      - catalinaOpts: "-Dcontext.path=/test1"
+      - dhisConfig: |
+          connection.dialect = org.hibernate.dialect.PostgreSQLDialect
+          connection.driver_class = org.postgresql.Driver
+          connection.url = jdbc:postgresql://dhis2-doris-database-postgresql.doris.svc/dhis2
+          connection.username = dhis
+          connection.password = dhis
+          connection.pool.acquire_retry_attempts = 1000
+          connection.pool.acquire_retry_delay = 5000
+          # Database schema behavior, can be validate, update, create, create-drop
+          connection.schema = update
+          # Server base URL
+          server.base.url = https://doris.im.dhis2.org/test1
+          # This will ensure the secure property of the JSESSIONID cookie is set to true
+          server.https = on
+          flyway.migrate_out_of_order = false
+          flyway.repair_before_migration = false
+          # Enables logging of all SQL queries.
+          enable.query.logging = true
+
+          #analytics.table.unlogged = on
+          #analytics.table.use_views = off
+          #analytics.database=doris
+          #analytics.connection.url=jdbc:mysql://doriscluster-helm-fe-service.doris.svc:9030/dhis2?
+          #useUnicode=true&characterEncoding=UTF-8&useSSL=false
+          #analytics.connection.username=root
+          #analytics.connection.password=
+          #analytics.connection.driver_class=com.mysql.cj.jdbc.Driver
+          #analytics.connection.pool.validation_timeout=10000
+
+repositories:
+  - name: doris
+    url: https://charts.selectdb.com
+  - name: bitnami
+    url: https://charts.bitnami.com/bitnami
+  - name: dhis2
+    url: https://dhis2-sre.github.io/dhis2-core-helm

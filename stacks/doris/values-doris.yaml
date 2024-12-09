@@ -76,7 +76,9 @@ feSpec:
   # specify the configMap, as a dictionary.
   # Its 'key' is the config file name in the doris 'doris_root_path/fe/conf/' file path,
   # Its 'value' is the text content of the corresponding file (it should be relatively long, actually).
-  configMap: {}
+  configMap:
+    fe.conf: |
+      lower_case_table_names = 1
     # 'fe.conf' is the startup config file of fe, and the name must be 'fe.conf'.
     # fe.conf: |
     #   http_port = 8030
