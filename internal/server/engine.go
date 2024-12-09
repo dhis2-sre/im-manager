@@ -14,7 +14,7 @@ import (
 func GetEngine(logger *slog.Logger, basePath string, allowedOrigins []string) (*gin.Engine, error) {
 	r := gin.New()
 	r.Use(gin.Recovery())
-	r.Use(middleware.RequestID())
+	r.Use(middleware.CorrelationID())
 	r.Use(middleware.RequestLogger(logger))
 
 	corsConfig := cors.DefaultConfig()

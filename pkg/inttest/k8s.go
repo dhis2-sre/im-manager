@@ -25,10 +25,10 @@ func SetupK8s(t *testing.T) *K8sClient {
 		k3s.Preset(
 			k3s.WithVersion("v1.26.7-k3s1"),
 			func(p *k3s.P) {
-				p.K3sServerFlags = []string{"--debug"} // TODO(ivo) remove this flag before merging?
+				p.K3sServerFlags = []string{"--debug"}
 			},
 		),
-		gnomock.WithDebugMode(), // TODO(ivo) remove this config before merging?
+		gnomock.WithDebugMode(),
 	)
 	require.NoError(t, err, "failed to start k3s")
 	t.Cleanup(func() { require.NoError(t, gnomock.Stop(container), "failed to stop k3s") })

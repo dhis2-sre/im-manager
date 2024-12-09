@@ -35,9 +35,13 @@ func ErrorHandler() gin.HandlerFunc {
 		} else if errdef.IsConflict(err) {
 			c.String(http.StatusConflict, err.Error())
 		} else {
-			id := GetRequestID(c)
-			err := fmt.Errorf("something went wrong. We'll look into it if you send us the request id %q :)", id)
-			c.String(http.StatusInternalServerError, err.Error())
+			var body string
+			if id, ok := GetCorrelationID(c.Request.Context()); ok {
+				body = fmt.Sprintf("something went wrong. We'll look into it if you send us the request id %q :)", id)
+			} else {
+				body = "something went wrong."
+			}
+			c.String(http.StatusInternalServerError, body)
 		}
 	}
 }

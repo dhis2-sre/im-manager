@@ -2,12 +2,14 @@ package instance
 
 import (
 	"cmp"
+	"context"
 	"errors"
 	"fmt"
 	"io"
 	"log/slog"
 	"os/exec"
 	"slices"
+	"strings"
 
 	"golang.org/x/exp/maps"
 
@@ -21,15 +23,14 @@ import (
 	"github.com/dhis2-sre/im-manager/pkg/model"
 )
 
-//goland:noinspection GoExportedFuncWithUnexportedType
 func NewService(
 	logger *slog.Logger,
-	instanceRepository Repository,
+	instanceRepository *repository,
 	groupService groupService,
 	stackService stack.Service,
 	helmfileService helmfile,
-) *service {
-	return &service{
+) *Service {
+	return &Service{
 		logger:             logger,
 		instanceRepository: instanceRepository,
 		groupService:       groupService,
@@ -38,64 +39,51 @@ func NewService(
 	}
 }
 
-type Repository interface {
-	SaveDeployment(deployment *model.Deployment) error
-	SaveInstance(instance *model.DeploymentInstance) error
-	SaveDeployLog(instance *model.DeploymentInstance, log string) error
-	DeleteDeploymentInstance(instance *model.DeploymentInstance) error
-	DeleteDeployment(deployment *model.Deployment) error
-	FindDeploymentById(id uint) (*model.Deployment, error)
-	FindDecryptedDeploymentById(id uint) (*model.Deployment, error)
-	FindDeploymentInstanceById(id uint) (*model.DeploymentInstance, error)
-	FindDecryptedDeploymentInstanceById(id uint) (*model.DeploymentInstance, error)
-	FindDeployments(groupNames []string) ([]*model.Deployment, error)
-}
-
 type groupService interface {
-	Find(name string) (*model.Group, error)
-	FindByGroupNames(groupNames []string) ([]model.Group, error)
+	Find(ctx context.Context, name string) (*model.Group, error)
+	FindByGroupNames(ctx context.Context, groupNames []string) ([]model.Group, error)
 }
 
 type helmfile interface {
-	sync(token string, instance *model.DeploymentInstance, group *model.Group, ttl uint) (*exec.Cmd, error)
-	destroy(instance *model.DeploymentInstance, group *model.Group) (*exec.Cmd, error)
+	sync(ctx context.Context, token string, instance *model.DeploymentInstance, group *model.Group, ttl uint) (*exec.Cmd, error)
+	destroy(ctx context.Context, instance *model.DeploymentInstance, group *model.Group) (*exec.Cmd, error)
 }
 
-type service struct {
+type Service struct {
 	logger             *slog.Logger
-	instanceRepository Repository
+	instanceRepository *repository
 	groupService       groupService
 	stackService       stack.Service
 	helmfileService    helmfile
 }
 
-func (s service) SaveDeployment(deployment *model.Deployment) error {
-	return s.instanceRepository.SaveDeployment(deployment)
+func (s Service) SaveDeployment(ctx context.Context, deployment *model.Deployment) error {
+	return s.instanceRepository.SaveDeployment(ctx, deployment)
 }
 
-func (s service) FindDeploymentById(id uint) (*model.Deployment, error) {
-	return s.instanceRepository.FindDeploymentById(id)
+func (s Service) FindDeploymentById(ctx context.Context, id uint) (*model.Deployment, error) {
+	return s.instanceRepository.FindDeploymentById(ctx, id)
 }
 
-func (s service) FindDecryptedDeploymentById(id uint) (*model.Deployment, error) {
-	return s.instanceRepository.FindDecryptedDeploymentById(id)
+func (s Service) FindDecryptedDeploymentById(ctx context.Context, id uint) (*model.Deployment, error) {
+	return s.instanceRepository.FindDecryptedDeploymentById(ctx, id)
 }
 
-func (s service) FindDeploymentInstanceById(id uint) (*model.DeploymentInstance, error) {
-	return s.instanceRepository.FindDeploymentInstanceById(id)
+func (s Service) FindDeploymentInstanceById(ctx context.Context, id uint) (*model.DeploymentInstance, error) {
+	return s.instanceRepository.FindDeploymentInstanceById(ctx, id)
 }
 
-func (s service) FindDecryptedDeploymentInstanceById(id uint) (*model.DeploymentInstance, error) {
-	return s.instanceRepository.FindDecryptedDeploymentInstanceById(id)
+func (s Service) FindDecryptedDeploymentInstanceById(ctx context.Context, id uint) (*model.DeploymentInstance, error) {
+	return s.instanceRepository.FindDecryptedDeploymentInstanceById(ctx, id)
 }
 
-func (s service) SaveInstance(instance *model.DeploymentInstance) error {
+func (s Service) SaveInstance(ctx context.Context, instance *model.DeploymentInstance) error {
 	err := s.rejectConsumedParameters(instance)
 	if err != nil {
 		return err
 	}
 
-	deployment, err := s.instanceRepository.FindDecryptedDeploymentById(instance.DeploymentID)
+	deployment, err := s.instanceRepository.FindDecryptedDeploymentById(ctx, instance.DeploymentID)
 	if err != nil {
 		return err
 	}
@@ -112,10 +100,10 @@ func (s service) SaveInstance(instance *model.DeploymentInstance) error {
 		return errdef.NewBadRequest("failed to resolve parameters: %v", err)
 	}
 
-	return s.instanceRepository.SaveInstance(instance)
+	return s.instanceRepository.SaveInstance(ctx, instance)
 }
 
-func (s service) rejectConsumedParameters(instance *model.DeploymentInstance) error {
+func (s Service) rejectConsumedParameters(instance *model.DeploymentInstance) error {
 	stack, err := s.stackService.Find(instance.StackName)
 	if err != nil {
 		return err
@@ -130,8 +118,8 @@ func (s service) rejectConsumedParameters(instance *model.DeploymentInstance) er
 	return errors.Join(errs...)
 }
 
-func (s service) DeleteInstance(deploymentId, instanceId uint) error {
-	deployment, err := s.FindDeploymentById(deploymentId)
+func (s Service) DeleteInstance(ctx context.Context, deploymentId, instanceId uint) error {
+	deployment, err := s.FindDeploymentById(ctx, deploymentId)
 	if err != nil {
 		return err
 	}
@@ -153,15 +141,15 @@ func (s service) DeleteInstance(deploymentId, instanceId uint) error {
 		return errdef.NewBadRequest("failed to delete instance: %v", err)
 	}
 
-	err = s.destroyDeploymentInstance(instance)
+	err = s.destroyDeploymentInstance(ctx, instance)
 	if err != nil {
 		return fmt.Errorf("failed to destroy instance %d in deployment %d: %v", instanceId, deployment.ID, err)
 	}
 
-	return s.instanceRepository.DeleteDeploymentInstance(instance)
+	return s.instanceRepository.DeleteDeploymentInstance(ctx, instance)
 }
 
-func (s service) validateNoCycles(instances []*model.DeploymentInstance) (graph.Graph[string, *model.DeploymentInstance], error) {
+func (s Service) validateNoCycles(instances []*model.DeploymentInstance) (graph.Graph[string, *model.DeploymentInstance], error) {
 	g := graph.New(func(instance *model.DeploymentInstance) string {
 		return instance.StackName
 	}, graph.Directed(), graph.PreventCycles())
@@ -199,7 +187,7 @@ func (s service) validateNoCycles(instances []*model.DeploymentInstance) (graph.
 	return g, nil
 }
 
-func (s service) resolveParameters(deployment *model.Deployment) error {
+func (s Service) resolveParameters(deployment *model.Deployment) error {
 	for _, instance := range deployment.Instances {
 		stack, err := s.stackService.Find(instance.StackName)
 		if err != nil {
@@ -310,7 +298,7 @@ func addDefaultParameterValues(instanceParameters model.DeploymentInstanceParame
 	}
 }
 
-func (s service) DeployDeployment(token string, deployment *model.Deployment) error {
+func (s Service) DeployDeployment(ctx context.Context, token string, deployment *model.Deployment) error {
 	deploymentGraph, err := s.validateNoCycles(deployment.Instances)
 	if err != nil {
 		return err
@@ -324,7 +312,7 @@ func (s service) DeployDeployment(token string, deployment *model.Deployment) er
 	deployment.Instances = instances
 
 	for _, instance := range instances {
-		err := s.deployDeploymentInstance(token, instance, deployment.TTL)
+		err := s.deployDeploymentInstance(ctx, token, instance, deployment.TTL)
 		if err != nil {
 			return fmt.Errorf("failed to deploy instance(%s) %q: %v", instance.StackName, instance.Name, err)
 		}
@@ -333,19 +321,19 @@ func (s service) DeployDeployment(token string, deployment *model.Deployment) er
 	return nil
 }
 
-func (s service) deployDeploymentInstance(token string, instance *model.DeploymentInstance, ttl uint) error {
-	group, err := s.groupService.Find(instance.GroupName)
+func (s Service) deployDeploymentInstance(ctx context.Context, token string, instance *model.DeploymentInstance, ttl uint) error {
+	group, err := s.groupService.Find(ctx, instance.GroupName)
 	if err != nil {
 		return err
 	}
 
-	syncCmd, err := s.helmfileService.sync(token, instance, group, ttl)
+	syncCmd, err := s.helmfileService.sync(ctx, token, instance, group, ttl)
 	if err != nil {
 		return err
 	}
 
 	deployLog, deployErrorLog, err := commandExecutor(syncCmd, group.ClusterConfiguration)
-	s.logger.Info("Deploy log", "log", deployLog, "errorLog", deployErrorLog)
+	s.logger.InfoContext(ctx, "Deploy log", "log", string(deployLog), "errorLog", string(deployErrorLog))
 	/* TODO: return error log if relevant
 	if len(deployErrorLog) > 0 {
 		return errors.New(string(deployErrorLog))
@@ -356,39 +344,39 @@ func (s service) deployDeploymentInstance(token string, instance *model.Deployme
 	}
 
 	// TODO: Encrypt before saving? Yes...
-	err = s.instanceRepository.SaveDeployLog(instance, string(deployLog))
+	err = s.instanceRepository.SaveDeployLog(ctx, instance, string(deployLog))
 	instance.DeployLog = string(deployLog)
 	if err != nil {
-		s.logger.Error("Failed saving deploy log", "error", err)
+		s.logger.ErrorContext(ctx, "Failed saving deploy log", "error", err)
 		return err
 	}
 	return nil
 }
 
-func (s service) Delete(deploymentInstanceId uint) error {
-	deploymentInstance, err := s.FindDeploymentInstanceById(deploymentInstanceId)
+func (s Service) Delete(ctx context.Context, deploymentInstanceId uint) error {
+	deploymentInstance, err := s.FindDeploymentInstanceById(ctx, deploymentInstanceId)
 	if err != nil {
 		return err
 	}
 
-	err = s.DeleteInstance(deploymentInstance.DeploymentID, deploymentInstance.ID)
+	err = s.DeleteInstance(ctx, deploymentInstance.DeploymentID, deploymentInstance.ID)
 	if err != nil {
 		return err
 	}
 
-	deployment, err := s.FindDeploymentById(deploymentInstance.DeploymentID)
+	deployment, err := s.FindDeploymentById(ctx, deploymentInstance.DeploymentID)
 	if err != nil {
 		return err
 	}
 
 	if len(deployment.Instances) == 0 {
-		return s.DeleteDeployment(deployment)
+		return s.DeleteDeployment(ctx, deployment)
 	}
 
 	return nil
 }
 
-func (s service) DeleteDeployment(deployment *model.Deployment) error {
+func (s Service) DeleteDeployment(ctx context.Context, deployment *model.Deployment) error {
 	deploymentGraph, err := s.validateNoCycles(deployment.Instances)
 	if err != nil {
 		return err
@@ -402,12 +390,12 @@ func (s service) DeleteDeployment(deployment *model.Deployment) error {
 
 	var errs error
 	for _, instance := range instances {
-		err := s.destroyDeploymentInstance(instance)
+		err := s.destroyDeploymentInstance(ctx, instance)
 		if err != nil {
 			errs = errors.Join(errs, fmt.Errorf("failed to destroy instance(%s) %q: %v", instance.StackName, instance.Name, err))
 		}
 
-		err = s.instanceRepository.DeleteDeploymentInstance(instance)
+		err = s.instanceRepository.DeleteDeploymentInstance(ctx, instance)
 		if err != nil {
 			errs = errors.Join(errs, fmt.Errorf("failed to delete instance(%s) %q: %v", instance.StackName, instance.Name, err))
 		}
@@ -416,26 +404,26 @@ func (s service) DeleteDeployment(deployment *model.Deployment) error {
 		return errs
 	}
 
-	return s.instanceRepository.DeleteDeployment(deployment)
+	return s.instanceRepository.DeleteDeployment(ctx, deployment)
 }
 
-func (s service) destroyDeploymentInstance(instance *model.DeploymentInstance) error {
+func (s Service) destroyDeploymentInstance(ctx context.Context, instance *model.DeploymentInstance) error {
 	if instance.DeployLog == "" {
 		return nil
 	}
 
-	group, err := s.groupService.Find(instance.GroupName)
+	group, err := s.groupService.Find(ctx, instance.GroupName)
 	if err != nil {
 		return err
 	}
 
-	destroyCmd, err := s.helmfileService.destroy(instance, group)
+	destroyCmd, err := s.helmfileService.destroy(ctx, instance, group)
 	if err != nil {
 		return err
 	}
 
 	destroyLog, destroyErrorLog, err := commandExecutor(destroyCmd, group.ClusterConfiguration)
-	s.logger.Info("Destroy log", "log", destroyLog, "errorLog", destroyErrorLog)
+	s.logger.InfoContext(ctx, "Destroy log", "log", destroyLog, "errorLog", destroyErrorLog)
 	if err != nil {
 		return err
 	}
@@ -464,8 +452,8 @@ func deploymentOrder(deployment *model.Deployment, g graph.Graph[string, *model.
 	return orderedInstances, nil
 }
 
-func (s service) Pause(instance *model.DeploymentInstance) error {
-	group, err := s.groupService.Find(instance.GroupName)
+func (s Service) Pause(ctx context.Context, instance *model.DeploymentInstance) error {
+	group, err := s.groupService.Find(ctx, instance.GroupName)
 	if err != nil {
 		return err
 	}
@@ -478,8 +466,8 @@ func (s service) Pause(instance *model.DeploymentInstance) error {
 	return ks.pause(instance)
 }
 
-func (s service) Resume(instance *model.DeploymentInstance) error {
-	group, err := s.groupService.Find(instance.GroupName)
+func (s Service) Resume(ctx context.Context, instance *model.DeploymentInstance) error {
+	group, err := s.groupService.Find(ctx, instance.GroupName)
 	if err != nil {
 		return err
 	}
@@ -492,8 +480,8 @@ func (s service) Resume(instance *model.DeploymentInstance) error {
 	return ks.resume(instance)
 }
 
-func (s service) Restart(instance *model.DeploymentInstance, typeSelector string) error {
-	group, err := s.groupService.Find(instance.GroupName)
+func (s Service) Restart(ctx context.Context, instance *model.DeploymentInstance, typeSelector string) error {
+	group, err := s.groupService.Find(ctx, instance.GroupName)
 	if err != nil {
 		return err
 	}
@@ -511,7 +499,7 @@ func (s service) Restart(instance *model.DeploymentInstance, typeSelector string
 	return ks.restart(instance, typeSelector, stack)
 }
 
-func (s service) Logs(instance *model.DeploymentInstance, group *model.Group, typeSelector string) (io.ReadCloser, error) {
+func (s Service) Logs(instance *model.DeploymentInstance, group *model.Group, typeSelector string) (io.ReadCloser, error) {
 	ks, err := NewKubernetesService(group.ClusterConfiguration)
 	if err != nil {
 		return nil, err
@@ -520,13 +508,13 @@ func (s service) Logs(instance *model.DeploymentInstance, group *model.Group, ty
 	return ks.getLogs(instance, typeSelector)
 }
 
-type GroupsWithDeployments struct {
+type GroupWithDeployments struct {
 	Name        string              `json:"name"`
 	Hostname    string              `json:"hostname"`
 	Deployments []*model.Deployment `json:"deployments"`
 }
 
-func (s service) FindDeployments(user *model.User) ([]GroupsWithDeployments, error) {
+func (s Service) FindDeployments(ctx context.Context, user *model.User) ([]GroupWithDeployments, error) {
 	groups := append(user.Groups, user.AdminGroups...) //nolint:gocritic
 
 	groupsByName := make(map[string]model.Group)
@@ -535,38 +523,28 @@ func (s service) FindDeployments(user *model.User) ([]GroupsWithDeployments, err
 	}
 	groupNames := maps.Keys(groupsByName)
 
-	deployments, err := s.instanceRepository.FindDeployments(groupNames)
+	deployments, err := s.instanceRepository.FindDeployments(ctx, groupNames)
 	if err != nil {
 		return nil, err
 	}
 
 	if len(deployments) < 1 {
-		return []GroupsWithDeployments{}, nil
+		return []GroupWithDeployments{}, nil
 	}
 
 	return s.groupDeployments(deployments)
 }
 
-func (s service) groupDeployments(deployments []*model.Deployment) ([]GroupsWithDeployments, error) {
-	groupNamesMap := map[string]struct{}{}
+func (s Service) groupDeployments(deployments []*model.Deployment) ([]GroupWithDeployments, error) {
+	groupsByName := map[string]*model.Group{}
 	for _, deployment := range deployments {
-		groupNamesMap[deployment.GroupName] = struct{}{}
+		for _, instance := range deployment.Instances {
+			groupsByName[instance.GroupName] = deployment.Group
+		}
 	}
 
-	groupNames := maps.Keys(groupNamesMap)
-
-	groups, err := s.groupService.FindByGroupNames(groupNames)
-	if err != nil {
-		return nil, err
-	}
-
-	groupsByName := map[string]model.Group{}
-	for _, group := range groups {
-		groupsByName[group.Name] = group
-	}
-
-	groupsWithDeployments := make([]GroupsWithDeployments, len(groupNames))
-	for i, name := range groupNames {
+	groupsWithDeployments := make([]GroupWithDeployments, len(groupsByName))
+	for i, name := range maps.Keys(groupsByName) {
 		groupWithDeployments := groupsWithDeployments[i]
 		groupWithDeployments.Name = name
 		groupWithDeployments.Hostname = groupsByName[name].Hostname
@@ -583,11 +561,96 @@ func (s service) groupDeployments(deployments []*model.Deployment) ([]GroupsWith
 		groupsWithDeployments[i] = groupWithDeployments
 	}
 
-	slices.SortFunc(groupsWithDeployments, func(a, b GroupsWithDeployments) int {
+	slices.SortFunc(groupsWithDeployments, func(a, b GroupWithDeployments) int {
 		return cmp.Compare(a.Name, b.Name)
 	})
 
 	return groupsWithDeployments, nil
+}
+
+type PublicInstance struct {
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Hostname    string `json:"hostname"`
+}
+
+type Category struct {
+	Label     string           `json:"label"`
+	Instances []PublicInstance `json:"instances"`
+}
+
+type GroupWithPublicInstances struct {
+	Name        string     `json:"name"`
+	Description string     `json:"description"`
+	Categories  []Category `json:"categories"`
+}
+
+func (s Service) FindPublicInstances(ctx context.Context) ([]GroupWithPublicInstances, error) {
+	instances, err := s.instanceRepository.FindPublicInstances(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(instances) < 1 {
+		return []GroupWithPublicInstances{}, nil
+	}
+
+	return s.groupPublicInstances(instances)
+}
+
+func (s Service) groupPublicInstances(instances []*model.DeploymentInstance) ([]GroupWithPublicInstances, error) {
+	groupsByName := map[string]*model.Group{}
+	for _, instance := range instances {
+		groupsByName[instance.GroupName] = instance.Group
+	}
+
+	var groupsWithPublicInstances []GroupWithPublicInstances
+	for name, group := range groupsByName {
+		groupWithPublicInstances := GroupWithPublicInstances{
+			Name:        name,
+			Description: group.Description,
+			Categories:  nil,
+		}
+		stableCategory := Category{Label: "Stable"}
+		devCategory := Category{Label: "Under Development"}
+		nightlyCategory := Category{Label: "Canary"}
+		for _, instance := range instances {
+			if instance.GroupName == name && instance.StackName == "dhis2-core" {
+				publicInstance := PublicInstance{
+					Name:        instance.Name,
+					Description: instance.Deployment.Description,
+					Hostname:    fmt.Sprintf("https://%s/%s", instance.Group.Hostname, instance.Name),
+				}
+				if strings.HasPrefix(instance.Name, "dev") {
+					devCategory.Instances = append(devCategory.Instances, publicInstance)
+				}
+				if strings.HasPrefix(instance.Name, "nightly") {
+					nightlyCategory.Instances = append(nightlyCategory.Instances, publicInstance)
+				}
+				if strings.HasPrefix(instance.Name, "stable") {
+					stableCategory.Instances = append(stableCategory.Instances, publicInstance)
+				}
+			}
+		}
+
+		if len(stableCategory.Instances) > 0 {
+			groupWithPublicInstances.Categories = append(groupWithPublicInstances.Categories, stableCategory)
+		}
+
+		if len(devCategory.Instances) > 0 {
+			groupWithPublicInstances.Categories = append(groupWithPublicInstances.Categories, devCategory)
+		}
+
+		if len(nightlyCategory.Instances) > 0 {
+			groupWithPublicInstances.Categories = append(groupWithPublicInstances.Categories, nightlyCategory)
+		}
+
+		if len(groupWithPublicInstances.Categories) > 0 {
+			groupsWithPublicInstances = append(groupsWithPublicInstances, groupWithPublicInstances)
+		}
+	}
+
+	return groupsWithPublicInstances, nil
 }
 
 type InstanceStatus string
@@ -601,7 +664,7 @@ const (
 	Error              InstanceStatus = "Error"
 )
 
-func (s service) GetStatus(instance *model.DeploymentInstance) (InstanceStatus, error) {
+func (s Service) GetStatus(instance *model.DeploymentInstance) (InstanceStatus, error) {
 	ks, err := NewKubernetesService(instance.Group.ClusterConfiguration)
 	if err != nil {
 		return "", err
@@ -666,11 +729,11 @@ func (s service) GetStatus(instance *model.DeploymentInstance) (InstanceStatus, 
 	return "", fmt.Errorf("failed to get instance status")
 }
 
-func (s service) Reset(token string, instance *model.DeploymentInstance, ttl uint) error {
-	err := s.destroyDeploymentInstance(instance)
+func (s Service) Reset(ctx context.Context, token string, instance *model.DeploymentInstance, ttl uint) error {
+	err := s.destroyDeploymentInstance(ctx, instance)
 	if err != nil {
 		return err
 	}
 
-	return s.deployDeploymentInstance(token, instance, ttl)
+	return s.deployDeploymentInstance(ctx, token, instance, ttl)
 }

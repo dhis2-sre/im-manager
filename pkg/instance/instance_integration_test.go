@@ -1,6 +1,7 @@
 package instance_test
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -66,8 +67,9 @@ func TestInstanceHandler(t *testing.T) {
 	instanceRepo := instance.NewRepository(db, encryptionKey)
 	groupService := groupService{group: group}
 	stacks := stack.Stacks{
-		"whoami-go": stack.WhoamiGo,
-		"dhis2":     stack.DHIS2,
+		"whoami-go":  stack.WhoamiGo,
+		"dhis2-core": stack.WhoamiGo, // Used to test public instance view - stack.WhoamiGo because it has no dependencies
+		"dhis2":      stack.DHIS2,
 	}
 	stackService := stack.NewService(stacks)
 	// classification 'test' does not actually exist, this is used to decrypt the stack parameters
@@ -84,8 +86,9 @@ func TestInstanceHandler(t *testing.T) {
 	databaseRepository := database.NewRepository(db)
 	databaseService := database.NewService(logger, s3Bucket, s3Client, groupService, databaseRepository)
 
-	authenticator := func(ctx *gin.Context) {
-		ctx.Set("user", user)
+	authenticator := func(c *gin.Context) {
+		ctx := model.NewContextWithUser(c.Request.Context(), user)
+		c.Request = c.Request.WithContext(ctx)
 	}
 	client := inttest.SetupHTTPServer(t, func(engine *gin.Engine) {
 		var twoDayTTL uint = 172800
@@ -147,6 +150,7 @@ func TestInstanceHandler(t *testing.T) {
 			   	})
 	*/
 	t.Run("DeployDeploymentWithoutInstances", func(t *testing.T) {
+		t.Parallel()
 		t.Log("Create deployment")
 		var deployment model.Deployment
 		body := strings.NewReader(`{
@@ -169,6 +173,7 @@ func TestInstanceHandler(t *testing.T) {
 	})
 
 	t.Run("Deployment", func(t *testing.T) {
+		t.Parallel()
 		t.Log("Create deployment")
 		var deployment model.Deployment
 		body := strings.NewReader(`{
@@ -206,6 +211,74 @@ func TestInstanceHandler(t *testing.T) {
 		// TODO: Ideally we shouldn't use sleep here but rather watch the pod until it disappears or a timeout is reached
 		time.Sleep(3 * time.Second)
 		k8sClient.AssertPodIsNotRunning(t, deploymentInstance.GroupName, deploymentInstance.Name)
+	})
+
+	t.Run("GetPublicDeployments", func(t *testing.T) {
+		t.Parallel()
+		t.Log("Create deployment")
+		var deployment model.Deployment
+		body := strings.NewReader(`{
+			"name": "private-deployment",
+			"group": "group-name",
+			"description": "some description"
+		}`)
+
+		client.PostJSON(t, "/deployments", body, &deployment, inttest.WithAuthToken("sometoken"))
+
+		assert.Equal(t, "private-deployment", deployment.Name)
+		assert.Equal(t, "group-name", deployment.GroupName)
+		assert.Equal(t, "some description", deployment.Description)
+
+		t.Log("Create deployment instance")
+		var deploymentInstance model.DeploymentInstance
+		body = strings.NewReader(`{
+			"stackName": "dhis2-core"
+		}`)
+
+		path := fmt.Sprintf("/deployments/%d/instance", deployment.ID)
+		client.PostJSON(t, path, body, &deploymentInstance, inttest.WithAuthToken("sometoken"))
+		assert.Equal(t, deployment.ID, deploymentInstance.DeploymentID)
+		assert.Equal(t, "group-name", deploymentInstance.GroupName)
+		assert.Equal(t, "dhis2-core", deploymentInstance.StackName)
+
+		t.Log("Create public deployment")
+		body = strings.NewReader(`{
+			"name": "dev-public-deployment",
+			"group": "group-name",
+			"description": "some description"
+		}`)
+
+		client.PostJSON(t, "/deployments", body, &deployment, inttest.WithAuthToken("sometoken"))
+
+		assert.Equal(t, "dev-public-deployment", deployment.Name)
+		assert.Equal(t, "group-name", deployment.GroupName)
+		assert.Equal(t, "some description", deployment.Description)
+
+		t.Log("Create public deployment instance")
+		var publicDeploymentInstance model.DeploymentInstance
+		body = strings.NewReader(`{
+			"stackName": "dhis2-core",
+			"public": true
+		}`)
+
+		path = fmt.Sprintf("/deployments/%d/instance", deployment.ID)
+		client.PostJSON(t, path, body, &publicDeploymentInstance, inttest.WithAuthToken("sometoken"))
+		assert.Equal(t, deployment.ID, publicDeploymentInstance.DeploymentID)
+		assert.Equal(t, "group-name", publicDeploymentInstance.GroupName)
+		assert.Equal(t, "dhis2-core", publicDeploymentInstance.StackName)
+
+		t.Log("Get public instances")
+		var groupsWithInstances []instance.GroupWithPublicInstances
+
+		client.GetJSON(t, "/instances/public", &groupsWithInstances)
+
+		require.Len(t, groupsWithInstances, 1)
+		assert.Equal(t, "group-name", groupsWithInstances[0].Name)
+		instances := groupsWithInstances[0].Categories[0].Instances
+		assert.Len(t, instances, 1)
+		assert.Equal(t, "dev-public-deployment", instances[0].Name)
+		assert.Equal(t, "some description", instances[0].Description)
+		assert.Equal(t, "https://some/dev-public-deployment", instances[0].Hostname)
 	})
 }
 
@@ -257,10 +330,10 @@ type groupService struct {
 	group *model.Group
 }
 
-func (gs groupService) FindByGroupNames(groupNames []string) ([]model.Group, error) {
-	panic("implement me")
+func (gs groupService) FindByGroupNames(ctx context.Context, groupNames []string) ([]model.Group, error) {
+	return []model.Group{*gs.group}, nil
 }
 
-func (gs groupService) Find(name string) (*model.Group, error) {
+func (gs groupService) Find(ctx context.Context, name string) (*model.Group, error) {
 	return gs.group, nil
 }

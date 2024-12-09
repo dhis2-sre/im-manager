@@ -1,6 +1,7 @@
 package group_test
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -28,7 +29,7 @@ func TestGroupHandler(t *testing.T) {
 	groupRepository := group.NewRepository(db)
 	groupService := group.NewService(groupRepository, userService)
 
-	err := user.CreateUser("admin", "admin", userService, groupService, model.AdministratorGroupName, "admin")
+	err := user.CreateUser(context.Background(), "admin", "admin", userService, groupService, model.AdministratorGroupName, "admin")
 	require.NoError(t, err, "failed to create admin user and group")
 
 	client := inttest.SetupHTTPServer(t, func(engine *gin.Engine) {
@@ -41,7 +42,7 @@ func TestGroupHandler(t *testing.T) {
 	var userId string
 	var user *model.User
 	{
-		user, err = userService.FindOrCreate("user@dhis2.org", "oneoneoneoneoneoneone111")
+		user, err = userService.FindOrCreate(context.Background(), "user@dhis2.org", "oneoneoneoneoneoneone111")
 		require.NoError(t, err)
 		userId = strconv.FormatUint(uint64(user.ID), 10)
 	}
@@ -50,6 +51,7 @@ func TestGroupHandler(t *testing.T) {
 	{
 		requestBody := strings.NewReader(`{
 			"name": "test-group",
+			"description": "test-group-description",
 			"hostname": "test-hostname.com"
 		}`)
 
@@ -57,6 +59,7 @@ func TestGroupHandler(t *testing.T) {
 		client.PostJSON(t, "/groups", requestBody, &group)
 
 		require.Equal(t, "test-group", group.Name)
+		require.Equal(t, "test-group-description", group.Description)
 		require.Equal(t, "test-hostname.com", group.Hostname)
 		require.False(t, group.Deployable)
 		groupName = group.Name
@@ -103,6 +106,7 @@ func TestGroupHandler(t *testing.T) {
 
 			requestBody := strings.NewReader(`{
 				"name": "deployable-test-group",
+				"description": "deployable-test-group-description",
 				"hostname": "deployable-test-hostname.com",
 				"deployable": true
 			}`)
@@ -111,6 +115,7 @@ func TestGroupHandler(t *testing.T) {
 			client.PostJSON(t, "/groups", requestBody, &group)
 
 			assert.Equal(t, "deployable-test-group", group.Name)
+			assert.Equal(t, "deployable-test-group-description", group.Description)
 			assert.Equal(t, "deployable-test-hostname.com", group.Hostname)
 			assert.True(t, group.Deployable)
 		})

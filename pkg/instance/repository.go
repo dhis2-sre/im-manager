@@ -1,6 +1,7 @@
 package instance
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"slices"
@@ -12,7 +13,10 @@ import (
 
 //goland:noinspection GoExportedFuncWithUnexportedType
 func NewRepository(db *gorm.DB, instanceParameterEncryptionKey string) *repository {
-	return &repository{db: db, instanceParameterEncryptionKey: instanceParameterEncryptionKey}
+	return &repository{
+		db:                             db,
+		instanceParameterEncryptionKey: instanceParameterEncryptionKey,
+	}
 }
 
 type repository struct {
@@ -20,8 +24,12 @@ type repository struct {
 	instanceParameterEncryptionKey string
 }
 
-func (r repository) DeleteDeploymentInstance(instance *model.DeploymentInstance) error {
-	err := r.db.Unscoped().Delete(&model.DeploymentInstance{}, instance.ID).Error
+func (r repository) DeleteDeploymentInstance(ctx context.Context, instance *model.DeploymentInstance) error {
+	// only use ctx for values (logging) and not cancellation signals on cud operations for now. ctx
+	// cancellation can lead to rollbacks which we should decide individually.
+	ctx = context.WithoutCancel(ctx)
+
+	err := r.db.WithContext(ctx).Unscoped().Delete(&model.DeploymentInstance{}, instance.ID).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return errdef.NewNotFound("instance not found by id: %d", instance.ID)
@@ -32,8 +40,12 @@ func (r repository) DeleteDeploymentInstance(instance *model.DeploymentInstance)
 	return nil
 }
 
-func (r repository) DeleteDeployment(deployment *model.Deployment) error {
-	err := r.db.Unscoped().Delete(&model.Deployment{}, deployment).Error
+func (r repository) DeleteDeployment(ctx context.Context, deployment *model.Deployment) error {
+	// only use ctx for values (logging) and not cancellation signals on cud operations for now. ctx
+	// cancellation can lead to rollbacks which we should decide individually.
+	ctx = context.WithoutCancel(ctx)
+
+	err := r.db.WithContext(ctx).Unscoped().Delete(&model.Deployment{}, deployment).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return errdef.NewNotFound("deployment not found by id: %d", deployment.ID)
@@ -44,8 +56,12 @@ func (r repository) DeleteDeployment(deployment *model.Deployment) error {
 	return nil
 }
 
-func (r repository) SaveDeployment(deployment *model.Deployment) error {
-	err := r.db.Create(&deployment).Error
+func (r repository) SaveDeployment(ctx context.Context, deployment *model.Deployment) error {
+	// only use ctx for values (logging) and not cancellation signals on cud operations for now. ctx
+	// cancellation can lead to rollbacks which we should decide individually.
+	ctx = context.WithoutCancel(ctx)
+
+	err := r.db.WithContext(ctx).Create(&deployment).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrDuplicatedKey) {
 			return errdef.NewDuplicated("a deployment named %q already exists", deployment.Name)
@@ -56,14 +72,14 @@ func (r repository) SaveDeployment(deployment *model.Deployment) error {
 	return nil
 }
 
-func (r repository) FindDeploymentById(id uint) (*model.Deployment, error) {
+func (r repository) FindDeploymentById(ctx context.Context, id uint) (*model.Deployment, error) {
 	var deployment *model.Deployment
 	err := r.db.
+		WithContext(ctx).
 		Joins("Group").
 		Joins("User").
 		Preload("Instances.GormParameters").
 		First(&deployment, id).Error
-
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, errdef.NewNotFound("deployment not found by id: %d", id)
@@ -74,13 +90,13 @@ func (r repository) FindDeploymentById(id uint) (*model.Deployment, error) {
 	return deployment, nil
 }
 
-func (r repository) FindDeploymentInstanceById(id uint) (*model.DeploymentInstance, error) {
+func (r repository) FindDeploymentInstanceById(ctx context.Context, id uint) (*model.DeploymentInstance, error) {
 	var instance *model.DeploymentInstance
 	err := r.db.
+		WithContext(ctx).
 		Joins("Group").
 		Preload("GormParameters").
 		First(&instance, id).Error
-
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, errdef.NewNotFound("instance not found by id: %d", id)
@@ -91,8 +107,8 @@ func (r repository) FindDeploymentInstanceById(id uint) (*model.DeploymentInstan
 	return instance, nil
 }
 
-func (r repository) FindDecryptedDeploymentInstanceById(id uint) (*model.DeploymentInstance, error) {
-	instance, err := r.FindDeploymentInstanceById(id)
+func (r repository) FindDecryptedDeploymentInstanceById(ctx context.Context, id uint) (*model.DeploymentInstance, error) {
+	instance, err := r.FindDeploymentInstanceById(ctx, id)
 	if err != nil {
 		return nil, err
 	}
@@ -105,8 +121,8 @@ func (r repository) FindDecryptedDeploymentInstanceById(id uint) (*model.Deploym
 	return instance, nil
 }
 
-func (r repository) FindDecryptedDeploymentById(id uint) (*model.Deployment, error) {
-	deployment, err := r.FindDeploymentById(id)
+func (r repository) FindDecryptedDeploymentById(ctx context.Context, id uint) (*model.Deployment, error) {
+	deployment, err := r.FindDeploymentById(ctx, id)
 	if err != nil {
 		return nil, err
 	}
@@ -121,7 +137,11 @@ func (r repository) FindDecryptedDeploymentById(id uint) (*model.Deployment, err
 	return deployment, nil
 }
 
-func (r repository) SaveInstance(instance *model.DeploymentInstance) error {
+func (r repository) SaveInstance(ctx context.Context, instance *model.DeploymentInstance) error {
+	// only use ctx for values (logging) and not cancellation signals on cud operations for now. ctx
+	// cancellation can lead to rollbacks which we should decide individually.
+	ctx = context.WithoutCancel(ctx)
+
 	key := r.instanceParameterEncryptionKey
 
 	err := encryptParameters(key, instance)
@@ -129,15 +149,19 @@ func (r repository) SaveInstance(instance *model.DeploymentInstance) error {
 		return err
 	}
 
-	err = r.db.Session(&gorm.Session{FullSaveAssociations: true}).Save(instance).Error
+	err = r.db.WithContext(ctx).Session(&gorm.Session{FullSaveAssociations: true}).Save(instance).Error
 	if err != nil {
 		return fmt.Errorf("failed to save instance: %v", err)
 	}
 	return nil
 }
 
-func (r repository) SaveDeployLog(instance *model.DeploymentInstance, log string) error {
-	err := r.db.Model(&instance).Update("DeployLog", log).Error
+func (r repository) SaveDeployLog(ctx context.Context, instance *model.DeploymentInstance, log string) error {
+	// only use ctx for values (logging) and not cancellation signals on cud operations for now. ctx
+	// cancellation can lead to rollbacks which we should decide individually.
+	ctx = context.WithoutCancel(ctx)
+
+	err := r.db.WithContext(ctx).Model(&instance).Update("DeployLog", log).Error
 	if err != nil {
 		return fmt.Errorf("failed to save deploy log: %v", err)
 	}
@@ -146,8 +170,8 @@ func (r repository) SaveDeployLog(instance *model.DeploymentInstance, log string
 
 const administratorGroupName = "administrators"
 
-func (r repository) FindDeployments(groupNames []string) ([]*model.Deployment, error) {
-	db := r.db
+func (r repository) FindDeployments(ctx context.Context, groupNames []string) ([]*model.Deployment, error) {
+	db := r.db.WithContext(ctx)
 
 	isAdmin := slices.Contains(groupNames, administratorGroupName)
 	if !isAdmin {
@@ -156,12 +180,28 @@ func (r repository) FindDeployments(groupNames []string) ([]*model.Deployment, e
 
 	var deployments []*model.Deployment
 	err := db.
+		Joins("Group").
 		Joins("User").
 		Preload("Instances").
 		Order("updated_at desc").
 		Find(&deployments).Error
 
 	return deployments, err
+}
+
+func (r repository) FindPublicInstances(ctx context.Context) ([]*model.DeploymentInstance, error) {
+	var instances []*model.DeploymentInstance
+	err := r.db.
+		WithContext(ctx).
+		Joins("Group").
+		Joins("Deployment").
+		Where("public = true").
+		Order("updated_at desc").
+		Find(&instances).Error
+	if err != nil {
+		return nil, fmt.Errorf("failed to find instances: %v", err)
+	}
+	return instances, nil
 }
 
 func encryptParameters(key string, instance *model.DeploymentInstance) error {

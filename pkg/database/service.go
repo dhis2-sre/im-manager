@@ -27,7 +27,7 @@ import (
 )
 
 //goland:noinspection GoExportedFuncWithUnexportedType
-func NewService(logger *slog.Logger, s3Bucket string, s3Client S3Client, groupService groupService, repository Repository) *service {
+func NewService(logger *slog.Logger, s3Bucket string, s3Client S3Client, groupService groupService, repository *repository) *service {
 	return &service{
 		logger:       logger,
 		s3Bucket:     s3Bucket,
@@ -38,7 +38,7 @@ func NewService(logger *slog.Logger, s3Bucket string, s3Client S3Client, groupSe
 }
 
 type groupService interface {
-	Find(name string) (*model.Group, error)
+	Find(ctx context.Context, name string) (*model.Group, error)
 }
 
 type service struct {
@@ -46,52 +46,36 @@ type service struct {
 	s3Bucket     string
 	s3Client     S3Client
 	groupService groupService
-	repository   Repository
-}
-
-type Repository interface {
-	Create(d *model.Database) error
-	Save(d *model.Database) error
-	FindById(id uint) (*model.Database, error)
-	Lock(databaseId, instanceId, userId uint) (*model.Lock, error)
-	Unlock(databaseId uint) error
-	Delete(id uint) error
-	FindByGroupNames(names []string) ([]model.Database, error)
-	Update(d *model.Database) error
-	CreateExternalDownload(databaseID uint, expiration uint) (*model.ExternalDownload, error)
-	FindExternalDownload(uuid uuid.UUID) (*model.ExternalDownload, error)
-	PurgeExternalDownload() error
-	FindBySlug(slug string) (*model.Database, error)
-	UpdateId(old, new uint) error
+	repository   *repository
 }
 
 type S3Client interface {
 	Copy(bucket string, source string, destination string) error
 	Move(bucket string, source string, destination string) error
-	Upload(bucket string, key string, body storage.ReadAtSeeker, size int64) error
+	Upload(ctx context.Context, bucket string, key string, body storage.ReadAtSeeker, size int64) error
 	Delete(bucket string, key string) error
-	Download(bucket string, key string, dst io.Writer, cb func(contentLength int64)) error
+	Download(ctx context.Context, bucket string, key string, dst io.Writer, cb func(contentLength int64)) error
 }
 
-func (s service) FindByIdentifier(identifier string) (*model.Database, error) {
+func (s service) FindByIdentifier(ctx context.Context, identifier string) (*model.Database, error) {
 	id, err := strconv.ParseUint(identifier, 10, 32)
 	if err != nil {
-		database, err := s.FindBySlug(identifier)
+		database, err := s.FindBySlug(ctx, identifier)
 		if err != nil {
 			return nil, err
 		}
 		return database, nil
 	}
 
-	database, err := s.FindById(uint(id))
+	database, err := s.FindById(ctx, uint(id))
 	if err != nil {
 		return nil, err
 	}
 	return database, nil
 }
 
-func (s service) Copy(id uint, d *model.Database, group *model.Group) error {
-	source, err := s.FindById(id)
+func (s service) Copy(ctx context.Context, id uint, d *model.Database, group *model.Group) error {
+	source, err := s.FindById(ctx, id)
 	if err != nil {
 		return err
 	}
@@ -110,23 +94,23 @@ func (s service) Copy(id uint, d *model.Database, group *model.Group) error {
 
 	d.Url = fmt.Sprintf("s3://%s/%s", s.s3Bucket, destinationKey)
 
-	return s.repository.Create(d)
+	return s.repository.Create(ctx, d)
 }
 
-func (s service) FindById(id uint) (*model.Database, error) {
-	return s.repository.FindById(id)
+func (s service) FindById(ctx context.Context, id uint) (*model.Database, error) {
+	return s.repository.FindById(ctx, id)
 }
 
-func (s service) FindBySlug(slug string) (*model.Database, error) {
-	return s.repository.FindBySlug(slug)
+func (s service) FindBySlug(ctx context.Context, slug string) (*model.Database, error) {
+	return s.repository.FindBySlug(ctx, slug)
 }
 
-func (s service) Lock(databaseId uint, instanceId uint, userId uint) (*model.Lock, error) {
-	return s.repository.Lock(databaseId, instanceId, userId)
+func (s service) Lock(ctx context.Context, databaseId uint, instanceId uint, userId uint) (*model.Lock, error) {
+	return s.repository.Lock(ctx, databaseId, instanceId, userId)
 }
 
-func (s service) Unlock(databaseId uint) error {
-	return s.repository.Unlock(databaseId)
+func (s service) Unlock(ctx context.Context, databaseId uint) error {
+	return s.repository.Unlock(ctx, databaseId)
 }
 
 type ReadAtSeeker interface {
@@ -134,16 +118,16 @@ type ReadAtSeeker interface {
 	io.ReadSeeker
 }
 
-func (s service) Upload(d *model.Database, group *model.Group, reader ReadAtSeeker, size int64) (*model.Database, error) {
+func (s service) Upload(ctx context.Context, d *model.Database, group *model.Group, reader ReadAtSeeker, size int64) (*model.Database, error) {
 	key := fmt.Sprintf("%s/%s", group.Name, d.Name)
-	err := s.s3Client.Upload(s.s3Bucket, key, reader, size)
+	err := s.s3Client.Upload(ctx, s.s3Bucket, key, reader, size)
 	if err != nil {
 		return nil, err
 	}
 
 	d.Url = fmt.Sprintf("s3://%s/%s", s.s3Bucket, key)
 
-	err = s.repository.Save(d)
+	err = s.repository.Save(ctx, d)
 	if err != nil {
 		return nil, err
 	}
@@ -151,8 +135,8 @@ func (s service) Upload(d *model.Database, group *model.Group, reader ReadAtSeek
 	return d, nil
 }
 
-func (s service) Download(id uint, dst io.Writer, cb func(contentLength int64)) error {
-	d, err := s.repository.FindById(id)
+func (s service) Download(ctx context.Context, id uint, dst io.Writer, cb func(contentLength int64)) error {
+	d, err := s.repository.FindById(ctx, id)
 	if err != nil {
 		return err
 	}
@@ -167,11 +151,11 @@ func (s service) Download(id uint, dst io.Writer, cb func(contentLength int64)) 
 	}
 
 	key := strings.TrimPrefix(u.Path, "/")
-	return s.s3Client.Download(s.s3Bucket, key, dst, cb)
+	return s.s3Client.Download(ctx, s.s3Bucket, key, dst, cb)
 }
 
-func (s service) Delete(id uint) error {
-	d, err := s.repository.FindById(id)
+func (s service) Delete(ctx context.Context, id uint) error {
+	d, err := s.repository.FindById(ctx, id)
 	if err != nil {
 		return err
 	}
@@ -189,10 +173,10 @@ func (s service) Delete(id uint) error {
 		}
 	}
 
-	return s.repository.Delete(id)
+	return s.repository.Delete(ctx, id)
 }
 
-func (s service) List(user *model.User) ([]GroupsWithDatabases, error) {
+func (s service) List(ctx context.Context, user *model.User) ([]GroupsWithDatabases, error) {
 	groups := append(user.Groups, user.AdminGroups...) //nolint:gocritic
 	groupsByName := make(map[string]model.Group)
 	for _, group := range groups {
@@ -200,7 +184,7 @@ func (s service) List(user *model.User) ([]GroupsWithDatabases, error) {
 	}
 	groupNames := maps.Keys(groupsByName)
 
-	databases, err := s.repository.FindByGroupNames(groupNames)
+	databases, err := s.repository.FindByGroupNames(ctx, groupNames)
 	if err != nil {
 		return nil, err
 	}
@@ -238,28 +222,28 @@ func filterDatabases(databases []model.Database, test func(database *model.Datab
 	return
 }
 
-func (s service) Update(d *model.Database) error {
-	return s.repository.Update(d)
+func (s service) Update(ctx context.Context, d *model.Database) error {
+	return s.repository.Update(ctx, d)
 }
 
-func (s service) CreateExternalDownload(databaseID uint, expiration uint) (*model.ExternalDownload, error) {
-	err := s.repository.PurgeExternalDownload()
+func (s service) CreateExternalDownload(ctx context.Context, databaseID uint, expiration uint) (*model.ExternalDownload, error) {
+	err := s.repository.PurgeExternalDownload(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	return s.repository.CreateExternalDownload(databaseID, expiration)
+	return s.repository.CreateExternalDownload(ctx, databaseID, expiration)
 }
 
-func (s service) FindExternalDownload(uuid uuid.UUID) (*model.ExternalDownload, error) {
-	err := s.repository.PurgeExternalDownload()
+func (s service) FindExternalDownload(ctx context.Context, uuid uuid.UUID) (*model.ExternalDownload, error) {
+	err := s.repository.PurgeExternalDownload(ctx)
 	if err != nil {
 		return nil, err
 	}
-	return s.repository.FindExternalDownload(uuid)
+	return s.repository.FindExternalDownload(ctx, uuid)
 }
 
-func (s service) Save(userId uint, database *model.Database, instance *model.DeploymentInstance, stack *model.Stack) error {
+func (s service) Save(ctx context.Context, userId uint, database *model.Database, instance *model.DeploymentInstance, stack *model.Stack) error {
 	lock := database.Lock
 	isLocked := lock != nil
 	if isLocked && (lock.InstanceID != instance.ID || lock.UserID != userId) {
@@ -267,12 +251,12 @@ func (s service) Save(userId uint, database *model.Database, instance *model.Dep
 	}
 
 	if !isLocked {
-		_, err := s.Lock(database.ID, instance.ID, userId)
+		_, err := s.Lock(ctx, database.ID, instance.ID, userId)
 		if err != nil {
 			return err
 		}
 
-		reloaded, err := s.FindById(database.ID)
+		reloaded, err := s.FindById(ctx, database.ID)
 		if err != nil {
 			return err
 		}
@@ -281,25 +265,25 @@ func (s service) Save(userId uint, database *model.Database, instance *model.Dep
 
 	tmpName := uuid.New().String()
 	format := getFormat(database)
-	_, err := s.SaveAs(database, instance, stack, tmpName, format, func(saved *model.Database) {
+	_, err := s.SaveAs(ctx, database, instance, stack, tmpName, format, func(ctx context.Context, saved *model.Database) {
 		defer func() {
 			if !isLocked {
-				err := s.Unlock(database.ID)
+				err := s.Unlock(ctx, database.ID)
 				if err != nil {
-					s.logError(fmt.Errorf("unlock database failed: %v", err))
+					s.logError(ctx, fmt.Errorf("unlock database failed: %v", err))
 				}
 			}
 		}()
 
 		u, err := url.Parse(saved.Url)
 		if err != nil {
-			s.logError(err)
+			s.logError(ctx, err)
 			return
 		}
 
-		err = s.Delete(database.ID)
+		err = s.Delete(ctx, database.ID)
 		if err != nil {
-			s.logError(err)
+			s.logError(ctx, err)
 			return
 		}
 
@@ -307,7 +291,7 @@ func (s service) Save(userId uint, database *model.Database, instance *model.Dep
 		destinationKey := fmt.Sprintf("%s/%s", saved.GroupName, database.Name)
 		err = s.s3Client.Move(s.s3Bucket, sourceKey, destinationKey)
 		if err != nil {
-			s.logError(err)
+			s.logError(ctx, err)
 			return
 		}
 
@@ -315,22 +299,22 @@ func (s service) Save(userId uint, database *model.Database, instance *model.Dep
 		saved.Url = database.Url
 		saved.Slug = database.Slug
 		saved.CreatedAt = database.CreatedAt
-		err = s.Update(saved)
+		err = s.Update(ctx, saved)
 		if err != nil {
-			s.logError(err)
+			s.logError(ctx, err)
 			return
 		}
 
-		err = s.repository.UpdateId(saved.ID, database.ID)
+		err = s.repository.UpdateId(ctx, saved.ID, database.ID)
 		if err != nil {
-			s.logError(err)
+			s.logError(ctx, err)
 			return
 		}
 
 		if database.Lock != nil {
-			_, err := s.repository.Lock(database.ID, database.Lock.InstanceID, database.Lock.UserID)
+			_, err := s.repository.Lock(ctx, database.ID, database.Lock.InstanceID, database.Lock.UserID)
 			if err != nil {
-				s.logError(err)
+				s.logError(ctx, err)
 				return
 			}
 		}
@@ -346,11 +330,11 @@ func getFormat(database *model.Database) string {
 	return "plain"
 }
 
-func (s service) SaveAs(database *model.Database, instance *model.DeploymentInstance, stack *model.Stack, newName string, format string, done func(saved *model.Database)) (*model.Database, error) {
+func (s service) SaveAs(ctx context.Context, database *model.Database, instance *model.DeploymentInstance, stack *model.Stack, newName string, format string, done func(ctx context.Context, saved *model.Database)) (*model.Database, error) {
 	// TODO: Add to config
 	dumpPath := "/mnt/data/"
 
-	group, err := s.groupService.Find(instance.GroupName)
+	group, err := s.groupService.Find(ctx, instance.GroupName)
 	if err != nil {
 		return nil, err
 	}
@@ -366,11 +350,14 @@ func (s service) SaveAs(database *model.Database, instance *model.DeploymentInst
 		GroupName: instance.GroupName,
 	}
 
-	err = s.repository.Save(newDatabase)
+	err = s.repository.Save(ctx, newDatabase)
 	if err != nil {
 		return nil, err
 	}
 
+	// only use ctx for values (logging) and not cancellation signals since we create a go routine
+	// that outlives the HTTP request scope
+	ctx = context.WithoutCancel(ctx)
 	go func() {
 		var ret *forwarder.Result
 		if group.ClusterConfiguration != nil && len(group.ClusterConfiguration.KubernetesConfiguration) > 0 {
@@ -386,20 +373,20 @@ func (s service) SaveAs(database *model.Database, instance *model.DeploymentInst
 
 			kubeConfig, err := decryptYaml(group.ClusterConfiguration.KubernetesConfiguration)
 			if err != nil {
-				s.logError(err)
+				s.logError(ctx, err)
 				return
 			}
 
 			ret, err = forwarder.WithForwardersEmbedConfig(context.Background(), options, kubeConfig)
 			if err != nil {
-				s.logError(err)
+				s.logError(ctx, err)
 				return
 			}
 			defer ret.Close()
 
 			ports, err := ret.Ready()
 			if err != nil {
-				s.logError(err)
+				s.logError(ctx, err)
 				return
 			}
 
@@ -417,68 +404,68 @@ func (s service) SaveAs(database *model.Database, instance *model.DeploymentInst
 
 		dumpExec := dump.Exec(pg.ExecOptions{StreamPrint: true, StreamDestination: os.Stdout})
 		if dumpExec.Error != nil {
-			s.logger.Error("Failed to dump DB", "error", dumpExec.Error.Err, "dumpOutput", dumpExec.Output)
+			s.logger.ErrorContext(ctx, "Failed to dump DB", "error", dumpExec.Error.Err, "dumpOutput", dumpExec.Output)
 			return
 		}
 
 		dumpFile := path.Join(dumpPath, dumpExec.File)
 		file, err := os.Open(dumpFile) // #nosec
 		if err != nil {
-			s.logError(err)
+			s.logError(ctx, err)
 			return
 		}
-		defer s.removeTempFile(file)
+		defer s.removeTempFile(ctx, file)
 
 		if format == "plain" {
 			gzFileName := path.Join(dumpPath, fileId+".gz")
-			file, err = s.gz(gzFileName, database, file)
+			file, err = s.gz(ctx, gzFileName, database, file)
 			if err != nil {
-				s.logError(err)
+				s.logError(ctx, err)
 				return
 			}
 
-			defer s.removeTempFile(file)
+			defer s.removeTempFile(ctx, file)
 		}
 
 		stat, err := file.Stat()
 		if err != nil {
-			s.logError(err)
+			s.logError(ctx, err)
 			return
 		}
 
 		// This is added due to the following issue - https://github.com/aws/aws-sdk-go/issues/1962
 		_, err = file.Seek(0, 0)
 		if err != nil {
-			s.logError(err)
+			s.logError(ctx, err)
 			return
 		}
 
-		_, err = s.Upload(newDatabase, group, file, stat.Size())
+		_, err = s.Upload(ctx, newDatabase, group, file, stat.Size())
 		if err != nil {
-			s.logError(err)
+			s.logError(ctx, err)
 			return
 		}
 
-		done(newDatabase)
+		done(ctx, newDatabase)
 	}()
 
 	return newDatabase, nil
 }
 
-func (s service) logError(err error) {
+func (s service) logError(ctx context.Context, err error) {
 	// TODO: Persist error message
-	s.logger.Error("Failed to SaveAs DB", "error", err)
+	s.logger.ErrorContext(ctx, "Failed to SaveAs DB", "error", err)
 }
 
-func (s service) removeTempFile(fd *os.File) {
+func (s service) removeTempFile(ctx context.Context, fd *os.File) {
 	for _, err := range [...]error{fd.Close(), os.Remove(fd.Name())} {
 		if err != nil {
-			s.logger.Error("Failed to remove temp file", "error", err)
+			s.logger.ErrorContext(ctx, "Failed to remove temp file", "error", err)
 		}
 	}
 }
 
-func (s service) gz(gzFile string, database *model.Database, src *os.File) (*os.File, error) {
+func (s service) gz(ctx context.Context, gzFile string, database *model.Database, src *os.File) (*os.File, error) {
 	outFile, err := os.Create(gzFile) // #nosec
 	if err != nil {
 		return nil, err
@@ -490,7 +477,7 @@ func (s service) gz(gzFile string, database *model.Database, src *os.File) (*os.
 	defer func(zw *gzip.Writer) {
 		err := zw.Close()
 		if err != nil {
-			s.logger.Error("Failed to close gzip writer", "error", err)
+			s.logger.ErrorContext(ctx, "Failed to close gzip writer", "error", err)
 		}
 	}(zw)
 
@@ -502,7 +489,7 @@ func (s service) gz(gzFile string, database *model.Database, src *os.File) (*os.
 	defer func(src *os.File) {
 		err := src.Close()
 		if err != nil {
-			s.logger.Error("Failed to close file", "error", err)
+			s.logger.ErrorContext(ctx, "Failed to close file", "error", err)
 		}
 	}(src)
 

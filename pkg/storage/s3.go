@@ -44,7 +44,6 @@ func (s S3Client) Copy(bucket string, source string, destination string) error {
 		Key:        aws.String(destination),
 		ACL:        types.ObjectCannedACLPrivate,
 	})
-
 	if err != nil {
 		return fmt.Errorf("error copying object from %q to %q: %s", source, destination, err)
 	}
@@ -65,8 +64,13 @@ func (s S3Client) Move(bucket string, source string, destination string) error {
 	return nil
 }
 
-func (s S3Client) Upload(bucket string, key string, body ReadAtSeeker, size int64) error {
-	s.logger.Info("Uploading", "bucket", bucket, "key", key)
+func (s S3Client) Upload(ctx context.Context, bucket string, key string, body ReadAtSeeker, size int64) error {
+	// only use ctx for values (logging) and not cancellation signals for now. lets discuss if we
+	// want to cancel the upload if the client cancels the request first and make sure we align that
+	// with how we handle the DB context after the upload.
+	ctx = context.WithoutCancel(ctx)
+
+	s.logger.InfoContext(ctx, "Uploading", "bucket", bucket, "key", key)
 	reader, err := newProgressReader(body, size, func(read int64, size int64) {
 		// TODO(DEVOPS-390) this is meant to be read by users but this implementation does not work
 		fmt.Fprintf(os.Stdout, "%s/%s - total read:%d\tprogress:%d%%", bucket, key, read, int(float32(read*100)/float32(size)))
@@ -81,7 +85,6 @@ func (s S3Client) Upload(bucket string, key string, body ReadAtSeeker, size int6
 		Body:   reader,
 		ACL:    types.ObjectCannedACLPrivate,
 	})
-
 	if err != nil {
 		return fmt.Errorf("error uploading object to bucket %q using key %q: %s", bucket, key, err)
 	}
@@ -93,15 +96,14 @@ func (s S3Client) Delete(bucket string, key string) error {
 		Bucket: aws.String(bucket),
 		Key:    aws.String(key),
 	})
-
 	if err != nil {
 		return fmt.Errorf("error deleting object from bucket %q using key %q: %s", bucket, key, err)
 	}
 	return nil
 }
 
-func (s S3Client) Download(bucket string, key string, dst io.Writer, cb func(contentLength int64)) error {
-	object, err := s.client.GetObject(context.TODO(), &s3.GetObjectInput{
+func (s S3Client) Download(ctx context.Context, bucket string, key string, dst io.Writer, cb func(contentLength int64)) error {
+	object, err := s.client.GetObject(ctx, &s3.GetObjectInput{
 		Bucket: aws.String(bucket),
 		Key:    aws.String(key),
 	})

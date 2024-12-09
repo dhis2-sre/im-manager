@@ -2,7 +2,6 @@ package user
 
 import (
 	"github.com/dhis2-sre/im-manager/pkg/model"
-	"github.com/dhis2-sre/im-manager/pkg/token"
 )
 
 // swagger:parameters signUp
@@ -50,12 +49,6 @@ type _ struct {
 	// in: body
 	// required: true
 	Body validateEmailRequest
-}
-
-// swagger:response Tokens
-type _ struct {
-	//in: body
-	_ token.Tokens
 }
 
 // swagger:response UsersResponse

@@ -1,7 +1,6 @@
 package group
 
 import (
-	"context"
 	"errors"
 	"io"
 	"mime/multipart"
@@ -15,29 +14,21 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func NewHandler(groupService groupService) Handler {
-	return Handler{groupService}
+func NewHandler(groupService *Service) Handler {
+	return Handler{
+		groupService: groupService,
+	}
 }
 
 type Handler struct {
-	groupService groupService
-}
-
-type groupService interface {
-	Create(name string, hostname string, deployable bool) (*model.Group, error)
-	AddUser(ctx context.Context, groupName string, userId uint) error
-	RemoveUser(ctx context.Context, groupName string, userId uint) error
-	AddClusterConfiguration(clusterConfiguration *model.ClusterConfiguration) error
-	GetClusterConfiguration(groupName string) (*model.ClusterConfiguration, error)
-	Find(name string) (*model.Group, error)
-	FindWithDetails(name string) (*model.Group, error)
-	FindAll(user *model.User, deployable bool) ([]model.Group, error)
+	groupService *Service
 }
 
 type CreateGroupRequest struct {
-	Name       string `json:"name" binding:"required"`
-	Hostname   string `json:"hostname" binding:"required"`
-	Deployable bool   `json:"deployable"`
+	Name        string `json:"name" binding:"required"`
+	Description string `json:"description" binding:"required"`
+	Hostname    string `json:"hostname" binding:"required"`
+	Deployable  bool   `json:"deployable"`
 }
 
 // Create group
@@ -64,7 +55,7 @@ func (h Handler) Create(c *gin.Context) {
 		return
 	}
 
-	group, err := h.groupService.Create(request.Name, request.Hostname, request.Deployable)
+	group, err := h.groupService.Create(c.Request.Context(), request.Name, request.Description, request.Hostname, request.Deployable)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -97,7 +88,7 @@ func (h Handler) AddUserToGroup(c *gin.Context) {
 		return
 	}
 
-	err := h.groupService.AddUser(c, groupName, userId)
+	err := h.groupService.AddUser(c.Request.Context(), groupName, userId)
 	if err != nil {
 		if errdef.IsNotFound(err) {
 			_ = c.AbortWithError(http.StatusNotFound, err)
@@ -134,7 +125,7 @@ func (h Handler) RemoveUserFromGroup(c *gin.Context) {
 		return
 	}
 
-	err := h.groupService.RemoveUser(c, groupName, userId)
+	err := h.groupService.RemoveUser(c.Request.Context(), groupName, userId)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -189,7 +180,7 @@ func (h Handler) AddClusterConfiguration(c *gin.Context) {
 		KubernetesConfiguration: kubernetesConfiguration,
 	}
 
-	err = h.groupService.AddClusterConfiguration(clusterConfiguration)
+	err = h.groupService.AddClusterConfiguration(c.Request.Context(), clusterConfiguration)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -235,7 +226,7 @@ func (h Handler) Find(c *gin.Context) {
 	//   oauth2:
 	name := c.Param("name")
 
-	group, err := h.groupService.Find(name)
+	group, err := h.groupService.Find(c.Request.Context(), name)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -263,7 +254,7 @@ func (h Handler) FindWithDetails(c *gin.Context) {
 	//   oauth2:
 	name := c.Param("name")
 
-	group, err := h.groupService.FindWithDetails(name)
+	group, err := h.groupService.FindWithDetails(c.Request.Context(), name)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -287,7 +278,8 @@ func (h Handler) FindAll(c *gin.Context) {
 	//
 	// security:
 	//   oauth2:
-	user, err := handler.GetUserFromContext(c)
+	ctx := c.Request.Context()
+	user, err := handler.GetUserFromContext(ctx)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -304,7 +296,7 @@ func (h Handler) FindAll(c *gin.Context) {
 		deployable = parseBool
 	}
 
-	groups, err := h.groupService.FindAll(user, deployable)
+	groups, err := h.groupService.FindAll(ctx, user, deployable)
 	if err != nil {
 		_ = c.Error(err)
 		return

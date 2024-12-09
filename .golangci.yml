@@ -2,6 +2,7 @@ run:
   timeout: 4m
 linters:
   enable:
+    - bodyclose
     - errcheck
     - forbidigo
     - gocritic
@@ -19,6 +20,9 @@ linters-settings:
         msg: Use log/slog to log
       - p: ^log\.Fatal.*$
         msg: Only main should call os.Exit(). Return an error instead
+      - p: ^gin.Context.(Deadline|Done|Err|Value|Set|Get|MustGet|GetString|GetBool|GetInt|GetInt64|GetUint|GetUint64|GetFloat64|GetTime|GetDuration|GetStringSlice|GetStringMap|GetStringMapString|GetStringMapStringSlice)$
+        msg: Always use https://pkg.go.dev/net/http#Request.Context instead of gin.Context
+    analyze-types: true
   sloglint:
     no-global: "all"
     static-msg: true

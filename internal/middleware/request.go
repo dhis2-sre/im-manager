@@ -1,48 +1,41 @@
 package middleware
 
 import (
+	"context"
 	"log/slog"
 	"net/http"
 	"time"
 
-	"github.com/dhis2-sre/im-manager/pkg/model"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
 
-// gin.Context only allows string keys so the best we can do is to use a prefix to avoid name
-// clashes
-const requestIDKey = "im-manager.requestID"
+type ctxKey int
 
-const (
-	// slog key under which to log the request id
-	RequestLoggerKeyID = "id"
-	// slog key under which to log the request user
-	RequestLoggerKeyUser = "user"
-)
+var correlationIDKey ctxKey
 
-// RequestID adds a request ID to each request.
-func RequestID() gin.HandlerFunc {
+// CorrelationID is a Gin middleware that adds a generated correlation ID to the
+// [http.Request.Context].
+func CorrelationID() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		c.Set(requestIDKey, uuid.NewString())
+		ctx := c.Request.Context()
+		ctx = NewContextWithCorrelationID(ctx, uuid.NewString())
+		c.Request = c.Request.WithContext(ctx)
 
 		c.Next()
 	}
 }
 
-// GetRequestID gets the request ID added by the RequestID middleware out of the request context.
-func GetRequestID(c *gin.Context) string {
-	v, ok := c.Get(requestIDKey)
-	if !ok {
-		return ""
-	}
+// NewContextWithCorrelationID returns a new [context.Context] that carries value correlationID.
+func NewContextWithCorrelationID(ctx context.Context, correlationID string) context.Context {
+	return context.WithValue(ctx, correlationIDKey, correlationID)
+}
 
-	ID, ok := v.(string)
-	if !ok {
-		return ""
-	}
-
-	return ID
+// GetCorrelationID returns the correlation ID stored in the ctx, if any. It had to have been set by
+// the [CorrelationID] middleware before.
+func GetCorrelationID(ctx context.Context) (string, bool) {
+	id, ok := ctx.Value(correlationIDKey).(string)
+	return id, ok
 }
 
 // RequestLogger logs details like request time, response time, latency and more about every
@@ -55,13 +48,6 @@ func RequestLogger(logger *slog.Logger) gin.HandlerFunc {
 
 		responseTime := time.Now()
 
-		idAttribute := slog.String(RequestLoggerKeyID, GetRequestID(c))
-		var userAttribute slog.Attr
-		if ctxUser, ok := c.Get("user"); ok {
-			if user, ok := ctxUser.(*model.User); ok {
-				userAttribute = slog.Any(RequestLoggerKeyUser, user)
-			}
-		}
 		params := make(map[string]string, len(c.Params))
 		for _, param := range c.Params {
 			params[param.Key] = param.Value
@@ -83,8 +69,8 @@ func RequestLogger(logger *slog.Logger) gin.HandlerFunc {
 			slog.Int("status", c.Writer.Status()),
 		)
 
-		msg := "Processed HTTP request"
 		level := slog.LevelInfo
+		const msg = "Processed HTTP request"
 		var errorAttribute slog.Attr
 		if status := c.Writer.Status(); status >= http.StatusBadRequest && status < http.StatusInternalServerError {
 			level = slog.LevelWarn
@@ -94,7 +80,6 @@ func RequestLogger(logger *slog.Logger) gin.HandlerFunc {
 			errorAttribute = slog.String("error", c.Errors.String())
 		}
 
-		logger.LogAttrs(c.Request.Context(), level, msg, idAttribute, userAttribute,
-			errorAttribute, requestAttribute, responseAttribute)
+		logger.LogAttrs(c.Request.Context(), level, msg, errorAttribute, requestAttribute, responseAttribute)
 	}
 }

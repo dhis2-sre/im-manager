@@ -23,17 +23,17 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func NewHandler(logger *slog.Logger, hostname string, sameSiteMode http.SameSite, accessTokenExpirationSeconds int, refreshTokenExpirationSeconds int, refreshTokenRememberMeExpirationSeconds int, publicKey rsa.PublicKey, userService userService, tokenService tokenService) Handler {
+func NewHandler(logger *slog.Logger, hostname string, sameSiteMode http.SameSite, accessTokenExpirationSeconds int, refreshTokenExpirationSeconds int, refreshTokenRememberMeExpirationSeconds int, publicKey rsa.PublicKey, userService *Service, tokenService tokenService) Handler {
 	return Handler{
-		logger,
-		hostname,
-		sameSiteMode,
-		accessTokenExpirationSeconds,
-		refreshTokenExpirationSeconds,
-		refreshTokenRememberMeExpirationSeconds,
-		publicKey,
-		userService,
-		tokenService,
+		logger:                                  logger,
+		hostname:                                hostname,
+		sameSiteMode:                            sameSiteMode,
+		accessTokenExpirationSeconds:            accessTokenExpirationSeconds,
+		refreshTokenExpirationSeconds:           refreshTokenExpirationSeconds,
+		refreshTokenRememberMeExpirationSeconds: refreshTokenRememberMeExpirationSeconds,
+		publicKey:                               publicKey,
+		userService:                             userService,
+		tokenService:                            tokenService,
 	}
 }
 
@@ -45,25 +45,13 @@ type Handler struct {
 	refreshTokenExpirationSeconds           int
 	refreshTokenRememberMeExpirationSeconds int
 	publicKey                               rsa.PublicKey
-	userService                             userService
+	userService                             *Service
 	tokenService                            tokenService
-}
-
-type userService interface {
-	SignUp(email string, password string) (*model.User, error)
-	SignIn(email string, password string) (*model.User, error)
-	FindById(ctx context.Context, id uint) (*model.User, error)
-	FindAll(ctx context.Context) ([]*model.User, error)
-	Delete(ctx context.Context, id uint) error
-	Update(ctx context.Context, id uint, email, password string) (*model.User, error)
-	ValidateEmail(token uuid.UUID) error
-	RequestPasswordReset(email string) error
-	ResetPassword(token string, password string) error
 }
 
 type tokenService interface {
 	GetTokens(user *model.User, previousTokenId string, rememberMe bool) (*token.Tokens, error)
-	ValidateRefreshToken(tokenString string) (*token.RefreshTokenData, error)
+	ValidateRefreshToken(ctx context.Context, tokenString string) (*token.RefreshTokenData, error)
 	SignOut(userId uint) error
 }
 
@@ -90,7 +78,7 @@ func (h Handler) SignUp(c *gin.Context) {
 		return
 	}
 
-	user, err := h.userService.SignUp(request.Email, request.Password)
+	user, err := h.userService.SignUp(c.Request.Context(), request.Email, request.Password)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -151,7 +139,7 @@ func (h Handler) ValidateEmail(c *gin.Context) {
 		return
 	}
 
-	err = h.userService.ValidateEmail(token)
+	err = h.userService.ValidateEmail(c.Request.Context(), token)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -182,7 +170,7 @@ func (h Handler) RequestPasswordReset(c *gin.Context) {
 		return
 	}
 
-	err := h.userService.RequestPasswordReset(request.Email)
+	err := h.userService.RequestPasswordReset(c.Request.Context(), request.Email)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -214,7 +202,7 @@ func (h Handler) ResetPassword(c *gin.Context) {
 		return
 	}
 
-	err := h.userService.ResetPassword(request.Token, request.Password)
+	err := h.userService.ResetPassword(c.Request.Context(), request.Token, request.Password)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -239,13 +227,13 @@ func (h Handler) SignIn(c *gin.Context) {
 	//   basicAuth:
 	//
 	// responses:
-	//   201: Tokens
+	//   201:
 	//   400: Error
 	//   401: Error
 	//   403: Error
 	//   404: Error
 	//   415: Error
-	user, err := handler.GetUserFromContext(c)
+	user, err := handler.GetUserFromContext(c.Request.Context())
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -265,7 +253,7 @@ func (h Handler) SignIn(c *gin.Context) {
 
 	h.setCookies(c, tokens, request.RememberMe)
 
-	c.JSON(http.StatusCreated, tokens)
+	c.Status(http.StatusCreated)
 }
 
 type RefreshTokenRequest struct {
@@ -281,7 +269,7 @@ func (h Handler) RefreshToken(c *gin.Context) {
 	// Refresh user tokens
 	//
 	// responses:
-	//   201: Tokens
+	//   201:
 	//   400: Error
 	//   415: Error
 
@@ -307,13 +295,14 @@ func (h Handler) RefreshToken(c *gin.Context) {
 		return
 	}
 
-	refreshToken, err := h.tokenService.ValidateRefreshToken(refreshTokenString)
+	ctx := c.Request.Context()
+	refreshToken, err := h.tokenService.ValidateRefreshToken(ctx, refreshTokenString)
 	if err != nil {
 		_ = c.AbortWithError(http.StatusUnauthorized, err)
 		return
 	}
 
-	user, err := h.userService.FindById(c, refreshToken.UserId)
+	user, err := h.userService.FindById(ctx, refreshToken.UserId)
 	if err != nil {
 		if errdef.IsNotFound(err) {
 			_ = c.AbortWithError(http.StatusUnauthorized, err)
@@ -337,7 +326,7 @@ func (h Handler) RefreshToken(c *gin.Context) {
 
 	h.setCookies(c, tokens, rememberMe)
 
-	c.JSON(http.StatusCreated, tokens)
+	c.Status(http.StatusCreated)
 }
 
 func (h Handler) setCookies(c *gin.Context, tokens *token.Tokens, rememberMe bool) {
@@ -368,13 +357,14 @@ func (h Handler) Me(c *gin.Context) {
 	//   403: Error
 	//   404: Error
 	//   415: Error
-	user, err := handler.GetUserFromContext(c)
+	ctx := c.Request.Context()
+	user, err := handler.GetUserFromContext(ctx)
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
 
-	userWithGroups, err := h.userService.FindById(c, user.ID)
+	userWithGroups, err := h.userService.FindById(ctx, user.ID)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -391,9 +381,6 @@ func (h Handler) SignOut(c *gin.Context) {
 	//
 	// Sign out user... The authentication is done using oauth and JWT. A JWT can't easily be invalidated so even after calling this endpoint a user can still sign in assuming the JWT isn't expired. However, the token can't be refreshed using the refresh token supplied upon signin
 	//
-	// security:
-	//	oauth2:
-	//
 	// responses:
 	//	200:
 	//	401: Error
@@ -404,7 +391,6 @@ func (h Handler) SignOut(c *gin.Context) {
 
 	user, err := h.parseRequest(c.Request)
 	if err != nil {
-		h.logger.Error("token not valid", "error", err)
 		_ = c.Error(errdef.NewUnauthorized("token not valid"))
 		return
 	}
@@ -477,7 +463,7 @@ func (h Handler) FindById(c *gin.Context) {
 		return
 	}
 
-	userWithGroups, err := h.userService.FindById(c, id)
+	userWithGroups, err := h.userService.FindById(c.Request.Context(), id)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -503,7 +489,7 @@ func (h Handler) FindAll(c *gin.Context) {
 	//	403: Error
 	//	404: Error
 	//	415: Error
-	users, err := h.userService.FindAll(c)
+	users, err := h.userService.FindAll(c.Request.Context())
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -534,13 +520,14 @@ func (h Handler) Delete(c *gin.Context) {
 		return
 	}
 
-	user, err := handler.GetUserFromContext(c)
+	ctx := c.Request.Context()
+	user, err := handler.GetUserFromContext(ctx)
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
 
-	_, err = h.userService.FindById(c, id)
+	_, err = h.userService.FindById(ctx, id)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -551,7 +538,7 @@ func (h Handler) Delete(c *gin.Context) {
 		return
 	}
 
-	err = h.userService.Delete(c, id)
+	err = h.userService.Delete(ctx, id)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -598,7 +585,7 @@ func (h Handler) Update(c *gin.Context) {
 		return
 	}
 
-	user, err := h.userService.Update(c, id, request.Email, request.Password)
+	user, err := h.userService.Update(c.Request.Context(), id, request.Email, request.Password)
 	if err != nil {
 		_ = c.Error(err)
 		return

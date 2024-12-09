@@ -75,10 +75,17 @@ services:
       - prod
 
   rabbitmq:
-    image: rabbitmq:3-management-alpine
+    image: bitnami/rabbitmq:3.13
     ports:
-      - "5672:5672"
-      - "15672:15672"
+      - "127.0.0.1:5552:5552" # Stream
+      - "127.0.0.1:5672:5672" # regular AMQP
+      - "127.0.0.1:15672:15672" # management UI
+    environment:
+      RABBITMQ_USERNAME: ${RABBITMQ_USERNAME}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
+      RABBITMQ_MANAGEMENT_ALLOW_WEB_ACCESS: true
+      RABBITMQ_DISK_FREE_ABSOLUTE_LIMIT: "100MB"
+      RABBITMQ_PLUGINS: "rabbitmq_management,rabbitmq_management_agent,rabbitmq_stream,rabbitmq_stream_management"
     healthcheck:
       # https://www.rabbitmq.com/docs/monitoring#stage-3
       test: rabbitmq-diagnostics -q check_running && rabbitmq-diagnostics -q check_local_alarms

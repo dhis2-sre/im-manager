@@ -1,6 +1,18 @@
 consumes:
     - application/json
 definitions:
+    Category:
+        properties:
+            instances:
+                items:
+                    $ref: '#/definitions/PublicInstance'
+                type: array
+                x-go-name: Instances
+            label:
+                type: string
+                x-go-name: Label
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
     ClusterConfiguration:
         properties:
             createdAt:
@@ -50,6 +62,9 @@ definitions:
             deployable:
                 type: boolean
                 x-go-name: Deployable
+            description:
+                type: string
+                x-go-name: Description
             hostname:
                 type: string
                 x-go-name: Hostname
@@ -119,9 +134,6 @@ definitions:
             name:
                 type: string
                 x-go-name: Name
-            public:
-                type: boolean
-                x-go-name: Public
             ttl:
                 format: uint64
                 type: integer
@@ -168,6 +180,9 @@ definitions:
                 x-go-name: Name
             parameters:
                 $ref: '#/definitions/DeploymentInstanceParameters'
+            public:
+                type: boolean
+                x-go-name: Public
             stackName:
                 description: Stack     *Stack `json:"stack,omitempty"`
                 type: string
@@ -190,6 +205,18 @@ definitions:
             $ref: '#/definitions/DeploymentInstanceParameter'
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/model
+    Event:
+        properties:
+            Data: {}
+            Event:
+                type: string
+            Id:
+                type: string
+            Retry:
+                format: uint64
+                type: integer
+        type: object
+        x-go-package: github.com/gin-contrib/sse
     ExternalDownload:
         properties:
             databaseId:
@@ -235,6 +262,9 @@ definitions:
             deployable:
                 type: boolean
                 x-go-name: Deployable
+            description:
+                type: string
+                x-go-name: Description
             hostname:
                 type: string
                 x-go-name: Hostname
@@ -252,19 +282,7 @@ definitions:
                 x-go-name: Users
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/model
-    GroupsWithDatabases:
-        properties:
-            databases:
-                items:
-                    $ref: '#/definitions/Database'
-                type: array
-                x-go-name: Databases
-            name:
-                type: string
-                x-go-name: Name
-        type: object
-        x-go-package: github.com/dhis2-sre/im-manager/pkg/database
-    GroupsWithDeployments:
+    GroupWithDeployments:
         properties:
             deployments:
                 items:
@@ -279,6 +297,33 @@ definitions:
                 x-go-name: Name
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
+    GroupWithPublicInstances:
+        properties:
+            categories:
+                items:
+                    $ref: '#/definitions/Category'
+                type: array
+                x-go-name: Categories
+            description:
+                type: string
+                x-go-name: Description
+            name:
+                type: string
+                x-go-name: Name
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
+    GroupsWithDatabases:
+        properties:
+            databases:
+                items:
+                    $ref: '#/definitions/Database'
+                type: array
+                x-go-name: Databases
+            name:
+                type: string
+                x-go-name: Name
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/database
     InstanceStatus:
         type: string
         x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
@@ -316,6 +361,19 @@ definitions:
             keys to sets of values.
         type: object
         x-go-package: net/textproto
+    PublicInstance:
+        properties:
+            description:
+                type: string
+                x-go-name: Description
+            hostname:
+                type: string
+                x-go-name: Hostname
+            name:
+                type: string
+                x-go-name: Name
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
     RefreshTokenRequest:
         properties:
             refreshToken:
@@ -364,9 +422,6 @@ definitions:
             name:
                 type: string
                 x-go-name: Name
-            public:
-                type: boolean
-                x-go-name: Public
             ttl:
                 format: uint64
                 type: integer
@@ -377,6 +432,9 @@ definitions:
         properties:
             parameters:
                 $ref: '#/definitions/parameters'
+            public:
+                type: boolean
+                x-go-name: Public
             stackName:
                 type: string
                 x-go-name: StackName
@@ -419,24 +477,6 @@ definitions:
                 x-go-name: Priority
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/stack
-    Tokens:
-        description: Tokens domain object defining user tokens
-        properties:
-            accessToken:
-                type: string
-                x-go-name: AccessToken
-            expiresIn:
-                format: uint64
-                type: integer
-                x-go-name: ExpiresIn
-            refreshToken:
-                type: string
-                x-go-name: RefreshToken
-            tokenType:
-                type: string
-                x-go-name: TokenType
-        type: object
-        x-go-package: github.com/dhis2-sre/im-manager/pkg/token
     UpdateDatabaseRequest:
         properties:
             name:
@@ -1078,6 +1118,38 @@ paths:
             security:
                 - oauth2: []
             summary: Delete deployment instance
+    /deployments/public:
+        get:
+            description: Find all public deployments
+            operationId: findPublicInstances
+            responses:
+                "200":
+                    $ref: '#/responses/GroupsWithPublicInstances'
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            summary: Find public deployments
+    /events:
+        get:
+            description: Stream events...
+            operationId: streamSSE
+            responses:
+                "200":
+                    $ref: '#/responses/Stream'
+                "400":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Stream events
     /groups:
         get:
             description: Find all groups by user
@@ -1472,6 +1544,36 @@ paths:
             security:
                 - oauth2: []
             summary: Integration
+    /integrations/image-exists/{repository}/{tag}:
+        get:
+            description: Assert if docker image exists...
+            operationId: imageExists
+            parameters:
+                - in: path
+                  name: repository
+                  required: true
+                  type: string
+                  x-go-name: Repository
+                - format: uint64
+                  in: path
+                  name: tag
+                  required: true
+                  type: integer
+                  x-go-name: Tag
+            responses:
+                "200":
+                    description: ""
+                "400":
+                    $ref: '#/responses/Error'
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Assert if docker image exists
     /me:
         get:
             description: Current user details
@@ -1504,7 +1606,7 @@ paths:
                     $ref: '#/definitions/RefreshTokenRequest'
             responses:
                 "201":
-                    $ref: '#/responses/Tokens'
+                    description: ""
                 "400":
                     $ref: '#/responses/Error'
                 "415":
@@ -1558,7 +1660,7 @@ paths:
             operationId: signIn
             responses:
                 "201":
-                    $ref: '#/responses/Tokens'
+                    description: ""
                 "400":
                     $ref: '#/responses/Error'
                 "401":
@@ -1583,8 +1685,6 @@ paths:
                     $ref: '#/responses/Error'
                 "415":
                     $ref: '#/responses/Error'
-            security:
-                - oauth2: []
             summary: Sign out
         get:
             description: Find all users with the groups they belong to
@@ -1799,7 +1899,13 @@ responses:
         description: ""
         schema:
             items:
-                $ref: '#/definitions/GroupsWithDeployments'
+                $ref: '#/definitions/GroupWithDeployments'
+            type: array
+    GroupsWithPublicInstances:
+        description: ""
+        schema:
+            items:
+                $ref: '#/definitions/GroupWithPublicInstances'
             type: array
     InstanceLogsResponse:
         description: ""
@@ -1825,10 +1931,10 @@ responses:
         description: ""
         schema:
             $ref: '#/definitions/InstanceStatus'
-    Tokens:
+    Stream:
         description: ""
         schema:
-            $ref: '#/definitions/Tokens'
+            $ref: '#/definitions/Event'
     UsersResponse:
         description: ""
         schema:

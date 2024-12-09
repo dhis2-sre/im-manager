@@ -11,23 +11,64 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func NewHandler(client DockerHubClient, instanceManagerHost, databaseManagerHost string) Handler {
-	return Handler{client, instanceManagerHost, databaseManagerHost}
+func NewHandler(client DockerHubClient, instanceManagerHost string) Handler {
+	return Handler{
+		dockerHubClient:     client,
+		instanceManagerHost: instanceManagerHost,
+	}
 }
 
 type Handler struct {
-	dockerHubClient                          DockerHubClient
-	instanceManagerHost, databaseManagerHost string
+	dockerHubClient     DockerHubClient
+	instanceManagerHost string
 }
 
 type DockerHubClient interface {
 	GetImages(organization string) ([]string, error)
 	GetTags(organization, repository string) ([]string, error)
+	ImageExists(organization, repository, tag string) error
 }
 
 type Request struct {
 	Key     string `json:"key" binding:"required"`
 	Payload any    `json:"payload"`
+}
+
+func (h Handler) ImageExists(c *gin.Context) {
+	// swagger:route GET /integrations/image-exists/{repository}/{tag} imageExists
+	//
+	// Assert if docker image exists
+	//
+	// Assert if docker image exists...
+	//
+	// security:
+	//   oauth2:
+	//
+	// responses:
+	//   200:
+	//   400: Error
+	//   401: Error
+	//   403: Error
+	//   415: Error
+	repository := c.Param("repository")
+	if repository == "" {
+		_ = c.Error(fmt.Errorf("required parameter \"repository\" not found"))
+		return
+	}
+
+	tag := c.Param("tag")
+	if tag == "" {
+		_ = c.Error(fmt.Errorf("required parameter \"tag\" not found"))
+		return
+	}
+
+	err := h.dockerHubClient.ImageExists("dhis2", repository, tag)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	c.Status(http.StatusOK)
 }
 
 // Integrations ...
@@ -123,6 +164,13 @@ func (h Handler) Integrations(c *gin.Context) {
 		return
 	}
 
+	if request.Key == "STORAGE_TYPE" {
+		storageTypes := []string{"minio", "s3"}
+
+		c.JSON(http.StatusOK, storageTypes)
+		return
+	}
+
 	if request.Key == "DATABASE_ID" {
 		token, err := handler.GetTokenFromRequest(c)
 		if err != nil {
@@ -130,7 +178,7 @@ func (h Handler) Integrations(c *gin.Context) {
 			return
 		}
 
-		url := fmt.Sprintf("http://%s/databases", h.databaseManagerHost)
+		url := fmt.Sprintf("http://%s/databases", h.instanceManagerHost)
 		databases, err := getDatabases(token, url)
 		if err != nil {
 			_ = c.Error(err)
