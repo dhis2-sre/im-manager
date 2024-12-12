@@ -228,15 +228,11 @@ func TestInstanceHandler(t *testing.T) {
 		assert.Equal(t, "group-name", decryptedInstance.GroupName)
 		assert.Equal(t, "whoami-go", decryptedInstance.StackName)
 		expectedParameters := model.DeploymentInstanceParameters{
-			"CHART_VERSION":             {0, "", "", "12.6.2"},
-			"DATABASE_ID":               {0, "", "", "7"},
-			"DATABASE_NAME":             {0, "", "", "dhis2"},
-			"DATABASE_PASSWORD":         {0, "", "", "dhis"},
-			"DATABASE_SIZE":             {0, "", "", "20Gi"},
-			"DATABASE_USERNAME":         {0, "", "", "dhis"},
-			"DATABASE_VERSION":          {0, "", "", "13"},
-			"RESOURCES_REQUESTS_CPU":    {0, "", "", "250m"},
-			"RESOURCES_REQUESTS_MEMORY": {0, "", "", "256Mi"},
+			"CHART_VERSION":     {0, "", "", "0.9.0"},
+			"IMAGE_PULL_POLICY": {0, "", "", "IfNotPresent"},
+			"IMAGE_REPOSITORY":  {0, "", "", "whoami-go"},
+			"IMAGE_TAG":         {0, "", "", "0.6.0"},
+			"REPLICA_COUNT":     {0, "", "", "1"},
 		}
 		assert.EqualExportedValues(t, expectedParameters, decryptedInstance.Parameters)
 
