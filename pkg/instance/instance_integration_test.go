@@ -209,15 +209,12 @@ func TestInstanceHandler(t *testing.T) {
 		assert.Equal(t, "whoami-go", instance.StackName)
 		{
 			parameters := instance.Parameters
-			assert.NotEqual(t, parameters["CHART_VERSION"], "12.6.2")
-			assert.NotEqual(t, parameters["DATABASE_ID"], "7")
-			assert.NotEqual(t, parameters["DATABASE_NAME"], "dhis2")
-			assert.NotEqual(t, parameters["DATABASE_PASSWORD"], "dhis")
-			assert.NotEqual(t, parameters["DATABASE_SIZE"], "20Gi")
-			assert.NotEqual(t, parameters["DATABASE_USERNAME"], "dhis")
-			assert.NotEqual(t, parameters["DATABASE_VERSION"], "13")
-			assert.NotEqual(t, parameters["RESOURCES_REQUESTS_CPU"], "250m")
-			assert.NotEqual(t, parameters["RESOURCES_REQUESTS_MEMORY"], "256Mi")
+			assert.Len(t, parameters, 5)
+			assert.NotEqual(t, parameters["CHART_VERSION"], "0.9.0")
+			assert.NotEqual(t, parameters["IMAGE_PULL_POLICY"], "IfNotPresent")
+			assert.NotEqual(t, parameters["IMAGE_REPOSITORY"], "whoami-go")
+			assert.NotEqual(t, parameters["IMAGE_TAG"], "0.6.0")
+			assert.NotEqual(t, parameters["REPLICA_COUNT"], "1")
 		}
 
 		t.Log("Get deployment instance with decrypted details")
@@ -227,6 +224,7 @@ func TestInstanceHandler(t *testing.T) {
 		assert.Equal(t, deploymentInstance.ID, decryptedInstance.ID)
 		assert.Equal(t, "group-name", decryptedInstance.GroupName)
 		assert.Equal(t, "whoami-go", decryptedInstance.StackName)
+		assert.Len(t, decryptedInstance.Parameters, 5)
 		expectedParameters := model.DeploymentInstanceParameters{
 			"CHART_VERSION":     {0, "", "", "0.9.0"},
 			"IMAGE_PULL_POLICY": {0, "", "", "IfNotPresent"},
