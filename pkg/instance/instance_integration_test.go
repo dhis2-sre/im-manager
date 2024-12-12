@@ -202,13 +202,13 @@ func TestInstanceHandler(t *testing.T) {
 
 		t.Log("Get deployment instance with details")
 		path = fmt.Sprintf("/instances/%d/details", deploymentInstance.ID)
-		var deploymentInstanceDetails model.DeploymentInstance
-		client.GetJSON(t, path, &deploymentInstanceDetails, inttest.WithAuthToken("sometoken"))
-		assert.Equal(t, deploymentInstance.ID, deploymentInstanceDetails.DeploymentID)
-		assert.Equal(t, "group-name", deploymentInstance.GroupName)
-		assert.Equal(t, "dhis2-core", deploymentInstance.StackName)
+		var instance model.DeploymentInstance
+		client.GetJSON(t, path, &instance, inttest.WithAuthToken("sometoken"))
+		assert.Equal(t, deploymentInstance.ID, instance.ID)
+		assert.Equal(t, "group-name", instance.GroupName)
+		assert.Equal(t, "dhis2-core", instance.StackName)
 		{
-			parameters := deploymentInstanceDetails.Parameters
+			parameters := instance.Parameters
 			assert.NotEqual(t, parameters["CHART_VERSION"], "12.6.2")
 			assert.NotEqual(t, parameters["DATABASE_ID"], "7")
 			assert.NotEqual(t, parameters["DATABASE_NAME"], "dhis2")
@@ -222,23 +222,23 @@ func TestInstanceHandler(t *testing.T) {
 
 		t.Log("Get deployment instance with decrypted details")
 		path = fmt.Sprintf("/instances/%d/decrypted-details", deploymentInstance.ID)
-		var deploymentDecryptedInstanceDetails model.DeploymentInstance
-		client.GetJSON(t, path, &deploymentDecryptedInstanceDetails, inttest.WithAuthToken("sometoken"))
-		assert.Equal(t, deploymentInstance.ID, deploymentInstanceDetails.DeploymentID)
-		assert.Equal(t, "group-name", deploymentInstance.GroupName)
-		assert.Equal(t, "dhis2-core", deploymentInstance.StackName)
+		var decryptedInstance model.DeploymentInstance
+		client.GetJSON(t, path, &decryptedInstance, inttest.WithAuthToken("sometoken"))
+		assert.Equal(t, deploymentInstance.ID, decryptedInstance.ID)
+		assert.Equal(t, "group-name", decryptedInstance.GroupName)
+		assert.Equal(t, "dhis2-core", decryptedInstance.StackName)
 		expectedDecryptedParameters := model.DeploymentInstanceParameters{
-			"CHART_VERSION":             model.DeploymentInstanceParameter{Value: "12.6.2"},
-			"DATABASE_ID":               model.DeploymentInstanceParameter{Value: "7"},
-			"DATABASE_NAME":             model.DeploymentInstanceParameter{Value: "dhis2"},
-			"DATABASE_PASSWORD":         model.DeploymentInstanceParameter{Value: "dhis"},
-			"DATABASE_SIZE":             model.DeploymentInstanceParameter{Value: "20Gi"},
-			"DATABASE_USERNAME":         model.DeploymentInstanceParameter{Value: "dhis"},
-			"DATABASE_VERSION":          model.DeploymentInstanceParameter{Value: "13"},
-			"RESOURCES_REQUESTS_CPU":    model.DeploymentInstanceParameter{Value: "250m"},
-			"RESOURCES_REQUESTS_MEMORY": model.DeploymentInstanceParameter{Value: "256Mi"},
+			"CHART_VERSION":             {0, "", "", "12.6.2"},
+			"DATABASE_ID":               {0, "", "", "7"},
+			"DATABASE_NAME":             {0, "", "", "dhis2"},
+			"DATABASE_PASSWORD":         {0, "", "", "dhis"},
+			"DATABASE_SIZE":             {0, "", "", "20Gi"},
+			"DATABASE_USERNAME":         {0, "", "", "dhis"},
+			"DATABASE_VERSION":          {0, "", "", "13"},
+			"RESOURCES_REQUESTS_CPU":    {0, "", "", "250m"},
+			"RESOURCES_REQUESTS_MEMORY": {0, "", "", "256Mi"},
 		}
-		assert.EqualExportedValues(t, expectedDecryptedParameters, deploymentInstanceDetails.Parameters)
+		assert.EqualExportedValues(t, expectedDecryptedParameters, instance.Parameters)
 
 		t.Log("Deploy deployment")
 		path = fmt.Sprintf("/deployments/%d/deploy", deployment.ID)
