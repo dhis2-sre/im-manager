@@ -200,6 +200,46 @@ func TestInstanceHandler(t *testing.T) {
 		assert.Equal(t, "group-name", deploymentInstance.GroupName)
 		assert.Equal(t, "whoami-go", deploymentInstance.StackName)
 
+		t.Log("Get deployment instance with details")
+		path = fmt.Sprintf("/instances/%d/details", deploymentInstance.ID)
+		var deploymentInstanceDetails model.DeploymentInstance
+		client.GetJSON(t, path, &deploymentInstanceDetails, inttest.WithAuthToken("sometoken"))
+		assert.Equal(t, deploymentInstance.ID, deploymentInstanceDetails.DeploymentID)
+		assert.Equal(t, "group-name", deploymentInstance.GroupName)
+		assert.Equal(t, "dhis2-core", deploymentInstance.StackName)
+		{
+			parameters := deploymentInstanceDetails.Parameters
+			assert.NotEqual(t, parameters["CHART_VERSION"], "12.6.2")
+			assert.NotEqual(t, parameters["DATABASE_ID"], "7")
+			assert.NotEqual(t, parameters["DATABASE_NAME"], "dhis2")
+			assert.NotEqual(t, parameters["DATABASE_PASSWORD"], "dhis")
+			assert.NotEqual(t, parameters["DATABASE_SIZE"], "20Gi")
+			assert.NotEqual(t, parameters["DATABASE_USERNAME"], "dhis")
+			assert.NotEqual(t, parameters["DATABASE_VERSION"], "13")
+			assert.NotEqual(t, parameters["RESOURCES_REQUESTS_CPU"], "250m")
+			assert.NotEqual(t, parameters["RESOURCES_REQUESTS_MEMORY"], "256Mi")
+		}
+
+		t.Log("Get deployment instance with decrypted details")
+		path = fmt.Sprintf("/instances/%d/decrypted-details", deploymentInstance.ID)
+		var deploymentDecryptedInstanceDetails model.DeploymentInstance
+		client.GetJSON(t, path, &deploymentDecryptedInstanceDetails, inttest.WithAuthToken("sometoken"))
+		assert.Equal(t, deploymentInstance.ID, deploymentInstanceDetails.DeploymentID)
+		assert.Equal(t, "group-name", deploymentInstance.GroupName)
+		assert.Equal(t, "dhis2-core", deploymentInstance.StackName)
+		expectedDecryptedParameters := model.DeploymentInstanceParameters{
+			"CHART_VERSION":             model.DeploymentInstanceParameter{Value: "12.6.2"},
+			"DATABASE_ID":               model.DeploymentInstanceParameter{Value: "7"},
+			"DATABASE_NAME":             model.DeploymentInstanceParameter{Value: "dhis2"},
+			"DATABASE_PASSWORD":         model.DeploymentInstanceParameter{Value: "dhis"},
+			"DATABASE_SIZE":             model.DeploymentInstanceParameter{Value: "20Gi"},
+			"DATABASE_USERNAME":         model.DeploymentInstanceParameter{Value: "dhis"},
+			"DATABASE_VERSION":          model.DeploymentInstanceParameter{Value: "13"},
+			"RESOURCES_REQUESTS_CPU":    model.DeploymentInstanceParameter{Value: "250m"},
+			"RESOURCES_REQUESTS_MEMORY": model.DeploymentInstanceParameter{Value: "256Mi"},
+		}
+		assert.EqualExportedValues(t, expectedDecryptedParameters, deploymentInstanceDetails.Parameters)
+
 		t.Log("Deploy deployment")
 		path = fmt.Sprintf("/deployments/%d/deploy", deployment.ID)
 		client.Do(t, http.MethodPost, path, nil, http.StatusOK, inttest.WithAuthToken("sometoken"))
