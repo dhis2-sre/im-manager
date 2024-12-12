@@ -206,7 +206,7 @@ func TestInstanceHandler(t *testing.T) {
 		client.GetJSON(t, path, &instance, inttest.WithAuthToken("sometoken"))
 		assert.Equal(t, deploymentInstance.ID, instance.ID)
 		assert.Equal(t, "group-name", instance.GroupName)
-		assert.Equal(t, "dhis2-core", instance.StackName)
+		assert.Equal(t, "whoami-go", instance.StackName)
 		{
 			parameters := instance.Parameters
 			assert.NotEqual(t, parameters["CHART_VERSION"], "12.6.2")
@@ -226,8 +226,8 @@ func TestInstanceHandler(t *testing.T) {
 		client.GetJSON(t, path, &decryptedInstance, inttest.WithAuthToken("sometoken"))
 		assert.Equal(t, deploymentInstance.ID, decryptedInstance.ID)
 		assert.Equal(t, "group-name", decryptedInstance.GroupName)
-		assert.Equal(t, "dhis2-core", decryptedInstance.StackName)
-		expectedDecryptedParameters := model.DeploymentInstanceParameters{
+		assert.Equal(t, "whoami-go", decryptedInstance.StackName)
+		expectedParameters := model.DeploymentInstanceParameters{
 			"CHART_VERSION":             {0, "", "", "12.6.2"},
 			"DATABASE_ID":               {0, "", "", "7"},
 			"DATABASE_NAME":             {0, "", "", "dhis2"},
@@ -238,7 +238,7 @@ func TestInstanceHandler(t *testing.T) {
 			"RESOURCES_REQUESTS_CPU":    {0, "", "", "250m"},
 			"RESOURCES_REQUESTS_MEMORY": {0, "", "", "256Mi"},
 		}
-		assert.EqualExportedValues(t, expectedDecryptedParameters, instance.Parameters)
+		assert.EqualExportedValues(t, expectedParameters, decryptedInstance.Parameters)
 
 		t.Log("Deploy deployment")
 		path = fmt.Sprintf("/deployments/%d/deploy", deployment.ID)
