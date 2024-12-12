@@ -78,15 +78,15 @@ releases:
           # Enables logging of all SQL queries.
           enable.query.logging = {{ requiredEnv "ENABLE_QUERY_LOGGING" }}
 
-          #analytics.table.unlogged = on
-          #analytics.table.use_views = off
-          #analytics.database=doris
-          #analytics.connection.url=jdbc:mysql://doriscluster-helm-fe-service.doris.svc:9030/dhis2?
           #useUnicode=true&characterEncoding=UTF-8&useSSL=false
-          #analytics.connection.username=root
-          #analytics.connection.password=
-          #analytics.connection.driver_class=com.mysql.cj.jdbc.Driver
-          #analytics.connection.pool.validation_timeout=10000
+          analytics.table.unlogged = on
+          analytics.table.use_views = off
+          analytics.database=doris
+          analytics.connection.url=jdbc:mysql://doriscluster-helm-fe-service.doris.svc:9030/dhis2?
+          analytics.connection.username=root
+          analytics.connection.password=
+          analytics.connection.driver_class=com.mysql.cj.jdbc.Driver
+          analytics.connection.pool.validation_timeout=10000
 
       - googleAuth:
           projectId: "{{ requiredEnv "GOOGLE_AUTH_PROJECT_ID" }}"
