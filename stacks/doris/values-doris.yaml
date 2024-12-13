@@ -44,7 +44,7 @@ dorisCluster:
   # password: dDBwLVNlY3JldA==
 
 feSpec:
-  replicas: 3
+  replicas: 1
   # electionNumber represents `FOLLOWER` number, replicas - electionNumber as `OBSERVER`
   # electionNumber: 3
   # the pod labels for user select or classify pods.
@@ -114,8 +114,8 @@ feSpec:
   # but the default configuration of other types will still take effect.
   resource:
     requests:
-      cpu: 4
-      memory: 8Gi
+      cpu: 1
+      memory: 2Gi
     # limits:
     #   cpu: 16
     #   memory: 32Gi
@@ -212,7 +212,7 @@ feSpec:
     # command: [ "/sbin/sysctl", "-w", "vm.max_map_count=2000000" ]
 
 beSpec:
-  replicas: 3
+  replicas: 1
   # the pod labels for user select or classify pods.
   labels: {}
     # selectdb.app.classify: "classify-1"
@@ -279,8 +279,8 @@ beSpec:
   # but the default configuration of other types will still take effect.
   resource:
     requests:
-      cpu: 4
-      memory: 8Gi
+      cpu: 1
+      memory: 2Gi
     # limits:
     #   cpu: 16
     #   memory: 32Gi
