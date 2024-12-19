@@ -1355,6 +1355,56 @@ paths:
                 "200":
                     $ref: '#/responses/Response'
             summary: Health status
+    /instances/{id}/decrypted-details:
+        put:
+            description: Returns the details of an instance including decrypted parameters
+            operationId: instanceWithDecryptedDetails
+            parameters:
+                - format: uint64
+                  in: path
+                  name: id
+                  required: true
+                  type: integer
+                  x-go-name: ID
+            responses:
+                "202":
+                    description: ""
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Instance with decrypted details
+    /instances/{id}/details:
+        put:
+            description: Returns the details of an instance including parameters
+            operationId: instanceWithDetails
+            parameters:
+                - format: uint64
+                  in: path
+                  name: id
+                  required: true
+                  type: integer
+                  x-go-name: ID
+            responses:
+                "202":
+                    description: ""
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Instance with details
     /instances/{id}/logs:
         get:
             description: Stream instance logs in real time
