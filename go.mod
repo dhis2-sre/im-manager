@@ -3,7 +3,7 @@ module github.com/dhis2-sre/im-manager
 go 1.22.1
 
 require (
-	filippo.io/age v1.2.0
+	filippo.io/age v1.2.1
 	github.com/anthhub/forwarder v1.1.0
 	github.com/aws/aws-sdk-go-v2 v1.32.6
 	github.com/aws/aws-sdk-go-v2/config v1.28.6
