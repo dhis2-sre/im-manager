@@ -20,7 +20,7 @@ require (
 	github.com/go-playground/validator/v10 v10.23.0
 	github.com/go-redis/redis v6.15.9+incompatible
 	github.com/google/uuid v1.6.0
-	github.com/gosimple/slug v1.14.0
+	github.com/gosimple/slug v1.15.0
 	github.com/habx/pg-commands v0.6.1
 	github.com/lestrrat-go/jwx/v2 v2.0.19-0.20240309224501-3735e8aace59
 	github.com/lib/pq v1.10.9
