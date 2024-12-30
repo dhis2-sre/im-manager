@@ -1355,6 +1355,31 @@ paths:
                 "200":
                     $ref: '#/responses/Response'
             summary: Health status
+    /instances/{id}/backup:
+        post:
+            description: Backup filestore...
+            operationId: filestoreBackup
+            parameters:
+                - format: uint64
+                  in: path
+                  name: id
+                  required: true
+                  type: integer
+                  x-go-name: ID
+            responses:
+                "200":
+                    description: ""
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Backup filestore
     /instances/{id}/decrypted-details:
         put:
             description: Returns the details of an instance including decrypted parameters

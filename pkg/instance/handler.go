@@ -32,11 +32,53 @@ type groupServiceHandler interface {
 	Find(ctx context.Context, name string) (*model.Group, error)
 }
 
-type SaveDeploymentRequest struct {
-	Name        string `json:"name" binding:"required,dns_rfc1035_label"`
-	Description string `json:"description"`
-	Group       string `json:"group" binding:"required"`
-	TTL         uint   `json:"ttl"`
+type filestoreBackupRequest struct {
+	// Name of backup
+	Name string `json:"name" binding:"required"`
+}
+
+func (h Handler) FilestoreBackup(c *gin.Context) {
+	// swagger:route POST /instances/{id}/backup filestoreBackup
+	//
+	// Backup filestore
+	//
+	// Backup filestore...
+	//
+	// Security:
+	//	oauth2:
+	//
+	// responses:
+	//	200:
+	//	401: Error
+	//	403: Error
+	//	404: Error
+	//	415: Error
+	id, ok := handler.GetPathParameter(c, "id")
+	if !ok {
+		return
+	}
+
+	var request filestoreBackupRequest
+	if err := handler.DataBinder(c, &request); err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	ctx := c.Request.Context()
+
+	instance, err := h.instanceService.FindDeploymentInstanceById(ctx, id)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	err = h.instanceService.FilestoreBackup(ctx, instance, request.Name)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	c.Status(http.StatusOK)
 }
 
 func (h Handler) DeployDeployment(c *gin.Context) {
@@ -99,6 +141,13 @@ func (h Handler) DeployDeployment(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, deployment)
+}
+
+type SaveDeploymentRequest struct {
+	Name        string `json:"name" binding:"required,dns_rfc1035_label"`
+	Description string `json:"description"`
+	Group       string `json:"group" binding:"required"`
+	TTL         uint   `json:"ttl"`
 }
 
 func (h Handler) SaveDeployment(c *gin.Context) {

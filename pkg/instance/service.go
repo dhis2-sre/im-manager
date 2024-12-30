@@ -5,11 +5,16 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/dhis2-sre/im-manager/pkg/storage"
+	"github.com/minio/minio-go/v7"
+	"github.com/minio/minio-go/v7/pkg/credentials"
 	"io"
 	"log/slog"
 	"os/exec"
 	"slices"
 	"strings"
+	"time"
 
 	"golang.org/x/exp/maps"
 
@@ -23,19 +28,14 @@ import (
 	"github.com/dhis2-sre/im-manager/pkg/model"
 )
 
-func NewService(
-	logger *slog.Logger,
-	instanceRepository *repository,
-	groupService groupService,
-	stackService stack.Service,
-	helmfileService helmfile,
-) *Service {
+func NewService(logger *slog.Logger, instanceRepository *repository, groupService groupService, stackService stack.Service, helmfileService helmfile, s3Client *s3.Client) *Service {
 	return &Service{
 		logger:             logger,
 		instanceRepository: instanceRepository,
 		groupService:       groupService,
 		stackService:       stackService,
 		helmfileService:    helmfileService,
+		s3Client:           s3Client,
 	}
 }
 
@@ -55,6 +55,7 @@ type Service struct {
 	groupService       groupService
 	stackService       stack.Service
 	helmfileService    helmfile
+	s3Client           *s3.Client
 }
 
 func (s Service) SaveDeployment(ctx context.Context, deployment *model.Deployment) error {
@@ -736,4 +737,38 @@ func (s Service) Reset(ctx context.Context, token string, instance *model.Deploy
 	}
 
 	return s.deployDeploymentInstance(ctx, token, instance, ttl)
+}
+
+func (s Service) FilestoreBackup(ctx context.Context, instance *model.DeploymentInstance, name string) error {
+	endpoint := fmt.Sprintf("%s-minio.%s.svc:9000", instance.Name, instance.GroupName)
+	minioClient, err := newMinioClient("dhisdhis", "dhisdhis", endpoint, false)
+	if err != nil {
+		return err
+	}
+
+	backupService, err := storage.NewBackupService(s.logger, minioClient, s.s3Client)
+	if err != nil {
+		return err
+	}
+
+	s3Bucket := "im-databases-feature"
+	timestamp := time.Now().Format(time.RFC3339)
+	key := fmt.Sprintf("%s/backup-%s.tar.gz", instance.GroupName, timestamp)
+	err = backupService.PerformBackup(ctx, "dhis2", s3Bucket, key)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func newMinioClient(accessKey, secretKey, endpoint string, useSSL bool) (*minio.Client, error) {
+	minioClient, err := minio.New(endpoint, &minio.Options{
+		Creds:  credentials.NewStaticV4(accessKey, secretKey, ""),
+		Secure: useSSL,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("error creating MinIO client: %v", err)
+	}
+	return minioClient, nil
 }
