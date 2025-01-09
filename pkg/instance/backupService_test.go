@@ -1,16 +1,16 @@
-package storage
+package instance
 
 import (
 	"bytes"
 	"context"
-	"github.com/minio/minio-go/v7"
-	"github.com/minio/minio-go/v7/pkg/credentials"
-	"github.com/orlangure/gnomock"
-	"github.com/orlangure/gnomock/preset/localstack"
-	"github.com/testcontainers/testcontainers-go"
 	"log/slog"
 	"os"
 	"testing"
+
+	"github.com/dhis2-sre/im-manager/pkg/inttest"
+	"github.com/minio/minio-go/v7"
+	"github.com/minio/minio-go/v7/pkg/credentials"
+	"github.com/testcontainers/testcontainers-go"
 
 	"github.com/stretchr/testify/require"
 	minioContainer "github.com/testcontainers/testcontainers-go/modules/minio"
@@ -56,34 +56,9 @@ func TestBackupService(t *testing.T) {
 	s3Bucket := "database-bucket"
 	err = os.Mkdir(s3Dir+"/"+s3Bucket, 0o755)
 	require.NoError(t, err, "failed to create S3 output bucket")
+	s3 := inttest.SetupS3(t, s3Dir)
 
-	s3Container, err := gnomock.Start(
-		localstack.Preset(
-			localstack.WithServices(localstack.S3),
-			localstack.WithS3Files(s3Dir+"/"+s3Bucket),
-			localstack.WithVersion("2.1.0"),
-		),
-	)
-	require.NoError(t, err, "failed to start S3")
-	t.Cleanup(func() { require.NoError(t, gnomock.Stop(s3Container), "failed to stop S3") })
-	/*
-		s3Client := s3.NewFromConfig(
-			aws.Config{
-				Region: "",
-				EndpointResolverWithOptions: aws.EndpointResolverWithOptionsFunc(func(service, region string, options ...interface{}) (aws.Endpoint, error) {
-					return aws.Endpoint{
-						URL:           fmt.Sprintf("http://%s/", s3Container.Host),
-						SigningRegion: region,
-					}, nil
-				}),
-			},
-			func(o *s3.Options) {
-				o.UsePathStyle = true
-			},
-		)
-	*/
-	backupService, err := NewBackupService(logger, minioClient, nil)
-	require.NoError(t, err)
+	backupService := NewBackupService(logger, minioClient, s3.Client)
 
 	err = backupService.PerformBackup(ctx, bucketName, "backup-bucket", "backup-key")
 	require.NoError(t, err)

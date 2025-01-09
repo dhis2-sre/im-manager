@@ -3,15 +3,16 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/aws/aws-sdk-go-v2/config"
-	"github.com/aws/aws-sdk-go-v2/service/s3"
-	"github.com/dhis2-sre/im-manager/pkg/storage"
-	"github.com/minio/minio-go/v7"
-	"github.com/minio/minio-go/v7/pkg/credentials"
 	"log"
 	"log/slog"
 	"os"
 	"time"
+
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/dhis2-sre/im-manager/pkg/instance"
+	"github.com/minio/minio-go/v7"
+	"github.com/minio/minio-go/v7/pkg/credentials"
 )
 
 func main() {
@@ -38,10 +39,7 @@ func main() {
 		log.Fatalf("s3 client setup: %v", err)
 	}
 
-	service, err := storage.NewBackupService(logger, minioClient, s3Client)
-	if err != nil {
-		log.Fatalf("Failed to create backup service: %v", err)
-	}
+	service := instance.NewBackupService(logger, minioClient, s3Client)
 
 	timestamp := time.Now().Format(time.RFC3339)
 	key := fmt.Sprintf("backup-%s.tar.gz", timestamp)

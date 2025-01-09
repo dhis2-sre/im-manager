@@ -5,17 +5,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/aws/aws-sdk-go-v2/service/s3"
-	"github.com/dhis2-sre/im-manager/pkg/storage"
-	"github.com/minio/minio-go/v7"
-	"github.com/minio/minio-go/v7/pkg/credentials"
 	"io"
 	"log/slog"
 	"os/exec"
 	"slices"
 	"strings"
-	"time"
 
+	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/minio/minio-go/v7"
+	"github.com/minio/minio-go/v7/pkg/credentials"
 	"golang.org/x/exp/maps"
 
 	v1 "k8s.io/api/core/v1"
@@ -746,20 +744,33 @@ func (s Service) FilestoreBackup(ctx context.Context, instance *model.Deployment
 		return err
 	}
 
-	backupService, err := storage.NewBackupService(s.logger, minioClient, s.s3Client)
-	if err != nil {
-		return err
-	}
+	backupService := NewBackupService(s.logger, minioClient, s.s3Client)
 
 	s3Bucket := "im-databases-feature"
-	timestamp := time.Now().Format(time.RFC3339)
-	key := fmt.Sprintf("%s/backup-%s.tar.gz", instance.GroupName, timestamp)
+	key := fmt.Sprintf("%s/%s-%s.tar.gz", instance.GroupName, name, "fs")
 	err = backupService.PerformBackup(ctx, "dhis2", s3Bucket, key)
 	if err != nil {
 		return err
 	}
 
+	// Record backup in database
+	s3Uri := fmt.Sprintf("s3://%s/%s", s3Bucket, key)
+	err = s.recordBackup(ctx, instance.GroupName, s3Uri, name+".tar.gz")
+	if err != nil {
+		return err
+	}
+
 	return nil
+}
+
+func (s Service) recordBackup(ctx context.Context, groupName, s3uri, name string) error {
+	database := model.Database{
+		Name:      name,
+		GroupName: groupName,
+		Url:       s3uri,
+		Type:      "fs",
+	}
+	return s.instanceRepository.RecordBackup(ctx, database)
 }
 
 func newMinioClient(accessKey, secretKey, endpoint string, useSSL bool) (*minio.Client, error) {

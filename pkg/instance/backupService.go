@@ -1,4 +1,4 @@
-package storage
+package instance
 
 import (
 	"archive/tar"
@@ -7,23 +7,29 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/service/s3"
-	"github.com/aws/aws-sdk-go-v2/service/s3/types"
-	"github.com/minio/minio-go/v7"
 	"io"
 	"log/slog"
 	"sync"
 	"time"
+
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/aws/aws-sdk-go-v2/service/s3/types"
+	"github.com/minio/minio-go/v7"
+	"golang.org/x/sync/errgroup"
+)
+
+const (
+	bufferSize = 5 * 1024 * 1024 // 5 MB
 )
 
 // NewBackupService creates a new backup service instance
-func NewBackupService(logger *slog.Logger, minioClient MinioClient, s3Client S3BackupClient) (*BackupService, error) {
+func NewBackupService(logger *slog.Logger, minioClient MinioClient, s3Client S3BackupClient) *BackupService {
 	return &BackupService{
 		minioClient: minioClient,
 		s3Client:    s3Client,
 		logger:      logger,
-	}, nil
+	}
 }
 
 // BackupService handles the backup operation
@@ -64,36 +70,26 @@ func (bs *BackupStats) increment(size int64) {
 
 // PerformBackup executes the backup operation
 func (s *BackupService) PerformBackup(ctx context.Context, minioBucket, s3Bucket, key string) error {
+	g, ctx := errgroup.WithContext(ctx)
 	stats := &BackupStats{StartTime: time.Now()}
 	pr, pw := io.Pipe()
 
-	errCh := make(chan error, 1)
-
-	// Start goroutine to write the tar.gz stream
-	go func() {
+	g.Go(func() error {
 		defer pw.Close()
-		if err := s.createTarGzStream(ctx, pw, minioBucket, stats); err != nil {
-			errCh <- err
-			pw.CloseWithError(err)
-			return
-		}
-		close(errCh)
-	}()
+		return s.createTarGzStream(ctx, pw, minioBucket, stats)
+	})
 
-	// Upload to S3
-	if err := s.streamToS3WithMultipart(ctx, s3Bucket, key, pr); err != nil {
-		return fmt.Errorf("s3 upload: %v", err)
-	}
+	g.Go(func() error {
+		return s.streamToS3WithMultipart(ctx, s3Bucket, key, pr)
+	})
 
-	// Check for errors from the goroutine
-	if err := <-errCh; err != nil {
-		return fmt.Errorf("backup creation: %v", err)
+	if err := g.Wait(); err != nil {
+		return fmt.Errorf("backup failed: %v", err)
 	}
 
 	s.logBackupStats(stats)
 	return nil
 }
-
 func (s *BackupService) createTarGzStream(ctx context.Context, w io.Writer, minioBucket string, stats *BackupStats) error {
 	gw := gzip.NewWriter(w)
 	defer gw.Close()
@@ -160,7 +156,7 @@ func (s *BackupService) streamToS3WithMultipart(ctx context.Context, bucket, key
 	defer s.cleanupFailedUpload(ctx, bucket, key, uploadID, &err)
 
 	partNumber := int32(1)
-	buffer := make([]byte, 5*1024*1024) // 5MB buffer
+	buffer := make([]byte, bufferSize)
 
 	for {
 		n, err := io.ReadFull(reader, buffer)

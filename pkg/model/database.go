@@ -17,6 +17,8 @@ type Database struct {
 	ExternalDownloads []ExternalDownload `json:"externalDownloads" gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
 	Lock              *Lock              `json:"lock" gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
 	Slug              string             `json:"slug" gorm:"uniqueIndex"`
+	// TODO: Sql or fs?
+	Type string `json:"type"`
 }
 
 // swagger:model

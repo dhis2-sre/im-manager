@@ -99,6 +99,10 @@ definitions:
             slug:
                 type: string
                 x-go-name: Slug
+            type:
+                description: 'TODO: Sql or fs?'
+                type: string
+                x-go-name: Type
             updatedAt:
                 format: date-time
                 type: string
