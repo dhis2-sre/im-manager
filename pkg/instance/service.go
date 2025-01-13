@@ -65,7 +65,25 @@ func (s Service) FindDeploymentById(ctx context.Context, id uint) (*model.Deploy
 }
 
 func (s Service) FindDecryptedDeploymentById(ctx context.Context, id uint) (*model.Deployment, error) {
-	return s.instanceRepository.FindDecryptedDeploymentById(ctx, id)
+	deployment, err := s.instanceRepository.FindDeploymentById(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	return s.decryptDeployment(deployment)
+}
+
+func (s Service) decryptDeployment(deployment *model.Deployment) (*model.Deployment, error) {
+	var stacksByName = map[string]*model.Stack{}
+	for _, instance := range deployment.Instances {
+		stack, err := s.stackService.Find(instance.StackName)
+		if err != nil {
+			return nil, err
+		}
+		stacksByName[instance.StackName] = stack
+	}
+
+	return s.instanceRepository.DecryptDeployment(deployment, stacksByName)
 }
 
 func (s Service) FindDeploymentInstanceById(ctx context.Context, id uint) (*model.DeploymentInstance, error) {
@@ -73,7 +91,15 @@ func (s Service) FindDeploymentInstanceById(ctx context.Context, id uint) (*mode
 }
 
 func (s Service) FindDecryptedDeploymentInstanceById(ctx context.Context, id uint) (*model.DeploymentInstance, error) {
-	return s.instanceRepository.FindDecryptedDeploymentInstanceById(ctx, id)
+	deploymentInstance, err := s.instanceRepository.FindDeploymentInstanceById(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	stack, err := s.stackService.Find(deploymentInstance.StackName)
+	if err != nil {
+		return nil, err
+	}
+	return s.instanceRepository.DecryptDeploymentInstance(deploymentInstance, stack)
 }
 
 func (s Service) SaveInstance(ctx context.Context, instance *model.DeploymentInstance) error {
@@ -82,24 +108,34 @@ func (s Service) SaveInstance(ctx context.Context, instance *model.DeploymentIns
 		return err
 	}
 
-	deployment, err := s.instanceRepository.FindDecryptedDeploymentById(ctx, instance.DeploymentID)
+	deployment, err := s.FindDeploymentById(ctx, instance.DeploymentID)
 	if err != nil {
 		return err
 	}
 
-	deployment.Instances = append(deployment.Instances, instance)
+	decryptedDeployment, err := s.decryptDeployment(deployment)
+	if err != nil {
+		return err
+	}
 
-	_, err = s.validateNoCycles(deployment.Instances)
+	decryptedDeployment.Instances = append(decryptedDeployment.Instances, instance)
+
+	_, err = s.validateNoCycles(decryptedDeployment.Instances)
 	if err != nil {
 		return errdef.NewBadRequest("failed to validate instance: %v", err)
 	}
 
-	err = s.resolveParameters(deployment)
+	err = s.resolveParameters(decryptedDeployment)
 	if err != nil {
 		return errdef.NewBadRequest("failed to resolve parameters: %v", err)
 	}
 
-	return s.instanceRepository.SaveInstance(ctx, instance)
+	stack, err := s.stackService.Find(instance.StackName)
+	if err != nil {
+		return err
+	}
+
+	return s.instanceRepository.SaveInstance(ctx, instance, stack)
 }
 
 func (s Service) rejectConsumedParameters(instance *model.DeploymentInstance) error {
