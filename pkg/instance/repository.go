@@ -107,28 +107,18 @@ func (r repository) FindDeploymentInstanceById(ctx context.Context, id uint) (*m
 	return instance, nil
 }
 
-func (r repository) FindDecryptedDeploymentInstanceById(ctx context.Context, id uint) (*model.DeploymentInstance, error) {
-	instance, err := r.FindDeploymentInstanceById(ctx, id)
+func (r repository) DecryptDeploymentInstance(deploymentInstance *model.DeploymentInstance, stack *model.Stack) (*model.DeploymentInstance, error) {
+	err := decryptParameters(r.instanceParameterEncryptionKey, deploymentInstance, stack)
 	if err != nil {
 		return nil, err
 	}
 
-	err = decryptParameters(r.instanceParameterEncryptionKey, instance)
-	if err != nil {
-		return nil, err
-	}
-
-	return instance, nil
+	return deploymentInstance, nil
 }
 
-func (r repository) FindDecryptedDeploymentById(ctx context.Context, id uint) (*model.Deployment, error) {
-	deployment, err := r.FindDeploymentById(ctx, id)
-	if err != nil {
-		return nil, err
-	}
-
+func (r repository) DecryptDeployment(deployment *model.Deployment, stacksByName map[string]*model.Stack) (*model.Deployment, error) {
 	for _, instance := range deployment.Instances {
-		err := decryptParameters(r.instanceParameterEncryptionKey, instance)
+		err := decryptParameters(r.instanceParameterEncryptionKey, instance, stacksByName[instance.StackName])
 		if err != nil {
 			return nil, err
 		}
@@ -137,14 +127,14 @@ func (r repository) FindDecryptedDeploymentById(ctx context.Context, id uint) (*
 	return deployment, nil
 }
 
-func (r repository) SaveInstance(ctx context.Context, instance *model.DeploymentInstance) error {
+func (r repository) SaveInstance(ctx context.Context, instance *model.DeploymentInstance, stack *model.Stack) error {
 	// only use ctx for values (logging) and not cancellation signals on cud operations for now. ctx
 	// cancellation can lead to rollbacks which we should decide individually.
 	ctx = context.WithoutCancel(ctx)
 
 	key := r.instanceParameterEncryptionKey
 
-	err := encryptParameters(key, instance)
+	err := encryptParameters(key, instance, stack)
 	if err != nil {
 		return err
 	}
@@ -204,8 +194,11 @@ func (r repository) FindPublicInstances(ctx context.Context) ([]*model.Deploymen
 	return instances, nil
 }
 
-func encryptParameters(key string, instance *model.DeploymentInstance) error {
+func encryptParameters(key string, instance *model.DeploymentInstance, stack *model.Stack) error {
 	for i, parameter := range instance.Parameters {
+		if !stack.Parameters[parameter.ParameterName].Sensitive {
+			continue
+		}
 		value, err := encryptText(key, parameter.Value)
 		if err != nil {
 			return err
@@ -217,8 +210,11 @@ func encryptParameters(key string, instance *model.DeploymentInstance) error {
 	return nil
 }
 
-func decryptParameters(key string, instance *model.DeploymentInstance) error {
+func decryptParameters(key string, instance *model.DeploymentInstance, stack *model.Stack) error {
 	for i, parameter := range instance.Parameters {
+		if !stack.Parameters[parameter.ParameterName].Sensitive {
+			continue
+		}
 		value, err := decryptText(key, parameter.Value)
 		if err != nil {
 			return err
