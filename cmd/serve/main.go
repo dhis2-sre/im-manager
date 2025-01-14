@@ -426,7 +426,12 @@ func newInstanceService(logger *slog.Logger, db *gorm.DB, stackService stack.Ser
 	}
 	helmfileService := instance.NewHelmfileService(logger, stackService, "./stacks", classification)
 
-	return instance.NewService(logger, instanceRepository, groupService, stackService, helmfileService, s3Client), nil
+	s3Bucket, err := requireEnv("S3_BUCKET")
+	if err != nil {
+		return nil, err
+	}
+
+	return instance.NewService(logger, instanceRepository, groupService, stackService, helmfileService, s3Client, s3Bucket), nil
 }
 
 type rabbitMQConfig struct {

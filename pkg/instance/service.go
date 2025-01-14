@@ -26,7 +26,7 @@ import (
 	"github.com/dhis2-sre/im-manager/pkg/model"
 )
 
-func NewService(logger *slog.Logger, instanceRepository *repository, groupService groupService, stackService stack.Service, helmfileService helmfile, s3Client *s3.Client) *Service {
+func NewService(logger *slog.Logger, instanceRepository *repository, groupService groupService, stackService stack.Service, helmfileService helmfile, s3Client *s3.Client, s3Bucket string) *Service {
 	return &Service{
 		logger:             logger,
 		instanceRepository: instanceRepository,
@@ -34,6 +34,7 @@ func NewService(logger *slog.Logger, instanceRepository *repository, groupServic
 		stackService:       stackService,
 		helmfileService:    helmfileService,
 		s3Client:           s3Client,
+		s3Bucket:           s3Bucket,
 	}
 }
 
@@ -54,6 +55,7 @@ type Service struct {
 	stackService       stack.Service
 	helmfileService    helmfile
 	s3Client           *s3.Client
+	s3Bucket           string
 }
 
 func (s Service) SaveDeployment(ctx context.Context, deployment *model.Deployment) error {
@@ -782,15 +784,14 @@ func (s Service) FilestoreBackup(ctx context.Context, instance *model.Deployment
 
 	backupService := NewBackupService(s.logger, minioClient, s.s3Client)
 
-	s3Bucket := "im-databases-feature"
 	key := fmt.Sprintf("%s/%s-%s.tar.gz", instance.GroupName, name, "fs")
-	err = backupService.PerformBackup(ctx, "dhis2", s3Bucket, key)
+	err = backupService.PerformBackup(ctx, "dhis2", s.s3Bucket, key)
 	if err != nil {
 		return err
 	}
 
 	// Record backup in database
-	s3Uri := fmt.Sprintf("s3://%s/%s", s3Bucket, key)
+	s3Uri := fmt.Sprintf("s3://%s/%s", s.s3Bucket, key)
 	err = s.recordBackup(ctx, instance.GroupName, s3Uri, name+".tar.gz")
 	if err != nil {
 		return err
