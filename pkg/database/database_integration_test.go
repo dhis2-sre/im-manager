@@ -255,6 +255,14 @@ func (gs groupService) Find(ctx context.Context, name string) (*model.Group, err
 
 type instanceService struct{}
 
+func (is instanceService) FindDeploymentById(ctx context.Context, id uint) (*model.Deployment, error) {
+	panic("implement me")
+}
+
+func (is instanceService) FilestoreBackup(ctx context.Context, instance *model.DeploymentInstance, name string) error {
+	panic("implement me")
+}
+
 func (is instanceService) FindDecryptedDeploymentInstanceById(ctx context.Context, id uint) (*model.DeploymentInstance, error) {
 	panic("implement me")
 }

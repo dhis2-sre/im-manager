@@ -43,8 +43,7 @@ func (r repository) Save(ctx context.Context, d *model.Database) error {
 	// cancellation can lead to rollbacks which we should decide individually.
 	ctx = context.WithoutCancel(ctx)
 
-	s := fmt.Sprintf("%s/%s", d.GroupName, d.Name)
-	d.Slug = slug.Make(s)
+	updateSlug(d)
 
 	err := r.db.WithContext(ctx).Save(&d).Error
 	if errors.Is(err, gorm.ErrDuplicatedKey) {
@@ -181,13 +180,14 @@ func (r repository) Delete(ctx context.Context, id uint) error {
 func (r repository) FindByGroupNames(ctx context.Context, groupNames []string) ([]model.Database, error) {
 	var databases []model.Database
 
-	query := r.db
+	query := r.db.WithContext(ctx)
 	isAdmin := slices.Contains(groupNames, model.AdministratorGroupName)
 	if !isAdmin {
 		query = query.Where("group_name IN ?", groupNames)
 	}
 
 	err := query.
+		Where("type = ?", "database").
 		Order("updated_at desc").
 		Find(&databases).Error
 
@@ -199,7 +199,14 @@ func (r repository) Update(ctx context.Context, d *model.Database) error {
 	// cancellation can lead to rollbacks which we should decide individually.
 	ctx = context.WithoutCancel(ctx)
 
+	updateSlug(d)
+
 	return r.db.WithContext(ctx).Save(d).Error
+}
+
+func updateSlug(d *model.Database) {
+	s := fmt.Sprintf("%s/%s", d.GroupName, d.Name)
+	d.Slug = slug.Make(s)
 }
 
 func (r repository) CreateExternalDownload(ctx context.Context, databaseID uint, expirationInSeconds uint) (*model.ExternalDownload, error) {

@@ -40,6 +40,8 @@ type Handler struct {
 
 type instanceService interface {
 	FindDecryptedDeploymentInstanceById(ctx context.Context, id uint) (*model.DeploymentInstance, error)
+	FindDeploymentById(ctx context.Context, id uint) (*model.Deployment, error)
+	FilestoreBackup(ctx context.Context, instance *model.DeploymentInstance, name string) error
 }
 
 type stackService interface {
@@ -89,6 +91,7 @@ func (h Handler) Upload(c *gin.Context) {
 	d := &model.Database{
 		Name:      databaseName,
 		GroupName: groupName,
+		Type:      "database",
 	}
 
 	err := h.canAccess(c, d)
@@ -214,7 +217,35 @@ func (h Handler) SaveAs(c *gin.Context) {
 		return
 	}
 
+	// Backup file store
+	deployment, err := h.instanceService.FindDeploymentById(ctx, instance.DeploymentID)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	coreInstance, err := getInstanceByStack("dhis2-core", deployment.Instances)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	err = h.instanceService.FilestoreBackup(ctx, coreInstance, request.Name)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
 	c.JSON(http.StatusCreated, save)
+}
+
+func getInstanceByStack(stack string, instances []*model.DeploymentInstance) (*model.DeploymentInstance, error) {
+	for _, instance := range instances {
+		if instance.StackName == stack {
+			return instance, nil
+		}
+	}
+	return nil, errdef.NewNotFound("no instance of type %s found", stack)
 }
 
 // Save database
@@ -322,6 +353,7 @@ func (h Handler) Copy(c *gin.Context) {
 	d := &model.Database{
 		Name:      request.Name,
 		GroupName: request.Group,
+		Type:      "database",
 	}
 
 	err := h.canAccess(c, d)

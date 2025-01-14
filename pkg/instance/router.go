@@ -10,7 +10,6 @@ func Routes(r *gin.Engine, authenticator gin.HandlerFunc, handler Handler) {
 	tokenAuthenticationRouter := r.Group("")
 	tokenAuthenticationRouter.Use(authenticator)
 
-	tokenAuthenticationRouter.POST("/instances/:id/backup", handler.FilestoreBackup)
 	tokenAuthenticationRouter.PUT("/instances/:id/reset", handler.Reset)
 	tokenAuthenticationRouter.PUT("/instances/:id/pause", handler.Pause)
 	tokenAuthenticationRouter.PUT("/instances/:id/resume", handler.Resume)
