@@ -51,7 +51,7 @@ func main() {
 func setupS3Client(ctx context.Context, region string) (*s3.Client, error) {
 	awsConfig, err := config.LoadDefaultConfig(ctx, config.WithRegion(region))
 	if err != nil {
-		return nil, fmt.Errorf("error loading AWS configuration: %v", err)
+		return nil, fmt.Errorf("failed to load AWS configuration: %v", err)
 	}
 	return s3.NewFromConfig(awsConfig), nil
 }
