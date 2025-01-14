@@ -118,7 +118,7 @@ func (s *BackupService) processSingleObject(ctx context.Context, tw *tar.Writer,
 	s.logger.InfoContext(ctx, "Processing object", "key", object.Key, "bucket", minioBucket)
 	obj, err := s.minioClient.GetObject(ctx, minioBucket, object.Key, minio.GetObjectOptions{})
 	if err != nil {
-		return fmt.Errorf("get object %s: %v", object.Key, err)
+		return fmt.Errorf("failed to get object %s: %v", object.Key, err)
 	}
 	defer obj.Close()
 
