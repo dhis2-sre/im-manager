@@ -151,7 +151,7 @@ func (s *BackupService) streamToS3WithMultipart(ctx context.Context, bucket, key
 		return fmt.Errorf("create multipart upload: %v", err)
 	}
 
-	uploadID := *createResp.UploadId
+	uploadID := *createResponse.UploadId
 	var completedParts []types.CompletedPart
 	defer s.cleanupFailedUpload(ctx, bucket, key, uploadID, &err)
 
@@ -195,7 +195,7 @@ func (s *BackupService) uploadPart(ctx context.Context, bucket, key string, uplo
 
 	return types.CompletedPart{
 		PartNumber: aws.Int32(partNumber),
-		ETag:       partResp.ETag,
+		ETag:       partResponse.ETag,
 	}, nil
 }
 
