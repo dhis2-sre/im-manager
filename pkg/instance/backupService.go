@@ -188,7 +188,7 @@ func (s *BackupService) uploadPart(ctx context.Context, bucket, key string, uplo
 		Body:       bytes.NewReader(data),
 	}
 
-	partResp, err := s.s3Client.UploadPart(ctx, partInput)
+	partResponse, err := s.s3Client.UploadPart(ctx, partInput)
 	if err != nil {
 		return types.CompletedPart{}, fmt.Errorf("upload part %d: %v", partNumber, err)
 	}
