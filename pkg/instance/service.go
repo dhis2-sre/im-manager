@@ -816,7 +816,7 @@ func newMinioClient(accessKey, secretKey, endpoint string, useSSL bool) (*minio.
 		Secure: useSSL,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("error creating MinIO client: %v", err)
+		return nil, fmt.Errorf("failed to create MinIO client: %v", err)
 	}
 	return minioClient, nil
 }
