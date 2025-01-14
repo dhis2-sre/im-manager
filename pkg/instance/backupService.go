@@ -142,7 +142,7 @@ func (s *BackupService) processSingleObject(ctx context.Context, tw *tar.Writer,
 }
 
 func (s *BackupService) streamToS3WithMultipart(ctx context.Context, bucket, key string, reader io.Reader) error {
-	createResp, err := s.s3Client.CreateMultipartUpload(ctx, &s3.CreateMultipartUploadInput{
+	createResponse, err := s.s3Client.CreateMultipartUpload(ctx, &s3.CreateMultipartUploadInput{
 		Bucket:      &bucket,
 		Key:         &key,
 		ContentType: aws.String("application/x-gzip"),
