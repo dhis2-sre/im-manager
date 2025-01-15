@@ -35,6 +35,8 @@ func (r repository) Create(ctx context.Context, d *model.Database) error {
 	// cancellation can lead to rollbacks which we should decide individually.
 	ctx = context.WithoutCancel(ctx)
 
+	updateSlug(d)
+
 	return r.db.WithContext(ctx).Create(&d).Error
 }
 

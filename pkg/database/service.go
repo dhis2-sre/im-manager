@@ -80,6 +80,13 @@ func (s service) Copy(ctx context.Context, id uint, d *model.Database, group *mo
 		return err
 	}
 
+	if strings.HasSuffix(source.Name, ".pgc") && !strings.HasSuffix(d.Name, ".pgc") {
+		d.Name += ".pgc"
+	}
+	if strings.HasSuffix(source.Name, ".sql.gz") && !strings.HasSuffix(d.Name, ".sql.gz") {
+		d.Name += ".sql.gz"
+	}
+
 	u, err := url.Parse(source.Url)
 	if err != nil {
 		return err
@@ -105,8 +112,12 @@ func (s service) Copy(ctx context.Context, id uint, d *model.Database, group *mo
 }
 
 func (s service) copyFS(ctx context.Context, d *model.Database, group *model.Group) error {
-	fsSlug := d.Slug + "-fs"
-	fs, err := s.repository.FindBySlug(ctx, fsSlug)
+	sourceSlug := d.Slug
+	sourceSlug = strings.TrimSuffix(sourceSlug, "-pgc")
+	sourceSlug = strings.TrimSuffix(sourceSlug, "-sql-gz")
+	sourceSlug += "-fs-tar-gz"
+
+	fs, err := s.repository.FindBySlug(ctx, sourceSlug)
 	if err != nil {
 		if errdef.IsNotFound(err) {
 			return nil
@@ -114,23 +125,33 @@ func (s service) copyFS(ctx context.Context, d *model.Database, group *model.Gro
 		return err
 	}
 
+	newName := d.Name
+	newName = strings.TrimSuffix(newName, ".pgc")
+	newName = strings.TrimSuffix(newName, ".sql.gz")
+	newName += ".fs.tar.gz"
+
 	fsUrl, err := url.Parse(fs.Url)
 	if err != nil {
 		return err
 	}
 
 	sourceKey := strings.TrimPrefix(fsUrl.Path, "/")
-	destinationKey := fmt.Sprintf("%s/%s", group.Name, d.Name)
+	destinationKey := fmt.Sprintf("%s/%s", group.Name, newName)
 	err = s.s3Client.Copy(s.s3Bucket, sourceKey, destinationKey)
 	if err != nil {
 		return err
 	}
 
-	d.Url = fmt.Sprintf("s3://%s/%s", s.s3Bucket, destinationKey)
+	fsNewDatabase := &model.Database{
+		Name:      newName,
+		GroupName: group.Name,
+		Url:       fmt.Sprintf("s3://%s/%s", s.s3Bucket, destinationKey),
+		Type:      "fs",
+	}
 
-	updateSlug(d)
+	updateSlug(fsNewDatabase)
 
-	return s.repository.Create(ctx, d)
+	return s.repository.Create(ctx, fsNewDatabase)
 }
 
 func (s service) FindById(ctx context.Context, id uint) (*model.Database, error) {
