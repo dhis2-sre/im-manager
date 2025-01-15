@@ -1,8 +1,6 @@
 module github.com/dhis2-sre/im-manager
 
-go 1.23.0
-
-toolchain go1.23.2
+go 1.23.4
 
 require (
 	filippo.io/age v1.2.1
