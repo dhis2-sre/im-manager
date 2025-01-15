@@ -3,6 +3,7 @@ package instance
 import (
 	"bytes"
 	"context"
+	"github.com/testcontainers/testcontainers-go"
 	"log/slog"
 	"os"
 	"testing"
@@ -10,35 +11,21 @@ import (
 	"github.com/dhis2-sre/im-manager/pkg/inttest"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
-	"github.com/testcontainers/testcontainers-go"
-
 	"github.com/stretchr/testify/require"
 	minioContainer "github.com/testcontainers/testcontainers-go/modules/minio"
 )
 
 func TestBackupService(t *testing.T) {
-	// TODO: Don't skip!!!
-	t.SkipNow()
 	ctx := context.Background()
-	container, err := minioContainer.Run(ctx, "minio/minio:latest")
+	container, minioClient := setupMinio(t, ctx)
 	defer func() {
 		err := testcontainers.TerminateContainer(container)
 		require.NoError(t, err)
 	}()
-	require.NoError(t, err)
-
-	endpoint, err := container.Endpoint(ctx, "")
-	require.NoError(t, err)
-
-	minioClient, err := minio.New(endpoint, &minio.Options{
-		Creds:  credentials.NewStaticV4(container.Password, container.Password, ""),
-		Secure: false,
-	})
-	require.NoError(t, err)
 
 	// Create test bucket and upload test file
 	bucketName := "test-bucket"
-	err = minioClient.MakeBucket(ctx, bucketName, minio.MakeBucketOptions{})
+	err := minioClient.MakeBucket(ctx, bucketName, minio.MakeBucketOptions{})
 	require.NoError(t, err)
 
 	// Create and upload test files
@@ -64,4 +51,20 @@ func TestBackupService(t *testing.T) {
 
 	err = backupService.PerformBackup(ctx, bucketName, "backup-bucket", "backup-key")
 	require.NoError(t, err)
+}
+
+func setupMinio(t *testing.T, ctx context.Context) (*minioContainer.MinioContainer, *minio.Client) {
+	container, err := minioContainer.Run(ctx, "minio/minio:latest")
+	require.NoError(t, err)
+
+	endpoint, err := container.Endpoint(ctx, "")
+	require.NoError(t, err)
+
+	minioClient, err := minio.New(endpoint, &minio.Options{
+		Creds:  credentials.NewStaticV4(container.Password, container.Password, ""),
+		Secure: false,
+	})
+	require.NoError(t, err)
+
+	return container, minioClient
 }
