@@ -3,10 +3,11 @@ package instance
 import (
 	"bytes"
 	"context"
-	"github.com/testcontainers/testcontainers-go"
 	"log/slog"
 	"os"
 	"testing"
+
+	"github.com/testcontainers/testcontainers-go"
 
 	"github.com/dhis2-sre/im-manager/pkg/inttest"
 	"github.com/minio/minio-go/v7"
