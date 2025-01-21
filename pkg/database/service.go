@@ -108,16 +108,11 @@ func (s service) Copy(ctx context.Context, id uint, d *model.Database, group *mo
 		return err
 	}
 
-	return s.copyFS(ctx, d, group)
+	return s.copyFS(ctx, d, group, source.FilestoreID)
 }
 
-func (s service) copyFS(ctx context.Context, d *model.Database, group *model.Group) error {
-	sourceSlug := d.Slug
-	sourceSlug = strings.TrimSuffix(sourceSlug, "-pgc")
-	sourceSlug = strings.TrimSuffix(sourceSlug, "-sql-gz")
-	sourceSlug += "-fs-tar-gz"
-
-	fs, err := s.repository.FindBySlug(ctx, sourceSlug)
+func (s service) copyFS(ctx context.Context, d *model.Database, group *model.Group, filestoreID uint) error {
+	fs, err := s.repository.FindById(ctx, filestoreID)
 	if err != nil {
 		if errdef.IsNotFound(err) {
 			return nil
@@ -125,8 +120,7 @@ func (s service) copyFS(ctx context.Context, d *model.Database, group *model.Gro
 		return err
 	}
 
-	newName := d.Name
-	newName = strings.TrimSuffix(newName, ".pgc")
+	newName := strings.TrimSuffix(d.Name, ".pgc")
 	newName = strings.TrimSuffix(newName, ".sql.gz")
 	newName += ".fs.tar.gz"
 
@@ -142,16 +136,29 @@ func (s service) copyFS(ctx context.Context, d *model.Database, group *model.Gro
 		return err
 	}
 
+	url := fmt.Sprintf("s3://%s/%s", s.s3Bucket, destinationKey)
 	fsNewDatabase := &model.Database{
 		Name:      newName,
 		GroupName: group.Name,
-		Url:       fmt.Sprintf("s3://%s/%s", s.s3Bucket, destinationKey),
+		Url:       url,
 		Type:      "fs",
 	}
 
 	updateSlug(fsNewDatabase)
 
-	return s.repository.Create(ctx, fsNewDatabase)
+	err = s.repository.Create(ctx, fsNewDatabase)
+	if err != nil {
+		return err
+	}
+
+	d.FilestoreID = fsNewDatabase.ID
+
+	err = s.repository.Save(ctx, d)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (s service) FindById(ctx context.Context, id uint) (*model.Database, error) {
@@ -239,12 +246,8 @@ func (s service) Delete(ctx context.Context, id uint) error {
 }
 
 func (s service) deleteFS(ctx context.Context, d *model.Database) error {
-	fsSlug := d.Slug + "-fs"
-	fs, err := s.repository.FindBySlug(ctx, fsSlug)
+	fs, err := s.repository.FindById(ctx, d.FilestoreID)
 	if err != nil {
-		if errdef.IsNotFound(err) {
-			return nil
-		}
 		return err
 	}
 
@@ -265,6 +268,7 @@ func (s service) deleteFS(ctx context.Context, d *model.Database) error {
 	if err != nil {
 		return err
 	}
+
 	return nil
 }
 
@@ -315,13 +319,32 @@ func filterDatabases(databases []model.Database, test func(database *model.Datab
 }
 
 func (s service) Update(ctx context.Context, d *model.Database) error {
-	err := s.repository.Update(ctx, d)
+	sourceUrl, err := url.Parse(d.Url)
 	if err != nil {
 		return err
 	}
 
-	fsSlug := d.Slug + "-fs"
-	fs, err := s.repository.FindBySlug(ctx, fsSlug)
+	sourceKey := strings.TrimPrefix(sourceUrl.Path, "/")
+	destination := fmt.Sprintf("%s/%s", d.GroupName, d.Name)
+	err = s.s3Client.Move(s.s3Bucket, sourceKey, destination)
+	if err != nil {
+		return err
+	}
+
+	d.Url = fmt.Sprintf("s3://%s/%s", s.s3Bucket, destination)
+
+	updateSlug(d)
+
+	err = s.repository.Update(ctx, d)
+	if err != nil {
+		return err
+	}
+
+	return s.updateFS(ctx, d)
+}
+
+func (s service) updateFS(ctx context.Context, d *model.Database) error {
+	fs, err := s.repository.FindById(ctx, d.FilestoreID)
 	if err != nil {
 		if errdef.IsNotFound(err) {
 			return nil
@@ -329,13 +352,27 @@ func (s service) Update(ctx context.Context, d *model.Database) error {
 		return err
 	}
 
-	fs.Name = d.Name
-	err = s.repository.Update(ctx, d)
+	newName := strings.TrimSuffix(d.Name, ".pgc")
+	newName = strings.TrimSuffix(newName, ".sql.gz")
+	fs.Name = newName + "-fs.tar.gz"
+
+	sourceUrl, err := url.Parse(fs.Url)
 	if err != nil {
 		return err
 	}
 
-	return err
+	sourceKey := strings.TrimPrefix(sourceUrl.Path, "/")
+	destination := fmt.Sprintf("%s/%s", fs.GroupName, fs.Name)
+	err = s.s3Client.Move(s.s3Bucket, sourceKey, destination)
+	if err != nil {
+		return err
+	}
+
+	d.Url = fmt.Sprintf("s3://%s/%s", s.s3Bucket, destination)
+
+	updateSlug(d)
+
+	return s.repository.Update(ctx, fs)
 }
 
 func (s service) CreateExternalDownload(ctx context.Context, databaseID uint, expiration uint) (*model.ExternalDownload, error) {

@@ -775,7 +775,9 @@ func (s Service) Reset(ctx context.Context, token string, instance *model.Deploy
 	return s.deployDeploymentInstance(ctx, token, instance, ttl)
 }
 
-func (s Service) FilestoreBackup(ctx context.Context, instance *model.DeploymentInstance, name string) error {
+func (s Service) FilestoreBackup(ctx context.Context, instance *model.DeploymentInstance, name string, database *model.Database) error {
+	s.logger.InfoContext(ctx, "save again", "database", database)
+
 	endpoint := fmt.Sprintf("%s-minio.%s.svc:9000", instance.Name, instance.GroupName)
 	minioClient, err := newMinioClient("dhisdhis", "dhisdhis", endpoint, false)
 	if err != nil {
@@ -784,6 +786,8 @@ func (s Service) FilestoreBackup(ctx context.Context, instance *model.Deployment
 
 	backupService := NewBackupService(s.logger, minioClient, s.s3Client)
 
+	name = strings.TrimSuffix(name, ".pgc")
+	name = strings.TrimSuffix(name, ".tar.gz")
 	key := fmt.Sprintf("%s/%s-%s.tar.gz", instance.GroupName, name, "fs")
 	err = backupService.PerformBackup(ctx, "dhis2", s.s3Bucket, key)
 	if err != nil {
@@ -792,7 +796,16 @@ func (s Service) FilestoreBackup(ctx context.Context, instance *model.Deployment
 
 	// Record backup in database
 	s3Uri := fmt.Sprintf("s3://%s/%s", s.s3Bucket, key)
-	err = s.recordBackup(ctx, instance.GroupName, s3Uri, name+".tar.gz")
+	filestore, err := s.recordBackup(ctx, instance.GroupName, s3Uri, name+"-fs.tar.gz")
+	if err != nil {
+		return err
+	}
+
+	database.FilestoreID = filestore.ID
+
+	s.logger.InfoContext(ctx, "save2", "database.FilestoreID", database.FilestoreID)
+	s.logger.InfoContext(ctx, "save3", "filestore.ID", filestore.ID)
+	err = s.instanceRepository.SaveDatabase(ctx, database)
 	if err != nil {
 		return err
 	}
@@ -800,14 +813,19 @@ func (s Service) FilestoreBackup(ctx context.Context, instance *model.Deployment
 	return nil
 }
 
-func (s Service) recordBackup(ctx context.Context, groupName, s3uri, name string) error {
-	database := model.Database{
+func (s Service) recordBackup(ctx context.Context, groupName, s3uri, name string) (*model.Database, error) {
+	database := &model.Database{
 		Name:      name,
 		GroupName: groupName,
 		Url:       s3uri,
 		Type:      "fs",
 	}
-	return s.instanceRepository.RecordBackup(ctx, database)
+	err := s.instanceRepository.RecordBackup(ctx, database)
+	if err != nil {
+		return nil, err
+	}
+
+	return database, nil
 }
 
 func newMinioClient(accessKey, secretKey, endpoint string, useSSL bool) (*minio.Client, error) {

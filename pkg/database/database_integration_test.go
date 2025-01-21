@@ -259,7 +259,7 @@ func (is instanceService) FindDeploymentById(ctx context.Context, id uint) (*mod
 	panic("implement me")
 }
 
-func (is instanceService) FilestoreBackup(ctx context.Context, instance *model.DeploymentInstance, name string) error {
+func (is instanceService) FilestoreBackup(ctx context.Context, instance *model.DeploymentInstance, name string, database *model.Database) error {
 	panic("implement me")
 }
 

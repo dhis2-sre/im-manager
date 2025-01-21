@@ -199,7 +199,7 @@ func (r repository) FindPublicInstances(ctx context.Context) ([]*model.Deploymen
 // TODO: This code is duplicated from https://github.com/dhis2-sre/im-manager/blob/5581b4765fd6878138f4741d4c82607ed4ce0998/pkg/database/repository.go#L41
 // A significant difference is that here we include the database.Type in the slug
 // Ideally we should rewrite the database service to a storage service and use that in both the database and instance handlers (and/or services)
-func (r repository) RecordBackup(ctx context.Context, database model.Database) error {
+func (r repository) RecordBackup(ctx context.Context, database *model.Database) error {
 	// only use ctx for values (logging) and not cancellation signals on cud operations for now. ctx
 	// cancellation can lead to rollbacks which we should decide individually.
 	ctx = context.WithoutCancel(ctx)
@@ -207,12 +207,16 @@ func (r repository) RecordBackup(ctx context.Context, database model.Database) e
 	s := fmt.Sprintf("%s/%s-%s", database.GroupName, database.Name, database.Type)
 	database.Slug = slug.Make(s)
 
-	err := r.db.WithContext(ctx).Save(&database).Error
+	err := r.db.WithContext(ctx).Save(database).Error
 	if errors.Is(err, gorm.ErrDuplicatedKey) {
 		return errdef.NewDuplicated("database named %q already exists", database.Name)
 	}
 
 	return err
+}
+
+func (r repository) SaveDatabase(ctx context.Context, database *model.Database) error {
+	return r.db.WithContext(ctx).Save(&database).Error
 }
 
 func encryptParameters(key string, instance *model.DeploymentInstance, stack *model.Stack) error {

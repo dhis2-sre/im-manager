@@ -8,7 +8,7 @@ import (
 
 // swagger:model
 type Database struct {
-	ID                uint               `json:"id" gorm:"primarykey"`
+	ID                uint               `json:"id" gorm:"primaryKey"`
 	CreatedAt         time.Time          `json:"createdAt"`
 	UpdatedAt         time.Time          `json:"updatedAt"`
 	Name              string             `json:"name" gorm:"index:database_name_group_idx,unique"`
@@ -18,7 +18,9 @@ type Database struct {
 	Lock              *Lock              `json:"lock" gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
 	Slug              string             `json:"slug" gorm:"uniqueIndex"`
 	// TODO: Sql or fs?
-	Type string `json:"type"`
+	Type        string    `json:"type"`
+	FilestoreID uint      `json:"filestoreId"`
+	Filestore   *Database `json:"filestore" gorm:"foreignKey:ID"`
 }
 
 // swagger:model

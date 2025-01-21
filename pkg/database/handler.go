@@ -41,7 +41,7 @@ type Handler struct {
 type instanceService interface {
 	FindDecryptedDeploymentInstanceById(ctx context.Context, id uint) (*model.DeploymentInstance, error)
 	FindDeploymentById(ctx context.Context, id uint) (*model.Deployment, error)
-	FilestoreBackup(ctx context.Context, instance *model.DeploymentInstance, name string) error
+	FilestoreBackup(ctx context.Context, instance *model.DeploymentInstance, name string, database *model.Database) error
 }
 
 type stackService interface {
@@ -209,7 +209,7 @@ func (h Handler) SaveAs(c *gin.Context) {
 		return
 	}
 
-	save, err := h.databaseService.SaveAs(ctx, database, instance, stack, request.Name, request.Format, func(ctx context.Context, saved *model.Database) {
+	savedDatabase, err := h.databaseService.SaveAs(ctx, database, instance, stack, request.Name, request.Format, func(ctx context.Context, saved *model.Database) {
 		h.logger.InfoContext(ctx, "Save an instances database as", "groupName", saved.GroupName, "databaseName", saved.Name, "instanceName", instance.Name)
 	})
 	if err != nil {
@@ -230,13 +230,13 @@ func (h Handler) SaveAs(c *gin.Context) {
 		return
 	}
 
-	err = h.instanceService.FilestoreBackup(ctx, coreInstance, request.Name)
+	err = h.instanceService.FilestoreBackup(ctx, coreInstance, request.Name, savedDatabase)
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
 
-	c.JSON(http.StatusCreated, save)
+	c.JSON(http.StatusCreated, savedDatabase)
 }
 
 func getInstanceByStack(stack string, instances []*model.DeploymentInstance) (*model.DeploymentInstance, error) {
