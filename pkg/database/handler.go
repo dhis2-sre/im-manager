@@ -245,7 +245,7 @@ func getInstanceByStack(stack string, instances []*model.DeploymentInstance) (*m
 			return instance, nil
 		}
 	}
-	return nil, errdef.NewNotFound("no instance of type %s found", stack)
+	return nil, errdef.NewNotFound("failed to find instance of type %s", stack)
 }
 
 // Save database
