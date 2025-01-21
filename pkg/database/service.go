@@ -248,6 +248,9 @@ func (s service) Delete(ctx context.Context, id uint) error {
 func (s service) deleteFS(ctx context.Context, d *model.Database) error {
 	fs, err := s.repository.FindById(ctx, d.FilestoreID)
 	if err != nil {
+		if errdef.IsNotFound(err) {
+			return nil
+		}
 		return err
 	}
 
