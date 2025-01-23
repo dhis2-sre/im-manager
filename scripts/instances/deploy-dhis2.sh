@@ -43,7 +43,6 @@ DEPLOYMENT_ID=$(echo "{
 
 echo "{
   \"stackName\": \"dhis2-db\",
-  \"public\": $PUBLIC,
   \"parameters\": {
     \"DATABASE_ID\": {
       \"value\": \"$DATABASE_ID\"
