@@ -803,8 +803,6 @@ func (s Service) FilestoreBackup(ctx context.Context, instance *model.Deployment
 
 	database.FilestoreID = filestore.ID
 
-	s.logger.InfoContext(ctx, "save2", "database.FilestoreID", database.FilestoreID)
-	s.logger.InfoContext(ctx, "save3", "filestore.ID", filestore.ID)
 	err = s.instanceRepository.SaveDatabase(ctx, database)
 	if err != nil {
 		return err
