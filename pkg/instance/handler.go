@@ -32,13 +32,6 @@ type groupServiceHandler interface {
 	Find(ctx context.Context, name string) (*model.Group, error)
 }
 
-type SaveDeploymentRequest struct {
-	Name        string `json:"name" binding:"required,dns_rfc1035_label"`
-	Description string `json:"description"`
-	Group       string `json:"group" binding:"required"`
-	TTL         uint   `json:"ttl"`
-}
-
 func (h Handler) DeployDeployment(c *gin.Context) {
 	// swagger:route POST /deployments/{id}/deploy deployDeployment
 	//
@@ -99,6 +92,13 @@ func (h Handler) DeployDeployment(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, deployment)
+}
+
+type SaveDeploymentRequest struct {
+	Name        string `json:"name" binding:"required,dns_rfc1035_label"`
+	Description string `json:"description"`
+	Group       string `json:"group" binding:"required"`
+	TTL         uint   `json:"ttl"`
 }
 
 func (h Handler) SaveDeployment(c *gin.Context) {

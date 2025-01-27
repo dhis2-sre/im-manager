@@ -74,7 +74,7 @@ func TestInstanceHandler(t *testing.T) {
 	stackService := stack.NewService(stacks)
 	// classification 'test' does not actually exist, this is used to decrypt the stack parameters
 	helmfileService := instance.NewHelmfileService(logger, stackService, "../../stacks", "test")
-	instanceService := instance.NewService(logger, instanceRepo, groupService, stackService, helmfileService)
+	instanceService := instance.NewService(logger, instanceRepo, groupService, stackService, helmfileService, nil, "")
 
 	s3Dir := t.TempDir()
 	s3Bucket := "database-bucket"

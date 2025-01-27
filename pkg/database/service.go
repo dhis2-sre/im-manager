@@ -80,6 +80,13 @@ func (s service) Copy(ctx context.Context, id uint, d *model.Database, group *mo
 		return err
 	}
 
+	if strings.HasSuffix(source.Name, ".pgc") && !strings.HasSuffix(d.Name, ".pgc") {
+		d.Name += ".pgc"
+	}
+	if strings.HasSuffix(source.Name, ".sql.gz") && !strings.HasSuffix(d.Name, ".sql.gz") {
+		d.Name += ".sql.gz"
+	}
+
 	u, err := url.Parse(source.Url)
 	if err != nil {
 		return err
@@ -94,7 +101,64 @@ func (s service) Copy(ctx context.Context, id uint, d *model.Database, group *mo
 
 	d.Url = fmt.Sprintf("s3://%s/%s", s.s3Bucket, destinationKey)
 
-	return s.repository.Create(ctx, d)
+	updateSlug(d)
+
+	err = s.repository.Create(ctx, d)
+	if err != nil {
+		return err
+	}
+
+	return s.copyFS(ctx, d, group, source.FilestoreID)
+}
+
+func (s service) copyFS(ctx context.Context, d *model.Database, group *model.Group, filestoreID uint) error {
+	fs, err := s.repository.FindById(ctx, filestoreID)
+	if err != nil {
+		if errdef.IsNotFound(err) {
+			return nil
+		}
+		return err
+	}
+
+	newName := strings.TrimSuffix(d.Name, ".pgc")
+	newName = strings.TrimSuffix(newName, ".sql.gz")
+	newName += ".fs.tar.gz"
+
+	fsUrl, err := url.Parse(fs.Url)
+	if err != nil {
+		return err
+	}
+
+	sourceKey := strings.TrimPrefix(fsUrl.Path, "/")
+	destinationKey := fmt.Sprintf("%s/%s", group.Name, newName)
+	err = s.s3Client.Copy(s.s3Bucket, sourceKey, destinationKey)
+	if err != nil {
+		return err
+	}
+
+	url := fmt.Sprintf("s3://%s/%s", s.s3Bucket, destinationKey)
+	fsNewDatabase := &model.Database{
+		Name:      newName,
+		GroupName: group.Name,
+		Url:       url,
+		Type:      "fs",
+	}
+
+	updateSlug(fsNewDatabase)
+
+	err = s.repository.Create(ctx, fsNewDatabase)
+	if err != nil {
+		return err
+	}
+
+	d.FilestoreID = fsNewDatabase.ID
+
+	err = s.repository.Save(ctx, d)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (s service) FindById(ctx context.Context, id uint) (*model.Database, error) {
@@ -173,7 +237,42 @@ func (s service) Delete(ctx context.Context, id uint) error {
 		}
 	}
 
-	return s.repository.Delete(ctx, id)
+	err = s.repository.Delete(ctx, id)
+	if err != nil {
+		return err
+	}
+
+	return s.deleteFS(ctx, d)
+}
+
+func (s service) deleteFS(ctx context.Context, d *model.Database) error {
+	fs, err := s.repository.FindById(ctx, d.FilestoreID)
+	if err != nil {
+		if errdef.IsNotFound(err) {
+			return nil
+		}
+		return err
+	}
+
+	fsUrl, err := url.Parse(fs.Url)
+	if err != nil {
+		return err
+	}
+
+	fsKey := strings.TrimPrefix(fsUrl.Path, "/")
+	if fsKey != "" {
+		err = s.s3Client.Delete(s.s3Bucket, fsKey)
+		if err != nil {
+			return err
+		}
+	}
+
+	err = s.repository.Delete(ctx, fs.ID)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (s service) List(ctx context.Context, user *model.User) ([]GroupsWithDatabases, error) {
@@ -223,7 +322,60 @@ func filterDatabases(databases []model.Database, test func(database *model.Datab
 }
 
 func (s service) Update(ctx context.Context, d *model.Database) error {
-	return s.repository.Update(ctx, d)
+	sourceUrl, err := url.Parse(d.Url)
+	if err != nil {
+		return err
+	}
+
+	sourceKey := strings.TrimPrefix(sourceUrl.Path, "/")
+	destination := fmt.Sprintf("%s/%s", d.GroupName, d.Name)
+	err = s.s3Client.Move(s.s3Bucket, sourceKey, destination)
+	if err != nil {
+		return err
+	}
+
+	d.Url = fmt.Sprintf("s3://%s/%s", s.s3Bucket, destination)
+
+	updateSlug(d)
+
+	err = s.repository.Update(ctx, d)
+	if err != nil {
+		return err
+	}
+
+	return s.updateFS(ctx, d)
+}
+
+func (s service) updateFS(ctx context.Context, d *model.Database) error {
+	fs, err := s.repository.FindById(ctx, d.FilestoreID)
+	if err != nil {
+		if errdef.IsNotFound(err) {
+			return nil
+		}
+		return err
+	}
+
+	newName := strings.TrimSuffix(d.Name, ".pgc")
+	newName = strings.TrimSuffix(newName, ".sql.gz")
+	fs.Name = newName + "-fs.tar.gz"
+
+	sourceUrl, err := url.Parse(fs.Url)
+	if err != nil {
+		return err
+	}
+
+	sourceKey := strings.TrimPrefix(sourceUrl.Path, "/")
+	destination := fmt.Sprintf("%s/%s", fs.GroupName, fs.Name)
+	err = s.s3Client.Move(s.s3Bucket, sourceKey, destination)
+	if err != nil {
+		return err
+	}
+
+	d.Url = fmt.Sprintf("s3://%s/%s", s.s3Bucket, destination)
+
+	updateSlug(d)
+
+	return s.repository.Update(ctx, fs)
 }
 
 func (s service) CreateExternalDownload(ctx context.Context, databaseID uint, expiration uint) (*model.ExternalDownload, error) {
@@ -348,6 +500,7 @@ func (s service) SaveAs(ctx context.Context, database *model.Database, instance 
 		Name: newName,
 		// TODO: For now, only saving to the same group is supported
 		GroupName: instance.GroupName,
+		Type:      "database",
 	}
 
 	err = s.repository.Save(ctx, newDatabase)

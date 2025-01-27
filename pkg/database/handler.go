@@ -40,6 +40,8 @@ type Handler struct {
 
 type instanceService interface {
 	FindDecryptedDeploymentInstanceById(ctx context.Context, id uint) (*model.DeploymentInstance, error)
+	FindDeploymentById(ctx context.Context, id uint) (*model.Deployment, error)
+	FilestoreBackup(ctx context.Context, instance *model.DeploymentInstance, name string, database *model.Database) error
 }
 
 type stackService interface {
@@ -89,6 +91,7 @@ func (h Handler) Upload(c *gin.Context) {
 	d := &model.Database{
 		Name:      databaseName,
 		GroupName: groupName,
+		Type:      "database",
 	}
 
 	err := h.canAccess(c, d)
@@ -206,7 +209,7 @@ func (h Handler) SaveAs(c *gin.Context) {
 		return
 	}
 
-	save, err := h.databaseService.SaveAs(ctx, database, instance, stack, request.Name, request.Format, func(ctx context.Context, saved *model.Database) {
+	savedDatabase, err := h.databaseService.SaveAs(ctx, database, instance, stack, request.Name, request.Format, func(ctx context.Context, saved *model.Database) {
 		h.logger.InfoContext(ctx, "Save an instances database as", "groupName", saved.GroupName, "databaseName", saved.Name, "instanceName", instance.Name)
 	})
 	if err != nil {
@@ -214,7 +217,35 @@ func (h Handler) SaveAs(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusCreated, save)
+	// Backup file store
+	deployment, err := h.instanceService.FindDeploymentById(ctx, instance.DeploymentID)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	coreInstance, err := getInstanceByStack("dhis2-core", deployment.Instances)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	err = h.instanceService.FilestoreBackup(ctx, coreInstance, request.Name, savedDatabase)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	c.JSON(http.StatusCreated, savedDatabase)
+}
+
+func getInstanceByStack(stack string, instances []*model.DeploymentInstance) (*model.DeploymentInstance, error) {
+	for _, instance := range instances {
+		if instance.StackName == stack {
+			return instance, nil
+		}
+	}
+	return nil, errdef.NewNotFound("failed to find instance of type %s", stack)
 }
 
 // Save database
@@ -322,6 +353,7 @@ func (h Handler) Copy(c *gin.Context) {
 	d := &model.Database{
 		Name:      request.Name,
 		GroupName: request.Group,
+		Type:      "database",
 	}
 
 	err := h.canAccess(c, d)
