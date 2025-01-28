@@ -167,12 +167,12 @@ var dhis2DBDefaults = struct {
 	resourcesRequestsCPU    string
 	resourcesRequestsMemory string
 }{
-	chartVersion:            "12.6.2",
+	chartVersion:            "16.4.5",
 	dbName:                  "dhis2",
 	dbPassword:              "dhis",
 	dbSize:                  "20Gi",
 	dbUsername:              "dhis",
-	dbVersion:               "13",
+	dbVersion:               "17",
 	resourcesRequestsCPU:    "250m",
 	resourcesRequestsMemory: "256Mi",
 }
