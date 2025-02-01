@@ -77,8 +77,8 @@ releases:
           flyway.repair_before_migration = {{ requiredEnv "FLYWAY_REPAIR_BEFORE_MIGRATION" }}
           # Enables logging of all SQL queries.
           enable.query.logging = {{ requiredEnv "ENABLE_QUERY_LOGGING" }}
-          {{- if requiredEnv "CUSTOM_DHIS2_CONFIG" }}
-          {{ requiredEnv "CUSTOM_DHIS2_CONFIG" }}
+          {{- if ne (requiredEnv "CUSTOM_DHIS2_CONFIG") "" }}
+          {{- requiredEnv "CUSTOM_DHIS2_CONFIG" | nindent 10 }}
           {{- end }}
       - googleAuth:
           projectId: "{{ requiredEnv "GOOGLE_AUTH_PROJECT_ID" }}"
