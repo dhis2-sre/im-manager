@@ -35,7 +35,7 @@ require (
 	go.mozilla.org/sops/v3 v3.7.3
 	golang.org/x/crypto v0.32.0
 	golang.org/x/exp v0.0.0-20231108232855-2478ac86f678
-	golang.org/x/sync v0.10.0
+	golang.org/x/sync v0.11.0
 	gorm.io/driver/postgres v1.5.11
 	gorm.io/gorm v1.25.12
 	k8s.io/api v0.32.0
