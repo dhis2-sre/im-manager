@@ -112,8 +112,8 @@ releases:
       - defaultBuckets: dhis2
       - sidecars:
           - name: "{{ requiredEnv "INSTANCE_NAME" }}-minio-seed"
-            image: bitnami/minio:latest
-            version: "{{ requiredEnv "MINIO_CHART_VERSION" }}"
+            # Should match the version used by the main container
+            image: bitnami/minio:2025.1.20-debian-12-r0
             pullPolicy: {{ requiredEnv "IMAGE_PULL_POLICY" }}
             env:
               - name: HOSTNAME
