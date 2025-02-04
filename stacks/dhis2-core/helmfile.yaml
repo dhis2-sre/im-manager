@@ -120,13 +120,18 @@ releases:
               - "-c"
               - |
                 # Wait for MinIO to be ready
-                # TODO: add a timeout here so it doesn't hang forever
-                until curl --silent --fail http://{{ requiredEnv "INSTANCE_NAME" }}-minio:9000/minio/health/live; do
+                timeout=20
+                elapsed=0
+                
+                until curl --silent --fail http://{{ requiredEnv "INSTANCE_NAME" }}-minio:9000/minio/health/ready; do
                   echo "Waiting for MinIO to be ready..."
                   sleep 2
+                  elapsed=$((elapsed + 2))
+                  if [ "$elapsed" -ge "$timeout" ]; then
+                    echo "Timeout reached: MinIO is not ready after $timeout seconds."
+                    exit 1
+                  fi
                 done
-                # TODO: Shouldn't be necessary, but it seems like the pod is not ready despite the above
-                sleep 10
                 echo "MinIO is ready!!!"
                 
                 mc alias set myminio http://{{ requiredEnv "INSTANCE_NAME" }}-minio:9000 dhisdhis dhisdhis
