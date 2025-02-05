@@ -6,7 +6,6 @@ import (
 	"crypto/subtle"
 	"database/sql"
 	"encoding/base64"
-	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -93,6 +92,8 @@ const (
 
 	keyLen  = 32 // Length of derived key
 	saltLen = 32 // Salt length
+
+	minPasswordLength = 24 // Minimum password length
 )
 
 // hashPassword generates a hash of a password using Argon2id.
@@ -114,8 +115,8 @@ const (
 //   - string: The encoded password hash containing all parameters
 //   - error: Any error that occurred during the hashing process
 func hashPassword(password string) (string, error) {
-	if len(password) == 0 {
-		return "", errors.New("password cannot be empty")
+	if len(password) < minPasswordLength {
+		return "", fmt.Errorf("password must be at least %d characters long", minPasswordLength)
 	}
 
 	salt := make([]byte, saltLen)

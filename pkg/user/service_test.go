@@ -1,6 +1,7 @@
 package user
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -9,7 +10,7 @@ import (
 
 func TestHashPassword(t *testing.T) {
 	t.Run("basic hashing", func(t *testing.T) {
-		password := "mySecurePassword123"
+		password := "mySecurePassword123456789"
 		hash, err := hashPassword(password)
 
 		require.NoError(t, err)
@@ -18,7 +19,7 @@ func TestHashPassword(t *testing.T) {
 	})
 
 	t.Run("hash format and components", func(t *testing.T) {
-		password := "testPassword"
+		password := "someTestPassword123456789"
 		hash, err := hashPassword(password)
 
 		require.NoError(t, err)
@@ -31,7 +32,7 @@ func TestHashPassword(t *testing.T) {
 	})
 
 	t.Run("hash uniqueness", func(t *testing.T) {
-		password := "samePassword"
+		password := "sameSamePassword123456789"
 
 		hash1, err := hashPassword(password)
 		require.NoError(t, err)
@@ -43,7 +44,7 @@ func TestHashPassword(t *testing.T) {
 	})
 
 	t.Run("verification with comparePasswords", func(t *testing.T) {
-		password := "verifyThisPassword"
+		password := "verifyThisPassword123456789"
 
 		hash, err := hashPassword(password)
 		require.NoError(t, err)
@@ -56,13 +57,21 @@ func TestHashPassword(t *testing.T) {
 	t.Run("empty password", func(t *testing.T) {
 		_, err := hashPassword("")
 
-		require.Contains(t, err.Error(), "password cannot be empty")
+		require.ErrorContains(t, err, fmt.Sprintf("password must be at least %d characters long", minPasswordLength))
+	})
+
+	t.Run("too short password", func(t *testing.T) {
+		password := strings.Repeat("a", minPasswordLength-1)
+
+		_, err := hashPassword(password)
+
+		require.ErrorContains(t, err, fmt.Sprintf("password must be at least %d characters long", minPasswordLength))
 	})
 }
 
 func TestComparePasswords(t *testing.T) {
 	t.Run("successful match", func(t *testing.T) {
-		password := "correctPassword123"
+		password := "correctPassword123456789"
 		hash, _ := hashPassword(password)
 
 		match, err := comparePasswords(hash, password)
@@ -72,8 +81,8 @@ func TestComparePasswords(t *testing.T) {
 	})
 
 	t.Run("incorrect password", func(t *testing.T) {
-		password := "correctPassword123"
-		wrongPassword := "wrongPassword123"
+		password := "correctPassword123456789"
+		wrongPassword := "wrongPassword123456789"
 		hash, _ := hashPassword(password)
 
 		match, err := comparePasswords(hash, wrongPassword)
@@ -89,7 +98,7 @@ func TestComparePasswords(t *testing.T) {
 
 		require.Error(t, err)
 		require.False(t, match)
-		require.Contains(t, err.Error(), "invalid password hash")
+		require.ErrorContains(t, err, "invalid password hash")
 	})
 
 	t.Run("invalid parameters format", func(t *testing.T) {
@@ -99,7 +108,7 @@ func TestComparePasswords(t *testing.T) {
 
 		require.Error(t, err)
 		require.False(t, match)
-		require.Contains(t, err.Error(), "invalid password parameters")
+		require.ErrorContains(t, err, "invalid password parameters")
 	})
 
 	t.Run("invalid base64 salt", func(t *testing.T) {
@@ -109,6 +118,6 @@ func TestComparePasswords(t *testing.T) {
 
 		require.Error(t, err)
 		require.False(t, match)
-		require.Contains(t, err.Error(), "failed to decode salt")
+		require.ErrorContains(t, err, "failed to decode salt")
 	})
 }
