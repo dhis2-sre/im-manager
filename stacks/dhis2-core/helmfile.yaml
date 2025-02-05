@@ -74,8 +74,6 @@ releases:
           connection.url = jdbc:postgresql://{{ requiredEnv "DATABASE_HOSTNAME" }}/{{ requiredEnv "DATABASE_NAME" }}
           connection.username = {{ requiredEnv "DATABASE_USERNAME" }}
           connection.password = {{ requiredEnv "DATABASE_PASSWORD" }}
-          # Database schema behavior, can be validate, update, create, create-drop
-          connection.schema = update
           # Server base URL
           server.base.url = https://{{ requiredEnv "INSTANCE_HOSTNAME" }}/{{ requiredEnv "INSTANCE_NAME" }}
           # This will ensure the secure property of the JSESSIONID cookie is set to true

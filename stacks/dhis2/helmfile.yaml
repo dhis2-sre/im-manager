@@ -48,8 +48,6 @@ releases:
           connection.password = {{ requiredEnv "DATABASE_PASSWORD" }}
           connection.pool.acquire_retry_attempts = 1000
           connection.pool.acquire_retry_delay = 5000
-          # Database schema behavior, can be validate, update, create, create-drop
-          connection.schema = update
           # Server base URL
           server.base.url = https://{{ requiredEnv "INSTANCE_HOSTNAME" }}/{{ requiredEnv "INSTANCE_NAME" }}
           # This will ensure the secure property of the JSESSIONID cookie is set to true
