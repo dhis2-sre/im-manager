@@ -6,6 +6,7 @@ import (
 	"crypto/subtle"
 	"database/sql"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -113,6 +114,10 @@ const (
 //   - string: The encoded password hash containing all parameters
 //   - error: Any error that occurred during the hashing process
 func hashPassword(password string) (string, error) {
+	if len(password) == 0 {
+		return "", errors.New("password cannot be empty")
+	}
+
 	salt := make([]byte, saltLen)
 	if _, err := rand.Read(salt); err != nil {
 		return "", fmt.Errorf("failed to generate salt: %w", err)

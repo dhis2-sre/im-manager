@@ -54,10 +54,9 @@ func TestHashPassword(t *testing.T) {
 	})
 
 	t.Run("empty password", func(t *testing.T) {
-		hash, err := hashPassword("")
+		_, err := hashPassword("")
 
-		require.NoError(t, err)
-		require.NotEmpty(t, hash)
+		require.Contains(t, err.Error(), "password cannot be empty")
 	})
 }
 
