@@ -42,7 +42,8 @@ func TestUserHandler(t *testing.T) {
 	groupService := group.NewService(groupRepository, userService)
 
 	userCount.Increment()
-	err := user.CreateUser(context.Background(), "admin", "admin", userService, groupService, model.AdministratorGroupName, "admin")
+	password := strings.Repeat("a", 24)
+	err := user.CreateUser(context.Background(), "admin", password, userService, groupService, model.AdministratorGroupName, "admin")
 	require.NoError(t, err, "failed to create admin user and group")
 	userCount.Done()
 
