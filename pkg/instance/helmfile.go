@@ -4,13 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"gopkg.in/yaml.v3"
 	"log/slog"
 	"os"
 	"os/exec"
 	"path"
 	"time"
-
-	"k8s.io/apimachinery/pkg/util/yaml"
 
 	"github.com/dhis2-sre/im-manager/pkg/model"
 )
