@@ -1,9 +1,10 @@
 package user
 
 import (
-	"github.com/stretchr/testify/require"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestHashPassword(t *testing.T) {
