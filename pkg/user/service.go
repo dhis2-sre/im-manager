@@ -102,7 +102,7 @@ const (
 // Security features:
 // - Uses Argon2id - winner of the Password Hashing Competition, designed to be resistant against GPU/ASIC attacks
 // - Implements high-security parameters: 128MB memory, 3 iterations, 4 threads
-// - Generates cryptographically secure 16-byte random salt to prevent rainbow table attacks
+// - Generates cryptographically secure 32-byte random salt to prevent rainbow table attacks
 // - Produces 32-byte key length for final hash
 // - Stores complete parameter set with hash for future-proof verification
 //
