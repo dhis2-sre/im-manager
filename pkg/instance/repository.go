@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"slices"
 
+	"github.com/gosimple/slug"
+
 	"github.com/dhis2-sre/im-manager/internal/errdef"
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	"gorm.io/gorm"
@@ -107,28 +109,18 @@ func (r repository) FindDeploymentInstanceById(ctx context.Context, id uint) (*m
 	return instance, nil
 }
 
-func (r repository) FindDecryptedDeploymentInstanceById(ctx context.Context, id uint) (*model.DeploymentInstance, error) {
-	instance, err := r.FindDeploymentInstanceById(ctx, id)
+func (r repository) DecryptDeploymentInstance(deploymentInstance *model.DeploymentInstance, stack *model.Stack) (*model.DeploymentInstance, error) {
+	err := decryptParameters(r.instanceParameterEncryptionKey, deploymentInstance, stack)
 	if err != nil {
 		return nil, err
 	}
 
-	err = decryptParameters(r.instanceParameterEncryptionKey, instance)
-	if err != nil {
-		return nil, err
-	}
-
-	return instance, nil
+	return deploymentInstance, nil
 }
 
-func (r repository) FindDecryptedDeploymentById(ctx context.Context, id uint) (*model.Deployment, error) {
-	deployment, err := r.FindDeploymentById(ctx, id)
-	if err != nil {
-		return nil, err
-	}
-
+func (r repository) DecryptDeployment(deployment *model.Deployment, stacksByName map[string]*model.Stack) (*model.Deployment, error) {
 	for _, instance := range deployment.Instances {
-		err := decryptParameters(r.instanceParameterEncryptionKey, instance)
+		err := decryptParameters(r.instanceParameterEncryptionKey, instance, stacksByName[instance.StackName])
 		if err != nil {
 			return nil, err
 		}
@@ -137,14 +129,14 @@ func (r repository) FindDecryptedDeploymentById(ctx context.Context, id uint) (*
 	return deployment, nil
 }
 
-func (r repository) SaveInstance(ctx context.Context, instance *model.DeploymentInstance) error {
+func (r repository) SaveInstance(ctx context.Context, instance *model.DeploymentInstance, stack *model.Stack) error {
 	// only use ctx for values (logging) and not cancellation signals on cud operations for now. ctx
 	// cancellation can lead to rollbacks which we should decide individually.
 	ctx = context.WithoutCancel(ctx)
 
 	key := r.instanceParameterEncryptionKey
 
-	err := encryptParameters(key, instance)
+	err := encryptParameters(key, instance, stack)
 	if err != nil {
 		return err
 	}
@@ -204,8 +196,34 @@ func (r repository) FindPublicInstances(ctx context.Context) ([]*model.Deploymen
 	return instances, nil
 }
 
-func encryptParameters(key string, instance *model.DeploymentInstance) error {
+// TODO: This code is duplicated from https://github.com/dhis2-sre/im-manager/blob/5581b4765fd6878138f4741d4c82607ed4ce0998/pkg/database/repository.go#L41
+// A significant difference is that here we include the database.Type in the slug
+// Ideally we should rewrite the database service to a storage service and use that in both the database and instance handlers (and/or services)
+func (r repository) RecordBackup(ctx context.Context, database *model.Database) error {
+	// only use ctx for values (logging) and not cancellation signals on cud operations for now. ctx
+	// cancellation can lead to rollbacks which we should decide individually.
+	ctx = context.WithoutCancel(ctx)
+
+	s := fmt.Sprintf("%s/%s-%s", database.GroupName, database.Name, database.Type)
+	database.Slug = slug.Make(s)
+
+	err := r.db.WithContext(ctx).Save(database).Error
+	if errors.Is(err, gorm.ErrDuplicatedKey) {
+		return errdef.NewDuplicated("database named %q already exists", database.Name)
+	}
+
+	return err
+}
+
+func (r repository) SaveDatabase(ctx context.Context, database *model.Database) error {
+	return r.db.WithContext(ctx).Save(&database).Error
+}
+
+func encryptParameters(key string, instance *model.DeploymentInstance, stack *model.Stack) error {
 	for i, parameter := range instance.Parameters {
+		if !stack.Parameters[parameter.ParameterName].Sensitive {
+			continue
+		}
 		value, err := encryptText(key, parameter.Value)
 		if err != nil {
 			return err
@@ -217,8 +235,11 @@ func encryptParameters(key string, instance *model.DeploymentInstance) error {
 	return nil
 }
 
-func decryptParameters(key string, instance *model.DeploymentInstance) error {
+func decryptParameters(key string, instance *model.DeploymentInstance, stack *model.Stack) error {
 	for i, parameter := range instance.Parameters {
+		if !stack.Parameters[parameter.ParameterName].Sensitive {
+			continue
+		}
 		value, err := decryptText(key, parameter.Value)
 		if err != nil {
 			return err

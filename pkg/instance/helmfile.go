@@ -10,7 +10,7 @@ import (
 	"path"
 	"time"
 
-	"k8s.io/apimachinery/pkg/util/yaml"
+	"gopkg.in/yaml.v3"
 
 	"github.com/dhis2-sre/im-manager/pkg/model"
 )

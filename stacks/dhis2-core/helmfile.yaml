@@ -1,4 +1,4 @@
-# consumedParameters: DATABASE_USERNAME, DATABASE_PASSWORD, DATABASE_NAME, DATABASE_HOSTNAME
+# consumedParameters: DATABASE_ID, DATABASE_USERNAME, DATABASE_PASSWORD, DATABASE_NAME, DATABASE_HOSTNAME
 # hostnameVariable: DATABASE_HOSTNAME
 # stackParameters: GOOGLE_AUTH_PROJECT_ID,GOOGLE_AUTH_PRIVATE_KEY_ID,GOOGLE_AUTH_PRIVATE_KEY,GOOGLE_AUTH_CLIENT_EMAIL,GOOGLE_AUTH_CLIENT_ID
 releases:
@@ -41,14 +41,39 @@ releases:
           im-type: "dhis2"
           im-creation-timestamp: "{{ requiredEnv "INSTANCE_CREATION_TIMESTAMP" }}"
           im-ttl: "{{ requiredEnv "INSTANCE_TTL" }}"
+
+      {{- if eq (requiredEnv "STORAGE_TYPE") "minio" }}
+      - minIOConfig: |
+          filestore.provider = s3
+          filestore.container = dhis2
+          filestore.endpoint = http://{{ requiredEnv "INSTANCE_NAME" }}-minio.{{ requiredEnv "INSTANCE_NAMESPACE" }}.svc:9000
+          filestore.location = eu-west-1
+          filestore.identity = dhisdhis
+          filestore.secret = dhisdhis
+      {{- end }}
+
+      {{- if eq (requiredEnv "STORAGE_TYPE") "s3" }}
+      - S3Config: |
+          filestore.provider = aws-s3
+          filestore.container = {{ requiredEnv "S3_BUCKET" }}
+          filestore.location = {{ requiredEnv "S3_REGION" }}
+          filestore.identity = {{ requiredEnv "S3_IDENTITY" }}
+          filestore.secret = {{ requiredEnv "S3_SECRET" }}
+      {{- end }}
+
       - dhisConfig: |
+          # Custom DHIS2 configuration
+          # !!!Caution!!!
+          # It's important to have this section at the top of the file so users can't overwrite any of the subsequent configuration listed below
+          # Notably we don't want users to be able to set the database connection to a database they shouldn't have access to
+          {{- if ne (requiredEnv "CUSTOM_DHIS2_CONFIG") "" }}
+          {{- requiredEnv "CUSTOM_DHIS2_CONFIG" | nindent 10 }}
+          {{- end }}
           connection.dialect = org.hibernate.dialect.PostgreSQLDialect
           connection.driver_class = org.postgresql.Driver
           connection.url = jdbc:postgresql://{{ requiredEnv "DATABASE_HOSTNAME" }}/{{ requiredEnv "DATABASE_NAME" }}
           connection.username = {{ requiredEnv "DATABASE_USERNAME" }}
           connection.password = {{ requiredEnv "DATABASE_PASSWORD" }}
-          # Database schema behavior, can be validate, update, create, create-drop
-          connection.schema = update
           # Server base URL
           server.base.url = https://{{ requiredEnv "INSTANCE_HOSTNAME" }}/{{ requiredEnv "INSTANCE_NAME" }}
           # This will ensure the secure property of the JSESSIONID cookie is set to true
@@ -57,14 +82,6 @@ releases:
           flyway.repair_before_migration = {{ requiredEnv "FLYWAY_REPAIR_BEFORE_MIGRATION" }}
           # Enables logging of all SQL queries.
           enable.query.logging = {{ requiredEnv "ENABLE_QUERY_LOGGING" }}
-#          # If STORAGE_TYPE == minio... {{ requiredEnv "STORAGE_TYPE" }}
-#          filestore.provider = s3
-#          filestore.container = dhis2
-#          filestore.endpoint = http://{{ requiredEnv "INSTANCE_NAME" }}-minio.{{ requiredEnv "INSTANCE_NAMESPACE" }}.svc:9000
-#          filestore.location = eu-west-1
-#          filestore.identity = dhisdhis
-#          filestore.secret = dhisdhis
-
       - googleAuth:
           projectId: "{{ requiredEnv "GOOGLE_AUTH_PROJECT_ID" }}"
           privateKeyId: "{{ requiredEnv "GOOGLE_AUTH_PRIVATE_KEY_ID" }}"
@@ -76,23 +93,93 @@ releases:
             cpu: {{ requiredEnv "RESOURCES_REQUESTS_CPU" }}
             memory: {{ requiredEnv "RESOURCES_REQUESTS_MEMORY" }}
 
-#  - name: "{{ requiredEnv "INSTANCE_NAME" }}"-minio
-#    namespace: "{{ requiredEnv "INSTANCE_NAMESPACE" }}"
-#    chart: bitnami/minio
-#    version: "{{ requiredEnv "CHART_VERSION" }}"
-#    values:
-#      - persistence:
-#        #  size: 8Gi
-#        annotations:
-#          helm.sh/resource-policy: keep
-#      - auth:
-#        rootUser: dhisdhis
-#        rootPassword: dhisdhis
-#        forcePassword: true
-#      - defaultBuckets: dhis2
+  {{- if eq (requiredEnv "STORAGE_TYPE") "minio" }}
+  - name: "{{ requiredEnv "INSTANCE_NAME" }}-minio"
+    namespace: "{{ requiredEnv "INSTANCE_NAMESPACE" }}"
+    chart: bitnami/minio
+    version: "{{ requiredEnv "MINIO_CHART_VERSION" }}"
+    values:
+      - persistence:
+          size: {{ requiredEnv "MINIO_STORAGE_SIZE" }}
+        annotations:
+          helm.sh/resource-policy: keep
+      - auth:
+          rootUser: dhisdhis
+          rootPassword: dhisdhis
+          forcePassword: true
+      - defaultBuckets: dhis2
+      - sidecars:
+          - name: "{{ requiredEnv "INSTANCE_NAME" }}-minio-seed"
+            # Should match the version used by the main container
+            image: bitnami/minio:2025.1.20-debian-12-r0
+            pullPolicy: {{ requiredEnv "IMAGE_PULL_POLICY" }}
+            env:
+              - name: HOSTNAME
+                value: {{ requiredEnv "HOSTNAME" }}
+              - name: DATABASE_ID
+                value: "{{ requiredEnv "DATABASE_ID" }}"
+              - name: IM_ACCESS_TOKEN
+                value: {{ requiredEnv "IM_ACCESS_TOKEN" }}
+            command:
+              - "/bin/bash"
+              - "-c"
+              - |
+                # Wait for MinIO to be ready
+                timeout=20
+                elapsed=0
+                
+                until curl --silent --fail http://{{ requiredEnv "INSTANCE_NAME" }}-minio:9000/minio/health/ready; do
+                  echo "Waiting for MinIO to be ready..."
+                  sleep 2
+                  elapsed=$((elapsed + 2))
+                  if [ "$elapsed" -ge "$timeout" ]; then
+                    echo "Timeout reached: MinIO is not ready after $timeout seconds."
+                    exit 1
+                  fi
+                done
+                echo "MinIO is ready!!!"
+
+                mc alias set myminio http://{{ requiredEnv "INSTANCE_NAME" }}-minio:9000 dhisdhis dhisdhis
+
+                seed_file=myminio/dhis2/seeded.txt
+                if mc stat $seed_file >/dev/null 2>&1; then
+                  echo "Already seeded, skipping..."
+                else
+                  DATABASE_URL="$HOSTNAME/databases/$DATABASE_ID"
+                  echo "DATABASE_URL: $DATABASE_URL"
+                  FILESTORE_ID=$(curl --connect-timeout 10 --retry 5 --retry-delay 1 --fail -L $DATABASE_URL --cookie "accessToken=$IM_ACCESS_TOKEN" | jq -r '.filestoreId')
+                  if [[ -z "$FILESTORE_ID" ]]; then
+                    echo "No filestore id associated with database"
+                  else
+                    echo "Seeding..."
+
+                    tmp_file=$(mktemp)
+                    trap 'rm -f "$tmp_file"' EXIT  # Ensures cleanup on script exit
+                    FILESTORE_DOWNLOAD_URL="$HOSTNAME/databases/$FILESTORE_ID/download"
+                    curl --connect-timeout 10 --retry 5 --retry-delay 1 --fail -L "$FILESTORE_DOWNLOAD_URL" --cookie "accessToken=$IM_ACCESS_TOKEN" > "$tmp_file"
+
+                    tmp_dir=$(mktemp -d /tmp/minio.XXXXXX)
+                    trap 'rm -rf "$tmp_dir"' EXIT  # Ensures cleanup on script exit
+                    gunzip -c "$tmp_file" | tar xf - -C "$tmp_dir"
+
+                    mc cp --recursive "$tmp_dir"/* myminio/dhis2
+
+                    echo "Seeded from $FILESTORE_DOWNLOAD_URL" | mc pipe $seed_file
+
+                    # Clean up            
+                    rm -f "$tmp_file"
+                    rm -rf "$tmp_dir"
+
+                    echo "Done seeding!"
+                  fi
+                fi
+
+                # Wait forever
+                tail -f /dev/null
+  {{- end }}
 
 repositories:
   - name: dhis2
     url: https://dhis2-sre.github.io/dhis2-core-helm
-#  - name: bitnami
-#    url: https://charts.bitnami.com/bitnami
+  - name: bitnami
+    url: https://charts.bitnami.com/bitnami

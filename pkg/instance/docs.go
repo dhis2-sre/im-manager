@@ -30,7 +30,7 @@ type _ struct {
 	Selector string `json:"selector"`
 }
 
-// swagger:parameters deleteInstance findById findByIdDecrypted saveInstance pauseInstance resumeInstance resetInstance findDeploymentById deployDeployment deleteDeployment status
+// swagger:parameters deleteInstance findById findByIdDecrypted saveInstance pauseInstance resumeInstance resetInstance findDeploymentById deployDeployment deleteDeployment status instanceWithDetails instanceWithDecryptedDetails filestoreBackup
 type _ struct {
 	// in: path
 	// required: true
