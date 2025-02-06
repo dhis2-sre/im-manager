@@ -14,15 +14,6 @@
 #      corsAllowOrigins:
 #        - "https://{{ .UI_URL }}"
 
-.im-tolerations-config: &im-tolerations-config
-  key: im-dedicated
-  operator: Equal
-  value: true
-  effect: NoSchedule
-
-.im-node-selector-config: &im-node-selector-config
-  im-dedicated: "true"
-
 apiVersion: skaffold/v4beta6
 kind: Config
 metadata:
@@ -52,12 +43,9 @@ deploy:
             - name: streams
               port: 5552
               targetPort: 5552
-          tolerations:
-            - <<: *im-tolerations-config
-          nodeSelector:
-            <<: *im-node-selector-config
         valuesFiles:
           - helm/data/secrets/{{ .CLASSIFICATION }}/rabbitmq.yaml
+          - helm/data/values/{{ .CLASSIFICATION }}/rabbitmq.yaml
 
       - name: im-manager-redis-{{ .ENVIRONMENT }}
         namespace: instance-manager-{{ .CLASSIFICATION }}
@@ -70,11 +58,8 @@ deploy:
           architecture: standalone
           auth:
             enabled: false
-          tolerations:
-            - <<: *im-tolerations-config
-          nodeSelector:
-            <<: *im-node-selector-config
-
+        valuesFiles:
+          - helm/data/values/{{ .CLASSIFICATION }}/redis.yaml
 
       - name: im-manager-postgresql-{{ .ENVIRONMENT }}
         namespace: instance-manager-{{ .CLASSIFICATION }}
@@ -84,12 +69,6 @@ deploy:
         version: 13.2.30
         upgradeOnChange: true
         useHelmSecrets: true
-        setValues:
-          primary:
-            tolerations:
-              - <<: *im-tolerations-config
-            nodeSelector:
-              <<: *im-node-selector-config
         valuesFiles:
           - helm/data/secrets/{{ .CLASSIFICATION }}/postgresql.yaml
           - helm/data/values/{{ .CLASSIFICATION }}/postgresql.yaml
@@ -128,10 +107,6 @@ deploy:
             S3_REGION: eu-west-1
             DEFAULT_TTL: "172800" # 48 hours
             PASSWORD_TOKEN_TTL: "900" # 15 minutes
-          tolerations:
-            - <<: *im-tolerations-config
-          nodeSelector:
-            <<: *im-node-selector-config
         useHelmSecrets: true
         valuesFiles:
           - helm/data/secrets/{{ .CLASSIFICATION }}/values.yaml
