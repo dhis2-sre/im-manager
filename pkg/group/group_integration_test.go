@@ -29,7 +29,7 @@ func TestGroupHandler(t *testing.T) {
 	groupRepository := group.NewRepository(db)
 	groupService := group.NewService(groupRepository, userService)
 
-	err := user.CreateUser(context.Background(), "admin", "admin", userService, groupService, model.AdministratorGroupName, "admin")
+	err := user.CreateUser(context.Background(), "admin", "adminadminadminadminadmin", userService, groupService, model.AdministratorGroupName, "admin")
 	require.NoError(t, err, "failed to create admin user and group")
 
 	client := inttest.SetupHTTPServer(t, func(engine *gin.Engine) {

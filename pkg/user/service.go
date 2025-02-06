@@ -3,20 +3,20 @@ package user
 import (
 	"context"
 	"crypto/rand"
+	"crypto/subtle"
 	"database/sql"
 	"encoding/base64"
-	"encoding/hex"
 	"fmt"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
+	"golang.org/x/crypto/argon2"
 
 	"github.com/dhis2-sre/im-manager/internal/errdef"
 
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	"github.com/go-mail/mail"
-	"golang.org/x/crypto/scrypt"
 )
 
 func NewService(uiUrl string, passwordTokenTtl uint, repository *repository, dialer dailer) *Service {
@@ -79,23 +79,61 @@ func (s Service) sendValidationEmail(user *model.User) error {
 	return s.dailer.DialAndSend(m)
 }
 
+const (
+	/* General Web App
+	iterations = 2         // Number of iterations
+	memory     = 64 * 1024 // 64 MB memory usage
+	threads    = 2         // Number of parallel threads
+	*/
+	// High-Security App (admin logins, banking, crypto, IM)
+	iterations = 3          // Number of hashing passes
+	memory     = 128 * 1024 // 128MB memory usage
+	threads    = 4          // Number of threads
+
+	keyLen  = 32 // Length of derived key
+	saltLen = 32 // Salt length
+
+	minPasswordLength = 24 // Minimum password length
+)
+
+// hashPassword generates a hash of a password using Argon2id.
+//
+// The function generates a random salt and returns the complete hash string in the standardized format:
+// $argon2id$v=19$m=memory,t=iterations,p=threads$salt$hash
+//
+// Security features:
+// - Uses Argon2id - winner of the Password Hashing Competition, designed to be resistant against GPU/ASIC attacks
+// - Implements high-security parameters: 128MB memory, 3 iterations, 4 threads
+// - Generates cryptographically secure 32-byte random salt to prevent rainbow table attacks
+// - Produces 32-byte key length for final hash
+// - Stores complete parameter set with hash for future-proof verification
+//
+// Parameters:
+//   - password: The plaintext password to hash
+//
+// Returns:
+//   - string: The encoded password hash containing all parameters
+//   - error: Any error that occurred during the hashing process
 func hashPassword(password string) (string, error) {
-	// example for making salt - https://play.golang.org/p/_Aw6WeWC42I
-	salt := make([]byte, 32)
-	_, err := rand.Read(salt)
-	if err != nil {
-		return "", err
+	if len(password) < minPasswordLength {
+		return "", fmt.Errorf("password must be at least %d characters long", minPasswordLength)
 	}
 
-	// using recommended cost parameters from - https://godoc.org/golang.org/x/crypto/scrypt
-	hash, err := scrypt.Key([]byte(password), salt, 32768, 8, 1, 32)
-	if err != nil {
-		return "", err
+	salt := make([]byte, saltLen)
+	if _, err := rand.Read(salt); err != nil {
+		return "", fmt.Errorf("failed to generate salt: %w", err)
 	}
 
-	hashedPassword := fmt.Sprintf("%s.%s", hex.EncodeToString(hash), hex.EncodeToString(salt))
+	// Derive the key
+	hash := argon2.IDKey([]byte(password), salt, iterations, memory, threads, keyLen)
 
-	return hashedPassword, nil
+	// Encode hash, salt, and parameters as a single string
+	format := "$argon2id$v=19$m=%d,t=%d,p=%d$%s$%s"
+	encodedSalt := base64.RawStdEncoding.EncodeToString(salt)
+	encodedHash := base64.RawStdEncoding.EncodeToString(hash)
+	hashStr := fmt.Sprintf(format, memory, iterations, threads, encodedSalt, encodedHash)
+
+	return hashStr, nil
 }
 
 func (s Service) ValidateEmail(ctx context.Context, token uuid.UUID) error {
@@ -135,23 +173,62 @@ func (s Service) SignIn(ctx context.Context, email string, password string) (*mo
 	return user, nil
 }
 
+// comparePasswords compares a stored password hash with a supplied plaintext password.
+// It uses Argon2id to verify if the supplied password matches the stored hash.
+//
+// The stored password hash is expected to be in the format:
+// $argon2id$v=19$m=memory,t=iterations,p=threads$salt$hash
+//
+// Security features:
+// - Implements constant-time comparison to prevent timing attacks
+// - Wipe memory buffers to prevent memory-based attacks
+//
+// Parameters:
+//   - storedPassword: The complete hash string from the database
+//   - suppliedPassword: The plaintext password to verify
+//
+// Returns:
+//   - bool: true if passwords match, false otherwise
+//   - error: Any error that occurred during the comparison process
 func comparePasswords(storedPassword string, suppliedPassword string) (bool, error) {
-	passwordAndSalt := strings.Split(storedPassword, ".")
-	if len(passwordAndSalt) != 2 {
-		return false, fmt.Errorf("wrong password/salt format: %s", storedPassword)
+	parts := strings.Split(storedPassword, "$")
+	if len(parts) != 6 {
+		return false, fmt.Errorf("invalid password hash")
 	}
 
-	salt, err := hex.DecodeString(passwordAndSalt[1])
+	var memory, iterations, threads int
+	_, err := fmt.Sscanf(parts[3], "m=%d,t=%d,p=%d", &memory, &iterations, &threads)
 	if err != nil {
-		return false, fmt.Errorf("unable to verify user password")
+		return false, fmt.Errorf("invalid password parameters")
 	}
 
-	hash, err := scrypt.Key([]byte(suppliedPassword), salt, 32768, 8, 1, 32)
+	salt, err := base64.RawStdEncoding.DecodeString(parts[4])
 	if err != nil {
-		return false, err
+		return false, fmt.Errorf("failed to decode salt")
 	}
 
-	return hex.EncodeToString(hash) == passwordAndSalt[0], nil
+	expectedHash, err := base64.RawStdEncoding.DecodeString(parts[5])
+	if err != nil {
+		return false, fmt.Errorf("failed to decode hash")
+	}
+
+	// Convert password to mutable byte slice
+	suppliedBytes := []byte(suppliedPassword)
+	defer func() {
+		for i := range suppliedBytes {
+			suppliedBytes[i] = 0
+		}
+	}() // Wipe password from memory
+
+	// Compute Argon2 hash
+	computedHash := argon2.IDKey(suppliedBytes, salt, uint32(iterations), uint32(memory), uint8(threads), uint32(len(expectedHash)))
+	defer func() {
+		for i := range computedHash {
+			computedHash[i] = 0
+		}
+	}() // Wipe computed hash
+
+	return subtle.ConstantTimeCompare(computedHash, expectedHash) == 1, nil
 }
 
 func (s Service) FindAll(ctx context.Context) ([]*model.User, error) {
