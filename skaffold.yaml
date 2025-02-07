@@ -45,6 +45,7 @@ deploy:
               targetPort: 5552
         valuesFiles:
           - helm/data/secrets/{{ .CLASSIFICATION }}/rabbitmq.yaml
+          - helm/data/values/{{ .CLASSIFICATION }}/rabbitmq.yaml
 
       - name: im-manager-redis-{{ .ENVIRONMENT }}
         namespace: instance-manager-{{ .CLASSIFICATION }}
@@ -57,6 +58,8 @@ deploy:
           architecture: standalone
           auth:
             enabled: false
+        valuesFiles:
+          - helm/data/values/{{ .CLASSIFICATION }}/redis.yaml
 
       - name: im-manager-postgresql-{{ .ENVIRONMENT }}
         namespace: instance-manager-{{ .CLASSIFICATION }}
