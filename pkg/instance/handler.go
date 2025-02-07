@@ -378,56 +378,6 @@ func (h Handler) InstanceWithDetails(c *gin.Context) {
 	c.JSON(http.StatusOK, instance)
 }
 
-// InstanceWithDecryptedDetails instance
-func (h Handler) InstanceWithDecryptedDetails(c *gin.Context) {
-	// swagger:route PUT /instances/{id}/decrypted-details instanceWithDecryptedDetails
-	//
-	// Instance with decrypted details
-	//
-	// Returns the details of an instance including decrypted parameters
-	//
-	// Security:
-	//	oauth2:
-	//
-	// responses:
-	//	202:
-	//	401: Error
-	//	403: Error
-	//	404: Error
-	//	415: Error
-	id, ok := handler.GetPathParameter(c, "id")
-	if !ok {
-		return
-	}
-
-	ctx := c.Request.Context()
-	user, err := handler.GetUserFromContext(ctx)
-	if err != nil {
-		_ = c.Error(err)
-		return
-	}
-
-	instance, err := h.instanceService.FindDecryptedDeploymentInstanceById(ctx, id)
-	if err != nil {
-		_ = c.Error(err)
-		return
-	}
-
-	deployment, err := h.instanceService.FindDeploymentById(ctx, instance.DeploymentID)
-	if err != nil {
-		_ = c.Error(err)
-		return
-	}
-
-	canWrite := handler.CanWriteDeployment(user, deployment)
-	if !canWrite {
-		_ = c.AbortWithError(http.StatusUnauthorized, fmt.Errorf("write access denied"))
-		return
-	}
-
-	c.JSON(http.StatusOK, instance)
-}
-
 // Reset instance
 func (h Handler) Reset(c *gin.Context) {
 	// swagger:route PUT /instances/{id}/reset resetInstance
