@@ -162,6 +162,7 @@ releases:
                     tmp_dir=$(mktemp -d /tmp/minio.XXXXXX)
                     trap 'rm -rf "$tmp_dir"' EXIT  # Ensures cleanup on script exit
                     gunzip -c "$tmp_file" | tar xf - -C "$tmp_dir"
+                    chmod -R u+rwx,go+rx "$tmp_dir"
 
                     mc cp --recursive "$tmp_dir"/* myminio/dhis2
 
