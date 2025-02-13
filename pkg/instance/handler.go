@@ -3,10 +3,11 @@ package instance
 import (
 	"bufio"
 	"fmt"
-	"github.com/dhis2-sre/im-manager/pkg/group"
-	"github.com/dhis2-sre/im-manager/pkg/stack"
 	"io"
 	"net/http"
+
+	"github.com/dhis2-sre/im-manager/pkg/group"
+	"github.com/dhis2-sre/im-manager/pkg/stack"
 
 	"github.com/dhis2-sre/im-manager/internal/errdef"
 
