@@ -2,11 +2,11 @@ package instance
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"io"
 	"net/http"
 
-	"github.com/dhis2-sre/im-manager/pkg/group"
 	"github.com/dhis2-sre/im-manager/pkg/stack"
 
 	"github.com/dhis2-sre/im-manager/internal/errdef"
@@ -16,7 +16,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func NewHandler(stackService stack.Service, groupService group.Service, instanceService *Service, defaultTTL uint) Handler {
+func NewHandler(stackService stack.Service, groupService groupServiceHandler, instanceService *Service, defaultTTL uint) Handler {
 	return Handler{
 		stackService:    stackService,
 		groupService:    groupService,
@@ -27,9 +27,13 @@ func NewHandler(stackService stack.Service, groupService group.Service, instance
 
 type Handler struct {
 	stackService    stack.Service
-	groupService    group.Service
+	groupService    groupServiceHandler
 	instanceService *Service
 	defaultTTL      uint
+}
+
+type groupServiceHandler interface {
+	Find(ctx context.Context, name string) (*model.Group, error)
 }
 
 func (h Handler) DeployDeployment(c *gin.Context) {

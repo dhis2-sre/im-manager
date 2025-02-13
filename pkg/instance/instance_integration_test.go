@@ -92,7 +92,7 @@ func TestInstanceHandler(t *testing.T) {
 	}
 	client := inttest.SetupHTTPServer(t, func(engine *gin.Engine) {
 		var twoDayTTL uint = 172800
-		instanceHandler := instance.NewHandler(groupService, instanceService, twoDayTTL)
+		instanceHandler := instance.NewHandler(stackService, groupService, instanceService, twoDayTTL)
 		instance.Routes(engine, authenticator, instanceHandler)
 
 		databaseHandler := database.NewHandler(logger, databaseService, groupService, instanceService, stackService)
