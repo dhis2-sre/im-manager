@@ -7,6 +7,8 @@ import (
 	"io"
 	"net/http"
 
+	"github.com/dhis2-sre/im-manager/pkg/stack"
+
 	"github.com/dhis2-sre/im-manager/internal/errdef"
 
 	"github.com/dhis2-sre/im-manager/internal/handler"
@@ -14,8 +16,9 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func NewHandler(groupService groupServiceHandler, instanceService *Service, defaultTTL uint) Handler {
+func NewHandler(stackService stack.Service, groupService groupServiceHandler, instanceService *Service, defaultTTL uint) Handler {
 	return Handler{
+		stackService:    stackService,
 		groupService:    groupService,
 		instanceService: instanceService,
 		defaultTTL:      defaultTTL,
@@ -23,6 +26,7 @@ func NewHandler(groupService groupServiceHandler, instanceService *Service, defa
 }
 
 type Handler struct {
+	stackService    stack.Service
 	groupService    groupServiceHandler
 	instanceService *Service
 	defaultTTL      uint
@@ -91,7 +95,38 @@ func (h Handler) DeployDeployment(c *gin.Context) {
 		return
 	}
 
+	err = h.stripDeploymentSensitiveParameterValues(deployment)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
 	c.JSON(http.StatusOK, deployment)
+}
+
+func (h Handler) stripDeploymentSensitiveParameterValues(deployment *model.Deployment) error {
+	for _, instance := range deployment.Instances {
+		err := h.stripInstanceSensitiveParameterValues(instance)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (h Handler) stripInstanceSensitiveParameterValues(instance *model.DeploymentInstance) error {
+	stack, err := h.stackService.Find(instance.StackName)
+	if err != nil {
+		return err
+	}
+
+	for index, parameter := range instance.Parameters {
+		if stack.Parameters[parameter.ParameterName].Sensitive {
+			parameter.Value = "***"
+			instance.Parameters[index] = parameter
+		}
+	}
+	return nil
 }
 
 type SaveDeploymentRequest struct {
@@ -167,6 +202,12 @@ func (h Handler) SaveDeployment(c *gin.Context) {
 		return
 	}
 
+	err = h.stripDeploymentSensitiveParameterValues(deployment)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
 	c.JSON(http.StatusCreated, deployment)
 }
 
@@ -209,6 +250,12 @@ func (h Handler) FindDeploymentById(c *gin.Context) {
 	if !canRead {
 		unauthorized := errdef.NewUnauthorized("read access denied")
 		_ = c.Error(unauthorized)
+		return
+	}
+
+	err = h.stripDeploymentSensitiveParameterValues(deployment)
+	if err != nil {
+		_ = c.Error(err)
 		return
 	}
 
@@ -280,6 +327,12 @@ func (h Handler) SaveInstance(c *gin.Context) {
 	}
 
 	err = h.instanceService.SaveInstance(ctx, instance)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	err = h.stripInstanceSensitiveParameterValues(instance)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -375,53 +428,9 @@ func (h Handler) InstanceWithDetails(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, instance)
-}
-
-// InstanceWithDecryptedDetails instance
-func (h Handler) InstanceWithDecryptedDetails(c *gin.Context) {
-	// swagger:route PUT /instances/{id}/decrypted-details instanceWithDecryptedDetails
-	//
-	// Instance with decrypted details
-	//
-	// Returns the details of an instance including decrypted parameters
-	//
-	// Security:
-	//	oauth2:
-	//
-	// responses:
-	//	202:
-	//	401: Error
-	//	403: Error
-	//	404: Error
-	//	415: Error
-	id, ok := handler.GetPathParameter(c, "id")
-	if !ok {
-		return
-	}
-
-	ctx := c.Request.Context()
-	user, err := handler.GetUserFromContext(ctx)
+	err = h.stripInstanceSensitiveParameterValues(instance)
 	if err != nil {
 		_ = c.Error(err)
-		return
-	}
-
-	instance, err := h.instanceService.FindDecryptedDeploymentInstanceById(ctx, id)
-	if err != nil {
-		_ = c.Error(err)
-		return
-	}
-
-	deployment, err := h.instanceService.FindDeploymentById(ctx, instance.DeploymentID)
-	if err != nil {
-		_ = c.Error(err)
-		return
-	}
-
-	canWrite := handler.CanWriteDeployment(user, deployment)
-	if !canWrite {
-		_ = c.AbortWithError(http.StatusUnauthorized, fmt.Errorf("write access denied"))
 		return
 	}
 
@@ -770,6 +779,17 @@ func (h Handler) FindDeployments(c *gin.Context) {
 	if err != nil {
 		_ = c.Error(err)
 		return
+	}
+
+	for i, group := range groupsWithDeployments {
+		for j, deployment := range group.Deployments {
+			err := h.stripDeploymentSensitiveParameterValues(deployment)
+			if err != nil {
+				_ = c.Error(err)
+				return
+			}
+			groupsWithDeployments[i].Deployments[j] = deployment
+		}
 	}
 
 	c.JSON(http.StatusOK, groupsWithDeployments)
