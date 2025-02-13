@@ -122,7 +122,7 @@ func (h Handler) stripInstanceSensitiveParameterValues(instance *model.Deploymen
 
 	for index, parameter := range instance.Parameters {
 		if stack.Parameters[parameter.ParameterName].Sensitive {
-			parameter.Value = "!!!redacted!!!"
+			parameter.Value = "***"
 			instance.Parameters[index] = parameter
 		}
 	}
