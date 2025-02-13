@@ -2,8 +2,9 @@ package instance
 
 import (
 	"bufio"
-	"context"
 	"fmt"
+	"github.com/dhis2-sre/im-manager/pkg/group"
+	"github.com/dhis2-sre/im-manager/pkg/stack"
 	"io"
 	"net/http"
 
@@ -14,8 +15,9 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func NewHandler(groupService groupServiceHandler, instanceService *Service, defaultTTL uint) Handler {
+func NewHandler(stackService stack.Service, groupService group.Service, instanceService *Service, defaultTTL uint) Handler {
 	return Handler{
+		stackService:    stackService,
 		groupService:    groupService,
 		instanceService: instanceService,
 		defaultTTL:      defaultTTL,
@@ -23,13 +25,10 @@ func NewHandler(groupService groupServiceHandler, instanceService *Service, defa
 }
 
 type Handler struct {
-	groupService    groupServiceHandler
+	stackService    stack.Service
+	groupService    group.Service
 	instanceService *Service
 	defaultTTL      uint
-}
-
-type groupServiceHandler interface {
-	Find(ctx context.Context, name string) (*model.Group, error)
 }
 
 func (h Handler) DeployDeployment(c *gin.Context) {
@@ -91,7 +90,38 @@ func (h Handler) DeployDeployment(c *gin.Context) {
 		return
 	}
 
+	err = h.stripDeploymentSensitiveParameterValues(deployment)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
 	c.JSON(http.StatusOK, deployment)
+}
+
+func (h Handler) stripDeploymentSensitiveParameterValues(deployment *model.Deployment) error {
+	for _, instance := range deployment.Instances {
+		err := h.stripInstanceSensitiveParameterValues(instance)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (h Handler) stripInstanceSensitiveParameterValues(instance *model.DeploymentInstance) error {
+	stack, err := h.stackService.Find(instance.StackName)
+	if err != nil {
+		return err
+	}
+
+	for index, parameter := range instance.Parameters {
+		if stack.Parameters[parameter.ParameterName].Sensitive {
+			parameter.Value = "!!!redacted!!!"
+			instance.Parameters[index] = parameter
+		}
+	}
+	return nil
 }
 
 type SaveDeploymentRequest struct {
@@ -167,6 +197,12 @@ func (h Handler) SaveDeployment(c *gin.Context) {
 		return
 	}
 
+	err = h.stripDeploymentSensitiveParameterValues(deployment)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
 	c.JSON(http.StatusCreated, deployment)
 }
 
@@ -209,6 +245,12 @@ func (h Handler) FindDeploymentById(c *gin.Context) {
 	if !canRead {
 		unauthorized := errdef.NewUnauthorized("read access denied")
 		_ = c.Error(unauthorized)
+		return
+	}
+
+	err = h.stripDeploymentSensitiveParameterValues(deployment)
+	if err != nil {
+		_ = c.Error(err)
 		return
 	}
 
@@ -280,6 +322,12 @@ func (h Handler) SaveInstance(c *gin.Context) {
 	}
 
 	err = h.instanceService.SaveInstance(ctx, instance)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	err = h.stripInstanceSensitiveParameterValues(instance)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -370,6 +418,12 @@ func (h Handler) InstanceWithDetails(c *gin.Context) {
 	ctx := c.Request.Context()
 
 	instance, err := h.instanceService.FindDeploymentInstanceById(ctx, id)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	err = h.stripInstanceSensitiveParameterValues(instance)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -720,6 +774,17 @@ func (h Handler) FindDeployments(c *gin.Context) {
 	if err != nil {
 		_ = c.Error(err)
 		return
+	}
+
+	for i, group := range groupsWithDeployments {
+		for j, deployment := range group.Deployments {
+			err := h.stripDeploymentSensitiveParameterValues(deployment)
+			if err != nil {
+				_ = c.Error(err)
+				return
+			}
+			groupsWithDeployments[i].Deployments[j] = deployment
+		}
 	}
 
 	c.JSON(http.StatusOK, groupsWithDeployments)
