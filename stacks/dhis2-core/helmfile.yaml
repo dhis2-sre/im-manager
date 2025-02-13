@@ -148,9 +148,10 @@ releases:
                   DATABASE_URL="$HOSTNAME/databases/$DATABASE_ID"
                   echo "DATABASE_URL: $DATABASE_URL"
                   FILESTORE_ID=$(curl --connect-timeout 10 --retry 5 --retry-delay 1 --fail -L $DATABASE_URL --cookie "accessToken=$IM_ACCESS_TOKEN" | jq -r '.filestoreId')
-                  if [[ -z "$FILESTORE_ID" ]]; then
+                  if [[ "$FILESTORE_ID" == "0" ]]; then
                     echo "No filestore id associated with database"
                   else
+                    echo "Filestore ID: $FILESTORE_ID"
                     echo "Seeding..."
 
                     tmp_file=$(mktemp)
@@ -161,6 +162,7 @@ releases:
                     tmp_dir=$(mktemp -d /tmp/minio.XXXXXX)
                     trap 'rm -rf "$tmp_dir"' EXIT  # Ensures cleanup on script exit
                     gunzip -c "$tmp_file" | tar xf - -C "$tmp_dir"
+                    chmod -R u+rwx,go+rx "$tmp_dir"
 
                     mc cp --recursive "$tmp_dir"/* myminio/dhis2
 

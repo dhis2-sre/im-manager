@@ -1,4 +1,4 @@
-FROM golang:1.23.6-alpine3.21 AS build
+FROM golang:1.24.0-alpine3.21 AS build
 
 # https://kubernetes.io/docs/tasks/tools/install-kubectl-linux/
 ARG KUBECTL_VERSION=v1.28.0
@@ -47,7 +47,7 @@ RUN go build -o /app/im-manager -ldflags "-s -w" ./cmd/serve
 
 FROM alpine:3.21
 RUN apk --no-cache -U upgrade \
-    && apk add --no-cache postgresql-client
+    && apk add --no-cache postgresql16-client
 COPY --from=build /usr/bin/kubectl /usr/bin/kubectl
 COPY --from=build /usr/bin/helm /usr/bin/helm
 COPY --from=build /usr/bin/helmfile /usr/bin/helmfile
