@@ -1,7 +1,8 @@
-tolerations:
-  - key: im-dedicated
-    operator: Equal
-    value: "true"
-    effect: NoSchedule
-nodeSelector:
-  im-dedicated: "true"
+master:
+  tolerations:
+    - key: im-dedicated
+      operator: Equal
+      value: "true"
+      effect: NoSchedule
+  nodeSelector:
+    im-dedicated: "true"
