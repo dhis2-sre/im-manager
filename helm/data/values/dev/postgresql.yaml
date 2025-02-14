@@ -6,3 +6,10 @@ primary:
     limits:
       cpu: 250m
       memory: 128Mi
+  tolerations:
+    - key: im-dedicated
+      operator: Equal
+      value: "true"
+      effect: NoSchedule
+  nodeSelector:
+    im-dedicated: "true"
