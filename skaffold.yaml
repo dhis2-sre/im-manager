@@ -28,6 +28,26 @@ deploy:
   tolerateFailuresUntilDeadline: true
   helm:
     releases:
+      - name: jaeger-{{ .ENVIRONMENT }}
+        namespace: instance-manager-{{ .CLASSIFICATION }}
+        createNamespace: true
+        remoteChart: jaeger
+        repo: https://jaegertracing.github.io/helm-charts
+        upgradeOnChange: true
+        setValues:
+          provisionDataStore:
+            cassandra: false
+          allInOne:
+            enabled: true
+          storage:
+            type: memory
+          agent:
+            enabled: false
+          collector:
+            enabled: false
+          query:
+            enabled: false
+
       - name: im-rabbitmq-{{ .ENVIRONMENT }}
         namespace: instance-manager-{{ .CLASSIFICATION }}
         createNamespace: true
@@ -95,6 +115,8 @@ deploy:
             HOSTNAME: "{{ .API_HOSTNAME }}"
             UI_URL: "{{ .UI_URL }}"
             INSTANCE_SERVICE_HOST: im-manager-{{ .ENVIRONMENT }}.instance-manager-{{ .CLASSIFICATION }}.svc:8080
+            JAEGER_HOST: jaeger-{{ .ENVIRONMENT }}-collector.instance-manager-{{ .CLASSIFICATION }}.svc
+            JAEGER_PORT: "14268"
             DATABASE_HOST: im-manager-postgresql-{{ .ENVIRONMENT }}.instance-manager-{{ .CLASSIFICATION }}.svc
             DATABASE_PORT: "5432"
             RABBITMQ_HOST: im-rabbitmq-{{ .ENVIRONMENT }}.instance-manager-{{ .CLASSIFICATION }}.svc

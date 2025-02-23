@@ -5,6 +5,8 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/uptrace/opentelemetry-go-extra/otelgorm"
+
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	slogGorm "github.com/orandin/slog-gorm"
 	"gorm.io/driver/postgres"
@@ -35,6 +37,10 @@ func NewDatabase(logger *slog.Logger, c PostgresqlConfig) (*gorm.DB, error) {
 	db, err := gorm.Open(postgres.Open(dsn), &databaseConfig)
 	if err != nil {
 		return nil, err
+	}
+
+	if err := db.Use(otelgorm.NewPlugin()); err != nil {
+		return nil, fmt.Errorf("failed to initialize otelgorm: %v", err)
 	}
 
 	err = db.AutoMigrate(

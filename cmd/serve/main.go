@@ -37,6 +37,12 @@ import (
 	"strings"
 	"time"
 
+	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/exporters/jaeger"
+	"go.opentelemetry.io/otel/propagation"
+	"go.opentelemetry.io/otel/sdk/trace"
+
 	"github.com/gin-gonic/gin"
 	"github.com/go-mail/mail"
 	"github.com/go-redis/redis"
@@ -79,6 +85,12 @@ func run() (err error) {
 			err = fmt.Errorf("panicked due to: %v", r)
 		}
 	}()
+
+	shutdown, err := initTracer()
+	defer shutdown()
+	if err != nil {
+		return err
+	}
 
 	ctx := context.Background()
 	logger := slog.New(log.New(slog.NewJSONHandler(os.Stdout, nil)))
@@ -213,6 +225,8 @@ func run() (err error) {
 	if err != nil {
 		return err
 	}
+
+	r.Use(otelgin.Middleware("my-app")) // Attach OpenTelemetry middleware
 
 	group.Routes(r, authentication, authorization, groupHandler)
 	user.Routes(r, authentication, authorization, userHandler)
@@ -724,4 +738,29 @@ func requireEnvAsArray(key string) ([]string, error) {
 		return nil, err
 	}
 	return strings.Split(value, ","), nil
+}
+
+func initTracer() (func(), error) {
+	host, err := requireEnv("JAEGER_HOST")
+	if err != nil {
+		return nil, err
+	}
+	port, err := requireEnvAsUint("JAEGER_PORT")
+	if err != nil {
+		return nil, err
+	}
+
+	endpoint := fmt.Sprintf("http://%s:%d/api/traces", host, port)
+	exporter, err := jaeger.New(jaeger.WithCollectorEndpoint(jaeger.WithEndpoint(endpoint)))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Jaeger exporter: %v", err)
+	}
+
+	tracerProvider := trace.NewTracerProvider(trace.WithBatcher(exporter))
+	otel.SetTracerProvider(tracerProvider)
+
+	otel.SetTextMapPropagator(propagation.TraceContext{})
+
+	// Return shutdown function
+	return func() { _ = tracerProvider.Shutdown(context.Background()) }, nil
 }
