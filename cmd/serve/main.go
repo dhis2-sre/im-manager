@@ -181,7 +181,7 @@ func run() (err error) {
 
 	stackHandler := stack.NewHandler(stackService)
 
-	instanceHandler, err := newInstanceHandler(groupService, instanceService)
+	instanceHandler, err := newInstanceHandler(stackService, groupService, instanceService)
 	if err != nil {
 		return err
 	}
@@ -492,13 +492,13 @@ func newRabbitMQ() (rabbitMQConfig, error) {
 	}, nil
 }
 
-func newInstanceHandler(groupService *group.Service, instanceService *instance.Service) (instance.Handler, error) {
+func newInstanceHandler(stackService stack.Service, groupService *group.Service, instanceService *instance.Service) (instance.Handler, error) {
 	defaultTTL, err := requireEnvAsUint("DEFAULT_TTL")
 	if err != nil {
 		return instance.Handler{}, err
 	}
 
-	return instance.NewHandler(groupService, instanceService, defaultTTL), nil
+	return instance.NewHandler(stackService, groupService, instanceService, defaultTTL), nil
 }
 
 func newDatabaseHandler(ctx context.Context, logger *slog.Logger, db *gorm.DB, groupService *group.Service, instanceService *instance.Service, stackService stack.Service) (database.Handler, error) {
