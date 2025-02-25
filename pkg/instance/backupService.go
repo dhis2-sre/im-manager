@@ -15,34 +15,39 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
-	"github.com/minio/minio-go/v7"
 	"golang.org/x/sync/errgroup"
 )
+
+// BackupSource defines a generic interface for backup sources
+type BackupSource interface {
+	// List returns a channel of objects to back up
+	List(ctx context.Context) (<-chan BackupObject, error)
+	// Get returns a reader for a specific object
+	Get(ctx context.Context, path string) (io.ReadCloser, error)
+}
+
+// BackupObject represents an object to be backed up
+type BackupObject struct {
+	Path         string
+	Size         int64
+	LastModified time.Time
+	Err          error
+}
 
 const (
 	bufferSize = 5 * 1024 * 1024 // 5 MB
 )
 
 // NewBackupService creates a new backup service instance
-func NewBackupService(logger *slog.Logger, minioClient MinioClient, s3Client S3BackupClient) *BackupService {
-	return &BackupService{
-		minioClient: minioClient,
-		s3Client:    s3Client,
-		logger:      logger,
-	}
+func NewBackupService(logger *slog.Logger, source BackupSource, s3Client S3BackupClient) *BackupService {
+	return &BackupService{logger, source, s3Client}
 }
 
 // BackupService handles the backup operation
 type BackupService struct {
-	minioClient MinioClient
-	s3Client    S3BackupClient
-	logger      *slog.Logger
-}
-
-// MinioClient defines the methods we need from MinIO client
-type MinioClient interface {
-	ListObjects(ctx context.Context, bucketName string, opts minio.ListObjectsOptions) <-chan minio.ObjectInfo
-	GetObject(ctx context.Context, bucketName, objectName string, opts minio.GetObjectOptions) (*minio.Object, error)
+	logger   *slog.Logger
+	source   BackupSource
+	s3Client S3BackupClient
 }
 
 // S3BackupClient defines the methods we need from AWS S3 client
@@ -69,14 +74,14 @@ func (bs *BackupStats) increment(size int64) {
 }
 
 // PerformBackup executes the backup operation
-func (s *BackupService) PerformBackup(ctx context.Context, minioBucket, s3Bucket, key string) error {
+func (s *BackupService) PerformBackup(ctx context.Context, s3Bucket, key string) error {
 	g, ctx := errgroup.WithContext(ctx)
 	stats := &BackupStats{StartTime: time.Now()}
 	pr, pw := io.Pipe()
 
 	g.Go(func() error {
 		defer pw.Close()
-		return s.createTarGzStream(ctx, pw, minioBucket, stats)
+		return s.createTarGzStream(ctx, pw, stats)
 	})
 
 	g.Go(func() error {
@@ -90,23 +95,25 @@ func (s *BackupService) PerformBackup(ctx context.Context, minioBucket, s3Bucket
 	s.logBackupStats(stats)
 	return nil
 }
-func (s *BackupService) createTarGzStream(ctx context.Context, w io.Writer, minioBucket string, stats *BackupStats) error {
+
+func (s *BackupService) createTarGzStream(ctx context.Context, w io.Writer, stats *BackupStats) error {
 	gw := gzip.NewWriter(w)
 	defer gw.Close()
 
 	tw := tar.NewWriter(gw)
 	defer tw.Close()
 
-	objectCh := s.minioClient.ListObjects(ctx, minioBucket, minio.ListObjectsOptions{
-		Recursive: true,
-	})
+	objectCh, err := s.source.List(ctx)
+	if err != nil {
+		return fmt.Errorf("list objects: %v", err)
+	}
 
 	for object := range objectCh {
 		if object.Err != nil {
-			return fmt.Errorf("list objects: %v", object.Err)
+			return object.Err
 		}
 
-		if err := s.processSingleObject(ctx, tw, minioBucket, object, stats); err != nil {
+		if err := s.processSingleObject(ctx, tw, object, stats); err != nil {
 			return err
 		}
 	}
@@ -114,27 +121,28 @@ func (s *BackupService) createTarGzStream(ctx context.Context, w io.Writer, mini
 	return nil
 }
 
-func (s *BackupService) processSingleObject(ctx context.Context, tw *tar.Writer, minioBucket string, object minio.ObjectInfo, stats *BackupStats) error {
-	s.logger.InfoContext(ctx, "Processing object", "key", object.Key, "bucket", minioBucket)
-	obj, err := s.minioClient.GetObject(ctx, minioBucket, object.Key, minio.GetObjectOptions{})
+func (s *BackupService) processSingleObject(ctx context.Context, tw *tar.Writer, object BackupObject, stats *BackupStats) error {
+	s.logger.InfoContext(ctx, "Processing object", "path", object.Path)
+
+	reader, err := s.source.Get(ctx, object.Path)
 	if err != nil {
-		return fmt.Errorf("failed to get object %s: %v", object.Key, err)
+		return fmt.Errorf("failed to get object %s: %v", object.Path, err)
 	}
-	defer obj.Close()
+	defer reader.Close()
 
 	header := &tar.Header{
-		Name:    object.Key,
+		Name:    object.Path,
 		Size:    object.Size,
 		Mode:    0644,
 		ModTime: object.LastModified,
 	}
 
 	if err := tw.WriteHeader(header); err != nil {
-		return fmt.Errorf("write tar header for %s: %v", object.Key, err)
+		return fmt.Errorf("write tar header for %s: %v", object.Path, err)
 	}
 
-	if _, err := io.Copy(tw, obj); err != nil {
-		return fmt.Errorf("copy object %s to tar: %v", object.Key, err)
+	if _, err := io.Copy(tw, reader); err != nil {
+		return fmt.Errorf("copy object %s to tar: %v", object.Path, err)
 	}
 
 	stats.increment(object.Size)
