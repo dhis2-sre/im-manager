@@ -226,7 +226,7 @@ func run() (err error) {
 		return err
 	}
 
-	r.Use(otelgin.Middleware("my-app")) // Attach OpenTelemetry middleware
+	r.Use(otelgin.Middleware("im")) // Attach OpenTelemetry middleware
 
 	group.Routes(r, authentication, authorization, groupHandler)
 	user.Routes(r, authentication, authorization, userHandler)
