@@ -1,11 +1,4 @@
-primary:
-  resources:
-    requests:
-      cpu: 125m
-      memory: 32Mi
-    limits:
-      cpu: 250m
-      memory: 128Mi
+master:
   tolerations:
     - key: im-dedicated
       operator: Equal

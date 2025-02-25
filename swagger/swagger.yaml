@@ -84,6 +84,12 @@ definitions:
                     $ref: '#/definitions/ExternalDownload'
                 type: array
                 x-go-name: ExternalDownloads
+            filestore:
+                $ref: '#/definitions/Database'
+            filestoreId:
+                format: uint64
+                type: integer
+                x-go-name: FilestoreID
             groupName:
                 type: string
                 x-go-name: GroupName
@@ -99,6 +105,10 @@ definitions:
             slug:
                 type: string
                 x-go-name: Slug
+            type:
+                description: 'TODO: Sql or fs?'
+                type: string
+                x-go-name: Type
             updatedAt:
                 format: date-time
                 type: string
@@ -475,6 +485,9 @@ definitions:
                 format: uint64
                 type: integer
                 x-go-name: Priority
+            sensitive:
+                type: boolean
+                x-go-name: Sensitive
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/stack
     UpdateDatabaseRequest:
@@ -1355,6 +1368,31 @@ paths:
                 "200":
                     $ref: '#/responses/Response'
             summary: Health status
+    /instances/{id}/details:
+        put:
+            description: Returns the details of an instance including parameters
+            operationId: instanceWithDetails
+            parameters:
+                - format: uint64
+                  in: path
+                  name: id
+                  required: true
+                  type: integer
+                  x-go-name: ID
+            responses:
+                "202":
+                    description: ""
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Instance with details
     /instances/{id}/logs:
         get:
             description: Stream instance logs in real time

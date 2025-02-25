@@ -74,7 +74,7 @@ func TestInstanceHandler(t *testing.T) {
 	stackService := stack.NewService(stacks)
 	// classification 'test' does not actually exist, this is used to decrypt the stack parameters
 	helmfileService := instance.NewHelmfileService(logger, stackService, "../../stacks", "test")
-	instanceService := instance.NewService(logger, instanceRepo, groupService, stackService, helmfileService)
+	instanceService := instance.NewService(logger, instanceRepo, groupService, stackService, helmfileService, nil, "")
 
 	s3Dir := t.TempDir()
 	s3Bucket := "database-bucket"
@@ -92,7 +92,7 @@ func TestInstanceHandler(t *testing.T) {
 	}
 	client := inttest.SetupHTTPServer(t, func(engine *gin.Engine) {
 		var twoDayTTL uint = 172800
-		instanceHandler := instance.NewHandler(groupService, instanceService, twoDayTTL)
+		instanceHandler := instance.NewHandler(stackService, groupService, instanceService, twoDayTTL)
 		instance.Routes(engine, authenticator, instanceHandler)
 
 		databaseHandler := database.NewHandler(logger, databaseService, groupService, instanceService, stackService)
@@ -199,6 +199,23 @@ func TestInstanceHandler(t *testing.T) {
 		assert.Equal(t, deployment.ID, deploymentInstance.DeploymentID)
 		assert.Equal(t, "group-name", deploymentInstance.GroupName)
 		assert.Equal(t, "whoami-go", deploymentInstance.StackName)
+
+		t.Log("Get deployment instance with details")
+		path = fmt.Sprintf("/instances/%d/details", deploymentInstance.ID)
+		var instance model.DeploymentInstance
+		client.GetJSON(t, path, &instance, inttest.WithAuthToken("sometoken"))
+		assert.Equal(t, deploymentInstance.ID, instance.ID)
+		assert.Equal(t, "group-name", instance.GroupName)
+		assert.Equal(t, "whoami-go", instance.StackName)
+		{
+			parameters := instance.Parameters
+			assert.Len(t, parameters, 5)
+			assert.NotEqual(t, parameters["CHART_VERSION"], "0.9.0")
+			assert.NotEqual(t, parameters["IMAGE_PULL_POLICY"], "IfNotPresent")
+			assert.NotEqual(t, parameters["IMAGE_REPOSITORY"], "whoami-go")
+			assert.NotEqual(t, parameters["IMAGE_TAG"], "0.6.0")
+			assert.NotEqual(t, parameters["REPLICA_COUNT"], "1")
+		}
 
 		t.Log("Deploy deployment")
 		path = fmt.Sprintf("/deployments/%d/deploy", deployment.ID)

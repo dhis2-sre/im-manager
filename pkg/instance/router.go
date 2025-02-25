@@ -16,6 +16,7 @@ func Routes(r *gin.Engine, authenticator gin.HandlerFunc, handler Handler) {
 	tokenAuthenticationRouter.PUT("/instances/:id/restart", handler.Restart)
 	tokenAuthenticationRouter.GET("/instances/:id/logs", handler.Logs)
 	tokenAuthenticationRouter.GET("/instances/:id/status", handler.Status)
+	tokenAuthenticationRouter.GET("/instances/:id/details", handler.InstanceWithDetails)
 
 	tokenAuthenticationRouter.POST("/deployments", handler.SaveDeployment)
 	tokenAuthenticationRouter.GET("/deployments", handler.FindDeployments)

@@ -174,6 +174,40 @@ func TestDatabaseHandler(t *testing.T) {
 		}
 	})
 
+	t.Run("Update", func(t *testing.T) {
+		{
+			t.Log("Update")
+
+			requestBody := strings.NewReader(`{"name": "path/rename.extension"}`)
+			response := client.Do(t, http.MethodPut, "/databases/"+databaseID, requestBody, http.StatusOK, inttest.WithHeader("Content-Type", "application/json"))
+			var actualDB model.Database
+			err := json.Unmarshal(response, &actualDB)
+			assert.NoError(t, err)
+
+			require.Equal(t, "path/rename.extension", actualDB.Name)
+			require.Equal(t, "packages", actualDB.GroupName)
+
+			actualContent := s3.GetObject(t, s3Bucket, "packages/path/rename.extension")
+			require.Equalf(t, "file contents", string(actualContent), "DB in S3 should have expected content")
+		}
+
+		{
+			t.Log("GetAll")
+
+			var groupDBs []database.GroupsWithDatabases
+			client.GetJSON(t, "/databases", &groupDBs)
+
+			require.Len(t, groupDBs, 1)
+			groupDB := groupDBs[0]
+			assert.Equal(t, "packages", groupDB.Name, "GET /databases failed")
+			var names []string
+			for _, d := range groupDB.Databases {
+				names = append(names, d.Name)
+			}
+			assert.ElementsMatchf(t, []string{"path/rename.extension", "path/copy.extension"}, names, "GET /databases failed: should return original and copied DB")
+		}
+	})
+
 	t.Run("Lock/Unlock", func(t *testing.T) {
 		{
 			t.Log("Lock")
@@ -254,6 +288,14 @@ func (gs groupService) Find(ctx context.Context, name string) (*model.Group, err
 }
 
 type instanceService struct{}
+
+func (is instanceService) FindDeploymentById(ctx context.Context, id uint) (*model.Deployment, error) {
+	panic("implement me")
+}
+
+func (is instanceService) FilestoreBackup(ctx context.Context, instance *model.DeploymentInstance, name string, database *model.Database) error {
+	panic("implement me")
+}
 
 func (is instanceService) FindDecryptedDeploymentInstanceById(ctx context.Context, id uint) (*model.DeploymentInstance, error) {
 	panic("implement me")

@@ -136,7 +136,12 @@ func run() (err error) {
 		return err
 	}
 
-	instanceService, err := newInstanceService(logger, db, stackService, groupService)
+	awsS3Client, err := newAWSS3Client(ctx)
+	if err != nil {
+		return err
+	}
+
+	instanceService, err := newInstanceService(logger, db, stackService, groupService, awsS3Client)
 	if err != nil {
 		return err
 	}
@@ -164,7 +169,7 @@ func run() (err error) {
 
 	stackHandler := stack.NewHandler(stackService)
 
-	instanceHandler, err := newInstanceHandler(groupService, instanceService)
+	instanceHandler, err := newInstanceHandler(stackService, groupService, instanceService)
 	if err != nil {
 		return err
 	}
@@ -409,7 +414,7 @@ func newStackService() (stack.Service, error) {
 	return stack.NewService(stacks), nil
 }
 
-func newInstanceService(logger *slog.Logger, db *gorm.DB, stackService stack.Service, groupService *group.Service) (*instance.Service, error) {
+func newInstanceService(logger *slog.Logger, db *gorm.DB, stackService stack.Service, groupService *group.Service, s3Client *s3.Client) (*instance.Service, error) {
 	instanceParameterEncryptionKey, err := requireEnv("INSTANCE_PARAMETER_ENCRYPTION_KEY")
 	if err != nil {
 		return nil, err
@@ -421,7 +426,12 @@ func newInstanceService(logger *slog.Logger, db *gorm.DB, stackService stack.Ser
 	}
 	helmfileService := instance.NewHelmfileService(logger, stackService, "./stacks", classification)
 
-	return instance.NewService(logger, instanceRepository, groupService, stackService, helmfileService), nil
+	s3Bucket, err := requireEnv("S3_BUCKET")
+	if err != nil {
+		return nil, err
+	}
+
+	return instance.NewService(logger, instanceRepository, groupService, stackService, helmfileService, s3Client, s3Bucket), nil
 }
 
 type rabbitMQConfig struct {
@@ -468,13 +478,13 @@ func newRabbitMQ() (rabbitMQConfig, error) {
 	}, nil
 }
 
-func newInstanceHandler(groupService *group.Service, instanceService *instance.Service) (instance.Handler, error) {
+func newInstanceHandler(stackService stack.Service, groupService *group.Service, instanceService *instance.Service) (instance.Handler, error) {
 	defaultTTL, err := requireEnvAsUint("DEFAULT_TTL")
 	if err != nil {
 		return instance.Handler{}, err
 	}
 
-	return instance.NewHandler(groupService, instanceService, defaultTTL), nil
+	return instance.NewHandler(stackService, groupService, instanceService, defaultTTL), nil
 }
 
 func newDatabaseHandler(ctx context.Context, logger *slog.Logger, db *gorm.DB, groupService *group.Service, instanceService *instance.Service, stackService stack.Service) (database.Handler, error) {
@@ -493,6 +503,16 @@ func newDatabaseHandler(ctx context.Context, logger *slog.Logger, db *gorm.DB, g
 }
 
 func newS3Client(ctx context.Context, logger *slog.Logger) (*storage.S3Client, error) {
+	awsClient, err := newAWSS3Client(ctx)
+	if err != nil {
+		return nil, err
+	}
+	uploader := manager.NewUploader(awsClient)
+
+	return storage.NewS3Client(logger, awsClient, uploader), nil
+}
+
+func newAWSS3Client(ctx context.Context) (*s3.Client, error) {
 	s3Region, err := requireEnv("S3_REGION")
 	if err != nil {
 		return nil, err
@@ -517,9 +537,7 @@ func newS3Client(ctx context.Context, logger *slog.Logger) (*storage.S3Client, e
 	s3AWSClient := s3.NewFromConfig(s3Config, func(o *s3.Options) {
 		o.UsePathStyle = true
 	})
-	uploader := manager.NewUploader(s3AWSClient)
-
-	return storage.NewS3Client(logger, s3AWSClient, uploader), nil
+	return s3AWSClient, nil
 }
 
 func newIntegrationHandler() (integration.Handler, error) {
