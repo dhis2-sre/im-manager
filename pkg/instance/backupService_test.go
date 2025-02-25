@@ -43,17 +43,18 @@ func TestBackupService(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-
 	s3Dir := t.TempDir()
 	s3Bucket := "database-bucket"
 	err = os.Mkdir(s3Dir+"/"+s3Bucket, 0o755)
 	require.NoError(t, err, "failed to create S3 output bucket")
 	s3 := inttest.SetupS3(t, s3Dir)
 
-	backupService := NewBackupService(logger, minioClient, s3.Client)
+	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
-	err = backupService.PerformBackup(ctx, bucketName, "backup-bucket", "backup-key")
+	source := NewMinioBackupSource(logger, minioClient, "dhis2")
+	backupService := NewBackupService(logger, source, s3.Client)
+
+	err = backupService.PerformBackup(ctx, bucketName, "backup-key")
 	require.NoError(t, err)
 }
 

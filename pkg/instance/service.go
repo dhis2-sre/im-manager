@@ -784,12 +784,13 @@ func (s Service) FilestoreBackup(ctx context.Context, instance *model.Deployment
 		return err
 	}
 
-	backupService := NewBackupService(s.logger, minioClient, s.s3Client)
+	source := NewMinioBackupSource(s.logger, minioClient, "dhis2")
+	backupService := NewBackupService(s.logger, source, s.s3Client)
 
 	name = strings.TrimSuffix(name, ".pgc")
 	name = strings.TrimSuffix(name, ".tar.gz")
 	key := fmt.Sprintf("%s/%s-%s.tar.gz", instance.GroupName, name, "fs")
-	err = backupService.PerformBackup(ctx, "dhis2", s.s3Bucket, key)
+	err = backupService.PerformBackup(ctx, s.s3Bucket, key)
 	if err != nil {
 		return err
 	}
