@@ -55,6 +55,15 @@ services:
     profiles:
       - dev
 
+  jaeger:
+    image: jaegertracing/all-in-one:1.6.0
+    ports:
+      - "14268:14268"
+      - "16686:16686"
+    profiles:
+      - dev
+      - prod
+
   database:
     image: postgres:13-alpine
     ports:
