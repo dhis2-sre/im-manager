@@ -5,3 +5,9 @@ tolerations:
     effect: NoSchedule
 nodeSelector:
   im-dedicated: "true"
+extraPlugins: "rabbitmq_stream rabbitmq_stream_management"
+service:
+  extraPorts:
+    - name: streams
+      port: 5552
+      targetPort: 5552

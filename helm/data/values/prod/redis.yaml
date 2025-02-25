@@ -6,3 +6,6 @@ master:
       effect: NoSchedule
   nodeSelector:
     im-dedicated: "true"
+architecture: standalone
+auth:
+  enabled: false

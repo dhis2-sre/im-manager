@@ -35,19 +35,8 @@ deploy:
         repo: https://jaegertracing.github.io/helm-charts
         version: 3.4.0
         upgradeOnChange: true
-        setValues:
-          provisionDataStore:
-            cassandra: false
-          allInOne:
-            enabled: true
-          storage:
-            type: memory
-          agent:
-            enabled: false
-          collector:
-            enabled: false
-          query:
-            enabled: false
+        valuesFiles:
+          - helm/data/values/{{ .CLASSIFICATION }}/jaeger.yaml
 
       - name: im-rabbitmq-{{ .ENVIRONMENT }}
         namespace: instance-manager-{{ .CLASSIFICATION }}
@@ -57,13 +46,6 @@ deploy:
         version: 14.4.2
         upgradeOnChange: true
         useHelmSecrets: true
-        setValues:
-          extraPlugins: "rabbitmq_stream rabbitmq_stream_management"
-          service:
-            extraPorts:
-            - name: streams
-              port: 5552
-              targetPort: 5552
         valuesFiles:
           - helm/data/secrets/{{ .CLASSIFICATION }}/rabbitmq.yaml
           - helm/data/values/{{ .CLASSIFICATION }}/rabbitmq.yaml
@@ -75,10 +57,6 @@ deploy:
         repo: https://charts.bitnami.com/bitnami
         version: 18.2.2
         upgradeOnChange: true
-        setValues:
-          architecture: standalone
-          auth:
-            enabled: false
         valuesFiles:
           - helm/data/values/{{ .CLASSIFICATION }}/redis.yaml
 
