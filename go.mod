@@ -22,7 +22,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/gosimple/slug v1.15.0
 	github.com/habx/pg-commands v0.6.1
-	github.com/lestrrat-go/jwx/v2 v2.1.3
+	github.com/lestrrat-go/jwx/v2 v2.1.4
 	github.com/lib/pq v1.10.9
 	github.com/minio/minio-go/v7 v7.0.87
 	github.com/orandin/slog-gorm v1.4.0
@@ -98,7 +98,7 @@ require (
 	github.com/containerd/platforms v0.2.1 // indirect
 	github.com/cpuguy83/dockercfg v0.3.2 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
-	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.3.0 // indirect
+	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.0 // indirect
 	github.com/dimchansky/utfbom v1.1.1 // indirect
 	github.com/distribution/reference v0.6.0 // indirect
 	github.com/docker/docker v27.5.1+incompatible // indirect
