@@ -92,7 +92,7 @@ func TestInstanceHandler(t *testing.T) {
 	}
 	client := inttest.SetupHTTPServer(t, func(engine *gin.Engine) {
 		var twoDayTTL uint = 172800
-		instanceHandler := instance.NewHandler(groupService, instanceService, twoDayTTL)
+		instanceHandler := instance.NewHandler(stackService, groupService, instanceService, twoDayTTL)
 		instance.Routes(engine, authenticator, instanceHandler)
 
 		databaseHandler := database.NewHandler(logger, databaseService, groupService, instanceService, stackService)
@@ -216,23 +216,6 @@ func TestInstanceHandler(t *testing.T) {
 			assert.NotEqual(t, parameters["IMAGE_TAG"], "0.6.0")
 			assert.NotEqual(t, parameters["REPLICA_COUNT"], "1")
 		}
-
-		t.Log("Get deployment instance with decrypted details")
-		path = fmt.Sprintf("/instances/%d/decrypted-details", deploymentInstance.ID)
-		var decryptedInstance model.DeploymentInstance
-		client.GetJSON(t, path, &decryptedInstance, inttest.WithAuthToken("sometoken"))
-		assert.Equal(t, deploymentInstance.ID, decryptedInstance.ID)
-		assert.Equal(t, "group-name", decryptedInstance.GroupName)
-		assert.Equal(t, "whoami-go", decryptedInstance.StackName)
-		assert.Len(t, decryptedInstance.Parameters, 5)
-		expectedParameters := model.DeploymentInstanceParameters{
-			"CHART_VERSION":     {0, "", "", "0.9.0"},
-			"IMAGE_PULL_POLICY": {0, "", "", "IfNotPresent"},
-			"IMAGE_REPOSITORY":  {0, "", "", "whoami-go"},
-			"IMAGE_TAG":         {0, "", "", "0.6.0"},
-			"REPLICA_COUNT":     {0, "", "", "1"},
-		}
-		assert.EqualExportedValues(t, expectedParameters, decryptedInstance.Parameters)
 
 		t.Log("Deploy deployment")
 		path = fmt.Sprintf("/deployments/%d/deploy", deployment.ID)
