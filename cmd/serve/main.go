@@ -37,6 +37,9 @@ import (
 	"strings"
 	"time"
 
+	"go.opentelemetry.io/otel/sdk/resource"
+	semconv "go.opentelemetry.io/otel/semconv/v1.27.0"
+
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/jaeger"
@@ -756,7 +759,13 @@ func initTracer() (func(), error) {
 		return nil, fmt.Errorf("failed to create Jaeger exporter: %v", err)
 	}
 
-	tracerProvider := trace.NewTracerProvider(trace.WithBatcher(exporter))
+	environment, err := requireEnv("ENVIRONMENT")
+	if err != nil {
+		return nil, err
+	}
+
+	resources := trace.WithResource(resource.NewWithAttributes(semconv.SchemaURL, semconv.ServiceNameKey.String(fmt.Sprintf("%s-api", environment))))
+	tracerProvider := trace.NewTracerProvider(trace.WithBatcher(exporter), resources)
 	otel.SetTracerProvider(tracerProvider)
 
 	otel.SetTextMapPropagator(propagation.TraceContext{})
