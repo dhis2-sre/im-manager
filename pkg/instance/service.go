@@ -370,6 +370,7 @@ func (s Service) deployDeploymentInstance(ctx context.Context, token string, ins
 	}
 
 	deployLog, deployErrorLog, err := commandExecutor(syncCmd, group.ClusterConfiguration)
+	// In recent versions of helmfile most of the command output is sent to stderr https://github.com/roboll/helmfile/pull/583
 	s.logger.InfoContext(ctx, "Deploy log", "log", string(deployLog), "errorLog", string(deployErrorLog))
 	/* TODO: return error log if relevant
 	if len(deployErrorLog) > 0 {
@@ -445,8 +446,8 @@ func (s Service) DeleteDeployment(ctx context.Context, deployment *model.Deploym
 }
 
 func (s Service) destroyDeploymentInstance(ctx context.Context, instance *model.DeploymentInstance) error {
-	if instance.DeployLog == "" {
-		return nil
+	if _, err := s.FindDeploymentInstanceById(ctx, instance.ID); err != nil {
+		return err
 	}
 
 	group, err := s.groupService.Find(ctx, instance.GroupName)
@@ -460,6 +461,7 @@ func (s Service) destroyDeploymentInstance(ctx context.Context, instance *model.
 	}
 
 	destroyLog, destroyErrorLog, err := commandExecutor(destroyCmd, group.ClusterConfiguration)
+	// In recent versions of helmfile most of the command output is sent to stderr https://github.com/roboll/helmfile/pull/583
 	s.logger.InfoContext(ctx, "Destroy log", "log", destroyLog, "errorLog", destroyErrorLog)
 	if err != nil {
 		return err
