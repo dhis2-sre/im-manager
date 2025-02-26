@@ -60,7 +60,7 @@ deploy:
         valuesFiles:
           - helm/data/values/{{ .CLASSIFICATION }}/redis.yaml
 
-      - name: im-postgresql-{{ .ENVIRONMENT }}
+      - name: im-manager-postgresql-{{ .ENVIRONMENT }}
         namespace: instance-manager-{{ .CLASSIFICATION }}
         createNamespace: true
         remoteChart: postgresql
@@ -99,7 +99,7 @@ deploy:
             INSTANCE_SERVICE_HOST: im-manager-{{ .ENVIRONMENT }}.instance-manager-{{ .CLASSIFICATION }}.svc:8080
             JAEGER_HOST: im-jaeger-{{ .ENVIRONMENT }}-collector.instance-manager-{{ .CLASSIFICATION }}.svc
             JAEGER_PORT: "14268"
-            DATABASE_HOST: im-postgresql-{{ .ENVIRONMENT }}.instance-manager-{{ .CLASSIFICATION }}.svc
+            DATABASE_HOST: im-manager-postgresql-{{ .ENVIRONMENT }}.instance-manager-{{ .CLASSIFICATION }}.svc
             DATABASE_PORT: "5432"
             RABBITMQ_HOST: im-rabbitmq-{{ .ENVIRONMENT }}.instance-manager-{{ .CLASSIFICATION }}.svc
             RABBITMQ_PORT: "5672"
