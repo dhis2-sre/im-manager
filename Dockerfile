@@ -8,9 +8,9 @@ ARG KUBECTL_CHECKSUM=4717660fd1466ec72d59000bb1d9f5cdc91fac31d491043ca62b34398e0
 ARG HELM_VERSION=v3.12.3
 ARG HELM_CHECKSUM=1b2313cd198d45eab00cc37c38f6b1ca0a948ba279c29e322bdf426d406129b5
 
-# https://github.com/roboll/helmfile/releases
-ARG HELMFILE_VERSION=v0.144.0
-ARG HELMFILE_CHECKSUM=dcf865a715028d3a61e2fec09f2a0beaeb7ff10cde32e096bf94aeb9a6eb4f02
+# https://github.com/helmfile/helmfile/releases
+ARG HELMFILE_VERSION=0.171.0
+ARG HELMFILE_CHECKSUM=c190fd305307ea3fd41a91a95b3341100a1ede239cf32e225564a1ece286fb1b
 
 # https://github.com/kubernetes-sigs/aws-iam-authenticator/releases/
 ARG AWS_IAM_AUTHENTICATOR_VERSION=0.6.11
@@ -30,8 +30,9 @@ RUN apk add gcc musl-dev git && \
     tar -xvf helm-${HELM_VERSION}-linux-amd64.tar.gz && \
     install -o root -g root -m 0755 linux-amd64/helm /usr/bin/helm && \
 \
-    wget -O helmfile https://github.com/roboll/helmfile/releases/download/${HELMFILE_VERSION}/helmfile_linux_amd64 && \
-    echo "${HELMFILE_CHECKSUM}  helmfile" | sha256sum -c - && \
+    wget https://github.com/helmfile/helmfile/releases/download/v${HELMFILE_VERSION}/helmfile_${HELMFILE_VERSION}_linux_amd64.tar.gz && \
+    echo "${HELMFILE_CHECKSUM}  helmfile_${HELMFILE_VERSION}_linux_amd64.tar.gz" | sha256sum -c - && \
+    tar -xvf helmfile_${HELMFILE_VERSION}_linux_amd64.tar.gz && \
     install -o root -g root -m 0755 helmfile /usr/bin/helmfile && \
 \
     wget -O aws-iam-authenticator https://github.com/kubernetes-sigs/aws-iam-authenticator/releases/download/v${AWS_IAM_AUTHENTICATOR_VERSION}/aws-iam-authenticator_${AWS_IAM_AUTHENTICATOR_VERSION}_linux_amd64 && \
