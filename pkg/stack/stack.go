@@ -204,7 +204,8 @@ var DHIS2Core = model.Stack{
 		"MINIO_CHART_VERSION":             {Priority: 21, DisplayName: "MinIO Chart Version", DefaultValue: &dhis2CoreDefaults.minIOChartVersion},
 		"MINIO_STORAGE_SIZE":              {Priority: 22, DisplayName: "MinIO Storage Size", DefaultValue: &dhis2CoreDefaults.minIOStorageSize},
 		"ENABLE_QUERY_LOGGING":            {Priority: 23, DisplayName: "Enable Query Logging", DefaultValue: &dhis2CoreDefaults.enableQueryLogging},
-		"CUSTOM_DHIS2_CONFIG":             {Priority: 24, DisplayName: "Custom DHIS2 config (applied to top of dhis.conf)", DefaultValue: &dhis2CoreDefaults.customDhis2Config, Sensitive: true},
+		"FILESYSTEM_VOLUME_SIZE":          {Priority: 24, DisplayName: "Filesystem volume size (only in effect if \"Storage\" is set to \"filesystem\")", DefaultValue: &dhis2CoreDefaults.filesystemVolumeSize, Sensitive: true},
+		"CUSTOM_DHIS2_CONFIG":             {Priority: 25, DisplayName: "Custom DHIS2 config (applied to top of dhis.conf)", DefaultValue: &dhis2CoreDefaults.customDhis2Config, Sensitive: true},
 		"GOOGLE_AUTH_PROJECT_ID":          {Priority: 0, DisplayName: "Google auth project id", DefaultValue: &dhis2CoreDefaults.googleAuthClientId, Sensitive: true},
 		"GOOGLE_AUTH_PRIVATE_KEY":         {Priority: 0, DisplayName: "Google auth private key", DefaultValue: &dhis2CoreDefaults.googleAuthPrivateKey, Sensitive: true},
 		"GOOGLE_AUTH_PRIVATE_KEY_ID":      {Priority: 0, DisplayName: "Google auth private key id", DefaultValue: &dhis2CoreDefaults.googleAuthPrivateKeyId, Sensitive: true},
@@ -227,6 +228,7 @@ var dhis2CoreDefaults = struct {
 	minIOChartVersion            string
 	minIOStorageSize             string
 	storageType                  string
+	filesystemVolumeSize         string
 	s3Bucket                     string
 	s3Region                     string
 	s3Identity                   string
@@ -257,6 +259,7 @@ var dhis2CoreDefaults = struct {
 	minIOChartVersion:            "14.7.5",
 	minIOStorageSize:             "8Gi",
 	storageType:                  minIOStorage,
+	filesystemVolumeSize:         "8Gi",
 	s3Bucket:                     "dhis2",
 	s3Region:                     "eu-west-1",
 	s3Identity:                   "-",
@@ -427,7 +430,7 @@ const (
 )
 
 // storage validates the value is one of our storage types.
-var storage = OneOf(minIOStorage, s3Storage)
+var storage = OneOf(minIOStorage, s3Storage, filesystemStorage)
 
 // OneOf creates a function returning an error when called with a value that is not any of the given
 // validValues.

@@ -42,6 +42,11 @@ releases:
           im-creation-timestamp: "{{ requiredEnv "INSTANCE_CREATION_TIMESTAMP" }}"
           im-ttl: "{{ requiredEnv "INSTANCE_TTL" }}"
 
+      {{- if eq (requiredEnv "STORAGE_TYPE") "filesystem" }}
+      - storage:
+          volumeSize: {{ requiredEnv "FILESYSTEM_VOLUME_SIZE" }}
+      {{- end }}
+
       {{- if eq (requiredEnv "STORAGE_TYPE") "minio" }}
       - minIOConfig: |
           filestore.provider = s3
