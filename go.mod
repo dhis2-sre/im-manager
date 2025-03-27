@@ -1,6 +1,7 @@
 module github.com/dhis2-sre/im-manager
 
 go 1.23.4
+toolchain go1.24.1
 
 require (
 	filippo.io/age v1.2.1
@@ -24,7 +25,7 @@ require (
 	github.com/habx/pg-commands v0.6.1
 	github.com/lestrrat-go/jwx/v2 v2.1.4
 	github.com/lib/pq v1.10.9
-	github.com/minio/minio-go/v7 v7.0.88
+	github.com/minio/minio-go/v7 v7.0.89
 	github.com/orandin/slog-gorm v1.4.0
 	github.com/orlangure/gnomock v0.31.0
 	github.com/rabbitmq/amqp091-go v1.10.0
@@ -167,7 +168,7 @@ require (
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
-	github.com/klauspost/compress v1.17.11 // indirect
+	github.com/klauspost/compress v1.18.0 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.10 // indirect
 	github.com/leodido/go-urn v1.4.0 // indirect
 	github.com/lestrrat-go/blackmagic v1.0.2 // indirect
