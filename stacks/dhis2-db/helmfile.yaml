@@ -21,6 +21,9 @@ releases:
           im-ttl: "{{ requiredEnv "INSTANCE_TTL" }}"
 
       - primary:
+          extendedConfiguration: |-
+            dhis2.environment = 'instance-manager'
+
           extraEnvVars:
             - name: HOSTNAME
               value: {{ requiredEnv "HOSTNAME" }}
