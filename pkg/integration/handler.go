@@ -165,7 +165,7 @@ func (h Handler) Integrations(c *gin.Context) {
 	}
 
 	if request.Key == "STORAGE_TYPE" {
-		storageTypes := []string{"minio", "s3"}
+		storageTypes := []string{"minio", "s3", "filesystem"}
 
 		c.JSON(http.StatusOK, storageTypes)
 		return
