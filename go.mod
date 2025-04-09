@@ -12,12 +12,12 @@ require (
 	github.com/dhis2-sre/rabbitmq-client v0.5.0
 	github.com/docker/go-connections v0.5.0
 	github.com/dominikbraun/graph v0.23.0
-	github.com/gin-contrib/cors v1.7.4
+	github.com/gin-contrib/cors v1.7.5
 	github.com/gin-contrib/sse v1.0.0
 	github.com/gin-gonic/gin v1.10.0
 	github.com/go-mail/mail v2.3.1+incompatible
 	github.com/go-openapi/runtime v0.28.0
-	github.com/go-playground/validator/v10 v10.25.0
+	github.com/go-playground/validator/v10 v10.26.0
 	github.com/go-redis/redis v6.15.9+incompatible
 	github.com/google/uuid v1.6.0
 	github.com/gosimple/slug v1.15.0
@@ -87,8 +87,8 @@ require (
 	github.com/aws/smithy-go v1.22.2 // indirect
 	github.com/blang/semver v3.5.1+incompatible // indirect
 	github.com/blang/semver/v4 v4.0.0 // indirect
-	github.com/bytedance/sonic v1.12.10 // indirect
-	github.com/bytedance/sonic/loader v0.2.3 // indirect
+	github.com/bytedance/sonic v1.13.2 // indirect
+	github.com/bytedance/sonic/loader v0.2.4 // indirect
 	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
 	github.com/cloudflare/circl v1.6.0 // indirect
 	github.com/cloudwego/base64x v0.1.5 // indirect
@@ -236,7 +236,7 @@ require (
 	go.opentelemetry.io/otel/trace v1.35.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.27.0 // indirect
-	golang.org/x/arch v0.14.0 // indirect
+	golang.org/x/arch v0.15.0 // indirect
 	golang.org/x/mod v0.23.0 // indirect
 	golang.org/x/net v0.38.0 // indirect
 	golang.org/x/oauth2 v0.26.0 // indirect
@@ -248,7 +248,7 @@ require (
 	google.golang.org/genproto/googleapis/api v0.0.0-20250204164813-702378808489 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250204164813-702378808489 // indirect
 	google.golang.org/grpc v1.70.0 // indirect
-	google.golang.org/protobuf v1.36.5 // indirect
+	google.golang.org/protobuf v1.36.6 // indirect
 	gopkg.in/alexcesaro/quotedprintable.v3 v3.0.0-20150716171945-2caba252f4dc // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.12.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
