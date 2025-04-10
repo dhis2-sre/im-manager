@@ -780,19 +780,54 @@ func (s Service) Reset(ctx context.Context, token string, instance *model.Deploy
 func (s Service) FilestoreBackup(ctx context.Context, instance *model.DeploymentInstance, name string, database *model.Database) error {
 	s.logger.InfoContext(ctx, "save again", "database", database)
 
-	endpoint := fmt.Sprintf("%s-minio.%s.svc:9000", instance.Name, instance.GroupName)
-	minioClient, err := newMinioClient("dhisdhis", "dhisdhis", endpoint, false)
-	if err != nil {
-		return err
+	instanceParameter, ok := instance.Parameters["STORAGE_TYPE"]
+	if !ok {
+		return fmt.Errorf("instance parameter %q is not set", "STORAGE_TYPE")
 	}
 
-	source := NewMinioBackupSource(s.logger, minioClient, "dhis2")
+	value := instanceParameter.Value
+	s.logger.InfoContext(ctx, "storage", "type", value)
+
+	var source BackupSource
+	if value == stack.FilesystemStorage {
+		var clusterConfiguration *model.ClusterConfiguration
+		if instance.Group != nil {
+			clusterConfiguration = instance.Group.ClusterConfiguration
+		}
+		kubernetesService, err := NewKubernetesService(clusterConfiguration)
+		if err != nil {
+			return err
+		}
+
+		restConfig, err := newConfig(clusterConfiguration)
+		if err != nil {
+			return err
+		}
+
+		pod, err := kubernetesService.getPod(instance.ID, "dhis2")
+		if err != nil {
+			return err
+		}
+
+		source = NewPodBackupSource(s.logger, kubernetesService.client, restConfig, instance.GroupName, pod.Name, "core", "/opt/dhis2/files")
+	} else if value == stack.MinIOStorage {
+		endpoint := fmt.Sprintf("%s-minio.%s.svc:9000", instance.Name, instance.GroupName)
+		minioClient, err := newMinioClient("dhisdhis", "dhisdhis", endpoint, false)
+		if err != nil {
+			return err
+		}
+
+		source = NewMinioBackupSource(s.logger, minioClient, "dhis2")
+	} else {
+		return fmt.Errorf("unsuppoted storage type for backup: %s", value)
+	}
+
 	backupService := NewBackupService(s.logger, source, s.s3Client)
 
 	name = strings.TrimSuffix(name, ".pgc")
 	name = strings.TrimSuffix(name, ".tar.gz")
 	key := fmt.Sprintf("%s/%s-%s.tar.gz", instance.GroupName, name, "fs")
-	err = backupService.PerformBackup(ctx, s.s3Bucket, key)
+	err := backupService.PerformBackup(ctx, s.s3Bucket, key)
 	if err != nil {
 		return err
 	}

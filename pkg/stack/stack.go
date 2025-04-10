@@ -258,7 +258,7 @@ var dhis2CoreDefaults = struct {
 	chartVersion:                 "0.20.1",
 	minIOChartVersion:            "14.7.5",
 	minIOStorageSize:             "8Gi",
-	storageType:                  minIOStorage,
+	storageType:                  MinIOStorage,
 	filesystemVolumeSize:         "8Gi",
 	s3Bucket:                     "dhis2",
 	s3Region:                     "eu-west-1",
@@ -424,13 +424,13 @@ var postgresHostnameProvider = model.ParameterProviderFunc(func(instance model.D
 var imagePullPolicy = OneOf(string(k8s.PullAlways), string(k8s.PullNever), string(k8s.PullIfNotPresent))
 
 const (
-	filesystemStorage = "filesystem"
-	minIOStorage      = "minio"
+	FilesystemStorage = "filesystem"
+	MinIOStorage      = "minio"
 	s3Storage         = "s3"
 )
 
 // storage validates the value is one of our storage types.
-var storage = OneOf(minIOStorage, s3Storage, filesystemStorage)
+var storage = OneOf(MinIOStorage, s3Storage, FilesystemStorage)
 
 // OneOf creates a function returning an error when called with a value that is not any of the given
 // validValues.
