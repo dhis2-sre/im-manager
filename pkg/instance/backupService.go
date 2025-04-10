@@ -137,11 +137,13 @@ func (s *BackupService) processSingleObject(ctx context.Context, tw *tar.Writer,
 		ModTime: object.LastModified,
 	}
 
-	if err := tw.WriteHeader(header); err != nil {
+	err = tw.WriteHeader(header)
+	if err != nil {
 		return fmt.Errorf("write tar header for %s: %v", object.Path, err)
 	}
 
-	if _, err := io.Copy(tw, reader); err != nil {
+	_, err = io.Copy(tw, reader)
+	if err != nil {
 		return fmt.Errorf("copy object %s to tar: %v", object.Path, err)
 	}
 

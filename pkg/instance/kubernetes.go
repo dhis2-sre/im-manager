@@ -96,7 +96,7 @@ func runCommand(cmd *exec.Cmd) ([]byte, []byte, error) {
 	return stdout.Bytes(), stderr.Bytes(), err
 }
 
-func newClient(configuration *model.ClusterConfiguration) (*kubernetes.Clientset, error) {
+func newConfig(configuration *model.ClusterConfiguration) (*rest.Config, error) {
 	var restClientConfig *rest.Config
 	if configuration != nil && len(configuration.KubernetesConfiguration) > 0 {
 		kubeCfg, err := decryptYaml(configuration.KubernetesConfiguration)
@@ -120,8 +120,16 @@ func newClient(configuration *model.ClusterConfiguration) (*kubernetes.Clientset
 			return nil, err
 		}
 	}
+	return restClientConfig, nil
+}
 
-	client, err := kubernetes.NewForConfig(restClientConfig)
+func newClient(configuration *model.ClusterConfiguration) (*kubernetes.Clientset, error) {
+	config, err := newConfig(configuration)
+	if err != nil {
+		return nil, err
+	}
+
+	client, err := kubernetes.NewForConfig(config)
 	if err != nil {
 		return nil, err
 	}
