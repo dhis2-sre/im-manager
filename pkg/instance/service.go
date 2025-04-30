@@ -778,7 +778,7 @@ func (s Service) Reset(ctx context.Context, token string, instance *model.Deploy
 }
 
 func (s Service) FilestoreBackup(ctx context.Context, instance *model.DeploymentInstance, name string, database *model.Database) error {
-	s.logger.InfoContext(ctx, "save again", "database", database)
+	ctx = context.WithoutCancel(ctx)
 
 	instanceParameter, ok := instance.Parameters["STORAGE_TYPE"]
 	if !ok {
