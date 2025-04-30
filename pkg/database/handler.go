@@ -217,6 +217,8 @@ func (h Handler) SaveAs(c *gin.Context) {
 		return
 	}
 
+	h.logger.InfoContext(ctx, "savedDatabase", "database", savedDatabase)
+
 	// Backup file store
 	deployment, err := h.instanceService.FindDeploymentById(ctx, instance.DeploymentID)
 	if err != nil {
