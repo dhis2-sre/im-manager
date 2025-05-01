@@ -100,6 +100,65 @@ releases:
           requests:
             cpu: {{ requiredEnv "RESOURCES_REQUESTS_CPU" }}
             memory: {{ requiredEnv "RESOURCES_REQUESTS_MEMORY" }}
+      {{- if eq (requiredEnv "STORAGE_TYPE") "filesystem" }}
+      - initContainers:
+          - name: "{{ requiredEnv "INSTANCE_NAME" }}-init-fs"
+            image: alpine:3.18
+            env:
+              - name: HOSTNAME
+                value: {{ requiredEnv "HOSTNAME" }}
+              - name: DATABASE_ID
+                value: "{{ requiredEnv "DATABASE_ID" }}"
+              - name: IM_ACCESS_TOKEN
+                value: {{ requiredEnv "IM_ACCESS_TOKEN" }}
+            command:
+              - "/bin/sh"
+              - "-c"
+              - |
+                # Install required tools
+                apk add --no-cache curl jq tar gzip
+
+                # Create necessary directories
+                mkdir -p /dhis-home/files
+
+                # Check if already seeded
+                if [ -f /dhis-home/files/seeded.txt ]; then
+                  echo "Already seeded, skipping..."
+                else
+                  DATABASE_URL="$HOSTNAME/databases/$DATABASE_ID"
+                  echo "DATABASE_URL: $DATABASE_URL"
+                  FILESTORE_ID=$(curl --connect-timeout 10 --retry 5 --retry-delay 1 --fail -L $DATABASE_URL --cookie "accessToken=$IM_ACCESS_TOKEN" | jq -r '.filestoreId')
+
+                  if [[ "$FILESTORE_ID" == "0" ]]; then
+                    echo "No filestore id associated with database"
+                  else
+                    echo "Filestore ID: $FILESTORE_ID"
+                    echo "Seeding filesystem..."
+
+                    # Create temp file and ensure cleanup
+                    tmp_file=$(mktemp)
+                    trap 'rm -f "$tmp_file"' EXIT
+
+                    FILESTORE_DOWNLOAD_URL="$HOSTNAME/databases/$FILESTORE_ID/download"
+                    curl --connect-timeout 10 --retry 5 --retry-delay 1 --fail -L "$FILESTORE_DOWNLOAD_URL" --cookie "accessToken=$IM_ACCESS_TOKEN" > "$tmp_file"
+
+                    # Extract to dhis-home directory
+                    gunzip -c "$tmp_file" | tar vxf - -C /dhis-home/files
+                    chmod -R u+rwx,go+rx /dhis-home
+
+                    # Mark as seeded
+                    echo "Seeded from $FILESTORE_DOWNLOAD_URL" > /dhis-home/files/seeded.txt
+
+                    # Clean up
+                    rm -f "$tmp_file"
+
+                    echo "Done seeding filesystem!"
+                  fi
+                fi
+            volumeMounts:
+              - name: dhis-home
+                mountPath: /dhis-home
+      {{- end }}
 
   {{- if eq (requiredEnv "STORAGE_TYPE") "minio" }}
   - name: "{{ requiredEnv "INSTANCE_NAME" }}-minio"
