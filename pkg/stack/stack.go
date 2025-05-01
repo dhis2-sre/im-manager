@@ -205,6 +205,7 @@ var DHIS2Core = model.Stack{
 		"MINIO_STORAGE_SIZE":              {Priority: 22, DisplayName: "MinIO Storage Size", DefaultValue: &dhis2CoreDefaults.minIOStorageSize},
 		"ENABLE_QUERY_LOGGING":            {Priority: 23, DisplayName: "Enable Query Logging", DefaultValue: &dhis2CoreDefaults.enableQueryLogging},
 		"FILESYSTEM_VOLUME_SIZE":          {Priority: 24, DisplayName: "Filesystem volume size (only in effect if \"Storage\" is set to \"filesystem\")", DefaultValue: &dhis2CoreDefaults.filesystemVolumeSize, Sensitive: true},
+		"SAME_SITE_COOKIES":               {Priority: 24, DisplayName: "Same site cookies", DefaultValue: &dhis2CoreDefaults.sameSiteCookies, Validator: sameSiteCookies},
 		"CUSTOM_DHIS2_CONFIG":             {Priority: 25, DisplayName: "Custom DHIS2 config (applied to top of dhis.conf)", DefaultValue: &dhis2CoreDefaults.customDhis2Config, Sensitive: true},
 		"GOOGLE_AUTH_PROJECT_ID":          {Priority: 0, DisplayName: "Google auth project id", DefaultValue: &dhis2CoreDefaults.googleAuthClientId, Sensitive: true},
 		"GOOGLE_AUTH_PRIVATE_KEY":         {Priority: 0, DisplayName: "Google auth private key", DefaultValue: &dhis2CoreDefaults.googleAuthPrivateKey, Sensitive: true},
@@ -228,6 +229,7 @@ var dhis2CoreDefaults = struct {
 	minIOChartVersion            string
 	minIOStorageSize             string
 	storageType                  string
+	sameSiteCookies              string
 	filesystemVolumeSize         string
 	s3Bucket                     string
 	s3Region                     string
@@ -259,6 +261,7 @@ var dhis2CoreDefaults = struct {
 	minIOChartVersion:            "14.7.5",
 	minIOStorageSize:             "8Gi",
 	storageType:                  MinIOStorage,
+	sameSiteCookies:              lax,
 	filesystemVolumeSize:         "8Gi",
 	s3Bucket:                     "dhis2",
 	s3Region:                     "eu-west-1",
@@ -431,6 +434,15 @@ const (
 
 // storage validates the value is one of our storage types.
 var storage = OneOf(MinIOStorage, s3Storage, FilesystemStorage)
+
+const (
+	strict = "strict"
+	lax    = "lax"
+	none   = "none"
+)
+
+// sameSiteCookies validates the value is one of our same site cookie types.
+var sameSiteCookies = OneOf(strict, lax, none)
 
 // OneOf creates a function returning an error when called with a value that is not any of the given
 // validValues.
