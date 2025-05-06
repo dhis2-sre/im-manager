@@ -238,7 +238,7 @@ func (h Handler) SaveAs(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusCreated, savedDatabase)
+	c.JSON(http.StatusAccepted, savedDatabase)
 }
 
 func getInstanceByStack(stack string, instances []*model.DeploymentInstance) (*model.DeploymentInstance, error) {
