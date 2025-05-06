@@ -9,6 +9,8 @@ rules:
       - ""
     resources:
       - namespaces
+# Required for backing up files from the filesystem
+      - pods/exec
     verbs:
       - create
   - apiGroups:
