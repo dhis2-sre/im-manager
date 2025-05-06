@@ -116,10 +116,10 @@ releases:
               - "-c"
               - |
                 # Create necessary directories
-                mkdir -p /dhis-home/files
+                mkdir -p /opt/dhis2/files/userAvatar
 
                 # Check if already seeded
-                if [ -f /dhis-home/files/seeded.txt ]; then
+                if [ -f /opt/dhis2/files/seeded.txt ]; then
                   echo "Already seeded, skipping..."
                 else
                   # Install required tools
@@ -143,11 +143,11 @@ releases:
                     curl --connect-timeout 10 --retry 5 --retry-delay 1 --fail -L "$FILESTORE_DOWNLOAD_URL" --cookie "accessToken=$IM_ACCESS_TOKEN" > "$tmp_file"
 
                     # Extract to dhis-home directory
-                    gunzip -c "$tmp_file" | tar vxf - -C /dhis-home/files
+                    gunzip -c "$tmp_file" | tar vxf - -C /opt/dhis2/files
                     chmod -R u+rwx,go+rx /dhis-home
 
                     # Mark as seeded
-                    echo "Seeded from $FILESTORE_DOWNLOAD_URL" > /dhis-home/files/seeded.txt
+                    echo "Seeded from $FILESTORE_DOWNLOAD_URL" > /opt/dhis2/files/seeded.txt
 
                     # Clean up
                     rm -f "$tmp_file"
