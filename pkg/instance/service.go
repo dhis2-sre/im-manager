@@ -827,10 +827,13 @@ func (s Service) FilestoreBackup(ctx context.Context, instance *model.Deployment
 	name = strings.TrimSuffix(name, ".pgc")
 	name = strings.TrimSuffix(name, ".tar.gz")
 	key := fmt.Sprintf("%s/%s-%s.tar.gz", instance.GroupName, name, "fs")
-	err := backupService.PerformBackup(ctx, s.s3Bucket, key)
-	if err != nil {
-		return err
-	}
+
+	go func() {
+		err := backupService.PerformBackup(ctx, s.s3Bucket, key)
+		if err != nil {
+			s.logger.ErrorContext(ctx, "failed to perform backup", "error", err)
+		}
+	}()
 
 	// Record backup in database
 	s3Uri := fmt.Sprintf("s3://%s/%s", s.s3Bucket, key)
