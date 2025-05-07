@@ -89,8 +89,6 @@ func (p *PodBackupSource) List(ctx context.Context) (<-chan BackupObject, error)
 				continue // Skip files outside the target directory
 			}
 
-			p.logger.InfoContext(ctx, "File in tar", "path", path, "size", header.Size, "modTime", header.ModTime)
-
 			select {
 			case ch <- BackupObject{
 				Path:         path,
