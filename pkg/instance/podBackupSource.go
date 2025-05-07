@@ -145,8 +145,6 @@ func (p *PodBackupSource) Get(ctx context.Context, path string) (io.ReadCloser, 
 
 	catCmd := []string{"cat", filepath.Join(p.sourcePath, path)}
 
-	p.logger.InfoContext(ctx, "get file cmd", "cmd", catCmd)
-
 	return p.execInPod(ctx, catCmd)
 }
 
