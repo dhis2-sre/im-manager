@@ -819,7 +819,7 @@ func (s Service) FilestoreBackup(ctx context.Context, instance *model.Deployment
 
 		source = NewMinioBackupSource(s.logger, minioClient, "dhis2")
 	} else {
-		return fmt.Errorf("unsuppoted storage type for backup: %s", value)
+		return fmt.Errorf("unsupported storage type for backup: %s", value)
 	}
 
 	backupService := NewBackupService(s.logger, source, s.s3Client)
