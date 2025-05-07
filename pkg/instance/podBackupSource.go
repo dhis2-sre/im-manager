@@ -137,28 +137,6 @@ func (p *PodBackupSource) checkTarExists(ctx context.Context) error {
 }
 
 // Get implements BackupSource interface
-/*
-func (p *PodBackupSource) Get(ctx context.Context, path string) (io.ReadCloser, error) {
-	path = filepath.Clean(path)
-	if strings.HasPrefix(path, "../") {
-		return nil, fmt.Errorf("invalid path: %s", path)
-	}
-
-	tarCmd := []string{
-		"tar",
-		"--warning=no-timestamp",
-		"--create",
-		"--file=-",
-		"--directory", filepath.Dir(p.sourcePath),
-		path,
-	}
-
-	p.logger.InfoContext(ctx, "get tar cmd", "cmd", tarCmd)
-
-	return p.execInPod(ctx, tarCmd)
-}
-*/
-
 func (p *PodBackupSource) Get(ctx context.Context, path string) (io.ReadCloser, error) {
 	path = filepath.Clean(path)
 	if strings.HasPrefix(path, "../") {
