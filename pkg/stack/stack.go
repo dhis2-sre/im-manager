@@ -257,10 +257,10 @@ var dhis2CoreDefaults = struct {
 	googleAuthClientEmail        string
 	googleAuthClientId           string
 }{
-	chartVersion:                 "0.21.0",
+	chartVersion:                 "0.23.3",
 	minIOChartVersion:            "14.7.5",
 	minIOStorageSize:             "8Gi",
-	storageType:                  minIOStorage,
+	storageType:                  MinIOStorage,
 	sameSiteCookies:              lax,
 	filesystemVolumeSize:         "8Gi",
 	s3Bucket:                     "dhis2",
@@ -427,13 +427,13 @@ var postgresHostnameProvider = model.ParameterProviderFunc(func(instance model.D
 var imagePullPolicy = OneOf(string(k8s.PullAlways), string(k8s.PullNever), string(k8s.PullIfNotPresent))
 
 const (
-	filesystemStorage = "filesystem"
-	minIOStorage      = "minio"
+	FilesystemStorage = "filesystem"
+	MinIOStorage      = "minio"
 	s3Storage         = "s3"
 )
 
 // storage validates the value is one of our storage types.
-var storage = OneOf(minIOStorage, s3Storage, filesystemStorage)
+var storage = OneOf(MinIOStorage, s3Storage, FilesystemStorage)
 
 const (
 	strict = "strict"
