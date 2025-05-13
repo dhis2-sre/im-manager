@@ -1,6 +1,6 @@
 groups:
-  names: dev,play,qa,meta-packages,design,research,android,implement
-  hostnames: dev.im.dhis2.org,play.im.dhis2.org,qa.im.dhis2.org,meta-packages.im.dhis2.org,design.im.dhis2.org,research.im.dhis2.org,android.im.dhis2.org,implement.im.dhis2.org
+  names: dev,play,qa,meta-packages,design,research,android,implement,emis
+  hostnames: dev.im.dhis2.org,play.im.dhis2.org,qa.im.dhis2.org,meta-packages.im.dhis2.org,design.im.dhis2.org,research.im.dhis2.org,android.im.dhis2.org,implement.im.dhis2.org,emis.im.dhis2.org
 tolerations:
   - key: im-dedicated
     operator: Equal
