@@ -19,6 +19,9 @@ init:
 check:
 	pre-commit run --verbose --all-files --show-diff-on-failure
 
+change-log:
+	git-chglog -o CHANGELOG.md
+
 smoke-test:
 	IMAGE_TAG=$(tag) docker compose up -d prod
 
