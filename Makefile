@@ -16,6 +16,8 @@ init:
 	go install github.com/go-swagger/go-swagger/cmd/swagger@latest
 	swagger version
 
+	go install github.com/git-chglog/git-chglog/cmd/git-chglog@latest
+
 check:
 	pre-commit run --verbose --all-files --show-diff-on-failure
 
