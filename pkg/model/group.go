@@ -9,6 +9,7 @@ const DefaultGroupName = "whoami"
 // swagger:model
 type Group struct {
 	Name        string    `json:"name" gorm:"primarykey; unique;"`
+	Namespace   string    `json:"namespace"`
 	Description string    `json:"description" gorm:"type:text"`
 	CreatedAt   time.Time `json:"createdAt"`
 	UpdatedAt   time.Time `json:"updatedAt"`

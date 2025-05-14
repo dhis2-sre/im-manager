@@ -46,9 +46,10 @@ func (s *Service) Create(ctx context.Context, name, description, hostname string
 	return group, err
 }
 
-func (s *Service) FindOrCreate(ctx context.Context, name string, hostname string, deployable bool) (*model.Group, error) {
+func (s *Service) FindOrCreate(ctx context.Context, name, namespace, hostname string, deployable bool) (*model.Group, error) {
 	group := &model.Group{
 		Name:       name,
+		Namespace:  namespace,
 		Hostname:   hostname,
 		Deployable: deployable,
 	}
