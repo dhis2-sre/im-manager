@@ -8,11 +8,11 @@ import (
 )
 
 type groupService interface {
-	FindOrCreate(ctx context.Context, group, hostname string, deployable bool) (*model.Group, error)
+	FindOrCreate(ctx context.Context, name string, namespace string, hostname string, deployable bool) (*model.Group, error)
 	AddUser(ctx context.Context, group string, userId uint) error
 }
 
-func CreateUser(ctx context.Context, email, password string, userService *Service, groupService groupService, groupName, userType string) error {
+func CreateUser(ctx context.Context, email, password string, userService *Service, groupService groupService, groupName, namespace, userType string) error {
 	u, err := userService.FindOrCreate(ctx, email, password)
 	if err != nil {
 		return fmt.Errorf("error creating %s user: %v", userType, err)
@@ -25,7 +25,7 @@ func CreateUser(ctx context.Context, email, password string, userService *Servic
 		return fmt.Errorf("error saving %s user: %v", userType, err)
 	}
 
-	g, err := groupService.FindOrCreate(ctx, groupName, "", false)
+	g, err := groupService.FindOrCreate(ctx, groupName, namespace, "", false)
 	if err != nil {
 		return fmt.Errorf("error creating %s group: %v", groupName, err)
 	}

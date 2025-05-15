@@ -608,11 +608,16 @@ func newEventHandler(ctx context.Context, logger *slog.Logger, rabbitmqConfig ra
 }
 
 type groupService interface {
-	FindOrCreate(ctx context.Context, name string, hostname string, deployable bool) (*model.Group, error)
+	FindOrCreate(ctx context.Context, name string, namespace string, hostname string, deployable bool) (*model.Group, error)
 }
 
 func createGroups(ctx context.Context, logger *slog.Logger, groupService groupService) error {
 	groupNames, err := requireEnvAsArray("GROUP_NAMES")
+	if err != nil {
+		return err
+	}
+
+	groupNamespaces, err := requireEnvAsArray("GROUP_NAMESPACES")
 	if err != nil {
 		return err
 	}
@@ -624,15 +629,16 @@ func createGroups(ctx context.Context, logger *slog.Logger, groupService groupSe
 		return fmt.Errorf("want arrays to be of equal size, instead got \"GROUP_NAMES\"=%v \"GROUP_HOSTNAMES\"=%v", groupNames, groupHostnames)
 	}
 
-	groups := make([]struct{ Name, Hostname string }, len(groupNames))
+	groups := make([]struct{ Name, Namespaces, Hostname string }, len(groupNames))
 	for i := 0; i < len(groupNames); i++ {
 		groups[i].Name = groupNames[i]
+		groups[i].Namespaces = groupNamespaces[i]
 		groups[i].Hostname = groupHostnames[i]
 	}
 
 	logger.InfoContext(ctx, "Creating groups...")
 	for _, g := range groups {
-		newGroup, err := groupService.FindOrCreate(ctx, g.Name, g.Hostname, true)
+		newGroup, err := groupService.FindOrCreate(ctx, g.Name, g.Namespaces, g.Hostname, true)
 		if err != nil {
 			return fmt.Errorf("error creating group: %v", err)
 		}
@@ -654,7 +660,7 @@ func createAdminUser(ctx context.Context, userService *user.Service, groupServic
 		return err
 	}
 
-	return user.CreateUser(ctx, adminEmail, adminPassword, userService, groupService, model.AdministratorGroupName, "admin")
+	return user.CreateUser(ctx, adminEmail, adminPassword, userService, groupService, model.AdministratorGroupName, "", "admin")
 }
 
 func createE2ETestUser(ctx context.Context, userService *user.Service, groupService *group.Service) error {
@@ -667,7 +673,7 @@ func createE2ETestUser(ctx context.Context, userService *user.Service, groupServ
 		return err
 	}
 
-	return user.CreateUser(ctx, testEmail, testPassword, userService, groupService, model.DefaultGroupName, "e2e test")
+	return user.CreateUser(ctx, testEmail, testPassword, userService, groupService, model.DefaultGroupName, model.DefaultGroupName, "e2e test")
 }
 
 func newGinEngine(logger *slog.Logger) (*gin.Engine, error) {
