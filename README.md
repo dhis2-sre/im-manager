@@ -34,6 +34,22 @@ make init
 make dev
 ```
 
+# Release
+
+Releasing is done by creating a new release tag.
+
+It's advised to generate the release log before doing so.
+
+Example
+
+```shell
+make change-log
+git commit CHANGELOG.md -m "chore: generate change log"
+git tag --sort=-creatordate | head --lines=1              # Get the latest tag
+git tag v0.53.0                                           # Use whichever tag you want to release
+git push
+```
+
 # Add a group
 
 * Add group in IM (either through the UI or by using the user script found [here](scripts/users/createGroup.sh)
