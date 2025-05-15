@@ -10,19 +10,25 @@ print_usage() {
   echo "  -i INSTANCES  Number of instances"
   echo "  -n NAME       Instance name prefix"
   echo "  -s START_NUM  Starting instance number (default: 1)"
+  echo "  -u USERNAME   Username for authentication (default: admin)"
+  echo "  -p PASSWORD   Password for authentication (default: district)"
   exit 1
 }
 
 # Default values
 START_NUM=1
+USERNAME="admin"
+PASSWORD="district"
 
 # Parse command line arguments
-while getopts ":g:i:n:s:h" opt; do
+while getopts ":g:i:n:s:u:p:h" opt; do
   case $opt in
     g) GROUP="$OPTARG" ;;
     i) INSTANCES="$OPTARG" ;;
     n) NAME="$OPTARG" ;;
     s) START_NUM="$OPTARG" ;;
+    u) USERNAME="$OPTARG" ;;
+    p) PASSWORD="$OPTARG" ;;
     h) print_usage ;;
     \?) echo "Invalid option -$OPTARG" >&2; print_usage ;;
     :) echo "Option -$OPTARG requires an argument" >&2; print_usage ;;
@@ -35,26 +41,12 @@ if [ -z "${GROUP:-}" ] || [ -z "${INSTANCES:-}" ] || [ -z "${NAME:-}" ]; then
   print_usage
 fi
 
-export STARTUP_PROBE_PERIOD_SECONDS=10
+if [ -z "$START_NUM" ]; then
+  START_NUM=1
+fi
 
-export DATABASE_ID=test-dbs-sierra-leone-dev-sql-gz
-export DATABASE_SIZE=20Gi
-
-export IMAGE_REPOSITORY=core-dev
-export IMAGE_PULL_POLICY=Always
-export IMAGE_TAG=latest
-export INSTANCE_TTL=432000 # 5 days
-
-export CORE_RESOURCES_REQUESTS_CPU=500m # 250m
-export CORE_RESOURCES_REQUESTS_MEMORY=2500Mi # 1500Mi
-
-
-# Main loop
-for ((i = START_NUM; i < INSTANCES + 1; i++)); do
-  # Ensure each deploy get a fresh access token
-  rm -f .access_token_cache
-  source ./auth.sh
+for ((i = $START_NUM; i < INSTANCES + 1; i++)); do
   # zero pad the number
   zi=$(printf "%02d" $i)
-  ./deploy-dhis2.sh "$GROUP" "$NAME-$zi"
+  http --auth "$USERNAME:$PASSWORD" patch "https://$GROUP.im.dhis2.org/$NAME-$zi/api/icons"
 done
