@@ -196,3 +196,10 @@ profiles:
           name: im-group-emis
           namespace: emis
           <<: [ *im-group-chart-config, *im-group-prod-service-account-config ]
+
+      - op: add
+        path: /deploy/helm/releases/-
+        value:
+          name: im-group-prod
+          namespace: prod
+          <<: [ *im-group-chart-config, *im-group-prod-service-account-config ]
