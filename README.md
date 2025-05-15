@@ -44,9 +44,9 @@ Example
 
 ```shell
 make change-log
-git commit CHANGELOG.md -m "chore: generate release log"
-git tag --sort=-creatordate | head --lines=1 # Get the latest tag
-git tag v0.53.0 # Use whichever tag you want to release
+git commit CHANGELOG.md -m "chore: generate change log"
+git tag --sort=-creatordate | head --lines=1              # Get the latest tag
+git tag v0.53.0                                           # Use whichever tag you want to release
 git push
 ```
 
