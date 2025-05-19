@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// SetupS3 creates an S3 container (using localstack) with all the buckets and files in given path.
+// SetupS3 creates an S3 container (using localstack) with all the buckets and files in a given path.
 func SetupS3(t *testing.T, path string) *S3Client {
 	t.Helper()
 

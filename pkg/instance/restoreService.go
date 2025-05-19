@@ -84,7 +84,7 @@ func (s *RestoreService) PerformRestore(ctx context.Context, s3Bucket, s3Key, mi
 
 	g, ctx := errgroup.WithContext(ctx)
 
-	// Start header reader goroutine
+	// Start the header reader goroutine
 	g.Go(func() error {
 		defer close(objectCh)
 		for {
@@ -190,7 +190,7 @@ func (s *RestoreService) restoreObject(ctx context.Context, minioBucket string, 
 		}
 	}()
 
-	// Start copy goroutine
+	// Start the copy goroutine
 	go func() {
 		defer wg.Done()
 		written, err := io.CopyN(pw, reader, header.Size)

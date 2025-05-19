@@ -34,6 +34,14 @@ type BackupObject struct {
 	Err          error
 }
 
+func (s *BackupService) logBackupStats(stats *backupStats) {
+	duration := time.Since(stats.StartTime)
+	s.logger.Info("Backup completed",
+		"objects_processed", stats.ObjectsProcessed,
+		"bytes_processed", stats.BytesProcessed,
+		"duration", duration)
+}
+
 const (
 	bufferSize = 5 * 1024 * 1024 // 5 MB
 )
@@ -58,15 +66,15 @@ type S3BackupClient interface {
 	AbortMultipartUpload(ctx context.Context, params *s3.AbortMultipartUploadInput, optFns ...func(*s3.Options)) (*s3.AbortMultipartUploadOutput, error)
 }
 
-// BackupStats tracks backup operation statistics
-type BackupStats struct {
+// backupStats tracks backup operation statistics
+type backupStats struct {
 	ObjectsProcessed int64
 	BytesProcessed   int64
 	StartTime        time.Time
 	mu               sync.Mutex
 }
 
-func (bs *BackupStats) increment(size int64) {
+func (bs *backupStats) increment(size int64) {
 	bs.mu.Lock()
 	defer bs.mu.Unlock()
 	bs.ObjectsProcessed++
@@ -76,11 +84,16 @@ func (bs *BackupStats) increment(size int64) {
 // PerformBackup executes the backup operation
 func (s *BackupService) PerformBackup(ctx context.Context, s3Bucket, key string) error {
 	g, ctx := errgroup.WithContext(ctx)
-	stats := &BackupStats{StartTime: time.Now()}
+	stats := &backupStats{StartTime: time.Now()}
 	pr, pw := io.Pipe()
 
 	g.Go(func() error {
-		defer pw.Close()
+		defer func(pw *io.PipeWriter) {
+			err := pw.Close()
+			if err != nil {
+				s.logger.ErrorContext(ctx, "Failed to close pipe writer", "error", err)
+			}
+		}(pw)
 		return s.createTarGzStream(ctx, pw, stats)
 	})
 
@@ -96,12 +109,22 @@ func (s *BackupService) PerformBackup(ctx context.Context, s3Bucket, key string)
 	return nil
 }
 
-func (s *BackupService) createTarGzStream(ctx context.Context, w io.Writer, stats *BackupStats) error {
+func (s *BackupService) createTarGzStream(ctx context.Context, w io.Writer, stats *backupStats) error {
 	gw := gzip.NewWriter(w)
-	defer gw.Close()
+	defer func(gw *gzip.Writer) {
+		err := gw.Close()
+		if err != nil {
+			s.logger.ErrorContext(ctx, "Failed to close gzip writer", "error", err)
+		}
+	}(gw)
 
 	tw := tar.NewWriter(gw)
-	defer tw.Close()
+	defer func(tw *tar.Writer) {
+		err := tw.Close()
+		if err != nil {
+			s.logger.ErrorContext(ctx, "Failed to close tar writer", "error", err)
+		}
+	}(tw)
 
 	objectCh, err := s.source.List(ctx)
 	if err != nil {
@@ -121,14 +144,19 @@ func (s *BackupService) createTarGzStream(ctx context.Context, w io.Writer, stat
 	return nil
 }
 
-func (s *BackupService) processSingleObject(ctx context.Context, tw *tar.Writer, object BackupObject, stats *BackupStats) error {
+func (s *BackupService) processSingleObject(ctx context.Context, tw *tar.Writer, object BackupObject, stats *backupStats) error {
 	s.logger.InfoContext(ctx, "Processing object", "path", object.Path)
 
 	reader, err := s.source.Get(ctx, object.Path)
 	if err != nil {
 		return fmt.Errorf("failed to get object %s: %v", object.Path, err)
 	}
-	defer reader.Close()
+	defer func(reader io.ReadCloser) {
+		err := reader.Close()
+		if err != nil {
+			s.logger.ErrorContext(ctx, "Failed to close reader", "error", err)
+		}
+	}(reader)
 
 	header := &tar.Header{
 		Name:    object.Path,
@@ -137,11 +165,13 @@ func (s *BackupService) processSingleObject(ctx context.Context, tw *tar.Writer,
 		ModTime: object.LastModified,
 	}
 
-	if err := tw.WriteHeader(header); err != nil {
+	err = tw.WriteHeader(header)
+	if err != nil {
 		return fmt.Errorf("write tar header for %s: %v", object.Path, err)
 	}
 
-	if _, err := io.Copy(tw, reader); err != nil {
+	_, err = io.Copy(tw, reader)
+	if err != nil {
 		return fmt.Errorf("copy object %s to tar: %v", object.Path, err)
 	}
 
@@ -237,12 +267,4 @@ func (s *BackupService) abortMultipartUpload(ctx context.Context, bucket, key, u
 		UploadId: &uploadID,
 	})
 	return err
-}
-
-func (s *BackupService) logBackupStats(stats *BackupStats) {
-	duration := time.Since(stats.StartTime)
-	s.logger.Info("Backup completed",
-		"objects_processed", stats.ObjectsProcessed,
-		"bytes_processed", stats.BytesProcessed,
-		"duration", duration)
 }
