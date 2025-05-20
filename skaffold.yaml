@@ -119,6 +119,16 @@ profiles:
       - op: add
         path: /deploy/helm/releases/-
         value:
+          name: im-group-dev-dev
+          namespace: dev
+          <<: *im-group-chart-config
+          setValueTemplates:
+            serviceAccount:
+              name: im-manager-{{ .ENVIRONMENT }}
+              namespace: instance-manager-{{ .CLASSIFICATION }}
+      - op: add
+        path: /deploy/helm/releases/-
+        value:
           name: im-group-whoami-{{ .ENVIRONMENT }}
           namespace: whoami
           <<: *im-group-chart-config
