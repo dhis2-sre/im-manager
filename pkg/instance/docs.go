@@ -110,3 +110,28 @@ type _ struct {
 	// in: body
 	_ model.DeploymentInstance
 }
+
+// swagger:parameters updateInstance
+type _ struct {
+	// in: path
+	// required: true
+	ID uint `json:"id"`
+	// in: path
+	// required: true
+	InstanceID uint `json:"instanceId"`
+	// Update instance request body parameter
+	// in: body
+	// required: true
+	Payload SaveInstanceRequest
+}
+
+// swagger:parameters updateDeployment
+type _ struct {
+	// in: path
+	// required: true
+	ID uint `json:"id"`
+	// Update deployment request body parameter
+	// in: body
+	// required: true
+	Payload UpdateDeploymentRequest
+}

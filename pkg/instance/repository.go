@@ -63,7 +63,7 @@ func (r repository) SaveDeployment(ctx context.Context, deployment *model.Deploy
 	// cancellation can lead to rollbacks which we should decide individually.
 	ctx = context.WithoutCancel(ctx)
 
-	err := r.db.WithContext(ctx).Create(&deployment).Error
+	err := r.db.WithContext(ctx).Save(&deployment).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrDuplicatedKey) {
 			return errdef.NewDuplicated("a deployment named %q already exists", deployment.Name)
