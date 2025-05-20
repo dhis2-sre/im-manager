@@ -30,9 +30,10 @@ func (s *Service) FindWithDetails(ctx context.Context, name string) (*model.Grou
 	return s.groupRepository.findWithDetails(ctx, name)
 }
 
-func (s *Service) Create(ctx context.Context, name, description, hostname string, deployable bool) (*model.Group, error) {
+func (s *Service) Create(ctx context.Context, name, namespace, description, hostname string, deployable bool) (*model.Group, error) {
 	group := &model.Group{
 		Name:        name,
+		Namespace:   namespace,
 		Description: description,
 		Hostname:    hostname,
 		Deployable:  deployable,
@@ -46,9 +47,10 @@ func (s *Service) Create(ctx context.Context, name, description, hostname string
 	return group, err
 }
 
-func (s *Service) FindOrCreate(ctx context.Context, name string, hostname string, deployable bool) (*model.Group, error) {
+func (s *Service) FindOrCreate(ctx context.Context, name, namespace, hostname string, deployable bool) (*model.Group, error) {
 	group := &model.Group{
 		Name:       name,
+		Namespace:  namespace,
 		Hostname:   hostname,
 		Deployable: deployable,
 	}

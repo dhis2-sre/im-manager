@@ -287,6 +287,7 @@ func resolveConsumedParameters(deployment *model.Deployment, instance *model.Dep
 
 			// consume from provider
 			if provider, ok := requiredStack.ParameterProviders[name]; ok {
+				sourceInstance.Group = instance.Group
 				value, err := provider.Provide(*sourceInstance)
 				if err != nil {
 					return fmt.Errorf("failed to provide value for instance %q parameter %q: %v", instance.Name, name, err)
