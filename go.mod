@@ -14,7 +14,7 @@ require (
 	github.com/dominikbraun/graph v0.23.0
 	github.com/gin-contrib/cors v1.7.5
 	github.com/gin-contrib/sse v1.1.0
-	github.com/gin-gonic/gin v1.10.0
+	github.com/gin-gonic/gin v1.10.1
 	github.com/go-mail/mail v2.3.1+incompatible
 	github.com/go-openapi/runtime v0.28.0
 	github.com/go-playground/validator/v10 v10.26.0
