@@ -47,6 +47,7 @@ func TestInstanceHandler(t *testing.T) {
 
 	group := &model.Group{
 		Name:       "group-name",
+		Namespace:  "group-name",
 		Hostname:   "some",
 		Deployable: true,
 		ClusterConfiguration: &model.ClusterConfiguration{
