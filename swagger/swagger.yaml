@@ -281,6 +281,9 @@ definitions:
             name:
                 type: string
                 x-go-name: Name
+            namespace:
+                type: string
+                x-go-name: Namespace
             updatedAt:
                 format: date-time
                 type: string
