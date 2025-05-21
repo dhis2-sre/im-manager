@@ -81,6 +81,7 @@ func (r repository) FindDeploymentById(ctx context.Context, id uint) (*model.Dep
 		Joins("Group").
 		Joins("User").
 		Preload("Instances.GormParameters").
+		Preload("Instances.Group").
 		First(&deployment, id).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
