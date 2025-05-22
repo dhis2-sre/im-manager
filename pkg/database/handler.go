@@ -121,14 +121,16 @@ func (h Handler) Upload(c *gin.Context) {
 		}
 	}(f)
 
-	header := c.GetHeader("Content-Length")
-	contentLength, err := strconv.Atoi(header)
-	if err != nil {
-		_ = c.Error(err)
-		return
-	}
+	/*
+		header := c.GetHeader("Content-Length")
+		contentLength, err := strconv.Atoi(header)
+		if err != nil {
+			_ = c.Error(err)
+			return
+		}
+	*/
 
-	save, err := h.databaseService.Upload(ctx, d, group, f, int64(contentLength))
+	save, err := h.databaseService.StreamUpload(ctx, d, group, f, file.Size)
 	if err != nil {
 		_ = c.Error(err)
 		return

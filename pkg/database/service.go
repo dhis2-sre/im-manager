@@ -3,6 +3,7 @@ package database
 import (
 	"compress/gzip"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -11,6 +12,9 @@ import (
 	"path"
 	"strconv"
 	"strings"
+
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 
 	"golang.org/x/exp/maps"
 
@@ -55,6 +59,10 @@ type S3Client interface {
 	Upload(ctx context.Context, bucket string, key string, body storage.ReadAtSeeker, size int64) error
 	Delete(bucket string, key string) error
 	Download(ctx context.Context, bucket string, key string, dst io.Writer, cb func(contentLength int64)) error
+	InitiateMultipartUpload(ctx context.Context, bucket, key string) (string, error)
+	UploadPart(ctx context.Context, bucket, key, uploadID string, partNumber int, data []byte) (*types.CompletedPart, error)
+	CompleteMultipartUpload(ctx context.Context, bucket, key, uploadID string, completedParts []types.CompletedPart) error
+	AbortMultipartUpload(ctx context.Context, bucket, key, uploadID string) error
 }
 
 func (s service) FindByIdentifier(ctx context.Context, identifier string) (*model.Database, error) {
@@ -553,7 +561,7 @@ func (s service) SaveAs(ctx context.Context, database *model.Database, instance 
 		dump.SetupFormat(format)
 
 		// TODO: Remove... Or at least make configurable
-		dump.EnableVerbose()
+		//dump.EnableVerbose()
 
 		dumpExec := dump.Exec(pg.ExecOptions{StreamPrint: true, StreamDestination: os.Stdout})
 		if dumpExec.Error != nil {
@@ -682,4 +690,78 @@ func newPgDumpConfig(instance *model.DeploymentInstance, stack *model.Stack) (*p
 	dump.IgnoreTableData = []string{"analytics*", "_*"}
 
 	return dump, nil
+}
+
+// StreamUpload uploads a database file by streaming it directly to S3
+func (s service) StreamUpload(ctx context.Context, database *model.Database, group *model.Group, reader io.Reader, fileSize int64) (*model.Database, error) {
+	key := fmt.Sprintf("%s/%s", group.Name, database.Name)
+	bucket := s.s3Bucket
+
+	uploadID, err := s.s3Client.InitiateMultipartUpload(ctx, bucket, key)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize multipart upload: %v", err)
+	}
+
+	var uploadErr error
+	defer s.cleanupFailedUpload(ctx, bucket, key, uploadID, &uploadErr)
+
+	// Use a buffer size of 5MB (minimum for S3 multipart uploads)
+	partSize := int64(5 * 1024 * 1024)
+	buffer := make([]byte, partSize)
+	var completedParts []types.CompletedPart
+	partNumber := 1
+
+	for {
+		bytesRead, err := io.ReadFull(reader, buffer)
+		if err != nil {
+			if err == io.EOF || errors.Is(err, io.ErrUnexpectedEOF) {
+				// End of file or partial read at end of file
+				if bytesRead == 0 {
+					break // No more data to read
+				}
+			} else {
+				uploadErr = fmt.Errorf("error reading file: %v", err)
+				return nil, uploadErr
+			}
+		}
+
+		partOutput, err := s.s3Client.UploadPart(ctx, bucket, key, uploadID, partNumber, buffer)
+		if err != nil {
+			uploadErr = fmt.Errorf("failed to upload part %d: %v", partNumber, err)
+			return nil, uploadErr
+		}
+
+		completedParts = append(completedParts, types.CompletedPart{
+			ETag:       partOutput.ETag,
+			PartNumber: aws.Int32(int32(partNumber)),
+		})
+
+		partNumber++
+
+		// If we didn't read a full buffer, we're done
+		if bytesRead < len(buffer) {
+			break
+		}
+	}
+
+	err = s.s3Client.CompleteMultipartUpload(ctx, bucket, key, uploadID, completedParts)
+	if err != nil {
+		return nil, fmt.Errorf("failed to complete multipart upload: %v", err)
+	}
+
+	database.Url = fmt.Sprintf("s3://%s/%s", s.s3Bucket, key)
+	err = s.repository.Save(ctx, database)
+	if err != nil {
+		return nil, fmt.Errorf("failed to save database record: %v", err)
+	}
+
+	return database, nil
+}
+
+func (s service) cleanupFailedUpload(ctx context.Context, bucket, key, uploadID string, err *error) {
+	if *err != nil {
+		if abortErr := s.s3Client.AbortMultipartUpload(ctx, bucket, key, uploadID); abortErr != nil {
+			s.logger.ErrorContext(ctx, "failed to abort multipart upload", "error", abortErr, "bucket", bucket, "key", key)
+		}
+	}
 }
