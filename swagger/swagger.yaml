@@ -580,16 +580,6 @@ definitions:
                 x-go-name: Password
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/user
-    uploadDatabaseRequest:
-        properties:
-            Database:
-                $ref: '#/definitions/FileHeader'
-            Group:
-                type: string
-            Name:
-                type: string
-        type: object
-        x-go-package: github.com/dhis2-sre/im-manager/pkg/database
     validateEmailRequest:
         properties:
             token:
@@ -623,16 +613,28 @@ paths:
             security:
                 - oauth2: []
             summary: List databases
-        post:
+        put:
             description: Upload database...
             operationId: uploadDatabase
             parameters:
-                - description: Update database request body parameter
+                - description: 'Required custom header: X-Upload-Name'
+                  in: header
+                  name: name
+                  required: true
+                  type: string
+                  x-go-name: Name
+                - description: 'Required custom header: X-Upload-Group'
+                  in: header
+                  name: group
+                  required: true
+                  type: string
+                  x-go-name: Group
+                - description: The file to upload
                   in: body
                   name: Body
                   required: true
                   schema:
-                    $ref: '#/definitions/uploadDatabaseRequest'
+                    $ref: '#/definitions/FileHeader'
             responses:
                 "201":
                     $ref: '#/responses/Database'

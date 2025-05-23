@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"mime/multipart"
 	"net/http"
 	"path"
 	"strconv"
@@ -45,12 +44,6 @@ type instanceService interface {
 
 type stackService interface {
 	Find(name string) (*model.Stack, error)
-}
-
-type uploadDatabaseRequest struct {
-	Database *multipart.FileHeader `form:"database"`
-	Group    string                `form:"group"`
-	Name     string                `form:"name"`
 }
 
 // Upload database
