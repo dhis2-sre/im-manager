@@ -2,7 +2,6 @@ package database
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log/slog"
 	"mime/multipart"
@@ -56,7 +55,7 @@ type uploadDatabaseRequest struct {
 
 // Upload database
 func (h Handler) Upload(c *gin.Context) {
-	// swagger:route POST /databases uploadDatabase
+	// swagger:route PUT /databases uploadDatabase
 	//
 	// Upload database
 	//
@@ -71,30 +70,39 @@ func (h Handler) Upload(c *gin.Context) {
 	//	403: Error
 	//	404: Error
 	//	415: Error
-
-	var request uploadDatabaseRequest
-	if err := handler.DataBinder(c, &request); err != nil {
-		_ = c.Error(err)
-		return
-	}
-
-	file := request.Database
-
-	groupName := request.Group
+	groupName := strings.TrimSpace(c.GetHeader("X-Upload-Group"))
 	if groupName == "" {
-		_ = c.Error(errors.New("group name not found"))
+		_ = c.Error(errdef.NewBadRequest("X-Upload-Group header is required"))
 		return
 	}
 
-	databaseName := strings.Trim(request.Name, "/")
+	name := strings.TrimSpace(c.GetHeader("X-Upload-Name"))
+	if name == "" {
+		_ = c.Error(errdef.NewBadRequest("X-Upload-Name header is required"))
+		return
+	}
 
-	d := &model.Database{
+	contentType := c.GetHeader("Content-Type")
+	if contentType == "" {
+		contentType = "application/octet-stream"
+	}
+
+	var contentLength int64
+	if cl := c.GetHeader("Content-Length"); cl != "" {
+		if parsed, err := strconv.ParseInt(cl, 10, 64); err == nil {
+			contentLength = parsed
+		}
+	}
+
+	databaseName := strings.Trim(name, "/")
+
+	d := model.Database{
 		Name:      databaseName,
 		GroupName: groupName,
 		Type:      "database",
 	}
 
-	err := h.canAccess(c, d)
+	err := h.canAccess(c, &d)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -107,30 +115,7 @@ func (h Handler) Upload(c *gin.Context) {
 		return
 	}
 
-	f, err := file.Open()
-	if err != nil {
-		_ = c.Error(err)
-		return
-	}
-
-	defer func(file multipart.File) {
-		err := file.Close()
-		if err != nil {
-			_ = c.Error(err)
-			return
-		}
-	}(f)
-
-	/*
-		header := c.GetHeader("Content-Length")
-		contentLength, err := strconv.Atoi(header)
-		if err != nil {
-			_ = c.Error(err)
-			return
-		}
-	*/
-
-	save, err := h.databaseService.StreamUpload(ctx, d, group, f, file.Size)
+	save, err := h.databaseService.StreamUpload(ctx, d, group, c.Request.Body, contentType, contentLength)
 	if err != nil {
 		_ = c.Error(err)
 		return

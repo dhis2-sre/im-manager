@@ -32,7 +32,6 @@ type AWSS3Client interface {
 	CopyObject(ctx context.Context, params *s3.CopyObjectInput, optFns ...func(*s3.Options)) (*s3.CopyObjectOutput, error)
 	DeleteObject(ctx context.Context, params *s3.DeleteObjectInput, optFns ...func(*s3.Options)) (*s3.DeleteObjectOutput, error)
 	GetObject(ctx context.Context, params *s3.GetObjectInput, optFns ...func(*s3.Options)) (*s3.GetObjectOutput, error)
-
 	CreateMultipartUpload(ctx context.Context, params *s3.CreateMultipartUploadInput, optFns ...func(*s3.Options)) (*s3.CreateMultipartUploadOutput, error)
 	UploadPart(ctx context.Context, params *s3.UploadPartInput, optFns ...func(*s3.Options)) (*s3.UploadPartOutput, error)
 	CompleteMultipartUpload(ctx context.Context, params *s3.CompleteMultipartUploadInput, optFns ...func(*s3.Options)) (*s3.CompleteMultipartUploadOutput, error)
@@ -161,10 +160,11 @@ func (r *progressReader) Seek(offset int64, whence int) (int64, error) {
 	return r.fp.Seek(offset, whence)
 }
 
-func (s S3Client) InitiateMultipartUpload(ctx context.Context, bucket, key string) (string, error) {
+func (s S3Client) InitiateMultipartUpload(ctx context.Context, bucket, key, contentType string) (string, error) {
 	input := &s3.CreateMultipartUploadInput{
-		Bucket: &bucket,
-		Key:    &key,
+		Bucket:      &bucket,
+		Key:         &key,
+		ContentType: &contentType,
 	}
 	resp, err := s.client.CreateMultipartUpload(ctx, input)
 	if err != nil {
