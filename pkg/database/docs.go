@@ -2,7 +2,6 @@ package database
 
 import (
 	"github.com/dhis2-sre/im-manager/pkg/model"
-	"mime/multipart"
 )
 
 // swagger:response
@@ -60,20 +59,20 @@ type _ struct {
 
 // swagger:parameters uploadDatabase
 type uploadDatabaseParams struct {
-	// Required custom header: X-Upload-Name
+	// Required custom header representing the name of the file
 	// in: header
 	// required: true
-	Name string `json:"name"`
+	Name string `json:"X-Upload-Name"`
 
-	// Required custom header: X-Upload-Group
+	// Required custom header representing the group name
 	// in: header
 	// required: true
-	Group string `json:"group"`
+	Group string `json:"X-Upload-Group"`
 
-	// The file to upload
+	// The file content
 	// in: body
 	// required: true
-	Body *multipart.FileHeader
+	Body []byte
 }
 
 // swagger:parameters updateDatabaseById
