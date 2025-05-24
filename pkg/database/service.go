@@ -721,11 +721,12 @@ func (s service) StreamUpload(ctx context.Context, database model.Database, grou
 
 	for {
 		n, err := io.ReadFull(body, buffer)
-		// TODO: Something is wrong here... Why ignore io.ErrUnexpectedEOF
+		// Handle fatal errors
 		if err != nil && err != io.EOF && !errors.Is(err, io.ErrUnexpectedEOF) {
 			return model.Database{}, fmt.Errorf("failed to read from stream: %w", err)
 		}
 
+		// No data read, we're done
 		if n == 0 {
 			break
 		}
@@ -744,9 +745,8 @@ func (s service) StreamUpload(ctx context.Context, database model.Database, grou
 		s.logger.InfoContext(ctx, "Uploading progress", "partNumber", partNumber, "bytes", n, "database", database.Name, "group", group.Name, "uploadId", uploadID)
 		partNumber++
 
-		// TODO: Something is wrong here. io.EOF should result in break but shouldn't io.ErrUnexpectedEOF be reported as an error
-		// If we didn't read a full buffer, we're done
-		if err == io.EOF || errors.Is(err, io.ErrUnexpectedEOF) {
+		// If we got ErrUnexpectedEOF, it means we got a partial read and we're done
+		if errors.Is(err, io.ErrUnexpectedEOF) {
 			break
 		}
 	}
