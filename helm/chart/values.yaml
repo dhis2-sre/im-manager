@@ -94,7 +94,8 @@ ingress:
     # kubernetes.io/ingress.class: nginx
     # kubernetes.io/tls-acme: "true"
     nginx.ingress.kubernetes.io/proxy-body-size: 10G
-    # Ideally we only disable request buffering and increase the body buffer size for /databases endpoint but for our load it won't matter
+    # Ideally we only disable request buffering and increase the body buffer size for /databases endpoint, and only for
+    # put requests, since that's the only endpoint where we upload large files and stream them to S3 but for our workload it won't matter
     nginx.ingress.kubernetes.io/proxy-request-buffering: "off"
     nginx.ingress.kubernetes.io/client-body-buffer-size: "10m"
 
