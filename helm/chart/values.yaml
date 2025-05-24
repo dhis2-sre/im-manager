@@ -94,33 +94,9 @@ ingress:
     # kubernetes.io/ingress.class: nginx
     # kubernetes.io/tls-acme: "true"
     nginx.ingress.kubernetes.io/proxy-body-size: 10G
+    # Ideally we only disable request buffering and increase the body buffer size for /databases endpoint but for our load it won't matter
     nginx.ingress.kubernetes.io/proxy-request-buffering: "off"
     nginx.ingress.kubernetes.io/client-body-buffer-size: "10m"
-    # TODO: Ideally we only disable this for the /databases endpoint but server-snippet are disabled
-    #nginx.ingress.kubernetes.io/proxy-request-buffering: "off"
-    #    nginx.ingress.kubernetes.io/server-snippet: |
-    #      location = /databases {
-    #        if ($request_method = PUT) {
-    #          proxy_request_buffering off;
-    #        }
-    #        proxy_pass http://upstream_balancer;
-    #      }
-#    nginx.ingress.kubernetes.io/server-snippet: |
-#      location = /databases {
-#        if ($request_method = PUT) {
-#          proxy_request_buffering off;
-#          # Increase buffer sizes for streaming
-#          proxy_buffer_size 128k;
-#          proxy_buffers 8 128k;
-#          proxy_busy_buffers_size 256k;
-#          # Optimize body handling
-#          client_body_buffer_size 128k;
-#          # Extend timeouts for large uploads
-#          proxy_read_timeout 1800s;
-#          proxy_send_timeout 1800s;
-#        }
-#        proxy_pass http://upstream_balancer;
-#      }
 
 resources: {}
   # We usually recommend not to specify default resources and to leave this as a conscious
