@@ -554,6 +554,7 @@ func newAWSS3Client(ctx context.Context) (*s3.Client, error) {
 	s3AWSClient := s3.NewFromConfig(s3Config, func(o *s3.Options) {
 		o.UsePathStyle = true
 	})
+
 	return s3AWSClient, nil
 }
 

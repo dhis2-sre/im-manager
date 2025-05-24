@@ -58,11 +58,21 @@ type _ struct {
 }
 
 // swagger:parameters uploadDatabase
-type _ struct {
-	// Update database request body parameter
+type uploadDatabaseParams struct {
+	// Required custom header representing the name of the file
+	// in: header
+	// required: true
+	Name string `json:"X-Upload-Name"`
+
+	// Required custom header representing the group name
+	// in: header
+	// required: true
+	Group string `json:"X-Upload-Group"`
+
+	// The file content
 	// in: body
 	// required: true
-	Body uploadDatabaseRequest
+	Body []byte
 }
 
 // swagger:parameters updateDatabaseById

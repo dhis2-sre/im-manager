@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -31,6 +32,10 @@ type AWSS3Client interface {
 	CopyObject(ctx context.Context, params *s3.CopyObjectInput, optFns ...func(*s3.Options)) (*s3.CopyObjectOutput, error)
 	DeleteObject(ctx context.Context, params *s3.DeleteObjectInput, optFns ...func(*s3.Options)) (*s3.DeleteObjectOutput, error)
 	GetObject(ctx context.Context, params *s3.GetObjectInput, optFns ...func(*s3.Options)) (*s3.GetObjectOutput, error)
+	CreateMultipartUpload(ctx context.Context, params *s3.CreateMultipartUploadInput, optFns ...func(*s3.Options)) (*s3.CreateMultipartUploadOutput, error)
+	UploadPart(ctx context.Context, params *s3.UploadPartInput, optFns ...func(*s3.Options)) (*s3.UploadPartOutput, error)
+	CompleteMultipartUpload(ctx context.Context, params *s3.CompleteMultipartUploadInput, optFns ...func(*s3.Options)) (*s3.CompleteMultipartUploadOutput, error)
+	AbortMultipartUpload(ctx context.Context, params *s3.AbortMultipartUploadInput, optFns ...func(*s3.Options)) (*s3.AbortMultipartUploadOutput, error)
 }
 
 type AWSS3Uploader interface {
@@ -153,4 +158,57 @@ func (r *progressReader) ReadAt(p []byte, off int64) (int, error) {
 
 func (r *progressReader) Seek(offset int64, whence int) (int64, error) {
 	return r.fp.Seek(offset, whence)
+}
+
+func (s S3Client) InitiateMultipartUpload(ctx context.Context, bucket, key, contentType string) (string, error) {
+	input := &s3.CreateMultipartUploadInput{
+		Bucket:      &bucket,
+		Key:         &key,
+		ContentType: &contentType,
+	}
+	resp, err := s.client.CreateMultipartUpload(ctx, input)
+	if err != nil {
+		return "", err
+	}
+	return *resp.UploadId, nil
+}
+
+func (s S3Client) UploadPart(ctx context.Context, bucket, key, uploadID string, partNumber int, data []byte) (*types.CompletedPart, error) {
+	resp, err := s.client.UploadPart(ctx, &s3.UploadPartInput{
+		Bucket:     &bucket,
+		Key:        &key,
+		UploadId:   &uploadID,
+		PartNumber: aws.Int32(int32(partNumber)),
+		Body:       bytes.NewReader(data),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	completedPart := &types.CompletedPart{
+		ETag:       resp.ETag,
+		PartNumber: aws.Int32(int32(partNumber)),
+	}
+	return completedPart, nil
+}
+
+func (s S3Client) CompleteMultipartUpload(ctx context.Context, bucket, key, uploadID string, completedParts []types.CompletedPart) error {
+	_, err := s.client.CompleteMultipartUpload(ctx, &s3.CompleteMultipartUploadInput{
+		Bucket:   &bucket,
+		Key:      &key,
+		UploadId: &uploadID,
+		MultipartUpload: &types.CompletedMultipartUpload{
+			Parts: completedParts,
+		},
+	})
+	return err
+}
+
+func (s S3Client) AbortMultipartUpload(ctx context.Context, bucket, key, uploadID string) error {
+	_, err := s.client.AbortMultipartUpload(ctx, &s3.AbortMultipartUploadInput{
+		Bucket:   &bucket,
+		Key:      &key,
+		UploadId: &uploadID,
+	})
+	return err
 }
