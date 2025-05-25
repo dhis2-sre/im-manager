@@ -2,6 +2,7 @@ package group
 
 import (
 	"context"
+
 	"github.com/dhis2-sre/im-manager/pkg/instance"
 
 	"github.com/dhis2-sre/im-manager/pkg/model"

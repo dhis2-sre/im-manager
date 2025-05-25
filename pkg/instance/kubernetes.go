@@ -5,14 +5,15 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"k8s.io/apimachinery/pkg/api/resource"
-	clientset "k8s.io/metrics/pkg/client/clientset/versioned"
-	metrics "k8s.io/metrics/pkg/client/clientset/versioned"
 	"os"
 	"os/exec"
 	"slices"
 	"strings"
 	"time"
+
+	"k8s.io/apimachinery/pkg/api/resource"
+	clientset "k8s.io/metrics/pkg/client/clientset/versioned"
+	metrics "k8s.io/metrics/pkg/client/clientset/versioned"
 
 	"github.com/dhis2-sre/im-manager/internal/errdef"
 
