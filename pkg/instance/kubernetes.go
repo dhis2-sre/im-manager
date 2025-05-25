@@ -5,6 +5,9 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"k8s.io/apimachinery/pkg/api/resource"
+	clientset "k8s.io/metrics/pkg/client/clientset/versioned"
+	metrics "k8s.io/metrics/pkg/client/clientset/versioned"
 	"os"
 	"os/exec"
 	"slices"
@@ -96,7 +99,35 @@ func runCommand(cmd *exec.Cmd) ([]byte, []byte, error) {
 	return stdout.Bytes(), stderr.Bytes(), err
 }
 
+func newMetricsClient(configuration *model.ClusterConfiguration) (*clientset.Clientset, error) {
+	restClientConfig, err := newRestConfig(configuration)
+	if err != nil {
+		return nil, err
+	}
+
+	metricsClient, err := metrics.NewForConfig(restClientConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	return metricsClient, nil
+}
+
 func newClient(configuration *model.ClusterConfiguration) (*kubernetes.Clientset, error) {
+	restClientConfig, err := newRestConfig(configuration)
+	if err != nil {
+		return nil, err
+	}
+
+	client, err := kubernetes.NewForConfig(restClientConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	return client, nil
+}
+
+func newRestConfig(configuration *model.ClusterConfiguration) (*rest.Config, error) {
 	var restClientConfig *rest.Config
 	if configuration != nil && len(configuration.KubernetesConfiguration) > 0 {
 		kubeCfg, err := decryptYaml(configuration.KubernetesConfiguration)
@@ -121,12 +152,7 @@ func newClient(configuration *model.ClusterConfiguration) (*kubernetes.Clientset
 		}
 	}
 
-	client, err := kubernetes.NewForConfig(restClientConfig)
-	if err != nil {
-		return nil, err
-	}
-
-	return client, nil
+	return restClientConfig, nil
 }
 
 func (ks kubernetesService) getLogs(instance *model.DeploymentInstance, typeSelector string) (io.ReadCloser, error) {
@@ -349,6 +375,79 @@ func (ks kubernetesService) scale(instance *model.DeploymentInstance, replicas u
 	}
 
 	return nil
+}
+
+type ClusterResources struct {
+	CPU, Memory string
+	Autoscaled  bool
+	Nodes       int
+}
+
+func FindResources(configuration *model.ClusterConfiguration) (ClusterResources, error) {
+	client, err := newClient(configuration)
+	if err != nil {
+		return ClusterResources{}, nil
+	}
+
+	metricsClient, err := newMetricsClient(configuration)
+	if err != nil {
+		return ClusterResources{}, nil
+	}
+
+	nodes, err := client.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		panic(err)
+	}
+
+	nodeMetrics, err := metricsClient.MetricsV1beta1().NodeMetricses().List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		panic(err)
+	}
+
+	var totalCPUUsed, totalMemUsed, totalCPUAlloc, totalMemAlloc resource.Quantity
+
+	for _, node := range nodes.Items {
+		name := node.Name
+		allocCPU := node.Status.Allocatable["cpu"]
+		allocMem := node.Status.Allocatable["memory"]
+
+		var usedCPU, usedMem resource.Quantity
+		for _, metric := range nodeMetrics.Items {
+			if metric.Name == name {
+				usedCPU = metric.Usage["cpu"]
+				usedMem = metric.Usage["memory"]
+				break
+			}
+		}
+		/*
+			cpuPercent := percent(usedCPU.MilliValue(), allocCPU.MilliValue())
+			memPercent := percent(usedMem.Value(), allocMem.Value())
+
+			fmt.Printf("- %s\n", name)
+			fmt.Printf("  CPU: %s / %s (%.1f%%)\n", usedCPU.String(), allocCPU.String(), cpuPercent)
+			fmt.Printf("  MEM: %s / %s (%.1f%%)\n", usedMem.String(), allocMem.String(), memPercent)
+		*/
+		totalCPUUsed.Add(usedCPU)
+		totalMemUsed.Add(usedMem)
+		totalCPUAlloc.Add(allocCPU)
+		totalMemAlloc.Add(allocMem)
+	}
+
+	clusterCPUPercent := percent(totalCPUUsed.MilliValue(), totalCPUAlloc.MilliValue())
+	clusterMemPercent := percent(totalMemUsed.Value(), totalMemAlloc.Value())
+
+	return ClusterResources{
+		CPU:    fmt.Sprintf("%.1f%%", clusterCPUPercent),
+		Memory: fmt.Sprintf("%.1f%%", clusterMemPercent),
+		Nodes:  len(nodes.Items),
+	}, nil
+}
+
+func percent(used, total int64) float64 {
+	if total == 0 {
+		return 0.0
+	}
+	return (float64(used) / float64(total)) * 100
 }
 
 // scaler allows updating the desired scale of a resource as well as getting the current desired and

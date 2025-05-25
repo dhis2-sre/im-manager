@@ -17,6 +17,19 @@ rules:
       - pods
     verbs:
       - list
+# For getting resources
+  - apiGroups:
+      - ""
+    resources:
+      - nodes
+    verbs:
+      - list
+  - apiGroups:
+      - metrics.k8s.io
+    resources:
+      - nodes
+    verbs:
+      - list
   - apiGroups:
       - policy
     resources:

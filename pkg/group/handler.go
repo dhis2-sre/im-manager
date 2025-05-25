@@ -305,3 +305,34 @@ func (h Handler) FindAll(c *gin.Context) {
 
 	c.JSON(http.StatusOK, groups)
 }
+
+func (h Handler) FindResources(c *gin.Context) {
+	// swagger:route GET /groups/{name}/resources findResources
+	//
+	// Find group resources
+	//
+	// Find group resources by group name
+	//
+	// responses:
+	//   200: ClusterResources
+	//   401: Error
+	//   403: Error
+	//   404: Error
+	//   415: Error
+	//
+	// security:
+	//   oauth2:
+	name := c.Param("name")
+	if name == "" {
+		_ = c.AbortWithError(http.StatusBadRequest, errors.New("group name found"))
+		return
+	}
+
+	resources, err := h.groupService.FindResources(c.Request.Context(), name)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	c.JSON(http.StatusOK, resources)
+}
