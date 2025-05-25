@@ -378,9 +378,10 @@ func (ks kubernetesService) scale(instance *model.DeploymentInstance, replicas u
 }
 
 type ClusterResources struct {
-	CPU, Memory string
-	Autoscaled  bool
-	Nodes       int
+	CPU        string
+	Memory     string
+	Autoscaled bool
+	Nodes      int
 }
 
 func FindResources(configuration *model.ClusterConfiguration) (ClusterResources, error) {
