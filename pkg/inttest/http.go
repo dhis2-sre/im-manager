@@ -108,6 +108,14 @@ func (hc *HTTPClient) Post(t *testing.T, path string, requestBody io.Reader, hea
 	return hc.Do(t, http.MethodPost, path, requestBody, http.StatusCreated, headers...)
 }
 
+// Put sends an HTTP POST request to given path. Optional headers are applied to the request. The
+// response body is read in full and returned as is. Failure to read or close the HTTP response body
+// and HTTP status other than 201 will fail the test associated with t.
+func (hc *HTTPClient) Put(t *testing.T, path string, requestBody io.Reader, headers ...func(http.Header)) []byte {
+	t.Helper()
+	return hc.Do(t, http.MethodPut, path, requestBody, http.StatusCreated, headers...)
+}
+
 // Delete sends an HTTP DELETE request to given path. Optional headers are applied to the request. The
 // response body is read in full and returned as is. Failure to read or close the HTTP response body
 // and HTTP status other than 202 will fail the test associated with t.
