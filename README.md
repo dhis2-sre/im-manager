@@ -64,4 +64,3 @@ Tracing is implemented using [OpenTelemetry](https://opentelemetry.io/) and [Jae
 Tracing is enabled by default and configured for Gin and Gorm.
 
 Forward the Jaeger UI to your local machine by running: `kubectl port-forward --namespace instance-manager-dev svc/jaeger-dev-query 16686:16686`
-
