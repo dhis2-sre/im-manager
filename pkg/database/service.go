@@ -3,6 +3,7 @@ package database
 import (
 	"compress/gzip"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -11,6 +12,11 @@ import (
 	"path"
 	"strconv"
 	"strings"
+	"sync"
+	"time"
+
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 
 	"golang.org/x/exp/maps"
 
@@ -55,6 +61,10 @@ type S3Client interface {
 	Upload(ctx context.Context, bucket string, key string, body storage.ReadAtSeeker, size int64) error
 	Delete(bucket string, key string) error
 	Download(ctx context.Context, bucket string, key string, dst io.Writer, cb func(contentLength int64)) error
+	InitiateMultipartUpload(ctx context.Context, bucket, key, contentType string) (uploadID string, err error)
+	UploadPart(ctx context.Context, bucket, key, uploadID string, partNumber int, data []byte) (*types.CompletedPart, error)
+	CompleteMultipartUpload(ctx context.Context, bucket, key, uploadID string, completedParts []types.CompletedPart) error
+	AbortMultipartUpload(ctx context.Context, bucket, key, uploadID string) error
 }
 
 func (s service) FindByIdentifier(ctx context.Context, identifier string) (*model.Database, error) {
@@ -553,7 +563,7 @@ func (s service) SaveAs(ctx context.Context, database *model.Database, instance 
 		dump.SetupFormat(format)
 
 		// TODO: Remove... Or at least make configurable
-		dump.EnableVerbose()
+		//dump.EnableVerbose()
 
 		dumpExec := dump.Exec(pg.ExecOptions{StreamPrint: true, StreamDestination: os.Stdout})
 		if dumpExec.Error != nil {
@@ -682,4 +692,101 @@ func newPgDumpConfig(instance *model.DeploymentInstance, stack *model.Stack) (*p
 	dump.IgnoreTableData = []string{"analytics*", "_*"}
 
 	return dump, nil
+}
+
+func (s service) StreamUpload(ctx context.Context, database model.Database, group *model.Group, body io.Reader, contentType string, contentLength int64) (model.Database, error) {
+	ctx = context.WithoutCancel(ctx)
+	stats := newUploadStats(contentLength)
+
+	key := fmt.Sprintf("%s/%s", group.Name, database.Name)
+	uploadID, err := s.s3Client.InitiateMultipartUpload(ctx, s.s3Bucket, key, contentType)
+	if err != nil {
+		return model.Database{}, fmt.Errorf("failed to initiate multipart upload: %w", err)
+	}
+
+	s.logger.InfoContext(ctx, "Uploading started", "database", database.Name, "group", group.Name, "uploadId", uploadID)
+
+	var parts []types.CompletedPart
+	partNumber := 1
+
+	// Use 10MB chunks
+	const chunkSize = 10 * 1024 * 1024
+	buffer := make([]byte, chunkSize)
+
+	defer func() {
+		if err != nil {
+			_ = s.s3Client.AbortMultipartUpload(ctx, s.s3Bucket, key, uploadID)
+		}
+	}()
+
+	for {
+		n, err := io.ReadFull(body, buffer)
+		// Handle fatal errors
+		if err != nil && err != io.EOF && !errors.Is(err, io.ErrUnexpectedEOF) {
+			return model.Database{}, fmt.Errorf("failed to read from stream: %w", err)
+		}
+
+		// No data read, we're done
+		if n == 0 {
+			break
+		}
+
+		partResp, err := s.s3Client.UploadPart(ctx, s.s3Bucket, key, uploadID, partNumber, buffer[:n])
+		if err != nil {
+			return model.Database{}, fmt.Errorf("failed to upload part %d: %w", partNumber, err)
+		}
+
+		parts = append(parts, types.CompletedPart{
+			ETag:       partResp.ETag,
+			PartNumber: aws.Int32(int32(partNumber)),
+		})
+
+		stats.increment(n)
+		s.logger.InfoContext(ctx, "Uploading progress", "partNumber", partNumber, "bytes", n, "database", database.Name, "group", group.Name, "uploadId", uploadID)
+		partNumber++
+
+		// If we got ErrUnexpectedEOF, it means we got a partial read and we're done
+		if errors.Is(err, io.ErrUnexpectedEOF) {
+			break
+		}
+	}
+
+	err = s.s3Client.CompleteMultipartUpload(ctx, s.s3Bucket, key, uploadID, parts)
+	if err != nil {
+		return model.Database{}, fmt.Errorf("failed to complete multipart upload: %w", err)
+	}
+
+	stats.log(s.logger)
+
+	database.Url = fmt.Sprintf("s3://%s/%s", s.s3Bucket, key)
+	err = s.repository.Save(ctx, &database)
+	if err != nil {
+		return model.Database{}, fmt.Errorf("failed to save database record: %w", err)
+	}
+
+	return database, nil
+}
+
+func newUploadStats(contentLength int64) *uploadStats {
+	return &uploadStats{StartTime: time.Now(), ContentLength: contentLength}
+}
+
+type uploadStats struct {
+	PartsProcessed int64
+	BytesProcessed int64
+	ContentLength  int64
+	StartTime      time.Time
+	mu             sync.Mutex
+}
+
+func (us *uploadStats) increment(size int) {
+	us.mu.Lock()
+	defer us.mu.Unlock()
+	us.PartsProcessed++
+	us.BytesProcessed += int64(size)
+}
+
+func (us *uploadStats) log(logger *slog.Logger) {
+	duration := time.Since(us.StartTime)
+	logger.Info("Upload completed", "partsProcessed", us.PartsProcessed, "contentLength", us.ContentLength, "bytesProcessed", us.BytesProcessed, "duration", duration)
 }
