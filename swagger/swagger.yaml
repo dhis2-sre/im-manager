@@ -259,18 +259,6 @@ definitions:
                 x-go-name: UUID
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/model
-    FileHeader:
-        properties:
-            Filename:
-                type: string
-            Header:
-                $ref: '#/definitions/MIMEHeader'
-            Size:
-                format: int64
-                type: integer
-        title: A FileHeader describes a file part of a multipart request.
-        type: object
-        x-go-package: mime/multipart
     Group:
         description: Group domain object defining a group
         properties:
@@ -383,16 +371,6 @@ definitions:
                 x-go-name: InstanceId
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/database
-    MIMEHeader:
-        additionalProperties:
-            items:
-                type: string
-            type: array
-        description: |-
-            A MIMEHeader represents a MIME-style header mapping
-            keys to sets of values.
-        type: object
-        x-go-package: net/textproto
     PublicInstance:
         properties:
             description:
@@ -596,16 +574,6 @@ definitions:
                 x-go-name: Password
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/user
-    uploadDatabaseRequest:
-        properties:
-            Database:
-                $ref: '#/definitions/FileHeader'
-            Group:
-                type: string
-            Name:
-                type: string
-        type: object
-        x-go-package: github.com/dhis2-sre/im-manager/pkg/database
     validateEmailRequest:
         properties:
             token:
@@ -639,16 +607,31 @@ paths:
             security:
                 - oauth2: []
             summary: List databases
-        post:
+        put:
             description: Upload database...
             operationId: uploadDatabase
             parameters:
-                - description: Update database request body parameter
+                - description: Required custom header representing the name of the file
+                  in: header
+                  name: X-Upload-Name
+                  required: true
+                  type: string
+                  x-go-name: Name
+                - description: Required custom header representing the group name
+                  in: header
+                  name: X-Upload-Group
+                  required: true
+                  type: string
+                  x-go-name: Group
+                - description: The file content
                   in: body
                   name: Body
                   required: true
                   schema:
-                    $ref: '#/definitions/uploadDatabaseRequest'
+                    items:
+                        format: uint8
+                        type: integer
+                    type: array
             responses:
                 "201":
                     $ref: '#/responses/Database'

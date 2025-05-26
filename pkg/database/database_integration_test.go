@@ -1,12 +1,9 @@
 package database_test
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
-	"io"
 	"log/slog"
-	"mime/multipart"
 	"net/http"
 	"os"
 	"strconv"
@@ -66,19 +63,10 @@ func TestDatabaseHandler(t *testing.T) {
 	{
 		t.Log("Upload")
 
-		var b bytes.Buffer
-		w := multipart.NewWriter(&b)
-		err := w.WriteField("group", "packages")
-		require.NoError(t, err, "failed to write form field")
-		err = w.WriteField("name", "path/name.extension")
-		require.NoError(t, err, "failed to write form field")
-		f, err := w.CreateFormFile("database", "mydb")
-		require.NoError(t, err, "failed to create form file")
-		_, err = io.WriteString(f, "file contents")
-		require.NoError(t, err, "failed to write file")
-		_ = w.Close()
-
-		body := client.Post(t, "/databases", &b, inttest.WithHeader("Content-Type", w.FormDataContentType()))
+		requestBody := strings.NewReader("file contents")
+		nameHeader := inttest.WithHeader("X-Upload-Name", "path/name.extension")
+		groupHeader := inttest.WithHeader("X-Upload-Group", "packages")
+		body := client.Put(t, "/databases", requestBody, nameHeader, groupHeader)
 
 		var database model.Database
 		err = json.Unmarshal(body, &database)
