@@ -55,7 +55,7 @@ deploy:
         createNamespace: true
         remoteChart: redis
         repo: https://charts.bitnami.com/bitnami
-        version: 18.2.2
+        version: 20.13.4
         upgradeOnChange: true
         valuesFiles:
           - helm/data/values/{{ .CLASSIFICATION }}/redis.yaml

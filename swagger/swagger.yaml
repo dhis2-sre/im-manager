@@ -38,6 +38,19 @@ definitions:
                 x-go-name: UpdatedAt
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/model
+    ClusterResources:
+        properties:
+            Autoscaled:
+                type: boolean
+            CPU:
+                type: string
+            Memory:
+                type: string
+            Nodes:
+                format: int64
+                type: integer
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
     CopyDatabaseRequest:
         properties:
             group:
@@ -254,6 +267,9 @@ definitions:
                     $ref: '#/definitions/User'
                 type: array
                 x-go-name: AdminUsers
+            autoscaled:
+                type: boolean
+                x-go-name: Autoscaled
             clusterConfiguration:
                 $ref: '#/definitions/ClusterConfiguration'
             createdAt:
@@ -1349,6 +1365,30 @@ paths:
             security:
                 - oauth2: []
             summary: Find group with details
+    /groups/{name}/resources:
+        get:
+            description: Find group resources by group name
+            operationId: findResources
+            parameters:
+                - in: path
+                  name: name
+                  required: true
+                  type: string
+                  x-go-name: Name
+            responses:
+                "200":
+                    $ref: '#/responses/ClusterResources'
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Find group resources
     /health:
         get:
             description: Show service health status
@@ -1897,6 +1937,10 @@ paths:
 produces:
     - application/json
 responses:
+    ClusterResources:
+        description: ""
+        schema:
+            $ref: '#/definitions/ClusterResources'
     CreateExternalDownloadResponse:
         description: ""
         schema:

@@ -15,6 +15,7 @@ type Group struct {
 	UpdatedAt   time.Time `json:"updatedAt"`
 	Hostname    string    `json:"hostname" gorm:"unique;"`
 	Deployable  bool      `json:"deployable"`
+	Autoscaled  bool      `json:"autoscaled"`
 	Users       []User    `json:"users" gorm:"many2many:user_groups;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
 	AdminUsers  []User    `json:"adminUsers" gorm:"many2many:user_groups_admin;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
 	// TODO: Shouldn't this be json:"-"?

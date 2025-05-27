@@ -1,5 +1,7 @@
 package group
 
+import "github.com/dhis2-sre/im-manager/pkg/instance"
+
 // swagger:parameters groupCreate
 type _ struct {
 	// Create group request body parameter
@@ -32,7 +34,7 @@ type _ struct {
 	Body CreateClusterConfigurationRequest
 }
 
-// swagger:parameters findGroupByName findGroupByNameWithDetails
+// swagger:parameters findGroupByName findGroupByNameWithDetails findResources
 type _ struct {
 	// in: path
 	// required: true
@@ -47,4 +49,10 @@ type _ struct {
 	// type: string
 	// description: if true, only deployable groups are returned. Otherwise, all groups are returned
 	Deployable string `json:"deployable"`
+}
+
+// swagger:response ClusterResources
+type _ struct {
+	// in: body
+	_ instance.ClusterResources
 }

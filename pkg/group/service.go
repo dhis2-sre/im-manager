@@ -3,6 +3,8 @@ package group
 import (
 	"context"
 
+	"github.com/dhis2-sre/im-manager/pkg/instance"
+
 	"github.com/dhis2-sre/im-manager/pkg/model"
 )
 
@@ -105,4 +107,20 @@ func (s *Service) FindAll(ctx context.Context, user *model.User, deployable bool
 
 func (s *Service) FindByGroupNames(ctx context.Context, groupNames []string) ([]model.Group, error) {
 	return s.groupRepository.findByGroupNames(ctx, groupNames)
+}
+
+func (s *Service) FindResources(ctx context.Context, name string) (instance.ClusterResources, error) {
+	group, err := s.groupRepository.find(ctx, name)
+	if err != nil {
+		return instance.ClusterResources{}, err
+	}
+
+	resources, err := instance.FindResources(group.ClusterConfiguration)
+	if err != nil {
+		return instance.ClusterResources{}, err
+	}
+
+	resources.Autoscaled = group.Autoscaled
+
+	return resources, nil
 }
