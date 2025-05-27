@@ -917,26 +917,66 @@ func (s Service) UpdateInstance(ctx context.Context, token string, deploymentId,
 	return instance, nil
 }
 
-func (s Service) UpdateDeployment(ctx context.Context, token string, deploymentId uint, ttl uint, description string) (*model.Deployment, error) {
+func (s Service) UpdateDeployment(ctx context.Context, token string, deploymentId uint, ttl uint, description string, group string) (*model.Deployment, error) {
 	deployment, err := s.FindDecryptedDeploymentById(ctx, deploymentId)
 	if err != nil {
 		return nil, err
 	}
 
 	ttlChanged := deployment.TTL != ttl
+	groupChanged := group != "" && deployment.GroupName != group
 
-	deployment.TTL = ttl
-	deployment.Description = description
+	// If group is changing, we need to destroy and recreate resources
+	if groupChanged {
+		// Store old group for cleanup
+		oldGroup := deployment.GroupName
 
-	err = s.instanceRepository.SaveDeployment(ctx, deployment)
-	if err != nil {
-		return nil, err
-	}
+		// Update deployment with new group
+		deployment.GroupName = group
 
-	if ttlChanged {
+		// Update all instances with new group
+		for _, instance := range deployment.Instances {
+			instance.GroupName = deployment.GroupName
+		}
+
+		// Save changes to database
+		err = s.instanceRepository.SaveDeployment(ctx, deployment)
+		if err != nil {
+			return nil, err
+		}
+
+		// Destroy old resources
+		for _, instance := range deployment.Instances {
+			// Temporarily set old group for cleanup
+			instance.GroupName = oldGroup
+			err = s.destroyDeploymentInstance(ctx, instance)
+			if err != nil {
+				return nil, fmt.Errorf("failed to destroy old instance resources: %v", err)
+			}
+			// Restore new group
+			instance.GroupName = deployment.GroupName
+		}
+
+		// Deploy with new configuration
 		err = s.DeployDeployment(ctx, token, deployment)
 		if err != nil {
-			return nil, fmt.Errorf("failed to redeploy instances with new TTL: %v", err)
+			return nil, fmt.Errorf("failed to deploy with new configuration: %v", err)
+		}
+	} else {
+		// Just update TTL and description if no group change
+		deployment.TTL = ttl
+		deployment.Description = description
+
+		err = s.instanceRepository.SaveDeployment(ctx, deployment)
+		if err != nil {
+			return nil, err
+		}
+
+		if ttlChanged {
+			err = s.DeployDeployment(ctx, token, deployment)
+			if err != nil {
+				return nil, fmt.Errorf("failed to redeploy instances with new TTL: %v", err)
+			}
 		}
 	}
 
