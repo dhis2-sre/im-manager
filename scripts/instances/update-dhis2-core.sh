@@ -73,4 +73,4 @@ echo "{
       \"value\": \"$ENABLE_QUERY_LOGGING\"
     }
   }
-}" | $HTTP put "$IM_HOST/deployments/$DEPLOYMENT_ID/instance/$INSTANCE_ID" "Authorization: Bearer $ACCESS_TOKEN" 
+}" | $HTTP put "$IM_HOST/deployments/$DEPLOYMENT_ID/instance/$INSTANCE_ID" "Authorization: Bearer $ACCESS_TOKEN"
