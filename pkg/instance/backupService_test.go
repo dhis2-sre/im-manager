@@ -27,7 +27,7 @@ func TestBackupService(t *testing.T) {
 		require.NoError(t, err)
 	}()
 
-	// Create test bucket and upload test file
+	// Create a test bucket and upload a test file
 	bucketName := "test-bucket"
 	err := minioClient.MakeBucket(ctx, bucketName, minio.MakeBucketOptions{})
 	require.NoError(t, err)

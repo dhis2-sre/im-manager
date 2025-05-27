@@ -197,6 +197,8 @@ func (h Handler) SaveAs(c *gin.Context) {
 		return
 	}
 
+	h.logger.InfoContext(ctx, "savedDatabase", "database", savedDatabase)
+
 	// Backup file store
 	deployment, err := h.instanceService.FindDeploymentById(ctx, instance.DeploymentID)
 	if err != nil {
@@ -216,7 +218,7 @@ func (h Handler) SaveAs(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusCreated, savedDatabase)
+	c.JSON(http.StatusAccepted, savedDatabase)
 }
 
 func getInstanceByStack(stack string, instances []*model.DeploymentInstance) (*model.DeploymentInstance, error) {
