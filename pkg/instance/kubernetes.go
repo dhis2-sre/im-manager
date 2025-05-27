@@ -388,22 +388,22 @@ type ClusterResources struct {
 func FindResources(configuration *model.ClusterConfiguration) (ClusterResources, error) {
 	client, err := newClient(configuration)
 	if err != nil {
-		return ClusterResources{}, nil
+		return ClusterResources{}, err
 	}
 
 	metricsClient, err := newMetricsClient(configuration)
 	if err != nil {
-		return ClusterResources{}, nil
+		return ClusterResources{}, err
 	}
 
 	nodes, err := client.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
-		panic(err)
+		return ClusterResources{}, err
 	}
 
 	nodeMetrics, err := metricsClient.MetricsV1beta1().NodeMetricses().List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
-		panic(err)
+		return ClusterResources{}, err
 	}
 
 	var totalCPUUsed, totalMemUsed, totalCPUAlloc, totalMemAlloc resource.Quantity
