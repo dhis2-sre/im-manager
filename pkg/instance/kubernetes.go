@@ -12,8 +12,8 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/resource"
-	clientset "k8s.io/metrics/pkg/client/clientset/versioned"
-	metrics "k8s.io/metrics/pkg/client/clientset/versioned"
+
+	metricsv1beta1 "k8s.io/metrics/pkg/client/clientset/versioned"
 
 	"github.com/dhis2-sre/im-manager/internal/errdef"
 
@@ -100,13 +100,13 @@ func runCommand(cmd *exec.Cmd) ([]byte, []byte, error) {
 	return stdout.Bytes(), stderr.Bytes(), err
 }
 
-func newMetricsClient(configuration *model.ClusterConfiguration) (*clientset.Clientset, error) {
+func newMetricsClient(configuration *model.ClusterConfiguration) (*metricsv1beta1.Clientset, error) {
 	restClientConfig, err := newRestConfig(configuration)
 	if err != nil {
 		return nil, err
 	}
 
-	metricsClient, err := metrics.NewForConfig(restClientConfig)
+	metricsClient, err := metricsv1beta1.NewForConfig(restClientConfig)
 	if err != nil {
 		return nil, err
 	}
