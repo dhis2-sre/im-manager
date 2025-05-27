@@ -324,7 +324,7 @@ func (h Handler) FindResources(c *gin.Context) {
 	//   oauth2:
 	name := c.Param("name")
 	if name == "" {
-		_ = c.AbortWithError(http.StatusBadRequest, errors.New("group name found"))
+		_ = c.AbortWithError(http.StatusBadRequest, errors.New("group name not found"))
 		return
 	}
 
