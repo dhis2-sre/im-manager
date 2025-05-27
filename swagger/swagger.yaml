@@ -502,6 +502,9 @@ definitions:
             description:
                 type: string
                 x-go-name: Description
+            group:
+                type: string
+                x-go-name: Group
             ttl:
                 format: uint64
                 type: integer

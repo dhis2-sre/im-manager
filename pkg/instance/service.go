@@ -918,26 +918,46 @@ func (s Service) UpdateInstance(ctx context.Context, token string, deploymentId,
 	return instance, nil
 }
 
-func (s Service) UpdateDeployment(ctx context.Context, token string, deploymentId uint, ttl uint, description string) (*model.Deployment, error) {
+func (s Service) UpdateDeployment(ctx context.Context, token string, deploymentId uint, ttl uint, description string, group string) (*model.Deployment, error) {
 	deployment, err := s.FindDecryptedDeploymentById(ctx, deploymentId)
 	if err != nil {
 		return nil, err
 	}
 
 	ttlChanged := deployment.TTL != ttl
+	groupChanged := group != "" && deployment.GroupName != group
+
+	oldGroup := deployment.GroupName
 
 	deployment.TTL = ttl
 	deployment.Description = description
+	if groupChanged {
+		deployment.GroupName = group
+		for _, instance := range deployment.Instances {
+			instance.GroupName = group
+		}
+	}
 
 	err = s.instanceRepository.SaveDeployment(ctx, deployment)
 	if err != nil {
 		return nil, err
 	}
 
-	if ttlChanged {
+	if groupChanged {
+		for _, instance := range deployment.Instances {
+			instance.GroupName = oldGroup
+			err = s.destroyDeploymentInstance(ctx, instance)
+			if err != nil {
+				return nil, fmt.Errorf("failed to destroy old instance resources: %v", err)
+			}
+			instance.GroupName = group
+		}
+	}
+
+	if ttlChanged || groupChanged {
 		err = s.DeployDeployment(ctx, token, deployment)
 		if err != nil {
-			return nil, fmt.Errorf("failed to redeploy instances with new TTL: %v", err)
+			return nil, fmt.Errorf("failed to redeploy instances: %v", err)
 		}
 	}
 
