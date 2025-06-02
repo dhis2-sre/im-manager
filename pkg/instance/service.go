@@ -840,3 +840,145 @@ func newMinioClient(accessKey, secretKey, endpoint string, useSSL bool) (*minio.
 	}
 	return minioClient, nil
 }
+
+func (s Service) UpdateInstance(ctx context.Context, token string, deploymentId, instanceId uint, parameters parameters, public bool) (*model.DeploymentInstance, error) {
+	instance, err := s.FindDecryptedDeploymentInstanceById(ctx, instanceId)
+	if err != nil {
+		return nil, err
+	}
+
+	if instance.DeploymentID != deploymentId {
+		return nil, errdef.NewBadRequest("instance %d does not belong to deployment %d", instanceId, deploymentId)
+	}
+
+	instance.Public = public
+
+	instanceParameters := make(model.DeploymentInstanceParameters, len(parameters))
+	for name, parameter := range parameters {
+		instanceParameters[name] = model.DeploymentInstanceParameter{
+			ParameterName: name,
+			Value:         parameter.Value,
+		}
+	}
+	instance.Parameters = instanceParameters
+
+	err = s.rejectConsumedParameters(instance)
+	if err != nil {
+		return nil, err
+	}
+
+	deployment, err := s.FindDeploymentById(ctx, deploymentId)
+	if err != nil {
+		return nil, err
+	}
+
+	decryptedDeployment, err := s.decryptDeployment(deployment)
+	if err != nil {
+		return nil, err
+	}
+
+	for i, inst := range decryptedDeployment.Instances {
+		if inst.ID == instanceId {
+			decryptedDeployment.Instances[i] = instance
+			break
+		}
+	}
+
+	_, err = s.validateNoCycles(decryptedDeployment.Instances)
+	if err != nil {
+		return nil, errdef.NewBadRequest("failed to validate instance: %v", err)
+	}
+
+	err = s.resolveParameters(decryptedDeployment)
+	if err != nil {
+		return nil, errdef.NewBadRequest("failed to resolve parameters: %v", err)
+	}
+
+	stack, err := s.stackService.Find(instance.StackName)
+	if err != nil {
+		return nil, err
+	}
+
+	err = s.instanceRepository.SaveInstance(ctx, instance, stack)
+	if err != nil {
+		return nil, err
+	}
+
+	decryptedInstance, err := s.FindDecryptedDeploymentInstanceById(ctx, instanceId)
+	if err != nil {
+		return nil, err
+	}
+
+	err = s.deployDeploymentInstance(ctx, token, decryptedInstance, deployment.TTL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to deploy updated instance: %v", err)
+	}
+
+	return instance, nil
+}
+
+func (s Service) UpdateDeployment(ctx context.Context, token string, deploymentId uint, ttl uint, description string, group string) (*model.Deployment, error) {
+	deployment, err := s.FindDecryptedDeploymentById(ctx, deploymentId)
+	if err != nil {
+		return nil, err
+	}
+
+	ttlChanged := deployment.TTL != ttl
+	groupChanged := group != "" && deployment.GroupName != group
+
+	// If group is changing, we need to destroy and recreate resources
+	if groupChanged {
+		// Store old group for cleanup
+		oldGroup := deployment.GroupName
+
+		// Update deployment with new group
+		deployment.GroupName = group
+
+		// Update all instances with new group
+		for _, instance := range deployment.Instances {
+			instance.GroupName = deployment.GroupName
+		}
+
+		// Save changes to database
+		err = s.instanceRepository.SaveDeployment(ctx, deployment)
+		if err != nil {
+			return nil, err
+		}
+
+		// Destroy old resources
+		for _, instance := range deployment.Instances {
+			// Temporarily set old group for cleanup
+			instance.GroupName = oldGroup
+			err = s.destroyDeploymentInstance(ctx, instance)
+			if err != nil {
+				return nil, fmt.Errorf("failed to destroy old instance resources: %v", err)
+			}
+			// Restore new group
+			instance.GroupName = deployment.GroupName
+		}
+
+		// Deploy with new configuration
+		err = s.DeployDeployment(ctx, token, deployment)
+		if err != nil {
+			return nil, fmt.Errorf("failed to deploy with new configuration: %v", err)
+		}
+	} else {
+		// Just update TTL and description if no group change
+		deployment.TTL = ttl
+		deployment.Description = description
+
+		err = s.instanceRepository.SaveDeployment(ctx, deployment)
+		if err != nil {
+			return nil, err
+		}
+
+		if ttlChanged {
+			err = s.DeployDeployment(ctx, token, deployment)
+			if err != nil {
+				return nil, fmt.Errorf("failed to redeploy instances with new TTL: %v", err)
+			}
+		}
+	}
+
+	return deployment, nil
+}
