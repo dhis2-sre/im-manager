@@ -1,4 +1,29 @@
 
+<a name="v0.55.0"></a>
+## [v0.55.0](https://github.com/dhis2-sre/im-manager/compare/v0.54.1...v0.55.0)
+
+> 2025-05-30
+
+### Chore
+
+* bump sops and other versions ([#1099](https://github.com/dhis2-sre/im-manager/issues/1099))
+
+### Feat
+
+* stream uploads to s3 ([#1098](https://github.com/dhis2-sre/im-manager/issues/1098))
+
+
+<a name="v0.54.1"></a>
+## [v0.54.1](https://github.com/dhis2-sre/im-manager/compare/v0.54.0...v0.54.1)
+
+> 2025-05-22
+
+### Chore
+
+* preload groups
+* generate change log
+
+
 <a name="v0.54.0"></a>
 ## [v0.54.0](https://github.com/dhis2-sre/im-manager/compare/v0.53.0...v0.54.0)
 
