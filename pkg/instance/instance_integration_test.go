@@ -298,6 +298,84 @@ func TestInstanceHandler(t *testing.T) {
 		assert.Equal(t, "some description", instances[0].Description)
 		assert.Equal(t, "https://some/dev-public-deployment", instances[0].Hostname)
 	})
+
+	t.Run("UpdateDeployment", func(t *testing.T) {
+		t.Parallel()
+		t.Log("Create deployment")
+		var deployment model.Deployment
+		body := strings.NewReader(`{
+			"name": "test-deployment-update",
+			"group": "group-name",
+			"description": "initial description",
+			"ttl": 172800
+		}`)
+
+		client.PostJSON(t, "/deployments", body, &deployment, inttest.WithAuthToken("sometoken"))
+
+		t.Log("Update deployment")
+		body = strings.NewReader(`{
+			"group": "group-name",
+			"description": "updated description",
+			"ttl": 86400
+		}`)
+
+		path := fmt.Sprintf("/deployments/%d", deployment.ID)
+		var updatedDeployment model.Deployment
+		client.PutJSON(t, path, body, &updatedDeployment, inttest.WithAuthToken("sometoken"))
+
+		assert.Equal(t, uint(86400), updatedDeployment.TTL)
+		assert.Equal(t, "updated description", updatedDeployment.Description)
+		assert.Equal(t, "group-name", updatedDeployment.GroupName)
+		assert.Equal(t, "test-deployment-update", updatedDeployment.Name)
+	})
+
+	t.Run("UpdateDeploymentInstance", func(t *testing.T) {
+		t.Parallel()
+		t.Log("Create deployment")
+		var deployment model.Deployment
+		body := strings.NewReader(`{
+			"name": "test-deployment-instance-update",
+			"group": "group-name",
+			"description": "some description"
+		}`)
+
+		client.PostJSON(t, "/deployments", body, &deployment, inttest.WithAuthToken("sometoken"))
+
+		t.Log("Create deployment instance")
+		var deploymentInstance model.DeploymentInstance
+		body = strings.NewReader(`{
+			"stackName": "whoami-go",
+			"parameters": {
+				"IMAGE_TAG": {
+					"value": "0.6.0"
+				}
+			},
+			"public": false
+		}`)
+
+		path := fmt.Sprintf("/deployments/%d/instance", deployment.ID)
+		client.PostJSON(t, path, body, &deploymentInstance, inttest.WithAuthToken("sometoken"))
+
+		t.Log("Update deployment instance")
+		body = strings.NewReader(`{
+			"stackName": "whoami-go",
+			"parameters": {
+				"IMAGE_TAG": {
+					"value": "0.7.0"
+				}
+			},
+			"public": true
+		}`)
+
+		path = fmt.Sprintf("/deployments/%d/instance/%d", deployment.ID, deploymentInstance.ID)
+		var updatedInstance model.DeploymentInstance
+		client.PutJSON(t, path, body, &updatedInstance, inttest.WithAuthToken("sometoken"))
+
+		assert.Equal(t, "0.7.0", updatedInstance.Parameters["IMAGE_TAG"].Value)
+		assert.True(t, updatedInstance.Public)
+		assert.Equal(t, deploymentInstance.Name, updatedInstance.Name)
+		assert.Equal(t, deploymentInstance.GroupName, updatedInstance.GroupName)
+	})
 }
 
 func encryptUsingAge(t *testing.T, identity *age.X25519Identity, yamlData []byte) []byte {
