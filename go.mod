@@ -7,7 +7,7 @@ toolchain go1.24.3
 require (
 	filippo.io/age v1.2.1
 	github.com/anthhub/forwarder v1.1.0
-	github.com/aws/aws-sdk-go-v2 v1.36.3
+	github.com/aws/aws-sdk-go-v2 v1.36.4
 	github.com/aws/aws-sdk-go-v2/config v1.29.14
 	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.17.77
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.80.0
