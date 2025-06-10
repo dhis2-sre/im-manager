@@ -927,14 +927,32 @@ func (s Service) UpdateDeployment(ctx context.Context, token string, deploymentI
 	ttlChanged := deployment.TTL != ttl
 	groupChanged := group != "" && deployment.GroupName != group
 
-	oldGroup := deployment.GroupName
+	oldGroupName := deployment.GroupName
 
 	deployment.TTL = ttl
 	deployment.Description = description
 	if groupChanged {
+		newGroup, err := s.groupService.Find(ctx, group)
+		if err != nil {
+			return nil, fmt.Errorf("failed to find new group: %v", err)
+		}
+		deployment.Group = newGroup
 		deployment.GroupName = group
 		for _, instance := range deployment.Instances {
+			instance.Group = newGroup
 			instance.GroupName = group
+
+			// Update DATABASE_HOSTNAME if it's a dhis2-core instance, otherwise the hostname remains pointing to the old group
+			// TODO is there a better way to do this?
+			if instance.StackName == "dhis2-core" {
+				newHostname, err := stack.PostgresHostnameProvider.Provide(*instance)
+				if err != nil {
+					return nil, fmt.Errorf("failed to get new database hostname: %w", err)
+				}
+				instance.Parameters["DATABASE_HOSTNAME"] = model.DeploymentInstanceParameter{
+					Value: newHostname,
+				}
+			}
 		}
 	}
 
@@ -944,13 +962,21 @@ func (s Service) UpdateDeployment(ctx context.Context, token string, deploymentI
 	}
 
 	if groupChanged {
-		for _, instance := range deployment.Instances {
-			instance.GroupName = oldGroup
-			err = s.destroyDeploymentInstance(ctx, instance)
-			if err != nil {
-				return nil, fmt.Errorf("failed to destroy old instance resources: %v", err)
+		oldGroup, err := s.groupService.Find(ctx, oldGroupName)
+		if err != nil {
+			return nil, fmt.Errorf("failed to find old group: %v", err)
+		}
+
+		// Only destroy and recreate if the actual Kubernetes namespace is changing
+		if oldGroup.Namespace != deployment.Group.Namespace {
+			for _, instance := range deployment.Instances {
+				instance.GroupName = oldGroupName
+				err = s.destroyDeploymentInstance(ctx, instance)
+				if err != nil {
+					return nil, fmt.Errorf("failed to destroy old instance resources: %v", err)
+				}
+				instance.GroupName = group
 			}
-			instance.GroupName = group
 		}
 	}
 
