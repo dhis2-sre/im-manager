@@ -307,23 +307,22 @@ func TestInstanceHandler(t *testing.T) {
 			"name": "test-deployment-update",
 			"group": "group-name",
 			"description": "initial description",
-			"ttl": 172800
+			"ttl": 86400
 		}`)
 
 		client.PostJSON(t, "/deployments", body, &deployment, inttest.WithAuthToken("sometoken"))
 
 		t.Log("Update deployment")
 		body = strings.NewReader(`{
-			"group": "group-name",
 			"description": "updated description",
-			"ttl": 86400
+			"ttl": 172800
 		}`)
 
 		path := fmt.Sprintf("/deployments/%d", deployment.ID)
 		var updatedDeployment model.Deployment
 		client.PutJSON(t, path, body, &updatedDeployment, inttest.WithAuthToken("sometoken"))
 
-		assert.Equal(t, uint(86400), updatedDeployment.TTL)
+		assert.Equal(t, uint(172800), updatedDeployment.TTL)
 		assert.Equal(t, "updated description", updatedDeployment.Description)
 		assert.Equal(t, "group-name", updatedDeployment.GroupName)
 		assert.Equal(t, "test-deployment-update", updatedDeployment.Name)
