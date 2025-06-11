@@ -995,9 +995,8 @@ func (h Handler) UpdateInstance(c *gin.Context) {
 }
 
 type UpdateDeploymentRequest struct {
-	TTL         uint   `json:"ttl" binding:"required"`
+	TTL         uint   `json:"ttl"`
 	Description string `json:"description"`
-	Group       string `json:"group" binding:"omitempty"`
 }
 
 // UpdateDeployment updates an existing Deployment's TTL and description
@@ -1036,7 +1035,7 @@ func (h Handler) UpdateDeployment(c *gin.Context) {
 	}
 
 	ctx := c.Request.Context()
-	updatedDeployment, err := h.instanceService.UpdateDeployment(ctx, token, id, request.TTL, request.Description, request.Group)
+	updatedDeployment, err := h.instanceService.UpdateDeployment(ctx, token, id, request.TTL, request.Description)
 	if err != nil {
 		_ = c.Error(err)
 		return
