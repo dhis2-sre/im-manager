@@ -37,4 +37,11 @@ rules:
     verbs:
       - get
       - create
+      - patch
       - delete
+  - apiGroups:
+      - networking.k8s.io
+    resources:
+      - networkpolicies
+    verbs:
+      - patch

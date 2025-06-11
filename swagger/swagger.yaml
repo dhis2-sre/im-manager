@@ -497,6 +497,17 @@ definitions:
                 x-go-name: Name
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/database
+    UpdateDeploymentRequest:
+        properties:
+            description:
+                type: string
+                x-go-name: Description
+            ttl:
+                format: uint64
+                type: integer
+                x-go-name: TTL
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
     User:
         description: User domain object defining a user
         properties:
@@ -1049,6 +1060,40 @@ paths:
             security:
                 - oauth2: []
             summary: Find a deployment
+        put:
+            description: Update a Deployment ...
+            operationId: updateDeployment
+            parameters:
+                - format: uint64
+                  in: path
+                  name: id
+                  required: true
+                  type: integer
+                  x-go-name: ID
+                - description: Update deployment request body parameter
+                  in: body
+                  name: Payload
+                  required: true
+                  schema:
+                    $ref: '#/definitions/UpdateDeploymentRequest'
+            responses:
+                "200":
+                    description: Deployment
+                    schema:
+                        $ref: '#/definitions/Deployment'
+                "400":
+                    $ref: '#/responses/Error'
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+                "500":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Update a Deployment
     /deployments/{id}/deploy:
         post:
             description: Deploy a deployment...
@@ -1136,6 +1181,42 @@ paths:
             security:
                 - oauth2: []
             summary: Delete deployment instance
+        put:
+            description: Update a Deployment Instance ...
+            operationId: updateInstance
+            parameters:
+                - format: uint64
+                  in: path
+                  name: id
+                  required: true
+                  type: integer
+                  x-go-name: ID
+                - format: uint64
+                  in: path
+                  name: instanceId
+                  required: true
+                  type: integer
+                  x-go-name: InstanceID
+                - description: Update instance request body parameter
+                  in: body
+                  name: Payload
+                  required: true
+                  schema:
+                    $ref: '#/definitions/SaveInstanceRequest'
+            responses:
+                "200":
+                    $ref: '#/responses/DeploymentInstance'
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Update a Deployment Instance
     /deployments/public:
         get:
             description: Find all public deployments
