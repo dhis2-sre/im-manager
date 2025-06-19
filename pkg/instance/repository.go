@@ -98,6 +98,7 @@ func (r repository) FindDeploymentInstanceById(ctx context.Context, id uint) (*m
 	err := r.db.
 		WithContext(ctx).
 		Joins("Group").
+		Joins("Group.ClusterConfiguration").
 		Preload("GormParameters").
 		First(&instance, id).Error
 	if err != nil {
