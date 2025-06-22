@@ -1,4 +1,22 @@
 
+<a name="v0.55.1"></a>
+## [v0.55.1](https://github.com/dhis2-sre/im-manager/compare/v0.55.0...v0.55.1)
+
+> 2025-06-20
+
+### Chore
+
+* generate changelog for v0.55.0 ([#1107](https://github.com/dhis2-sre/im-manager/issues/1107))
+
+### Docs
+
+* spelling
+
+### Fix
+
+* remote status ([#1126](https://github.com/dhis2-sre/im-manager/issues/1126))
+
+
 <a name="v0.55.0"></a>
 ## [v0.55.0](https://github.com/dhis2-sre/im-manager/compare/v0.54.1...v0.55.0)
 
@@ -1429,17 +1447,7 @@
 
 
 <a name="v0.5.5"></a>
-## [v0.5.5](https://github.com/dhis2-sre/im-manager/compare/v0.5.9...v0.5.5)
-
-> 2022-04-11
-
-### Fix
-
-* Use func names with argument signatures to change ownership [DEVOPS-102]
-
-
-<a name="v0.5.9"></a>
-## [v0.5.9](https://github.com/dhis2-sre/im-manager/compare/v0.5.6...v0.5.9)
+## [v0.5.5](https://github.com/dhis2-sre/im-manager/compare/v0.5.6...v0.5.5)
 
 > 2022-04-11
 
@@ -1449,17 +1457,7 @@
 
 
 <a name="v0.5.6"></a>
-## [v0.5.6](https://github.com/dhis2-sre/im-manager/compare/v0.5.7...v0.5.6)
-
-> 2022-04-11
-
-### Fix
-
-* Use func names with argument signatures to change ownership [DEVOPS-102]
-
-
-<a name="v0.5.7"></a>
-## [v0.5.7](https://github.com/dhis2-sre/im-manager/compare/v0.5.8...v0.5.7)
+## [v0.5.6](https://github.com/dhis2-sre/im-manager/compare/v0.5.8...v0.5.6)
 
 > 2022-04-11
 
@@ -1469,7 +1467,27 @@
 
 
 <a name="v0.5.8"></a>
-## [v0.5.8](https://github.com/dhis2-sre/im-manager/compare/v0.5.3...v0.5.8)
+## [v0.5.8](https://github.com/dhis2-sre/im-manager/compare/v0.5.9...v0.5.8)
+
+> 2022-04-11
+
+### Fix
+
+* Use func names with argument signatures to change ownership [DEVOPS-102]
+
+
+<a name="v0.5.9"></a>
+## [v0.5.9](https://github.com/dhis2-sre/im-manager/compare/v0.5.7...v0.5.9)
+
+> 2022-04-11
+
+### Fix
+
+* Use func names with argument signatures to change ownership [DEVOPS-102]
+
+
+<a name="v0.5.7"></a>
+## [v0.5.7](https://github.com/dhis2-sre/im-manager/compare/v0.5.3...v0.5.7)
 
 > 2022-04-11
 
