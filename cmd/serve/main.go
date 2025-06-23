@@ -37,6 +37,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/dhis2-sre/im-manager/pkg/inspector"
+
 	"go.opentelemetry.io/otel/sdk/resource"
 	semconv "go.opentelemetry.io/otel/semconv/v1.27.0"
 
@@ -223,6 +225,10 @@ func run() (err error) {
 	if err != nil {
 		return err
 	}
+
+	producer := rabbitmq.NewProducer(logger, rabbitmqConfig.GetURI())
+	ins := inspector.NewInspector(logger, groupService, inspector.NewTTLDestroyHandler(logger, &producer))
+	go ins.Inspect(ctx)
 
 	r, err := newGinEngine(logger)
 	if err != nil {

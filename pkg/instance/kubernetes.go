@@ -204,6 +204,36 @@ func (ks kubernetesService) getPod(instanceID uint, typeSelector string) (v1.Pod
 	return pods.Items[0], nil
 }
 
+func (ks kubernetesService) GetPods(namespace string) ([]v1.Pod, error) {
+	labels := &metav1.LabelSelector{
+		MatchLabels: map[string]string{
+			"im": "true",
+		},
+	}
+
+	ls, err := metav1.LabelSelectorAsSelector(labels)
+	if err != nil {
+		return []v1.Pod{}, fmt.Errorf("error generating labels(%v): %v", labels, err)
+	}
+
+	listOptions := metav1.ListOptions{
+		LabelSelector: ls.String(),
+	}
+
+	pods, err := ks.client.CoreV1().Pods(namespace).List(context.TODO(), listOptions)
+	if err != nil {
+		return []v1.Pod{}, fmt.Errorf("error getting pods for namespace %s: %v", namespace, err)
+	}
+
+	// 'Evicted' pods are safe to filter out, as for each pod
+	// there will be another pod created in a different state inplace of it.
+	pods.Items = slices.DeleteFunc(pods.Items, func(pod v1.Pod) bool {
+		return pod.Status.Phase == v1.PodFailed && pod.Status.Reason == "Evicted"
+	})
+
+	return pods.Items, nil
+}
+
 // labelSelector returns a selector with requirements for im-id=instanceId and either the im-default
 // or im-type=typeSelector.
 func labelSelector(instanceID uint, typeSelector string) (string, error) {
