@@ -151,7 +151,7 @@ var DHIS2DB = model.Stack{
 		"CHART_VERSION":             {Priority: 9, DisplayName: "Chart Version", DefaultValue: &dhis2DBDefaults.chartVersion},
 	},
 	ParameterProviders: model.ParameterProviders{
-		"DATABASE_HOSTNAME": PostgresHostnameProvider,
+		"DATABASE_HOSTNAME": postgresHostnameProvider,
 	},
 	KubernetesResource: model.StatefulSetResource,
 }
@@ -328,7 +328,7 @@ var DHIS2 = model.Stack{
 		"GOOGLE_AUTH_CLIENT_ID":           {Priority: 0, DisplayName: "Google auth client id", DefaultValue: &dhis2CoreDefaults.googleAuthClientId, Sensitive: true},
 	},
 	ParameterProviders: model.ParameterProviders{
-		"DATABASE_HOSTNAME": PostgresHostnameProvider,
+		"DATABASE_HOSTNAME": postgresHostnameProvider,
 	},
 }
 
@@ -419,7 +419,7 @@ var imJobRunnerDefaults = struct {
 }
 
 // Provides the PostgreSQL hostname of an instance.
-var PostgresHostnameProvider = model.ParameterProviderFunc(func(instance model.DeploymentInstance) (string, error) {
+var postgresHostnameProvider = model.ParameterProviderFunc(func(instance model.DeploymentInstance) (string, error) {
 	return fmt.Sprintf("%s-database-postgresql.%s.svc", instance.Name, instance.Group.Namespace), nil
 })
 
