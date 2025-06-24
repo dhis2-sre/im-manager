@@ -54,6 +54,10 @@ func (c *ttlDestroyConsumer) Consume() error {
 		instance, err := c.instanceService.FindDeploymentInstanceById(ctx, payload.ID)
 		if err != nil {
 			c.logger.ErrorContext(ctx, "Error finding instance", "instanceId", payload.ID, "error", err)
+			err := d.Nack(false, false)
+			if err != nil {
+				c.logger.ErrorContext(ctx, "Error acknowledging", "correlationId", d.CorrelationId, "error", err)
+			}
 			return
 		}
 

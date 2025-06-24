@@ -2,13 +2,12 @@ package inspector
 
 import (
 	"context"
+	"github.com/dhis2-sre/im-manager/pkg/group"
 	"github.com/dhis2-sre/im-manager/pkg/instance"
+	"github.com/dhis2-sre/im-manager/pkg/model"
 	"log/slog"
 	"strings"
 	"time"
-
-	"github.com/dhis2-sre/im-manager/pkg/group"
-	"github.com/dhis2-sre/im-manager/pkg/model"
 )
 
 func NewInspector(logger *slog.Logger, service *group.Service, handlers ...Handler) *inspector {
@@ -30,9 +29,9 @@ type inspector struct {
 
 func (i inspector) Inspect(ctx context.Context) {
 	for {
-		time.Sleep(5 * time.Minute)
+		time.Sleep(2 * time.Minute)
 
-		i.logger.Info("Starting inspection...")
+		i.logger.InfoContext(ctx, "Starting inspection...")
 
 		groups, err := i.groupService.FindAll(ctx, &model.User{
 			Groups: []model.Group{
@@ -46,40 +45,67 @@ func (i inspector) Inspect(ctx context.Context) {
 			continue
 		}
 
-		uniqueByNameNamespace := map[string]model.Group{}
-		for _, group := range groups {
-			uniqueByNameNamespace[group.Name+group.Namespace] = group
+		groupsWithDetails := make([]model.Group, len(groups))
+		for index := range groups {
+			groupWithDetails, err := i.groupService.FindWithDetails(ctx, groups[index].Name)
+			if err != nil {
+				i.logger.ErrorContext(ctx, "Failed to find group with details", "error", err)
+				continue
+			}
+			groupsWithDetails[index] = *groupWithDetails
 		}
 
-		for _, v := range uniqueByNameNamespace {
-			kubernetesService, err := instance.NewKubernetesService(v.ClusterConfiguration)
+		/* TODO: Only visit each namespace once...
+		uniqueByNameAndNamespace := map[string]model.Group{}
+		for _, group := range groupsWithDetails {
+			var remote string
+			if group.ClusterConfiguration != nil {
+				remote = group.ClusterConfiguration.GroupName
+			}
+			key := fmt.Sprintf("%s-%s", group.Namespace, remote)
+			uniqueByNameAndNamespace[key] = group
+		}
+		*/
+
+		for _, group := range groups {
+			i.logger.InfoContext(ctx, "Inspecting...", "name", group.Name, "namespace", group.Namespace)
+
+			groupWithDetails, err := i.groupService.FindWithDetails(ctx, group.Name)
+			if err != nil {
+				i.logger.ErrorContext(ctx, "Failed to find group with details", "error", err)
+				continue
+			}
+
+			kubernetesService, err := instance.NewKubernetesService(groupWithDetails.ClusterConfiguration)
 			if err != nil {
 				i.logger.ErrorContext(ctx, "Failed to create Kubernetes service", "error", err)
 				continue
 			}
-			pods, err := kubernetesService.GetPods(v.Namespace)
+
+			pods, err := kubernetesService.GetPods(groupWithDetails.Namespace)
 			if err != nil {
 				i.logger.ErrorContext(ctx, "failed to get pods", "error", err)
 				continue
 			}
 
-			i.logger.Info("Inspecting pods", "count", slog.IntValue(len(pods)))
+			i.logger.InfoContext(ctx, "Inspecting pods", "count", slog.IntValue(len(pods)))
 			for _, pod := range pods {
-				i.logger.Info("Inspecting pod", "pod", pod.Name)
+				i.logger.InfoContext(ctx, "Inspecting pod", "name", pod.Name, "namespace", pod.Namespace, "group", groupWithDetails.Name)
 				for label := range pod.Labels {
 					handlers, exists := i.handlerMap[label]
 					if exists && strings.HasPrefix(label, "im-") {
 						for _, h := range handlers {
 							err := h.Handle(pod)
 							if err != nil {
-								i.logger.Error("Failed to handle pod", "pod", pod.Name, "namespace", pod.Namespace, "error", err.Error())
+								i.logger.ErrorContext(ctx, "Failed to handle pod", "pod", pod.Name, "namespace", pod.Namespace, "error", err)
 							}
 						}
 					}
 				}
 			}
 		}
-		i.logger.Info("Inspection ended")
+
+		i.logger.InfoContext(ctx, "Inspection ended")
 	}
 }
 

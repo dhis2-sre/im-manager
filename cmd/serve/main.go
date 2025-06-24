@@ -228,6 +228,7 @@ func run() (err error) {
 
 	producer := rabbitmq.NewProducer(logger, rabbitmqConfig.GetURI())
 	ins := inspector.NewInspector(logger, groupService, inspector.NewTTLDestroyHandler(logger, &producer))
+	// TODO: Graceful shutdown... ?
 	go ins.Inspect(ctx)
 
 	r, err := newGinEngine(logger)

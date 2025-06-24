@@ -72,7 +72,7 @@ func (t ttlDestroyHandler) Handle(pod v1.Pod) error {
 		if err != nil {
 			return err
 		}
-		logger.Info("TTL destroyed", "pod", pod.Name, "namespace", pod.Namespace, "correlationId", correlationID)
+		logger.Info("TTL destroy", "instance-id", id, "pod", pod.Name, "namespace", pod.Namespace, "correlationId", correlationID)
 	}
 
 	return nil
