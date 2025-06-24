@@ -45,6 +45,7 @@ func (i inspector) Inspect(ctx context.Context) {
 			continue
 		}
 
+		/* TODO: Only visit each namespace once...
 		groupsWithDetails := make([]model.Group, len(groups))
 		for index := range groups {
 			groupWithDetails, err := i.groupService.FindWithDetails(ctx, groups[index].Name)
@@ -55,7 +56,6 @@ func (i inspector) Inspect(ctx context.Context) {
 			groupsWithDetails[index] = *groupWithDetails
 		}
 
-		/* TODO: Only visit each namespace once...
 		uniqueByNameAndNamespace := map[string]model.Group{}
 		for _, group := range groupsWithDetails {
 			var remote string
