@@ -372,8 +372,8 @@ func TestInstanceHandler(t *testing.T) {
 
 		assert.Equal(t, "0.7.0", updatedInstance.Parameters["IMAGE_TAG"].Value)
 		assert.True(t, updatedInstance.Public)
-		assert.Equal(t, deploymentInstance.Name, updatedInstance.Name)
-		assert.Equal(t, deploymentInstance.GroupName, updatedInstance.GroupName)
+		assert.Equal(t, "test-deployment-instance-update", updatedInstance.Name)
+		assert.Equal(t, "group-name", updatedInstance.GroupName)
 	})
 }
 
