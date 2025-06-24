@@ -1035,6 +1035,25 @@ func (h Handler) UpdateDeployment(c *gin.Context) {
 	}
 
 	ctx := c.Request.Context()
+	user, err := handler.GetUserFromContext(ctx)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	deployment, err := h.instanceService.FindDeploymentById(ctx, id)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	canWrite := handler.CanWriteDeployment(user, deployment)
+	if !canWrite {
+		unauthorized := errdef.NewUnauthorized("write access denied")
+		_ = c.Error(unauthorized)
+		return
+	}
+
 	updatedDeployment, err := h.instanceService.UpdateDeployment(ctx, token, id, request.TTL, request.Description)
 	if err != nil {
 		_ = c.Error(err)
