@@ -925,3 +925,140 @@ func (h Handler) Status(c *gin.Context) {
 
 	c.JSON(http.StatusOK, status)
 }
+
+// UpdateInstance updates an existing deployment instance
+func (h Handler) UpdateInstance(c *gin.Context) {
+	// swagger:route PUT /deployments/{id}/instance/{instanceId} updateInstance
+	//
+	// Update a Deployment Instance
+	//
+	// Update a Deployment Instance ...
+	//
+	// Security:
+	//	oauth2:
+	//
+	// responses:
+	//	200: DeploymentInstance
+	//	401: Error
+	//	403: Error
+	//	404: Error
+	//	415: Error
+	deploymentId, ok := handler.GetPathParameter(c, "id")
+	if !ok {
+		return
+	}
+
+	instanceId, ok := handler.GetPathParameter(c, "instanceId")
+	if !ok {
+		return
+	}
+
+	var request SaveInstanceRequest
+	if err := handler.DataBinder(c, &request); err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	ctx := c.Request.Context()
+	user, err := handler.GetUserFromContext(ctx)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	deployment, err := h.instanceService.FindDeploymentById(ctx, deploymentId)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	canWrite := handler.CanWriteDeployment(user, deployment)
+	if !canWrite {
+		unauthorized := errdef.NewUnauthorized("write access denied")
+		_ = c.Error(unauthorized)
+		return
+	}
+
+	token, err := handler.GetTokenFromRequest(c)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	instance, err := h.instanceService.UpdateInstance(ctx, token, deploymentId, instanceId, request.Parameters, request.Public)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	c.JSON(http.StatusOK, instance)
+}
+
+type UpdateDeploymentRequest struct {
+	TTL         uint   `json:"ttl"`
+	Description string `json:"description"`
+}
+
+// UpdateDeployment updates an existing Deployment's TTL and description
+func (h Handler) UpdateDeployment(c *gin.Context) {
+	// swagger:route PUT /deployments/{id} updateDeployment
+	//
+	// Update a Deployment
+	//
+	// Update a Deployment ...
+	//
+	// Security:
+	//   oauth2:
+	//
+	// Responses:
+	//   200: Deployment
+	//   400: Error
+	//   401: Error
+	//   403: Error
+	//   404: Error
+	//   500: Error
+	id, ok := handler.GetPathParameter(c, "id")
+	if !ok {
+		return
+	}
+
+	var request UpdateDeploymentRequest
+	if err := handler.DataBinder(c, &request); err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	token, err := handler.GetTokenFromRequest(c)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	ctx := c.Request.Context()
+	user, err := handler.GetUserFromContext(ctx)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	deployment, err := h.instanceService.FindDeploymentById(ctx, id)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	canWrite := handler.CanWriteDeployment(user, deployment)
+	if !canWrite {
+		unauthorized := errdef.NewUnauthorized("write access denied")
+		_ = c.Error(unauthorized)
+		return
+	}
+
+	updatedDeployment, err := h.instanceService.UpdateDeployment(ctx, token, id, request.TTL, request.Description)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	c.JSON(http.StatusOK, updatedDeployment)
+}
