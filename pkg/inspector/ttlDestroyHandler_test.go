@@ -2,10 +2,11 @@ package inspector
 
 import (
 	"context"
-	"github.com/dhis2-sre/im-manager/pkg/model"
 	"log/slog"
 	"testing"
 	"time"
+
+	"github.com/dhis2-sre/im-manager/pkg/model"
 
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
