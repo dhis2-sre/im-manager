@@ -8,6 +8,7 @@ import (
 	"github.com/dhis2-sre/im-manager/pkg/instance"
 )
 
+//goland:noinspection GoExportedFuncWithUnexportedType
 func NewInspector(logger *slog.Logger, service *instance.Service, handlers ...Handler) inspector {
 	return inspector{logger, handlers, service}
 }
