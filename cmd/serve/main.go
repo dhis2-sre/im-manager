@@ -226,8 +226,7 @@ func run() (err error) {
 		return err
 	}
 
-	producer := rabbitmq.NewProducer(logger, rabbitmqConfig.GetURI())
-	ins := inspector.NewInspector(logger, groupService, inspector.NewTTLDestroyHandler(logger, &producer))
+	ins := inspector.NewInspector(logger, instanceService, inspector.NewTTLDestroyHandler(logger, instanceService))
 	// TODO: Graceful shutdown... ?
 	go ins.Inspect(ctx)
 

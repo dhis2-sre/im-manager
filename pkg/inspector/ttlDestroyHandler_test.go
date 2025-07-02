@@ -1,65 +1,51 @@
 package inspector
 
 import (
+	"context"
+	"github.com/dhis2-sre/im-manager/pkg/model"
 	"log/slog"
-	"strconv"
 	"testing"
 	"time"
 
-	"github.com/dhis2-sre/rabbitmq-client/pkg/rabbitmq"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func Test_TTLDestroyHandler_NotExpired(t *testing.T) {
-	producer := &mockQueueProducer{}
-	handler := NewTTLDestroyHandler(slog.Default(), producer)
-	now := strconv.Itoa(int(time.Now().Unix()))
-	pod := v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Labels: map[string]string{
-				"im-instance-id":        "1",
-				"im-creation-timestamp": now,
-				"im-ttl":                "300",
-			},
-		},
+	instanceService := &mockInstanceService{}
+	handler := NewTTLDestroyHandler(slog.Default(), instanceService)
+
+	deployment := model.Deployment{
+		CreatedAt: time.Now(),
+		TTL:       300,
 	}
 
-	err := handler.Handle(pod)
+	err := handler.Handle(context.TODO(), deployment)
 
 	require.NoError(t, err)
-	producer.AssertExpectations(t)
+	instanceService.AssertExpectations(t)
 }
 
 func Test_TTLDestroyHandler_Expired(t *testing.T) {
-	producer := &mockQueueProducer{}
-	var channel rabbitmq.Channel = "ttl-destroy"
-	producer.
-		On("Produce", channel, mock.AnythingOfType("string"), struct{ ID uint }{ID: 1}).
-		Return(nil)
-	handler := NewTTLDestroyHandler(slog.Default(), producer)
-	tenMinutesAgo := strconv.Itoa(int(time.Now().Add(time.Minute * -10).Unix()))
-	pod := v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Labels: map[string]string{
-				"im-instance-id":        "1",
-				"im-creation-timestamp": tenMinutesAgo,
-				"im-ttl":                "300",
-			},
-		},
+	ctx := context.TODO()
+	deployment := model.Deployment{
+		CreatedAt: time.Now().Add(time.Minute * -10),
+		TTL:       300,
 	}
+	instanceService := &mockInstanceService{}
+	instanceService.On("DeleteDeployment", ctx, &deployment).Return(nil)
 
-	err := handler.Handle(pod)
+	handler := NewTTLDestroyHandler(slog.Default(), instanceService)
+
+	err := handler.Handle(ctx, deployment)
 
 	require.NoError(t, err)
-	producer.AssertExpectations(t)
+	instanceService.AssertExpectations(t)
 }
 
-type mockQueueProducer struct{ mock.Mock }
+type mockInstanceService struct{ mock.Mock }
 
-func (m *mockQueueProducer) Produce(channel rabbitmq.Channel, correlationId string, payload any) error {
-	called := m.Called(channel, correlationId, payload)
+func (m *mockInstanceService) DeleteDeployment(ctx context.Context, deployment *model.Deployment) error {
+	called := m.Called(ctx, deployment)
 	return called.Error(0)
 }

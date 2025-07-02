@@ -1,87 +1,43 @@
 package inspector
 
 import (
-	"fmt"
+	"context"
 	"log/slog"
-	"strconv"
 	"time"
 
-	"github.com/google/uuid"
-
-	"github.com/dhis2-sre/rabbitmq-client/pkg/rabbitmq"
-
-	v1 "k8s.io/api/core/v1"
+	"github.com/dhis2-sre/im-manager/pkg/model"
 )
 
-const (
-	ttlDestroy = "ttl-destroy"
-)
-
-func NewTTLDestroyHandler(logger *slog.Logger, producer queueProducer) ttlDestroyHandler {
-	return ttlDestroyHandler{logger, producer}
+func NewTTLDestroyHandler(logger *slog.Logger, instanceService instanceService) ttlDestroyHandler {
+	return ttlDestroyHandler{logger, instanceService}
 }
 
-type queueProducer interface {
-	Produce(channel rabbitmq.Channel, correlationId string, payload any) error
+type instanceService interface {
+	DeleteDeployment(ctx context.Context, deployment *model.Deployment) error
 }
 
 type ttlDestroyHandler struct {
-	logger   *slog.Logger
-	producer queueProducer
+	logger          *slog.Logger
+	instanceService instanceService
 }
 
-func (t ttlDestroyHandler) Supports() string {
-	return "im-ttl"
-}
+func (t ttlDestroyHandler) Handle(ctx context.Context, deployment model.Deployment) error {
+	t.logger.Info("TTL handler invoked", "deploymentId", deployment.ID)
 
-func (t ttlDestroyHandler) Handle(pod v1.Pod) error {
-	correlationID := uuid.NewString()
-	logger := t.logger.With("correlationId", correlationID)
-
-	logger.Info("TTL handler invoked", "pod", pod.Name)
-
-	creationTimestampLabel := pod.Labels["im-creation-timestamp"]
-	if creationTimestampLabel == "" {
-		return fmt.Errorf("failed to find label \"im-creation-timestamp\" on pod %q", pod.Name)
-	}
-
-	ttlLabel := pod.Labels["im-ttl"]
-	if ttlLabel == "" {
-		logger.Info(`No TTL label "im-ttl" found`)
-		return nil
-	}
-
-	creationTimestamp, err := strconv.ParseInt(creationTimestampLabel, 10, 64)
-	if err != nil {
-		return err
-	}
-
-	ttl, err := strconv.ParseInt(ttlLabel, 10, 64)
-	if err != nil {
-		return err
-	}
-
-	if t.ttlBeforeNow(creationTimestamp, ttl) {
-		id, err := strconv.ParseUint(pod.Labels["im-instance-id"], 10, 64)
+	if t.ttlBeforeNow(deployment.CreatedAt, deployment.TTL) {
+		err := t.instanceService.DeleteDeployment(ctx, &deployment)
 		if err != nil {
 			return err
 		}
-
-		payload := struct{ ID uint }{uint(id)}
-		err = t.producer.Produce(ttlDestroy, correlationID, payload)
-		if err != nil {
-			return err
-		}
-		logger.Info("TTL destroy", "instance-id", id, "pod", pod.Name, "namespace", pod.Namespace, "correlationId", correlationID)
+		t.logger.Info("TTL destroy", "deploymentId", deployment.ID)
 	}
 
 	return nil
 }
 
-// ttlBeforeNow returns true if the pod has expired according to its time to live.
-// creationTimestampLabel is a unix timestamp in seconds.
-// ttlLabel is the pods time-to-live in seconds.
-func (t ttlDestroyHandler) ttlBeforeNow(creationTimestamp, ttl int64) bool {
-	ttlTime := time.Unix(creationTimestamp+ttl, 0).UTC()
-	return ttlTime.Before(time.Now())
+// ttlBeforeNow returns true if creationTimestamp + ttl is before now.
+// ttl is the deployments time-to-live in seconds.
+func (t ttlDestroyHandler) ttlBeforeNow(creationTimestamp time.Time, ttl uint) bool {
+	expiration := creationTimestamp.Add(time.Duration(ttl) * time.Second)
+	return expiration.Before(time.Now())
 }

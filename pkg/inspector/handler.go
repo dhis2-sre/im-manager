@@ -1,10 +1,11 @@
 package inspector
 
 import (
-	v1 "k8s.io/api/core/v1"
+	"context"
+
+	"github.com/dhis2-sre/im-manager/pkg/model"
 )
 
 type Handler interface {
-	Supports() string
-	Handle(pod v1.Pod) error
+	Handle(ctx context.Context, deployment model.Deployment) error
 }
