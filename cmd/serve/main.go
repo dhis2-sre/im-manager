@@ -178,12 +178,6 @@ func run() (err error) {
 	}
 	defer consumer.Close()
 
-	ttlDestroyConsumer := instance.NewTTLDestroyConsumer(logger, consumer, instanceService)
-	err = ttlDestroyConsumer.Consume()
-	if err != nil {
-		return err
-	}
-
 	stackHandler := stack.NewHandler(stackService)
 
 	instanceHandler, err := newInstanceHandler(stackService, groupService, instanceService)
