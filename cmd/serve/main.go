@@ -73,7 +73,6 @@ import (
 	"github.com/dhis2-sre/im-manager/pkg/integration"
 	"github.com/dhis2-sre/im-manager/pkg/stack"
 	"github.com/dhis2-sre/im-manager/pkg/storage"
-	"github.com/dhis2-sre/rabbitmq-client/pkg/rabbitmq"
 )
 
 func main() {
@@ -163,21 +162,6 @@ func run() (err error) {
 		return err
 	}
 
-	rabbitmqConfig, err := newRabbitMQ()
-	if err != nil {
-		return err
-	}
-	consumer, err := rabbitmq.NewConsumer(
-		rabbitmqConfig.GetURI(),
-		rabbitmq.WithConnectionName(hostname),
-		rabbitmq.WithConsumerTagPrefix(hostname),
-		rabbitmq.WithLogger(logger.WithGroup("rabbitmq")),
-	)
-	if err != nil {
-		return fmt.Errorf("failed to setup RabbitMQ consumer: %v", err)
-	}
-	defer consumer.Close()
-
 	stackHandler := stack.NewHandler(stackService)
 
 	instanceHandler, err := newInstanceHandler(stackService, groupService, instanceService)
@@ -196,6 +180,11 @@ func run() (err error) {
 	}
 
 	integrationHandler, err := newIntegrationHandler()
+	if err != nil {
+		return err
+	}
+
+	rabbitmqConfig, err := newRabbitMQ()
 	if err != nil {
 		return err
 	}
