@@ -831,6 +831,10 @@ func (s Service) recordBackup(ctx context.Context, groupName, s3uri, name string
 	return database, nil
 }
 
+func (s Service) FindAllDeployments(ctx context.Context) ([]model.Deployment, error) {
+	return s.instanceRepository.FindAllDeployments(ctx)
+}
+
 func newMinioClient(accessKey, secretKey, endpoint string, useSSL bool) (*minio.Client, error) {
 	minioClient, err := minio.New(endpoint, &minio.Options{
 		Creds:  credentials.NewStaticV4(accessKey, secretKey, ""),
