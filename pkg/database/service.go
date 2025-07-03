@@ -524,13 +524,13 @@ func (s service) SaveAs(ctx context.Context, database *model.Database, instance 
 	go func() {
 		var ret *forwarder.Result
 		if group.ClusterConfiguration != nil && len(group.ClusterConfiguration.KubernetesConfiguration) > 0 {
-			hostname := fmt.Sprintf(stack.HostnamePattern, instance.Name, instance.GroupName)
+			hostname := fmt.Sprintf(stack.HostnamePattern, instance.Name, instance.Group.Namespace)
 			serviceName := strings.Split(hostname, ".")[0]
 			options := []*forwarder.Option{
 				{
 					RemotePort:  5432,
 					ServiceName: serviceName,
-					Namespace:   instance.GroupName,
+					Namespace:   instance.Group.Namespace,
 				},
 			}
 
@@ -678,7 +678,7 @@ func newPgDumpConfig(instance *model.DeploymentInstance, stack *model.Stack) (*p
 	}
 
 	dump, err := pg.NewDump(&pg.Postgres{
-		Host:     fmt.Sprintf(stack.HostnamePattern, instance.Name, instance.GroupName),
+		Host:     fmt.Sprintf(stack.HostnamePattern, instance.Name, instance.Group.Namespace),
 		Port:     5432,
 		DB:       databaseName.Value,
 		Username: databaseUsername.Value,
