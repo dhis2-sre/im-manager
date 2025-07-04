@@ -353,6 +353,11 @@ func (s service) Update(ctx context.Context, d *model.Database) error {
 		return err
 	}
 
+	// TODO: This shouldn't be necessary... But without it I get the following error: {"time":"2025-07-04T00:03:05.942946078Z","level":"ERROR","msg":"record not found","error":"record not found","query":"SELECT * FROM \"databases\" WHERE \"databases\".\"id\" = 0 ORDER BY \"databases\".\"id\" LIMIT 1","duration": 602547,"rows":0,"file":"/src/pkg/database/repository.go:63","correlationId":"4c39fa85-d8fb-4e75-a0cb-1ad4732b7f47","user":12}
+	if d.FilestoreID == 0 {
+		return nil
+	}
+
 	return s.updateFS(ctx, d)
 }
 
