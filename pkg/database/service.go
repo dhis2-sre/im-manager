@@ -443,6 +443,11 @@ func (s service) Save(ctx context.Context, userId uint, database *model.Database
 			return
 		}
 
+		err = s.Unlock(ctx, database.ID)
+		if err != nil {
+			s.logError(ctx, fmt.Errorf("unlock database failed: %v", err))
+		}
+
 		err = s.Delete(ctx, database.ID)
 		if err != nil {
 			s.logError(ctx, err)
