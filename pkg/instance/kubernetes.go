@@ -236,7 +236,7 @@ func (ks kubernetesService) restart(instance *model.DeploymentInstance, typeSele
 	}
 
 	if instanceStack.KubernetesResource == model.StatefulSetResource {
-		statefulSets := ks.client.AppsV1().StatefulSets(instance.GroupName)
+		statefulSets := ks.client.AppsV1().StatefulSets(instance.Group.Namespace)
 		statefulSetsList, err := statefulSets.List(context.TODO(), listOptions)
 		if err != nil {
 			return err
@@ -261,7 +261,7 @@ func (ks kubernetesService) restart(instance *model.DeploymentInstance, typeSele
 	}
 
 	if instanceStack.KubernetesResource == model.DeploymentResource {
-		deployments := ks.client.AppsV1().Deployments(instance.GroupName)
+		deployments := ks.client.AppsV1().Deployments(instance.Group.Namespace)
 		deploymentList, err := deployments.List(context.TODO(), listOptions)
 		if err != nil {
 			return err
@@ -319,7 +319,7 @@ func (ks kubernetesService) deletePersistentVolumeClaim(instance *model.Deployme
 		return nil
 	}
 
-	pvcs := ks.client.CoreV1().PersistentVolumeClaims(instance.GroupName)
+	pvcs := ks.client.CoreV1().PersistentVolumeClaims(instance.Group.Namespace)
 
 	for _, pattern := range labelPatterns {
 		selector := fmt.Sprintf(pattern, instance.Name)
@@ -349,7 +349,7 @@ func (ks kubernetesService) scale(instance *model.DeploymentInstance, replicas u
 	labelSelector := fmt.Sprintf("im-id=%d", instance.ID)
 	listOptions := metav1.ListOptions{LabelSelector: labelSelector}
 
-	deployments := ks.client.AppsV1().Deployments(instance.GroupName)
+	deployments := ks.client.AppsV1().Deployments(instance.Group.Namespace)
 	deploymentList, err := deployments.List(context.TODO(), listOptions)
 	if err != nil {
 		return fmt.Errorf("error finding deployments using selector %q: %v", labelSelector, err)
@@ -362,7 +362,7 @@ func (ks kubernetesService) scale(instance *model.DeploymentInstance, replicas u
 		}
 	}
 
-	sets := ks.client.AppsV1().StatefulSets(instance.GroupName)
+	sets := ks.client.AppsV1().StatefulSets(instance.Group.Namespace)
 	setsList, err := sets.List(context.TODO(), listOptions)
 	if err != nil {
 		return fmt.Errorf("error finding StatefulSets using selector %q: %v", labelSelector, err)

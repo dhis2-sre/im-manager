@@ -353,6 +353,11 @@ func (s service) Update(ctx context.Context, d *model.Database) error {
 		return err
 	}
 
+	// TODO: This shouldn't be necessary... But without it I get the following error: {"time":"2025-07-04T00:03:05.942946078Z","level":"ERROR","msg":"record not found","error":"record not found","query":"SELECT * FROM \"databases\" WHERE \"databases\".\"id\" = 0 ORDER BY \"databases\".\"id\" LIMIT 1","duration": 602547,"rows":0,"file":"/src/pkg/database/repository.go:63","correlationId":"4c39fa85-d8fb-4e75-a0cb-1ad4732b7f47","user":12}
+	if d.FilestoreID == 0 {
+		return nil
+	}
+
 	return s.updateFS(ctx, d)
 }
 
@@ -443,6 +448,11 @@ func (s service) Save(ctx context.Context, userId uint, database *model.Database
 			return
 		}
 
+		err = s.Unlock(ctx, database.ID)
+		if err != nil {
+			s.logError(ctx, fmt.Errorf("unlock database failed: %v", err))
+		}
+
 		err = s.Delete(ctx, database.ID)
 		if err != nil {
 			s.logError(ctx, err)
@@ -524,13 +534,13 @@ func (s service) SaveAs(ctx context.Context, database *model.Database, instance 
 	go func() {
 		var ret *forwarder.Result
 		if group.ClusterConfiguration != nil && len(group.ClusterConfiguration.KubernetesConfiguration) > 0 {
-			hostname := fmt.Sprintf(stack.HostnamePattern, instance.Name, instance.GroupName)
+			hostname := fmt.Sprintf(stack.HostnamePattern, instance.Name, instance.Group.Namespace)
 			serviceName := strings.Split(hostname, ".")[0]
 			options := []*forwarder.Option{
 				{
 					RemotePort:  5432,
 					ServiceName: serviceName,
-					Namespace:   instance.GroupName,
+					Namespace:   instance.Group.Namespace,
 				},
 			}
 
@@ -678,7 +688,7 @@ func newPgDumpConfig(instance *model.DeploymentInstance, stack *model.Stack) (*p
 	}
 
 	dump, err := pg.NewDump(&pg.Postgres{
-		Host:     fmt.Sprintf(stack.HostnamePattern, instance.Name, instance.GroupName),
+		Host:     fmt.Sprintf(stack.HostnamePattern, instance.Name, instance.Group.Namespace),
 		Port:     5432,
 		DB:       databaseName.Value,
 		Username: databaseUsername.Value,
