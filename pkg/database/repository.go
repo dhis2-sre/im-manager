@@ -185,7 +185,7 @@ func (r repository) FindByGroupNames(ctx context.Context, groupNames []string) (
 	query := r.db.WithContext(ctx)
 	isAdmin := slices.Contains(groupNames, model.AdministratorGroupName)
 	if !isAdmin {
-		query = query.Where("group_name IN ?", groupNames)
+		query = query.Where("Databases.group_name IN ?", groupNames)
 	}
 
 	err := query.
