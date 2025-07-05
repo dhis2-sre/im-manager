@@ -66,7 +66,7 @@ func TestDatabaseHandler(t *testing.T) {
 		requestBody := strings.NewReader("file contents")
 		nameHeader := inttest.WithHeader("X-Upload-Name", "path/name.extension")
 		groupHeader := inttest.WithHeader("X-Upload-Group", "packages")
-		body := client.Put(t, "/databases", requestBody, nameHeader, groupHeader)
+		body := client.Put(t, "/databases", requestBody, http.StatusCreated, nameHeader, groupHeader)
 
 		var database model.Database
 		err = json.Unmarshal(body, &database)
