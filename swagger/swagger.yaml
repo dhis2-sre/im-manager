@@ -353,10 +353,14 @@ definitions:
                 format: uint64
                 type: integer
                 x-go-name: DatabaseID
+            instance:
+                $ref: '#/definitions/DeploymentInstance'
             instanceId:
                 format: uint64
                 type: integer
                 x-go-name: InstanceID
+            user:
+                $ref: '#/definitions/User'
             userId:
                 format: uint64
                 type: integer
