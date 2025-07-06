@@ -33,7 +33,7 @@ type kubernetesService struct {
 }
 
 //goland:noinspection GoExportedFuncWithUnexportedType
-func NewKubernetesService(config *model.ClusterConfiguration) (*kubernetesService, error) {
+func NewKubernetesService(config model.Cluster) (*kubernetesService, error) {
 	client, err := newClient(config)
 	if err != nil {
 		return nil, fmt.Errorf("error creating kube client: %v", err)
@@ -42,12 +42,12 @@ func NewKubernetesService(config *model.ClusterConfiguration) (*kubernetesServic
 	return &kubernetesService{client: client}, nil
 }
 
-func commandExecutor(cmd *exec.Cmd, configuration *model.ClusterConfiguration) (stdout []byte, stderr []byte, err error) {
-	if configuration == nil {
+func commandExecutor(cmd *exec.Cmd, cluster model.Cluster) (stdout []byte, stderr []byte, err error) {
+	if cluster.Configuration == nil {
 		return runCommand(cmd)
 	}
 
-	kubeCfg, err := decryptYaml(configuration.KubernetesConfiguration)
+	kubeCfg, err := decryptYaml(cluster.Configuration)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to decrypt kubernetes config: %v", err)
 	}
@@ -100,8 +100,8 @@ func runCommand(cmd *exec.Cmd) ([]byte, []byte, error) {
 	return stdout.Bytes(), stderr.Bytes(), err
 }
 
-func newMetricsClient(configuration *model.ClusterConfiguration) (*metricsv1beta1.Clientset, error) {
-	restClientConfig, err := newRestConfig(configuration)
+func newMetricsClient(cluster model.Cluster) (*metricsv1beta1.Clientset, error) {
+	restClientConfig, err := newRestConfig(cluster)
 	if err != nil {
 		return nil, err
 	}
@@ -114,7 +114,7 @@ func newMetricsClient(configuration *model.ClusterConfiguration) (*metricsv1beta
 	return metricsClient, nil
 }
 
-func newClient(configuration *model.ClusterConfiguration) (*kubernetes.Clientset, error) {
+func newClient(configuration model.Cluster) (*kubernetes.Clientset, error) {
 	restClientConfig, err := newRestConfig(configuration)
 	if err != nil {
 		return nil, err
@@ -128,10 +128,10 @@ func newClient(configuration *model.ClusterConfiguration) (*kubernetes.Clientset
 	return client, nil
 }
 
-func newRestConfig(configuration *model.ClusterConfiguration) (*rest.Config, error) {
+func newRestConfig(cluster model.Cluster) (*rest.Config, error) {
 	var restClientConfig *rest.Config
-	if configuration != nil && len(configuration.KubernetesConfiguration) > 0 {
-		kubeCfg, err := decryptYaml(configuration.KubernetesConfiguration)
+	if cluster.Configuration != nil {
+		kubeCfg, err := decryptYaml(cluster.Configuration)
 		if err != nil {
 			return nil, err
 		}
@@ -385,13 +385,13 @@ type ClusterResources struct {
 	Nodes      int
 }
 
-func FindResources(configuration *model.ClusterConfiguration) (ClusterResources, error) {
-	client, err := newClient(configuration)
+func FindResources(cluster model.Cluster) (ClusterResources, error) {
+	client, err := newClient(cluster)
 	if err != nil {
 		return ClusterResources{}, err
 	}
 
-	metricsClient, err := newMetricsClient(configuration)
+	metricsClient, err := newMetricsClient(cluster)
 	if err != nil {
 		return ClusterResources{}, err
 	}

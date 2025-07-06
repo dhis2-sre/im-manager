@@ -50,7 +50,7 @@ func NewDatabase(logger *slog.Logger, c PostgresqlConfig) (*gorm.DB, error) {
 
 		&model.User{},
 		&model.Group{},
-		&model.ClusterConfiguration{},
+		&model.Cluster{},
 
 		&model.Database{},
 		&model.Lock{},
