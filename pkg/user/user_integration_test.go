@@ -532,7 +532,7 @@ func TestUserHandler(t *testing.T) {
 
 		{
 			t.Log("GetAllUsers")
-			userCount.Wait()
+			//userCount.Wait()
 
 			var users []model.User
 			client.GetJSON(t, "/users", &users, inttest.WithAuthToken(adminAccessToken.Value))
