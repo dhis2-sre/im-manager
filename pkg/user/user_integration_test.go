@@ -16,6 +16,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dhis2-sre/im-manager/pkg/cluster"
+
 	"github.com/google/uuid"
 
 	"github.com/go-mail/mail"
@@ -35,11 +37,16 @@ func TestUserHandler(t *testing.T) {
 	t.Parallel()
 
 	db := inttest.SetupDB(t)
+	groupRepository := group.NewRepository(db)
+
 	userRepository := user.NewRepository(db)
 	const passwordTokenTtl = 10
 	userService := user.NewService("", passwordTokenTtl, userRepository, fakeDialer{t})
-	groupRepository := group.NewRepository(db)
-	groupService := group.NewService(groupRepository, userService)
+
+	clusterRepository := cluster.NewRepository(db)
+	clusterService := cluster.NewService(clusterRepository)
+
+	groupService := group.NewService(groupRepository, userService, clusterService)
 
 	userCount.Increment()
 	err := user.CreateUser(context.Background(), "admin", "admin", userService, groupService, model.AdministratorGroupName, "", "admin")

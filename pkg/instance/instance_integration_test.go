@@ -50,9 +50,9 @@ func TestInstanceHandler(t *testing.T) {
 		Namespace:  "group-name",
 		Hostname:   "some",
 		Deployable: true,
-		ClusterConfiguration: &model.ClusterConfiguration{
-			GroupName:               "group-name",
-			KubernetesConfiguration: k8sConfig,
+		Cluster: model.Cluster{
+			Name:          "cluster-name",
+			Configuration: k8sConfig,
 		},
 	}
 	user := &model.User{

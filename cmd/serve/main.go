@@ -37,6 +37,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/dhis2-sre/im-manager/pkg/cluster"
+
 	"go.opentelemetry.io/otel/sdk/resource"
 	semconv "go.opentelemetry.io/otel/semconv/v1.27.0"
 
@@ -141,9 +143,13 @@ func run() (err error) {
 	}
 	userHandler := user.NewHandler(logger, hostname, authConfig.SameSiteMode, authConfig.AccessTokenExpirationSeconds, authConfig.RefreshTokenExpirationSeconds, authConfig.RefreshTokenRememberMeExpirationSeconds, publicKey, userService, tokenService)
 
+	clusterRepository := cluster.NewRepository(db)
+	clusterService := cluster.NewService(clusterRepository)
+	clusterHandler := cluster.NewHandler(clusterService)
+
 	authentication := middleware.NewAuthentication(publicKey, userService)
 	groupRepository := group.NewRepository(db)
-	groupService := group.NewService(groupRepository, userService)
+	groupService := group.NewService(groupRepository, userService, clusterService)
 	groupHandler := group.NewHandler(groupService)
 
 	stackService, err := newStackService()
@@ -209,6 +215,11 @@ func run() (err error) {
 		return err
 	}
 
+	_, err = createDefaultCluster(ctx, clusterService)
+	if err != nil {
+		return err
+	}
+
 	err = createGroups(ctx, logger, groupService)
 	if err != nil {
 		return err
@@ -231,6 +242,7 @@ func run() (err error) {
 
 	r.Use(otelgin.Middleware("im")) // Attach OpenTelemetry middleware
 
+	cluster.Routes(r, authentication, authorization, clusterHandler)
 	group.Routes(r, authentication, authorization, groupHandler)
 	user.Routes(r, authentication, authorization, userHandler)
 	stack.Routes(r, authentication.TokenAuthentication, stackHandler)
@@ -606,6 +618,10 @@ func newEventHandler(ctx context.Context, logger *slog.Logger, rabbitmqConfig ra
 	}
 
 	return event.NewHandler(logger, env, streamName), nil
+}
+
+func createDefaultCluster(ctx context.Context, clusterService cluster.Service) (model.Cluster, error) {
+	return clusterService.FindOrCreate(ctx, "default", "The cluster where IM is hosted")
 }
 
 type groupService interface {
