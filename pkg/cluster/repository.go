@@ -81,22 +81,6 @@ func (r repository) delete(ctx context.Context, cluster model.Cluster) error {
 	return r.db.WithContext(ctx).Delete(&cluster).Error
 }
 
-func (r repository) addGroup(ctx context.Context, cluster model.Cluster, group model.Group) error {
-	// only use ctx for values (logging) and not cancellation signals on cud operations for now. ctx
-	// cancellation can lead to rollbacks which we should decide individually.
-	ctx = context.WithoutCancel(ctx)
-
-	return r.db.WithContext(ctx).Model(&cluster).Association("Groups").Append([]model.Group{group})
-}
-
-func (r repository) removeGroup(ctx context.Context, cluster model.Cluster, group model.Group) error {
-	// only use ctx for values (logging) and not cancellation signals on cud operations for now. ctx
-	// cancellation can lead to rollbacks which we should decide individually.
-	ctx = context.WithoutCancel(ctx)
-
-	return r.db.WithContext(ctx).Model(&cluster).Association("Groups").Delete([]model.Group{group})
-}
-
 func (r repository) findOrCreate(ctx context.Context, cluster model.Cluster) (model.Cluster, error) {
 	// only use ctx for values (logging) and not cancellation signals on cud operations for now. ctx
 	// cancellation can lead to rollbacks which we should decide individually.
