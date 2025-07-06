@@ -10,10 +10,6 @@ func NewService(clusterRepository *repository) Service {
 	return Service{clusterRepository}
 }
 
-type groupService interface {
-	Find(ctx context.Context, name string) (*model.Group, error)
-}
-
 type Service struct {
 	clusterRepository *repository
 }
