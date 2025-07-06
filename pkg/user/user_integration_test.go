@@ -521,7 +521,7 @@ func TestUserHandler(t *testing.T) {
 	})
 
 	t.Run("AsAdmin", func(t *testing.T) {
-		//t.Parallel()
+		t.Parallel()
 
 		var adminAccessToken *http.Cookie
 		{
