@@ -521,7 +521,7 @@ func TestUserHandler(t *testing.T) {
 	})
 
 	t.Run("AsAdmin", func(t *testing.T) {
-		t.Parallel()
+		//t.Parallel()
 
 		var adminAccessToken *http.Cookie
 		{
@@ -532,7 +532,7 @@ func TestUserHandler(t *testing.T) {
 
 		{
 			t.Log("GetAllUsers")
-			//userCount.Wait()
+			userCount.Wait()
 
 			var users []model.User
 			client.GetJSON(t, "/users", &users, inttest.WithAuthToken(adminAccessToken.Value))
