@@ -178,6 +178,8 @@ definitions:
         x-go-package: github.com/dhis2-sre/im-manager/pkg/model
     DeploymentInstance:
         properties:
+            Lock:
+                $ref: '#/definitions/Lock'
             createdAt:
                 format: date-time
                 type: string
@@ -353,10 +355,14 @@ definitions:
                 format: uint64
                 type: integer
                 x-go-name: DatabaseID
+            instance:
+                $ref: '#/definitions/DeploymentInstance'
             instanceId:
                 format: uint64
                 type: integer
                 x-go-name: InstanceID
+            user:
+                $ref: '#/definitions/User'
             userId:
                 format: uint64
                 type: integer
