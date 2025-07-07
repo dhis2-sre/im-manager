@@ -39,7 +39,7 @@ import (
 
 	"github.com/dhis2-sre/im-manager/pkg/cluster"
 
-  "github.com/dhis2-sre/im-manager/pkg/inspector"
+	"github.com/dhis2-sre/im-manager/pkg/inspector"
 
 	"go.opentelemetry.io/otel/sdk/resource"
 	semconv "go.opentelemetry.io/otel/semconv/v1.27.0"
