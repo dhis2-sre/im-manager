@@ -221,6 +221,19 @@ func (r repository) SaveDatabase(ctx context.Context, database *model.Database) 
 	return r.db.WithContext(ctx).Save(&database).Error
 }
 
+func (r repository) FindAllDeployments(ctx context.Context) ([]model.Deployment, error) {
+	var deployments []model.Deployment
+	err := r.db.WithContext(ctx).
+		Find(&deployments).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return []model.Deployment{}, nil
+		}
+		return nil, fmt.Errorf("failed to find instance: %v", err)
+	}
+	return deployments, err
+}
+
 func encryptParameters(key string, instance *model.DeploymentInstance, stack *model.Stack) error {
 	for i, parameter := range instance.Parameters {
 		if !stack.Parameters[parameter.ParameterName].Sensitive {

@@ -39,6 +39,8 @@ import (
 
 	"github.com/dhis2-sre/im-manager/pkg/cluster"
 
+  "github.com/dhis2-sre/im-manager/pkg/inspector"
+
 	"go.opentelemetry.io/otel/sdk/resource"
 	semconv "go.opentelemetry.io/otel/semconv/v1.27.0"
 
@@ -73,7 +75,6 @@ import (
 	"github.com/dhis2-sre/im-manager/pkg/integration"
 	"github.com/dhis2-sre/im-manager/pkg/stack"
 	"github.com/dhis2-sre/im-manager/pkg/storage"
-	"github.com/dhis2-sre/rabbitmq-client/pkg/rabbitmq"
 )
 
 func main() {
@@ -167,27 +168,6 @@ func run() (err error) {
 		return err
 	}
 
-	rabbitmqConfig, err := newRabbitMQ()
-	if err != nil {
-		return err
-	}
-	consumer, err := rabbitmq.NewConsumer(
-		rabbitmqConfig.GetURI(),
-		rabbitmq.WithConnectionName(hostname),
-		rabbitmq.WithConsumerTagPrefix(hostname),
-		rabbitmq.WithLogger(logger.WithGroup("rabbitmq")),
-	)
-	if err != nil {
-		return fmt.Errorf("failed to setup RabbitMQ consumer: %v", err)
-	}
-	defer consumer.Close()
-
-	ttlDestroyConsumer := instance.NewTTLDestroyConsumer(logger, consumer, instanceService)
-	err = ttlDestroyConsumer.Consume()
-	if err != nil {
-		return err
-	}
-
 	stackHandler := stack.NewHandler(stackService)
 
 	instanceHandler, err := newInstanceHandler(stackService, groupService, instanceService)
@@ -206,6 +186,11 @@ func run() (err error) {
 	}
 
 	integrationHandler, err := newIntegrationHandler()
+	if err != nil {
+		return err
+	}
+
+	rabbitmqConfig, err := newRabbitMQ()
 	if err != nil {
 		return err
 	}
@@ -234,6 +219,10 @@ func run() (err error) {
 	if err != nil {
 		return err
 	}
+
+	ins := inspector.NewInspector(logger, instanceService, inspector.NewTTLDestroyHandler(logger, instanceService))
+	// TODO: Graceful shutdown... ?
+	go ins.Inspect(ctx)
 
 	r, err := newGinEngine(logger)
 	if err != nil {
