@@ -176,6 +176,7 @@ func (r repository) FindDeployments(ctx context.Context, groupNames []string) ([
 		Joins("Group").
 		Joins("User").
 		Preload("Instances").
+		Preload("Instances.Lock").
 		Order("updated_at desc").
 		Find(&deployments).Error
 

@@ -27,9 +27,9 @@ type Database struct {
 type Lock struct {
 	DatabaseID uint               `json:"databaseId" gorm:"primaryKey"`
 	InstanceID uint               `json:"instanceId"`
-	Instance   DeploymentInstance `json:"instance"`
+	Instance   DeploymentInstance `json:"instance,omitempty"`
 	UserID     uint               `json:"userId"`
-	User       User               `json:"user"`
+	User       User               `json:"user,omitempty"`
 }
 
 // swagger:model
