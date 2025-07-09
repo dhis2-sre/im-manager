@@ -21,19 +21,6 @@ type _ struct {
 	UserID uint `json:"userId"`
 }
 
-// swagger:parameters addClusterConfigurationToGroup
-type _ struct {
-	// in: path
-	// required: true
-	Group string `json:"group"`
-
-	// SOPS encrypted Kubernetes configuration file
-	// in: formData
-	// required: true
-	// swagger:file
-	Body CreateClusterConfigurationRequest
-}
-
 // swagger:parameters findGroupByName findGroupByNameWithDetails findResources
 type _ struct {
 	// in: path
@@ -55,4 +42,14 @@ type _ struct {
 type _ struct {
 	// in: body
 	_ instance.ClusterResources
+}
+
+// swagger:parameters addClusterToGroup removeClusterFromGroup
+type _ struct {
+	// in: path
+	// required: true
+	Group string `json:"group"`
+	// in: path
+	// required: true
+	ClusterId string `json:"clusterId"`
 }

@@ -28,8 +28,8 @@ func (r repository) find(ctx context.Context, name string) (*model.Group, error)
 	var group *model.Group
 	err := r.db.
 		WithContext(ctx).
-		Joins("ClusterConfiguration").
-		Where("name = ?", name).
+		Joins("Cluster").
+		Where("groups.name = ?", name).
 		First(&group).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, errdef.NewNotFound("group %q doesn't exist", name)
@@ -46,8 +46,8 @@ func (r repository) findWithDetails(ctx context.Context, name string) (*model.Gr
 	var group *model.Group
 	err := r.db.
 		WithContext(ctx).
-		Where("name = ?", name).
-		Joins("ClusterConfiguration").
+		Where("groups.name = ?", name).
+		Joins("Cluster").
 		Preload("Users").
 		Preload("AdminUsers").
 		First(&group).Error
@@ -77,6 +77,7 @@ func (r repository) findAll(ctx context.Context, user *model.User, deployable bo
 		if deployable {
 			err := r.db.
 				WithContext(ctx).
+				Joins("Cluster").
 				Where("deployable = true").
 				Find(&groups).Error
 			return groups, err
@@ -156,26 +157,6 @@ func (r repository) removeUser(ctx context.Context, group *model.Group, user *mo
 	return r.db.WithContext(ctx).Model(&group).Association("Users").Delete([]*model.User{user})
 }
 
-func (r repository) addClusterConfiguration(ctx context.Context, configuration *model.ClusterConfiguration) error {
-	// only use ctx for values (logging) and not cancellation signals on cud operations for now. ctx
-	// cancellation can lead to rollbacks which we should decide individually.
-	ctx = context.WithoutCancel(ctx)
-
-	return r.db.WithContext(ctx).Create(&configuration).Error
-}
-
-func (r repository) getClusterConfiguration(ctx context.Context, groupName string) (*model.ClusterConfiguration, error) {
-	var configuration *model.ClusterConfiguration
-	err := r.db.
-		WithContext(ctx).
-		Where("group_name = ?", groupName).
-		First(&configuration).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, errdef.NewNotFound("group %q doesn't exist", groupName)
-	}
-	return configuration, err
-}
-
 func (r repository) findByGroupNames(ctx context.Context, groupNames []string) ([]model.Group, error) {
 	var databases []model.Group
 	err := r.db.
@@ -184,4 +165,53 @@ func (r repository) findByGroupNames(ctx context.Context, groupNames []string) (
 		Order("updated_at desc").
 		Find(&databases).Error
 	return databases, err
+}
+
+// AddClusterToGroup adds a cluster to a group
+func (r repository) AddClusterToGroup(ctx context.Context, groupName string, clusterId uint) error {
+	group := &model.Group{}
+	if err := r.db.
+		WithContext(ctx).
+		Where("name = ?", groupName).First(group).Error; err != nil {
+		return err
+	}
+
+	cluster := &model.Cluster{}
+	if err := r.db.
+		WithContext(ctx).
+		First(cluster, clusterId).Error; err != nil {
+		return err
+	}
+
+	if err := r.db.
+		WithContext(ctx).
+		Model(group).
+		Update("cluster_id", clusterId).Error; err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// RemoveCluster removes a cluster from a group
+func (r repository) RemoveCluster(ctx context.Context, groupName string, clusterId uint) error {
+	group := &model.Group{}
+	if err := r.db.
+		WithContext(ctx).
+		Where("name = ? AND cluster_id = ?", groupName, clusterId).
+		First(group).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return errdef.NewNotFound("cluster not found in group")
+		}
+		return err
+	}
+
+	if err := r.db.
+		WithContext(ctx).
+		Model(group).
+		Update("cluster_id", nil).Error; err != nil {
+		return err
+	}
+
+	return nil
 }
