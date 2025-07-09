@@ -7,4 +7,4 @@ CLUSTER_ID=$2
 
 source ./auth.sh Admin
 
-$HTTP post "$IM_HOST/groups/$GROUP/clusters/$CLUSTER_ID" "Authorization: Bearer $ACCESS_TOKEN" 
+$HTTP post "$IM_HOST/groups/$GROUP/clusters/$CLUSTER_ID" "Authorization: Bearer $ACCESS_TOKEN"
