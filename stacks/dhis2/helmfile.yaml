@@ -137,4 +137,4 @@ repositories:
   - name: bitnami
     url: https://charts.bitnami.com/bitnami
   - name: dhis2
-    url: https://dhis2-sre.github.io/dhis2-core-helm
+    url: https://dhis2-sre.github.io/dhis2-core-chart

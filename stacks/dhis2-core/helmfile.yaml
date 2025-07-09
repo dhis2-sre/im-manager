@@ -190,6 +190,6 @@ releases:
 
 repositories:
   - name: dhis2
-    url: https://dhis2-sre.github.io/dhis2-core-helm
+    url: https://dhis2-sre.github.io/dhis2-core-chart
   - name: bitnami
     url: https://charts.bitnami.com/bitnami
