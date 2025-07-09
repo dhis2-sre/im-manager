@@ -1,4 +1,19 @@
 
+<a name="v0.56.1"></a>
+## [v0.56.1](https://github.com/dhis2-sre/im-manager/compare/v0.56.0...v0.56.1)
+
+> 2025-07-10
+
+### Chore
+
+* bump chart version
+* generate change log
+
+### Feat
+
+* initial cluster model ([#1142](https://github.com/dhis2-sre/im-manager/issues/1142))
+
+
 <a name="v0.56.0"></a>
 ## [v0.56.0](https://github.com/dhis2-sre/im-manager/compare/v0.55.2...v0.56.0)
 
@@ -213,7 +228,7 @@
 
 
 <a name="v0.45.0"></a>
-## [v0.45.0](https://github.com/dhis2-sre/im-manager/compare/v0.44.0...v0.45.0)
+## [v0.45.0](https://github.com/dhis2-sre/im-manager/compare/v0.43.0...v0.45.0)
 
 > 2024-11-27
 
@@ -223,14 +238,14 @@
 * order public instances as stable, development and nightly
 
 
-<a name="v0.44.0"></a>
-## [v0.44.0](https://github.com/dhis2-sre/im-manager/compare/v0.43.0...v0.44.0)
+<a name="v0.43.0"></a>
+## [v0.43.0](https://github.com/dhis2-sre/im-manager/compare/v0.44.0...v0.43.0)
 
 > 2024-11-27
 
 
-<a name="v0.43.0"></a>
-## [v0.43.0](https://github.com/dhis2-sre/im-manager/compare/v0.41.0...v0.43.0)
+<a name="v0.44.0"></a>
+## [v0.44.0](https://github.com/dhis2-sre/im-manager/compare/v0.41.0...v0.44.0)
 
 > 2024-11-27
 
