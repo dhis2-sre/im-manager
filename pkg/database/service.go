@@ -533,7 +533,7 @@ func (s service) SaveAs(ctx context.Context, database *model.Database, instance 
 	ctx = context.WithoutCancel(ctx)
 	go func() {
 		var ret *forwarder.Result
-		if group.ClusterConfiguration != nil && len(group.ClusterConfiguration.KubernetesConfiguration) > 0 {
+		if group.Cluster.Configuration != nil {
 			hostname := fmt.Sprintf(stack.HostnamePattern, instance.Name, instance.Group.Namespace)
 			serviceName := strings.Split(hostname, ".")[0]
 			options := []*forwarder.Option{
@@ -544,7 +544,7 @@ func (s service) SaveAs(ctx context.Context, database *model.Database, instance 
 				},
 			}
 
-			kubeConfig, err := decryptYaml(group.ClusterConfiguration.KubernetesConfiguration)
+			kubeConfig, err := decryptYaml(group.Cluster.Configuration)
 			if err != nil {
 				s.logError(ctx, err)
 				return
