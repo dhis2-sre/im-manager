@@ -1,13 +1,11 @@
 package inttest
 
 import (
-	"bytes"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
-	"mime/multipart"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -195,21 +193,6 @@ func (hc *HTTPClient) PutJSON(t *testing.T, path string, requestBody io.Reader, 
 	err := json.Unmarshal(body, &responseBody)
 	errMsg := httpClientErrMessage(http.MethodPut, path)
 	require.NoError(t, err, errMsg+": failed to unmarshal response body")
-}
-
-// PostForm sends a multipart form data POST request
-func (hc *HTTPClient) PostForm(t *testing.T, path string, form *multipart.Writer, body *bytes.Buffer, responseBody any, headers ...func(http.Header)) {
-	t.Helper()
-
-	headers = append(headers, WithHeader("Content-Type", form.FormDataContentType()))
-
-	respBody := hc.Post(t, path, body, headers...)
-
-	if responseBody != nil {
-		err := json.Unmarshal(respBody, &responseBody)
-		errMsg := httpClientErrMessage(http.MethodPost, path)
-		require.NoError(t, err, errMsg+": failed to unmarshal response body")
-	}
 }
 
 func (hc *HTTPClient) SignIn(t *testing.T, email, password string) (*http.Cookie, *http.Cookie) {
