@@ -8,8 +8,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/dhis2-sre/im-manager/pkg/cluster"
-
 	"github.com/go-mail/mail"
 
 	"github.com/stretchr/testify/assert"
@@ -26,20 +24,12 @@ func TestGroupHandler(t *testing.T) {
 	t.Parallel()
 
 	db := inttest.SetupDB(t)
-	groupRepository := group.NewRepository(db)
-
 	userRepository := user.NewRepository(db)
 	userService := user.NewService("", 900, userRepository, fakeDialer{})
+	groupRepository := group.NewRepository(db)
+	groupService := group.NewService(groupRepository, userService)
 
-	clusterRepository := cluster.NewRepository(db)
-	clusterService := cluster.NewService(clusterRepository)
-
-	groupService := group.NewService(groupRepository, userService, clusterService)
-
-	cluster, err := clusterService.FindOrCreate(t.Context(), "default-name", "default-description")
-	assert.NoError(t, err)
-
-	err = user.CreateUser(context.Background(), "admin", "admin", userService, groupService, model.AdministratorGroupName, "", "admin")
+	err := user.CreateUser(context.Background(), "admin", "admin", userService, groupService, model.AdministratorGroupName, "", "admin")
 	require.NoError(t, err, "failed to create admin user and group")
 
 	client := inttest.SetupHTTPServer(t, func(engine *gin.Engine) {
@@ -112,33 +102,6 @@ func TestGroupHandler(t *testing.T) {
 
 			client.Do(t, http.MethodDelete, path, nil, http.StatusNoContent)
 		}
-
-		t.Run("AddClusterToGroup", func(t *testing.T) {
-			group, err := groupService.Find(t.Context(), groupName)
-			assert.NoError(t, err)
-			assert.Nil(t, group.ClusterID)
-
-			path := fmt.Sprintf("/groups/%s/clusters/%d", groupName, cluster.ID)
-			client.Post(t, path, nil)
-
-			group, err = groupService.Find(t.Context(), groupName)
-			assert.NoError(t, err)
-			assert.Equal(t, cluster.ID, *group.ClusterID)
-		})
-
-		t.Run("RemoveClusterFromGroup", func(t *testing.T) {
-			group, err := groupService.Find(t.Context(), groupName)
-			assert.NoError(t, err)
-			assert.NotNil(t, group.ClusterID)
-			assert.Equal(t, cluster.ID, *group.ClusterID)
-
-			path := fmt.Sprintf("/groups/%s/clusters/%d", groupName, cluster.ID)
-			client.Delete(t, path)
-
-			group, err = groupService.Find(t.Context(), groupName)
-			assert.NoError(t, err)
-			assert.Nil(t, group.ClusterID)
-		})
 
 		t.Run("CreateDeployableGroup", func(t *testing.T) {
 			t.Parallel()
