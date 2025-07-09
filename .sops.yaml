@@ -11,6 +11,3 @@ creation_rules:
 
   - path_regex: 'stacks/.*/parameters/.*\.yaml$'
     kms: 'arn:aws:kms:eu-central-1:767224633206:alias/im-nonprod-secrets'
-
-  # Catch-all rule to encrypt kubeconfigs for remote clusters with the ./clusters/create.sh script.
-  - kms: 'arn:aws:kms:eu-central-1:767224633206:alias/im-nonprod-secrets'
