@@ -14,5 +14,5 @@ type Cluster struct {
 	// required: true
 	Description   string  `json:"description"`
 	Configuration []byte  `json:"-"`
-	Groups        []Group `json:"groups,omitempty" gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
+	Groups        []Group `json:"groups,omitempty" gorm:"constraint:OnUpdate:CASCADE"`
 }

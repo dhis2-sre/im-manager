@@ -19,5 +19,5 @@ type Group struct {
 	Users       []User    `json:"users" gorm:"many2many:user_groups;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
 	AdminUsers  []User    `json:"adminUsers" gorm:"many2many:user_groups_admin;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
 	ClusterID   *uint     `json:"clusterId"`
-	Cluster     Cluster   `json:"cluster" gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
+	Cluster     Cluster   `json:"cluster" gorm:"constraint:OnUpdate:CASCADE,OnDelete:SET NULL"`
 }
