@@ -1,4 +1,39 @@
 
+<a name="v0.56.0"></a>
+## [v0.56.0](https://github.com/dhis2-sre/im-manager/compare/v0.55.2...v0.56.0)
+
+> 2025-07-09
+
+### Chore
+
+* change chart name ([#1144](https://github.com/dhis2-sre/im-manager/issues/1144))
+
+### Feat
+
+* support DHIS2 with Embedded Tomcat ([#1145](https://github.com/dhis2-sre/im-manager/issues/1145))
+* inspector ([#1138](https://github.com/dhis2-sre/im-manager/issues/1138))
+* include lock when listing deployments ([#1143](https://github.com/dhis2-sre/im-manager/issues/1143))
+* include User and Instance when retrieving the Lock ([#1141](https://github.com/dhis2-sre/im-manager/issues/1141))
+
+### Fix
+
+* save ([#1139](https://github.com/dhis2-sre/im-manager/issues/1139))
+
+### Refactor
+
+* add endpoints for updating deployment and deployment instance ([#1091](https://github.com/dhis2-sre/im-manager/issues/1091))
+
+
+<a name="v0.55.2"></a>
+## [v0.55.2](https://github.com/dhis2-sre/im-manager/compare/v0.55.1...v0.55.2)
+
+> 2025-06-22
+
+### Chore
+
+* generate change log
+
+
 <a name="v0.55.1"></a>
 ## [v0.55.1](https://github.com/dhis2-sre/im-manager/compare/v0.55.0...v0.55.1)
 
@@ -178,7 +213,7 @@
 
 
 <a name="v0.45.0"></a>
-## [v0.45.0](https://github.com/dhis2-sre/im-manager/compare/v0.43.0...v0.45.0)
+## [v0.45.0](https://github.com/dhis2-sre/im-manager/compare/v0.44.0...v0.45.0)
 
 > 2024-11-27
 
@@ -188,14 +223,14 @@
 * order public instances as stable, development and nightly
 
 
-<a name="v0.43.0"></a>
-## [v0.43.0](https://github.com/dhis2-sre/im-manager/compare/v0.44.0...v0.43.0)
+<a name="v0.44.0"></a>
+## [v0.44.0](https://github.com/dhis2-sre/im-manager/compare/v0.43.0...v0.44.0)
 
 > 2024-11-27
 
 
-<a name="v0.44.0"></a>
-## [v0.44.0](https://github.com/dhis2-sre/im-manager/compare/v0.42.0...v0.44.0)
+<a name="v0.43.0"></a>
+## [v0.43.0](https://github.com/dhis2-sre/im-manager/compare/v0.41.0...v0.43.0)
 
 > 2024-11-27
 
@@ -205,14 +240,14 @@
 * use PAT
 
 
-<a name="v0.42.0"></a>
-## [v0.42.0](https://github.com/dhis2-sre/im-manager/compare/v0.41.0...v0.42.0)
+<a name="v0.41.0"></a>
+## [v0.41.0](https://github.com/dhis2-sre/im-manager/compare/v0.42.0...v0.41.0)
 
 > 2024-11-20
 
 
-<a name="v0.41.0"></a>
-## [v0.41.0](https://github.com/dhis2-sre/im-manager/compare/v0.40.0...v0.41.0)
+<a name="v0.42.0"></a>
+## [v0.42.0](https://github.com/dhis2-sre/im-manager/compare/v0.40.0...v0.42.0)
 
 > 2024-11-20
 
@@ -1457,27 +1492,7 @@
 
 
 <a name="v0.5.6"></a>
-## [v0.5.6](https://github.com/dhis2-sre/im-manager/compare/v0.5.8...v0.5.6)
-
-> 2022-04-11
-
-### Fix
-
-* Use func names with argument signatures to change ownership [DEVOPS-102]
-
-
-<a name="v0.5.8"></a>
-## [v0.5.8](https://github.com/dhis2-sre/im-manager/compare/v0.5.9...v0.5.8)
-
-> 2022-04-11
-
-### Fix
-
-* Use func names with argument signatures to change ownership [DEVOPS-102]
-
-
-<a name="v0.5.9"></a>
-## [v0.5.9](https://github.com/dhis2-sre/im-manager/compare/v0.5.7...v0.5.9)
+## [v0.5.6](https://github.com/dhis2-sre/im-manager/compare/v0.5.7...v0.5.6)
 
 > 2022-04-11
 
@@ -1487,7 +1502,27 @@
 
 
 <a name="v0.5.7"></a>
-## [v0.5.7](https://github.com/dhis2-sre/im-manager/compare/v0.5.3...v0.5.7)
+## [v0.5.7](https://github.com/dhis2-sre/im-manager/compare/v0.5.9...v0.5.7)
+
+> 2022-04-11
+
+### Fix
+
+* Use func names with argument signatures to change ownership [DEVOPS-102]
+
+
+<a name="v0.5.9"></a>
+## [v0.5.9](https://github.com/dhis2-sre/im-manager/compare/v0.5.8...v0.5.9)
+
+> 2022-04-11
+
+### Fix
+
+* Use func names with argument signatures to change ownership [DEVOPS-102]
+
+
+<a name="v0.5.8"></a>
+## [v0.5.8](https://github.com/dhis2-sre/im-manager/compare/v0.5.3...v0.5.8)
 
 > 2022-04-11
 
