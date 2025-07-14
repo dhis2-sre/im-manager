@@ -66,7 +66,6 @@ func (r repository) findByEmail(ctx context.Context, email string) (*model.User,
 	err := r.db.
 		WithContext(ctx).
 		Preload("Groups").
-		Preload("Groups.Cluster").
 		Preload("AdminGroups").
 		Where("email = ?", email).
 		First(&u).Error
