@@ -3,18 +3,15 @@ package group
 import (
 	"context"
 
-	"github.com/dhis2-sre/im-manager/pkg/cluster"
-
 	"github.com/dhis2-sre/im-manager/pkg/instance"
 
 	"github.com/dhis2-sre/im-manager/pkg/model"
 )
 
-func NewService(groupRepository *repository, userService userService, clusterService cluster.Service) *Service {
+func NewService(groupRepository *repository, userService userService) *Service {
 	return &Service{
 		groupRepository: groupRepository,
 		userService:     userService,
-		clusterService:  clusterService,
 	}
 }
 
@@ -25,7 +22,6 @@ type userService interface {
 type Service struct {
 	groupRepository *repository
 	userService     userService
-	clusterService  cluster.Service
 }
 
 func (s *Service) Find(ctx context.Context, name string) (*model.Group, error) {
@@ -97,6 +93,14 @@ func (s *Service) RemoveUser(ctx context.Context, groupName string, userId uint)
 	return s.groupRepository.removeUser(ctx, group, u)
 }
 
+func (s *Service) AddClusterConfiguration(ctx context.Context, clusterConfiguration *model.ClusterConfiguration) error {
+	return s.groupRepository.addClusterConfiguration(ctx, clusterConfiguration)
+}
+
+func (s *Service) GetClusterConfiguration(ctx context.Context, groupName string) (*model.ClusterConfiguration, error) {
+	return s.groupRepository.getClusterConfiguration(ctx, groupName)
+}
+
 func (s *Service) FindAll(ctx context.Context, user *model.User, deployable bool) ([]model.Group, error) {
 	return s.groupRepository.findAll(ctx, user, deployable)
 }
@@ -111,7 +115,7 @@ func (s *Service) FindResources(ctx context.Context, name string) (instance.Clus
 		return instance.ClusterResources{}, err
 	}
 
-	resources, err := instance.FindResources(group.Cluster)
+	resources, err := instance.FindResources(group.ClusterConfiguration)
 	if err != nil {
 		return instance.ClusterResources{}, err
 	}
@@ -119,34 +123,4 @@ func (s *Service) FindResources(ctx context.Context, name string) (instance.Clus
 	resources.Autoscaled = group.Autoscaled
 
 	return resources, nil
-}
-
-// AddClusterToGroup adds a cluster to a group
-func (s *Service) AddClusterToGroup(ctx context.Context, groupName string, clusterId uint) error {
-	group, err := s.groupRepository.find(ctx, groupName)
-	if err != nil {
-		return err
-	}
-
-	cluster, err := s.clusterService.Find(ctx, clusterId)
-	if err != nil {
-		return err
-	}
-
-	return s.groupRepository.AddClusterToGroup(ctx, group.Name, cluster.ID)
-}
-
-// RemoveClusterFromGroup removes a cluster from a group
-func (s *Service) RemoveClusterFromGroup(ctx context.Context, groupName string, clusterId uint) error {
-	group, err := s.groupRepository.find(ctx, groupName)
-	if err != nil {
-		return err
-	}
-
-	cluster, err := s.clusterService.Find(ctx, clusterId)
-	if err != nil {
-		return err
-	}
-
-	return s.groupRepository.RemoveCluster(ctx, group.Name, cluster.ID)
 }

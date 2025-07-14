@@ -370,7 +370,7 @@ func (s Service) deployDeploymentInstance(ctx context.Context, token string, ins
 		return err
 	}
 
-	deployLog, deployErrorLog, err := commandExecutor(syncCmd, group.Cluster)
+	deployLog, deployErrorLog, err := commandExecutor(syncCmd, group.ClusterConfiguration)
 	// In recent versions of helmfile most of the command output is sent to stderr https://github.com/roboll/helmfile/pull/583
 	s.logger.InfoContext(ctx, "Deploy log", "log", string(deployLog), "errorLog", string(deployErrorLog))
 	/* TODO: return error log if relevant
@@ -461,14 +461,14 @@ func (s Service) destroyDeploymentInstance(ctx context.Context, instance *model.
 		return err
 	}
 
-	destroyLog, destroyErrorLog, err := commandExecutor(destroyCmd, group.Cluster)
+	destroyLog, destroyErrorLog, err := commandExecutor(destroyCmd, group.ClusterConfiguration)
 	// In recent versions of helmfile most of the command output is sent to stderr https://github.com/roboll/helmfile/pull/583
 	s.logger.InfoContext(ctx, "Destroy log", "log", destroyLog, "errorLog", destroyErrorLog)
 	if err != nil {
 		return err
 	}
 
-	ks, err := NewKubernetesService(group.Cluster)
+	ks, err := NewKubernetesService(group.ClusterConfiguration)
 	if err != nil {
 		return err
 	}
@@ -498,7 +498,7 @@ func (s Service) Pause(ctx context.Context, instance *model.DeploymentInstance) 
 		return err
 	}
 
-	ks, err := NewKubernetesService(group.Cluster)
+	ks, err := NewKubernetesService(group.ClusterConfiguration)
 	if err != nil {
 		return err
 	}
@@ -512,7 +512,7 @@ func (s Service) Resume(ctx context.Context, instance *model.DeploymentInstance)
 		return err
 	}
 
-	ks, err := NewKubernetesService(group.Cluster)
+	ks, err := NewKubernetesService(group.ClusterConfiguration)
 	if err != nil {
 		return err
 	}
@@ -526,7 +526,7 @@ func (s Service) Restart(ctx context.Context, instance *model.DeploymentInstance
 		return err
 	}
 
-	ks, err := NewKubernetesService(group.Cluster)
+	ks, err := NewKubernetesService(group.ClusterConfiguration)
 	if err != nil {
 		return err
 	}
@@ -540,7 +540,7 @@ func (s Service) Restart(ctx context.Context, instance *model.DeploymentInstance
 }
 
 func (s Service) Logs(instance *model.DeploymentInstance, group *model.Group, typeSelector string) (io.ReadCloser, error) {
-	ks, err := NewKubernetesService(group.Cluster)
+	ks, err := NewKubernetesService(group.ClusterConfiguration)
 	if err != nil {
 		return nil, err
 	}
@@ -705,7 +705,7 @@ const (
 )
 
 func (s Service) GetStatus(instance *model.DeploymentInstance) (InstanceStatus, error) {
-	ks, err := NewKubernetesService(instance.Group.Cluster)
+	ks, err := NewKubernetesService(instance.Group.ClusterConfiguration)
 	if err != nil {
 		return "", err
 	}

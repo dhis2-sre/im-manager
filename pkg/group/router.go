@@ -26,6 +26,5 @@ func Routes(r *gin.Engine, authenticationMiddleware AuthenticationMiddleware, au
 	administratorRestrictedRouter.POST("/groups", handler.Create)
 	administratorRestrictedRouter.POST("/groups/:group/users/:userId", handler.AddUserToGroup)
 	administratorRestrictedRouter.DELETE("/groups/:group/users/:userId", handler.RemoveUserFromGroup)
-	administratorRestrictedRouter.POST("/groups/:group/clusters/:clusterId", handler.AddClusterToGroup)
-	administratorRestrictedRouter.DELETE("/groups/:group/clusters/:clusterId", handler.RemoveClusterFromGroup)
+	administratorRestrictedRouter.POST("/groups/:group/cluster-configuration", handler.AddClusterConfiguration)
 }
