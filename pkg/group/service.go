@@ -116,7 +116,7 @@ func (s *Service) FindResources(ctx context.Context, name string) (instance.Clus
 		return instance.ClusterResources{}, err
 	}
 
-	resources.Autoscaled = group.Autoscaled
+	resources.Autoscaled = group.Cluster.Autoscaled
 
 	return resources, nil
 }
