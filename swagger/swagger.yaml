@@ -13,29 +13,42 @@ definitions:
                 x-go-name: Label
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
-    ClusterConfiguration:
+    Cluster:
+        description: Cluster domain object defining a cluster
         properties:
+            autoscaled:
+                type: boolean
+                x-go-name: Autoscaled
             createdAt:
                 format: date-time
                 type: string
                 x-go-name: CreatedAt
-            groupName:
+            description:
                 type: string
-                x-go-name: GroupName
+                x-go-name: Description
+            groups:
+                items:
+                    $ref: '#/definitions/Group'
+                type: array
+                x-go-name: Groups
             id:
                 format: uint64
                 type: integer
                 x-go-name: ID
-            kubernetesConfiguration:
-                items:
-                    format: uint8
-                    type: integer
-                type: array
-                x-go-name: KubernetesConfiguration
+            name:
+                type: string
+                x-go-name: Name
             updatedAt:
                 format: date-time
                 type: string
                 x-go-name: UpdatedAt
+        required:
+            - id
+            - createdAt
+            - updatedAt
+            - name
+            - description
+            - autoscaled
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/model
     ClusterResources:
@@ -61,6 +74,18 @@ definitions:
                 x-go-name: Name
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/database
+    CreateClusterRequest:
+        properties:
+            KubernetesConfiguration:
+                $ref: '#/definitions/FileHeader'
+            description:
+                type: string
+                x-go-name: Description
+            name:
+                type: string
+                x-go-name: Name
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/cluster
     CreateExternalDatabaseRequest:
         properties:
             expiration:
@@ -261,6 +286,18 @@ definitions:
                 x-go-name: UUID
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/model
+    FileHeader:
+        properties:
+            Filename:
+                type: string
+            Header:
+                $ref: '#/definitions/MIMEHeader'
+            Size:
+                format: int64
+                type: integer
+        title: A FileHeader describes a file part of a multipart request.
+        type: object
+        x-go-package: mime/multipart
     Group:
         description: Group domain object defining a group
         properties:
@@ -269,11 +306,12 @@ definitions:
                     $ref: '#/definitions/User'
                 type: array
                 x-go-name: AdminUsers
-            autoscaled:
-                type: boolean
-                x-go-name: Autoscaled
-            clusterConfiguration:
-                $ref: '#/definitions/ClusterConfiguration'
+            cluster:
+                $ref: '#/definitions/Cluster'
+            clusterId:
+                format: uint64
+                type: integer
+                x-go-name: ClusterID
             createdAt:
                 format: date-time
                 type: string
@@ -377,6 +415,16 @@ definitions:
                 x-go-name: InstanceId
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/database
+    MIMEHeader:
+        additionalProperties:
+            items:
+                type: string
+            type: array
+        description: |-
+            A MIMEHeader represents a MIME-style header mapping
+            keys to sets of values.
+        type: object
+        x-go-package: net/textproto
     PublicInstance:
         properties:
             description:
@@ -496,6 +544,18 @@ definitions:
                 x-go-name: Sensitive
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/stack
+    UpdateClusterRequest:
+        properties:
+            KubernetesConfiguration:
+                $ref: '#/definitions/FileHeader'
+            description:
+                type: string
+                x-go-name: Description
+            name:
+                type: string
+                x-go-name: Name
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/cluster
     UpdateDatabaseRequest:
         properties:
             name:
@@ -608,6 +668,132 @@ info:
     title: Instance Manager
     version: 0.1.0
 paths:
+    /clusters:
+        get:
+            description: Find all clusters...
+            operationId: findAllClusters
+            responses:
+                "200":
+                    $ref: '#/responses/Clusters'
+                "401":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Find all clusters
+        post:
+            description: Save a cluster...
+            operationId: clusterCreate
+            parameters:
+                - description: The cluster creation request
+                  in: body
+                  name: Body
+                  required: true
+                  schema:
+                    $ref: '#/definitions/CreateClusterRequest'
+            responses:
+                "201":
+                    description: Cluster
+                    schema:
+                        $ref: '#/definitions/Cluster'
+                "400":
+                    $ref: '#/responses/Error'
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Save cluster
+    /clusters/{id}:
+        delete:
+            description: Delete a cluster...
+            operationId: clusterDelete
+            parameters:
+                - description: The cluster ID
+                  format: uint64
+                  in: path
+                  name: id
+                  required: true
+                  type: integer
+                  x-go-name: ID
+            responses:
+                "204":
+                    description: ""
+                "400":
+                    $ref: '#/responses/Error'
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Delete cluster
+        get:
+            description: Find a cluster by its id
+            operationId: findClusterById
+            parameters:
+                - description: The cluster ID
+                  format: uint64
+                  in: path
+                  name: id
+                  required: true
+                  type: integer
+                  x-go-name: ID
+            responses:
+                "200":
+                    description: Cluster
+                    schema:
+                        $ref: '#/definitions/Cluster'
+                "400":
+                    $ref: '#/responses/Error'
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Find cluster
+        put:
+            description: Update a cluster...
+            operationId: clusterUpdate
+            parameters:
+                - description: The cluster ID
+                  format: uint64
+                  in: path
+                  name: id
+                  required: true
+                  type: integer
+                  x-go-name: ID
+                - description: The cluster update request
+                  in: body
+                  name: Body
+                  required: true
+                  schema:
+                    $ref: '#/definitions/UpdateClusterRequest'
+            responses:
+                "200":
+                    description: Cluster
+                    schema:
+                        $ref: '#/definitions/Cluster'
+                "400":
+                    $ref: '#/responses/Error'
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Update cluster
     /databases:
         get:
             description: List databases...
@@ -1305,40 +1491,63 @@ paths:
             security:
                 - oauth2: []
             summary: Create group
-    /groups/{group}/cluster-configuration:
-        post:
-            description: |-
-                Add a cluster configuration to a group. This will allow deploying to a remote cluster.
-                Currently only configurations with embedded access tokens are support.
-                The configuration needs to be encrypted using Mozilla Sops. Please see ./scripts/addClusterConfigToGroup.sh for an example of how this can be done.
-            operationId: addClusterConfigurationToGroup
+    /groups/{group}/clusters/{clusterId}:
+        delete:
+            description: Remove a cluster from a group...
+            operationId: removeClusterFromGroup
             parameters:
                 - in: path
                   name: group
                   required: true
                   type: string
                   x-go-name: Group
-                - description: SOPS encrypted Kubernetes configuration file
-                  in: formData
-                  name: Body
+                - in: path
+                  name: clusterId
                   required: true
-                  type: file
+                  type: string
+                  x-go-name: ClusterId
             responses:
-                "201":
-                    description: Group
-                    schema:
-                        $ref: '#/definitions/Group'
+                "204":
+                    description: ""
                 "400":
                     $ref: '#/responses/Error'
                 "401":
                     $ref: '#/responses/Error'
                 "403":
                     $ref: '#/responses/Error'
-                "415":
+                "404":
                     $ref: '#/responses/Error'
             security:
                 - oauth2: []
-            summary: Add cluster configuration to group
+            summary: Remove cluster from group
+        post:
+            description: Add a cluster to a group...
+            operationId: addClusterToGroup
+            parameters:
+                - in: path
+                  name: group
+                  required: true
+                  type: string
+                  x-go-name: Group
+                - in: path
+                  name: clusterId
+                  required: true
+                  type: string
+                  x-go-name: ClusterId
+            responses:
+                "201":
+                    description: ""
+                "400":
+                    $ref: '#/responses/Error'
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Add cluster to group
     /groups/{group}/users/{userId}:
         delete:
             description: Remove a user from a group...
@@ -2028,6 +2237,12 @@ responses:
         description: ""
         schema:
             $ref: '#/definitions/ClusterResources'
+    Clusters:
+        description: ""
+        schema:
+            items:
+                $ref: '#/definitions/Cluster'
+            type: array
     CreateExternalDownloadResponse:
         description: ""
         schema:
