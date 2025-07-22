@@ -2,6 +2,11 @@
 
 set -euo pipefail
 
+if [ $# -ne 3 ]; then
+    echo "Usage: $0 <cluster-name> <description> <plain-text-config-file>"
+    exit 1
+fi
+
 source ./auth.sh
 
 NAME=$1
