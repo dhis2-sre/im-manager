@@ -82,7 +82,9 @@ func (r repository) findAll(ctx context.Context, user *model.User, deployable bo
 				Find(&groups).Error
 			return groups, err
 		}
-		err := r.db.WithContext(ctx).Find(&groups).Error
+		err := r.db.WithContext(ctx).
+			Joins("Cluster").
+			Find(&groups).Error
 		return groups, err
 	}
 
