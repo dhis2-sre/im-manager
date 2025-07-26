@@ -25,7 +25,7 @@ func TestPrettyJSONHandler(t *testing.T) {
 	}
 
 	fixedTime := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
-	expectedData := map[string]interface{}{
+	expectedData := map[string]any{
 		"level": "INFO",
 		"msg":   "test message",
 		"time":  "2024-01-01T00:00:00Z",
@@ -57,7 +57,7 @@ func TestPrettyJSONHandler(t *testing.T) {
 			}
 
 			// Parse the JSON and compare the data
-			var gotData map[string]interface{}
+			var gotData map[string]any
 			if err := json.Unmarshal([]byte(got), &gotData); err != nil {
 				t.Fatalf("Failed to parse JSON output: %v", err)
 			}
@@ -129,12 +129,12 @@ func TestAttributes(t *testing.T) {
 		"bool", true,
 	)
 
-	var result map[string]interface{}
+	var result map[string]any
 	if err := json.Unmarshal(buf.Bytes(), &result); err != nil {
 		t.Fatalf("Failed to parse JSON output: %v", err)
 	}
 
-	expected := map[string]interface{}{
+	expected := map[string]any{
 		"string": "value",
 		"number": float64(42), // JSON numbers are always float64
 		"bool":   true,
