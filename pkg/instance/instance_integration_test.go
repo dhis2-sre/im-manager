@@ -164,12 +164,12 @@ func TestInstanceHandler(t *testing.T) {
 		}
 
 		deployDeployment(t, client, deployment.ID, tokens.AccessToken)
-		k8sClient.AssertPodIsReady(t, deploymentInstance.Group.Namespace, deploymentInstance.Name, 60)
+		k8sClient.AssertPodIsReady(t, deploymentInstance.Group.Namespace, deploymentInstance.Name, 60, deploymentInstance.Group.ID)
 
 		// TODO:		t.Log("Save as deployment")
 
 		destroyDeployment(t, client, deployment.ID, tokens.AccessToken)
-		k8sClient.AssertPodIsNotRunning(t, deploymentInstance.Group.Namespace, deploymentInstance.Name, 10)
+		k8sClient.AssertPodIsNotRunning(t, deploymentInstance.Group.Namespace, deploymentInstance.Name, 10, deploymentInstance.Group.ID)
 	})
 
 	t.Run("GetPublicDeployments", func(t *testing.T) {
