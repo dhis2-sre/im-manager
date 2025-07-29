@@ -2,6 +2,7 @@ package inttest
 
 import (
 	"context"
+	"fmt"
 	"slices"
 	"testing"
 	"time"
@@ -54,23 +55,24 @@ type K8sClient struct {
 	Config []byte
 }
 
-func (k K8sClient) AssertPodIsNotRunning(t *testing.T, namespace string, instance string) {
+func (k K8sClient) AssertPodIsNotRunning(t *testing.T, namespace string, instance string, groupId uint) {
 	pods, err := k.Client.CoreV1().Pods(namespace).List(context.TODO(), metav1.ListOptions{
-		LabelSelector: "app.kubernetes.io/instance=" + instance,
+		LabelSelector: "app.kubernetes.io/instance=" + fmt.Sprintf("%s-%d", instance, groupId),
 	})
 	require.NoError(t, err)
 
 	require.Len(t, pods.Items, 0)
 }
 
-func (k K8sClient) AssertPodIsReady(t *testing.T, namespace string, instance string, timeoutInSeconds time.Duration) {
+func (k K8sClient) AssertPodIsReady(t *testing.T, namespace string, instance string, groupId uint, timeoutInSeconds time.Duration) {
 	ctx, cancel := context.WithCancel(context.Background())
+	podName := fmt.Sprintf("%s-%d", instance, groupId)
 	watch, err := k.Client.CoreV1().Pods(namespace).Watch(ctx, metav1.ListOptions{
-		LabelSelector: "app.kubernetes.io/instance=" + instance,
+		LabelSelector: "app.kubernetes.io/instance=" + podName,
 	})
-	require.NoErrorf(t, err, "failed to find pod for instance %q", instance)
+	require.NoErrorf(t, err, "failed to find pod for instance %q", podName)
 
-	t.Log("Waiting for:", instance)
+	t.Log("Waiting for:", podName)
 	timeout := timeoutInSeconds * time.Second
 	tm := time.NewTimer(timeout)
 	defer tm.Stop()
@@ -99,7 +101,7 @@ func (k K8sClient) AssertPodIsReady(t *testing.T, namespace string, instance str
 				})
 				readyCondition := conditions[index]
 				if readyCondition.Status == "True" {
-					t.Logf("pod for instance %q is running", instance)
+					t.Logf("pod for instance %q is running", podName)
 					if !tm.Stop() {
 						<-tm.C
 					}
