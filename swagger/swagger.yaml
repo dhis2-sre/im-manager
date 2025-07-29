@@ -325,6 +325,10 @@ definitions:
             hostname:
                 type: string
                 x-go-name: Hostname
+            id:
+                format: uint64
+                type: integer
+                x-go-name: ID
             name:
                 type: string
                 x-go-name: Name
