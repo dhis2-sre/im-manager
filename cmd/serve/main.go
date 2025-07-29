@@ -99,7 +99,14 @@ func run() (err error) {
 	}
 
 	ctx := context.Background()
-	logger := slog.New(log.New(slog.NewJSONHandler(os.Stdout, nil)))
+
+	environment, err := requireEnv("ENVIRONMENT")
+	if err != nil {
+		return err
+	}
+
+	options := log.PrettyJSONHandlerOptions{PrettyPrint: environment != "production"}
+	logger := slog.New(log.New(log.NewPrettyJSONHandler(os.Stdout, &options)))
 
 	db, err := newDB(logger)
 	if err != nil {
