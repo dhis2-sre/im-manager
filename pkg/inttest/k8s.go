@@ -79,7 +79,7 @@ func (k K8sClient) AssertPodIsReady(t *testing.T, namespace string, instance str
 	for {
 		select {
 		case <-tm.C:
-			assert.Fail(t, "timed out waiting on pod")
+			assert.Fail(t, "timed out waiting on pod: "+namespace+"/"+podName)
 			cancel()
 			return
 		case event := <-watch.ResultChan():
