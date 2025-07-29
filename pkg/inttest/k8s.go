@@ -54,24 +54,24 @@ type K8sClient struct {
 	Config []byte
 }
 
-func (k K8sClient) AssertPodIsNotRunning(t *testing.T, namespace string, instance string, timeoutInSeconds time.Duration) {
+func (k K8sClient) AssertPodIsNotRunning(t *testing.T, namespace string, releaseName string, timeoutInSeconds time.Duration) {
 	pods, err := k.Client.CoreV1().Pods(namespace).List(context.TODO(), metav1.ListOptions{
-		LabelSelector: "app.kubernetes.io/instance=" + instance,
+		LabelSelector: "app.kubernetes.io/instance=" + releaseName,
 	})
 	require.NoError(t, err)
 
 	if len(pods.Items) == 0 {
-		t.Logf("Pod isn't found: %s/%s", namespace, instance)
+		t.Logf("Pod isn't found: %s/%s", namespace, releaseName)
 		return
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	watch, err := k.Client.CoreV1().Pods(namespace).Watch(ctx, metav1.ListOptions{
-		LabelSelector: "app.kubernetes.io/instance=" + instance,
+		LabelSelector: "app.kubernetes.io/instance=" + releaseName,
 	})
-	require.NoErrorf(t, err, "failed to find pod for instance %q", instance)
+	require.NoErrorf(t, err, "failed to find pod for release %q", releaseName)
 
-	t.Logf("Waiting for pod to terminate: %s/%s", namespace, instance)
+	t.Logf("Waiting for pod to terminate: %s/%s", namespace, releaseName)
 	start := time.Now()
 	timeout := timeoutInSeconds * time.Second
 	tm := time.NewTimer(timeout)
@@ -80,11 +80,11 @@ func (k K8sClient) AssertPodIsNotRunning(t *testing.T, namespace string, instanc
 		select {
 		case <-tm.C:
 			elapsed := time.Since(start)
-			assert.Failf(t, "pod not terminating", "timed out after %s waiting for %s/%s to terminate", elapsed.String(), namespace, instance)
+			assert.Failf(t, "pod not terminating", "timed out after %s waiting for %s/%s to terminate", elapsed.String(), namespace, releaseName)
 			cancel()
 
 			k.logAllPods(t)
-			k.logTargetPodDetails(t, namespace, instance)
+			k.logTargetPodDetails(t, namespace, releaseName)
 
 			return
 		case event := <-watch.ResultChan():
@@ -100,13 +100,13 @@ func (k K8sClient) AssertPodIsNotRunning(t *testing.T, namespace string, instanc
 			}
 			// Check current pods
 			pods, err := k.Client.CoreV1().Pods(namespace).List(context.TODO(), metav1.ListOptions{
-				LabelSelector: "app.kubernetes.io/instance=" + instance,
+				LabelSelector: "app.kubernetes.io/instance=" + releaseName,
 			})
 			require.NoError(t, err)
 
 			if len(pods.Items) == 0 {
 				elapsed := time.Since(start)
-				t.Logf("waited %s for %s/%s to terminate", elapsed, namespace, instance)
+				t.Logf("waited %s for %s/%s to terminate", elapsed, namespace, releaseName)
 				if !tm.Stop() {
 					<-tm.C
 				}
@@ -117,14 +117,14 @@ func (k K8sClient) AssertPodIsNotRunning(t *testing.T, namespace string, instanc
 	}
 }
 
-func (k K8sClient) AssertPodIsReady(t *testing.T, namespace string, instance string, timeoutInSeconds time.Duration) {
+func (k K8sClient) AssertPodIsReady(t *testing.T, namespace string, releaseName string, timeoutInSeconds time.Duration) {
 	ctx, cancel := context.WithCancel(context.Background())
 	watch, err := k.Client.CoreV1().Pods(namespace).Watch(ctx, metav1.ListOptions{
-		LabelSelector: "app.kubernetes.io/instance=" + instance,
+		LabelSelector: "app.kubernetes.io/instance=" + releaseName,
 	})
-	require.NoErrorf(t, err, "failed to find pod for instance %q", instance)
+	require.NoErrorf(t, err, "failed to find pod for release %q", releaseName)
 
-	t.Log("Waiting for:", instance)
+	t.Log("Waiting for:", releaseName)
 	start := time.Now()
 	timeout := timeoutInSeconds * time.Second
 	tm := time.NewTimer(timeout)
@@ -133,11 +133,11 @@ func (k K8sClient) AssertPodIsReady(t *testing.T, namespace string, instance str
 		select {
 		case <-tm.C:
 			elapsed := time.Since(start)
-			assert.Failf(t, "failed to find pod", "timed out after %s waiting for %s/%s", elapsed.String(), namespace, instance)
+			assert.Failf(t, "failed to find pod", "timed out after %s waiting for %s/%s", elapsed.String(), namespace, releaseName)
 			cancel()
 
 			k.logAllPods(t)
-			k.logTargetPodDetails(t, namespace, instance)
+			k.logTargetPodDetails(t, namespace, releaseName)
 
 			return
 		case event := <-watch.ResultChan():
@@ -160,7 +160,7 @@ func (k K8sClient) AssertPodIsReady(t *testing.T, namespace string, instance str
 				readyCondition := conditions[index]
 				if readyCondition.Status == "True" {
 					elapsed := time.Since(start)
-					t.Logf("waited %v for pod for %s/%s to be ready", elapsed, namespace, instance)
+					t.Logf("waited %v for pod for %s/%s to be ready", elapsed, namespace, releaseName)
 					if !tm.Stop() {
 						<-tm.C
 					}

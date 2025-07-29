@@ -16,6 +16,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/dhis2-sre/im-manager/pkg/token"
 	"github.com/getsops/sops/v3"
@@ -156,13 +157,18 @@ func TestInstanceHandler(t *testing.T) {
 			assert.NotEqual(t, parameters["REPLICA_COUNT"], "1")
 		}
 
-		deployDeployment(t, client, deployment.ID, tokens.AccessToken)
-		k8sClient.AssertPodIsReady(t, deploymentInstance.Group.Namespace, deploymentInstance.Name, 60)
+		t.Log("Deploy deployment")
+		path = fmt.Sprintf("/deployments/%d/deploy", deployment.ID)
+		client.Do(t, http.MethodPost, path, nil, http.StatusOK, inttest.WithAuthToken("sometoken"))
+		releaseName := fmt.Sprintf("%s-%d", deploymentInstance.Name, deploymentInstance.Group.ID)
+		k8sClient.AssertPodIsReady(t, deploymentInstance.Group.Namespace, releaseName, 60)
 
-		// TODO:		t.Log("Save as deployment")
-
-		destroyDeployment(t, client, deployment.ID, tokens.AccessToken)
-		k8sClient.AssertPodIsNotRunning(t, deploymentInstance.Group.Namespace, deploymentInstance.Name, 10)
+		t.Log("Destroy deployment")
+		path = fmt.Sprintf("/deployments/%d", deployment.ID)
+		client.Do(t, http.MethodDelete, path, nil, http.StatusAccepted, inttest.WithAuthToken("sometoken"))
+		// TODO: Ideally we shouldn't use sleep here but rather watch the pod until it disappears or a timeout is reached
+		time.Sleep(3 * time.Second)
+		k8sClient.AssertPodIsNotRunning(t, deploymentInstance.Group.Namespace, releaseName, 10)
 	})
 
 	t.Run("GetPublicDeployments", func(t *testing.T) {
@@ -188,19 +194,22 @@ func TestInstanceHandler(t *testing.T) {
 	t.Run("DeploymentWithCompanionStack", func(t *testing.T) {
 		t.Parallel()
 		deployment := createDeployment(t, client, "companion-deployment", tokens.AccessToken, WithDescription("some description"))
-		deploymentInstance := createDHIS2DBInstance(t, client, deployment.ID, databaseID, tokens.AccessToken)
-		deploymentInstance = createMinioInstance(t, client, deployment.ID, tokens.AccessToken)
-		deploymentInstance = createDHIS2CoreInstance(t, client, deployment.ID, tokens.AccessToken, WithParameter("ALLOW_SUSPEND", "false"))
+		dbInstance := createDHIS2DBInstance(t, client, deployment.ID, databaseID, tokens.AccessToken)
+		_ = createMinioInstance(t, client, deployment.ID, tokens.AccessToken)
+		_ = createDHIS2CoreInstance(t, client, deployment.ID, tokens.AccessToken, WithParameter("ALLOW_SUSPEND", "false"))
 
 		deployDeployment(t, client, deployment.ID, tokens.AccessToken)
-		k8sClient.AssertPodIsReady(t, deploymentInstance.Group.Namespace, deploymentInstance.Name+"-database", 30)
-		k8sClient.AssertPodIsReady(t, deploymentInstance.Group.Namespace, deploymentInstance.Name+"-minio", 30)
-		k8sClient.AssertPodIsReady(t, deploymentInstance.Group.Namespace, deploymentInstance.Name, 90)
+		namespace := dbInstance.Group.Namespace
+		base := dbInstance.Name
+		groupID := dbInstance.Group.ID
+		k8sClient.AssertPodIsReady(t, namespace, fmt.Sprintf("%s-%d-database", base, groupID), 30)
+		k8sClient.AssertPodIsReady(t, namespace, fmt.Sprintf("%s-%d-minio", base, groupID), 30)
+		k8sClient.AssertPodIsReady(t, namespace, fmt.Sprintf("%s-%d", base, groupID), 90)
 
 		destroyDeployment(t, client, deployment.ID, tokens.AccessToken)
-		k8sClient.AssertPodIsNotRunning(t, deploymentInstance.Group.Namespace, deploymentInstance.Name, 10)
-		k8sClient.AssertPodIsNotRunning(t, deploymentInstance.Group.Namespace, deploymentInstance.Name+"-minio", 30)
-		k8sClient.AssertPodIsNotRunning(t, deploymentInstance.Group.Namespace, deploymentInstance.Name+"-database", 10)
+		k8sClient.AssertPodIsNotRunning(t, namespace, fmt.Sprintf("%s-%d", base, groupID), 10)
+		k8sClient.AssertPodIsNotRunning(t, namespace, fmt.Sprintf("%s-%d-minio", base, groupID), 30)
+		k8sClient.AssertPodIsNotRunning(t, namespace, fmt.Sprintf("%s-%d-database", base, groupID), 10)
 	})
 
 	t.Run("UpdateDeployment", func(t *testing.T) {
