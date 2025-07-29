@@ -136,7 +136,7 @@ func (k K8sClient) AssertPodIsReady(t *testing.T, namespace string, instance str
 		select {
 		case <-tm.C:
 			elapsed := time.Since(start)
-			assert.Failf(t, "failed to find pod", "timed out after %s waiting for %s/%s", elapsed.String(), namespace, instance)
+			assert.Failf(t, "failed to find pod", "timed out after %s waiting for %s/%s", elapsed.String(), namespace, podName)
 			cancel()
 
 			k.logAllPods(t)
