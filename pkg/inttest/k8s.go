@@ -2,6 +2,7 @@ package inttest
 
 import (
 	"context"
+	"fmt"
 	"slices"
 	"testing"
 	"time"
@@ -54,9 +55,10 @@ type K8sClient struct {
 	Config []byte
 }
 
-func (k K8sClient) AssertPodIsNotRunning(t *testing.T, namespace string, instance string, timeoutInSeconds time.Duration) {
+func (k K8sClient) AssertPodIsNotRunning(t *testing.T, namespace string, instance string, groupId uint, timeoutInSeconds time.Duration) {
+	podName := fmt.Sprintf("%s-%d", instance, groupId)
 	pods, err := k.Client.CoreV1().Pods(namespace).List(context.TODO(), metav1.ListOptions{
-		LabelSelector: "app.kubernetes.io/instance=" + instance,
+		LabelSelector: "app.kubernetes.io/instance=" + podName,
 	})
 	require.NoError(t, err)
 
@@ -67,9 +69,9 @@ func (k K8sClient) AssertPodIsNotRunning(t *testing.T, namespace string, instanc
 
 	ctx, cancel := context.WithCancel(context.Background())
 	watch, err := k.Client.CoreV1().Pods(namespace).Watch(ctx, metav1.ListOptions{
-		LabelSelector: "app.kubernetes.io/instance=" + instance,
+		LabelSelector: "app.kubernetes.io/instance=" + podName,
 	})
-	require.NoErrorf(t, err, "failed to find pod for instance %q", instance)
+	require.NoErrorf(t, err, "failed to find pod for instance %q", podName)
 
 	t.Logf("Waiting for pod to terminate: %s/%s", namespace, instance)
 	start := time.Now()
@@ -100,7 +102,7 @@ func (k K8sClient) AssertPodIsNotRunning(t *testing.T, namespace string, instanc
 			}
 			// Check current pods
 			pods, err := k.Client.CoreV1().Pods(namespace).List(context.TODO(), metav1.ListOptions{
-				LabelSelector: "app.kubernetes.io/instance=" + instance,
+				LabelSelector: "app.kubernetes.io/instance=" + podName,
 			})
 			require.NoError(t, err)
 
@@ -117,14 +119,15 @@ func (k K8sClient) AssertPodIsNotRunning(t *testing.T, namespace string, instanc
 	}
 }
 
-func (k K8sClient) AssertPodIsReady(t *testing.T, namespace string, instance string, timeoutInSeconds time.Duration) {
+func (k K8sClient) AssertPodIsReady(t *testing.T, namespace string, instance string, groupId uint, timeoutInSeconds time.Duration) {
 	ctx, cancel := context.WithCancel(context.Background())
+	podName := fmt.Sprintf("%s-%d", instance, groupId)
 	watch, err := k.Client.CoreV1().Pods(namespace).Watch(ctx, metav1.ListOptions{
-		LabelSelector: "app.kubernetes.io/instance=" + instance,
+		LabelSelector: "app.kubernetes.io/instance=" + podName,
 	})
-	require.NoErrorf(t, err, "failed to find pod for instance %q", instance)
+	require.NoErrorf(t, err, "failed to find pod for instance %q", podName)
 
-	t.Log("Waiting for:", instance)
+	t.Log("Waiting for:", podName)
 	start := time.Now()
 	timeout := timeoutInSeconds * time.Second
 	tm := time.NewTimer(timeout)
@@ -160,7 +163,7 @@ func (k K8sClient) AssertPodIsReady(t *testing.T, namespace string, instance str
 				readyCondition := conditions[index]
 				if readyCondition.Status == "True" {
 					elapsed := time.Since(start)
-					t.Logf("waited %v for pod for %s/%s to be ready", elapsed, namespace, instance)
+					t.Logf("waited %v for pod for %s/%s to be ready", elapsed, namespace, podName)
 					if !tm.Stop() {
 						<-tm.C
 					}
