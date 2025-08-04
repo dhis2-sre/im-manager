@@ -66,9 +66,9 @@ func (k K8sClient) AssertPodIsNotRunning(t *testing.T, instance model.Deployment
 	require.Len(t, pods.Items, 0)
 }
 
-func (k K8sClient) AssertPodIsReady(t *testing.T, instance model.DeploymentInstance, timeoutInSeconds time.Duration) {
+func (k K8sClient) AssertPodIsReady(t *testing.T, instance model.DeploymentInstance, namePostfix string, timeoutInSeconds time.Duration) {
 	ctx, cancel := context.WithCancel(context.Background())
-	podName := fmt.Sprintf("%s-%d", instance.Name, instance.Group.ID)
+	podName := fmt.Sprintf("%s-%d%s", instance.Name, instance.Group.ID, namePostfix)
 	watch, err := k.Client.CoreV1().Pods(instance.Group.Namespace).Watch(ctx, metav1.ListOptions{
 		LabelSelector: "app.kubernetes.io/instance=" + podName,
 	})
