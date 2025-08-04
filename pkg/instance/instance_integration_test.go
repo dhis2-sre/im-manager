@@ -55,6 +55,7 @@ func TestInstanceHandler(t *testing.T) {
 	k8sConfig := encryptUsingAge(t, identity, k8sClient.Config)
 
 	group := &model.Group{
+		ID:         1,
 		Name:       "group-name",
 		Namespace:  "group-name",
 		Hostname:   "some",
@@ -160,6 +161,7 @@ func TestInstanceHandler(t *testing.T) {
 		t.Log("Deploy deployment")
 		path = fmt.Sprintf("/deployments/%d/deploy", deployment.ID)
 		client.Do(t, http.MethodPost, path, nil, http.StatusOK, inttest.WithAuthToken("sometoken"))
+		deploymentInstance.Group = group
 		releaseName := fmt.Sprintf("%s-%d", deploymentInstance.Name, deploymentInstance.Group.ID)
 		k8sClient.AssertPodIsReady(t, deploymentInstance.Group.Namespace, releaseName, 60)
 
