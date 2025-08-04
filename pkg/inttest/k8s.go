@@ -3,10 +3,11 @@ package inttest
 import (
 	"context"
 	"fmt"
-	"github.com/dhis2-sre/im-manager/pkg/model"
 	"slices"
 	"testing"
 	"time"
+
+	"github.com/dhis2-sre/im-manager/pkg/model"
 
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
