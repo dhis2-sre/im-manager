@@ -140,7 +140,7 @@ func (k K8sClient) AssertPodIsReady(t *testing.T, namespace string, instance str
 			cancel()
 
 			k.logAllPods(t)
-			k.logTargetPodDetails(t, namespace, instance)
+			k.logTargetPodDetails(t, namespace, podName)
 
 			return
 		case event := <-watch.ResultChan():

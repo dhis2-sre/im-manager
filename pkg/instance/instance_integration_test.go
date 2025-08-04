@@ -60,6 +60,7 @@ func TestInstanceHandler(t *testing.T) {
 	require.NoError(t, err, "failed to encrypt k8s config")
 
 	group := &model.Group{
+		ID:         1,
 		Name:       "group-name",
 		Namespace:  "group-name",
 		Hostname:   "some",
@@ -164,6 +165,7 @@ func TestInstanceHandler(t *testing.T) {
 		}
 
 		deployDeployment(t, client, deployment.ID, tokens.AccessToken)
+		deploymentInstance.Group = group
 		k8sClient.AssertPodIsReady(t, deploymentInstance.Group.Namespace, deploymentInstance.Name, deploymentInstance.Group.ID, 60)
 
 		// TODO:		t.Log("Save as deployment")
