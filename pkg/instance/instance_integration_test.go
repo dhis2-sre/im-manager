@@ -1,7 +1,9 @@
 package instance_test
 
 import (
+	"archive/tar"
 	"bytes"
+	"compress/gzip"
 	"context"
 	"crypto/rand"
 	"crypto/rsa"
@@ -124,8 +126,65 @@ func TestInstanceHandler(t *testing.T) {
 	tokens, err := tokenService.GetTokens(user, "", false)
 	require.NoError(t, err, "failed to get tokens")
 
-	databaseID := uploadDatabase(t, client, "path/name.extension", "select now();", tokens.AccessToken)
+	var databaseID string
+	{
+		t.Log("Upload")
 
+		requestBody, err := createTarGzReader("database.sql", "select now();")
+		require.NoError(t, err, "failed to create tar.gz reader")
+		nameHeader := inttest.WithHeader("X-Upload-Name", "path/database.sql.tgz")
+		groupHeader := inttest.WithHeader("X-Upload-Group", "group-name")
+		body := client.Put(t, "/databases", requestBody, http.StatusCreated, nameHeader, groupHeader, inttest.WithAuthToken(tokens.AccessToken))
+
+		var database model.Database
+		err = json.Unmarshal(body, &database)
+		require.NoError(t, err, "POST /databases: failed to unmarshal HTTP response body")
+		require.Equal(t, "path/database.sql.tgz", database.Name)
+		require.Equal(t, "group-name", database.GroupName)
+		require.Equal(t, "s3://database-bucket/group-name/path/database.sql.tgz", database.Url)
+
+		tarGzContent := s3.GetObject(t, s3Bucket, "group-name/path/database.sql.tgz")
+		actualContent, err := extractFromTarGz(bytes.NewReader(tarGzContent))
+		require.NoError(t, err, "failed to extract content from tar.gz")
+		require.Equalf(t, "select now();", actualContent, "DB in S3 should have expected content")
+
+		databaseID = strconv.FormatUint(uint64(database.ID), 10)
+	}
+
+	t.Run("DeployDHIS2-DB", func(t *testing.T) {
+		t.Log("Create deployment")
+		var deployment model.Deployment
+		body := strings.NewReader(`{
+			"name": "test-db-deployment",
+			"group": "group-name",
+			"description": "some description"
+		}`)
+		client.PostJSON(t, "/deployments", body, &deployment, inttest.WithAuthToken("sometoken"))
+
+		t.Log("Create deployment instance")
+		var deploymentInstance model.DeploymentInstance
+		body = strings.NewReader(`{
+			"groupName": "group-name",
+			"stackName": "dhis2-db",
+			"parameters": {
+				"DATABASE_ID": {
+					"value": "` + databaseID + `"
+				}
+			}
+		}`)
+		path := fmt.Sprintf("/deployments/%d/instance", deployment.ID)
+		client.PostJSON(t, path, body, &deploymentInstance, inttest.WithAuthToken("sometoken"))
+		assert.Equal(t, deployment.ID, deploymentInstance.DeploymentID)
+		assert.Equal(t, "group-name", deploymentInstance.GroupName)
+		assert.Equal(t, "dhis2-db", deploymentInstance.StackName)
+
+		t.Log("Deploy deployment")
+		path = fmt.Sprintf("/deployments/%d/deploy", deployment.ID)
+		client.Do(t, http.MethodPost, path, nil, http.StatusOK, inttest.WithAuthToken("sometoken"))
+		deploymentInstance.Group = group
+		releaseName := fmt.Sprintf("%s-%d-database", deploymentInstance.Name, deploymentInstance.Group.ID)
+		k8sClient.AssertPodIsReady(t, deploymentInstance.Group.Namespace, releaseName, 60)
+	})
 	t.Run("DeployDeploymentWithoutInstances", func(t *testing.T) {
 		t.Parallel()
 		deployment := createDeployment(t, client, "test-deployment", tokens.AccessToken, WithDescription("some description"))
@@ -327,4 +386,63 @@ func (gs groupService) FindByGroupNames(ctx context.Context, groupNames []string
 
 func (gs groupService) Find(ctx context.Context, name string) (*model.Group, error) {
 	return gs.group, nil
+}
+
+func createTarGzReader(filename, content string) (io.Reader, error) {
+	var buf bytes.Buffer
+	gzipWriter := gzip.NewWriter(&buf)
+	tarWriter := tar.NewWriter(gzipWriter)
+
+	header := &tar.Header{
+		Name: filename,
+		Mode: 0600,
+		Size: int64(len(content)),
+	}
+
+	if err := tarWriter.WriteHeader(header); err != nil {
+		return nil, fmt.Errorf("failed to write tar header: %w", err)
+	}
+
+	if _, err := tarWriter.Write([]byte(content)); err != nil {
+		return nil, fmt.Errorf("failed to write tar file content: %w", err)
+	}
+
+	if err := tarWriter.Close(); err != nil {
+		return nil, fmt.Errorf("failed to close tar writer: %w", err)
+	}
+
+	if err := gzipWriter.Close(); err != nil {
+		return nil, fmt.Errorf("failed to close gzip writer: %w", err)
+	}
+
+	return bytes.NewReader(buf.Bytes()), nil
+}
+
+func extractFromTarGz(r io.Reader) (string, error) {
+	gzipReader, err := gzip.NewReader(r)
+	if err != nil {
+		return "", fmt.Errorf("failed to create gzip reader: %w", err)
+	}
+	defer gzipReader.Close()
+
+	tarReader := tar.NewReader(gzipReader)
+
+	header, err := tarReader.Next()
+	if err == io.EOF {
+		return "", fmt.Errorf("empty tar archive")
+	}
+	if err != nil {
+		return "", fmt.Errorf("failed to read tar header: %w", err)
+	}
+
+	if header.Typeflag != tar.TypeReg {
+		return "", fmt.Errorf("expected regular file, got %v", header.Typeflag)
+	}
+
+	var content bytes.Buffer
+	if _, err := io.Copy(&content, tarReader); err != nil {
+		return "", fmt.Errorf("failed to read file content: %w", err)
+	}
+
+	return content.String(), nil
 }
