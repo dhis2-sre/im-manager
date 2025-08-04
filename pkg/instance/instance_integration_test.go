@@ -46,6 +46,7 @@ func TestInstanceHandler(t *testing.T) {
 	k8sConfig := encryptUsingAge(t, identity, k8sClient.Config)
 
 	group := &model.Group{
+		ID:         1,
 		Name:       "group-name",
 		Namespace:  "group-name",
 		Hostname:   "some",
@@ -221,14 +222,16 @@ func TestInstanceHandler(t *testing.T) {
 		t.Log("Deploy deployment")
 		path = fmt.Sprintf("/deployments/%d/deploy", deployment.ID)
 		client.Do(t, http.MethodPost, path, nil, http.StatusOK, inttest.WithAuthToken("sometoken"))
-		k8sClient.AssertPodIsReady(t, deploymentInstance.Group.Namespace, deploymentInstance.Name, deploymentInstance.Group.ID, 60)
+		// The Group isn't returned from the above request but the id is used as part of the pod name so it's assigned manually here
+		deploymentInstance.Group = group
+		k8sClient.AssertPodIsReady(t, deploymentInstance, 60)
 
 		t.Log("Destroy deployment")
 		path = fmt.Sprintf("/deployments/%d", deployment.ID)
 		client.Do(t, http.MethodDelete, path, nil, http.StatusAccepted, inttest.WithAuthToken("sometoken"))
 		// TODO: Ideally we shouldn't use sleep here but rather watch the pod until it disappears or a timeout is reached
 		time.Sleep(3 * time.Second)
-		k8sClient.AssertPodIsNotRunning(t, deploymentInstance.Group.Namespace, deploymentInstance.Name, deploymentInstance.Group.ID)
+		k8sClient.AssertPodIsNotRunning(t, deploymentInstance)
 	})
 
 	t.Run("GetPublicDeployments", func(t *testing.T) {

@@ -3,6 +3,7 @@ package inttest
 import (
 	"context"
 	"fmt"
+	"github.com/dhis2-sre/im-manager/pkg/model"
 	"slices"
 	"testing"
 	"time"
@@ -55,19 +56,19 @@ type K8sClient struct {
 	Config []byte
 }
 
-func (k K8sClient) AssertPodIsNotRunning(t *testing.T, namespace string, instance string, groupId uint) {
-	pods, err := k.Client.CoreV1().Pods(namespace).List(context.TODO(), metav1.ListOptions{
-		LabelSelector: "app.kubernetes.io/instance=" + fmt.Sprintf("%s-%d", instance, groupId),
+func (k K8sClient) AssertPodIsNotRunning(t *testing.T, instance model.DeploymentInstance) {
+	pods, err := k.Client.CoreV1().Pods(instance.Group.Namespace).List(context.TODO(), metav1.ListOptions{
+		LabelSelector: "app.kubernetes.io/instance=" + fmt.Sprintf("%s-%d", instance.Name, instance.Group.ID),
 	})
 	require.NoError(t, err)
 
 	require.Len(t, pods.Items, 0)
 }
 
-func (k K8sClient) AssertPodIsReady(t *testing.T, namespace string, instance string, groupId uint, timeoutInSeconds time.Duration) {
+func (k K8sClient) AssertPodIsReady(t *testing.T, instance model.DeploymentInstance, timeoutInSeconds time.Duration) {
 	ctx, cancel := context.WithCancel(context.Background())
-	podName := fmt.Sprintf("%s-%d", instance, groupId)
-	watch, err := k.Client.CoreV1().Pods(namespace).Watch(ctx, metav1.ListOptions{
+	podName := fmt.Sprintf("%s-%d", instance.Name, instance.Group.ID)
+	watch, err := k.Client.CoreV1().Pods(instance.Group.Namespace).Watch(ctx, metav1.ListOptions{
 		LabelSelector: "app.kubernetes.io/instance=" + podName,
 	})
 	require.NoErrorf(t, err, "failed to find pod for instance %q", podName)
@@ -79,7 +80,7 @@ func (k K8sClient) AssertPodIsReady(t *testing.T, namespace string, instance str
 	for {
 		select {
 		case <-tm.C:
-			assert.Fail(t, "timed out waiting on pod: "+namespace+"/"+podName)
+			assert.Fail(t, "timed out waiting on pod: "+instance.Group.Namespace+"/"+podName)
 			cancel()
 			return
 		case event := <-watch.ResultChan():
