@@ -17,10 +17,11 @@ type Database struct {
 	ExternalDownloads []ExternalDownload `json:"externalDownloads" gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
 	Lock              *Lock              `json:"lock" gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
 	Slug              string             `json:"slug" gorm:"uniqueIndex"`
-	// TODO: Sql or fs?
-	Type        string    `json:"type"`
-	FilestoreID uint      `json:"filestoreId"`
-	Filestore   *Database `json:"filestore" gorm:"foreignKey:ID"`
+	Type              string             `json:"type"` // TODO: Strictly sql or fs?
+	FilestoreID       uint               `json:"filestoreId"`
+	Filestore         *Database          `json:"filestore" gorm:"foreignKey:ID"`
+	UserID            uint               `json:"userId"`
+	User              User               `json:"user"`
 }
 
 // swagger:model

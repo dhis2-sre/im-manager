@@ -82,6 +82,7 @@ func TestDatabaseHandler(t *testing.T) {
 	}
 
 	var instanceID string
+	var userID uint
 	{
 		group := &model.Group{
 			Name:     "group-name",
@@ -94,6 +95,7 @@ func TestDatabaseHandler(t *testing.T) {
 			},
 		}
 		db.Create(user)
+		userID = user.ID
 
 		deployment := &model.Deployment{
 			UserID:    user.ID,
@@ -120,6 +122,7 @@ func TestDatabaseHandler(t *testing.T) {
 
 		assert.Equal(t, "path/name.extension", actualDB.Name)
 		assert.Equal(t, "packages", actualDB.GroupName)
+		assert.Equal(t, userID, actualDB.UserID)
 	})
 
 	t.Run("Download", func(t *testing.T) {
@@ -140,6 +143,7 @@ func TestDatabaseHandler(t *testing.T) {
 
 			require.Equal(t, "path/copy.extension", actualDB.Name)
 			require.Equal(t, "packages", actualDB.GroupName)
+			assert.Equal(t, userID, actualDB.UserID)
 
 			actualContent := s3.GetObject(t, s3Bucket, "packages/path/copy.extension")
 			require.Equalf(t, "file contents", string(actualContent), "DB in S3 should have expected content")
