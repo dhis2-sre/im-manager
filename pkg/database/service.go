@@ -432,7 +432,7 @@ func (s service) Save(ctx context.Context, userId uint, database *model.Database
 
 	tmpName := uuid.New().String()
 	format := getFormat(database)
-	_, err := s.SaveAs(ctx, database, instance, stack, tmpName, format, func(ctx context.Context, saved *model.Database) {
+	_, err := s.SaveAs(ctx, database.UserID, database, instance, stack, tmpName, format, func(ctx context.Context, saved *model.Database) {
 		defer func() {
 			if !isLocked {
 				err := s.Unlock(ctx, database.ID)
@@ -502,7 +502,7 @@ func getFormat(database *model.Database) string {
 	return "plain"
 }
 
-func (s service) SaveAs(ctx context.Context, database *model.Database, instance *model.DeploymentInstance, stack *model.Stack, newName string, format string, done func(ctx context.Context, saved *model.Database)) (*model.Database, error) {
+func (s service) SaveAs(ctx context.Context, userId uint, database *model.Database, instance *model.DeploymentInstance, stack *model.Stack, newName string, format string, done func(ctx context.Context, saved *model.Database)) (*model.Database, error) {
 	// TODO: Add to config
 	dumpPath := "/mnt/data/"
 
@@ -521,6 +521,7 @@ func (s service) SaveAs(ctx context.Context, database *model.Database, instance 
 		// TODO: For now, only saving to the same group is supported
 		GroupName: instance.GroupName,
 		Type:      "database",
+		UserID:    userId,
 	}
 
 	err = s.repository.Save(ctx, newDatabase)
