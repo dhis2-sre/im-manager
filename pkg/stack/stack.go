@@ -134,7 +134,7 @@ func ValidateConsumedParameters(stacks []model.Stack) error {
 
 const ifNotPresent = "IfNotPresent"
 
-// Stack representing ../../stacks/dhis2-db/helmfile.yaml
+// Stack representing ../../stacks/dhis2-db/helmfile.yaml.gotmpl
 var DHIS2DB = model.Stack{
 	// TODO: Remove HostnamePattern once stacks 2.0 are the default
 	HostnamePattern: "%s-database-postgresql.%s.svc",
@@ -177,7 +177,7 @@ var dhis2DBDefaults = struct {
 	resourcesRequestsMemory: "256Mi",
 }
 
-// Stack representing ../../stacks/dhis2-core/helmfile.yaml
+// Stack representing ../../stacks/dhis2-core/helmfile.yaml.gotmpl
 var DHIS2Core = model.Stack{
 	Name: "dhis2-core",
 	Parameters: model.StackParameters{
@@ -290,7 +290,7 @@ var dhis2CoreDefaults = struct {
 	googleAuthClientId:           " ",
 }
 
-// Stack representing ../../stacks/dhis2/helmfile.yaml
+// Stack representing ../../stacks/dhis2/helmfile.yaml.gotmpl
 var DHIS2 = model.Stack{
 	// TODO: Remove HostnamePattern once stacks 2.0 are the default
 	HostnamePattern: "%s-database-postgresql.%s.svc",
@@ -338,7 +338,7 @@ var dhis2Defaults = struct {
 	installRedis: "false",
 }
 
-// Stack representing ../../stacks/pgadmin/helmfile.yaml
+// Stack representing ../../stacks/pgadmin/helmfile.yaml.gotmpl
 var PgAdmin = model.Stack{
 	Name: "pgadmin",
 	Parameters: model.StackParameters{
@@ -361,7 +361,7 @@ var pgAdminDefaults = struct {
 	chartVersion: "1.33.3",
 }
 
-// Stack representing ../../stacks/whoami-go/helmfile.yaml
+// Stack representing ../../stacks/whoami-go/helmfile.yaml.gotmpl
 var WhoamiGo = model.Stack{
 	Name: "whoami-go",
 	Parameters: model.StackParameters{
@@ -388,7 +388,7 @@ var whoamiGoDefaults = struct {
 	replicaCount:    "1",
 }
 
-// Stack representing ../../stacks/im-job-runner/helmfile.yaml
+// Stack representing ../../stacks/im-job-runner/helmfile.yaml.gotmpl
 var IMJobRunner = model.Stack{
 	Name: "im-job-runner",
 	Parameters: model.StackParameters{

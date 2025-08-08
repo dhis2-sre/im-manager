@@ -118,7 +118,7 @@ func parseStacks(dir string) (map[string]*stack, error) {
 }
 
 func parseStack(dir, name string) (*stack, error) {
-	path := fmt.Sprintf("%s/%s/helmfile.yaml", dir, name)
+	path := fmt.Sprintf("%s/%s/helmfile.yaml.gotmpl", dir, name)
 	file, err := os.ReadFile(path) // #nosec
 	if err != nil {
 		return nil, fmt.Errorf("error reading stack %q: %v", name, err)
