@@ -99,6 +99,8 @@ ingress:
     # for our workload it won't matter
     nginx.ingress.kubernetes.io/proxy-request-buffering: "off"
     nginx.ingress.kubernetes.io/client-body-buffer-size: "10m"
+    # Increase the proxy response buffer size to fix the response headers limit issue.
+    nginx.ingress.kubernetes.io/proxy-buffer-size: "16k"
 
 resources: {}
   # We usually recommend not to specify default resources and to leave this as a conscious
