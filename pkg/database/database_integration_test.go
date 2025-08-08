@@ -59,6 +59,22 @@ func TestDatabaseHandler(t *testing.T) {
 		database.Routes(engine, authenticator, databaseHandler)
 	})
 
+	var userID uint
+	{
+		group := &model.Group{
+			Name:     "group-name",
+			Hostname: "some",
+		}
+		user := &model.User{
+			Email: "user1@dhis2.org",
+			Groups: []model.Group{
+				*group,
+			},
+		}
+		db.Create(user)
+		userID = user.ID
+	}
+
 	var databaseID string
 	{
 		t.Log("Upload")
@@ -82,32 +98,17 @@ func TestDatabaseHandler(t *testing.T) {
 	}
 
 	var instanceID string
-	var userID uint
 	{
-		group := &model.Group{
-			Name:     "group-name",
-			Hostname: "some",
-		}
-		user := &model.User{
-			Email: "user1@dhis2.org",
-			Groups: []model.Group{
-				*group,
-			},
-		}
-		db.Create(user)
-		userID = user.ID
-
 		deployment := &model.Deployment{
-			UserID:    user.ID,
+			UserID:    userID,
 			Name:      "name",
-			GroupName: group.Name,
+			GroupName: "group-name",
 		}
 		db.Create(deployment)
 
 		instance := &model.DeploymentInstance{
-			ID:           0,
 			Name:         "name",
-			GroupName:    group.Name,
+			GroupName:    "group-name",
 			StackName:    "dhis2",
 			DeploymentID: deployment.ID,
 		}
