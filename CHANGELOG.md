@@ -1,4 +1,43 @@
 
+<a name="v0.58.0"></a>
+## [v0.58.0](https://github.com/dhis2-sre/im-manager/compare/v0.57.2...v0.58.0)
+
+> 2025-08-09
+
+### Chore
+
+* fix createGroup script ([#1174](https://github.com/dhis2-sre/im-manager/issues/1174))
+* increase proxy buffer size ([#1175](https://github.com/dhis2-sre/im-manager/issues/1175))
+* include cluster
+* sops
+
+### Feat
+
+* pretty log json ([#1164](https://github.com/dhis2-sre/im-manager/issues/1164))
+
+
+<a name="v0.57.2"></a>
+## [v0.57.2](https://github.com/dhis2-sre/im-manager/compare/v0.57.1...v0.57.2)
+
+> 2025-07-22
+
+
+<a name="v0.57.1"></a>
+## [v0.57.1](https://github.com/dhis2-sre/im-manager/compare/v0.57.0...v0.57.1)
+
+> 2025-07-14
+
+
+<a name="v0.57.0"></a>
+## [v0.57.0](https://github.com/dhis2-sre/im-manager/compare/v0.56.1...v0.57.0)
+
+> 2025-07-10
+
+### Chore
+
+* generate change log
+
+
 <a name="v0.56.1"></a>
 ## [v0.56.1](https://github.com/dhis2-sre/im-manager/compare/v0.56.0...v0.56.1)
 
@@ -228,7 +267,7 @@
 
 
 <a name="v0.45.0"></a>
-## [v0.45.0](https://github.com/dhis2-sre/im-manager/compare/v0.43.0...v0.45.0)
+## [v0.45.0](https://github.com/dhis2-sre/im-manager/compare/v0.44.0...v0.45.0)
 
 > 2024-11-27
 
@@ -238,14 +277,14 @@
 * order public instances as stable, development and nightly
 
 
-<a name="v0.43.0"></a>
-## [v0.43.0](https://github.com/dhis2-sre/im-manager/compare/v0.44.0...v0.43.0)
+<a name="v0.44.0"></a>
+## [v0.44.0](https://github.com/dhis2-sre/im-manager/compare/v0.43.0...v0.44.0)
 
 > 2024-11-27
 
 
-<a name="v0.44.0"></a>
-## [v0.44.0](https://github.com/dhis2-sre/im-manager/compare/v0.41.0...v0.44.0)
+<a name="v0.43.0"></a>
+## [v0.43.0](https://github.com/dhis2-sre/im-manager/compare/v0.42.0...v0.43.0)
 
 > 2024-11-27
 
@@ -255,14 +294,14 @@
 * use PAT
 
 
-<a name="v0.41.0"></a>
-## [v0.41.0](https://github.com/dhis2-sre/im-manager/compare/v0.42.0...v0.41.0)
+<a name="v0.42.0"></a>
+## [v0.42.0](https://github.com/dhis2-sre/im-manager/compare/v0.41.0...v0.42.0)
 
 > 2024-11-20
 
 
-<a name="v0.42.0"></a>
-## [v0.42.0](https://github.com/dhis2-sre/im-manager/compare/v0.40.0...v0.42.0)
+<a name="v0.41.0"></a>
+## [v0.41.0](https://github.com/dhis2-sre/im-manager/compare/v0.40.0...v0.41.0)
 
 > 2024-11-20
 
@@ -1507,17 +1546,7 @@
 
 
 <a name="v0.5.6"></a>
-## [v0.5.6](https://github.com/dhis2-sre/im-manager/compare/v0.5.7...v0.5.6)
-
-> 2022-04-11
-
-### Fix
-
-* Use func names with argument signatures to change ownership [DEVOPS-102]
-
-
-<a name="v0.5.7"></a>
-## [v0.5.7](https://github.com/dhis2-sre/im-manager/compare/v0.5.9...v0.5.7)
+## [v0.5.6](https://github.com/dhis2-sre/im-manager/compare/v0.5.9...v0.5.6)
 
 > 2022-04-11
 
@@ -1537,7 +1566,17 @@
 
 
 <a name="v0.5.8"></a>
-## [v0.5.8](https://github.com/dhis2-sre/im-manager/compare/v0.5.3...v0.5.8)
+## [v0.5.8](https://github.com/dhis2-sre/im-manager/compare/v0.5.7...v0.5.8)
+
+> 2022-04-11
+
+### Fix
+
+* Use func names with argument signatures to change ownership [DEVOPS-102]
+
+
+<a name="v0.5.7"></a>
+## [v0.5.7](https://github.com/dhis2-sre/im-manager/compare/v0.5.3...v0.5.7)
 
 > 2022-04-11
 
