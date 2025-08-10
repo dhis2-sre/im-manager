@@ -255,10 +255,6 @@ func (s service) Delete(ctx context.Context, id uint) error {
 	return s.deleteFS(ctx, d)
 }
 
-func (s service) DeleteRecordOnly(ctx context.Context, id uint) error {
-	return s.repository.Delete(ctx, id)
-}
-
 func (s service) deleteFS(ctx context.Context, d *model.Database) error {
 	fs, err := s.repository.FindById(ctx, d.FilestoreID)
 	if err != nil {
@@ -460,8 +456,7 @@ func (s service) Save(ctx context.Context, userId uint, database *model.Database
 			return
 		}
 
-		// Delete the original database record, but not the S3 object.
-		err = s.DeleteRecordOnly(ctx, database.ID)
+		err = s.repository.Delete(ctx, database.ID)
 		if err != nil {
 			s.logError(ctx, err)
 			return
