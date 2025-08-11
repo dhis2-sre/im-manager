@@ -89,19 +89,26 @@ func (h Handler) Upload(c *gin.Context) {
 
 	databaseName := strings.Trim(name, "/")
 
-	d := model.Database{
-		Name:      databaseName,
-		GroupName: groupName,
-		Type:      "database",
-	}
-
-	err := h.canAccess(c, &d)
+	ctx := c.Request.Context()
+	user, err := handler.GetUserFromContext(ctx)
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
 
-	ctx := c.Request.Context()
+	d := model.Database{
+		Name:      databaseName,
+		GroupName: groupName,
+		Type:      "database",
+		UserID:    user.ID,
+	}
+
+	err = h.canAccess(c, &d)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
 	group, err := h.groupService.Find(ctx, d.GroupName)
 	if err != nil {
 		_ = c.Error(err)
@@ -189,7 +196,13 @@ func (h Handler) SaveAs(c *gin.Context) {
 		return
 	}
 
-	savedDatabase, err := h.databaseService.SaveAs(ctx, database, instance, stack, request.Name, request.Format, func(ctx context.Context, saved *model.Database) {
+	user, err := handler.GetUserFromContext(ctx)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	savedDatabase, err := h.databaseService.SaveAs(ctx, user.ID, database, instance, stack, request.Name, request.Format, func(ctx context.Context, saved *model.Database) {
 		h.logger.InfoContext(ctx, "Save an instances database as", "groupName", saved.GroupName, "databaseName", saved.Name, "instanceName", instance.Name)
 	})
 	if err != nil {
@@ -206,6 +219,10 @@ func (h Handler) SaveAs(c *gin.Context) {
 
 	coreInstance, err := getInstanceByStack("dhis2-core", deployment.Instances)
 	if err != nil {
+		if errdef.IsNotFound(err) {
+			c.JSON(http.StatusCreated, savedDatabase)
+			return
+		}
 		_ = c.Error(err)
 		return
 	}
@@ -330,19 +347,26 @@ func (h Handler) Copy(c *gin.Context) {
 		return
 	}
 
-	d := &model.Database{
-		Name:      request.Name,
-		GroupName: request.Group,
-		Type:      "database",
-	}
-
-	err := h.canAccess(c, d)
+	ctx := c.Request.Context()
+	user, err := handler.GetUserFromContext(ctx)
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
 
-	ctx := c.Request.Context()
+	d := &model.Database{
+		Name:      request.Name,
+		GroupName: request.Group,
+		Type:      "database",
+		UserID:    user.ID,
+	}
+
+	err = h.canAccess(c, d)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
 	group, err := h.groupService.Find(ctx, d.GroupName)
 	if err != nil {
 		_ = c.Error(err)
