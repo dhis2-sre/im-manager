@@ -435,7 +435,7 @@ func (s service) Save(ctx context.Context, userId uint, database *model.Database
 	_, err := s.SaveAs(ctx, database, instance, stack, tmpName, format, func(ctx context.Context, saved *model.Database) {
 		defer func() {
 			if !isLocked {
-				err := s.Unlock(ctx, database.ID)
+				err := s.repository.Unlock(ctx, database.ID)
 				if err != nil {
 					s.logError(ctx, fmt.Errorf("unlock database failed: %v", err))
 				}
@@ -454,6 +454,11 @@ func (s service) Save(ctx context.Context, userId uint, database *model.Database
 		if err != nil {
 			s.logError(ctx, fmt.Errorf("moving database failed: %v", err))
 			return
+		}
+
+		err = s.repository.Unlock(ctx, database.ID)
+		if err != nil {
+			s.logError(ctx, fmt.Errorf("unlock database failed: %v", err))
 		}
 
 		err = s.repository.Delete(ctx, database.ID)
