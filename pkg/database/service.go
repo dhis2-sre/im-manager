@@ -194,17 +194,27 @@ type ReadAtSeeker interface {
 
 func (s service) Upload(ctx context.Context, d *model.Database, group *model.Group, reader ReadAtSeeker, size int64) (*model.Database, error) {
 	key := fmt.Sprintf("%s/%s", group.Name, d.Name)
+
+	s.logger.InfoContext(ctx, "Upload function called", "bucket", s.s3Bucket, "key", key, "databaseName", d.Name, "groupName", group.Name, "fileSize", size)
+
 	err := s.s3Client.Upload(ctx, s.s3Bucket, key, reader, size)
 	if err != nil {
+		s.logger.ErrorContext(ctx, "S3 upload failed", "error", err, "bucket", s.s3Bucket, "key", key, "databaseName", d.Name)
 		return nil, err
 	}
 
+	s.logger.InfoContext(ctx, "S3 upload successful", "bucket", s.s3Bucket, "key", key, "databaseName", d.Name)
+
 	d.Url = fmt.Sprintf("s3://%s/%s", s.s3Bucket, key)
+	s.logger.InfoContext(ctx, "Database URL set", "url", d.Url, "databaseName", d.Name)
 
 	err = s.repository.Save(ctx, d)
 	if err != nil {
+		s.logger.ErrorContext(ctx, "Failed to save database after upload", "error", err, "databaseName", d.Name)
 		return nil, err
 	}
+
+	s.logger.InfoContext(ctx, "Database saved to repository after upload", "databaseName", d.Name, "databaseId", d.ID)
 
 	return d, nil
 }
@@ -509,15 +519,23 @@ func (s service) SaveAs(ctx context.Context, database *model.Database, instance 
 	// TODO: Add to config
 	dumpPath := "/mnt/data/"
 
+	s.logger.InfoContext(ctx, "SaveAs started", "format", format, "newName", newName, "databaseName", database.Name)
+
 	group, err := s.groupService.Find(ctx, instance.GroupName)
 	if err != nil {
+		s.logger.ErrorContext(ctx, "Failed to find group", "error", err, "groupName", instance.GroupName)
 		return nil, err
 	}
 
+	s.logger.InfoContext(ctx, "Group found", "groupName", group.Name)
+
 	dump, err := newPgDumpConfig(instance, stack)
 	if err != nil {
+		s.logger.ErrorContext(ctx, "Failed to create pg_dump config", "error", err)
 		return nil, err
 	}
+
+	s.logger.InfoContext(ctx, "PgDump config created successfully")
 
 	newDatabase := &model.Database{
 		Name: newName,
@@ -526,17 +544,26 @@ func (s service) SaveAs(ctx context.Context, database *model.Database, instance 
 		Type:      "database",
 	}
 
+	s.logger.InfoContext(ctx, "Saving new database to repository", "databaseName", newDatabase.Name, "groupName", newDatabase.GroupName)
+
 	err = s.repository.Save(ctx, newDatabase)
 	if err != nil {
+		s.logger.ErrorContext(ctx, "Failed to save new database to repository", "error", err)
 		return nil, err
 	}
+
+	s.logger.InfoContext(ctx, "New database saved to repository successfully", "databaseId", newDatabase.ID)
 
 	// only use ctx for values (logging) and not cancellation signals since we create a go routine
 	// that outlives the HTTP request scope
 	ctx = context.WithoutCancel(ctx)
 	go func() {
+		s.logger.InfoContext(ctx, "Starting background SaveAs process", "format", format, "databaseId", newDatabase.ID)
+
 		var ret *forwarder.Result
 		if group.Cluster.Configuration != nil {
+			s.logger.InfoContext(ctx, "Setting up port forwarding for cluster", "clusterName", group.Cluster.Name)
+
 			hostname := fmt.Sprintf(stack.HostnamePattern, instance.Name, instance.Group.Namespace)
 			serviceName := strings.Split(hostname, ".")[0]
 			options := []*forwarder.Option{
@@ -547,27 +574,40 @@ func (s service) SaveAs(ctx context.Context, database *model.Database, instance 
 				},
 			}
 
+			s.logger.InfoContext(ctx, "Port forwarding options", "hostname", hostname, "serviceName", serviceName, "namespace", instance.Group.Namespace)
+
 			kubeConfig, err := decryptYaml(group.Cluster.Configuration)
 			if err != nil {
+				s.logger.ErrorContext(ctx, "Failed to decrypt cluster configuration", "error", err)
 				s.logError(ctx, err)
 				return
 			}
 
+			s.logger.InfoContext(ctx, "Cluster configuration decrypted successfully")
+
 			ret, err = forwarder.WithForwardersEmbedConfig(context.Background(), options, kubeConfig)
 			if err != nil {
+				s.logger.ErrorContext(ctx, "Failed to setup port forwarding", "error", err)
 				s.logError(ctx, err)
 				return
 			}
 			defer ret.Close()
 
+			s.logger.InfoContext(ctx, "Port forwarding setup successful")
+
 			ports, err := ret.Ready()
 			if err != nil {
+				s.logger.ErrorContext(ctx, "Failed to get port forwarding ports", "error", err)
 				s.logError(ctx, err)
 				return
 			}
 
+			s.logger.InfoContext(ctx, "Port forwarding ports ready", "localPort", ports[0][0].Local, "remotePort", ports[0][0].Remote)
+
 			dump.Host = "localhost"
 			dump.Port = int(ports[0][0].Local)
+		} else {
+			s.logger.InfoContext(ctx, "No cluster configuration, using direct connection")
 		}
 
 		dump.SetPath(dumpPath)
@@ -575,62 +615,170 @@ func (s service) SaveAs(ctx context.Context, database *model.Database, instance 
 		dump.SetFileName(fileId + ".dump")
 		dump.SetupFormat(format)
 
+		s.logger.InfoContext(ctx, "PgDump configured", "dumpPath", dumpPath, "fileName", fileId+".dump", "format", format)
+
+		s.logger.InfoContext(ctx, "PgDump command details", "format", format, "host", dump.Host, "port", dump.Port, "database", dump.DB, "username", dump.Username)
+
+		if format == "custom" {
+			s.logger.InfoContext(ctx, "Using custom format for database backup", "format", format)
+		}
+
 		// TODO: Remove... Or at least make configurable
 		//dump.EnableVerbose()
 
-		dumpExec := dump.Exec(pg.ExecOptions{StreamPrint: true, StreamDestination: os.Stdout})
-		if dumpExec.Error != nil {
-			s.logger.ErrorContext(ctx, "Failed to dump DB", "error", dumpExec.Error.Err, "dumpOutput", dumpExec.Output)
+		s.logger.InfoContext(ctx, "Executing pg_dump", "format", format)
+
+		// Add timeout context for pg_dump execution
+		dumpCtx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+		defer cancel()
+
+		var dumpExec pg.Result
+		var dumpErr *pg.ResultError
+
+		// Run pg_dump in a goroutine to monitor it
+		dumpDone := make(chan struct{})
+		go func() {
+			defer close(dumpDone)
+			s.logger.InfoContext(ctx, "Starting pg_dump execution in goroutine", "format", format)
+			dumpExec = dump.Exec(pg.ExecOptions{StreamPrint: true, StreamDestination: os.Stdout})
+			dumpErr = dumpExec.Error
+			s.logger.InfoContext(ctx, "Pg_dump goroutine completed", "format", format, "hasError", dumpErr != nil)
+		}()
+
+		// Wait for completion or timeout
+		select {
+		case <-dumpDone:
+			s.logger.InfoContext(ctx, "Pg_dump execution completed", "format", format)
+		case <-dumpCtx.Done():
+			s.logger.ErrorContext(ctx, "Pg_dump execution timed out", "format", format, "timeout", "5 minutes")
+			return
+		}
+
+		if dumpErr != nil {
+			s.logger.ErrorContext(ctx, "Failed to dump DB", "error", dumpErr.Err, "dumpOutput", dumpExec.Output, "format", format)
+			return
+		}
+
+		s.logger.InfoContext(ctx, "Pg_dump completed successfully", "outputFile", dumpExec.File, "format", format, "commandOutput", dumpExec.Output)
+
+		if dumpExec.File == "" {
+			s.logger.ErrorContext(ctx, "Pg_dump output file is empty", "format", format, "commandOutput", dumpExec.Output)
 			return
 		}
 
 		dumpFile := path.Join(dumpPath, dumpExec.File)
+		s.logger.InfoContext(ctx, "Checking dump file immediately after pg_dump", "dumpFile", dumpFile, "format", format)
+
+		time.Sleep(100 * time.Millisecond)
+
+		if _, err := os.Stat(dumpFile); os.IsNotExist(err) {
+			s.logger.ErrorContext(ctx, "Dump file still does not exist after pg_dump", "dumpFile", dumpFile, "format", format, "dumpPath", dumpPath, "dumpFileName", dumpExec.File)
+			return
+		}
+
+		s.logger.InfoContext(ctx, "Dump file confirmed to exist after pg_dump", "dumpFile", dumpFile, "format", format)
+
+		s.logger.InfoContext(ctx, "Opening dump file", "dumpFile", dumpFile, "format", format)
+
+		if fileInfo, err := os.Stat(dumpFile); err == nil {
+			s.logger.InfoContext(ctx, "Dump file exists", "dumpFile", dumpFile, "size", fileInfo.Size(), "mode", fileInfo.Mode(), "format", format)
+		}
+
 		file, err := os.Open(dumpFile) // #nosec
 		if err != nil {
+			s.logger.ErrorContext(ctx, "Failed to open dump file", "error", err, "dumpFile", dumpFile, "format", format)
 			s.logError(ctx, err)
 			return
 		}
 		defer s.removeTempFile(ctx, file)
 
+		s.logger.InfoContext(ctx, "Dump file opened successfully", "format", format)
+
+		initialStat, err := file.Stat()
+		if err != nil {
+			s.logger.ErrorContext(ctx, "Failed to get initial file stats", "error", err, "format", format)
+			s.logError(ctx, err)
+			return
+		}
+		s.logger.InfoContext(ctx, "Initial file stats", "fileName", file.Name(), "size", initialStat.Size(), "format", format)
+
+		firstBytes := make([]byte, 16)
+		_, err = file.Read(firstBytes)
+		if err != nil && err != io.EOF {
+			s.logger.ErrorContext(ctx, "Failed to read first bytes from file", "error", err, "format", format)
+			s.logError(ctx, err)
+			return
+		}
+		s.logger.InfoContext(ctx, "File first bytes", "firstBytes", fmt.Sprintf("%x", firstBytes), "bytesRead", len(firstBytes), "format", format)
+
+		_, err = file.Seek(0, 0)
+		if err != nil {
+			s.logger.ErrorContext(ctx, "Failed to seek to beginning of file after reading", "error", err, "format", format)
+			s.logError(ctx, err)
+			return
+		}
+
 		if format == "plain" {
+			s.logger.InfoContext(ctx, "Processing plain format - compressing with gzip")
 			gzFileName := path.Join(dumpPath, fileId+".gz")
 			file, err = s.gz(ctx, gzFileName, database, file)
 			if err != nil {
+				s.logger.ErrorContext(ctx, "Failed to compress plain format file", "error", err, "format", format)
 				s.logError(ctx, err)
 				return
 			}
 
 			defer s.removeTempFile(ctx, file)
+			s.logger.InfoContext(ctx, "Plain format file compressed successfully", "format", format)
+		} else if format == "custom" {
+			s.logger.InfoContext(ctx, "Processing custom format - no compression needed", "format", format)
+		} else {
+			s.logger.InfoContext(ctx, "Unknown format, proceeding without compression", "format", format)
 		}
+
+		s.logger.InfoContext(ctx, "File processing completed", "finalFileName", file.Name(), "format", format)
 
 		stat, err := file.Stat()
 		if err != nil {
+			s.logger.ErrorContext(ctx, "Failed to get file stats", "error", err, "format", format)
 			s.logError(ctx, err)
 			return
 		}
+
+		s.logger.InfoContext(ctx, "File stats obtained", "fileName", file.Name(), "size", stat.Size(), "format", format)
 
 		// This is added due to the following issue - https://github.com/aws/aws-sdk-go/issues/1962
 		_, err = file.Seek(0, 0)
 		if err != nil {
+			s.logger.ErrorContext(ctx, "Failed to seek to beginning of file", "error", err, "format", format)
 			s.logError(ctx, err)
 			return
 		}
+
+		s.logger.InfoContext(ctx, "File position reset to beginning", "format", format)
+
+		s.logger.InfoContext(ctx, "Starting S3 upload", "databaseName", newDatabase.Name, "groupName", newDatabase.GroupName, "fileSize", stat.Size(), "format", format)
 
 		_, err = s.Upload(ctx, newDatabase, group, file, stat.Size())
 		if err != nil {
+			s.logger.ErrorContext(ctx, "Failed to upload to S3", "error", err, "databaseName", newDatabase.Name, "groupName", newDatabase.GroupName, "format", format)
 			s.logError(ctx, err)
 			return
 		}
 
+		s.logger.InfoContext(ctx, "S3 upload completed successfully", "databaseName", newDatabase.Name, "format", format)
+
 		done(ctx, newDatabase)
+		s.logger.InfoContext(ctx, "SaveAs background process completed successfully", "databaseId", newDatabase.ID, "format", format)
 	}()
 
+	s.logger.InfoContext(ctx, "SaveAs function returning new database", "databaseId", newDatabase.ID, "format", format)
 	return newDatabase, nil
 }
 
 func (s service) logError(ctx context.Context, err error) {
 	// TODO: Persist error message
-	s.logger.ErrorContext(ctx, "Failed to SaveAs DB", "error", err)
+	s.logger.ErrorContext(ctx, "Failed to SaveAs DB", "error", err, "errorType", fmt.Sprintf("%T", err))
 }
 
 func (s service) removeTempFile(ctx context.Context, fd *os.File) {
