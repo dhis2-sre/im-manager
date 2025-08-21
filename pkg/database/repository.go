@@ -191,6 +191,7 @@ func (r repository) FindByGroupNames(ctx context.Context, groupNames []string) (
 	err := query.
 		Where("type = ?", "database").
 		Order("updated_at desc").
+		Joins("User").
 		Joins("Lock.User").
 		Joins("Lock.Instance").
 		Find(&databases).Error
