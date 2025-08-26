@@ -101,7 +101,7 @@ func run() (err error) {
 	ctx := context.Background()
 
 	prettyPrint, exists := os.LookupEnv("LOG_PRETTY_PRINT")
-	enablePrettyPrint := !exists || prettyPrint != "false"
+	enablePrettyPrint := exists && prettyPrint == "true"
 
 	options := log.PrettyJSONHandlerOptions{PrettyPrint: enablePrettyPrint}
 	logger := slog.New(log.New(log.NewPrettyJSONHandler(os.Stdout, &options)))
