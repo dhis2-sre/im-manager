@@ -49,6 +49,12 @@ deploy:
         valuesFiles:
           - helm/data/secrets/{{ .CLASSIFICATION }}/rabbitmq.yaml
           - helm/data/values/{{ .CLASSIFICATION }}/rabbitmq.yaml
+        setValueTemplates:
+          global:
+            security:
+              allowInsecureImages: true
+          image:
+            repository: bitnamilegacy/rabbitmq
 
       - name: im-redis-{{ .ENVIRONMENT }}
         namespace: instance-manager-{{ .CLASSIFICATION }}
@@ -59,6 +65,12 @@ deploy:
         upgradeOnChange: true
         valuesFiles:
           - helm/data/values/{{ .CLASSIFICATION }}/redis.yaml
+        setValueTemplates:
+          global:
+            security:
+              allowInsecureImages: true
+          image:
+            repository: bitnamilegacy/redis
 
       - name: im-manager-postgresql-{{ .ENVIRONMENT }}
         namespace: instance-manager-{{ .CLASSIFICATION }}
