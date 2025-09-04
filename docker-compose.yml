@@ -84,7 +84,7 @@ services:
       - prod
 
   rabbitmq:
-    image: bitnami/rabbitmq:3.13
+    image: bitnamilegacy/rabbitmq:3.13
     ports:
       - "127.0.0.1:5552:5552" # Stream
       - "127.0.0.1:5672:5672" # regular AMQP
