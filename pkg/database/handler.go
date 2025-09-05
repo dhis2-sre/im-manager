@@ -210,11 +210,16 @@ func (h Handler) SaveAs(c *gin.Context) {
 		return
 	}
 
-	err = h.instanceService.FilestoreBackup(ctx, coreInstance, request.Name, savedDatabase)
-	if err != nil {
-		_ = c.Error(err)
-		return
-	}
+	// Use background context for long-running filestore backup
+	// The HTTP request context may be canceled before backup completes
+	go func() {
+		backupCtx := context.Background()
+		err := h.instanceService.FilestoreBackup(backupCtx, coreInstance, request.Name, savedDatabase)
+		if err != nil {
+			// Log error but don't fail the HTTP request since database backup already succeeded
+			h.logger.ErrorContext(backupCtx, "Filestore backup failed in background", "error", err, "databaseId", savedDatabase.ID)
+		}
+	}()
 
 	c.JSON(http.StatusCreated, savedDatabase)
 }

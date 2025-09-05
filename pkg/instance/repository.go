@@ -221,6 +221,10 @@ func (r repository) SaveDatabase(ctx context.Context, database *model.Database) 
 	return r.db.WithContext(ctx).Save(&database).Error
 }
 
+func (r repository) UpdateDatabase(ctx context.Context, database *model.Database) error {
+	return r.db.WithContext(ctx).Model(&model.Database{}).Where("id = ?", database.ID).Update("filestore_id", database.FilestoreID).Error
+}
+
 func (r repository) FindAllDeployments(ctx context.Context) ([]model.Deployment, error) {
 	var deployments []model.Deployment
 	err := r.db.WithContext(ctx).
