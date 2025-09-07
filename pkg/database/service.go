@@ -435,7 +435,7 @@ func (s service) Save(ctx context.Context, userId uint, database *model.Database
 	_, err := s.SaveAs(ctx, database.UserID, database, instance, stack, tmpName, format, func(ctx context.Context, saved *model.Database) {
 		defer func() {
 			if !isLocked {
-				err := s.Unlock(ctx, database.ID)
+				err := s.repository.Unlock(ctx, database.ID)
 				if err != nil {
 					s.logError(ctx, fmt.Errorf("unlock database failed: %v", err))
 				}
@@ -448,30 +448,33 @@ func (s service) Save(ctx context.Context, userId uint, database *model.Database
 			return
 		}
 
-		err = s.Unlock(ctx, database.ID)
+		sourceKey := strings.TrimPrefix(u.Path, "/")
+		destinationKey := fmt.Sprintf("%s/%s", database.GroupName, database.Name)
+		err = s.s3Client.Move(s.s3Bucket, sourceKey, destinationKey)
+		if err != nil {
+			s.logError(ctx, fmt.Errorf("moving database failed: %v", err))
+			return
+		}
+
+		err = s.repository.Unlock(ctx, database.ID)
 		if err != nil {
 			s.logError(ctx, fmt.Errorf("unlock database failed: %v", err))
 		}
 
-		err = s.Delete(ctx, database.ID)
-		if err != nil {
-			s.logError(ctx, err)
-			return
-		}
-
-		sourceKey := strings.TrimPrefix(u.Path, "/")
-		destinationKey := fmt.Sprintf("%s/%s", saved.GroupName, database.Name)
-		err = s.s3Client.Move(s.s3Bucket, sourceKey, destinationKey)
+		err = s.repository.Delete(ctx, database.ID)
 		if err != nil {
 			s.logError(ctx, err)
 			return
 		}
 
 		saved.Name = database.Name
+		saved.GroupName = database.GroupName
 		saved.Url = database.Url
 		saved.Slug = database.Slug
 		saved.CreatedAt = database.CreatedAt
-		err = s.Update(ctx, saved)
+
+		// Use the repository Update method, since the service Update method also performs an S3 move.
+		err = s.repository.Update(ctx, saved)
 		if err != nil {
 			s.logError(ctx, err)
 			return
