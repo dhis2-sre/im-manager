@@ -224,12 +224,13 @@ func (r repository) SaveDatabase(ctx context.Context, database *model.Database) 
 func (r repository) FindAllDeployments(ctx context.Context) ([]model.Deployment, error) {
 	var deployments []model.Deployment
 	err := r.db.WithContext(ctx).
+		Preload("Instances").
 		Find(&deployments).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return []model.Deployment{}, nil
 		}
-		return nil, fmt.Errorf("failed to find instance: %v", err)
+		return nil, fmt.Errorf("failed to find deployments: %v", err)
 	}
 	return deployments, err
 }
