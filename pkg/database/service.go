@@ -1,6 +1,7 @@
 package database
 
 import (
+	"cmp"
 	"compress/gzip"
 	"context"
 	"errors"
@@ -10,6 +11,7 @@ import (
 	"net/url"
 	"os"
 	"path"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -318,7 +320,16 @@ func groupsWithDatabases(databases []model.Database) []GroupsWithDatabases {
 		groupsWithDatabases[i].Databases = filterDatabases(databases, func(database *model.Database) bool {
 			return database.GroupName == groupName
 		})
+
+		slices.SortFunc(groupsWithDatabases[i].Databases, func(a, b model.Database) int {
+			return cmp.Compare(a.Name, b.Name)
+		})
 	}
+
+	slices.SortFunc(groupsWithDatabases, func(a, b GroupsWithDatabases) int {
+		return cmp.Compare(a.Name, b.Name)
+	})
+
 	return groupsWithDatabases
 }
 
