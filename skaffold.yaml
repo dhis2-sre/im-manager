@@ -120,6 +120,7 @@ deploy:
             S3_REGION: eu-west-1
             DEFAULT_TTL: "172800" # 48 hours
             PASSWORD_TOKEN_TTL: "900" # 15 minutes
+            LOG_PRETTY_PRINT: "{{ .LOG_PRETTY_PRINT }}"
         useHelmSecrets: true
         valuesFiles:
           - helm/data/secrets/{{ .CLASSIFICATION }}/values.yaml
