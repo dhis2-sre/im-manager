@@ -45,3 +45,12 @@ rules:
       - networkpolicies
     verbs:
       - patch
+# KEDA
+  - apiGroups:
+      - http.keda.sh
+    resources:
+      - HTTPScaledObject
+    verbs:
+      - get
+      - create
+      - delete
