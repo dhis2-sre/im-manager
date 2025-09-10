@@ -99,6 +99,8 @@ releases:
           requests:
             cpu: {{ requiredEnv "RESOURCES_REQUESTS_CPU" }}
             memory: {{ requiredEnv "RESOURCES_REQUESTS_MEMORY" }}
+      - keda:
+          enabled: {{ requiredEnv "ALLOW_SUSPEND" }}
 
   {{- if eq (requiredEnv "STORAGE_TYPE") "minio" }}
   - name: "{{ requiredEnv "INSTANCE_NAME" }}-minio"
