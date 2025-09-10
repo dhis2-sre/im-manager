@@ -49,7 +49,7 @@ rules:
   - apiGroups:
       - http.keda.sh
     resources:
-      - HTTPScaledObject
+      - httpscaledobjects
     verbs:
       - get
       - create
