@@ -227,7 +227,7 @@ func (h Handler) SaveAs(c *gin.Context) {
 		return
 	}
 
-	err = h.instanceService.FilestoreBackup(ctx, coreInstance, request.Name, savedDatabase)
+	err = h.instanceService.FilestoreBackup(ctx, coreInstance, savedDatabase.Name, savedDatabase)
 	if err != nil {
 		_ = c.Error(err)
 		return
