@@ -52,46 +52,43 @@ releases:
       {{- end }}
 
       {{- if eq (requiredEnv "STORAGE_TYPE") "minio" }}
-      - minIOConfig: |
-          filestore.provider = s3
-          filestore.container = dhis2
-          filestore.endpoint = http://{{ requiredEnv "INSTANCE_NAME" }}-minio.{{ requiredEnv "INSTANCE_NAMESPACE" }}.svc:9000
-          filestore.location = eu-west-1
-          filestore.identity = dhisdhis
-          filestore.secret = dhisdhis
+      - minIO:
+          provider: s3
+          container: dhis2
+          endpoint: http://{{ requiredEnv "INSTANCE_NAME" }}-minio.{{ requiredEnv "INSTANCE_NAMESPACE" }}.svc:9000
+          location: eu-west-1
+          identity: dhisdhis
+          secret: dhisdhis
       {{- end }}
 
       {{- if eq (requiredEnv "STORAGE_TYPE") "s3" }}
-      - S3Config: |
-          filestore.provider = aws-s3
-          filestore.container = {{ requiredEnv "S3_BUCKET" }}
-          filestore.location = {{ requiredEnv "S3_REGION" }}
-          filestore.identity = {{ requiredEnv "S3_IDENTITY" }}
-          filestore.secret = {{ requiredEnv "S3_SECRET" }}
+      - S3:
+          provider: aws-s3
+          container: {{ requiredEnv "S3_BUCKET" }}
+          location: {{ requiredEnv "S3_REGION" }}
+          identity: {{ requiredEnv "S3_IDENTITY" }}
+          secret: {{ requiredEnv "S3_SECRET" }}
       {{- end }}
 
-      - dhisConfig: |
-          # Custom DHIS2 configuration
-          # !!!Caution!!!
-          # It's important to have this section at the top of the file so users can't overwrite any of the subsequent configuration listed below
-          # Notably we don't want users to be able to set the database connection to a database they shouldn't have access to
-          {{- if ne (requiredEnv "CUSTOM_DHIS2_CONFIG") "" }}
+      - database:
+          username: {{ requiredEnv "DATABASE_USERNAME" }}
+          password: {{ requiredEnv "DATABASE_PASSWORD" }}
+          database: {{ requiredEnv "DATABASE_NAME" }}
+          hostname: {{ requiredEnv "DATABASE_HOSTNAME" }}
+
+      {{- if ne (requiredEnv "CUSTOM_DHIS2_CONFIG") "" }}
+      - customConfigSnippet:
           {{- requiredEnv "CUSTOM_DHIS2_CONFIG" | nindent 10 }}
-          {{- end }}
-          connection.dialect = org.hibernate.dialect.PostgreSQLDialect
-          connection.driver_class = org.postgresql.Driver
-          connection.url = jdbc:postgresql://{{ requiredEnv "DATABASE_HOSTNAME" }}/{{ requiredEnv "DATABASE_NAME" }}
-          connection.username = {{ requiredEnv "DATABASE_USERNAME" }}
-          connection.password = {{ requiredEnv "DATABASE_PASSWORD" }}
-          # Server base URL
-          server.base.url = https://{{ requiredEnv "INSTANCE_HOSTNAME" }}/{{ requiredEnv "INSTANCE_NAME" }}
-          # This will ensure the secure property of the JSESSIONID cookie is set to true
-          server.https = on
-          flyway.migrate_out_of_order = {{ requiredEnv "FLYWAY_MIGRATE_OUT_OF_ORDER" }}
-          flyway.repair_before_migration = {{ requiredEnv "FLYWAY_REPAIR_BEFORE_MIGRATION" }}
-          # Enables logging of all SQL queries.
-          enable.query.logging = {{ requiredEnv "ENABLE_QUERY_LOGGING" }}
-          session.cookie.samesite = {{ requiredEnv "SAME_SITE_COOKIES" }}
+      {{- end }}
+
+      - sessionCookieSameSite: {{ requiredEnv "SAME_SITE_COOKIES" }}
+
+      - flyway:
+          migrateOutOfOrder: {{ requiredEnv "FLYWAY_MIGRATE_OUT_OF_ORDER" }}
+          repairBeforeMigration: {{ requiredEnv "FLYWAY_REPAIR_BEFORE_MIGRATION" }}
+
+      - enableQueryLogging: {{ requiredEnv "ENABLE_QUERY_LOGGING" }}
+
       - googleAuth:
           projectId: "{{ requiredEnv "GOOGLE_AUTH_PROJECT_ID" }}"
           privateKeyId: "{{ requiredEnv "GOOGLE_AUTH_PRIVATE_KEY_ID" }}"
@@ -102,6 +99,8 @@ releases:
           requests:
             cpu: {{ requiredEnv "RESOURCES_REQUESTS_CPU" }}
             memory: {{ requiredEnv "RESOURCES_REQUESTS_MEMORY" }}
+      - keda:
+          enabled: {{ requiredEnv "ALLOW_SUSPEND" }}
 
   {{- if eq (requiredEnv "STORAGE_TYPE") "minio" }}
   - name: "{{ requiredEnv "INSTANCE_NAME" }}-minio"
