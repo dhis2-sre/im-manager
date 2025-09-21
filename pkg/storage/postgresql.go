@@ -59,6 +59,11 @@ func NewDatabase(logger *slog.Logger, c PostgresqlConfig) (*gorm.DB, error) {
 		return nil, fmt.Errorf("failed to open Gorm session: %v", err)
 	}
 
+	err = db.Exec("CREATE EXTENSION IF NOT EXISTS pg_trgm").Error
+	if err != nil {
+		return nil, fmt.Errorf("failed to create pg_trgm extension: %v", err)
+	}
+
 	// GORM Doesn't handle the creation of gin indexes very well so the index is created manually here
 	//dev-1           | [00] Starting service
 	//database-1      | 2025-09-21 19:29:19.904 UTC [98] ERROR:  operator class "gin_trgm_ops" does not exist for access method "btree"
