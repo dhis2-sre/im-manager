@@ -78,6 +78,7 @@ services:
       timeout: 3s
       retries: 5
     volumes:
+      - ./init-scripts:/docker-entrypoint-initdb.d:ro
       - database:/var/lib/postgresql/data
     profiles:
       - dev
