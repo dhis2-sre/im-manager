@@ -75,6 +75,12 @@ func (h Handler) Upload(c *gin.Context) {
 		return
 	}
 
+	description := strings.TrimSpace(c.GetHeader("X-Upload-Description"))
+	if description == "" {
+		_ = c.Error(errdef.NewBadRequest("X-Upload-Description header is required"))
+		return
+	}
+
 	contentType := c.GetHeader("Content-Type")
 	if contentType == "" {
 		contentType = "application/octet-stream"
@@ -97,10 +103,11 @@ func (h Handler) Upload(c *gin.Context) {
 	}
 
 	d := model.Database{
-		Name:      databaseName,
-		GroupName: groupName,
-		Type:      "database",
-		UserID:    user.ID,
+		Name:        databaseName,
+		Description: description,
+		GroupName:   groupName,
+		Type:        "database",
+		UserID:      user.ID,
 	}
 
 	err = h.canAccess(c, &d)
@@ -661,7 +668,8 @@ func (h Handler) List(c *gin.Context) {
 }
 
 type UpdateDatabaseRequest struct {
-	Name string `json:"name" binding:"required"`
+	Name        string `json:"name" binding:"required"`
+	Description string `json:"description" binding:"required"`
 }
 
 // Update database
@@ -706,6 +714,7 @@ func (h Handler) Update(c *gin.Context) {
 	}
 
 	d.Name = request.Name
+	d.Description = request.Description
 
 	err = h.databaseService.Update(ctx, d)
 	if err != nil {
