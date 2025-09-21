@@ -13,7 +13,7 @@ type Database struct {
 	UpdatedAt         time.Time          `json:"updatedAt"`
 	Name              string             `json:"name" gorm:"index:database_name_group_idx,unique"`
 	GroupName         string             `json:"groupName" gorm:"index:database_name_group_idx,unique"`
-	Description       string             `json:"description" gorm:"type:text;index:idx_database_description,expression:description gin_trgm_ops,using:gin"`
+	Description       string             `json:"description" gorm:"type:text"`
 	Url               string             `json:"url"` // s3... Path?
 	ExternalDownloads []ExternalDownload `json:"externalDownloads" gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
 	Lock              *Lock              `json:"lock" gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
