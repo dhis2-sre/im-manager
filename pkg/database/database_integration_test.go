@@ -171,7 +171,7 @@ func TestDatabaseHandler(t *testing.T) {
 		{
 			t.Log("Update")
 
-			requestBody := strings.NewReader(`{"name": "path/rename.extension"}`)
+			requestBody := strings.NewReader(`{"name": "path/rename.extension", "description": "some new description"}`)
 			response := client.Do(t, http.MethodPut, "/databases/"+databaseID, requestBody, http.StatusOK, inttest.WithHeader("Content-Type", "application/json"))
 			var actualDB model.Database
 			err := json.Unmarshal(response, &actualDB)
