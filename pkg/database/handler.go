@@ -76,10 +76,6 @@ func (h Handler) Upload(c *gin.Context) {
 	}
 
 	description := strings.TrimSpace(c.GetHeader("X-Upload-Description"))
-	if description == "" {
-		_ = c.Error(errdef.NewBadRequest("X-Upload-Description header is required"))
-		return
-	}
 
 	contentType := c.GetHeader("Content-Type")
 	if contentType == "" {
