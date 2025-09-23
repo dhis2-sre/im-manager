@@ -35,5 +35,10 @@ func SetupDB(t *testing.T) *gorm.DB {
 		DatabaseName: "test_im",
 	})
 	require.NoError(t, err, "failed to setup DB")
+
+	sql := "CREATE EXTENSION IF NOT EXISTS pg_trgm"
+	err = db.Exec(sql).Error
+	require.NoError(t, err, "failed to create DB extension")
+
 	return db
 }

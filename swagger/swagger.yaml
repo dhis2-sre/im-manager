@@ -120,6 +120,9 @@ definitions:
                 format: date-time
                 type: string
                 x-go-name: CreatedAt
+            description:
+                type: string
+                x-go-name: Description
             externalDownloads:
                 items:
                     $ref: '#/definitions/ExternalDownload'
@@ -563,6 +566,9 @@ definitions:
         x-go-package: github.com/dhis2-sre/im-manager/pkg/cluster
     UpdateDatabaseRequest:
         properties:
+            description:
+                type: string
+                x-go-name: Description
             name:
                 type: string
                 x-go-name: Name
