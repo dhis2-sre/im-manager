@@ -1,4 +1,15 @@
 
+<a name="v0.59.1"></a>
+## [v0.59.1](https://github.com/dhis2-sre/im-manager/compare/v0.59.0...v0.59.1)
+
+> 2025-10-08
+
+### Chore
+
+* add ALLOW_SUSPEND param to deploy script ([#1250](https://github.com/dhis2-sre/im-manager/issues/1250))
+* generate change log for v0.59.0
+
+
 <a name="v0.59.0"></a>
 ## [v0.59.0](https://github.com/dhis2-sre/im-manager/compare/v0.58.0...v0.59.0)
 
@@ -301,7 +312,7 @@
 
 
 <a name="v0.45.0"></a>
-## [v0.45.0](https://github.com/dhis2-sre/im-manager/compare/v0.44.0...v0.45.0)
+## [v0.45.0](https://github.com/dhis2-sre/im-manager/compare/v0.43.0...v0.45.0)
 
 > 2024-11-27
 
@@ -311,14 +322,14 @@
 * order public instances as stable, development and nightly
 
 
-<a name="v0.44.0"></a>
-## [v0.44.0](https://github.com/dhis2-sre/im-manager/compare/v0.43.0...v0.44.0)
+<a name="v0.43.0"></a>
+## [v0.43.0](https://github.com/dhis2-sre/im-manager/compare/v0.44.0...v0.43.0)
 
 > 2024-11-27
 
 
-<a name="v0.43.0"></a>
-## [v0.43.0](https://github.com/dhis2-sre/im-manager/compare/v0.41.0...v0.43.0)
+<a name="v0.44.0"></a>
+## [v0.44.0](https://github.com/dhis2-sre/im-manager/compare/v0.42.0...v0.44.0)
 
 > 2024-11-27
 
@@ -328,14 +339,14 @@
 * use PAT
 
 
-<a name="v0.41.0"></a>
-## [v0.41.0](https://github.com/dhis2-sre/im-manager/compare/v0.42.0...v0.41.0)
+<a name="v0.42.0"></a>
+## [v0.42.0](https://github.com/dhis2-sre/im-manager/compare/v0.41.0...v0.42.0)
 
 > 2024-11-20
 
 
-<a name="v0.42.0"></a>
-## [v0.42.0](https://github.com/dhis2-sre/im-manager/compare/v0.40.0...v0.42.0)
+<a name="v0.41.0"></a>
+## [v0.41.0](https://github.com/dhis2-sre/im-manager/compare/v0.40.0...v0.41.0)
 
 > 2024-11-20
 
@@ -1525,27 +1536,18 @@
 
 
 <a name="v0.5.10"></a>
-## [v0.5.10](https://github.com/dhis2-sre/im-manager/compare/v0.5.9...v0.5.10)
+## [v0.5.10](https://github.com/dhis2-sre/im-manager/compare/v0.5.5...v0.5.10)
 
 > 2022-04-11
 
 ### Fix
 
 * Only change the ownership of generate_uid() func [DEVOPS-102]
-
-
-<a name="v0.5.9"></a>
-## [v0.5.9](https://github.com/dhis2-sre/im-manager/compare/v0.5.7...v0.5.9)
-
-> 2022-04-11
-
-### Fix
-
 * Use func names with argument signatures to change ownership [DEVOPS-102]
 
 
-<a name="v0.5.7"></a>
-## [v0.5.7](https://github.com/dhis2-sre/im-manager/compare/v0.5.6...v0.5.7)
+<a name="v0.5.5"></a>
+## [v0.5.5](https://github.com/dhis2-sre/im-manager/compare/v0.5.6...v0.5.5)
 
 > 2022-04-11
 
@@ -1555,7 +1557,7 @@
 
 
 <a name="v0.5.6"></a>
-## [v0.5.6](https://github.com/dhis2-sre/im-manager/compare/v0.5.5...v0.5.6)
+## [v0.5.6](https://github.com/dhis2-sre/im-manager/compare/v0.5.9...v0.5.6)
 
 > 2022-04-11
 
@@ -1564,8 +1566,8 @@
 * Use func names with argument signatures to change ownership [DEVOPS-102]
 
 
-<a name="v0.5.5"></a>
-## [v0.5.5](https://github.com/dhis2-sre/im-manager/compare/v0.5.8...v0.5.5)
+<a name="v0.5.9"></a>
+## [v0.5.9](https://github.com/dhis2-sre/im-manager/compare/v0.5.8...v0.5.9)
 
 > 2022-04-11
 
@@ -1575,7 +1577,17 @@
 
 
 <a name="v0.5.8"></a>
-## [v0.5.8](https://github.com/dhis2-sre/im-manager/compare/v0.5.3...v0.5.8)
+## [v0.5.8](https://github.com/dhis2-sre/im-manager/compare/v0.5.7...v0.5.8)
+
+> 2022-04-11
+
+### Fix
+
+* Use func names with argument signatures to change ownership [DEVOPS-102]
+
+
+<a name="v0.5.7"></a>
+## [v0.5.7](https://github.com/dhis2-sre/im-manager/compare/v0.5.3...v0.5.7)
 
 > 2022-04-11
 
