@@ -1,4 +1,18 @@
 
+<a name="v0.59.3"></a>
+## [v0.59.3](https://github.com/dhis2-sre/im-manager/compare/v0.59.2...v0.59.3)
+
+> 2025-10-09
+
+### Chore
+
+* generate change log for v0.59.2
+
+### Fix
+
+* use group namespace instead of name in minio endpoint ([#1255](https://github.com/dhis2-sre/im-manager/issues/1255))
+
+
 <a name="v0.59.2"></a>
 ## [v0.59.2](https://github.com/dhis2-sre/im-manager/compare/v0.59.1...v0.59.2)
 
