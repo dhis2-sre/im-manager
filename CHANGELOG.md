@@ -1,4 +1,19 @@
 
+<a name="v0.59.2"></a>
+## [v0.59.2](https://github.com/dhis2-sre/im-manager/compare/v0.59.1...v0.59.2)
+
+> 2025-10-09
+
+### Chore
+
+* add ALLOW_SUSPEND to request body ([#1254](https://github.com/dhis2-sre/im-manager/issues/1254))
+* generate change log for v0.59.1
+
+### Docs
+
+* update command order in release instructions ([#1249](https://github.com/dhis2-sre/im-manager/issues/1249))
+
+
 <a name="v0.59.1"></a>
 ## [v0.59.1](https://github.com/dhis2-sre/im-manager/compare/v0.59.0...v0.59.1)
 
