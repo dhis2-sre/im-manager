@@ -105,6 +105,9 @@ echo "{
     },
     \"ENABLE_QUERY_LOGGING\": {
       \"value\": \"$ENABLE_QUERY_LOGGING\"
+    },
+    \"ALLOW_SUSPEND\": {
+      \"value\": \"$ALLOW_SUSPEND\"
     }
   }
 }" | $HTTP post "$IM_HOST/deployments/$DEPLOYMENT_ID/instance" "Authorization: Bearer $ACCESS_TOKEN"
