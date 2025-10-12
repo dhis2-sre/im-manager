@@ -177,6 +177,43 @@ var dhis2DBDefaults = struct {
 	resourcesRequestsMemory: "256Mi",
 }
 
+// Stack representing ../../stacks/minio/helmfile.yaml.gotmpl
+var MINIO = model.Stack{
+	Name: "minio",
+	Parameters: model.StackParameters{
+		"DATABASE_ID":         {Priority: 1, DisplayName: "Database"},
+		"MINIO_STORAGE_SIZE":  {Priority: 2, DisplayName: "Storage Size", DefaultValue: &minIODefaults.storageSize},
+		"MINIO_CHART_VERSION": {Priority: 3, DisplayName: "Chart Version", DefaultValue: &minIODefaults.chartVersion},
+		"IMAGE_PULL_POLICY":   {Priority: 3, DisplayName: "Image Pull Policy", DefaultValue: &minIODefaults.imagePullPolicy, Validator: imagePullPolicy},
+	},
+	ParameterProviders: model.ParameterProviders{
+		"MINIO_HOSTNAME": minioHostnameProvider,
+	},
+	KubernetesResource: model.DeploymentResource,
+}
+
+// Provides the Minio hostname of an instance.
+var minioHostnameProvider = model.ParameterProviderFunc(func(instance model.DeploymentInstance) (string, error) {
+	return fmt.Sprintf("%s-minio.%s.svc", instance.Name, instance.Group.Namespace), nil
+})
+
+var storageCompanionProvider = model.RequireCompanionFunc(func(parameter model.DeploymentInstanceParameter) (*model.Stack, error) {
+	if parameter.Value == minIOStorage {
+		return &MINIO, nil
+	}
+	return nil, nil
+})
+
+var minIODefaults = struct {
+	chartVersion    string
+	storageSize     string
+	imagePullPolicy string
+}{
+	chartVersion:    "14.7.5",
+	storageSize:     "8Gi",
+	imagePullPolicy: ifNotPresent,
+}
+
 // Stack representing ../../stacks/dhis2-core/helmfile.yaml.gotmpl
 var DHIS2Core = model.Stack{
 	Name: "dhis2-core",
@@ -184,7 +221,7 @@ var DHIS2Core = model.Stack{
 		"IMAGE_TAG":                       {Priority: 1, DisplayName: "Image Tag", DefaultValue: &dhis2CoreDefaults.imageTag},
 		"IMAGE_REPOSITORY":                {Priority: 2, DisplayName: "Image Repository", DefaultValue: &dhis2CoreDefaults.imageRepository},
 		"IMAGE_PULL_POLICY":               {Priority: 3, DisplayName: "Image Pull Policy", DefaultValue: &dhis2CoreDefaults.imagePullPolicy, Validator: imagePullPolicy},
-		"STORAGE_TYPE":                    {Priority: 4, DisplayName: "Storage type", DefaultValue: &dhis2CoreDefaults.storageType, Validator: storage},
+		"STORAGE_TYPE":                    {Priority: 4, DisplayName: "Storage type", DefaultValue: &dhis2CoreDefaults.storageType, Validator: storage, RequireCompanion: storageCompanionProvider},
 		"S3_BUCKET":                       {Priority: 5, DisplayName: "S3 bucket", DefaultValue: &dhis2CoreDefaults.s3Bucket},
 		"S3_REGION":                       {Priority: 6, DisplayName: "S3 region", DefaultValue: &dhis2CoreDefaults.s3Region, Sensitive: true},
 		"S3_IDENTITY":                     {Priority: 7, DisplayName: "S3 identity", DefaultValue: &dhis2CoreDefaults.s3Identity, Sensitive: true},
@@ -221,6 +258,9 @@ var DHIS2Core = model.Stack{
 	},
 	Requires: []model.Stack{
 		DHIS2DB,
+	},
+	Companions: []model.Stack{
+		MINIO,
 	},
 	KubernetesResource: model.DeploymentResource,
 }
