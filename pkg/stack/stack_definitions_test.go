@@ -37,12 +37,13 @@ func TestStackDefinitionsAreInSyncWithHelmfile(t *testing.T) {
 	}
 
 	// helmfileParameters will not contain Go Validator or Provider functions. We therefore need to
-	// create map of stack name to parameters with parameters only containing. DefaultValue and
+	// create a map of stack name to parameters with parameters only containing. DefaultValue and
 	// Consumed as we cannot ignore fields in the assertions we use.
 	stacks := map[string]model.StackParameters{
 		"dhis2-db":      DHIS2DB.Parameters,
 		"dhis2-core":    DHIS2Core.Parameters,
 		"dhis2":         DHIS2.Parameters,
+		"minio":         MINIO.Parameters,
 		"pgadmin":       PgAdmin.Parameters,
 		"whoami-go":     WhoamiGo.Parameters,
 		"im-job-runner": IMJobRunner.Parameters,

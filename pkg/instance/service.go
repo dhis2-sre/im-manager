@@ -207,17 +207,43 @@ func (s Service) validateNoCycles(instances []*model.DeploymentInstance) (graph.
 		if err != nil {
 			return nil, err
 		}
+
+		for _, instanceParameter := range src.Parameters {
+			stackParameter := stack.Parameters[instanceParameter.ParameterName]
+			if stackParameter.RequireCompanion != nil {
+				companion, err := stackParameter.RequireCompanion.Require(instanceParameter)
+				if err != nil {
+					return nil, fmt.Errorf("failed to check companion for parameter %q: %v", instanceParameter.ParameterName, err)
+				}
+				if companion != nil {
+					companionStackName := companion.Name
+					err := g.AddEdge(src.StackName, companionStackName)
+					if err != nil {
+						if errors.Is(err, graph.ErrEdgeAlreadyExists) {
+							return nil, fmt.Errorf("instance %q requires %q more than once", src.Name, companionStackName)
+						} else if errors.Is(err, graph.ErrEdgeCreatesCycle) {
+							return nil, fmt.Errorf("link from instance %q to stack %q creates a cycle", src.Name, companionStackName)
+						} else if errors.Is(err, graph.ErrVertexNotFound) {
+							return nil, fmt.Errorf("%q is required by %q", companionStackName, src.StackName)
+						}
+						return nil, fmt.Errorf("failed linking instance %q with instance %q: %v", src.Name, companionStackName, err)
+					}
+				}
+			}
+		}
+
 		for _, requiredStack := range stack.Requires {
-			err := g.AddEdge(src.StackName, requiredStack.Name)
+			requiredStackName := requiredStack.Name
+			err := g.AddEdge(src.StackName, requiredStackName)
 			if err != nil {
 				if errors.Is(err, graph.ErrEdgeAlreadyExists) {
-					return nil, fmt.Errorf("instance %q requires %q more than once", src.Name, requiredStack.Name)
+					return nil, fmt.Errorf("instance %q requires %q more than once", src.Name, requiredStackName)
 				} else if errors.Is(err, graph.ErrEdgeCreatesCycle) {
-					return nil, fmt.Errorf("link from instance %q to stack %q creates a cycle", src.Name, requiredStack.Name)
+					return nil, fmt.Errorf("link from instance %q to stack %q creates a cycle", src.Name, requiredStackName)
 				} else if errors.Is(err, graph.ErrVertexNotFound) {
-					return nil, fmt.Errorf("%q is required by %q", requiredStack.Name, src.StackName)
+					return nil, fmt.Errorf("%q is required by %q", requiredStackName, src.StackName)
 				}
-				return nil, fmt.Errorf("failed linking instance %q with instance %q: %v", src.Name, requiredStack.Name, err)
+				return nil, fmt.Errorf("failed linking instance %q with instance %q: %v", src.Name, requiredStackName, err)
 			}
 		}
 	}

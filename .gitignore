@@ -3,3 +3,5 @@ im-manager
 .env
 .access_token_cache*
 coverage.*
+
+.session.json
