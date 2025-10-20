@@ -218,6 +218,7 @@ func (s Service) validateNoCycles(instances []*model.DeploymentInstance) (graph.
 				if companion != nil {
 					companionStackName := companion.Name
 					err := g.AddEdge(src.StackName, companionStackName)
+					// TODO: Fix error messages so they're unique and not the same as for required stacks
 					if err != nil {
 						if errors.Is(err, graph.ErrEdgeAlreadyExists) {
 							return nil, fmt.Errorf("instance %q requires %q more than once", src.Name, companionStackName)
