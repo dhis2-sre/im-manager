@@ -134,7 +134,7 @@ func ValidateConsumedParameters(stacks []model.Stack) error {
 
 const ifNotPresent = "IfNotPresent"
 
-// Stack representing ../../stacks/dhis2-db/helmfile.yaml
+// Stack representing ../../stacks/dhis2-db/helmfile.yaml.gotmpl
 var DHIS2DB = model.Stack{
 	// TODO: Remove HostnamePattern once stacks 2.0 are the default
 	HostnamePattern: "%s-database-postgresql.%s.svc",
@@ -177,7 +177,7 @@ var dhis2DBDefaults = struct {
 	resourcesRequestsMemory: "256Mi",
 }
 
-// Stack representing ../../stacks/dhis2-core/helmfile.yaml
+// Stack representing ../../stacks/dhis2-core/helmfile.yaml.gotmpl
 var DHIS2Core = model.Stack{
 	Name: "dhis2-core",
 	Parameters: model.StackParameters{
@@ -207,6 +207,7 @@ var DHIS2Core = model.Stack{
 		"FILESYSTEM_VOLUME_SIZE":          {Priority: 24, DisplayName: "Filesystem volume size (only in effect if \"Storage\" is set to \"filesystem\")", DefaultValue: &dhis2CoreDefaults.filesystemVolumeSize, Sensitive: true},
 		"SAME_SITE_COOKIES":               {Priority: 24, DisplayName: "Same site cookies", DefaultValue: &dhis2CoreDefaults.sameSiteCookies, Validator: sameSiteCookies},
 		"CUSTOM_DHIS2_CONFIG":             {Priority: 25, DisplayName: "Custom DHIS2 config (applied to top of dhis.conf)", DefaultValue: &dhis2CoreDefaults.customDhis2Config, Sensitive: true},
+		"ALLOW_SUSPEND":                   {Priority: 26, DisplayName: "Allow the application to be suspended", DefaultValue: &dhis2CoreDefaults.allowSuspend},
 		"GOOGLE_AUTH_PROJECT_ID":          {Priority: 0, DisplayName: "Google auth project id", DefaultValue: &dhis2CoreDefaults.googleAuthClientId, Sensitive: true},
 		"GOOGLE_AUTH_PRIVATE_KEY":         {Priority: 0, DisplayName: "Google auth private key", DefaultValue: &dhis2CoreDefaults.googleAuthPrivateKey, Sensitive: true},
 		"GOOGLE_AUTH_PRIVATE_KEY_ID":      {Priority: 0, DisplayName: "Google auth private key id", DefaultValue: &dhis2CoreDefaults.googleAuthPrivateKeyId, Sensitive: true},
@@ -251,13 +252,14 @@ var dhis2CoreDefaults = struct {
 	startupProbeFailureThreshold string
 	startupProbePeriodSeconds    string
 	customDhis2Config            string
+	allowSuspend                 string
 	googleAuthProjectId          string
 	googleAuthPrivateKey         string
 	googleAuthPrivateKeyId       string
 	googleAuthClientEmail        string
 	googleAuthClientId           string
 }{
-	chartVersion:                 "0.24.1",
+	chartVersion:                 "0.30.0",
 	minIOChartVersion:            "14.7.5",
 	minIOStorageSize:             "8Gi",
 	storageType:                  minIOStorage,
@@ -283,6 +285,7 @@ var dhis2CoreDefaults = struct {
 	startupProbeFailureThreshold: "26",
 	startupProbePeriodSeconds:    "5",
 	customDhis2Config:            " ",
+	allowSuspend:                 "true",
 	googleAuthProjectId:          " ", // TODO: " " doesn't need to be used here as with `javaOpts` since the googleAuth* parameters are stack parameters and therefor always populated
 	googleAuthPrivateKey:         " ", // However the web client currently doesn't support these empty parameter so for now
 	googleAuthPrivateKeyId:       " ",
@@ -290,7 +293,7 @@ var dhis2CoreDefaults = struct {
 	googleAuthClientId:           " ",
 }
 
-// Stack representing ../../stacks/dhis2/helmfile.yaml
+// Stack representing ../../stacks/dhis2/helmfile.yaml.gotmpl
 var DHIS2 = model.Stack{
 	// TODO: Remove HostnamePattern once stacks 2.0 are the default
 	HostnamePattern: "%s-database-postgresql.%s.svc",
@@ -338,7 +341,7 @@ var dhis2Defaults = struct {
 	installRedis: "false",
 }
 
-// Stack representing ../../stacks/pgadmin/helmfile.yaml
+// Stack representing ../../stacks/pgadmin/helmfile.yaml.gotmpl
 var PgAdmin = model.Stack{
 	Name: "pgadmin",
 	Parameters: model.StackParameters{
@@ -361,7 +364,7 @@ var pgAdminDefaults = struct {
 	chartVersion: "1.33.3",
 }
 
-// Stack representing ../../stacks/whoami-go/helmfile.yaml
+// Stack representing ../../stacks/whoami-go/helmfile.yaml.gotmpl
 var WhoamiGo = model.Stack{
 	Name: "whoami-go",
 	Parameters: model.StackParameters{
@@ -388,7 +391,7 @@ var whoamiGoDefaults = struct {
 	replicaCount:    "1",
 }
 
-// Stack representing ../../stacks/im-job-runner/helmfile.yaml
+// Stack representing ../../stacks/im-job-runner/helmfile.yaml.gotmpl
 var IMJobRunner = model.Stack{
 	Name: "im-job-runner",
 	Parameters: model.StackParameters{

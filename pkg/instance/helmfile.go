@@ -57,7 +57,7 @@ func (h helmfileService) executeHelmfileCommand(ctx context.Context, token strin
 		return nil, err
 	}
 
-	stackPath := path.Join(h.stackFolder, "/", stack.Name, "/helmfile.yaml")
+	stackPath := path.Join(h.stackFolder, "/", stack.Name, "/helmfile.yaml.gotmpl")
 	if _, err = os.Stat(stackPath); err != nil {
 		return nil, err
 	}

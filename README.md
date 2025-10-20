@@ -1,5 +1,7 @@
 # Getting Started
 
+If you just want to see what the application looks like you can find some screenshots [here](./docs/screenshots).
+
 ## Start local development environment with Docker
 
 1. Start by copying the `.env.example` file into a new `.env` file:
@@ -43,10 +45,10 @@ It's advised to generate the release log before doing so.
 Example
 
 ```shell
-make change-log
-git commit CHANGELOG.md -m "chore: generate change log"
 git tag --sort=-creatordate | head --lines=1              # Get the latest tag
 git tag v0.53.0                                           # Use whichever tag you want to release
+make change-log
+git commit CHANGELOG.md -m "chore: generate change log"
 git push
 ```
 

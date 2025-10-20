@@ -11,6 +11,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/anthhub/forwarder"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
@@ -780,20 +781,66 @@ func (s Service) Reset(ctx context.Context, token string, instance *model.Deploy
 }
 
 func (s Service) FilestoreBackup(ctx context.Context, instance *model.DeploymentInstance, name string, database *model.Database) error {
-	s.logger.InfoContext(ctx, "save again", "database", database)
-
-	endpoint := fmt.Sprintf("%s-minio.%s.svc:9000", instance.Name, instance.GroupName)
-	minioClient, err := newMinioClient("dhisdhis", "dhisdhis", endpoint, false)
+	group, err := s.groupService.Find(ctx, instance.GroupName)
 	if err != nil {
 		return err
+	}
+
+	var minioClient *minio.Client
+	var minioEndpoint string
+
+	minioEndpoint = fmt.Sprintf("%s-minio.%s.svc:9000", instance.Name, instance.Group.Namespace)
+
+	if group.Cluster.Configuration != nil {
+		hostname := fmt.Sprintf("%s-minio.%s.svc", instance.Name, instance.GroupName)
+		serviceName := strings.Split(hostname, ".")[0]
+		options := []*forwarder.Option{
+			{
+				RemotePort:  9000,
+				ServiceName: serviceName,
+				Namespace:   instance.Group.Namespace,
+			},
+		}
+
+		kubeConfig, err := decryptYaml(group.Cluster.Configuration)
+		if err != nil {
+			return err
+		}
+
+		ret, err := forwarder.WithForwardersEmbedConfig(context.Background(), options, kubeConfig)
+		if err != nil {
+			return err
+		}
+		defer ret.Close()
+
+		ports, err := ret.Ready()
+		if err != nil {
+			return err
+		}
+
+		minioEndpoint = fmt.Sprintf("localhost:%d", ports[0][0].Local)
+	}
+
+	minioClient, err = newMinioClient("dhisdhis", "dhisdhis", minioEndpoint, false)
+	if err != nil {
+		return err
+	}
+
+	// Test MinIO connection before proceeding
+	_, err = minioClient.ListBuckets(ctx)
+	if err != nil {
+		return fmt.Errorf("MinIO connection test failed: %v", err)
 	}
 
 	source := NewMinioBackupSource(s.logger, minioClient, "dhis2")
 	backupService := NewBackupService(s.logger, source, s.s3Client)
 
-	name = strings.TrimSuffix(name, ".pgc")
-	name = strings.TrimSuffix(name, ".tar.gz")
-	key := fmt.Sprintf("%s/%s-%s.tar.gz", instance.GroupName, name, "fs")
+	baseName := name
+	baseName = strings.TrimSuffix(baseName, ".sql.gz")
+	baseName = strings.TrimSuffix(baseName, ".pgc")
+	baseName = strings.TrimSuffix(baseName, ".tar.gz")
+
+	key := fmt.Sprintf("%s/%s-%s.tar.gz", instance.GroupName, baseName, "fs")
 	err = backupService.PerformBackup(ctx, s.s3Bucket, key)
 	if err != nil {
 		return err
@@ -801,7 +848,7 @@ func (s Service) FilestoreBackup(ctx context.Context, instance *model.Deployment
 
 	// Record backup in database
 	s3Uri := fmt.Sprintf("s3://%s/%s", s.s3Bucket, key)
-	filestore, err := s.recordBackup(ctx, instance.GroupName, s3Uri, name+"-fs.tar.gz")
+	filestore, err := s.recordBackup(ctx, instance.GroupName, s3Uri, baseName+"-fs.tar.gz", database.UserID)
 	if err != nil {
 		return err
 	}
@@ -816,12 +863,13 @@ func (s Service) FilestoreBackup(ctx context.Context, instance *model.Deployment
 	return nil
 }
 
-func (s Service) recordBackup(ctx context.Context, groupName, s3uri, name string) (*model.Database, error) {
+func (s Service) recordBackup(ctx context.Context, groupName, s3uri, name string, userID uint) (*model.Database, error) {
 	database := &model.Database{
 		Name:      name,
 		GroupName: groupName,
 		Url:       s3uri,
 		Type:      "fs",
+		UserID:    userID,
 	}
 	err := s.instanceRepository.RecordBackup(ctx, database)
 	if err != nil {

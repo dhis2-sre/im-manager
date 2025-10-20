@@ -59,6 +59,22 @@ func TestDatabaseHandler(t *testing.T) {
 		database.Routes(engine, authenticator, databaseHandler)
 	})
 
+	var userID uint
+	{
+		group := &model.Group{
+			Name:     "group-name",
+			Hostname: "some",
+		}
+		user := &model.User{
+			Email: "user1@dhis2.org",
+			Groups: []model.Group{
+				*group,
+			},
+		}
+		db.Create(user)
+		userID = user.ID
+	}
+
 	var databaseID string
 	{
 		t.Log("Upload")
@@ -83,29 +99,16 @@ func TestDatabaseHandler(t *testing.T) {
 
 	var instanceID string
 	{
-		group := &model.Group{
-			Name:     "group-name",
-			Hostname: "some",
-		}
-		user := &model.User{
-			Email: "user1@dhis2.org",
-			Groups: []model.Group{
-				*group,
-			},
-		}
-		db.Create(user)
-
 		deployment := &model.Deployment{
-			UserID:    user.ID,
+			UserID:    userID,
 			Name:      "name",
-			GroupName: group.Name,
+			GroupName: "group-name",
 		}
 		db.Create(deployment)
 
 		instance := &model.DeploymentInstance{
-			ID:           0,
 			Name:         "name",
-			GroupName:    group.Name,
+			GroupName:    "group-name",
 			StackName:    "dhis2",
 			DeploymentID: deployment.ID,
 		}
@@ -120,6 +123,7 @@ func TestDatabaseHandler(t *testing.T) {
 
 		assert.Equal(t, "path/name.extension", actualDB.Name)
 		assert.Equal(t, "packages", actualDB.GroupName)
+		assert.Equal(t, userID, actualDB.UserID)
 	})
 
 	t.Run("Download", func(t *testing.T) {
@@ -140,6 +144,7 @@ func TestDatabaseHandler(t *testing.T) {
 
 			require.Equal(t, "path/copy.extension", actualDB.Name)
 			require.Equal(t, "packages", actualDB.GroupName)
+			assert.Equal(t, userID, actualDB.UserID)
 
 			actualContent := s3.GetObject(t, s3Bucket, "packages/path/copy.extension")
 			require.Equalf(t, "file contents", string(actualContent), "DB in S3 should have expected content")
@@ -166,7 +171,7 @@ func TestDatabaseHandler(t *testing.T) {
 		{
 			t.Log("Update")
 
-			requestBody := strings.NewReader(`{"name": "path/rename.extension"}`)
+			requestBody := strings.NewReader(`{"name": "path/rename.extension", "description": "some new description"}`)
 			response := client.Do(t, http.MethodPut, "/databases/"+databaseID, requestBody, http.StatusOK, inttest.WithHeader("Content-Type", "application/json"))
 			var actualDB model.Database
 			err := json.Unmarshal(response, &actualDB)

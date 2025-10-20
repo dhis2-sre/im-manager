@@ -99,7 +99,12 @@ func run() (err error) {
 	}
 
 	ctx := context.Background()
-	logger := slog.New(log.New(slog.NewJSONHandler(os.Stdout, nil)))
+
+	prettyPrint, exists := os.LookupEnv("LOG_PRETTY_PRINT")
+	enablePrettyPrint := exists && prettyPrint == "true"
+
+	options := log.PrettyJSONHandlerOptions{PrettyPrint: enablePrettyPrint}
+	logger := slog.New(log.New(log.NewPrettyJSONHandler(os.Stdout, &options)))
 
 	db, err := newDB(logger)
 	if err != nil {

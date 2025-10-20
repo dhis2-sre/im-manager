@@ -1,4 +1,117 @@
 
+<a name="v0.59.3"></a>
+## [v0.59.3](https://github.com/dhis2-sre/im-manager/compare/v0.59.2...v0.59.3)
+
+> 2025-10-09
+
+### Chore
+
+* generate change log for v0.59.2
+
+### Fix
+
+* use group namespace instead of name in minio endpoint ([#1255](https://github.com/dhis2-sre/im-manager/issues/1255))
+
+
+<a name="v0.59.2"></a>
+## [v0.59.2](https://github.com/dhis2-sre/im-manager/compare/v0.59.1...v0.59.2)
+
+> 2025-10-09
+
+### Chore
+
+* add ALLOW_SUSPEND to request body ([#1254](https://github.com/dhis2-sre/im-manager/issues/1254))
+* generate change log for v0.59.1
+
+### Docs
+
+* update command order in release instructions ([#1249](https://github.com/dhis2-sre/im-manager/issues/1249))
+
+
+<a name="v0.59.1"></a>
+## [v0.59.1](https://github.com/dhis2-sre/im-manager/compare/v0.59.0...v0.59.1)
+
+> 2025-10-08
+
+### Chore
+
+* add ALLOW_SUSPEND param to deploy script ([#1250](https://github.com/dhis2-sre/im-manager/issues/1250))
+* generate change log for v0.59.0
+
+
+<a name="v0.59.0"></a>
+## [v0.59.0](https://github.com/dhis2-sre/im-manager/compare/v0.58.0...v0.59.0)
+
+> 2025-10-06
+
+### Chore
+
+* use empty string for the hostname to prevent cross-subdomain sharing ([#1248](https://github.com/dhis2-sre/im-manager/issues/1248))
+* fix casing
+* grant access to HTTPScaledObject
+* use the updated helm chart (version 0.29.0) which configures dhis2 using environment variables ([#1222](https://github.com/dhis2-sre/im-manager/issues/1222))
+* add separate env var for enabling pretty print logs ([#1197](https://github.com/dhis2-sre/im-manager/issues/1197))
+* switch to legacy repository ([#1209](https://github.com/dhis2-sre/im-manager/issues/1209))
+* unlock before deleting ([#1195](https://github.com/dhis2-sre/im-manager/issues/1195))
+* create LICENSE ([#1192](https://github.com/dhis2-sre/im-manager/issues/1192))
+* add creat instance screen
+* screenshots ([#1190](https://github.com/dhis2-sre/im-manager/issues/1190))
+* bump helmfile and other binaries ([#1184](https://github.com/dhis2-sre/im-manager/issues/1184))
+* generate change log
+
+### Feat
+
+* database description property ([#1233](https://github.com/dhis2-sre/im-manager/issues/1233))
+* allow suspending
+* user-owned databases ([#1183](https://github.com/dhis2-sre/im-manager/issues/1183))
+
+### Fix
+
+* use port-forwarding for MinIO backups ([#1226](https://github.com/dhis2-sre/im-manager/issues/1226))
+* sort databases list ([#1196](https://github.com/dhis2-sre/im-manager/issues/1196))
+* preload Instances when finding Deployments ([#1213](https://github.com/dhis2-sre/im-manager/issues/1213))
+* saving a database ([#1179](https://github.com/dhis2-sre/im-manager/issues/1179))
+
+
+<a name="v0.58.0"></a>
+## [v0.58.0](https://github.com/dhis2-sre/im-manager/compare/v0.57.2...v0.58.0)
+
+> 2025-08-09
+
+### Chore
+
+* fix createGroup script ([#1174](https://github.com/dhis2-sre/im-manager/issues/1174))
+* increase proxy buffer size ([#1175](https://github.com/dhis2-sre/im-manager/issues/1175))
+* include cluster
+* sops
+
+### Feat
+
+* pretty log json ([#1164](https://github.com/dhis2-sre/im-manager/issues/1164))
+
+
+<a name="v0.57.2"></a>
+## [v0.57.2](https://github.com/dhis2-sre/im-manager/compare/v0.57.1...v0.57.2)
+
+> 2025-07-22
+
+
+<a name="v0.57.1"></a>
+## [v0.57.1](https://github.com/dhis2-sre/im-manager/compare/v0.57.0...v0.57.1)
+
+> 2025-07-14
+
+
+<a name="v0.57.0"></a>
+## [v0.57.0](https://github.com/dhis2-sre/im-manager/compare/v0.56.1...v0.57.0)
+
+> 2025-07-10
+
+### Chore
+
+* generate change log
+
+
 <a name="v0.56.1"></a>
 ## [v0.56.1](https://github.com/dhis2-sre/im-manager/compare/v0.56.0...v0.56.1)
 
@@ -245,7 +358,7 @@
 
 
 <a name="v0.44.0"></a>
-## [v0.44.0](https://github.com/dhis2-sre/im-manager/compare/v0.41.0...v0.44.0)
+## [v0.44.0](https://github.com/dhis2-sre/im-manager/compare/v0.42.0...v0.44.0)
 
 > 2024-11-27
 
@@ -255,14 +368,14 @@
 * use PAT
 
 
-<a name="v0.41.0"></a>
-## [v0.41.0](https://github.com/dhis2-sre/im-manager/compare/v0.42.0...v0.41.0)
+<a name="v0.42.0"></a>
+## [v0.42.0](https://github.com/dhis2-sre/im-manager/compare/v0.41.0...v0.42.0)
 
 > 2024-11-20
 
 
-<a name="v0.42.0"></a>
-## [v0.42.0](https://github.com/dhis2-sre/im-manager/compare/v0.40.0...v0.42.0)
+<a name="v0.41.0"></a>
+## [v0.41.0](https://github.com/dhis2-sre/im-manager/compare/v0.40.0...v0.41.0)
 
 > 2024-11-20
 
@@ -736,7 +849,7 @@
 
 
 <a name="v0.23.0"></a>
-## [v0.23.0](https://github.com/dhis2-sre/im-manager/compare/v0.22.0...v0.23.0)
+## [v0.23.0](https://github.com/dhis2-sre/im-manager/compare/v0.21.0...v0.23.0)
 
 > 2023-07-28
 
@@ -762,6 +875,8 @@
 * fix swagger
 * rename function
 * fix Intellij warnings
+* s/HOSTNAME/API_HOSTNAME/ for the sake of avoiding collisions when deploying from im-tooling
+* remove custom reverse function
 
 ### Ci
 
@@ -775,6 +890,8 @@
 * public instances ([#314](https://github.com/dhis2-sre/im-manager/issues/314))
 * instance description
 * deployable/non-deployable groups ([#311](https://github.com/dhis2-sre/im-manager/issues/311))
+* sort Docker tags (integration)
+* sort Docker images (integration)
 
 ### Fix
 
@@ -788,6 +905,8 @@
 * order by updatedAt
 * sort instance by date of creation
 * join group with instance
+* check for gorm.ErrDuplicatedKey and return conflict for duplicated keys ([#312](https://github.com/dhis2-sre/im-manager/issues/312))
+* filter by "supported" field to simplify seed script ([#307](https://github.com/dhis2-sre/im-manager/issues/307))
 
 ### Test
 
@@ -796,32 +915,6 @@
 ### Reverts
 
 * chore: dummy
-
-
-<a name="v0.22.0"></a>
-## [v0.22.0](https://github.com/dhis2-sre/im-manager/compare/v0.21.0...v0.22.0)
-
-> 2023-06-30
-
-### Chore
-
-* use group
-* s/HOSTNAME/API_HOSTNAME/ for the sake of avoiding collisions when deploying from im-tooling
-* remove custom reverse function
-
-### Feat
-
-* deployable/non-deployable groups - We want to prevent users deploying to certain groups such as "administrators" and some "database only" groups
-* sort Docker tags (integration)
-* sort Docker images (integration)
-
-### Refactor
-
-* use group from request since that's what's used to populate the other properties
-* handle forbidden
-* add deployable parameter to group service and handler methods
-* check for gorm.ErrDuplicatedKey and return conflict for duplicated keys ([#312](https://github.com/dhis2-sre/im-manager/issues/312))
-* filter by "supported" field to simplify seed script ([#307](https://github.com/dhis2-sre/im-manager/issues/307))
 
 
 <a name="v0.21.0"></a>
@@ -1118,7 +1211,7 @@
 
 
 <a name="v0.10.0"></a>
-## [v0.10.0](https://github.com/dhis2-sre/im-manager/compare/v0.9.0...v0.10.0)
+## [v0.10.0](https://github.com/dhis2-sre/im-manager/compare/v0.8.0...v0.10.0)
 
 > 2022-11-07
 
@@ -1162,20 +1255,6 @@
 * expose DATABASE_SIZE in user script
 * make CHART_VERSION optional rather than required
 * reuse scripts
-* unexport "client" property
-
-
-<a name="v0.9.0"></a>
-## [v0.9.0](https://github.com/dhis2-sre/im-manager/compare/v0.8.0...v0.9.0)
-
-> 2022-09-06
-
-### Feat
-
-* implement FindStack on the client
-
-### Refactor
-
 * unexport "client" property
 
 
@@ -1507,17 +1586,7 @@
 
 
 <a name="v0.5.6"></a>
-## [v0.5.6](https://github.com/dhis2-sre/im-manager/compare/v0.5.7...v0.5.6)
-
-> 2022-04-11
-
-### Fix
-
-* Use func names with argument signatures to change ownership [DEVOPS-102]
-
-
-<a name="v0.5.7"></a>
-## [v0.5.7](https://github.com/dhis2-sre/im-manager/compare/v0.5.9...v0.5.7)
+## [v0.5.6](https://github.com/dhis2-sre/im-manager/compare/v0.5.9...v0.5.6)
 
 > 2022-04-11
 
@@ -1537,7 +1606,17 @@
 
 
 <a name="v0.5.8"></a>
-## [v0.5.8](https://github.com/dhis2-sre/im-manager/compare/v0.5.3...v0.5.8)
+## [v0.5.8](https://github.com/dhis2-sre/im-manager/compare/v0.5.7...v0.5.8)
+
+> 2022-04-11
+
+### Fix
+
+* Use func names with argument signatures to change ownership [DEVOPS-102]
+
+
+<a name="v0.5.7"></a>
+## [v0.5.7](https://github.com/dhis2-sre/im-manager/compare/v0.5.3...v0.5.7)
 
 > 2022-04-11
 

@@ -49,6 +49,12 @@ deploy:
         valuesFiles:
           - helm/data/secrets/{{ .CLASSIFICATION }}/rabbitmq.yaml
           - helm/data/values/{{ .CLASSIFICATION }}/rabbitmq.yaml
+        setValueTemplates:
+          global:
+            security:
+              allowInsecureImages: true
+          image:
+            repository: bitnamilegacy/rabbitmq
 
       - name: im-redis-{{ .ENVIRONMENT }}
         namespace: instance-manager-{{ .CLASSIFICATION }}
@@ -59,6 +65,12 @@ deploy:
         upgradeOnChange: true
         valuesFiles:
           - helm/data/values/{{ .CLASSIFICATION }}/redis.yaml
+        setValueTemplates:
+          global:
+            security:
+              allowInsecureImages: true
+          image:
+            repository: bitnamilegacy/redis
 
       - name: im-manager-postgresql-{{ .ENVIRONMENT }}
         namespace: instance-manager-{{ .CLASSIFICATION }}
@@ -108,6 +120,7 @@ deploy:
             S3_REGION: eu-west-1
             DEFAULT_TTL: "172800" # 48 hours
             PASSWORD_TOKEN_TTL: "900" # 15 minutes
+            LOG_PRETTY_PRINT: "{{ .LOG_PRETTY_PRINT }}"
         useHelmSecrets: true
         valuesFiles:
           - helm/data/secrets/{{ .CLASSIFICATION }}/values.yaml
