@@ -1,17 +1,16 @@
-mc alias set myminio "http://{{ requiredEnv "INSTANCE_NAME" }}-minio:9000" dhisdhis dhisdhis
+mc alias set myminio "http://$INSTANCE_NAME-minio:9000" dhisdhis dhisdhis
 
 seed_file=myminio/dhis2/seeded.txt
 if mc stat $seed_file >/dev/null 2>&1; then
   echo "Already seeded, skipping..."
 else
-  # Wait for MinIO to be ready, accounting for restart with consecutive checks
-  timeout=120
+  timeout=60
   elapsed=0
   success_count=0
-  required_successes=3
+  required_successes=5
 
   while [ "$success_count" -lt "$required_successes" ]; do
-    if curl --silent --fail "http://{{ requiredEnv "INSTANCE_NAME" }}-minio:9000/minio/health/ready"; then
+    if curl --silent --fail "http://$INSTANCE_NAME-minio:9000/minio/health/ready"; then
       success_count=$((success_count + 1))
       echo "MinIO health check $success_count/$required_successes passed"
     else
@@ -26,11 +25,11 @@ else
     fi
   done
 
-  echo "MinIO is stable and ready!!!"
+  echo "MinIO is stable and ready!"
 
   DATABASE_URL="$HOSTNAME/databases/$DATABASE_ID"
   echo "DATABASE_URL: $DATABASE_URL"
-  FILESTORE_ID=$(curl --connect-timeout 10 --retry 5 --retry-delay 1 --fail -L $DATABASE_URL --cookie "accessToken=$IM_ACCESS_TOKEN" | jq -r '.filestoreId')
+  FILESTORE_ID=$(curl --connect-timeout 10 --retry 5 --retry-delay 1 --fail -L "$DATABASE_URL" --cookie "accessToken=$IM_ACCESS_TOKEN" | jq -r '.filestoreId')
   if [[ "$FILESTORE_ID" == "0" ]]; then
     echo "No filestore id associated with database"
   else
@@ -51,7 +50,6 @@ else
 
     echo "Seeded from $FILESTORE_DOWNLOAD_URL" | mc pipe $seed_file
 
-    # Clean up
     rm -f "$tmp_file"
     rm -rf "$tmp_dir"
 
@@ -59,5 +57,5 @@ else
   fi
 fi
 
-# Wait forever
+# Wait forever, if the sidecar container terminates Kubernetes will restart it
 tail -f /dev/null

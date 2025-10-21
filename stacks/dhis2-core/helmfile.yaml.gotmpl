@@ -131,6 +131,10 @@ releases:
                 value: "{{ requiredEnv "DATABASE_ID" }}"
               - name: IM_ACCESS_TOKEN
                 value: {{ requiredEnv "IM_ACCESS_TOKEN" }}
+              - name: INSTANCE_NAME
+                value: {{ requiredEnv "INSTANCE_NAME" }}
+              - name: INSTANCE_NAME
+                value: {{ requiredEnv "INSTANCE_NAME" }}
             command:
               - "/bin/bash"
               - "-c"
