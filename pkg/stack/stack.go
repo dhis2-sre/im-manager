@@ -177,6 +177,43 @@ var dhis2DBDefaults = struct {
 	resourcesRequestsMemory: "256Mi",
 }
 
+// Stack representing ../../stacks/minio/helmfile.yaml.gotmpl
+var MINIO = model.Stack{
+	Name: "minio",
+	Parameters: model.StackParameters{
+		"DATABASE_ID":         {Priority: 1, DisplayName: "Database"},
+		"MINIO_STORAGE_SIZE":  {Priority: 2, DisplayName: "Storage Size", DefaultValue: &minIODefaults.storageSize},
+		"MINIO_CHART_VERSION": {Priority: 3, DisplayName: "Chart Version", DefaultValue: &minIODefaults.chartVersion},
+		"IMAGE_PULL_POLICY":   {Priority: 3, DisplayName: "Image Pull Policy", DefaultValue: &minIODefaults.imagePullPolicy, Validator: imagePullPolicy},
+	},
+	ParameterProviders: model.ParameterProviders{
+		"MINIO_HOSTNAME": minioHostnameProvider,
+	},
+	KubernetesResource: model.DeploymentResource,
+}
+
+// Provides the Minio hostname of an instance.
+var minioHostnameProvider = model.ParameterProviderFunc(func(instance model.DeploymentInstance) (string, error) {
+	return fmt.Sprintf("%s-minio.%s.svc", instance.Name, instance.Group.Namespace), nil
+})
+
+var storageCompanionProvider = model.RequireCompanionFunc(func(parameter model.DeploymentInstanceParameter) (*model.Stack, error) {
+	if parameter.Value == minIOStorage {
+		return &MINIO, nil
+	}
+	return nil, nil
+})
+
+var minIODefaults = struct {
+	chartVersion    string
+	storageSize     string
+	imagePullPolicy string
+}{
+	chartVersion:    "14.7.5",
+	storageSize:     "8Gi",
+	imagePullPolicy: ifNotPresent,
+}
+
 // Stack representing ../../stacks/dhis2-core/helmfile.yaml.gotmpl
 var DHIS2Core = model.Stack{
 	Name: "dhis2-core",
@@ -184,7 +221,7 @@ var DHIS2Core = model.Stack{
 		"IMAGE_TAG":                       {Priority: 1, DisplayName: "Image Tag", DefaultValue: &dhis2CoreDefaults.imageTag},
 		"IMAGE_REPOSITORY":                {Priority: 2, DisplayName: "Image Repository", DefaultValue: &dhis2CoreDefaults.imageRepository},
 		"IMAGE_PULL_POLICY":               {Priority: 3, DisplayName: "Image Pull Policy", DefaultValue: &dhis2CoreDefaults.imagePullPolicy, Validator: imagePullPolicy},
-		"STORAGE_TYPE":                    {Priority: 4, DisplayName: "Storage type", DefaultValue: &dhis2CoreDefaults.storageType, Validator: storage},
+		"STORAGE_TYPE":                    {Priority: 4, DisplayName: "Storage type", DefaultValue: &dhis2CoreDefaults.storageType, Validator: storage, RequireCompanion: storageCompanionProvider},
 		"S3_BUCKET":                       {Priority: 5, DisplayName: "S3 bucket", DefaultValue: &dhis2CoreDefaults.s3Bucket},
 		"S3_REGION":                       {Priority: 6, DisplayName: "S3 region", DefaultValue: &dhis2CoreDefaults.s3Region, Sensitive: true},
 		"S3_IDENTITY":                     {Priority: 7, DisplayName: "S3 identity", DefaultValue: &dhis2CoreDefaults.s3Identity, Sensitive: true},
@@ -201,19 +238,16 @@ var DHIS2Core = model.Stack{
 		"STARTUP_PROBE_PERIOD_SECONDS":    {Priority: 18, DisplayName: "Startup Probe Period Seconds", DefaultValue: &dhis2CoreDefaults.startupProbePeriodSeconds},
 		"JAVA_OPTS":                       {Priority: 19, DisplayName: "JAVA_OPTS", DefaultValue: &dhis2CoreDefaults.javaOpts},
 		"CHART_VERSION":                   {Priority: 20, DisplayName: "Chart Version", DefaultValue: &dhis2CoreDefaults.chartVersion},
-		"MINIO_CHART_VERSION":             {Priority: 21, DisplayName: "MinIO Chart Version", DefaultValue: &dhis2CoreDefaults.minIOChartVersion},
-		"MINIO_STORAGE_SIZE":              {Priority: 22, DisplayName: "MinIO Storage Size", DefaultValue: &dhis2CoreDefaults.minIOStorageSize},
-		"ENABLE_QUERY_LOGGING":            {Priority: 23, DisplayName: "Enable Query Logging", DefaultValue: &dhis2CoreDefaults.enableQueryLogging},
-		"FILESYSTEM_VOLUME_SIZE":          {Priority: 24, DisplayName: "Filesystem volume size (only in effect if \"Storage\" is set to \"filesystem\")", DefaultValue: &dhis2CoreDefaults.filesystemVolumeSize, Sensitive: true},
-		"SAME_SITE_COOKIES":               {Priority: 24, DisplayName: "Same site cookies", DefaultValue: &dhis2CoreDefaults.sameSiteCookies, Validator: sameSiteCookies},
-		"CUSTOM_DHIS2_CONFIG":             {Priority: 25, DisplayName: "Custom DHIS2 config (applied to top of dhis.conf)", DefaultValue: &dhis2CoreDefaults.customDhis2Config, Sensitive: true},
-		"ALLOW_SUSPEND":                   {Priority: 26, DisplayName: "Allow the application to be suspended", DefaultValue: &dhis2CoreDefaults.allowSuspend},
+		"ENABLE_QUERY_LOGGING":            {Priority: 21, DisplayName: "Enable Query Logging", DefaultValue: &dhis2CoreDefaults.enableQueryLogging},
+		"FILESYSTEM_VOLUME_SIZE":          {Priority: 22, DisplayName: "Filesystem volume size (only in effect if \"Storage\" is set to \"filesystem\")", DefaultValue: &dhis2CoreDefaults.filesystemVolumeSize, Sensitive: true},
+		"SAME_SITE_COOKIES":               {Priority: 23, DisplayName: "Same site cookies", DefaultValue: &dhis2CoreDefaults.sameSiteCookies, Validator: sameSiteCookies},
+		"CUSTOM_DHIS2_CONFIG":             {Priority: 24, DisplayName: "Custom DHIS2 config (applied to top of dhis.conf)", DefaultValue: &dhis2CoreDefaults.customDhis2Config, Sensitive: true},
+		"ALLOW_SUSPEND":                   {Priority: 25, DisplayName: "Allow the application to be suspended", DefaultValue: &dhis2CoreDefaults.allowSuspend},
 		"GOOGLE_AUTH_PROJECT_ID":          {Priority: 0, DisplayName: "Google auth project id", DefaultValue: &dhis2CoreDefaults.googleAuthClientId, Sensitive: true},
 		"GOOGLE_AUTH_PRIVATE_KEY":         {Priority: 0, DisplayName: "Google auth private key", DefaultValue: &dhis2CoreDefaults.googleAuthPrivateKey, Sensitive: true},
 		"GOOGLE_AUTH_PRIVATE_KEY_ID":      {Priority: 0, DisplayName: "Google auth private key id", DefaultValue: &dhis2CoreDefaults.googleAuthPrivateKeyId, Sensitive: true},
 		"GOOGLE_AUTH_CLIENT_EMAIL":        {Priority: 0, DisplayName: "Google auth client email", DefaultValue: &dhis2CoreDefaults.googleAuthClientEmail, Sensitive: true},
 		"GOOGLE_AUTH_CLIENT_ID":           {Priority: 0, DisplayName: "Google auth client id", DefaultValue: &dhis2CoreDefaults.googleAuthClientId, Sensitive: true},
-		"DATABASE_ID":                     {Priority: 0, DisplayName: "Database", Consumed: true},
 		"DATABASE_HOSTNAME":               {Priority: 0, DisplayName: "Database Hostname", Consumed: true},
 		"DATABASE_NAME":                   {Priority: 0, DisplayName: "Database Name", Consumed: true},
 		"DATABASE_PASSWORD":               {Priority: 0, DisplayName: "Database Password", Consumed: true, Sensitive: true},
@@ -221,6 +255,9 @@ var DHIS2Core = model.Stack{
 	},
 	Requires: []model.Stack{
 		DHIS2DB,
+	},
+	Companions: []model.Stack{
+		MINIO,
 	},
 	KubernetesResource: model.DeploymentResource,
 }

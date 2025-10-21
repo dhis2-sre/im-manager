@@ -16,7 +16,9 @@ type Stack struct {
 	// ParameterProviders provide parameters to other stacks.
 	ParameterProviders ParameterProviders `json:"-"`
 	// Requires these stacks to deploy an instance of this stack.
-	Requires           []Stack `json:"requires"`
+	Requires []Stack `json:"requires"`
+	// Companions are optional stacks that can be deployed alongside this stack. Certain parameters can require a companion stack.
+	Companions         []Stack `json:"companions"`
 	KubernetesResource KubernetesResource
 }
 
@@ -33,8 +35,9 @@ type StackParameter struct {
 	// Validator ensures that the actual stack parameters are valid according to its rules.
 	Validator func(value string) error `json:"-"`
 	// Priority determines the order in which the parameter is shown.
-	Priority  uint `json:"priority"`
-	Sensitive bool `json:"sensitive"`
+	Priority         uint                 `json:"priority"`
+	Sensitive        bool                 `json:"sensitive"`
+	RequireCompanion RequireCompanionFunc `json:"-"`
 }
 
 type ParameterProviders map[string]ParameterProvider
@@ -48,4 +51,10 @@ type ParameterProviderFunc func(instance DeploymentInstance) (string, error)
 
 func (p ParameterProviderFunc) Provide(instance DeploymentInstance) (string, error) {
 	return p(instance)
+}
+
+type RequireCompanionFunc func(instance DeploymentInstanceParameter) (*Stack, error)
+
+func (r RequireCompanionFunc) Require(parameter DeploymentInstanceParameter) (*Stack, error) {
+	return r(parameter)
 }

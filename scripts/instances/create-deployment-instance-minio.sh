@@ -5,7 +5,7 @@ set -euo pipefail
 source ./auth.sh
 
 DEPLOYMENT_ID=$1
-STACK_NAME=dhis2-db
+STACK_NAME=minio
 
 DATABASE_ID=${DATABASE_ID:-whoami-2-42-sql-gz}
 DATABASE_SIZE=${DATABASE_SIZE:-20Gi}
@@ -15,9 +15,6 @@ echo "{
   \"parameters\": {
     \"DATABASE_ID\": {
       \"value\": \"$DATABASE_ID\"
-    },
-    \"DATABASE_SIZE\": {
-      \"value\": \"$DATABASE_SIZE\"
     }
   }
 }" | $HTTP post "$IM_HOST/deployments/$DEPLOYMENT_ID/instance" "Authorization: Bearer $ACCESS_TOKEN"
