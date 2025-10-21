@@ -35,8 +35,8 @@ type StackParameter struct {
 	// Validator ensures that the actual stack parameters are valid according to its rules.
 	Validator func(value string) error `json:"-"`
 	// Priority determines the order in which the parameter is shown.
-	Priority         uint   `json:"priority"`
-	Sensitive        bool   `json:"sensitive"`
+	Priority         uint                 `json:"priority"`
+	Sensitive        bool                 `json:"sensitive"`
 	RequireCompanion RequireCompanionFunc `json:"-"`
 }
 
