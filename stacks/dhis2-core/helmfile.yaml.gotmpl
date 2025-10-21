@@ -135,33 +135,42 @@ releases:
               - "/bin/bash"
               - "-c"
               - |
-                # Wait for MinIO to be ready
-                timeout=20
-                elapsed=0
-                
-                until curl --silent --fail http://{{ requiredEnv "INSTANCE_NAME" }}-minio:9000/minio/health/ready; do
-                  echo "Waiting for MinIO to be ready..."
-                  sleep 2
-                  elapsed=$((elapsed + 2))
-                  if [ "$elapsed" -ge "$timeout" ]; then
-                    echo "Timeout reached: MinIO is not ready after $timeout seconds."
-                    exit 1
-                  fi
-                done
-                echo "MinIO is ready!!!"
+                  mc alias set myminio http://{{ requiredEnv "INSTANCE_NAME" }}-minio:9000 dhisdhis dhisdhis
 
-                mc alias set myminio http://{{ requiredEnv "INSTANCE_NAME" }}-minio:9000 dhisdhis dhisdhis
-
-                seed_file=myminio/dhis2/seeded.txt
-                if mc stat $seed_file >/dev/null 2>&1; then
-                  echo "Already seeded, skipping..."
-                else
-                  DATABASE_URL="$HOSTNAME/databases/$DATABASE_ID"
-                  echo "DATABASE_URL: $DATABASE_URL"
-                  FILESTORE_ID=$(curl --connect-timeout 10 --retry 5 --retry-delay 1 --fail -L $DATABASE_URL --cookie "accessToken=$IM_ACCESS_TOKEN" | jq -r '.filestoreId')
-                  if [[ "$FILESTORE_ID" == "0" ]]; then
-                    echo "No filestore id associated with database"
+                  seed_file=myminio/dhis2/seeded.txt
+                  if mc stat $seed_file >/dev/null 2>&1; then
+                    echo "Already seeded, skipping..."
                   else
+                    # Wait for MinIO to be ready, accounting for restart with consecutive checks
+                    timeout=120
+                    elapsed=0
+                    success_count=0
+                    required_successes=3
+
+                    while [ "$success_count" -lt "$required_successes" ]; do
+                      if curl --silent --fail http://{{ requiredEnv "INSTANCE_NAME" }}-minio:9000/minio/health/ready; then
+                        success_count=$((success_count + 1))
+                        echo "MinIO health check $success_count/$required_successes passed"
+                      else
+                        success_count=0
+                        echo "MinIO health check failed, resetting counter"
+                      fi
+                      sleep 2
+                      elapsed=$((elapsed + 2))
+                      if [ "$elapsed" -ge "$timeout" ]; then
+                        echo "Timeout reached: MinIO is not ready after $timeout seconds."
+                        exit 1
+                      fi
+                    done
+
+                    echo "MinIO is stable and ready!!!"
+
+                    DATABASE_URL="$HOSTNAME/databases/$DATABASE_ID"
+                    echo "DATABASE_URL: $DATABASE_URL"
+                    FILESTORE_ID=$(curl --connect-timeout 10 --retry 5 --retry-delay 1 --fail -L $DATABASE_URL --cookie "accessToken=$IM_ACCESS_TOKEN" | jq -r '.filestoreId')
+                    if [[ "$FILESTORE_ID" == "0" ]]; then
+                      echo "No filestore id associated with database"
+                    else
                     echo "Filestore ID: $FILESTORE_ID"
                     echo "Seeding..."
 
