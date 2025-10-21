@@ -1,3 +1,7 @@
+#!/usr/bin/env bash
+
+set -o pipefail
+
 mc alias set myminio "http://$INSTANCE_NAME-minio:9000" dhisdhis dhisdhis
 
 seed_file=myminio/dhis2/seeded.txt
@@ -29,7 +33,10 @@ else
 
   DATABASE_URL="$HOSTNAME/databases/$DATABASE_ID"
   echo "DATABASE_URL: $DATABASE_URL"
-  FILESTORE_ID=$(curl --connect-timeout 10 --retry 5 --retry-delay 1 --fail -L "$DATABASE_URL" --cookie "accessToken=$IM_ACCESS_TOKEN" | jq -r '.filestoreId')
+  if ! FILESTORE_ID=$(curl --connect-timeout 10 --retry 5 --retry-delay 1 --fail --show-error -L "$DATABASE_URL" --cookie "accessToken=$IM_ACCESS_TOKEN" | jq -r '.filestoreId'); then
+    echo "Failed to fetch database information from $DATABASE_URL"
+    exit 1
+  fi
   if [[ "$FILESTORE_ID" == "0" ]]; then
     echo "No filestore id associated with database"
   else
@@ -39,7 +46,10 @@ else
     tmp_file=$(mktemp)
     trap 'rm -f "$tmp_file"' EXIT  # Ensures cleanup on script exit
     FILESTORE_DOWNLOAD_URL="$HOSTNAME/databases/$FILESTORE_ID/download"
-    curl --connect-timeout 10 --retry 5 --retry-delay 1 --fail -L "$FILESTORE_DOWNLOAD_URL" --cookie "accessToken=$IM_ACCESS_TOKEN" > "$tmp_file"
+    if ! curl --connect-timeout 10 --retry 5 --retry-delay 1 --fail --show-error -L "$FILESTORE_DOWNLOAD_URL" --cookie "accessToken=$IM_ACCESS_TOKEN" > "$tmp_file"; then
+      echo "Failed to download filestore from $FILESTORE_DOWNLOAD_URL"
+      exit 1
+    fi
 
     tmp_dir=$(mktemp -d /tmp/minio.XXXXXX)
     trap 'rm -rf "$tmp_dir"' EXIT  # Ensures cleanup on script exit

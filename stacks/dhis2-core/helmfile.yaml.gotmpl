@@ -139,7 +139,7 @@ releases:
               - "/bin/bash"
               - "-c"
               - |
-                {{- readFile "./minio-seed.sh" | nindent 16 }}
+                {{- readFile "./seed-minio.sh" | nindent 16 }}
   {{- end }}
 
 repositories:
