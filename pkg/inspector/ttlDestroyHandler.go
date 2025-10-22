@@ -14,6 +14,7 @@ func NewTTLDestroyHandler(logger *slog.Logger, instanceService instanceService) 
 
 type instanceService interface {
 	DeleteDeployment(ctx context.Context, deployment *model.Deployment) error
+	FindDecryptedDeploymentById(ctx context.Context, id uint) (*model.Deployment, error)
 }
 
 type ttlDestroyHandler struct {
@@ -25,11 +26,18 @@ func (t ttlDestroyHandler) Handle(ctx context.Context, deployment model.Deployme
 	t.logger.Info("TTL handler invoked", "deploymentId", deployment.ID)
 
 	if t.ttlBeforeNow(deployment.CreatedAt, deployment.TTL) {
-		err := t.instanceService.DeleteDeployment(ctx, &deployment)
+		decryptedDeployment, err := t.instanceService.FindDecryptedDeploymentById(ctx, deployment.ID)
 		if err != nil {
+			t.logger.ErrorContext(ctx, "TTL handler failed to decrypt deployment", "deploymentId", deployment.ID, "error", err)
 			return err
 		}
-		t.logger.Info("TTL destroy", "deploymentId", deployment.ID)
+
+		err = t.instanceService.DeleteDeployment(ctx, decryptedDeployment)
+		if err != nil {
+			t.logger.ErrorContext(ctx, "TTL destroy failed", "deploymentId", deployment.ID, "error", err)
+			return err
+		}
+		t.logger.Info("TTL destroy completed", "deploymentId", deployment.ID)
 	}
 
 	return nil
