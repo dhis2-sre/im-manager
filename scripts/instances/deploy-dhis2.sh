@@ -18,6 +18,7 @@ DATABASE_SIZE=${DATABASE_SIZE:-20Gi}
 DB_RESOURCES_REQUESTS_CPU=${DB_RESOURCES_REQUESTS_CPU:-250m}
 DB_RESOURCES_REQUESTS_MEMORY=${DB_RESOURCES_REQUESTS_MEMORY:-256Mi}
 
+CHART_VERSION=${CHART_VERSION:-0.31.0}
 MIN_READY_SECONDS=${MIN_READY_SECONDS:-120}
 # container(s) in dhis2 pod will be restarted after that due to restartPolicy
 # 5*26=130s
@@ -73,6 +74,9 @@ echo "{
   \"stackName\": \"dhis2-core\",
   \"public\": $PUBLIC,
   \"parameters\": {
+    \"CHART_VERSION\": {
+      \"value\": \"$CHART_VERSION\"
+    },
     \"MIN_READY_SECONDS\": {
       \"value\": \"$MIN_READY_SECONDS\"
     },

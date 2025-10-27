@@ -1,4 +1,34 @@
 
+<a name="v0.61.0"></a>
+## [v0.61.0](https://github.com/dhis2-sre/im-manager/compare/v0.60.0...v0.61.0)
+
+> 2025-10-22
+
+### Chore
+
+* add dhis2-core chart version to scripts ([#1262](https://github.com/dhis2-sre/im-manager/issues/1262))
+
+### Fix
+
+* decrypt deployment when invoking ttl handler  ([#1265](https://github.com/dhis2-sre/im-manager/issues/1265))
+* add x-upload-description header to cors config ([#1263](https://github.com/dhis2-sre/im-manager/issues/1263))
+
+### Refactor
+
+* require multiple consecutive passing health checks to ensur… ([#1264](https://github.com/dhis2-sre/im-manager/issues/1264))
+
+
+<a name="v0.60.0"></a>
+## [v0.60.0](https://github.com/dhis2-sre/im-manager/compare/v0.59.3...v0.60.0)
+
+> 2025-10-20
+
+### Chore
+
+* bump default dhis2 core chart ([#1261](https://github.com/dhis2-sre/im-manager/issues/1261))
+* generate change log for v0.59.3
+
+
 <a name="v0.59.3"></a>
 ## [v0.59.3](https://github.com/dhis2-sre/im-manager/compare/v0.59.2...v0.59.3)
 
@@ -358,7 +388,7 @@
 
 
 <a name="v0.44.0"></a>
-## [v0.44.0](https://github.com/dhis2-sre/im-manager/compare/v0.42.0...v0.44.0)
+## [v0.44.0](https://github.com/dhis2-sre/im-manager/compare/v0.41.0...v0.44.0)
 
 > 2024-11-27
 
@@ -368,14 +398,14 @@
 * use PAT
 
 
-<a name="v0.42.0"></a>
-## [v0.42.0](https://github.com/dhis2-sre/im-manager/compare/v0.41.0...v0.42.0)
+<a name="v0.41.0"></a>
+## [v0.41.0](https://github.com/dhis2-sre/im-manager/compare/v0.42.0...v0.41.0)
 
 > 2024-11-20
 
 
-<a name="v0.41.0"></a>
-## [v0.41.0](https://github.com/dhis2-sre/im-manager/compare/v0.40.0...v0.41.0)
+<a name="v0.42.0"></a>
+## [v0.42.0](https://github.com/dhis2-sre/im-manager/compare/v0.40.0...v0.42.0)
 
 > 2024-11-20
 
@@ -1565,7 +1595,7 @@
 
 
 <a name="v0.5.10"></a>
-## [v0.5.10](https://github.com/dhis2-sre/im-manager/compare/v0.5.5...v0.5.10)
+## [v0.5.10](https://github.com/dhis2-sre/im-manager/compare/v0.5.8...v0.5.10)
 
 > 2022-04-11
 
@@ -1575,18 +1605,8 @@
 * Use func names with argument signatures to change ownership [DEVOPS-102]
 
 
-<a name="v0.5.5"></a>
-## [v0.5.5](https://github.com/dhis2-sre/im-manager/compare/v0.5.6...v0.5.5)
-
-> 2022-04-11
-
-### Fix
-
-* Use func names with argument signatures to change ownership [DEVOPS-102]
-
-
-<a name="v0.5.6"></a>
-## [v0.5.6](https://github.com/dhis2-sre/im-manager/compare/v0.5.9...v0.5.6)
+<a name="v0.5.8"></a>
+## [v0.5.8](https://github.com/dhis2-sre/im-manager/compare/v0.5.9...v0.5.8)
 
 > 2022-04-11
 
@@ -1596,7 +1616,7 @@
 
 
 <a name="v0.5.9"></a>
-## [v0.5.9](https://github.com/dhis2-sre/im-manager/compare/v0.5.8...v0.5.9)
+## [v0.5.9](https://github.com/dhis2-sre/im-manager/compare/v0.5.6...v0.5.9)
 
 > 2022-04-11
 
@@ -1605,8 +1625,18 @@
 * Use func names with argument signatures to change ownership [DEVOPS-102]
 
 
-<a name="v0.5.8"></a>
-## [v0.5.8](https://github.com/dhis2-sre/im-manager/compare/v0.5.7...v0.5.8)
+<a name="v0.5.6"></a>
+## [v0.5.6](https://github.com/dhis2-sre/im-manager/compare/v0.5.5...v0.5.6)
+
+> 2022-04-11
+
+### Fix
+
+* Use func names with argument signatures to change ownership [DEVOPS-102]
+
+
+<a name="v0.5.5"></a>
+## [v0.5.5](https://github.com/dhis2-sre/im-manager/compare/v0.5.7...v0.5.5)
 
 > 2022-04-11
 
@@ -1616,7 +1646,7 @@
 
 
 <a name="v0.5.7"></a>
-## [v0.5.7](https://github.com/dhis2-sre/im-manager/compare/v0.5.3...v0.5.7)
+## [v0.5.7](https://github.com/dhis2-sre/im-manager/compare/v0.5.4...v0.5.7)
 
 > 2022-04-11
 
@@ -1625,14 +1655,14 @@
 * Use func names with argument signatures to change ownership [DEVOPS-102]
 
 
-<a name="v0.5.3"></a>
-## [v0.5.3](https://github.com/dhis2-sre/im-manager/compare/v0.5.4...v0.5.3)
+<a name="v0.5.4"></a>
+## [v0.5.4](https://github.com/dhis2-sre/im-manager/compare/v0.5.3...v0.5.4)
 
 > 2022-04-08
 
 
-<a name="v0.5.4"></a>
-## [v0.5.4](https://github.com/dhis2-sre/im-manager/compare/v0.5.2...v0.5.4)
+<a name="v0.5.3"></a>
+## [v0.5.3](https://github.com/dhis2-sre/im-manager/compare/v0.5.2...v0.5.3)
 
 > 2022-04-08
 
