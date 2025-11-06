@@ -12,18 +12,20 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
 
-      - name: Install Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.x'
-
       - name: Install Helm
         uses: alexellis/arkade-get@master
         with:
           helm: v3.12.3
 
-      - name: Install HTTPie
-        run: python -m pip install httpie
+      - name: Install Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Set up Python virtual environment
+        run: |
+          python -m venv venv
+          venv/bin/pip install -r scripts/util/requirements.txt
 
       - name: Set up Instance Manager credentials
         run: |
@@ -46,8 +48,7 @@ jobs:
         id: find-orphaned-releases
         run: |
           set -o pipefail
-          cd scripts/instances
-          python3 find-orphaned-helm-releases.py \
+          venv/bin/python scripts/util/find-orphaned-helm-releases.py \
             --kubeconfig /tmp/eks-kubeconfig \
             --kubeconfig /tmp/hetzner-kubeconfig |
             tee /tmp/find-helm-releases-output

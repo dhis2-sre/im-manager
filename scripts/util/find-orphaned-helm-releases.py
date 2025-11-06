@@ -1,18 +1,69 @@
 #!/usr/bin/env python3
 
+"""
+Find Orphaned Helm Releases
+
+This script compares Instance Manager Deployments with Helm Releases
+in Kubernetes clusters to identify orphaned Helm Releases that no longer exist
+in the Instance Manager.
+
+The script:
+1. Fetches all deployments from Instance Manager (prod and/or dev environments)
+2. Fetches all Helm releases from specified Kubernetes clusters
+3. Compares them to find Releases that exist in Helm but not in Instance Manager
+4. Outputs Helm uninstall commands for the orphaned releases
+"""
+
 import json
 import os
 import shlex
 import subprocess
 import sys
 import argparse
+import requests
 from collections import defaultdict
-from typing import List, Dict
+from dataclasses import dataclass
+from typing import List, Dict, Optional
+
 
 INSTANCE_MANAGER_CHARTS = {"core", "minio", "postgresql", "pgadmin"}
 DEPLOYMENT_SUFFIXES = ["-database", "-minio", "-pgadmin"]
 IM_MANAGER_PREFIX = "im-manager-"
 ENVIRONMENTS = [("prod", "IM_HOST_PROD"), ("dev", "IM_HOST_DEV")]
+CLUSTERS_MAPPING = {
+    "hetzner": "hetzner",
+}
+
+
+@dataclass
+class Cluster:
+    id: int
+    name: str
+
+
+@dataclass
+class Group:
+    name: str
+    hostname: str
+    cluster_id: Optional[int]
+    namespace: str
+
+
+@dataclass
+class Deployment:
+    name: str
+    namespace: str
+    cluster: str
+    group: str
+    environment: str
+
+
+@dataclass
+class HelmRelease:
+    name: str
+    namespace: str
+    chart: str
+    base_name: str
 
 
 def authenticate(im_host: str, environment: str) -> str:
@@ -24,25 +75,35 @@ def authenticate(im_host: str, environment: str) -> str:
         print(f"Error: Credentials for {environment} environment not found. Set USER_EMAIL_{environment.upper()} and PASSWORD_{environment.upper()}")
         sys.exit(1)
 
-    cmd = (
-        f"export IM_HOST={shlex.quote(im_host)} && "
-        f"export USER_EMAIL={shlex.quote(user_email)} && "
-        f"export PASSWORD={shlex.quote(password)} && "
-        f"source ./auth.sh {shlex.quote(user_type)} && echo $ACCESS_TOKEN"
-    )
+    env = os.environ.copy()
+    env["IM_HOST"] = im_host
+    env["USER_EMAIL"] = user_email
+    env["PASSWORD"] = password
 
-    result = subprocess.run(["bash", "-c", cmd], capture_output=True, text=True, check=True)
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    auth_script = os.path.join(script_dir, "..", "clusters", "auth.sh")
+    cmd = f"source {shlex.quote(auth_script)} {shlex.quote(user_type)} && echo $ACCESS_TOKEN"
+
+    result = subprocess.run(["bash", "-c", cmd], env=env, capture_output=True, text=True, check=True)
     access_token = result.stdout.strip()
 
     if not access_token:
         print(f"Failed to obtain access token for {im_host}")
+        if result.stderr:
+            print(f"Error output: {result.stderr}")
+        if result.stdout:
+            print(f"Output: {result.stdout}")
         sys.exit(1)
 
     return access_token
 
 
 def normalize_cluster_name(cluster_name: str) -> str:
-    return "hetzner" if "hetzner" in cluster_name.lower() else "default"
+    cluster_name_lower = cluster_name.lower()
+    for key, normalized in CLUSTERS_MAPPING.items():
+        if key in cluster_name_lower:
+            return normalized
+    return "default"
 
 
 def print_separator(title: str = None):
@@ -52,56 +113,72 @@ def print_separator(title: str = None):
     print("=" * 60)
 
 
-def get_clusters(access_token: str, im_host: str) -> Dict[int, str]:
-    result = subprocess.run(
-        ["curl", "-s", "-H", f"Authorization: Bearer {access_token}", f"{im_host}/clusters"],
-        capture_output=True, text=True, check=True
-    )
+def get_clusters(access_token: str, im_host: str) -> Dict[int, Cluster]:
+    try:
+        response = requests.get(
+            f"{im_host}/clusters",
+            headers={"Authorization": f"Bearer {access_token}"},
+            timeout=30
+        )
+        response.raise_for_status()
+    except requests.exceptions.RequestException as e:
+        print(f"Error fetching clusters from {im_host}/clusters: {e}")
+        response = getattr(e, 'response', None)
+        if response is not None:
+            print(f"Response status: {response.status_code}")
+            print(f"Response body: {response.text}")
+        sys.exit(1)
 
-    if not result.stdout.strip():
+    if not response.text.strip():
         return {}
 
-    cluster_map = {}
-    for cluster in json.loads(result.stdout):
-        cluster_id = cluster.get("id")
-        cluster_name = cluster.get("name", "").strip()
-        if cluster_id and cluster_name:
-            cluster_map[cluster_id] = normalize_cluster_name(cluster_name)
+    clusters_data = response.json()
+
+    cluster_map = {
+        cluster_data["id"]: Cluster(id=cluster_data["id"], name=cluster_data["name"].strip())
+        for cluster_data in clusters_data
+    }
 
     return cluster_map
 
 
-def get_deployments_by_environment(access_token: str, im_host: str, environment: str, cluster_map: Dict[int, str]) -> List[Dict]:
+def get_deployments_by_environment(access_token: str, im_host: str, environment: str, cluster_map: Dict[int, Cluster]) -> List[Deployment]:
     print(f"Fetching Deployments from Instance Manager ({environment})...")
 
-    result = subprocess.run(
-        ["curl", "-s", "-H", f"Authorization: Bearer {access_token}", f"{im_host}/deployments"],
-        capture_output=True, text=True, check=True
-    )
+    try:
+        response = requests.get(
+            f"{im_host}/deployments",
+            headers={"Authorization": f"Bearer {access_token}"},
+            timeout=30
+        )
+        response.raise_for_status()
+    except requests.exceptions.RequestException as e:
+        print(f"Error fetching deployments from {im_host}/deployments: {e}")
+        response = getattr(e, 'response', None)
+        if response is not None:
+            print(f"Response status: {response.status_code}")
+            print(f"Response body: {response.text}")
+        sys.exit(1)
 
-    if not result.stdout.strip():
+    if not response.text.strip():
         print(f"Error: Empty response from {im_host}/deployments")
         sys.exit(1)
 
-    deployments = []
-    for group in json.loads(result.stdout):
-        group_name = group["name"]
-        for deployment in group.get("deployments", []):
-            deployment_name = deployment.get("name", "").strip()
-            if not deployment_name:
-                continue
+    groups_data = response.json()
 
-            deployment_group = deployment.get("group")
-            cluster_id = deployment_group.get("clusterId")
-            cluster_name = cluster_map.get(cluster_id, "default") if cluster_id else "default"
-
-            deployments.append({
-                "name": deployment_name,
-                "namespace": deployment_group.get("namespace", "").strip(),
-                "cluster": cluster_name,
-                "group": group_name,
-                "environment": environment
-            })
+    deployments = [
+        Deployment(
+            name=deployment_data["name"].strip(),
+            namespace=deployment_data["group"]["namespace"].strip(),
+            cluster=normalize_cluster_name(cluster_map[deployment_data["group"]["clusterId"]].name)
+            if (cluster_id := deployment_data["group"].get("clusterId")) and cluster_id in cluster_map
+            else "default",
+            group=group_data.get("name", "").strip(),
+            environment=environment
+        )
+        for group_data in groups_data
+        for deployment_data in group_data["deployments"]
+    ]
 
     print(f"Found {len(deployments)} deployments in Instance Manager ({environment})\n")
     return deployments
@@ -114,7 +191,7 @@ def extract_base_name(name: str) -> str:
     return name
 
 
-def get_helm_releases(kubeconfigs: List[str]) -> Dict[str, Dict[str, List[Dict]]]:
+def get_helm_releases(kubeconfigs: List[str]) -> Dict[str, Dict[str, List[HelmRelease]]]:
     print("Fetching Helm Releases from Kubernetes...")
 
     releases_by_kubeconfig = defaultdict(lambda: defaultdict(list))
@@ -126,26 +203,31 @@ def get_helm_releases(kubeconfigs: List[str]) -> Dict[str, Dict[str, List[Dict]]
         print(f"  Checking kubeconfig: {kubeconfig_name}")
         result = subprocess.run(helm_cmd, capture_output=True, text=True, check=True)
 
-        for release in json.loads(result.stdout):
-            release_name = release.get("name", "")
+        releases_data = json.loads(result.stdout)
+
+        for release_data in releases_data:
+            release_name = release_data["name"]
             if release_name.startswith(IM_MANAGER_PREFIX):
                 continue
 
-            chart = release.get("chart", "")
+            chart = release_data["chart"]
             if any(chart.startswith(chart_name) for chart_name in INSTANCE_MANAGER_CHARTS):
-                namespace = release.get("namespace", "")
-                releases_by_kubeconfig[kubeconfig_name][namespace].append({
-                    "name": release_name,
-                    "namespace": namespace,
-                    "base_name": extract_base_name(release_name)
-                })
+                namespace = release_data["namespace"]
+                releases_by_kubeconfig[kubeconfig_name][namespace].append(
+                    HelmRelease(
+                        name=release_name,
+                        namespace=namespace,
+                        chart=chart,
+                        base_name=extract_base_name(release_name)
+                    )
+                )
 
     total = sum(len(releases) for namespaces in releases_by_kubeconfig.values() for releases in namespaces.values())
     print(f"Found {total} Helm Releases")
     return releases_by_kubeconfig
 
 
-def get_all_deployments() -> Dict[str, List[Dict]]:
+def get_all_deployments() -> Dict[str, List[Deployment]]:
     env_configs = [(env, os.environ.get(env_var)) for env, env_var in ENVIRONMENTS if os.environ.get(env_var)]
 
     if not env_configs:
@@ -165,7 +247,7 @@ def get_all_deployments() -> Dict[str, List[Dict]]:
     return deployments_by_env
 
 
-def print_deployments(deployments_by_env: Dict[str, List[Dict]]):
+def print_deployments(deployments_by_env: Dict[str, List[Deployment]]):
     print_separator("Instance Manager Deployments")
 
     for env in sorted(deployments_by_env.keys()):
@@ -174,9 +256,9 @@ def print_deployments(deployments_by_env: Dict[str, List[Dict]]):
 
         by_group = defaultdict(lambda: {"namespace": "", "deployments": []})
         for deployment in deployments:
-            group_name = deployment["group"]
-            by_group[group_name]["namespace"] = deployment["namespace"]
-            by_group[group_name]["deployments"].append(deployment["name"])
+            group_name = deployment.group
+            by_group[group_name]["namespace"] = deployment.namespace
+            by_group[group_name]["deployments"].append(deployment.name)
 
         for group_name in sorted(by_group.keys()):
             group_data = by_group[group_name]
@@ -185,29 +267,29 @@ def print_deployments(deployments_by_env: Dict[str, List[Dict]]):
                 print(f"    - {name}")
 
 
-def print_helm_releases(helm_releases_by_kubeconfig: Dict[str, Dict[str, List[Dict]]]):
+def print_helm_releases(helm_releases_by_kubeconfig: Dict[str, Dict[str, List[HelmRelease]]]):
     print_separator("Helm Releases")
 
     for kubeconfig_name in sorted(helm_releases_by_kubeconfig.keys()):
         namespaces = helm_releases_by_kubeconfig[kubeconfig_name]
-        unique_releases = {(namespace, release["base_name"]) for namespace, releases in namespaces.items() for release in releases}
+        unique_releases = {(namespace, release.base_name) for namespace, releases in namespaces.items() for release in releases}
         print(f"\n{kubeconfig_name} ({len(unique_releases)} releases):")
 
         for namespace in sorted(namespaces.keys()):
-            base_names = sorted({r["base_name"] for r in namespaces[namespace]})
+            base_names = sorted({r.base_name for r in namespaces[namespace]})
             print(f"  {namespace} ({len(base_names)}):")
             for base_name in base_names:
                 print(f"    - {base_name}")
 
 
 def find_orphaned_releases(
-    deployments_by_env: Dict[str, List[Dict]],
-    helm_releases_by_kubeconfig: Dict[str, Dict[str, List[Dict]]]
-) -> Dict[str, Dict[str, List[Dict]]]:
+    deployments_by_env: Dict[str, List[Deployment]],
+    helm_releases_by_kubeconfig: Dict[str, Dict[str, List[HelmRelease]]]
+) -> Dict[str, Dict[str, List[HelmRelease]]]:
     im_deployments_by_cluster = defaultdict(set)
     for deployments in deployments_by_env.values():
         for deployment in deployments:
-            im_deployments_by_cluster[deployment["cluster"]].add((deployment["namespace"], deployment["name"]))
+            im_deployments_by_cluster[deployment.cluster].add((deployment.namespace, deployment.name))
 
     helm_releases_by_cluster = defaultdict(set)
     kubeconfig_to_cluster = {}
@@ -217,7 +299,7 @@ def find_orphaned_releases(
 
         for namespace, releases in namespaces.items():
             for release in releases:
-                helm_releases_by_cluster[cluster].add((namespace, release["base_name"]))
+                helm_releases_by_cluster[cluster].add((namespace, release.base_name))
 
     orphaned_by_kubeconfig = {}
     for kubeconfig_name, namespaces in helm_releases_by_kubeconfig.items():
@@ -227,16 +309,16 @@ def find_orphaned_releases(
         if orphaned_keys:
             orphaned_by_kubeconfig[kubeconfig_name] = {}
             for namespace, releases in namespaces.items():
-                orphaned_releases = [release for release in releases if (namespace, release["base_name"]) in orphaned_keys]
+                orphaned_releases = [release for release in releases if (namespace, release.base_name) in orphaned_keys]
                 if orphaned_releases:
                     orphaned_by_kubeconfig[kubeconfig_name][namespace] = orphaned_releases
 
     return orphaned_by_kubeconfig
 
 
-def print_orphaned_releases(orphaned_by_kubeconfig: Dict[str, Dict[str, List[Dict]]]):
+def print_orphaned_releases(orphaned_by_kubeconfig: Dict[str, Dict[str, List[HelmRelease]]]):
     total = sum(
-        len({r["base_name"] for r in releases})
+        len({r.base_name for r in releases})
         for namespaces in orphaned_by_kubeconfig.values()
         for releases in namespaces.values()
     )
@@ -248,13 +330,13 @@ def print_orphaned_releases(orphaned_by_kubeconfig: Dict[str, Dict[str, List[Dic
         namespaces = orphaned_by_kubeconfig[kubeconfig_name]
         for namespace in sorted(namespaces.keys()):
             releases = namespaces[namespace]
-            base_names = sorted({release["base_name"] for release in releases})
+            base_names = sorted({release.base_name for release in releases})
             print(f"  {kubeconfig_name} / {namespace} ({len(base_names)}):")
             for base_name in base_names:
                 print(f"    - {base_name}")
 
 
-def generate_helm_commands(orphaned_by_kubeconfig: Dict[str, Dict[str, List[Dict]]],kubeconfigs: List[str]) -> List[str]:
+def generate_helm_commands(orphaned_by_kubeconfig: Dict[str, Dict[str, List[HelmRelease]]], kubeconfigs: List[str]) -> List[str]:
     commands = []
     kubeconfig_map = {os.path.basename(kubeconfig): kubeconfig for kubeconfig in kubeconfigs}
 
@@ -262,7 +344,7 @@ def generate_helm_commands(orphaned_by_kubeconfig: Dict[str, Dict[str, List[Dict
         kubeconfig_path = kubeconfig_map.get(kubeconfig_name)
         for _, releases in namespaces.items():
             for release in releases:
-                cmd = f"helm uninstall {release['name']} --namespace {release['namespace']}"
+                cmd = f"helm uninstall {release.name} --namespace {release.namespace}"
                 if kubeconfig_path:
                     cmd += f" --kubeconfig {kubeconfig_path}"
                 commands.append(cmd)
@@ -271,7 +353,9 @@ def generate_helm_commands(orphaned_by_kubeconfig: Dict[str, Dict[str, List[Dict
 
 
 def main():
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(
+        description="Find orphaned Helm releases by comparing Instance Manager deployments with Kubernetes Helm releases."
+    )
     parser.add_argument("--kubeconfig", action="append", help="Path to kubeconfig file (can be used multiple times)")
     args = parser.parse_args()
 
@@ -302,3 +386,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
