@@ -675,8 +675,13 @@ func newPgDumpConfig(instance *model.DeploymentInstance, stack *model.Stack) (*p
 		return nil, fmt.Errorf(errorMessage, "DATABASE_PASSWORD")
 	}
 
+	host, err := stack.ParameterProviders["DATABASE_HOSTNAME"].Provide(*instance)
+	if err != nil {
+		return nil, err
+	}
+
 	dump, err := pg.NewDump(&pg.Postgres{
-		Host:     fmt.Sprintf(stack.HostnamePattern, instance.Name, instance.Group.Namespace),
+		Host:     host,
 		Port:     5432,
 		DB:       databaseName.Value,
 		Username: databaseUsername.Value,
