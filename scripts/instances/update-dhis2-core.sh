@@ -11,6 +11,7 @@ DEPLOYMENT_ID=$(./findByName.sh "$GROUP" "$NAME" | jq -r '.id')
 
 INSTANCE_ID=$($HTTP get "$IM_HOST/deployments/$DEPLOYMENT_ID" "Authorization: Bearer $ACCESS_TOKEN" | jq -r '.instances[] | select(.stackName=="dhis2-core") | .id')
 
+CHART_VERSION=${CHART_VERSION:-0.31.0}
 MIN_READY_SECONDS=${MIN_READY_SECONDS:-120}
 STARTUP_PROBE_FAILURE_THRESHOLD=${STARTUP_PROBE_FAILURE_THRESHOLD:-26}
 STARTUP_PROBE_PERIOD_SECONDS=${STARTUP_PROBE_PERIOD_SECONDS:-5}
@@ -30,6 +31,9 @@ echo "{
   \"stackName\": \"dhis2-core\",
   \"public\": $PUBLIC,
   \"parameters\": {
+    \"CHART_VERSION\": {
+      \"value\": \"$CHART_VERSION\"
+    },
     \"MIN_READY_SECONDS\": {
       \"value\": \"$MIN_READY_SECONDS\"
     },
