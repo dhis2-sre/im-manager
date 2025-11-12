@@ -202,6 +202,7 @@ func (s service) Upload(ctx context.Context, d *model.Database, group *model.Gro
 	}
 
 	d.Url = fmt.Sprintf("s3://%s/%s", s.s3Bucket, key)
+	d.Size = size
 
 	err = s.repository.Save(ctx, d)
 	if err != nil {
