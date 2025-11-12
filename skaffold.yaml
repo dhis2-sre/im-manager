@@ -83,6 +83,12 @@ deploy:
         valuesFiles:
           - helm/data/secrets/{{ .CLASSIFICATION }}/postgresql.yaml
           - helm/data/values/{{ .CLASSIFICATION }}/postgresql.yaml
+        setValueTemplates:
+          global:
+            security:
+              allowInsecureImages: true
+          image:
+            repository: bitnamilegacy/postgresql
 
       - name: im-manager-{{ .ENVIRONMENT }}
         namespace: instance-manager-{{ .CLASSIFICATION }}
