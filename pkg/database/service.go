@@ -548,7 +548,12 @@ func (s service) SaveAs(ctx context.Context, userId uint, database *model.Databa
 			return
 		}
 
-		hostname := fmt.Sprintf(stack.HostnamePattern, instance.Name, instance.Group.Namespace)
+		hostname, err := stack.ParameterProviders["DATABASE_HOSTNAME"].Provide(*instance)
+		if err != nil {
+			s.logError(ctx, err)
+			<-uploadDone
+			return
+		}
 		// TODO: get pod by label selector instead
 		podName := strings.Split(hostname, ".")[0] + "-0"
 		namespace := instance.Group.Namespace
