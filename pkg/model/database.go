@@ -23,6 +23,7 @@ type Database struct {
 	Filestore         *Database          `json:"filestore" gorm:"foreignKey:ID"`
 	UserID            uint               `json:"userId"`
 	User              User               `json:"user"`
+	Size              int64              `json:"size"`
 }
 
 // swagger:model
