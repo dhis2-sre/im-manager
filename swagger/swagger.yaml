@@ -146,6 +146,10 @@ definitions:
             name:
                 type: string
                 x-go-name: Name
+            size:
+                format: int64
+                type: integer
+                x-go-name: Size
             slug:
                 type: string
                 x-go-name: Slug
