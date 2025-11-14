@@ -38,7 +38,9 @@ else
     exit 1
   fi
   if [[ "$FILESTORE_ID" == "0" ]]; then
-    echo "No filestore id associated with database"
+    noFilestoreMessage="No filestore id associated with database"
+    echo "$noFilestoreMessage"
+    echo "$noFilestoreMessage" | mc pipe $seed_file
   else
     echo "Filestore ID: $FILESTORE_ID"
     echo "Seeding..."
