@@ -2,35 +2,35 @@
 
 set -o pipefail
 
+timeout=60
+elapsed=0
+success_count=0
+required_successes=5
+
+while [ "$success_count" -lt "$required_successes" ]; do
+  if curl --silent --fail "http://$INSTANCE_NAME-minio:9000/minio/health/ready"; then
+    success_count=$((success_count + 1))
+    echo "MinIO health check $success_count/$required_successes passed"
+  else
+    success_count=0
+    echo "MinIO health check failed, resetting counter"
+  fi
+  sleep 2
+  elapsed=$((elapsed + 2))
+  if [ "$elapsed" -ge "$timeout" ]; then
+    echo "Timeout reached: MinIO is not ready after $timeout seconds."
+    exit 1
+  fi
+done
+
+echo "MinIO is stable and ready!"
+
 mc alias set myminio "http://$INSTANCE_NAME-minio:9000" dhisdhis dhisdhis
 
 seed_file=myminio/dhis2/seeded.txt
 if mc stat $seed_file >/dev/null 2>&1; then
   echo "Already seeded, skipping..."
 else
-  timeout=60
-  elapsed=0
-  success_count=0
-  required_successes=5
-
-  while [ "$success_count" -lt "$required_successes" ]; do
-    if curl --silent --fail "http://$INSTANCE_NAME-minio:9000/minio/health/ready"; then
-      success_count=$((success_count + 1))
-      echo "MinIO health check $success_count/$required_successes passed"
-    else
-      success_count=0
-      echo "MinIO health check failed, resetting counter"
-    fi
-    sleep 2
-    elapsed=$((elapsed + 2))
-    if [ "$elapsed" -ge "$timeout" ]; then
-      echo "Timeout reached: MinIO is not ready after $timeout seconds."
-      exit 1
-    fi
-  done
-
-  echo "MinIO is stable and ready!"
-
   DATABASE_URL="$HOSTNAME/databases/$DATABASE_ID"
   echo "DATABASE_URL: $DATABASE_URL"
   if ! FILESTORE_ID=$(curl --connect-timeout 10 --retry 5 --retry-delay 1 --fail --show-error -L "$DATABASE_URL" --cookie "accessToken=$IM_ACCESS_TOKEN" | jq -r '.filestoreId'); then
