@@ -1,4 +1,4 @@
-FROM golang:1.25.2-alpine3.21 AS build
+FROM golang:1.25.4-alpine3.21 AS build
 
 # https://kubernetes.io/docs/tasks/tools/install-kubectl-linux/
 ARG KUBECTL_VERSION=v1.33.3
@@ -9,8 +9,8 @@ ARG HELM_VERSION=v3.17.4
 ARG HELM_CHECKSUM=c91e3d7293849eff3b4dc4ea7994c338bcc92f914864d38b5789bab18a1d775d
 
 # https://github.com/helmfile/helmfile/releases
-ARG HELMFILE_VERSION=1.1.3
-ARG HELMFILE_CHECKSUM=80733cd836f8b0d5b2271bf7b4a25b86abf80c4e5890b8ff2635d7a529a6df1b
+ARG HELMFILE_VERSION=1.1.7
+ARG HELMFILE_CHECKSUM=e9d870f4e502b9f0850d7e0546cab8b418ff7f44ff4df0ed54cd3df8dfda189c
 
 # https://github.com/kubernetes-sigs/aws-iam-authenticator/releases/
 ARG AWS_IAM_AUTHENTICATOR_VERSION=0.7.5

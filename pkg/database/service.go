@@ -202,6 +202,7 @@ func (s service) Upload(ctx context.Context, d *model.Database, group *model.Gro
 	}
 
 	d.Url = fmt.Sprintf("s3://%s/%s", s.s3Bucket, key)
+	d.Size = size
 
 	err = s.repository.Save(ctx, d)
 	if err != nil {
@@ -784,6 +785,7 @@ func (s service) StreamUpload(ctx context.Context, database model.Database, grou
 	stats.log(s.logger)
 
 	database.Url = fmt.Sprintf("s3://%s/%s", s.s3Bucket, key)
+	database.Size = stats.BytesProcessed
 	err = s.repository.Save(ctx, &database)
 	if err != nil {
 		return model.Database{}, fmt.Errorf("failed to save database record: %w", err)
