@@ -77,6 +77,17 @@ func (k K8sClient) AssertPodIsReady(t *testing.T, namespace string, instance str
 	for {
 		select {
 		case <-tm.C:
+			pods, err := k.Client.CoreV1().Pods("").List(context.Background(), metav1.ListOptions{})
+			if err != nil {
+				t.Logf("Failed to retrieve pods for debugging: %v", err)
+			}
+
+			t.Log("=== All pods ===")
+			for _, pod := range pods.Items {
+				t.Logf("Namespace: %s, Name: %s, Phase: %s, Ready: %s", pod.Namespace, pod.Name, pod.Status.Phase, getPodReadyStatus(pod))
+			}
+			t.Log("=== End of all pods ===")
+
 			assert.Fail(t, "timed out waiting on pod")
 			cancel()
 			return
@@ -95,7 +106,7 @@ func (k K8sClient) AssertPodIsReady(t *testing.T, namespace string, instance str
 			if pod.Status.Phase == v1.PodRunning {
 				conditions := pod.Status.Conditions
 				index := slices.IndexFunc(conditions, func(condition v1.PodCondition) bool {
-					return condition.Type == "Ready"
+					return condition.Type == v1.PodReady
 				})
 				readyCondition := conditions[index]
 				if readyCondition.Status == "True" {
@@ -109,4 +120,16 @@ func (k K8sClient) AssertPodIsReady(t *testing.T, namespace string, instance str
 			}
 		}
 	}
+}
+
+// getPodReadyStatus returns the ready status of a pod
+func getPodReadyStatus(pod v1.Pod) string {
+	conditions := pod.Status.Conditions
+	index := slices.IndexFunc(conditions, func(condition v1.PodCondition) bool {
+		return condition.Type == v1.PodReady
+	})
+	if index >= 0 {
+		return string(conditions[index].Status)
+	}
+	return "Unknown"
 }
