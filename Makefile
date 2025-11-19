@@ -37,7 +37,7 @@ dev:
 	docker compose --profile dev up
 
 test:
-	go test -race ./...
+	go test -race -timeout 20m ./...
 
 test-coverage:
 	go test -coverprofile=./coverage.out ./... && go tool cover -html=./coverage.out -o ./coverage.html
