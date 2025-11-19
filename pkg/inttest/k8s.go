@@ -77,19 +77,12 @@ func (k K8sClient) AssertPodIsReady(t *testing.T, namespace string, instance str
 	for {
 		select {
 		case <-tm.C:
-			pods, err := k.Client.CoreV1().Pods("").List(context.Background(), metav1.ListOptions{})
-			if err != nil {
-				t.Logf("Failed to retrieve pods for debugging: %v", err)
-			}
-
-			t.Log("=== All pods ===")
-			for _, pod := range pods.Items {
-				t.Logf("Namespace: %s, Name: %s, Phase: %s, Ready: %s", pod.Namespace, pod.Name, pod.Status.Phase, getPodReadyStatus(pod))
-			}
-			t.Log("=== End of all pods ===")
-
 			assert.Fail(t, "timed out waiting on pod")
 			cancel()
+
+			k.logAllPods(t)
+			k.logTargetPodDetails(t, namespace, instance)
+
 			return
 		case event := <-watch.ResultChan():
 			pod, ok := event.Object.(*v1.Pod)
@@ -122,6 +115,19 @@ func (k K8sClient) AssertPodIsReady(t *testing.T, namespace string, instance str
 	}
 }
 
+func (k K8sClient) logAllPods(t *testing.T) {
+	pods, err := k.Client.CoreV1().Pods("").List(context.Background(), metav1.ListOptions{})
+	if err != nil {
+		t.Logf("Failed to retrieve pods for debugging: %v", err)
+	}
+
+	t.Log("=== All pods ===")
+	for _, pod := range pods.Items {
+		t.Logf("Namespace: %s, Name: %s, Phase: %s, Ready: %s", pod.Namespace, pod.Name, pod.Status.Phase, getPodReadyStatus(pod))
+	}
+	t.Log("=== End of all pods ===")
+}
+
 // getPodReadyStatus returns the ready status of a pod
 func getPodReadyStatus(pod v1.Pod) string {
 	conditions := pod.Status.Conditions
@@ -132,4 +138,70 @@ func getPodReadyStatus(pod v1.Pod) string {
 		return string(conditions[index].Status)
 	}
 	return "Unknown"
+}
+
+// logTargetPodDetails logs detailed information about the target pod we're waiting for
+func (k K8sClient) logTargetPodDetails(t *testing.T, namespace string, instance string) {
+	targetPods, err := k.Client.CoreV1().Pods(namespace).List(context.Background(), metav1.ListOptions{
+		LabelSelector: "app.kubernetes.io/instance=" + instance,
+	})
+	if err != nil {
+		t.Logf("Failed to retrieve target pod for instance %q: %v", instance, err)
+		return
+	}
+
+	if len(targetPods.Items) == 0 {
+		t.Logf("No pods found for instance %q in namespace %q", instance, namespace)
+		return
+	}
+
+	t.Logf("=== Target pod details for instance %q ===", instance)
+	for _, pod := range targetPods.Items {
+		t.Logf("Name: %s, Namespace: %s, Phase: %s, Ready: %s", pod.Name, pod.Namespace, pod.Status.Phase, getPodReadyStatus(pod))
+
+		// Log conditions
+		if len(pod.Status.Conditions) > 0 {
+			t.Log("Conditions:")
+			for _, condition := range pod.Status.Conditions {
+				t.Logf("  - Type: %s, Status: %s, Reason: %s, Message: %s",
+					condition.Type, condition.Status, condition.Reason, condition.Message)
+			}
+		}
+
+		// Log container statuses
+		if len(pod.Status.ContainerStatuses) > 0 {
+			t.Log("Container Statuses:")
+			for _, cs := range pod.Status.ContainerStatuses {
+				t.Logf("  - Name: %s, Ready: %t, RestartCount: %d", cs.Name, cs.Ready, cs.RestartCount)
+				if cs.State.Waiting != nil {
+					t.Logf("    Waiting - Reason: %s, Message: %s", cs.State.Waiting.Reason, cs.State.Waiting.Message)
+				}
+				if cs.State.Running != nil {
+					t.Logf("    Running since: %s", cs.State.Running.StartedAt)
+				}
+				if cs.State.Terminated != nil {
+					t.Logf("    Terminated - Reason: %s, Message: %s, Exit Code: %d",
+						cs.State.Terminated.Reason, cs.State.Terminated.Message, cs.State.Terminated.ExitCode)
+				}
+			}
+		}
+
+		// Log events related to this pod
+		events, err := k.Client.CoreV1().Events(namespace).List(context.Background(), metav1.ListOptions{
+			FieldSelector: "involvedObject.name=" + pod.Name,
+		})
+		if err != nil {
+			t.Logf("Failed to retrieve events for pod %s: %v", pod.Name, err)
+			continue
+		}
+
+		if len(events.Items) > 0 {
+			t.Log("Recent Events:")
+			for _, event := range events.Items {
+				t.Logf("  - Type: %s, Reason: %s, Message: %s (Count: %d, Last: %s)",
+					event.Type, event.Reason, event.Message, event.Count, event.LastTimestamp)
+			}
+		}
+	}
+	t.Log("=== End of target pod details ===")
 }
