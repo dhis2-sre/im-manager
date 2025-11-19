@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"os"
 	"path"
+	"runtime"
 	"slices"
 	"strconv"
 	"strings"
@@ -195,6 +196,9 @@ type ReadAtSeeker interface {
 }
 
 func (s service) Upload(ctx context.Context, d *model.Database, group *model.Group, reader ReadAtSeeker, size int64) (*model.Database, error) {
+	_, callerFile, callerLine, _ := runtime.Caller(0)
+	s.logger.InfoContext(ctx, "Upload: Starting", "file", callerFile, "line", callerLine, "databaseID", d.ID, "databaseName", d.Name, "databaseSlug", d.Slug, "size", size)
+
 	key := fmt.Sprintf("%s/%s", group.Name, d.Name)
 	err := s.s3Client.Upload(ctx, s.s3Bucket, key, reader, size)
 	if err != nil {
@@ -204,10 +208,16 @@ func (s service) Upload(ctx context.Context, d *model.Database, group *model.Gro
 	d.Url = fmt.Sprintf("s3://%s/%s", s.s3Bucket, key)
 	d.Size = size
 
+	_, callerFile, callerLine, _ = runtime.Caller(0)
+	s.logger.InfoContext(ctx, "Upload: Before second Save() call", "file", callerFile, "line", callerLine, "databaseID", d.ID, "databaseName", d.Name, "databaseSlug", d.Slug, "url", d.Url)
 	err = s.repository.Save(ctx, d)
 	if err != nil {
+		_, callerFile, callerLine, _ = runtime.Caller(0)
+		s.logger.ErrorContext(ctx, "Upload: Second Save() failed", "file", callerFile, "line", callerLine, "error", err, "databaseID", d.ID, "databaseName", d.Name, "databaseSlug", d.Slug)
 		return nil, err
 	}
+	_, callerFile, callerLine, _ = runtime.Caller(0)
+	s.logger.InfoContext(ctx, "Upload: After second Save() call - SUCCESS", "file", callerFile, "line", callerLine, "databaseID", d.ID, "databaseName", d.Name)
 
 	return d, nil
 }
@@ -518,6 +528,9 @@ func getFormat(database *model.Database) string {
 }
 
 func (s service) SaveAs(ctx context.Context, userId uint, database *model.Database, instance *model.DeploymentInstance, stack *model.Stack, newName string, format string, done func(ctx context.Context, saved *model.Database)) (*model.Database, error) {
+	_, callerFile, callerLine, _ := runtime.Caller(0)
+	s.logger.InfoContext(ctx, "SaveAs: Starting", "file", callerFile, "line", callerLine, "newName", newName, "instanceId", instance.ID, "databaseId", database.ID)
+
 	// TODO: Add to config
 	dumpPath := "/mnt/data/"
 
@@ -539,15 +552,23 @@ func (s service) SaveAs(ctx context.Context, userId uint, database *model.Databa
 		UserID:    userId,
 	}
 
+	_, callerFile, callerLine, _ = runtime.Caller(0)
+	s.logger.InfoContext(ctx, "SaveAs: Before first Save() call", "file", callerFile, "line", callerLine, "databaseName", newDatabase.Name, "databaseSlug", newDatabase.Slug, "databaseID", newDatabase.ID)
 	err = s.repository.Save(ctx, newDatabase)
 	if err != nil {
+		_, callerFile, callerLine, _ = runtime.Caller(0)
+		s.logger.ErrorContext(ctx, "SaveAs: First Save() failed", "file", callerFile, "line", callerLine, "error", err, "databaseName", newDatabase.Name)
 		return nil, err
 	}
+	_, callerFile, callerLine, _ = runtime.Caller(0)
+	s.logger.InfoContext(ctx, "SaveAs: After first Save() call - SUCCESS", "file", callerFile, "line", callerLine, "databaseID", newDatabase.ID, "databaseName", newDatabase.Name, "databaseSlug", newDatabase.Slug)
 
 	// only use ctx for values (logging) and not cancellation signals since we create a go routine
 	// that outlives the HTTP request scope
 	ctx = context.WithoutCancel(ctx)
 	go func() {
+		_, callerFile, callerLine, _ := runtime.Caller(0)
+		s.logger.InfoContext(ctx, "SaveAs: Goroutine started", "file", callerFile, "line", callerLine, "databaseID", newDatabase.ID, "databaseName", newDatabase.Name)
 		var ret *forwarder.Result
 		if group.Cluster.Configuration != nil {
 			hostname := fmt.Sprintf(stack.HostnamePattern, instance.Name, instance.Group.Namespace)
@@ -629,11 +650,17 @@ func (s service) SaveAs(ctx context.Context, userId uint, database *model.Databa
 			return
 		}
 
+		_, callerFile, callerLine, _ = runtime.Caller(0)
+		s.logger.InfoContext(ctx, "SaveAs: Before Upload() call (will trigger second Save)", "file", callerFile, "line", callerLine, "databaseID", newDatabase.ID, "databaseName", newDatabase.Name, "databaseSlug", newDatabase.Slug, "fileSize", stat.Size())
 		_, err = s.Upload(ctx, newDatabase, group, file, stat.Size())
 		if err != nil {
+			_, callerFile, callerLine, _ = runtime.Caller(0)
+			s.logger.ErrorContext(ctx, "SaveAs: Upload() failed", "file", callerFile, "line", callerLine, "error", err, "databaseID", newDatabase.ID)
 			s.logError(ctx, err)
 			return
 		}
+		_, callerFile, callerLine, _ = runtime.Caller(0)
+		s.logger.InfoContext(ctx, "SaveAs: After Upload() call - SUCCESS", "file", callerFile, "line", callerLine, "databaseID", newDatabase.ID, "databaseName", newDatabase.Name)
 
 		done(ctx, newDatabase)
 	}()

@@ -122,7 +122,8 @@ func (s *BackupService) createTarGzStream(ctx context.Context, w io.Writer, stat
 }
 
 func (s *BackupService) processSingleObject(ctx context.Context, tw *tar.Writer, object BackupObject, stats *BackupStats) error {
-	s.logger.InfoContext(ctx, "Processing object", "path", object.Path)
+	// TODO Remove this as it is too verbose
+	// s.logger.InfoContext(ctx, "Processing object", "path", object.Path)
 
 	reader, err := s.source.Get(ctx, object.Path)
 	if err != nil {

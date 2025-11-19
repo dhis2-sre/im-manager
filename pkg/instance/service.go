@@ -784,8 +784,10 @@ func (s Service) Reset(ctx context.Context, token string, instance *model.Deploy
 }
 
 func (s Service) FilestoreBackup(ctx context.Context, instance *model.DeploymentInstance, name string, database *model.Database) error {
+	s.logger.InfoContext(ctx, "FilestoreBackup: Starting", "databaseID", database.ID, "databaseName", database.Name, "instanceName", instance.Name)
 	group, err := s.groupService.Find(ctx, instance.GroupName)
 	if err != nil {
+		s.logger.ErrorContext(ctx, "FilestoreBackup: Failed to find group", "error", err, "databaseID", database.ID)
 		return err
 	}
 
@@ -844,25 +846,33 @@ func (s Service) FilestoreBackup(ctx context.Context, instance *model.Deployment
 	baseName = strings.TrimSuffix(baseName, ".tar.gz")
 
 	key := fmt.Sprintf("%s/%s-%s.tar.gz", instance.GroupName, baseName, "fs")
+	s.logger.InfoContext(ctx, "FilestoreBackup: Starting PerformBackup", "databaseID", database.ID, "key", key)
 	err = backupService.PerformBackup(ctx, s.s3Bucket, key)
 	if err != nil {
+		s.logger.ErrorContext(ctx, "FilestoreBackup: PerformBackup failed", "error", err, "databaseID", database.ID, "key", key)
 		return err
 	}
+	s.logger.InfoContext(ctx, "FilestoreBackup: PerformBackup completed", "databaseID", database.ID, "key", key)
 
 	// Record backup in database
 	s3Uri := fmt.Sprintf("s3://%s/%s", s.s3Bucket, key)
+	s.logger.InfoContext(ctx, "FilestoreBackup: Recording backup in database", "databaseID", database.ID, "s3Uri", s3Uri)
 	filestore, err := s.recordBackup(ctx, instance.GroupName, s3Uri, baseName+"-fs.tar.gz", database.UserID)
 	if err != nil {
+		s.logger.ErrorContext(ctx, "FilestoreBackup: Failed to record backup", "error", err, "databaseID", database.ID)
 		return err
 	}
 
 	database.FilestoreID = filestore.ID
 
+	s.logger.InfoContext(ctx, "FilestoreBackup: Saving database with filestoreID", "databaseID", database.ID, "filestoreID", filestore.ID)
 	err = s.instanceRepository.SaveDatabase(ctx, database)
 	if err != nil {
+		s.logger.ErrorContext(ctx, "FilestoreBackup: Failed to save database", "error", err, "databaseID", database.ID)
 		return err
 	}
 
+	s.logger.InfoContext(ctx, "FilestoreBackup: Completed successfully", "databaseID", database.ID, "databaseName", database.Name)
 	return nil
 }
 

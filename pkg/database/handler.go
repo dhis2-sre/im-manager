@@ -214,6 +214,7 @@ func (h Handler) SaveAs(c *gin.Context) {
 	}
 
 	// Backup file store
+	h.logger.InfoContext(ctx, "SaveAs handler: Starting FilestoreBackup", "databaseID", savedDatabase.ID, "databaseName", savedDatabase.Name)
 	deployment, err := h.instanceService.FindDeploymentById(ctx, instance.DeploymentID)
 	if err != nil {
 		_ = c.Error(err)
@@ -223,6 +224,7 @@ func (h Handler) SaveAs(c *gin.Context) {
 	coreInstance, err := getInstanceByStack("dhis2-core", deployment.Instances)
 	if err != nil {
 		if errdef.IsNotFound(err) {
+			h.logger.InfoContext(ctx, "SaveAs handler: No dhis2-core instance found, skipping FilestoreBackup", "databaseID", savedDatabase.ID)
 			c.JSON(http.StatusCreated, savedDatabase)
 			return
 		}
@@ -230,11 +232,13 @@ func (h Handler) SaveAs(c *gin.Context) {
 		return
 	}
 
+	h.logger.InfoContext(ctx, "SaveAs handler: Calling FilestoreBackup", "databaseID", savedDatabase.ID, "databaseName", savedDatabase.Name, "coreInstanceName", coreInstance.Name)
 	err = h.instanceService.FilestoreBackup(ctx, coreInstance, savedDatabase.Name, savedDatabase)
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
+	h.logger.InfoContext(ctx, "SaveAs handler: FilestoreBackup completed successfully", "databaseID", savedDatabase.ID, "databaseName", savedDatabase.Name)
 
 	c.JSON(http.StatusCreated, savedDatabase)
 }
