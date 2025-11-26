@@ -19,7 +19,7 @@ redis:
 groups:
   names: whoami
   namespaces: whoami
-  hostnames: whoami.im.dhis2.org
+  hostnames: whoami.im-feat.dhis2.org
 
 tmpfsSizeLimit: 512Mi
 
