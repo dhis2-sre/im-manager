@@ -54,3 +54,4 @@ rules:
       - get
       - create
       - delete
+      - patch
