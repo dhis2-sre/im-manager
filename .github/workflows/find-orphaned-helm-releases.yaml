@@ -37,7 +37,7 @@ jobs:
           echo "USER_EMAIL_DEV=${{ secrets.IM_ADMIN_USER_DEV }}" >> $GITHUB_ENV
           echo "PASSWORD_DEV=${{ secrets.IM_ADMIN_PASSWORD_DEV }}" >> $GITHUB_ENV
 
-          echo "HTTP=https --check-status" >> $GITHUB_ENV
+          echo "HTTP=${{ github.workspace }}/venv/bin/https --check-status" >> $GITHUB_ENV
 
       - name: Create kubeconfig files
         run: |
