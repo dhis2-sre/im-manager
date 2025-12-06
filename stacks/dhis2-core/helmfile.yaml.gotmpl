@@ -101,6 +101,8 @@ releases:
             memory: {{ requiredEnv "RESOURCES_REQUESTS_MEMORY" }}
       - keda:
           enabled: {{ requiredEnv "ALLOW_SUSPEND" }}
+      - glowroot:
+          enabled: {{ requiredEnv "DEPLOY_GLOWROOT" }}
 
   {{- if eq (requiredEnv "STORAGE_TYPE") "minio" }}
   - name: "{{ requiredEnv "INSTANCE_NAME" }}-minio"
