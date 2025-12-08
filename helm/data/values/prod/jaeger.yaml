@@ -2,6 +2,9 @@ provisionDataStore:
   cassandra: false
 allInOne:
   enabled: true
+  image:
+    repository: jaegertracing/all-in-one
+    tag: 1.76.0
 storage:
   type: memory
 agent:
