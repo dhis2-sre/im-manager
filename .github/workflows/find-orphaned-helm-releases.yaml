@@ -33,7 +33,7 @@ jobs:
           echo "USER_EMAIL_PROD=${{ secrets.IM_ADMIN_USER }}" >> $GITHUB_ENV
           echo "PASSWORD_PROD=${{ secrets.IM_ADMIN_PASSWORD }}" >> $GITHUB_ENV
 
-          echo "IM_HOST_DEV=https://dev.api.im.dhis2.org" >> $GITHUB_ENV
+          echo "IM_HOST_DEV=https://api.im-dev.dhis2.org" >> $GITHUB_ENV
           echo "USER_EMAIL_DEV=${{ secrets.IM_ADMIN_USER_DEV }}" >> $GITHUB_ENV
           echo "PASSWORD_DEV=${{ secrets.IM_ADMIN_PASSWORD_DEV }}" >> $GITHUB_ENV
 
