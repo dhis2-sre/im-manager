@@ -288,7 +288,7 @@ var dhis2CoreDefaults = struct {
 	startupProbePeriodSeconds:    "5",
 	customDhis2Config:            " ",
 	allowSuspend:                 "false",
-	deployGlowroot:               "true",
+	deployGlowroot:               "false",
 	googleAuthProjectId:          " ", // TODO: " " doesn't need to be used here as with `javaOpts` since the googleAuth* parameters are stack parameters and therefor always populated
 	googleAuthPrivateKey:         " ", // However the web client currently doesn't support these empty parameter so for now
 	googleAuthPrivateKeyId:       " ",
