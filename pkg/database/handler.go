@@ -664,7 +664,9 @@ func (h Handler) List(c *gin.Context) {
 }
 
 type UpdateDatabaseRequest struct {
-	Name        string `json:"name" binding:"required"`
+	// required: true
+	Name string `json:"name" binding:"required"`
+	// required: true
 	Description string `json:"description" binding:"required"`
 }
 
