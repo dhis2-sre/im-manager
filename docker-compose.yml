@@ -1,5 +1,4 @@
-# These variables are exported from the .envrc file,
-# so they are not available in the .env file and we need to pass them explicitly.
+# These variables are exported from the .envrc file and are not available in the .env file so we need to pass them explicitly.
 x-envrc-vars: &envrc-vars
   environment:
     HOSTNAME: ${HOSTNAME}
