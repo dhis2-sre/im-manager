@@ -25,7 +25,12 @@ func SetupK8s(t *testing.T) *K8sClient {
 		k3s.Preset(
 			k3s.WithVersion("v1.33.2-k3s1"),
 			func(p *k3s.P) {
-				p.K3sServerFlags = []string{"--debug"}
+				p.K3sServerFlags = []string{
+					"--debug",
+					"--kubelet-arg=eviction-hard=imagefs.available<5%,nodefs.available<5%",
+					"--kubelet-arg=eviction-soft=imagefs.available<10%,nodefs.available<10%",
+					"--kubelet-arg=eviction-soft-grace-period=imagefs.available=1m30s,nodefs.available=1m30s",
+				}
 			},
 		),
 		gnomock.WithDebugMode(),
