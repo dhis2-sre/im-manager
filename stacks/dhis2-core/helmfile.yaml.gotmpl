@@ -101,6 +101,13 @@ releases:
             memory: {{ requiredEnv "RESOURCES_REQUESTS_MEMORY" }}
       - keda:
           enabled: {{ requiredEnv "ALLOW_SUSPEND" }}
+      - glowroot:
+          enabled: {{ requiredEnv "DEPLOY_GLOWROOT" }}
+          ingress:
+            path: /{{ requiredEnv "INSTANCE_NAME" }}-glowroot
+          config:
+            web:
+              contextPath: /{{ requiredEnv "INSTANCE_NAME" }}-glowroot
 
   {{- if eq (requiredEnv "STORAGE_TYPE") "minio" }}
   - name: "{{ requiredEnv "INSTANCE_NAME" }}-minio"
