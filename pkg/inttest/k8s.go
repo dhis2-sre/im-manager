@@ -25,9 +25,7 @@ func SetupK8s(t *testing.T) *K8sClient {
 		k3s.Preset(
 			k3s.WithVersion("v1.33.2-k3s1"),
 			func(p *k3s.P) {
-				p.K3sServerFlags = []string{
-					"--debug",
-				}
+				p.K3sServerFlags = []string{"--debug"}
 			},
 		),
 		gnomock.WithDebugMode(),
