@@ -27,9 +27,6 @@ func SetupK8s(t *testing.T) *K8sClient {
 			func(p *k3s.P) {
 				p.K3sServerFlags = []string{
 					"--debug",
-					"--kubelet-arg=eviction-hard=imagefs.available<5%,nodefs.available<5%",
-					"--kubelet-arg=eviction-soft=imagefs.available<10%,nodefs.available<10%",
-					"--kubelet-arg=eviction-soft-grace-period=imagefs.available=1m30s,nodefs.available=1m30s",
 				}
 			},
 		),
