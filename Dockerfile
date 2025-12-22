@@ -46,7 +46,7 @@ RUN go mod download -x
 COPY . .
 RUN go build -o /app/im-manager -ldflags "-s -w" ./cmd/serve
 
-FROM alpine:3.22
+FROM alpine:3.23
 RUN apk --no-cache -U upgrade \
     && apk add --no-cache postgresql16-client
 COPY --from=build /usr/bin/kubectl /usr/bin/kubectl
