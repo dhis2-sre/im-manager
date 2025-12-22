@@ -2,9 +2,12 @@ package inttest
 
 import (
 	"context"
+	"fmt"
 	"slices"
 	"testing"
 	"time"
+
+	"github.com/dhis2-sre/im-manager/pkg/model"
 
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
@@ -54,30 +57,31 @@ type K8sClient struct {
 	Config []byte
 }
 
-func (k K8sClient) AssertPodIsNotRunning(t *testing.T, namespace string, instance string) {
-	pods, err := k.Client.CoreV1().Pods(namespace).List(context.TODO(), metav1.ListOptions{
-		LabelSelector: "app.kubernetes.io/instance=" + instance,
+func (k K8sClient) AssertPodIsNotRunning(t *testing.T, instance model.DeploymentInstance) {
+	pods, err := k.Client.CoreV1().Pods(instance.Group.Namespace).List(context.TODO(), metav1.ListOptions{
+		LabelSelector: "app.kubernetes.io/instance=" + fmt.Sprintf("%s-%d", instance.Name, instance.Group.ID),
 	})
 	require.NoError(t, err)
 
 	require.Len(t, pods.Items, 0)
 }
 
-func (k K8sClient) AssertPodIsReady(t *testing.T, namespace string, instance string, timeoutInSeconds time.Duration) {
+func (k K8sClient) AssertPodIsReady(t *testing.T, instance model.DeploymentInstance, namePostfix string, timeoutInSeconds time.Duration) {
 	ctx, cancel := context.WithCancel(context.Background())
-	watch, err := k.Client.CoreV1().Pods(namespace).Watch(ctx, metav1.ListOptions{
-		LabelSelector: "app.kubernetes.io/instance=" + instance,
+	podName := fmt.Sprintf("%s-%d%s", instance.Name, instance.Group.ID, namePostfix)
+	watch, err := k.Client.CoreV1().Pods(instance.Group.Namespace).Watch(ctx, metav1.ListOptions{
+		LabelSelector: "app.kubernetes.io/instance=" + podName,
 	})
-	require.NoErrorf(t, err, "failed to find pod for instance %q", instance)
+	require.NoErrorf(t, err, "failed to find pod for instance %q", podName)
 
-	t.Log("Waiting for:", instance)
+	t.Log("Waiting for:", podName)
 	timeout := timeoutInSeconds * time.Second
 	tm := time.NewTimer(timeout)
 	defer tm.Stop()
 	for {
 		select {
 		case <-tm.C:
-			assert.Fail(t, "timed out waiting on pod")
+			assert.Fail(t, "timed out waiting on pod: "+instance.Group.Namespace+"/"+podName)
 			cancel()
 
 			k.logAllPods(t)
@@ -103,7 +107,7 @@ func (k K8sClient) AssertPodIsReady(t *testing.T, namespace string, instance str
 				})
 				readyCondition := conditions[index]
 				if readyCondition.Status == "True" {
-					t.Logf("pod for instance %q is running", instance)
+					t.Logf("pod for instance %q is running", podName)
 					if !tm.Stop() {
 						<-tm.C
 					}
