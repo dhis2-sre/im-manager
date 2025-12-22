@@ -1,4 +1,120 @@
 
+<a name="v0.62.1"></a>
+## [v0.62.1](https://github.com/dhis2-sre/im-manager/compare/v0.62.0...v0.62.1)
+
+> 2025-12-22
+
+### Chore
+
+* bump default dhis2-core chart version ([#1321](https://github.com/dhis2-sre/im-manager/issues/1321))
+* generate change log for v0.62.0
+
+
+<a name="v0.62.0"></a>
+## [v0.62.0](https://github.com/dhis2-sre/im-manager/compare/v0.61.0...v0.62.0)
+
+> 2025-12-19
+
+### Chore
+
+* default CLASSIFICATION to dev ([#1318](https://github.com/dhis2-sre/im-manager/issues/1318))
+* allow patching of httpscaledobjects ([#1300](https://github.com/dhis2-sre/im-manager/issues/1300))
+* bump default core chart version ([#1308](https://github.com/dhis2-sre/im-manager/issues/1308))
+* use Gnomock fork ([#1316](https://github.com/dhis2-sre/im-manager/issues/1316))
+* Glowroot ingress ([#1315](https://github.com/dhis2-sre/im-manager/issues/1315))
+* migrate dns ([#1306](https://github.com/dhis2-sre/im-manager/issues/1306))
+* add script for cleaning up orphaned instances ([#1272](https://github.com/dhis2-sre/im-manager/issues/1272))
+* bump default core chart version ([#1270](https://github.com/dhis2-sre/im-manager/issues/1270))
+* generate change log for v0.60.0 and v0.61.0
+
+### Ci
+
+* update IM Dev hostname ([#1313](https://github.com/dhis2-sre/im-manager/issues/1313))
+* fix httpie path ([#1309](https://github.com/dhis2-sre/im-manager/issues/1309))
+
+### Feat
+
+* Glowroot ([#1312](https://github.com/dhis2-sre/im-manager/issues/1312))
+* save the size of the database on the model ([#1293](https://github.com/dhis2-sre/im-manager/issues/1293))
+* show timestamp in the public instances list ([#1266](https://github.com/dhis2-sre/im-manager/issues/1266))
+
+### Fix
+
+* use commonLabels for pgadmin stack ([#1317](https://github.com/dhis2-sre/im-manager/issues/1317))
+* add jaeger as dependency for prod service ([#1314](https://github.com/dhis2-sre/im-manager/issues/1314))
+* MinIO restarts ([#1298](https://github.com/dhis2-sre/im-manager/issues/1298))
+
+
+<a name="v0.61.0"></a>
+## [v0.61.0](https://github.com/dhis2-sre/im-manager/compare/v0.60.0...v0.61.0)
+
+> 2025-10-22
+
+### Chore
+
+* add dhis2-core chart version to scripts ([#1262](https://github.com/dhis2-sre/im-manager/issues/1262))
+
+### Fix
+
+* decrypt deployment when invoking ttl handler  ([#1265](https://github.com/dhis2-sre/im-manager/issues/1265))
+* add x-upload-description header to cors config ([#1263](https://github.com/dhis2-sre/im-manager/issues/1263))
+
+### Refactor
+
+* require multiple consecutive passing health checks to ensur… ([#1264](https://github.com/dhis2-sre/im-manager/issues/1264))
+
+
+<a name="v0.60.0"></a>
+## [v0.60.0](https://github.com/dhis2-sre/im-manager/compare/v0.59.3...v0.60.0)
+
+> 2025-10-20
+
+### Chore
+
+* bump default dhis2 core chart ([#1261](https://github.com/dhis2-sre/im-manager/issues/1261))
+* generate change log for v0.59.3
+
+
+<a name="v0.59.3"></a>
+## [v0.59.3](https://github.com/dhis2-sre/im-manager/compare/v0.59.2...v0.59.3)
+
+> 2025-10-09
+
+### Chore
+
+* generate change log for v0.59.2
+
+### Fix
+
+* use group namespace instead of name in minio endpoint ([#1255](https://github.com/dhis2-sre/im-manager/issues/1255))
+
+
+<a name="v0.59.2"></a>
+## [v0.59.2](https://github.com/dhis2-sre/im-manager/compare/v0.59.1...v0.59.2)
+
+> 2025-10-09
+
+### Chore
+
+* add ALLOW_SUSPEND to request body ([#1254](https://github.com/dhis2-sre/im-manager/issues/1254))
+* generate change log for v0.59.1
+
+### Docs
+
+* update command order in release instructions ([#1249](https://github.com/dhis2-sre/im-manager/issues/1249))
+
+
+<a name="v0.59.1"></a>
+## [v0.59.1](https://github.com/dhis2-sre/im-manager/compare/v0.59.0...v0.59.1)
+
+> 2025-10-08
+
+### Chore
+
+* add ALLOW_SUSPEND param to deploy script ([#1250](https://github.com/dhis2-sre/im-manager/issues/1250))
+* generate change log for v0.59.0
+
+
 <a name="v0.59.0"></a>
 ## [v0.59.0](https://github.com/dhis2-sre/im-manager/compare/v0.58.0...v0.59.0)
 
@@ -301,7 +417,7 @@
 
 
 <a name="v0.45.0"></a>
-## [v0.45.0](https://github.com/dhis2-sre/im-manager/compare/v0.44.0...v0.45.0)
+## [v0.45.0](https://github.com/dhis2-sre/im-manager/compare/v0.43.0...v0.45.0)
 
 > 2024-11-27
 
@@ -311,14 +427,14 @@
 * order public instances as stable, development and nightly
 
 
-<a name="v0.44.0"></a>
-## [v0.44.0](https://github.com/dhis2-sre/im-manager/compare/v0.43.0...v0.44.0)
+<a name="v0.43.0"></a>
+## [v0.43.0](https://github.com/dhis2-sre/im-manager/compare/v0.44.0...v0.43.0)
 
 > 2024-11-27
 
 
-<a name="v0.43.0"></a>
-## [v0.43.0](https://github.com/dhis2-sre/im-manager/compare/v0.41.0...v0.43.0)
+<a name="v0.44.0"></a>
+## [v0.44.0](https://github.com/dhis2-sre/im-manager/compare/v0.41.0...v0.44.0)
 
 > 2024-11-27
 
@@ -1525,17 +1641,18 @@
 
 
 <a name="v0.5.10"></a>
-## [v0.5.10](https://github.com/dhis2-sre/im-manager/compare/v0.5.9...v0.5.10)
+## [v0.5.10](https://github.com/dhis2-sre/im-manager/compare/v0.5.8...v0.5.10)
 
 > 2022-04-11
 
 ### Fix
 
 * Only change the ownership of generate_uid() func [DEVOPS-102]
+* Use func names with argument signatures to change ownership [DEVOPS-102]
 
 
-<a name="v0.5.9"></a>
-## [v0.5.9](https://github.com/dhis2-sre/im-manager/compare/v0.5.7...v0.5.9)
+<a name="v0.5.8"></a>
+## [v0.5.8](https://github.com/dhis2-sre/im-manager/compare/v0.5.7...v0.5.8)
 
 > 2022-04-11
 
@@ -1565,7 +1682,7 @@
 
 
 <a name="v0.5.5"></a>
-## [v0.5.5](https://github.com/dhis2-sre/im-manager/compare/v0.5.8...v0.5.5)
+## [v0.5.5](https://github.com/dhis2-sre/im-manager/compare/v0.5.9...v0.5.5)
 
 > 2022-04-11
 
@@ -1574,8 +1691,8 @@
 * Use func names with argument signatures to change ownership [DEVOPS-102]
 
 
-<a name="v0.5.8"></a>
-## [v0.5.8](https://github.com/dhis2-sre/im-manager/compare/v0.5.3...v0.5.8)
+<a name="v0.5.9"></a>
+## [v0.5.9](https://github.com/dhis2-sre/im-manager/compare/v0.5.4...v0.5.9)
 
 > 2022-04-11
 
@@ -1584,14 +1701,14 @@
 * Use func names with argument signatures to change ownership [DEVOPS-102]
 
 
-<a name="v0.5.3"></a>
-## [v0.5.3](https://github.com/dhis2-sre/im-manager/compare/v0.5.4...v0.5.3)
+<a name="v0.5.4"></a>
+## [v0.5.4](https://github.com/dhis2-sre/im-manager/compare/v0.5.3...v0.5.4)
 
 > 2022-04-08
 
 
-<a name="v0.5.4"></a>
-## [v0.5.4](https://github.com/dhis2-sre/im-manager/compare/v0.5.2...v0.5.4)
+<a name="v0.5.3"></a>
+## [v0.5.3](https://github.com/dhis2-sre/im-manager/compare/v0.5.2...v0.5.3)
 
 > 2022-04-08
 

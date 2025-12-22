@@ -18,6 +18,7 @@ DATABASE_SIZE=${DATABASE_SIZE:-20Gi}
 DB_RESOURCES_REQUESTS_CPU=${DB_RESOURCES_REQUESTS_CPU:-250m}
 DB_RESOURCES_REQUESTS_MEMORY=${DB_RESOURCES_REQUESTS_MEMORY:-256Mi}
 
+CHART_VERSION=${CHART_VERSION:-0.31.0}
 MIN_READY_SECONDS=${MIN_READY_SECONDS:-120}
 # container(s) in dhis2 pod will be restarted after that due to restartPolicy
 # 5*26=130s
@@ -33,6 +34,7 @@ CORE_RESOURCES_REQUESTS_MEMORY=${CORE_RESOURCES_REQUESTS_MEMORY:-1500Mi}
 FLYWAY_MIGRATE_OUT_OF_ORDER=${FLYWAY_MIGRATE_OUT_OF_ORDER:-false}
 FLYWAY_REPAIR_BEFORE_MIGRATION=${FLYWAY_REPAIR_BEFORE_MIGRATION:-false}
 ENABLE_QUERY_LOGGING=${ENABLE_QUERY_LOGGING:-false}
+ALLOW_SUSPEND=${ALLOW_SUSPEND:-true}
 
 DEPLOYMENT_ID=$(echo "{
   \"name\": \"$NAME\",
@@ -63,6 +65,9 @@ echo "{
   \"stackName\": \"dhis2-core\",
   \"public\": $PUBLIC,
   \"parameters\": {
+    \"CHART_VERSION\": {
+      \"value\": \"$CHART_VERSION\"
+    },
     \"MIN_READY_SECONDS\": {
       \"value\": \"$MIN_READY_SECONDS\"
     },
@@ -104,6 +109,9 @@ echo "{
     },
     \"ENABLE_QUERY_LOGGING\": {
       \"value\": \"$ENABLE_QUERY_LOGGING\"
+    },
+    \"ALLOW_SUSPEND\": {
+      \"value\": \"$ALLOW_SUSPEND\"
     }
   }
 }" | $HTTP post "$IM_HOST/deployments/$DEPLOYMENT_ID/instance" "Authorization: Bearer $ACCESS_TOKEN"
