@@ -1,4 +1,4 @@
-FROM golang:1.25.4-alpine3.21 AS build
+FROM golang:1.25.5-alpine3.21 AS build
 
 # https://kubernetes.io/docs/tasks/tools/install-kubectl-linux/
 ARG KUBECTL_VERSION=v1.33.3
@@ -46,7 +46,7 @@ RUN go mod download -x
 COPY . .
 RUN go build -o /app/im-manager -ldflags "-s -w" ./cmd/serve
 
-FROM alpine:3.22
+FROM alpine:3.23
 RUN apk --no-cache -U upgrade \
     && apk add --no-cache postgresql16-client
 COPY --from=build /usr/bin/kubectl /usr/bin/kubectl
