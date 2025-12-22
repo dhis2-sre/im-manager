@@ -1,4 +1,15 @@
 
+<a name="v0.62.1"></a>
+## [v0.62.1](https://github.com/dhis2-sre/im-manager/compare/v0.62.0...v0.62.1)
+
+> 2025-12-22
+
+### Chore
+
+* bump default dhis2-core chart version ([#1321](https://github.com/dhis2-sre/im-manager/issues/1321))
+* generate change log for v0.62.0
+
+
 <a name="v0.62.0"></a>
 ## [v0.62.0](https://github.com/dhis2-sre/im-manager/compare/v0.61.0...v0.62.0)
 
@@ -1630,17 +1641,18 @@
 
 
 <a name="v0.5.10"></a>
-## [v0.5.10](https://github.com/dhis2-sre/im-manager/compare/v0.5.9...v0.5.10)
+## [v0.5.10](https://github.com/dhis2-sre/im-manager/compare/v0.5.8...v0.5.10)
 
 > 2022-04-11
 
 ### Fix
 
 * Only change the ownership of generate_uid() func [DEVOPS-102]
+* Use func names with argument signatures to change ownership [DEVOPS-102]
 
 
-<a name="v0.5.9"></a>
-## [v0.5.9](https://github.com/dhis2-sre/im-manager/compare/v0.5.7...v0.5.9)
+<a name="v0.5.8"></a>
+## [v0.5.8](https://github.com/dhis2-sre/im-manager/compare/v0.5.7...v0.5.8)
 
 > 2022-04-11
 
@@ -1670,7 +1682,7 @@
 
 
 <a name="v0.5.5"></a>
-## [v0.5.5](https://github.com/dhis2-sre/im-manager/compare/v0.5.8...v0.5.5)
+## [v0.5.5](https://github.com/dhis2-sre/im-manager/compare/v0.5.9...v0.5.5)
 
 > 2022-04-11
 
@@ -1679,8 +1691,8 @@
 * Use func names with argument signatures to change ownership [DEVOPS-102]
 
 
-<a name="v0.5.8"></a>
-## [v0.5.8](https://github.com/dhis2-sre/im-manager/compare/v0.5.4...v0.5.8)
+<a name="v0.5.9"></a>
+## [v0.5.9](https://github.com/dhis2-sre/im-manager/compare/v0.5.4...v0.5.9)
 
 > 2022-04-11
 
