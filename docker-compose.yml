@@ -1,3 +1,10 @@
+# These variables are exported from the .envrc file and are not available in the .env file so we need to pass them explicitly.
+x-envrc-vars: &envrc-vars
+  environment:
+    HOSTNAME: ${HOSTNAME}
+    UI_URL: ${UI_URL}
+    API_HOSTNAME: ${API_HOSTNAME}
+
 x-service: &common-dev-test
   build:
     context: .
@@ -7,6 +14,7 @@ x-service: &common-dev-test
   volumes:
     - .:/src
   working_dir: /src
+  <<: *envrc-vars
 
 services:
   prod:
@@ -14,6 +22,7 @@ services:
     build: .
     env_file:
       - .env
+    <<: *envrc-vars
     ports:
       - "8080:8080"
     depends_on:
@@ -22,6 +31,8 @@ services:
       rabbitmq:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      jaeger:
         condition: service_healthy
     profiles:
       - prod
@@ -52,14 +63,21 @@ services:
         condition: service_healthy
       minio:
         condition: service_healthy
+      jaeger:
+        condition: service_healthy
     profiles:
       - dev
 
   jaeger:
-    image: jaegertracing/all-in-one:1.6.0
+    image: jaegertracing/all-in-one:1.76.0
     ports:
-      - "14268:14268"
+      - "14269:14269"
       - "16686:16686"
+    healthcheck:
+      test: [ "CMD", "wget", "--spider", "--quiet", "http://localhost:14269" ]
+      interval: 5s
+      timeout: 3s
+      retries: 5
     profiles:
       - dev
       - prod
@@ -78,6 +96,7 @@ services:
       timeout: 3s
       retries: 5
     volumes:
+      - ./init-scripts:/docker-entrypoint-initdb.d:ro
       - database:/var/lib/postgresql/data
     profiles:
       - dev

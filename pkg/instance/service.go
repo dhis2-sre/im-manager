@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/anthhub/forwarder"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -610,9 +611,10 @@ func (s Service) groupDeployments(deployments []*model.Deployment) ([]GroupWithD
 }
 
 type PublicInstance struct {
-	Name        string `json:"name"`
-	Description string `json:"description"`
-	Hostname    string `json:"hostname"`
+	Name        string    `json:"name"`
+	Description string    `json:"description"`
+	Hostname    string    `json:"hostname"`
+	UpdatedAt   time.Time `json:"updatedAt"`
 }
 
 type Category struct {
@@ -661,6 +663,7 @@ func (s Service) groupPublicInstances(instances []*model.DeploymentInstance) ([]
 					Name:        instance.Name,
 					Description: instance.Deployment.Description,
 					Hostname:    fmt.Sprintf("https://%s/%s", instance.Group.Hostname, instance.Name),
+					UpdatedAt:   instance.UpdatedAt,
 				}
 				if strings.HasPrefix(instance.Name, "dev") {
 					devCategory.Instances = append(devCategory.Instances, publicInstance)
@@ -789,7 +792,7 @@ func (s Service) FilestoreBackup(ctx context.Context, instance *model.Deployment
 	var minioClient *minio.Client
 	var minioEndpoint string
 
-	minioEndpoint = fmt.Sprintf("%s-minio.%s.svc:9000", instance.Name, instance.GroupName)
+	minioEndpoint = fmt.Sprintf("%s-minio.%s.svc:9000", instance.Name, instance.Group.Namespace)
 
 	if group.Cluster.Configuration != nil {
 		hostname := fmt.Sprintf("%s-minio.%s.svc", instance.Name, instance.GroupName)

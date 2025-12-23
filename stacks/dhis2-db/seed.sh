@@ -31,23 +31,17 @@ curl --connect-timeout 10 --retry 5 --retry-delay 1 --fail -L "$DATABASE_DOWNLOA
 rm "$tmp_file"
 
 ## Change ownership to $DATABASE_USERNAME
-# Tables
-entities=$(exec_psql "select tablename from pg_tables where schemaname = 'public'")
-for entity in $entities; do
-  echo "Changing owner of $entity to $DATABASE_USERNAME"
-  exec_psql "alter table \"$entity\" owner to $DATABASE_USERNAME"
-done
+change_owner() {
+  local query=$1
+  local obj_type=$2
 
-# Sequences
-entities=$(exec_psql "select sequence_name from information_schema.sequences where sequence_schema = 'public'")
-for entity in $entities; do
-  echo "Changing owner of $entity to $DATABASE_USERNAME"
-  exec_psql "alter sequence \"$entity\" owner to $DATABASE_USERNAME"
-done
+  entities=$(exec_psql "$query")
+  for entity in $entities; do
+    echo "Changing owner of $obj_type $entity to $DATABASE_USERNAME"
+    exec_psql "ALTER $obj_type \"$entity\" OWNER TO $DATABASE_USERNAME"
+  done
+}
 
-# Views
-entities=$(exec_psql "select table_name from information_schema.views where table_schema = 'public'")
-for entity in $entities; do
-  echo "Changing owner of $entity to $DATABASE_USERNAME"
-  exec_psql "alter view \"$entity\" owner to $DATABASE_USERNAME"
-done
+change_owner "SELECT tablename FROM pg_tables WHERE schemaname = 'public'" "TABLE"
+change_owner "SELECT sequence_name FROM information_schema.sequences WHERE sequence_schema = 'public'" "SEQUENCE"
+change_owner "SELECT table_name FROM information_schema.views WHERE table_schema = 'public'" "VIEW"

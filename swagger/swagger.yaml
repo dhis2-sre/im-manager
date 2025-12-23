@@ -120,6 +120,9 @@ definitions:
                 format: date-time
                 type: string
                 x-go-name: CreatedAt
+            description:
+                type: string
+                x-go-name: Description
             externalDownloads:
                 items:
                     $ref: '#/definitions/ExternalDownload'
@@ -143,6 +146,10 @@ definitions:
             name:
                 type: string
                 x-go-name: Name
+            size:
+                format: int64
+                type: integer
+                x-go-name: Size
             slug:
                 type: string
                 x-go-name: Slug
@@ -441,6 +448,10 @@ definitions:
             name:
                 type: string
                 x-go-name: Name
+            updatedAt:
+                format: date-time
+                type: string
+                x-go-name: UpdatedAt
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
     RefreshTokenRequest:
@@ -563,6 +574,9 @@ definitions:
         x-go-package: github.com/dhis2-sre/im-manager/pkg/cluster
     UpdateDatabaseRequest:
         properties:
+            description:
+                type: string
+                x-go-name: Description
             name:
                 type: string
                 x-go-name: Name

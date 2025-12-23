@@ -208,6 +208,7 @@ var DHIS2Core = model.Stack{
 		"SAME_SITE_COOKIES":               {Priority: 24, DisplayName: "Same site cookies", DefaultValue: &dhis2CoreDefaults.sameSiteCookies, Validator: sameSiteCookies},
 		"CUSTOM_DHIS2_CONFIG":             {Priority: 25, DisplayName: "Custom DHIS2 config (applied to top of dhis.conf)", DefaultValue: &dhis2CoreDefaults.customDhis2Config, Sensitive: true},
 		"ALLOW_SUSPEND":                   {Priority: 26, DisplayName: "Allow the application to be suspended", DefaultValue: &dhis2CoreDefaults.allowSuspend},
+		"DEPLOY_GLOWROOT":                 {Priority: 27, DisplayName: "Deploy Glowroot", DefaultValue: &dhis2CoreDefaults.deployGlowroot},
 		"GOOGLE_AUTH_PROJECT_ID":          {Priority: 0, DisplayName: "Google auth project id", DefaultValue: &dhis2CoreDefaults.googleAuthClientId, Sensitive: true},
 		"GOOGLE_AUTH_PRIVATE_KEY":         {Priority: 0, DisplayName: "Google auth private key", DefaultValue: &dhis2CoreDefaults.googleAuthPrivateKey, Sensitive: true},
 		"GOOGLE_AUTH_PRIVATE_KEY_ID":      {Priority: 0, DisplayName: "Google auth private key id", DefaultValue: &dhis2CoreDefaults.googleAuthPrivateKeyId, Sensitive: true},
@@ -253,13 +254,14 @@ var dhis2CoreDefaults = struct {
 	startupProbePeriodSeconds    string
 	customDhis2Config            string
 	allowSuspend                 string
+	deployGlowroot               string
 	googleAuthProjectId          string
 	googleAuthPrivateKey         string
 	googleAuthPrivateKeyId       string
 	googleAuthClientEmail        string
 	googleAuthClientId           string
 }{
-	chartVersion:                 "0.30.0",
+	chartVersion:                 "0.32.1",
 	minIOChartVersion:            "14.7.5",
 	minIOStorageSize:             "8Gi",
 	storageType:                  minIOStorage,
@@ -285,7 +287,8 @@ var dhis2CoreDefaults = struct {
 	startupProbeFailureThreshold: "26",
 	startupProbePeriodSeconds:    "5",
 	customDhis2Config:            " ",
-	allowSuspend:                 "true",
+	allowSuspend:                 "false",
+	deployGlowroot:               "false",
 	googleAuthProjectId:          " ", // TODO: " " doesn't need to be used here as with `javaOpts` since the googleAuth* parameters are stack parameters and therefor always populated
 	googleAuthPrivateKey:         " ", // However the web client currently doesn't support these empty parameter so for now
 	googleAuthPrivateKeyId:       " ",

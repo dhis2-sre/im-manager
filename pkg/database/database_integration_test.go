@@ -90,6 +90,7 @@ func TestDatabaseHandler(t *testing.T) {
 		require.Equal(t, "path/name.extension", database.Name)
 		require.Equal(t, "packages", database.GroupName)
 		require.Equal(t, "s3://database-bucket/packages/path/name.extension", database.Url)
+		require.Equal(t, int64(13), database.Size)
 
 		actualContent := s3.GetObject(t, s3Bucket, "packages/path/name.extension")
 		require.Equalf(t, "file contents", string(actualContent), "DB in S3 should have expected content")
@@ -171,7 +172,7 @@ func TestDatabaseHandler(t *testing.T) {
 		{
 			t.Log("Update")
 
-			requestBody := strings.NewReader(`{"name": "path/rename.extension"}`)
+			requestBody := strings.NewReader(`{"name": "path/rename.extension", "description": "some new description"}`)
 			response := client.Do(t, http.MethodPut, "/databases/"+databaseID, requestBody, http.StatusOK, inttest.WithHeader("Content-Type", "application/json"))
 			var actualDB model.Database
 			err := json.Unmarshal(response, &actualDB)

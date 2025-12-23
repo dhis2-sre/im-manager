@@ -13,6 +13,7 @@ type Database struct {
 	UpdatedAt         time.Time          `json:"updatedAt"`
 	Name              string             `json:"name" gorm:"index:database_name_group_idx,unique"`
 	GroupName         string             `json:"groupName" gorm:"index:database_name_group_idx,unique"`
+	Description       string             `json:"description" gorm:"type:text"`
 	Url               string             `json:"url"` // s3... Path?
 	ExternalDownloads []ExternalDownload `json:"externalDownloads" gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
 	Lock              *Lock              `json:"lock" gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
@@ -22,6 +23,7 @@ type Database struct {
 	Filestore         *Database          `json:"filestore" gorm:"foreignKey:ID"`
 	UserID            uint               `json:"userId"`
 	User              User               `json:"user"`
+	Size              int64              `json:"size"`
 }
 
 // swagger:model
