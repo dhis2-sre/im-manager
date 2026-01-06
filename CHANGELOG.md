@@ -1,4 +1,50 @@
 
+<a name="v0.62.1"></a>
+## [v0.62.1](https://github.com/dhis2-sre/im-manager/compare/v0.62.0...v0.62.1)
+
+> 2025-12-22
+
+### Chore
+
+* bump default dhis2-core chart version ([#1321](https://github.com/dhis2-sre/im-manager/issues/1321))
+* generate change log for v0.62.0
+
+
+<a name="v0.62.0"></a>
+## [v0.62.0](https://github.com/dhis2-sre/im-manager/compare/v0.61.0...v0.62.0)
+
+> 2025-12-19
+
+### Chore
+
+* default CLASSIFICATION to dev ([#1318](https://github.com/dhis2-sre/im-manager/issues/1318))
+* allow patching of httpscaledobjects ([#1300](https://github.com/dhis2-sre/im-manager/issues/1300))
+* bump default core chart version ([#1308](https://github.com/dhis2-sre/im-manager/issues/1308))
+* use Gnomock fork ([#1316](https://github.com/dhis2-sre/im-manager/issues/1316))
+* Glowroot ingress ([#1315](https://github.com/dhis2-sre/im-manager/issues/1315))
+* migrate dns ([#1306](https://github.com/dhis2-sre/im-manager/issues/1306))
+* add script for cleaning up orphaned instances ([#1272](https://github.com/dhis2-sre/im-manager/issues/1272))
+* bump default core chart version ([#1270](https://github.com/dhis2-sre/im-manager/issues/1270))
+* generate change log for v0.60.0 and v0.61.0
+
+### Ci
+
+* update IM Dev hostname ([#1313](https://github.com/dhis2-sre/im-manager/issues/1313))
+* fix httpie path ([#1309](https://github.com/dhis2-sre/im-manager/issues/1309))
+
+### Feat
+
+* Glowroot ([#1312](https://github.com/dhis2-sre/im-manager/issues/1312))
+* save the size of the database on the model ([#1293](https://github.com/dhis2-sre/im-manager/issues/1293))
+* show timestamp in the public instances list ([#1266](https://github.com/dhis2-sre/im-manager/issues/1266))
+
+### Fix
+
+* use commonLabels for pgadmin stack ([#1317](https://github.com/dhis2-sre/im-manager/issues/1317))
+* add jaeger as dependency for prod service ([#1314](https://github.com/dhis2-sre/im-manager/issues/1314))
+* MinIO restarts ([#1298](https://github.com/dhis2-sre/im-manager/issues/1298))
+
+
 <a name="v0.61.0"></a>
 ## [v0.61.0](https://github.com/dhis2-sre/im-manager/compare/v0.60.0...v0.61.0)
 
@@ -1606,7 +1652,7 @@
 
 
 <a name="v0.5.8"></a>
-## [v0.5.8](https://github.com/dhis2-sre/im-manager/compare/v0.5.9...v0.5.8)
+## [v0.5.8](https://github.com/dhis2-sre/im-manager/compare/v0.5.7...v0.5.8)
 
 > 2022-04-11
 
@@ -1615,8 +1661,8 @@
 * Use func names with argument signatures to change ownership [DEVOPS-102]
 
 
-<a name="v0.5.9"></a>
-## [v0.5.9](https://github.com/dhis2-sre/im-manager/compare/v0.5.6...v0.5.9)
+<a name="v0.5.7"></a>
+## [v0.5.7](https://github.com/dhis2-sre/im-manager/compare/v0.5.6...v0.5.7)
 
 > 2022-04-11
 
@@ -1636,7 +1682,7 @@
 
 
 <a name="v0.5.5"></a>
-## [v0.5.5](https://github.com/dhis2-sre/im-manager/compare/v0.5.7...v0.5.5)
+## [v0.5.5](https://github.com/dhis2-sre/im-manager/compare/v0.5.9...v0.5.5)
 
 > 2022-04-11
 
@@ -1645,8 +1691,8 @@
 * Use func names with argument signatures to change ownership [DEVOPS-102]
 
 
-<a name="v0.5.7"></a>
-## [v0.5.7](https://github.com/dhis2-sre/im-manager/compare/v0.5.4...v0.5.7)
+<a name="v0.5.9"></a>
+## [v0.5.9](https://github.com/dhis2-sre/im-manager/compare/v0.5.4...v0.5.9)
 
 > 2022-04-11
 

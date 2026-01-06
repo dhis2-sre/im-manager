@@ -33,7 +33,7 @@ deploy:
         createNamespace: true
         remoteChart: jaeger
         repo: https://jaegertracing.github.io/helm-charts
-        version: 3.4.0
+        version: 3.4.1
         upgradeOnChange: true
         valuesFiles:
           - helm/data/values/{{ .CLASSIFICATION }}/jaeger.yaml
@@ -61,7 +61,7 @@ deploy:
         createNamespace: true
         remoteChart: redis
         repo: https://charts.bitnami.com/bitnami
-        version: 20.13.4
+        version: 23.2.12
         upgradeOnChange: true
         valuesFiles:
           - helm/data/values/{{ .CLASSIFICATION }}/redis.yaml
