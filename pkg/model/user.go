@@ -12,7 +12,7 @@ import (
 // User domain object defining a user
 // swagger:model
 type User struct {
-	ID               uint           `json:"id" gorm:"primarykey"`
+	ID               uint           `json:"id" gorm:"primaryKey"`
 	CreatedAt        time.Time      `json:"createdAt"`
 	UpdatedAt        time.Time      `json:"updatedAt"`
 	Email            string         `json:"email" gorm:"index;unique"`
