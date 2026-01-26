@@ -550,12 +550,16 @@ func (s service) SaveAs(ctx context.Context, userId uint, database *model.Databa
 	go func() {
 		var ret *forwarder.Result
 		if group.Cluster.Configuration != nil {
-			hostname := fmt.Sprintf(stack.HostnamePattern, instance.Name, instance.Group.Namespace)
-			serviceName := strings.Split(hostname, ".")[0]
+			hostname, err := stack.ParameterProviders["DATABASE_HOSTNAME"].Provide(*instance)
+			if err != nil {
+				s.logError(ctx, err)
+				return
+			}
+
 			options := []*forwarder.Option{
 				{
 					RemotePort:  5432,
-					ServiceName: serviceName,
+					ServiceName: hostname,
 					Namespace:   instance.Group.Namespace,
 				},
 			}
@@ -703,8 +707,13 @@ func newPgDumpConfig(instance *model.DeploymentInstance, stack *model.Stack) (*p
 		return nil, fmt.Errorf(errorMessage, "DATABASE_PASSWORD")
 	}
 
+	host, err := stack.ParameterProviders["DATABASE_HOSTNAME"].Provide(*instance)
+	if err != nil {
+		return nil, err
+	}
+
 	dump, err := pg.NewDump(&pg.Postgres{
-		Host:     fmt.Sprintf(stack.HostnamePattern, instance.Name, instance.Group.Namespace),
+		Host:     host,
 		Port:     5432,
 		DB:       databaseName.Value,
 		Username: databaseUsername.Value,

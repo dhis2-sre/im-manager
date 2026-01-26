@@ -792,10 +792,11 @@ func (s Service) FilestoreBackup(ctx context.Context, instance *model.Deployment
 	var minioClient *minio.Client
 	var minioEndpoint string
 
-	minioEndpoint = fmt.Sprintf("%s-minio.%s.svc:9000", instance.Name, instance.Group.Namespace)
+	minioEndpoint = fmt.Sprintf("%s-%d-minio.%s.svc:9000", instance.Name, instance.Group.ID, instance.Group.Namespace)
 
 	if group.Cluster.Configuration != nil {
-		hostname := fmt.Sprintf("%s-minio.%s.svc", instance.Name, instance.GroupName)
+		// TODO: Don't hard code the service name, use a provider as done for the database backup
+		hostname := fmt.Sprintf("%s-%d-minio.%s.svc", instance.Name, instance.Group.ID, instance.GroupName)
 		serviceName := strings.Split(hostname, ".")[0]
 		options := []*forwarder.Option{
 			{

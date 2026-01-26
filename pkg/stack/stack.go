@@ -426,7 +426,7 @@ var imJobRunnerDefaults = struct {
 
 // Provides the PostgreSQL hostname of an instance.
 var postgresHostnameProvider = model.ParameterProviderFunc(func(instance model.DeploymentInstance) (string, error) {
-	return fmt.Sprintf("%s-database-postgresql.%s.svc", instance.Name, instance.Group.Namespace), nil
+	return fmt.Sprintf("%s-%d-database-postgresql.%s.svc", instance.Name, instance.Group.ID, instance.Group.Namespace), nil
 })
 
 // imagePullPolicy validates a value is a valid Kubernetes image pull policy.
