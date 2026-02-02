@@ -973,7 +973,12 @@ func (s Service) UpdateInstance(ctx context.Context, token string, deploymentId,
 		return nil, err
 	}
 
-	err = s.deployDeploymentInstance(ctx, token, decryptedInstance, deployment.TTL)
+	refreshedToken, err := s.tokenService.RefreshAccessToken(token)
+	if err != nil {
+		return nil, err
+	}
+
+	err = s.deployDeploymentInstance(ctx, refreshedToken, decryptedInstance, deployment.TTL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to deploy updated instance: %v", err)
 	}
