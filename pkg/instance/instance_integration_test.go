@@ -2,6 +2,8 @@ package instance_test
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/rsa"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -11,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dhis2-sre/im-manager/pkg/token"
 	"github.com/getsops/sops/v3"
 
 	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
@@ -69,13 +72,18 @@ func TestInstanceHandler(t *testing.T) {
 	groupService := groupService{group: group}
 	stacks := stack.Stacks{
 		"whoami-go":  stack.WhoamiGo,
-		"dhis2-core": stack.WhoamiGo, // Used to test public instance view - stack.WhoamiGo because it has no dependencies
+		"dhis2-core": stack.DHIS2Core, // Used to test public instance view - stack.WhoamiGo because it has no dependencies
 		"dhis2":      stack.DHIS2,
 	}
 	stackService := stack.NewService(stacks)
 	// classification 'test' does not actually exist, this is used to decrypt the stack parameters
 	helmfileService := instance.NewHelmfileService(logger, stackService, "../../stacks", "test")
-	instanceService := instance.NewService(logger, instanceRepo, groupService, stackService, helmfileService, nil, "")
+	tokenRepository := token.NewRepository(nil)
+	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	require.NoError(t, err, "failed to generate RSA private key")
+	tokenService, err := token.NewService(logger, tokenRepository, privateKey, 100, "secret", 100, 100)
+	require.NoError(t, err, "failed to create token service")
+	instanceService := instance.NewService(logger, instanceRepo, groupService, stackService, helmfileService, nil, "", tokenService)
 
 	s3Dir := t.TempDir()
 	s3Bucket := "database-bucket"
@@ -222,6 +230,8 @@ func TestInstanceHandler(t *testing.T) {
 		path = fmt.Sprintf("/deployments/%d/deploy", deployment.ID)
 		client.Do(t, http.MethodPost, path, nil, http.StatusOK, inttest.WithAuthToken("sometoken"))
 		k8sClient.AssertPodIsReady(t, deploymentInstance.Group.Namespace, deploymentInstance.Name, 60)
+
+		//		t.Log("Save as deployment")
 
 		t.Log("Destroy deployment")
 		path = fmt.Sprintf("/deployments/%d", deployment.ID)

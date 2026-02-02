@@ -168,7 +168,7 @@ func run() (err error) {
 		return err
 	}
 
-	instanceService, err := newInstanceService(logger, db, stackService, groupService, awsS3Client)
+	instanceService, err := newInstanceService(logger, db, stackService, groupService, awsS3Client, tokenService)
 	if err != nil {
 		return err
 	}
@@ -437,7 +437,7 @@ func newStackService() (stack.Service, error) {
 	return stack.NewService(stacks), nil
 }
 
-func newInstanceService(logger *slog.Logger, db *gorm.DB, stackService stack.Service, groupService *group.Service, s3Client *s3.Client) (*instance.Service, error) {
+func newInstanceService(logger *slog.Logger, db *gorm.DB, stackService stack.Service, groupService *group.Service, s3Client *s3.Client, tokenService *token.TokenService) (*instance.Service, error) {
 	instanceParameterEncryptionKey, err := requireEnv("INSTANCE_PARAMETER_ENCRYPTION_KEY")
 	if err != nil {
 		return nil, err
@@ -454,7 +454,7 @@ func newInstanceService(logger *slog.Logger, db *gorm.DB, stackService stack.Ser
 		return nil, err
 	}
 
-	return instance.NewService(logger, instanceRepository, groupService, stackService, helmfileService, s3Client, s3Bucket), nil
+	return instance.NewService(logger, instanceRepository, groupService, stackService, helmfileService, s3Client, s3Bucket, tokenService), nil
 }
 
 type rabbitMQConfig struct {
