@@ -18,6 +18,15 @@ releases:
       - defaultBuckets: dhis2
       - image:
           repository: bitnamilegacy/minio
+      - commonLabels:
+          im: "true"
+          im-default: "false"
+          im-deployment-id: "{{ requiredEnv "DEPLOYMENT_ID" }}"
+          im-instance-id: "{{ requiredEnv "INSTANCE_ID" }}"
+          im-id: "{{ requiredEnv "INSTANCE_ID" }}"
+          im-type: "minio"
+          im-creation-timestamp: "{{ requiredEnv "INSTANCE_CREATION_TIMESTAMP" }}"
+          im-ttl: "{{ requiredEnv "INSTANCE_TTL" }}"
       - sidecars:
           - name: "{{ requiredEnv "INSTANCE_NAME" }}-minio-seed"
             # Should match the version used by the main container
