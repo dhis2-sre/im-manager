@@ -148,7 +148,7 @@ func RefreshAccessToken(token string, privateKey *rsa.PrivateKey) (string, error
 }
 
 func ValidateAccessToken(tokenString string, publicKey *rsa.PublicKey) (*model.User, int64, error) {
-	token, err := jwt.Parse([]byte(tokenString), jwt.WithKey(jwa.RS256, publicKey))
+	token, err := jwt.Parse([]byte(tokenString), jwt.WithKey(jwa.RS256, publicKey), jwt.WithTypedClaim("user", &model.User{}))
 	if err != nil {
 		return nil, 0, err
 	}

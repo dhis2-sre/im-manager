@@ -41,6 +41,7 @@ import (
 func TestInstanceHandler(t *testing.T) {
 	k8sClient := inttest.SetupK8s(t)
 	db := inttest.SetupDB(t)
+	redis := inttest.SetupRedis(t)
 
 	identity, err := age.GenerateX25519Identity()
 	require.NoError(t, err, "failed to generate age key pair")
@@ -72,13 +73,14 @@ func TestInstanceHandler(t *testing.T) {
 	groupService := groupService{group: group}
 	stacks := stack.Stacks{
 		"whoami-go":  stack.WhoamiGo,
-		"dhis2-core": stack.DHIS2Core, // Used to test public instance view - stack.WhoamiGo because it has no dependencies
+		"dhis2-db":   stack.DHIS2DB,
+		"dhis2-core": stack.DHIS2Core,
 		"dhis2":      stack.DHIS2,
 	}
 	stackService := stack.NewService(stacks)
 	// classification 'test' does not actually exist, this is used to decrypt the stack parameters
 	helmfileService := instance.NewHelmfileService(logger, stackService, "../../stacks", "test")
-	tokenRepository := token.NewRepository(nil)
+	tokenRepository := token.NewRepository(redis)
 	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	require.NoError(t, err, "failed to generate RSA private key")
 	tokenService, err := token.NewService(logger, tokenRepository, privateKey, 100, "secret", 100, 100)
@@ -95,6 +97,7 @@ func TestInstanceHandler(t *testing.T) {
 	databaseRepository := database.NewRepository(db)
 	databaseService := database.NewService(logger, s3Bucket, s3Client, groupService, databaseRepository)
 
+	tokens, err := tokenService.GetTokens(user, "", false)
 	authenticator := func(c *gin.Context) {
 		ctx := model.NewContextWithUser(c.Request.Context(), user)
 		c.Request = c.Request.WithContext(ctx)
@@ -152,7 +155,7 @@ func TestInstanceHandler(t *testing.T) {
 			   			    }
 			   			]
 			   		}`)
-			   		client.PostJSON(t, "/instances", body, &instance, inttest.WithAuthToken("sometoken"))
+			   		client.PostJSON(t, "/instances", body, &instance, inttest.WithAuthToken(tokens.AccessToken))
 
 			   		k8sClient.AssertPodIsReady(t, group.Name, instance.Name+"-database", 3*60)
 			   		k8sClient.AssertPodIsReady(t, group.Name, instance.Name, 5*60)
@@ -168,7 +171,7 @@ func TestInstanceHandler(t *testing.T) {
 			"description": "some description"
 		}`)
 
-		client.PostJSON(t, "/deployments", body, &deployment, inttest.WithAuthToken("sometoken"))
+		client.PostJSON(t, "/deployments", body, &deployment, inttest.WithAuthToken(tokens.AccessToken))
 
 		assert.Equal(t, "test-deployment", deployment.Name)
 		assert.Equal(t, "group-name", deployment.GroupName)
@@ -176,7 +179,7 @@ func TestInstanceHandler(t *testing.T) {
 
 		t.Log("Deploy deployment")
 		path := fmt.Sprintf("/deployments/%d/deploy", deployment.ID)
-		response := client.Do(t, http.MethodPost, path, nil, http.StatusBadRequest, inttest.WithAuthToken("sometoken"))
+		response := client.Do(t, http.MethodPost, path, nil, http.StatusBadRequest, inttest.WithAuthToken(tokens.AccessToken))
 
 		assert.Contains(t, "deployment contains no instances", string(response))
 	})
@@ -191,7 +194,7 @@ func TestInstanceHandler(t *testing.T) {
 			"description": "some description"
 		}`)
 
-		client.PostJSON(t, "/deployments", body, &deployment, inttest.WithAuthToken("sometoken"))
+		client.PostJSON(t, "/deployments", body, &deployment, inttest.WithAuthToken(tokens.AccessToken))
 
 		assert.Equal(t, "test-deployment-whoami", deployment.Name)
 		assert.Equal(t, "group-name", deployment.GroupName)
@@ -204,7 +207,7 @@ func TestInstanceHandler(t *testing.T) {
 		}`)
 
 		path := fmt.Sprintf("/deployments/%d/instance", deployment.ID)
-		client.PostJSON(t, path, body, &deploymentInstance, inttest.WithAuthToken("sometoken"))
+		client.PostJSON(t, path, body, &deploymentInstance, inttest.WithAuthToken(tokens.AccessToken))
 		assert.Equal(t, deployment.ID, deploymentInstance.DeploymentID)
 		assert.Equal(t, "group-name", deploymentInstance.GroupName)
 		assert.Equal(t, "whoami-go", deploymentInstance.StackName)
@@ -212,7 +215,7 @@ func TestInstanceHandler(t *testing.T) {
 		t.Log("Get deployment instance with details")
 		path = fmt.Sprintf("/instances/%d/details", deploymentInstance.ID)
 		var instance model.DeploymentInstance
-		client.GetJSON(t, path, &instance, inttest.WithAuthToken("sometoken"))
+		client.GetJSON(t, path, &instance, inttest.WithAuthToken(tokens.AccessToken))
 		assert.Equal(t, deploymentInstance.ID, instance.ID)
 		assert.Equal(t, "group-name", instance.GroupName)
 		assert.Equal(t, "whoami-go", instance.StackName)
@@ -228,14 +231,14 @@ func TestInstanceHandler(t *testing.T) {
 
 		t.Log("Deploy deployment")
 		path = fmt.Sprintf("/deployments/%d/deploy", deployment.ID)
-		client.Do(t, http.MethodPost, path, nil, http.StatusOK, inttest.WithAuthToken("sometoken"))
+		client.Do(t, http.MethodPost, path, nil, http.StatusOK, inttest.WithAuthToken(tokens.AccessToken))
 		k8sClient.AssertPodIsReady(t, deploymentInstance.Group.Namespace, deploymentInstance.Name, 60)
 
 		//		t.Log("Save as deployment")
 
 		t.Log("Destroy deployment")
 		path = fmt.Sprintf("/deployments/%d", deployment.ID)
-		client.Do(t, http.MethodDelete, path, nil, http.StatusAccepted, inttest.WithAuthToken("sometoken"))
+		client.Do(t, http.MethodDelete, path, nil, http.StatusAccepted, inttest.WithAuthToken(tokens.AccessToken))
 		// TODO: Ideally we shouldn't use sleep here but rather watch the pod until it disappears or a timeout is reached
 		time.Sleep(3 * time.Second)
 		k8sClient.AssertPodIsNotRunning(t, deploymentInstance.Group.Namespace, deploymentInstance.Name)
@@ -251,20 +254,24 @@ func TestInstanceHandler(t *testing.T) {
 			"description": "some description"
 		}`)
 
-		client.PostJSON(t, "/deployments", body, &deployment, inttest.WithAuthToken("sometoken"))
+		client.PostJSON(t, "/deployments", body, &deployment, inttest.WithAuthToken(tokens.AccessToken))
 
 		assert.Equal(t, "private-deployment", deployment.Name)
 		assert.Equal(t, "group-name", deployment.GroupName)
 		assert.Equal(t, "some description", deployment.Description)
 
-		t.Log("Create deployment instance")
-		var deploymentInstance model.DeploymentInstance
-		body = strings.NewReader(`{
-			"stackName": "dhis2-core"
-		}`)
-
+		t.Log("Create private deployment dhis2-db instance")
 		path := fmt.Sprintf("/deployments/%d/instance", deployment.ID)
-		client.PostJSON(t, path, body, &deploymentInstance, inttest.WithAuthToken("sometoken"))
+		body = strings.NewReader(`{"stackName": "dhis2-db"}`)
+		var deploymentInstance model.DeploymentInstance
+		client.PostJSON(t, path, body, &deploymentInstance, inttest.WithAuthToken(tokens.AccessToken))
+		assert.Equal(t, deployment.ID, deploymentInstance.DeploymentID)
+		assert.Equal(t, "group-name", deploymentInstance.GroupName)
+		assert.Equal(t, "dhis2-db", deploymentInstance.StackName)
+
+		t.Log("Create private deployment dhis2-core instance")
+		body = strings.NewReader(`{"stackName": "dhis2-core"}`)
+		client.PostJSON(t, path, body, &deploymentInstance, inttest.WithAuthToken(tokens.AccessToken))
 		assert.Equal(t, deployment.ID, deploymentInstance.DeploymentID)
 		assert.Equal(t, "group-name", deploymentInstance.GroupName)
 		assert.Equal(t, "dhis2-core", deploymentInstance.StackName)
@@ -275,22 +282,28 @@ func TestInstanceHandler(t *testing.T) {
 			"group": "group-name",
 			"description": "some description"
 		}`)
-
-		client.PostJSON(t, "/deployments", body, &deployment, inttest.WithAuthToken("sometoken"))
+		var publicDeploymentInstance model.DeploymentInstance
+		client.PostJSON(t, "/deployments", body, &deployment, inttest.WithAuthToken(tokens.AccessToken))
 
 		assert.Equal(t, "dev-public-deployment", deployment.Name)
 		assert.Equal(t, "group-name", deployment.GroupName)
 		assert.Equal(t, "some description", deployment.Description)
 
-		t.Log("Create public deployment instance")
-		var publicDeploymentInstance model.DeploymentInstance
+		t.Log("Create public deployment dhis2-db instance")
+		path = fmt.Sprintf("/deployments/%d/instance", deployment.ID)
+		body = strings.NewReader(`{"stackName": "dhis2-db"}`)
+		client.PostJSON(t, path, body, &deploymentInstance, inttest.WithAuthToken(tokens.AccessToken))
+		assert.Equal(t, deployment.ID, deploymentInstance.DeploymentID)
+		assert.Equal(t, "group-name", deploymentInstance.GroupName)
+		assert.Equal(t, "dhis2-db", deploymentInstance.StackName)
+
 		body = strings.NewReader(`{
 			"stackName": "dhis2-core",
 			"public": true
 		}`)
 
 		path = fmt.Sprintf("/deployments/%d/instance", deployment.ID)
-		client.PostJSON(t, path, body, &publicDeploymentInstance, inttest.WithAuthToken("sometoken"))
+		client.PostJSON(t, path, body, &publicDeploymentInstance, inttest.WithAuthToken(tokens.AccessToken))
 		assert.Equal(t, deployment.ID, publicDeploymentInstance.DeploymentID)
 		assert.Equal(t, "group-name", publicDeploymentInstance.GroupName)
 		assert.Equal(t, "dhis2-core", publicDeploymentInstance.StackName)
@@ -320,7 +333,7 @@ func TestInstanceHandler(t *testing.T) {
 			"ttl": 86400
 		}`)
 
-		client.PostJSON(t, "/deployments", body, &deployment, inttest.WithAuthToken("sometoken"))
+		client.PostJSON(t, "/deployments", body, &deployment, inttest.WithAuthToken(tokens.AccessToken))
 
 		t.Log("Update deployment")
 		body = strings.NewReader(`{
@@ -330,7 +343,7 @@ func TestInstanceHandler(t *testing.T) {
 
 		path := fmt.Sprintf("/deployments/%d", deployment.ID)
 		var updatedDeployment model.Deployment
-		client.PutJSON(t, path, body, &updatedDeployment, inttest.WithAuthToken("sometoken"))
+		client.PutJSON(t, path, body, &updatedDeployment, inttest.WithAuthToken(tokens.AccessToken))
 
 		assert.Equal(t, uint(172800), updatedDeployment.TTL)
 		assert.Equal(t, "updated description", updatedDeployment.Description)
@@ -348,7 +361,7 @@ func TestInstanceHandler(t *testing.T) {
 			"description": "some description"
 		}`)
 
-		client.PostJSON(t, "/deployments", body, &deployment, inttest.WithAuthToken("sometoken"))
+		client.PostJSON(t, "/deployments", body, &deployment, inttest.WithAuthToken(tokens.AccessToken))
 
 		t.Log("Create deployment instance")
 		var deploymentInstance model.DeploymentInstance
@@ -363,7 +376,7 @@ func TestInstanceHandler(t *testing.T) {
 		}`)
 
 		path := fmt.Sprintf("/deployments/%d/instance", deployment.ID)
-		client.PostJSON(t, path, body, &deploymentInstance, inttest.WithAuthToken("sometoken"))
+		client.PostJSON(t, path, body, &deploymentInstance, inttest.WithAuthToken(tokens.AccessToken))
 
 		t.Log("Update deployment instance")
 		body = strings.NewReader(`{
@@ -378,7 +391,7 @@ func TestInstanceHandler(t *testing.T) {
 
 		path = fmt.Sprintf("/deployments/%d/instance/%d", deployment.ID, deploymentInstance.ID)
 		var updatedInstance model.DeploymentInstance
-		client.PutJSON(t, path, body, &updatedInstance, inttest.WithAuthToken("sometoken"))
+		client.PutJSON(t, path, body, &updatedInstance, inttest.WithAuthToken(tokens.AccessToken))
 
 		assert.Equal(t, "0.7.0", updatedInstance.Parameters["IMAGE_TAG"].Value)
 		assert.True(t, updatedInstance.Public)
