@@ -14,6 +14,7 @@ import (
 
 	"github.com/anthhub/forwarder"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/dhis2-sre/im-manager/pkg/token"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
 	"golang.org/x/exp/maps"
@@ -28,7 +29,7 @@ import (
 	"github.com/dhis2-sre/im-manager/pkg/model"
 )
 
-func NewService(logger *slog.Logger, instanceRepository *repository, groupService groupService, stackService stack.Service, helmfileService helmfile, s3Client *s3.Client, s3Bucket string) *Service {
+func NewService(logger *slog.Logger, instanceRepository *repository, groupService groupService, stackService stack.Service, helmfileService helmfile, s3Client *s3.Client, s3Bucket string, tokenService *token.TokenService) *Service {
 	return &Service{
 		logger:             logger,
 		instanceRepository: instanceRepository,
@@ -37,6 +38,7 @@ func NewService(logger *slog.Logger, instanceRepository *repository, groupServic
 		helmfileService:    helmfileService,
 		s3Client:           s3Client,
 		s3Bucket:           s3Bucket,
+		tokenService:       tokenService,
 	}
 }
 
@@ -58,6 +60,7 @@ type Service struct {
 	helmfileService    helmfile
 	s3Client           *s3.Client
 	s3Bucket           string
+	tokenService       *token.TokenService
 }
 
 func (s Service) SaveDeployment(ctx context.Context, deployment *model.Deployment) error {
@@ -366,6 +369,11 @@ func addDefaultParameterValues(instanceParameters model.DeploymentInstanceParame
 }
 
 func (s Service) DeployDeployment(ctx context.Context, token string, deployment *model.Deployment) error {
+	refreshedToken, err := s.tokenService.RefreshAccessToken(token)
+	if err != nil {
+		return err
+	}
+
 	deploymentGraph, err := s.validateNoCycles(deployment.Instances)
 	if err != nil {
 		return err
@@ -379,7 +387,7 @@ func (s Service) DeployDeployment(ctx context.Context, token string, deployment 
 	deployment.Instances = instances
 
 	for _, instance := range instances {
-		err := s.deployDeploymentInstance(ctx, token, instance, deployment.TTL)
+		err := s.deployDeploymentInstance(ctx, refreshedToken, instance, deployment.TTL)
 		if err != nil {
 			return fmt.Errorf("failed to deploy instance(%s) %q: %v", instance.StackName, instance.Name, err)
 		}
@@ -992,7 +1000,12 @@ func (s Service) UpdateInstance(ctx context.Context, token string, deploymentId,
 		return nil, err
 	}
 
-	err = s.deployDeploymentInstance(ctx, token, decryptedInstance, deployment.TTL)
+	refreshedToken, err := s.tokenService.RefreshAccessToken(token)
+	if err != nil {
+		return nil, err
+	}
+
+	err = s.deployDeploymentInstance(ctx, refreshedToken, decryptedInstance, deployment.TTL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to deploy updated instance: %v", err)
 	}

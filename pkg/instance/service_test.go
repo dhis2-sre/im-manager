@@ -25,7 +25,7 @@ func TestResolveParameters(t *testing.T) {
 			"stack": s,
 		}
 		stackService := stack.NewService(stacks)
-		service := NewService(nil, nil, nil, stackService, nil, nil, "")
+		service := NewService(nil, nil, nil, stackService, nil, nil, "", nil)
 		instance := &model.DeploymentInstance{
 			StackName: "stack",
 			Parameters: map[string]model.DeploymentInstanceParameter{
@@ -50,7 +50,7 @@ func TestResolveParameters(t *testing.T) {
 			"name-a": s,
 		}
 		stackService := stack.NewService(stacks)
-		service := NewService(nil, nil, nil, stackService, nil, nil, "")
+		service := NewService(nil, nil, nil, stackService, nil, nil, "", nil)
 		deployment := &model.Deployment{
 			Instances: []*model.DeploymentInstance{
 				{
@@ -88,7 +88,7 @@ func TestResolveParameters(t *testing.T) {
 			"stack-a": stackA,
 		}
 		stackService := stack.NewService(stacks)
-		service := NewService(nil, nil, nil, stackService, nil, nil, "")
+		service := NewService(nil, nil, nil, stackService, nil, nil, "", nil)
 		deployment := &model.Deployment{
 			Instances: []*model.DeploymentInstance{
 				{
@@ -155,7 +155,7 @@ func TestResolveParameters(t *testing.T) {
 			"stack-b": stackB,
 		}
 		stackService := stack.NewService(stacks)
-		service := NewService(nil, nil, nil, stackService, nil, nil, "")
+		service := NewService(nil, nil, nil, stackService, nil, nil, "", nil)
 		deployment := &model.Deployment{
 			Instances: []*model.DeploymentInstance{
 				{
