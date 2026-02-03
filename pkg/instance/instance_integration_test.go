@@ -234,7 +234,7 @@ func TestInstanceHandler(t *testing.T) {
 		client.Do(t, http.MethodPost, path, nil, http.StatusOK, inttest.WithAuthToken(tokens.AccessToken))
 		k8sClient.AssertPodIsReady(t, deploymentInstance.Group.Namespace, deploymentInstance.Name, 60)
 
-		//		t.Log("Save as deployment")
+		// TODO:		t.Log("Save as deployment")
 
 		t.Log("Destroy deployment")
 		path = fmt.Sprintf("/deployments/%d", deployment.ID)
