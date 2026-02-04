@@ -5,7 +5,6 @@ releases:
     namespace: "{{ requiredEnv "INSTANCE_NAMESPACE" }}"
     chart: bitnami/minio
     version: "{{ requiredEnv "MINIO_CHART_VERSION" }}"
-    wait: true
     values:
       - persistence:
           size: {{ requiredEnv "MINIO_STORAGE_SIZE" }}
