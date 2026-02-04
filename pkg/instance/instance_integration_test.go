@@ -1,14 +1,19 @@
 package instance_test
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"crypto/rsa"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
+	"mime/multipart"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -72,6 +77,7 @@ func TestInstanceHandler(t *testing.T) {
 	instanceRepo := instance.NewRepository(db, encryptionKey)
 	groupService := groupService{group: group}
 	stacks := stack.Stacks{
+		"minio":      stack.MINIO,
 		"whoami-go":  stack.WhoamiGo,
 		"dhis2-db":   stack.DHIS2DB,
 		"dhis2-core": stack.DHIS2Core,
@@ -111,55 +117,67 @@ func TestInstanceHandler(t *testing.T) {
 		database.Routes(engine, authenticator, databaseHandler)
 	})
 
+	hostname := client.GetHostname(t)
+	// TODO: Why panic when trying to use t.Setenv within a test?
+	t.Setenv("HOSTNAME", hostname)
+
+	var databaseID string
+	{
+		t.Log("Upload")
+		var b bytes.Buffer
+		w := multipart.NewWriter(&b)
+		err := w.WriteField("group", "group-name")
+		require.NoError(t, err, "failed to write form field")
+		err = w.WriteField("name", "path/name.extension")
+		require.NoError(t, err, "failed to write form field")
+		f, err := w.CreateFormFile("database", "mydb")
+		require.NoError(t, err, "failed to create form file")
+		_, err = io.WriteString(f, "select now();")
+		require.NoError(t, err, "failed to write file")
+		_ = w.Close()
+
+		body := client.Put(t, "/databases", &b, http.StatusCreated,
+			//inttest.WithHeader("Content-Type", w.FormDataContentType()),
+			inttest.WithHeader("X-Upload-Group", "group-name"),
+			inttest.WithHeader("X-Upload-Name", "path/name.extension"),
+			inttest.WithHeader("X-Upload-Description", "Some database"),
+			inttest.WithAuthToken(tokens.AccessToken),
+		)
+
+		var actualDB model.Database
+		err = json.Unmarshal(body, &actualDB)
+		require.NoError(t, err, "POST /databases: failed to unmarshal HTTP response body")
+		require.Equal(t, "path/name.extension", actualDB.Name)
+		require.Equal(t, "group-name", actualDB.GroupName)
+
+		databaseID = strconv.FormatUint(uint64(actualDB.ID), 10)
+	}
+
 	// TODO: Convert below test to use deployments
 	/*
-		//	var databaseID string
-			{
-				t.Log("Upload")
-				var b bytes.Buffer
-				w := multipart.NewWriter(&b)
-				err := w.WriteField("group", "group-name")
-				require.NoError(t, err, "failed to write form field")
-				err = w.WriteField("name", "path/name.extension")
-				require.NoError(t, err, "failed to write form field")
-				f, err := w.CreateFormFile("database", "mydb")
-				require.NoError(t, err, "failed to create form file")
-				_, err = io.WriteString(f, "select now();")
-				require.NoError(t, err, "failed to write file")
-				_ = w.Close()
 
-				body := client.Post(t, "/databases", &b, inttest.WithHeader("Content-Type", w.FormDataContentType()))
+		   	t.Run("DeployDHIS2", func(t *testing.T) {
+				   		hostname := client.GetHostname(t)
+				   		t.Log("hostname:", hostname)
+				   		t.Setenv("HOSTNAME", hostname)
 
-				var actualDB model.Database
-				err = json.Unmarshal(body, &actualDB)
-				require.NoError(t, err, "POST /databases: failed to unmarshal HTTP response body")
-				require.Equal(t, "path/name.extension", actualDB.Name)
-				require.Equal(t, "group-name", actualDB.GroupName)
+				   		var instance model.Instance
+				   		body := strings.NewReader(`{
+				   			"name": "test-dhis2",
+				   			"groupName": "group-name",
+				   			"stackName": "dhis2",
+				   			"parameters": [
+				                   {
+				       		        "name": "DATABASE_ID",
+				   			        "value": "` + databaseID + `"
+				   			    }
+				   			]
+				   		}`)
+				   		client.PostJSON(t, "/instances", body, &instance, inttest.WithAuthToken(tokens.AccessToken))
 
-				databaseID = strconv.FormatUint(uint64(actualDB.ID), 10)
-			}
-			   	t.Run("DeployDHIS2", func(t *testing.T) {
-			   		hostname := client.GetHostname(t)
-			   		t.Log("hostname:", hostname)
-			   		t.Setenv("HOSTNAME", hostname)
-
-			   		var instance model.Instance
-			   		body := strings.NewReader(`{
-			   			"name": "test-dhis2",
-			   			"groupName": "group-name",
-			   			"stackName": "dhis2",
-			   			"parameters": [
-			                   {
-			       		        "name": "DATABASE_ID",
-			   			        "value": "` + databaseID + `"
-			   			    }
-			   			]
-			   		}`)
-			   		client.PostJSON(t, "/instances", body, &instance, inttest.WithAuthToken(tokens.AccessToken))
-
-			   		k8sClient.AssertPodIsReady(t, group.Name, instance.Name+"-database", 3*60)
-			   		k8sClient.AssertPodIsReady(t, group.Name, instance.Name, 5*60)
-			   	})
+				   		k8sClient.AssertPodIsReady(t, group.Name, instance.Name+"-database", 3*60)
+				   		k8sClient.AssertPodIsReady(t, group.Name, instance.Name, 5*60)
+				   	})
 	*/
 	t.Run("DeployDeploymentWithoutInstances", func(t *testing.T) {
 		t.Parallel()
@@ -320,6 +338,73 @@ func TestInstanceHandler(t *testing.T) {
 		assert.Equal(t, "dev-public-deployment", instances[0].Name)
 		assert.Equal(t, "some description", instances[0].Description)
 		assert.Equal(t, "https://some/dev-public-deployment", instances[0].Hostname)
+	})
+
+	t.Run("DeploymentWithCompanionStack", func(t *testing.T) {
+		t.Parallel()
+		t.Log("Create deployment")
+		var deployment model.Deployment
+		body := strings.NewReader(`{
+			"name": "companion-deployment",
+			"group": "group-name",
+			"description": "some description"
+		}`)
+
+		client.PostJSON(t, "/deployments", body, &deployment, inttest.WithAuthToken(tokens.AccessToken))
+
+		assert.Equal(t, "companion-deployment", deployment.Name)
+		assert.Equal(t, "group-name", deployment.GroupName)
+		assert.Equal(t, "some description", deployment.Description)
+
+		t.Log("Create dhis2-db instance")
+		path := fmt.Sprintf("/deployments/%d/instance", deployment.ID)
+		body = strings.NewReader(fmt.Sprintf(`{
+			"stackName": "dhis2-db",
+			"parameters": {
+				"DATABASE_ID": {
+					"value": "%s"
+				}
+			}
+		}`, databaseID))
+		var deploymentInstance model.DeploymentInstance
+		client.PostJSON(t, path, body, &deploymentInstance, inttest.WithAuthToken(tokens.AccessToken))
+		assert.Equal(t, deployment.ID, deploymentInstance.DeploymentID)
+		assert.Equal(t, "group-name", deploymentInstance.GroupName)
+		assert.Equal(t, "dhis2-db", deploymentInstance.StackName)
+
+		t.Log("Create minio instance")
+		path = fmt.Sprintf("/deployments/%d/instance", deployment.ID)
+		body = strings.NewReader(`{"stackName": "minio"}`)
+		client.PostJSON(t, path, body, &deploymentInstance, inttest.WithAuthToken(tokens.AccessToken))
+		assert.Equal(t, deployment.ID, deploymentInstance.DeploymentID)
+		assert.Equal(t, "group-name", deploymentInstance.GroupName)
+		assert.Equal(t, "minio", deploymentInstance.StackName)
+		t.Log("Create dhis2-core instance")
+		body = strings.NewReader(`{"stackName": "dhis2-core"}`)
+		body = strings.NewReader(`{
+			"stackName": "dhis2-core",
+			"parameters": {
+				"ALLOW_SUSPEND": {
+					"value": "false"
+				}
+			}
+		}`)
+		client.PostJSON(t, path, body, &deploymentInstance, inttest.WithAuthToken(tokens.AccessToken))
+		assert.Equal(t, deployment.ID, deploymentInstance.DeploymentID)
+		assert.Equal(t, "group-name", deploymentInstance.GroupName)
+		assert.Equal(t, "dhis2-core", deploymentInstance.StackName)
+
+		t.Log("Deploy deployment")
+		path = fmt.Sprintf("/deployments/%d/deploy", deployment.ID)
+		client.Do(t, http.MethodPost, path, nil, http.StatusOK, inttest.WithAuthToken(tokens.AccessToken))
+		k8sClient.AssertPodIsReady(t, deploymentInstance.Group.Namespace, deploymentInstance.Name, 160)
+
+		t.Log("Destroy deployment")
+		path = fmt.Sprintf("/deployments/%d", deployment.ID)
+		client.Do(t, http.MethodDelete, path, nil, http.StatusAccepted, inttest.WithAuthToken(tokens.AccessToken))
+		// TODO: Ideally we shouldn't use sleep here but rather watch the pod until it disappears or a timeout is reached
+		time.Sleep(3 * time.Second)
+		k8sClient.AssertPodIsNotRunning(t, deploymentInstance.Group.Namespace, deploymentInstance.Name)
 	})
 
 	t.Run("UpdateDeployment", func(t *testing.T) {
