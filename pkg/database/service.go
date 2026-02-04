@@ -10,7 +10,6 @@ import (
 	"log/slog"
 	"net/url"
 	"os"
-	"path"
 	"slices"
 	"strconv"
 	"strings"
@@ -27,11 +26,15 @@ import (
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	"github.com/dhis2-sre/im-manager/pkg/storage"
 
-	"github.com/anthhub/forwarder"
-
 	pg "github.com/habx/pg-commands"
 
 	"github.com/google/uuid"
+
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/tools/remotecommand"
 )
 
 //goland:noinspection GoExportedFuncWithUnexportedType
@@ -518,9 +521,6 @@ func getFormat(database *model.Database) string {
 }
 
 func (s service) SaveAs(ctx context.Context, userId uint, database *model.Database, instance *model.DeploymentInstance, stack *model.Stack, newName string, format string, done func(ctx context.Context, saved *model.Database)) (*model.Database, error) {
-	// TODO: Add to config
-	dumpPath := "/mnt/data/"
-
 	group, err := s.groupService.Find(ctx, instance.GroupName)
 	if err != nil {
 		return nil, err
@@ -530,6 +530,8 @@ func (s service) SaveAs(ctx context.Context, userId uint, database *model.Databa
 	if err != nil {
 		return nil, err
 	}
+	dump.Host = "localhost"
+	command := buildPgDumpCommand(dump, format)
 
 	newDatabase := &model.Database{
 		Name: newName,
@@ -544,101 +546,182 @@ func (s service) SaveAs(ctx context.Context, userId uint, database *model.Databa
 		return nil, err
 	}
 
-	// only use ctx for values (logging) and not cancellation signals since we create a go routine
-	// that outlives the HTTP request scope
 	ctx = context.WithoutCancel(ctx)
 	go func() {
-		var ret *forwarder.Result
-		if group.Cluster.Configuration != nil {
-			hostname := fmt.Sprintf(stack.HostnamePattern, instance.Name, instance.Group.Namespace)
-			serviceName := strings.Split(hostname, ".")[0]
-			options := []*forwarder.Option{
-				{
-					RemotePort:  5432,
-					ServiceName: serviceName,
-					Namespace:   instance.Group.Namespace,
-				},
-			}
-
-			kubeConfig, err := decryptYaml(group.Cluster.Configuration)
-			if err != nil {
-				s.logError(ctx, err)
-				return
-			}
-
-			ret, err = forwarder.WithForwardersEmbedConfig(context.Background(), options, kubeConfig)
-			if err != nil {
-				s.logError(ctx, err)
-				return
-			}
-			defer ret.Close()
-
-			ports, err := ret.Ready()
-			if err != nil {
-				s.logError(ctx, err)
-				return
-			}
-
-			dump.Host = "localhost"
-			dump.Port = int(ports[0][0].Local)
-		}
-
-		dump.SetPath(dumpPath)
-		fileId := uuid.New().String()
-		dump.SetFileName(fileId + ".dump")
-		dump.SetupFormat(format)
-
-		// TODO: Remove... Or at least make configurable
-		//dump.EnableVerbose()
-
-		dumpExec := dump.Exec(pg.ExecOptions{StreamPrint: true, StreamDestination: os.Stdout})
-		if dumpExec.Error != nil {
-			s.logger.ErrorContext(ctx, "Failed to dump DB", "error", dumpExec.Error.Err, "dumpOutput", dumpExec.Output)
-			return
-		}
-
-		dumpFile := path.Join(dumpPath, dumpExec.File)
-		file, err := os.Open(dumpFile) // #nosec
-		if err != nil {
-			s.logError(ctx, err)
-			return
-		}
-		defer s.removeTempFile(ctx, file)
-
-		if format == "plain" {
-			gzFileName := path.Join(dumpPath, fileId+".gz")
-			file, err = s.gz(ctx, gzFileName, database, file)
-			if err != nil {
-				s.logError(ctx, err)
-				return
-			}
-
-			defer s.removeTempFile(ctx, file)
-		}
-
-		stat, err := file.Stat()
+		kubeConfig, err := decryptYaml(group.Cluster.Configuration)
 		if err != nil {
 			s.logError(ctx, err)
 			return
 		}
 
-		// This is added due to the following issue - https://github.com/aws/aws-sdk-go/issues/1962
-		_, err = file.Seek(0, 0)
+		clientConfig, err := clientcmd.NewClientConfigFromBytes(kubeConfig)
 		if err != nil {
 			s.logError(ctx, err)
 			return
 		}
 
-		_, err = s.Upload(ctx, newDatabase, group, file, stat.Size())
+		restConfig, err := clientConfig.ClientConfig()
 		if err != nil {
 			s.logError(ctx, err)
 			return
 		}
 
+		clientset, err := kubernetes.NewForConfig(restConfig)
+		if err != nil {
+			s.logError(ctx, err)
+			return
+		}
+
+		hostname := fmt.Sprintf(stack.HostnamePattern, instance.Name, instance.Group.Namespace)
+		// TODO: get pod by label selector instead
+		podName := strings.Split(hostname, ".")[0] + "-0"
+		namespace := instance.Group.Namespace
+
+		req := clientset.CoreV1().RESTClient().Post().
+			Resource("pods").
+			Name(podName).
+			Namespace(namespace).
+			SubResource("exec")
+
+		req.VersionedParams(&corev1.PodExecOptions{
+			Container: "postgresql",
+			Command:   command,
+			Stdin:     false,
+			Stdout:    true,
+			Stderr:    true,
+			TTY:       false,
+		}, scheme.ParameterCodec)
+
+		executor, err := remotecommand.NewSPDYExecutor(restConfig, "POST", req.URL())
+		if err != nil {
+			s.logError(ctx, err)
+			return
+		}
+
+		pr, pw := io.Pipe()
+
+		key := fmt.Sprintf("%s/%s", group.Name, newDatabase.Name)
+
+		uploadDone := make(chan s3UploadResult, 1)
+		go func() {
+			defer pr.Close()
+			uploadDone <- s.streamToS3(ctx, pr, key)
+		}()
+
+		s.logger.InfoContext(ctx, "starting pg_dump", "pod", podName, "namespace", namespace, "command", strings.Join(command, " "))
+
+		if err := execPgDump(ctx, executor, pw, format, newDatabase.Name); err != nil {
+			s.logger.ErrorContext(ctx, "failed to exec pg_dump", "error", err)
+			<-uploadDone
+			return
+		}
+
+		result := <-uploadDone
+		if result.err != nil {
+			s.logError(ctx, result.err)
+			return
+		}
+
+		newDatabase.Url = fmt.Sprintf("s3://%s/%s", s.s3Bucket, key)
+		newDatabase.Size = result.size
+		if err := s.repository.Save(ctx, newDatabase); err != nil {
+			s.logError(ctx, err)
+			return
+		}
+
+		s.logger.InfoContext(ctx, "pg_dump completed successfully", "key", key, "size", result.size)
 		done(ctx, newDatabase)
 	}()
 
 	return newDatabase, nil
+}
+
+type s3UploadResult struct {
+	size int64
+	err  error
+}
+
+func (s service) streamToS3(ctx context.Context, r io.Reader, key string) s3UploadResult {
+	uploadID, err := s.s3Client.InitiateMultipartUpload(ctx, s.s3Bucket, key, "application/octet-stream")
+	if err != nil {
+		return s3UploadResult{err: fmt.Errorf("failed to initiate multipart upload: %w", err)}
+	}
+
+	var parts []types.CompletedPart
+	var totalSize int64
+	partNumber := 1
+	const chunkSize = 10 * 1024 * 1024
+	buffer := make([]byte, chunkSize)
+
+	var streamErr error
+	for {
+		n, readErr := io.ReadFull(r, buffer)
+
+		isEOF := readErr == io.EOF || errors.Is(readErr, io.ErrUnexpectedEOF)
+		if readErr != nil && !isEOF {
+			streamErr = readErr
+			break
+		}
+
+		if n == 0 {
+			break
+		}
+
+		partResp, partErr := s.s3Client.UploadPart(ctx, s.s3Bucket, key, uploadID, partNumber, buffer[:n])
+		if partErr != nil {
+			_ = s.s3Client.AbortMultipartUpload(ctx, s.s3Bucket, key, uploadID)
+			return s3UploadResult{err: fmt.Errorf("failed to upload part %d: %w", partNumber, partErr)}
+		}
+
+		parts = append(parts, types.CompletedPart{
+			ETag:       partResp.ETag,
+			PartNumber: aws.Int32(int32(partNumber)),
+		})
+		totalSize += int64(n)
+		partNumber++
+
+		if isEOF {
+			break
+		}
+	}
+
+	if streamErr != nil {
+		_ = s.s3Client.AbortMultipartUpload(ctx, s.s3Bucket, key, uploadID)
+		return s3UploadResult{err: fmt.Errorf("stream error, upload aborted: %w", streamErr)}
+	}
+
+	if err := s.s3Client.CompleteMultipartUpload(ctx, s.s3Bucket, key, uploadID, parts); err != nil {
+		return s3UploadResult{err: fmt.Errorf("failed to complete multipart upload: %w", err)}
+	}
+
+	return s3UploadResult{size: totalSize}
+}
+
+func execPgDump(ctx context.Context, executor remotecommand.Executor, pw *io.PipeWriter, format string, databaseName string) error {
+	var execWriter io.WriteCloser = pw
+	var gzWriter *gzip.Writer
+	if format == "plain" {
+		gzWriter = gzip.NewWriter(pw)
+		gzWriter.Name = strings.TrimSuffix(databaseName, ".gz")
+		execWriter = gzWriter
+	}
+
+	var stderrBuf strings.Builder
+	execErr := executor.StreamWithContext(ctx, remotecommand.StreamOptions{
+		Stdout: execWriter,
+		Stderr: &stderrBuf,
+	})
+
+	if gzWriter != nil {
+		gzWriter.Close()
+	}
+
+	if execErr != nil {
+		pw.CloseWithError(execErr)
+		return fmt.Errorf("%w: %s", execErr, stderrBuf.String())
+	}
+	pw.Close()
+	return nil
 }
 
 func (s service) logError(ctx context.Context, err error) {
@@ -674,13 +757,6 @@ func (s service) gz(ctx context.Context, gzFile string, database *model.Database
 	if err != nil {
 		return nil, err
 	}
-
-	defer func(src *os.File) {
-		err := src.Close()
-		if err != nil {
-			s.logger.ErrorContext(ctx, "Failed to close file", "error", err)
-		}
-	}(src)
 
 	return outFile, nil
 }
@@ -718,6 +794,16 @@ func newPgDumpConfig(instance *model.DeploymentInstance, stack *model.Stack) (*p
 	dump.IgnoreTableData = []string{"analytics*", "_*"}
 
 	return dump, nil
+}
+
+func buildPgDumpCommand(dump *pg.Dump, format string) []string {
+	options := dump.Options
+	options = append(options, dump.Postgres.Parse()...)
+	options = append(options, fmt.Sprintf("-F%s", format))
+	options = append(options, dump.IgnoreTableDataToString()...)
+
+	cmd := fmt.Sprintf("PGPASSWORD=%s pg_dump %s", dump.Password, strings.Join(options, " "))
+	return []string{"sh", "-c", cmd}
 }
 
 func (s service) StreamUpload(ctx context.Context, database model.Database, group *model.Group, body io.Reader, contentType string, contentLength int64) (model.Database, error) {
