@@ -137,7 +137,6 @@ func TestInstanceHandler(t *testing.T) {
 		_ = w.Close()
 
 		body := client.Put(t, "/databases", &b, http.StatusCreated,
-			//inttest.WithHeader("Content-Type", w.FormDataContentType()),
 			inttest.WithHeader("X-Upload-Group", "group-name"),
 			inttest.WithHeader("X-Upload-Name", "path/name.extension"),
 			inttest.WithHeader("X-Upload-Description", "Some database"),
@@ -153,32 +152,6 @@ func TestInstanceHandler(t *testing.T) {
 		databaseID = strconv.FormatUint(uint64(actualDB.ID), 10)
 	}
 
-	// TODO: Convert below test to use deployments
-	/*
-
-		   	t.Run("DeployDHIS2", func(t *testing.T) {
-				   		hostname := client.GetHostname(t)
-				   		t.Log("hostname:", hostname)
-				   		t.Setenv("HOSTNAME", hostname)
-
-				   		var instance model.Instance
-				   		body := strings.NewReader(`{
-				   			"name": "test-dhis2",
-				   			"groupName": "group-name",
-				   			"stackName": "dhis2",
-				   			"parameters": [
-				                   {
-				       		        "name": "DATABASE_ID",
-				   			        "value": "` + databaseID + `"
-				   			    }
-				   			]
-				   		}`)
-				   		client.PostJSON(t, "/instances", body, &instance, inttest.WithAuthToken(tokens.AccessToken))
-
-				   		k8sClient.AssertPodIsReady(t, group.Name, instance.Name+"-database", 3*60)
-				   		k8sClient.AssertPodIsReady(t, group.Name, instance.Name, 5*60)
-				   	})
-	*/
 	t.Run("DeployDeploymentWithoutInstances", func(t *testing.T) {
 		t.Parallel()
 		t.Log("Create deployment")
@@ -398,6 +371,10 @@ func TestInstanceHandler(t *testing.T) {
 		path = fmt.Sprintf("/deployments/%d/deploy", deployment.ID)
 		client.Do(t, http.MethodPost, path, nil, http.StatusOK, inttest.WithAuthToken(tokens.AccessToken))
 		k8sClient.AssertPodIsReady(t, deploymentInstance.Group.Namespace, deploymentInstance.Name, 160)
+
+		// TODO: Although core depends on minio and the database we should assert that both are healthy
+		//k8sClient.AssertPodIsReady(t, group.Name, instance.Name+"-database", 3*60)
+		//k8sClient.AssertPodIsReady(t, group.Name, instance.Name, 5*60)
 
 		t.Log("Destroy deployment")
 		path = fmt.Sprintf("/deployments/%d", deployment.ID)
