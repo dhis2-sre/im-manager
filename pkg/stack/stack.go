@@ -156,6 +156,11 @@ var DHIS2DB = model.Stack{
 	KubernetesResource: model.StatefulSetResource,
 }
 
+// Provides the PostgreSQL hostname of an instance.
+var postgresHostnameProvider = model.ParameterProviderFunc(func(instance model.DeploymentInstance) (string, error) {
+	return fmt.Sprintf("%s-database-postgresql.%s.svc", instance.Name, instance.Group.Namespace), nil
+})
+
 var dhis2DBDefaults = struct {
 	chartVersion            string
 	dbID                    string
@@ -181,14 +186,15 @@ var dhis2DBDefaults = struct {
 var MINIO = model.Stack{
 	Name: "minio",
 	Parameters: model.StackParameters{
-		"DATABASE_ID":         {Priority: 1, DisplayName: "Database"},
-		"MINIO_STORAGE_SIZE":  {Priority: 2, DisplayName: "Storage Size", DefaultValue: &minIODefaults.storageSize},
-		"MINIO_CHART_VERSION": {Priority: 3, DisplayName: "Chart Version", DefaultValue: &minIODefaults.chartVersion},
+		"MINIO_STORAGE_SIZE":  {Priority: 1, DisplayName: "Storage Size", DefaultValue: &minIODefaults.storageSize},
+		"MINIO_CHART_VERSION": {Priority: 2, DisplayName: "Chart Version", DefaultValue: &minIODefaults.chartVersion},
 		"IMAGE_PULL_POLICY":   {Priority: 3, DisplayName: "Image Pull Policy", DefaultValue: &minIODefaults.imagePullPolicy, Validator: imagePullPolicy},
+		"DATABASE_ID":         {Priority: 0, DisplayName: "Database", Consumed: true},
 	},
 	ParameterProviders: model.ParameterProviders{
 		"MINIO_HOSTNAME": minioHostnameProvider,
 	},
+	Requires:           []model.Stack{DHIS2DB},
 	KubernetesResource: model.DeploymentResource,
 }
 
@@ -456,11 +462,6 @@ var imJobRunnerDefaults = struct {
 	dhis2Hostname: "-",
 	payload:       "-",
 }
-
-// Provides the PostgreSQL hostname of an instance.
-var postgresHostnameProvider = model.ParameterProviderFunc(func(instance model.DeploymentInstance) (string, error) {
-	return fmt.Sprintf("%s-database-postgresql.%s.svc", instance.Name, instance.Group.Namespace), nil
-})
 
 // imagePullPolicy validates a value is a valid Kubernetes image pull policy.
 var imagePullPolicy = OneOf(string(k8s.PullAlways), string(k8s.PullNever), string(k8s.PullIfNotPresent))
