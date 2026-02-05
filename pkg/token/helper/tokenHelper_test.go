@@ -74,23 +74,31 @@ func TestRefreshAccessToken(t *testing.T) {
 		Email: "test@example.com",
 	}
 
-	// Test case: token with remaining time > 60 seconds, should return the same token
-	longExpirationToken, err := GenerateAccessToken(user, key, 120)
-	require.NoError(t, err)
-	refreshed, err := RefreshAccessToken(longExpirationToken, key)
-	assert.NoError(t, err)
-	assert.Equal(t, longExpirationToken, refreshed)
+	t.Run("Long expiration time", func(t *testing.T) {
+		t.Parallel()
+		t.Log("Token with remaining time > 60 seconds, should return the same token")
 
-	// Test case: token with remaining time <= 60 seconds, should generate a new token
-	shortExpirationToken, err := GenerateAccessToken(user, key, 30)
-	require.NoError(t, err)
-	refreshed2, err := RefreshAccessToken(shortExpirationToken, key)
-	assert.NoError(t, err)
-	assert.NotEqual(t, shortExpirationToken, refreshed2)
+		expirationTime, err := GenerateAccessToken(user, key, 120)
+		require.NoError(t, err)
+		refreshed, err := RefreshAccessToken(expirationTime, key)
+		assert.NoError(t, err)
+		assert.Equal(t, expirationTime, refreshed)
+	})
 
-	// Verify the new token has an expiration close to 60 seconds from now
-	_, exp, err := ValidateAccessToken(refreshed2, &key.PublicKey)
-	require.NoError(t, err)
-	now := time.Now().Unix()
-	assert.True(t, exp-now <= 60 && exp-now > 50, "new token expiration should be around 60 seconds")
+	t.Run("Short expiration time", func(t *testing.T) {
+		t.Parallel()
+		t.Log("Token with remaining time <= 60 seconds, should generate a new token")
+
+		expirationTime, err := GenerateAccessToken(user, key, 30)
+		require.NoError(t, err)
+		refreshed, err := RefreshAccessToken(expirationTime, key)
+		assert.NoError(t, err)
+		assert.NotEqual(t, expirationTime, refreshed)
+
+		t.Log("Verify the new token has an expiration close to 60 seconds from now")
+		_, exp, err := ValidateAccessToken(refreshed, &key.PublicKey)
+		require.NoError(t, err)
+		now := time.Now().Unix()
+		assert.True(t, exp-now <= 60 && exp-now > 50, "new token expiration should be around 60 seconds")
+	})
 }
