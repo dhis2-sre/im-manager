@@ -54,13 +54,63 @@ type K8sClient struct {
 	Config []byte
 }
 
-func (k K8sClient) AssertPodIsNotRunning(t *testing.T, namespace string, instance string) {
+func (k K8sClient) AssertPodIsNotRunning(t *testing.T, namespace string, instance string, timeoutInSeconds time.Duration) {
 	pods, err := k.Client.CoreV1().Pods(namespace).List(context.TODO(), metav1.ListOptions{
 		LabelSelector: "app.kubernetes.io/instance=" + instance,
 	})
 	require.NoError(t, err)
 
-	require.Len(t, pods.Items, 0)
+	if len(pods.Items) == 0 {
+		return
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	watch, err := k.Client.CoreV1().Pods(namespace).Watch(ctx, metav1.ListOptions{
+		LabelSelector: "app.kubernetes.io/instance=" + instance,
+	})
+	require.NoErrorf(t, err, "failed to find pod for instance %q", instance)
+
+	t.Logf("Waiting for pod to terminate: %s/%s", namespace, instance)
+	timeout := timeoutInSeconds * time.Second
+	tm := time.NewTimer(timeout)
+	defer tm.Stop()
+	for {
+		select {
+		case <-tm.C:
+			assert.Fail(t, "timed out waiting for pod to terminate: %s/%s", namespace, instance)
+			cancel()
+
+			k.logAllPods(t)
+			k.logTargetPodDetails(t, namespace, instance)
+
+			return
+		case event := <-watch.ResultChan():
+			t.Log("Received pod event...")
+			_, ok := event.Object.(*v1.Pod)
+			if !ok {
+				assert.Failf(t, "failed to get pod event", "want pod event instead got %T", event.Object)
+				if !tm.Stop() {
+					<-tm.C
+				}
+				cancel()
+				return
+			}
+			// Check current pods
+			pods, err := k.Client.CoreV1().Pods(namespace).List(context.TODO(), metav1.ListOptions{
+				LabelSelector: "app.kubernetes.io/instance=" + instance,
+			})
+			require.NoError(t, err)
+
+			if len(pods.Items) == 0 {
+				t.Logf("no pods for instance %q", instance)
+				if !tm.Stop() {
+					<-tm.C
+				}
+				cancel()
+				return
+			}
+		}
+	}
 }
 
 func (k K8sClient) AssertPodIsReady(t *testing.T, namespace string, instance string, timeoutInSeconds time.Duration) {

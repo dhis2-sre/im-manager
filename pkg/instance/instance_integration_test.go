@@ -16,7 +16,6 @@ import (
 	"strconv"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/dhis2-sre/im-manager/pkg/token"
 	"github.com/getsops/sops/v3"
@@ -230,9 +229,7 @@ func TestInstanceHandler(t *testing.T) {
 		t.Log("Destroy deployment")
 		path = fmt.Sprintf("/deployments/%d", deployment.ID)
 		client.Do(t, http.MethodDelete, path, nil, http.StatusAccepted, inttest.WithAuthToken(tokens.AccessToken))
-		// TODO: Ideally we shouldn't use sleep here but rather watch the pod until it disappears or a timeout is reached
-		time.Sleep(3 * time.Second)
-		k8sClient.AssertPodIsNotRunning(t, deploymentInstance.Group.Namespace, deploymentInstance.Name)
+		k8sClient.AssertPodIsNotRunning(t, deploymentInstance.Group.Namespace, deploymentInstance.Name, 10)
 	})
 
 	t.Run("GetPublicDeployments", func(t *testing.T) {
@@ -370,18 +367,16 @@ func TestInstanceHandler(t *testing.T) {
 		t.Log("Deploy deployment")
 		path = fmt.Sprintf("/deployments/%d/deploy", deployment.ID)
 		client.Do(t, http.MethodPost, path, nil, http.StatusOK, inttest.WithAuthToken(tokens.AccessToken))
-		k8sClient.AssertPodIsReady(t, deploymentInstance.Group.Namespace, deploymentInstance.Name, 160)
-
-		// TODO: Although core depends on minio and the database we should assert that both are healthy
-		//k8sClient.AssertPodIsReady(t, group.Name, instance.Name+"-database", 3*60)
-		//k8sClient.AssertPodIsReady(t, group.Name, instance.Name, 5*60)
+		k8sClient.AssertPodIsReady(t, deploymentInstance.Group.Namespace, deploymentInstance.Name+"-database", 30)
+		k8sClient.AssertPodIsReady(t, deploymentInstance.Group.Namespace, deploymentInstance.Name+"-minio", 30)
+		k8sClient.AssertPodIsReady(t, deploymentInstance.Group.Namespace, deploymentInstance.Name, 60)
 
 		t.Log("Destroy deployment")
 		path = fmt.Sprintf("/deployments/%d", deployment.ID)
 		client.Do(t, http.MethodDelete, path, nil, http.StatusAccepted, inttest.WithAuthToken(tokens.AccessToken))
-		// TODO: Ideally we shouldn't use sleep here but rather watch the pod until it disappears or a timeout is reached
-		time.Sleep(3 * time.Second)
-		k8sClient.AssertPodIsNotRunning(t, deploymentInstance.Group.Namespace, deploymentInstance.Name)
+		k8sClient.AssertPodIsNotRunning(t, deploymentInstance.Group.Namespace, deploymentInstance.Name, 10)
+		k8sClient.AssertPodIsNotRunning(t, deploymentInstance.Group.Namespace, deploymentInstance.Name+"-minio", 20)
+		k8sClient.AssertPodIsNotRunning(t, deploymentInstance.Group.Namespace, deploymentInstance.Name+"-database", 10)
 	})
 
 	t.Run("UpdateDeployment", func(t *testing.T) {
