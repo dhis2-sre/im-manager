@@ -118,7 +118,7 @@ func TestInstanceHandler(t *testing.T) {
 	})
 
 	hostname := client.GetHostname(t)
-	// TODO: Why panic when trying to use t.Setenv within a test?
+	// This is used when the database init container is downloading its database from IM
 	t.Setenv("HOSTNAME", hostname)
 
 	var databaseID string
