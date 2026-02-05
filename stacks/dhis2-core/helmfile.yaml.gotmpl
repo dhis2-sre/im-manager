@@ -1,12 +1,15 @@
 # consumedParameters: DATABASE_ID, DATABASE_USERNAME, DATABASE_PASSWORD, DATABASE_NAME, DATABASE_HOSTNAME
 # hostnameVariable: DATABASE_HOSTNAME
 # stackParameters: GOOGLE_AUTH_PROJECT_ID,GOOGLE_AUTH_PRIVATE_KEY_ID,GOOGLE_AUTH_PRIVATE_KEY,GOOGLE_AUTH_CLIENT_EMAIL,GOOGLE_AUTH_CLIENT_ID
+
+helmDefaults:
+  deleteWait: true
+
 releases:
   - name: "{{ requiredEnv "INSTANCE_NAME" }}"
     namespace: "{{ requiredEnv "INSTANCE_NAMESPACE" }}"
     chart: dhis2/core
     version: "{{ requiredEnv "CHART_VERSION" }}"
-    wait: true
     values:
       - image:
           repository: dhis2/{{ requiredEnv "IMAGE_REPOSITORY" }}
