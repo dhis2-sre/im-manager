@@ -71,13 +71,15 @@ func (k K8sClient) AssertPodIsNotRunning(t *testing.T, namespace string, instanc
 	require.NoErrorf(t, err, "failed to find pod for instance %q", instance)
 
 	t.Logf("Waiting for pod to terminate: %s/%s", namespace, instance)
+	start := time.Now()
 	timeout := timeoutInSeconds * time.Second
 	tm := time.NewTimer(timeout)
 	defer tm.Stop()
 	for {
 		select {
 		case <-tm.C:
-			assert.Fail(t, "timed out waiting for pod to terminate: %s/%s", namespace, instance)
+			elapsed := time.Since(start)
+			assert.Failf(t, "timed out after %s waiting for %s/%s to terminate", elapsed.String(), namespace, instance)
 			cancel()
 
 			k.logAllPods(t)
@@ -102,7 +104,8 @@ func (k K8sClient) AssertPodIsNotRunning(t *testing.T, namespace string, instanc
 			require.NoError(t, err)
 
 			if len(pods.Items) == 0 {
-				t.Logf("no pods for instance %q", instance)
+				elapsed := time.Since(start)
+				t.Logf("waited %s for %s/%s to terminate", elapsed, namespace, instance)
 				if !tm.Stop() {
 					<-tm.C
 				}
@@ -121,13 +124,15 @@ func (k K8sClient) AssertPodIsReady(t *testing.T, namespace string, instance str
 	require.NoErrorf(t, err, "failed to find pod for instance %q", instance)
 
 	t.Log("Waiting for:", instance)
+	start := time.Now()
 	timeout := timeoutInSeconds * time.Second
 	tm := time.NewTimer(timeout)
 	defer tm.Stop()
 	for {
 		select {
 		case <-tm.C:
-			assert.Fail(t, "timed out waiting on pod")
+			elapsed := time.Since(start)
+			assert.Failf(t, "timed out after %s waiting for %s/%s", elapsed.String(), namespace, instance)
 			cancel()
 
 			k.logAllPods(t)
@@ -153,7 +158,8 @@ func (k K8sClient) AssertPodIsReady(t *testing.T, namespace string, instance str
 				})
 				readyCondition := conditions[index]
 				if readyCondition.Status == "True" {
-					t.Logf("pod for instance %q is running", instance)
+					elapsed := time.Since(start)
+					t.Logf("waited %v for pod for %s/%s to be ready", elapsed, namespace, instance)
 					if !tm.Stop() {
 						<-tm.C
 					}

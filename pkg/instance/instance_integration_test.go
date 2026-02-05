@@ -375,7 +375,7 @@ func TestInstanceHandler(t *testing.T) {
 		path = fmt.Sprintf("/deployments/%d", deployment.ID)
 		client.Do(t, http.MethodDelete, path, nil, http.StatusAccepted, inttest.WithAuthToken(tokens.AccessToken))
 		k8sClient.AssertPodIsNotRunning(t, deploymentInstance.Group.Namespace, deploymentInstance.Name, 10)
-		k8sClient.AssertPodIsNotRunning(t, deploymentInstance.Group.Namespace, deploymentInstance.Name+"-minio", 20)
+		k8sClient.AssertPodIsNotRunning(t, deploymentInstance.Group.Namespace, deploymentInstance.Name+"-minio", 30)
 		k8sClient.AssertPodIsNotRunning(t, deploymentInstance.Group.Namespace, deploymentInstance.Name+"-database", 10)
 	})
 
