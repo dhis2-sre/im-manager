@@ -61,6 +61,7 @@ func (k K8sClient) AssertPodIsNotRunning(t *testing.T, namespace string, instanc
 	require.NoError(t, err)
 
 	if len(pods.Items) == 0 {
+		t.Logf("Pod isn't found: %s/%s", namespace, instance)
 		return
 	}
 
