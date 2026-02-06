@@ -232,24 +232,6 @@ func TestInstanceHandler(t *testing.T) {
 
 	t.Run("UpdateDeployment", func(t *testing.T) {
 		t.Parallel()
-		deployment := createDeployment(t, client, "companion-deployment", tokens.AccessToken, WithDescription("some description"))
-		deploymentInstance := createDHIS2DBInstance(t, client, deployment.ID, databaseID, tokens.AccessToken)
-		deploymentInstance = createMinioInstance(t, client, deployment.ID, tokens.AccessToken)
-		deploymentInstance = createDHIS2CoreInstance(t, client, deployment.ID, tokens.AccessToken, WithParameter("ALLOW_SUSPEND", "false"))
-
-		deployDeployment(t, client, deployment.ID, tokens.AccessToken)
-		k8sClient.AssertPodIsReady(t, deploymentInstance.Group.Namespace, deploymentInstance.Name+"-database", 30)
-		k8sClient.AssertPodIsReady(t, deploymentInstance.Group.Namespace, deploymentInstance.Name+"-minio", 30)
-		k8sClient.AssertPodIsReady(t, deploymentInstance.Group.Namespace, deploymentInstance.Name, 90)
-
-		destroyDeployment(t, client, deployment.ID, tokens.AccessToken)
-		k8sClient.AssertPodIsNotRunning(t, deploymentInstance.Group.Namespace, deploymentInstance.Name, 10)
-		k8sClient.AssertPodIsNotRunning(t, deploymentInstance.Group.Namespace, deploymentInstance.Name+"-minio", 30)
-		k8sClient.AssertPodIsNotRunning(t, deploymentInstance.Group.Namespace, deploymentInstance.Name+"-database", 10)
-	})
-
-	t.Run("UpdateDeployment", func(t *testing.T) {
-		t.Parallel()
 		deployment := createDeployment(t, client, "test-deployment-update", tokens.AccessToken, WithDescription("initial description"), WithTTL(86400))
 		updateDeployment(t, client, deployment.ID, tokens.AccessToken, WithDescription("updated description"), WithTTL(172800))
 	})
