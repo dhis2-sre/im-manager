@@ -214,68 +214,17 @@ func TestInstanceHandler(t *testing.T) {
 
 	t.Run("DeploymentWithCompanionStack", func(t *testing.T) {
 		t.Parallel()
-		t.Log("Create deployment")
-		var deployment model.Deployment
-		body := strings.NewReader(`{
-			"name": "companion-deployment",
-			"group": "group-name",
-			"description": "some description"
-		}`)
+		deployment := createDeployment(t, client, "companion-deployment", tokens.AccessToken, WithDescription("some description"))
+		deploymentInstance := createDHIS2DBInstance(t, client, deployment.ID, databaseID, tokens.AccessToken)
+		deploymentInstance = createMinioInstance(t, client, deployment.ID, tokens.AccessToken)
+		deploymentInstance = createDHIS2CoreInstance(t, client, deployment.ID, tokens.AccessToken, WithParameter("ALLOW_SUSPEND", "false"))
 
-		client.PostJSON(t, "/deployments", body, &deployment, inttest.WithAuthToken(tokens.AccessToken))
-
-		assert.Equal(t, "companion-deployment", deployment.Name)
-		assert.Equal(t, "group-name", deployment.GroupName)
-		assert.Equal(t, "some description", deployment.Description)
-
-		t.Log("Create dhis2-db instance")
-		path := fmt.Sprintf("/deployments/%d/instance", deployment.ID)
-		body = strings.NewReader(fmt.Sprintf(`{
-			"stackName": "dhis2-db",
-			"parameters": {
-				"DATABASE_ID": {
-					"value": "%s"
-				}
-			}
-		}`, databaseID))
-		var deploymentInstance model.DeploymentInstance
-		client.PostJSON(t, path, body, &deploymentInstance, inttest.WithAuthToken(tokens.AccessToken))
-		assert.Equal(t, deployment.ID, deploymentInstance.DeploymentID)
-		assert.Equal(t, "group-name", deploymentInstance.GroupName)
-		assert.Equal(t, "dhis2-db", deploymentInstance.StackName)
-
-		t.Log("Create minio instance")
-		path = fmt.Sprintf("/deployments/%d/instance", deployment.ID)
-		body = strings.NewReader(`{"stackName": "minio"}`)
-		client.PostJSON(t, path, body, &deploymentInstance, inttest.WithAuthToken(tokens.AccessToken))
-		assert.Equal(t, deployment.ID, deploymentInstance.DeploymentID)
-		assert.Equal(t, "group-name", deploymentInstance.GroupName)
-		assert.Equal(t, "minio", deploymentInstance.StackName)
-		t.Log("Create dhis2-core instance")
-		body = strings.NewReader(`{"stackName": "dhis2-core"}`)
-		body = strings.NewReader(`{
-			"stackName": "dhis2-core",
-			"parameters": {
-				"ALLOW_SUSPEND": {
-					"value": "false"
-				}
-			}
-		}`)
-		client.PostJSON(t, path, body, &deploymentInstance, inttest.WithAuthToken(tokens.AccessToken))
-		assert.Equal(t, deployment.ID, deploymentInstance.DeploymentID)
-		assert.Equal(t, "group-name", deploymentInstance.GroupName)
-		assert.Equal(t, "dhis2-core", deploymentInstance.StackName)
-
-		t.Log("Deploy deployment")
-		path = fmt.Sprintf("/deployments/%d/deploy", deployment.ID)
-		client.Do(t, http.MethodPost, path, nil, http.StatusOK, inttest.WithAuthToken(tokens.AccessToken))
+		deployDeployment(t, client, deployment.ID, tokens.AccessToken)
 		k8sClient.AssertPodIsReady(t, deploymentInstance.Group.Namespace, deploymentInstance.Name+"-database", 30)
 		k8sClient.AssertPodIsReady(t, deploymentInstance.Group.Namespace, deploymentInstance.Name+"-minio", 30)
 		k8sClient.AssertPodIsReady(t, deploymentInstance.Group.Namespace, deploymentInstance.Name, 90)
 
-		t.Log("Destroy deployment")
-		path = fmt.Sprintf("/deployments/%d", deployment.ID)
-		client.Do(t, http.MethodDelete, path, nil, http.StatusAccepted, inttest.WithAuthToken(tokens.AccessToken))
+		destroyDeployment(t, client, deployment.ID, tokens.AccessToken)
 		k8sClient.AssertPodIsNotRunning(t, deploymentInstance.Group.Namespace, deploymentInstance.Name, 10)
 		k8sClient.AssertPodIsNotRunning(t, deploymentInstance.Group.Namespace, deploymentInstance.Name+"-minio", 30)
 		k8sClient.AssertPodIsNotRunning(t, deploymentInstance.Group.Namespace, deploymentInstance.Name+"-database", 10)
