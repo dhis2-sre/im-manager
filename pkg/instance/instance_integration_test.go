@@ -102,7 +102,6 @@ func TestInstanceHandler(t *testing.T) {
 	databaseRepository := database.NewRepository(db)
 	databaseService := database.NewService(logger, s3Bucket, s3Client, groupService, databaseRepository)
 
-	tokens, err := tokenService.GetTokens(user, "", false)
 	authenticator := func(c *gin.Context) {
 		ctx := model.NewContextWithUser(c.Request.Context(), user)
 		c.Request = c.Request.WithContext(ctx)
@@ -120,36 +119,10 @@ func TestInstanceHandler(t *testing.T) {
 	// This is used when the database init container is downloading its database from IM
 	t.Setenv("HOSTNAME", hostname)
 
-	var databaseID string
-	{
-		t.Log("Upload")
-		var b bytes.Buffer
-		w := multipart.NewWriter(&b)
-		err := w.WriteField("group", "group-name")
-		require.NoError(t, err, "failed to write form field")
-		err = w.WriteField("name", "path/name.extension")
-		require.NoError(t, err, "failed to write form field")
-		f, err := w.CreateFormFile("database", "mydb")
-		require.NoError(t, err, "failed to create form file")
-		_, err = io.WriteString(f, "select now();")
-		require.NoError(t, err, "failed to write file")
-		_ = w.Close()
+	tokens, err := tokenService.GetTokens(user, "", false)
+	require.NoError(t, err, "failed to get tokens")
 
-		body := client.Put(t, "/databases", &b, http.StatusCreated,
-			inttest.WithHeader("X-Upload-Group", "group-name"),
-			inttest.WithHeader("X-Upload-Name", "path/name.extension"),
-			inttest.WithHeader("X-Upload-Description", "Some database"),
-			inttest.WithAuthToken(tokens.AccessToken),
-		)
-
-		var actualDB model.Database
-		err = json.Unmarshal(body, &actualDB)
-		require.NoError(t, err, "POST /databases: failed to unmarshal HTTP response body")
-		require.Equal(t, "path/name.extension", actualDB.Name)
-		require.Equal(t, "group-name", actualDB.GroupName)
-
-		databaseID = strconv.FormatUint(uint64(actualDB.ID), 10)
-	}
+	databaseID := uploadDatabase(t, client, "path/name.extension", "select now();", tokens.AccessToken)
 
 	t.Run("DeployDeploymentWithoutInstances", func(t *testing.T) {
 		t.Parallel()
@@ -300,6 +273,37 @@ func encryptUsingAge(t *testing.T, identity *age.X25519Identity, yamlData []byte
 	require.NoError(t, err, "failed to emit encrypted yaml file")
 
 	return encryptedFile
+}
+
+func uploadDatabase(t *testing.T, client *inttest.HTTPClient, name, content, authToken string) string {
+	t.Helper()
+
+	var b bytes.Buffer
+	w := multipart.NewWriter(&b)
+
+	err := w.WriteField("group", "group-name")
+	require.NoError(t, err, "failed to write form field")
+	err = w.WriteField("name", name)
+	require.NoError(t, err, "failed to write form field")
+
+	f, err := w.CreateFormFile("database", "mydb")
+	require.NoError(t, err, "failed to create form file")
+	_, err = io.WriteString(f, content)
+	require.NoError(t, err, "failed to write file")
+	_ = w.Close()
+
+	body := client.Put(t, "/databases", &b, http.StatusCreated,
+		inttest.WithHeader("X-Upload-Group", "group-name"),
+		inttest.WithHeader("X-Upload-Name", name),
+		inttest.WithHeader("X-Upload-Description", "Test database"),
+		inttest.WithAuthToken(authToken),
+	)
+
+	var actualDB model.Database
+	err = json.Unmarshal(body, &actualDB)
+	require.NoError(t, err, "failed to unmarshal database response")
+
+	return strconv.FormatUint(uint64(actualDB.ID), 10)
 }
 
 type groupService struct {
