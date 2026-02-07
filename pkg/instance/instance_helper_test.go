@@ -48,7 +48,7 @@ func createInstance(t *testing.T, client *inttest.HTTPClient, deploymentID uint,
 		opt(builder)
 	}
 
-	payload := map[string]interface{}{
+	payload := map[string]any{
 		"stackName": builder.stackName,
 	}
 
@@ -72,6 +72,39 @@ func createInstance(t *testing.T, client *inttest.HTTPClient, deploymentID uint,
 	assert.Equal(t, stackName, instance.StackName)
 
 	return instance
+}
+
+func updateInstance(t *testing.T, client *inttest.HTTPClient, instance model.DeploymentInstance, authToken string, opts ...InstanceOption) model.DeploymentInstance {
+	t.Helper()
+
+	builder := &instanceBuilder{
+		stackName: instance.StackName,
+	}
+
+	for _, opt := range opts {
+		opt(builder)
+	}
+
+	payload := map[string]any{
+		"stackName": builder.stackName,
+	}
+
+	if len(builder.parameters) > 0 {
+		payload["parameters"] = builder.parameters
+	}
+
+	if builder.public != nil {
+		payload["public"] = *builder.public
+	}
+
+	jsonData, err := json.Marshal(payload)
+	require.NoError(t, err, "failed to marshal update payload")
+
+	var updatedInstance model.DeploymentInstance
+	path := fmt.Sprintf("/deployments/%d/instance/%d", instance.DeploymentID, instance.ID)
+	client.PutJSON(t, path, strings.NewReader(string(jsonData)), &updatedInstance, inttest.WithAuthToken(authToken))
+
+	return updatedInstance
 }
 
 func createWhoamiInstance(t *testing.T, client *inttest.HTTPClient, deploymentID uint, authToken string, opts ...InstanceOption) model.DeploymentInstance {

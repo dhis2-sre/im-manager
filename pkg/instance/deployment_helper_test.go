@@ -35,25 +35,19 @@ func WithTTL(ttl uint) DeploymentOption {
 	}
 }
 
-func WithDeploymentPublic(public bool) DeploymentOption {
-	return func(db *deploymentBuilder) {
-		db.public = &public
-	}
-}
-
 func createDeployment(t *testing.T, client *inttest.HTTPClient, name string, authToken string, opts ...DeploymentOption) model.Deployment {
 	t.Helper()
 
 	builder := &deploymentBuilder{
 		name:      name,
-		groupName: "group-name", // default, could be made configurable if needed
+		groupName: "group-name", // hard coded, let's make this configurable if needed
 	}
 
 	for _, opt := range opts {
 		opt(builder)
 	}
 
-	payload := map[string]interface{}{
+	payload := map[string]any{
 		"name":  builder.name,
 		"group": builder.groupName,
 	}
@@ -105,7 +99,7 @@ func updateDeployment(t *testing.T, client *inttest.HTTPClient, deploymentID uin
 		opt(builder)
 	}
 
-	payload := make(map[string]interface{})
+	payload := make(map[string]any)
 	if builder.description != "" {
 		payload["description"] = builder.description
 	}

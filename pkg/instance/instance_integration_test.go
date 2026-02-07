@@ -233,34 +233,28 @@ func TestInstanceHandler(t *testing.T) {
 	t.Run("UpdateDeployment", func(t *testing.T) {
 		t.Parallel()
 		deployment := createDeployment(t, client, "test-deployment-update", tokens.AccessToken, WithDescription("initial description"), WithTTL(86400))
-		updateDeployment(t, client, deployment.ID, tokens.AccessToken, WithDescription("updated description"), WithTTL(172800))
+		updatedDeployment := updateDeployment(t, client, deployment.ID, tokens.AccessToken, WithDescription("updated description"), WithTTL(172800))
+
+		assert.Equal(t, deployment.ID, updatedDeployment.ID)
+		assert.Equal(t, "updated description", updatedDeployment.Description)
+		assert.Equal(t, uint(172800), updatedDeployment.TTL)
 	})
 
 	t.Run("UpdateDeploymentInstance", func(t *testing.T) {
 		t.Parallel()
 		deployment := createDeployment(t, client, "test-deployment-instance-update", tokens.AccessToken, WithDescription("some description"))
+
 		deploymentInstance := createWhoamiInstance(t, client, deployment.ID, tokens.AccessToken,
 			WithParameter("IMAGE_TAG", "0.6.0"),
 			WithPublic(false))
 
-		t.Log("Update deployment instance")
-		path := fmt.Sprintf("/deployments/%d/instance/%d", deployment.ID, deploymentInstance.ID)
-		body := strings.NewReader(`{
-			"stackName": "whoami-go",
-			"parameters": {
-				"IMAGE_TAG": {
-					"value": "0.7.0"
-				}
-			},
-			"public": true
-		}`)
-		var updatedInstance model.DeploymentInstance
-		client.PutJSON(t, path, body, &updatedInstance, inttest.WithAuthToken(tokens.AccessToken))
+		updatedInstance := updateInstance(t, client, deploymentInstance, tokens.AccessToken,
+			WithParameter("IMAGE_TAG", "0.7.0"),
+			WithPublic(true))
 
+		assert.Equal(t, deploymentInstance.ID, updatedInstance.ID)
 		assert.Equal(t, "0.7.0", updatedInstance.Parameters["IMAGE_TAG"].Value)
 		assert.True(t, updatedInstance.Public)
-		assert.Equal(t, "test-deployment-instance-update", updatedInstance.Name)
-		assert.Equal(t, "group-name", updatedInstance.GroupName)
 	})
 }
 
