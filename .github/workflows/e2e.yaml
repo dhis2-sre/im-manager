@@ -29,9 +29,8 @@ jobs:
 
       - name: Construct tests target URL
         run: |
-          BASE_HOSTNAME="api.im.dhis2.org"
-
           if [[ "$DEPLOY_ENVIRONMENT" == 'true' ]]; then
+            # Feature environment
             # convert to lower case
             HEAD_BRANCH_LOWERCASE=${GITHUB_HEAD_REF,,}
 
@@ -42,9 +41,10 @@ jobs:
             # the rest of the chars up to the limit are saved for the static part of the release names
             SANITIZED_HEAD_BRANCH=${HEAD_BRANCH_LOWERCASE_NO_NONALPHANUMERIC::25}
 
-            echo "TARGET_URL=https://$SANITIZED_HEAD_BRANCH.$BASE_HOSTNAME" >> $GITHUB_ENV
+            echo "TARGET_URL=https://$SANITIZED_HEAD_BRANCH.api.im-feat.dhis2.org" >> $GITHUB_ENV
           else
-            echo "TARGET_URL=https://dev.$BASE_HOSTNAME" >> $GITHUB_ENV
+            # Dev environment
+            echo "TARGET_URL=https://api.im-dev.dhis2.org" >> $GITHUB_ENV
           fi
 
       # Don't set environment variable "API_URL" in this workflow with the action below.

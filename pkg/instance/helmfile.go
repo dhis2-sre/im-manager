@@ -125,10 +125,6 @@ func (h helmfileService) configureInstanceEnvironment(ctx context.Context, acces
 
 	cmd.Env = h.injectEnv(ctx, cmd.Env, "KUBERNETES_SERVICE_PORT")
 	cmd.Env = h.injectEnv(ctx, cmd.Env, "KUBERNETES_PORT")
-	cmd.Env = h.injectEnv(ctx, cmd.Env, "KUBERNETES_PORT_443_TCP_ADDR")
-	cmd.Env = h.injectEnv(ctx, cmd.Env, "KUBERNETES_PORT_443_TCP_PORT")
-	cmd.Env = h.injectEnv(ctx, cmd.Env, "KUBERNETES_PORT_443_TCP_PROTO")
-	cmd.Env = h.injectEnv(ctx, cmd.Env, "KUBERNETES_PORT_443_TCP")
 	cmd.Env = h.injectEnv(ctx, cmd.Env, "KUBERNETES_SERVICE_PORT_HTTPS")
 	cmd.Env = h.injectEnv(ctx, cmd.Env, "KUBERNETES_SERVICE_HOST")
 

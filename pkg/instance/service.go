@@ -14,6 +14,7 @@ import (
 
 	"github.com/anthhub/forwarder"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/dhis2-sre/im-manager/pkg/token"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
 	"golang.org/x/exp/maps"
@@ -28,7 +29,7 @@ import (
 	"github.com/dhis2-sre/im-manager/pkg/model"
 )
 
-func NewService(logger *slog.Logger, instanceRepository *repository, groupService groupService, stackService stack.Service, helmfileService helmfile, s3Client *s3.Client, s3Bucket string) *Service {
+func NewService(logger *slog.Logger, instanceRepository *repository, groupService groupService, stackService stack.Service, helmfileService helmfile, s3Client *s3.Client, s3Bucket string, tokenService *token.TokenService) *Service {
 	return &Service{
 		logger:             logger,
 		instanceRepository: instanceRepository,
@@ -37,6 +38,7 @@ func NewService(logger *slog.Logger, instanceRepository *repository, groupServic
 		helmfileService:    helmfileService,
 		s3Client:           s3Client,
 		s3Bucket:           s3Bucket,
+		tokenService:       tokenService,
 	}
 }
 
@@ -58,6 +60,7 @@ type Service struct {
 	helmfileService    helmfile
 	s3Client           *s3.Client
 	s3Bucket           string
+	tokenService       *token.TokenService
 }
 
 func (s Service) SaveDeployment(ctx context.Context, deployment *model.Deployment) error {
@@ -208,17 +211,44 @@ func (s Service) validateNoCycles(instances []*model.DeploymentInstance) (graph.
 		if err != nil {
 			return nil, err
 		}
+
+		for _, instanceParameter := range src.Parameters {
+			stackParameter := stack.Parameters[instanceParameter.ParameterName]
+			if stackParameter.RequireCompanion != nil {
+				companion, err := stackParameter.RequireCompanion.Require(instanceParameter)
+				if err != nil {
+					return nil, fmt.Errorf("failed to check companion for parameter %q: %v", instanceParameter.ParameterName, err)
+				}
+				if companion != nil {
+					companionStackName := companion.Name
+					err := g.AddEdge(src.StackName, companionStackName)
+					// TODO: Fix error messages so they're unique and not the same as for required stacks
+					if err != nil {
+						if errors.Is(err, graph.ErrEdgeAlreadyExists) {
+							return nil, fmt.Errorf("instance %q requires %q more than once", src.Name, companionStackName)
+						} else if errors.Is(err, graph.ErrEdgeCreatesCycle) {
+							return nil, fmt.Errorf("link from instance %q to stack %q creates a cycle", src.Name, companionStackName)
+						} else if errors.Is(err, graph.ErrVertexNotFound) {
+							return nil, fmt.Errorf("%q is required by %q", companionStackName, src.StackName)
+						}
+						return nil, fmt.Errorf("failed linking instance %q with instance %q: %v", src.Name, companionStackName, err)
+					}
+				}
+			}
+		}
+
 		for _, requiredStack := range stack.Requires {
-			err := g.AddEdge(src.StackName, requiredStack.Name)
+			requiredStackName := requiredStack.Name
+			err := g.AddEdge(src.StackName, requiredStackName)
 			if err != nil {
 				if errors.Is(err, graph.ErrEdgeAlreadyExists) {
-					return nil, fmt.Errorf("instance %q requires %q more than once", src.Name, requiredStack.Name)
+					return nil, fmt.Errorf("instance %q requires %q more than once", src.Name, requiredStackName)
 				} else if errors.Is(err, graph.ErrEdgeCreatesCycle) {
-					return nil, fmt.Errorf("link from instance %q to stack %q creates a cycle", src.Name, requiredStack.Name)
+					return nil, fmt.Errorf("link from instance %q to stack %q creates a cycle", src.Name, requiredStackName)
 				} else if errors.Is(err, graph.ErrVertexNotFound) {
-					return nil, fmt.Errorf("%q is required by %q", requiredStack.Name, src.StackName)
+					return nil, fmt.Errorf("%q is required by %q", requiredStackName, src.StackName)
 				}
-				return nil, fmt.Errorf("failed linking instance %q with instance %q: %v", src.Name, requiredStack.Name, err)
+				return nil, fmt.Errorf("failed linking instance %q with instance %q: %v", src.Name, requiredStackName, err)
 			}
 		}
 	}
@@ -339,6 +369,11 @@ func addDefaultParameterValues(instanceParameters model.DeploymentInstanceParame
 }
 
 func (s Service) DeployDeployment(ctx context.Context, token string, deployment *model.Deployment) error {
+	refreshedToken, err := s.tokenService.RefreshAccessToken(token)
+	if err != nil {
+		return err
+	}
+
 	deploymentGraph, err := s.validateNoCycles(deployment.Instances)
 	if err != nil {
 		return err
@@ -352,7 +387,7 @@ func (s Service) DeployDeployment(ctx context.Context, token string, deployment 
 	deployment.Instances = instances
 
 	for _, instance := range instances {
-		err := s.deployDeploymentInstance(ctx, token, instance, deployment.TTL)
+		err := s.deployDeploymentInstance(ctx, refreshedToken, instance, deployment.TTL)
 		if err != nil {
 			return fmt.Errorf("failed to deploy instance(%s) %q: %v", instance.StackName, instance.Name, err)
 		}
@@ -966,7 +1001,12 @@ func (s Service) UpdateInstance(ctx context.Context, token string, deploymentId,
 		return nil, err
 	}
 
-	err = s.deployDeploymentInstance(ctx, token, decryptedInstance, deployment.TTL)
+	refreshedToken, err := s.tokenService.RefreshAccessToken(token)
+	if err != nil {
+		return nil, err
+	}
+
+	err = s.deployDeploymentInstance(ctx, refreshedToken, decryptedInstance, deployment.TTL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to deploy updated instance: %v", err)
 	}
