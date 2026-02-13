@@ -18,6 +18,10 @@ DATABASE_SIZE=${DATABASE_SIZE:-20Gi}
 DB_RESOURCES_REQUESTS_CPU=${DB_RESOURCES_REQUESTS_CPU:-250m}
 DB_RESOURCES_REQUESTS_MEMORY=${DB_RESOURCES_REQUESTS_MEMORY:-256Mi}
 
+MINIO_CHART_VERSION=${MINIO_CHART_VERSION:-14.7.5}
+MINIO_STORAGE_SIZE=${MINIO_STORAGE_SIZE:-8Gi}
+MINIO_IMAGE_PULL_POLICY=${MINIO_IMAGE_PULL_POLICY:-IfNotPresent}
+
 CHART_VERSION=${CHART_VERSION:-0.31.0}
 MIN_READY_SECONDS=${MIN_READY_SECONDS:-120}
 # container(s) in dhis2 pod will be restarted after that due to restartPolicy
@@ -35,6 +39,7 @@ FLYWAY_MIGRATE_OUT_OF_ORDER=${FLYWAY_MIGRATE_OUT_OF_ORDER:-false}
 FLYWAY_REPAIR_BEFORE_MIGRATION=${FLYWAY_REPAIR_BEFORE_MIGRATION:-false}
 ENABLE_QUERY_LOGGING=${ENABLE_QUERY_LOGGING:-false}
 ALLOW_SUSPEND=${ALLOW_SUSPEND:-true}
+STORAGE_TYPE=${STORAGE_TYPE:-filesystem}
 
 DEPLOYMENT_ID=$(echo "{
   \"name\": \"$NAME\",
@@ -64,8 +69,14 @@ echo "{
 echo "{
   \"stackName\": \"minio\",
   \"parameters\": {
-    \"DATABASE_ID\": {
-      \"value\": \"$DATABASE_ID\"
+    \"MINIO_STORAGE_SIZE\": {
+      \"value\": \"8Gi\"
+    },
+    \"MINIO_CHART_VERSION\": {
+      \"value\": \"14.7.5\"
+    },
+    \"IMAGE_PULL_POLICY\": {
+      \"value\": \"IfNotPresent\"
     }
   }
 }" | $HTTP post "$IM_HOST/deployments/$DEPLOYMENT_ID/instance" "Authorization: Bearer $ACCESS_TOKEN"
