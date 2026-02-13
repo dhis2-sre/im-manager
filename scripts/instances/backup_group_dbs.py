@@ -25,6 +25,7 @@ class BackupItem:
     db_instance_id: int
     saved_database_id: int
     saved_database_name: str
+    original_database_id: int
 
 
 @dataclass
@@ -34,6 +35,7 @@ class PendingBackup:
     db_instance_id: int
     saved_database_id: int
     saved_database_name: str
+    original_database_id: int
 
 
 def _env_default(name: str) -> Optional[str]:
@@ -115,6 +117,25 @@ def _find_instance_id(deployment: dict, stack_name: str) -> Optional[int]:
     return None
 
 
+def _get_original_database_id(deployment: dict, stack_name: str = "dhis2-db") -> Optional[int]:
+    """Return the current DATABASE_ID parameter value for the given stack's instance, or None if missing."""
+    for inst in deployment.get("instances") or []:
+        if inst.get("stackName") != stack_name:
+            continue
+        params = inst.get("parameters") or {}
+        db_id_param = params.get("DATABASE_ID")
+        if not isinstance(db_id_param, dict):
+            return None
+        value = db_id_param.get("value")
+        if value is None:
+            return None
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return None
+    return None
+
+
 def _wait_for_database_ready(
     session: requests.Session,
     host: str,
@@ -149,6 +170,7 @@ def _start_backup(
     db_instance_id: int,
     backup_name: str,
     fmt: str,
+    original_database_id: int,
 ) -> PendingBackup:
     print(f"[{dep_name}] saving database via save-as on instance {db_instance_id} as '{backup_name}'")
     save_resp = _request(
@@ -170,6 +192,7 @@ def _start_backup(
         db_instance_id=db_instance_id,
         saved_database_id=saved_db_id,
         saved_database_name=backup_name,
+        original_database_id=original_database_id,
     )
 
 
@@ -190,6 +213,7 @@ def _wait_and_finalize(
         db_instance_id=pending.db_instance_id,
         saved_database_id=pending.saved_database_id,
         saved_database_name=pending.saved_database_name,
+        original_database_id=pending.original_database_id,
     )
 
 
@@ -241,8 +265,12 @@ def main() -> int:
         if db_instance_id is None:
             print(f"Skipping {dep_name} ({dep_id}): no dhis2-db instance", file=sys.stderr)
             continue
+        original_db_id = _get_original_database_id(dep)
+        if original_db_id is None:
+            print(f"Skipping {dep_name} ({dep_id}): no DATABASE_ID parameter on dhis2-db instance", file=sys.stderr)
+            continue
         backup_name = f"{dep_name}-backup-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}.sql.gz"
-        targets.append((dep_id, dep_name, db_instance_id, backup_name))
+        targets.append((dep_id, dep_name, db_instance_id, backup_name, original_db_id))
 
     if not targets:
         print("No valid deployments to back up.", file=sys.stderr)
@@ -253,9 +281,11 @@ def main() -> int:
 
     if args.parallel:
         pending: List[PendingBackup] = []
-        for dep_id, dep_name, db_instance_id, backup_name in targets:
+        for dep_id, dep_name, db_instance_id, backup_name, original_db_id in targets:
             try:
-                p = _start_backup(session, host, auth, dep_id, dep_name, db_instance_id, backup_name, args.format)
+                p = _start_backup(
+                    session, host, auth, dep_id, dep_name, db_instance_id, backup_name, args.format, original_db_id
+                )
                 pending.append(p)
             except Exception as e:
                 errors.append(f"[{dep_name}] start failed: {e}")
@@ -278,9 +308,11 @@ def main() -> int:
                         errors.append(f"[{dep_name}] wait failed: {e}")
                         print(f"[{dep_name}] ERROR waiting for backup: {e}", file=sys.stderr)
     else:
-        for dep_id, dep_name, db_instance_id, backup_name in targets:
+        for dep_id, dep_name, db_instance_id, backup_name, original_db_id in targets:
             try:
-                p = _start_backup(session, host, auth, dep_id, dep_name, db_instance_id, backup_name, args.format)
+                p = _start_backup(
+                    session, host, auth, dep_id, dep_name, db_instance_id, backup_name, args.format, original_db_id
+                )
                 item = _wait_and_finalize(session, host, auth, p, args.poll_interval, args.timeout_seconds)
                 items.append(item)
             except Exception as e:
@@ -295,6 +327,7 @@ def main() -> int:
                 "deploymentId": i.deployment_id,
                 "deploymentName": i.deployment_name,
                 "dbInstanceId": i.db_instance_id,
+                "originalDatabaseId": i.original_database_id,
                 "savedDatabaseId": i.saved_database_id,
                 "savedDatabaseName": i.saved_database_name,
             }
