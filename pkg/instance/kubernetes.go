@@ -24,22 +24,30 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/tools/remotecommand"
 )
 
 type kubernetesService struct {
-	client *kubernetes.Clientset
+	client     *kubernetes.Clientset
+	restConfig *rest.Config
 }
 
 //goland:noinspection GoExportedFuncWithUnexportedType
 func NewKubernetesService(config model.Cluster) (*kubernetesService, error) {
-	client, err := newClient(config)
+	restConfig, err := newRestConfig(config)
+	if err != nil {
+		return nil, fmt.Errorf("error creating kube rest config: %v", err)
+	}
+
+	client, err := kubernetes.NewForConfig(restConfig)
 	if err != nil {
 		return nil, fmt.Errorf("error creating kube client: %v", err)
 	}
 
-	return &kubernetesService{client: client}, nil
+	return &kubernetesService{client: client, restConfig: restConfig}, nil
 }
 
 func commandExecutor(cmd *exec.Cmd, cluster model.Cluster) (stdout []byte, stderr []byte, err error) {
@@ -171,6 +179,33 @@ func (ks kubernetesService) getLogs(instance *model.DeploymentInstance, typeSele
 		Pods(pod.Namespace).
 		GetLogs(pod.Name, &podLogOptions).
 		Stream(context.TODO())
+}
+
+func (ks kubernetesService) Exec(ctx context.Context, namespace, podName, container string, command []string, stdout, stderr io.Writer) error {
+	req := ks.client.CoreV1().RESTClient().Post().
+		Resource("pods").
+		Name(podName).
+		Namespace(namespace).
+		SubResource("exec")
+
+	req.VersionedParams(&v1.PodExecOptions{
+		Container: container,
+		Command:   command,
+		Stdin:     false,
+		Stdout:    true,
+		Stderr:    true,
+		TTY:       false,
+	}, scheme.ParameterCodec)
+
+	executor, err := remotecommand.NewSPDYExecutor(ks.restConfig, "POST", req.URL())
+	if err != nil {
+		return err
+	}
+
+	return executor.StreamWithContext(ctx, remotecommand.StreamOptions{
+		Stdout: stdout,
+		Stderr: stderr,
+	})
 }
 
 func (ks kubernetesService) getPod(instanceID uint, typeSelector string) (v1.Pod, error) {
