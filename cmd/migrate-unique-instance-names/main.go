@@ -161,14 +161,12 @@ func runMigration(db *gorm.DB, items []backupItem, dryRun bool, logger *slog.Log
 			var inst model.DeploymentInstance
 			if err := tx.Where("id = ? AND stack_name = ?", item.DBInstanceID, stackDhis2DB).
 				Select("id", "name", "group_name", "deployment_id", "stack_name").First(&inst).Error; err != nil {
-				logger.Warn("skip: instance not found or not dhis2-db", "id", item.DBInstanceID)
-				continue
+				return fmt.Errorf("instance id=%d not found or not dhis2-db (passed validation but failed during migration): %w", item.DBInstanceID, err)
 			}
 
 			var gr groupRow
 			if err := tx.Table("groups").Where("name = ?", inst.GroupName).Select("id", "namespace").First(&gr).Error; err != nil {
-				logger.Warn("skip: group not found", "group", inst.GroupName)
-				continue
+				return fmt.Errorf("group %q for instance id=%d not found (passed validation but failed during migration): %w", inst.GroupName, item.DBInstanceID, err)
 			}
 
 			newHostname := fmt.Sprintf("%s-%d-database-postgresql.%s.svc", inst.Name, gr.ID, gr.Namespace)

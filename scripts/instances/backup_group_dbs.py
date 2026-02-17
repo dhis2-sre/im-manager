@@ -123,7 +123,8 @@ def _fetch_instance_details(
     """GET /instances/{id}/details returns one instance with parameters (same as frontend). DATABASE_ID is not sensitive so it is stored and returned in plaintext."""
     try:
         return _request(session, auth, "GET", f"{host}/instances/{instance_id}/details", timeout=60)
-    except Exception:
+    except Exception as e:
+        print(f"WARNING: failed to fetch instance {instance_id} details: {e}", file=sys.stderr)
         return None
 
 
@@ -327,7 +328,7 @@ def main() -> int:
             with ThreadPoolExecutor(max_workers=len(pending)) as executor:
                 wait_futures = {
                     executor.submit(
-                        _wait_and_finalize, session, host, auth, p, args.poll_interval, args.timeout_seconds
+                        _wait_and_finalize, requests.Session(), host, auth, p, args.poll_interval, args.timeout_seconds
                     ): p.deployment_name
                     for p in pending
                 }
