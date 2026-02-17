@@ -9,7 +9,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from threading import Lock
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 try:
     import requests
@@ -25,7 +25,7 @@ class BackupItem:
     db_instance_id: int
     saved_database_id: int
     saved_database_name: str
-    original_database_id: int
+    original_database_id: Union[int, str]  # numeric id or slug (e.g. "whoami-2-42-sql-gz")
 
 
 @dataclass
@@ -35,7 +35,7 @@ class PendingBackup:
     db_instance_id: int
     saved_database_id: int
     saved_database_name: str
-    original_database_id: int
+    original_database_id: Union[int, str]
 
 
 def _env_default(name: str) -> Optional[str]:
@@ -117,23 +117,48 @@ def _find_instance_id(deployment: dict, stack_name: str) -> Optional[int]:
     return None
 
 
-def _get_original_database_id(deployment: dict, stack_name: str = "dhis2-db") -> Optional[int]:
-    """Return the current DATABASE_ID parameter value for the given stack's instance, or None if missing."""
-    for inst in deployment.get("instances") or []:
-        if inst.get("stackName") != stack_name:
-            continue
-        params = inst.get("parameters") or {}
-        db_id_param = params.get("DATABASE_ID")
-        if not isinstance(db_id_param, dict):
-            return None
-        value = db_id_param.get("value")
-        if value is None:
-            return None
+def _fetch_instance_details(
+    session: requests.Session, auth: Auth, host: str, instance_id: int
+) -> Optional[dict]:
+    """GET /instances/{id}/details returns one instance with parameters (same as frontend). DATABASE_ID is not sensitive so it is stored and returned in plaintext."""
+    try:
+        return _request(session, auth, "GET", f"{host}/instances/{instance_id}/details", timeout=60)
+    except Exception:
+        return None
+
+
+def _get_original_database_id_from_instance(instance: dict) -> Optional[Union[int, str]]:
+    """Return the DATABASE_ID parameter value from an instance details response (numeric id or slug), or None if missing."""
+    params = instance.get("parameters") or {}
+    db_id_param = params.get("DATABASE_ID")
+    if not isinstance(db_id_param, dict):
+        return None
+    value = db_id_param.get("value")
+    if value is None:
+        return None
+    if isinstance(value, (int, float)):
+        return int(value)
+    if isinstance(value, str) and value.strip():
         try:
             return int(value)
         except (TypeError, ValueError):
-            return None
+            return value  # slug, e.g. "whoami-2-42-sql-gz"
     return None
+
+
+def _log_missing_database_id_debug(dep_name: str, dep_id: int, instance: dict) -> None:
+    """Log what we got from the API so we can see why DATABASE_ID is missing or unparseable."""
+    params = instance.get("parameters") or {}
+    param_names = list(params.keys())[:15]
+    if len(params) > 15:
+        param_names.append("...")
+    db_id_raw = params.get("DATABASE_ID")
+    print(
+        f"Skipping {dep_name} ({dep_id}): no DATABASE_ID parameter on dhis2-db instance. "
+        f"Instance id={instance.get('id')}, parameters keys ({len(params)}): {param_names}. "
+        f"DATABASE_ID present={db_id_raw is not None}, value={repr(db_id_raw)}",
+        file=sys.stderr,
+    )
 
 
 def _wait_for_database_ready(
@@ -170,7 +195,7 @@ def _start_backup(
     db_instance_id: int,
     backup_name: str,
     fmt: str,
-    original_database_id: int,
+    original_database_id: Union[int, str],
 ) -> PendingBackup:
     print(f"[{dep_name}] saving database via save-as on instance {db_instance_id} as '{backup_name}'")
     save_resp = _request(
@@ -265,9 +290,15 @@ def main() -> int:
         if db_instance_id is None:
             print(f"Skipping {dep_name} ({dep_id}): no dhis2-db instance", file=sys.stderr)
             continue
-        original_db_id = _get_original_database_id(dep)
+        # GET /deployments list does not include instance parameters. Fetch this instance's details
+        # (GET /instances/{id}/details); DATABASE_ID is not sensitive so it is returned in plaintext.
+        instance_details = _fetch_instance_details(session, auth, host, db_instance_id)
+        if instance_details is None:
+            print(f"Skipping {dep_name} ({dep_id}): failed to fetch instance details", file=sys.stderr)
+            continue
+        original_db_id = _get_original_database_id_from_instance(instance_details)
         if original_db_id is None:
-            print(f"Skipping {dep_name} ({dep_id}): no DATABASE_ID parameter on dhis2-db instance", file=sys.stderr)
+            _log_missing_database_id_debug(dep_name, dep_id, instance_details)
             continue
         backup_name = f"{dep_name}-backup-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}.sql.gz"
         targets.append((dep_id, dep_name, db_instance_id, backup_name, original_db_id))
@@ -319,20 +350,21 @@ def main() -> int:
                 errors.append(f"[{dep_name}] failed: {e}")
                 print(f"[{dep_name}] ERROR: {e}", file=sys.stderr)
 
+    def item_to_dict(i: BackupItem) -> dict:
+        d = {
+            "deploymentId": i.deployment_id,
+            "deploymentName": i.deployment_name,
+            "dbInstanceId": i.db_instance_id,
+            "savedDatabaseId": i.saved_database_id,
+            "savedDatabaseName": i.saved_database_name,
+        }
+        d["originalDatabaseId"] = i.original_database_id  # int or str (slug)
+        return d
+
     out_obj = {
         "group": group,
         "createdAt": datetime.now(timezone.utc).isoformat(),
-        "items": [
-            {
-                "deploymentId": i.deployment_id,
-                "deploymentName": i.deployment_name,
-                "dbInstanceId": i.db_instance_id,
-                "originalDatabaseId": i.original_database_id,
-                "savedDatabaseId": i.saved_database_id,
-                "savedDatabaseName": i.saved_database_name,
-            }
-            for i in items
-        ],
+        "items": [item_to_dict(i) for i in items],
     }
 
     os.makedirs(os.path.dirname(os.path.abspath(args.out)) or ".", exist_ok=True)
