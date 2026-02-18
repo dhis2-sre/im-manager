@@ -104,7 +104,9 @@ func (h helmfileService) loadStackParameters(stackName string) (stackParameters,
 func (h helmfileService) configureInstanceEnvironment(ctx context.Context, accessToken string, instance *model.DeploymentInstance, group *model.Group, ttl uint, stackParameters stackParameters, cmd *exec.Cmd) {
 	// TODO: We should only inject what the stack require, currently we just blindly inject IM_ACCESS_TOKEN and others which may not be required by the stack
 	// We could probably list the required system parameters in the stacks helmfile and parse those as well as other parameters
+	// INSTANCE_NAME: unique name for K8s/Helm (release names, services). INSTANCE_PATH_NAME: deployment name for URL path/context (group-based subdomain already makes URL unique).
 	instanceNameEnv := fmt.Sprintf("%s=%s-%d", "INSTANCE_NAME", instance.Name, group.ID)
+	instancePathNameEnv := fmt.Sprintf("%s=%s", "INSTANCE_PATH_NAME", instance.Name)
 	instanceNamespaceEnv := fmt.Sprintf("%s=%s", "INSTANCE_NAMESPACE", group.Namespace)
 	instanceIdEnv := fmt.Sprintf("%s=%d", "INSTANCE_ID", instance.ID)
 	deploymentIdEnv := fmt.Sprintf("%s=%d", "DEPLOYMENT_ID", instance.DeploymentID)
@@ -113,7 +115,7 @@ func (h helmfileService) configureInstanceEnvironment(ctx context.Context, acces
 	imTokenEnv := fmt.Sprintf("%s=%s", "IM_ACCESS_TOKEN", accessToken)
 	homeEnv := fmt.Sprintf("%s=%s", "HOME", "/tmp")
 	imCreationTimestamp := fmt.Sprintf("%s=%d", "INSTANCE_CREATION_TIMESTAMP", time.Now().Unix())
-	cmd.Env = append(cmd.Env, instanceNameEnv, instanceNamespaceEnv, instanceIdEnv, deploymentIdEnv, instanceTTLEnv, instanceHostnameEnv, imTokenEnv, homeEnv, imCreationTimestamp)
+	cmd.Env = append(cmd.Env, instanceNameEnv, instancePathNameEnv, instanceNamespaceEnv, instanceIdEnv, deploymentIdEnv, instanceTTLEnv, instanceHostnameEnv, imTokenEnv, homeEnv, imCreationTimestamp)
 
 	cmd.Env = h.injectEnv(ctx, cmd.Env, "HOSTNAME")
 	cmd.Env = h.injectEnv(ctx, cmd.Env, "AWS_ACCESS_KEY_ID")
