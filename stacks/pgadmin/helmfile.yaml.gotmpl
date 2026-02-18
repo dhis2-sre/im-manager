@@ -6,7 +6,7 @@ releases:
     chart: runix/pgadmin4
     version: "{{ requiredEnv "CHART_VERSION" }}"
     values:
-      - podLabels:
+      - commonLabels:
           im: "true"
           im-default: "true"
           im-deployment-id: "{{ requiredEnv "DEPLOYMENT_ID" }}"
@@ -21,7 +21,7 @@ releases:
           hosts:
             - host: {{ requiredEnv "INSTANCE_HOSTNAME" }}
               paths:
-                - path: /{{ requiredEnv "INSTANCE_NAME" }}-pgadmin
+                - path: /{{ requiredEnv "INSTANCE_PATH_NAME" }}-pgadmin
                   pathType: Prefix
           annotations:
             cert-manager.io/cluster-issuer: cert-issuer-prod
@@ -34,12 +34,12 @@ releases:
           # TODO: https://jira.dhis2.org/browse/DEVOPS-136
           email: {{ requiredEnv "PGADMIN_USERNAME" }}
           password: {{ requiredEnv "PGADMIN_PASSWORD" | quote }}
-          contextPath: /{{ requiredEnv "INSTANCE_NAME" }}-pgadmin
+          contextPath: /{{ requiredEnv "INSTANCE_PATH_NAME" }}-pgadmin
       - serverDefinitions:
           enabled: true
           servers:
             server:
-              Name: {{ requiredEnv "INSTANCE_NAME" }}
+              Name: {{ requiredEnv "INSTANCE_PATH_NAME" }}
               Group: Servers
               Port: 5432
               Username: {{ requiredEnv "DATABASE_USERNAME" }}

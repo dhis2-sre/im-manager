@@ -4,21 +4,15 @@ import (
 	"cmp"
 	"compress/gzip"
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"log/slog"
 	"net/url"
 	"os"
-	"path"
 	"slices"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
-
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 
 	"golang.org/x/exp/maps"
 
@@ -27,21 +21,20 @@ import (
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	"github.com/dhis2-sre/im-manager/pkg/storage"
 
-	"github.com/anthhub/forwarder"
-
 	pg "github.com/habx/pg-commands"
 
 	"github.com/google/uuid"
 )
 
 //goland:noinspection GoExportedFuncWithUnexportedType
-func NewService(logger *slog.Logger, s3Bucket string, s3Client S3Client, groupService groupService, repository *repository) *service {
+func NewService(logger *slog.Logger, s3Bucket string, s3Client S3Client, groupService groupService, repository *repository, podExecutor podExecutorFunc) *service {
 	return &service{
 		logger:       logger,
 		s3Bucket:     s3Bucket,
 		s3Client:     s3Client,
 		groupService: groupService,
 		repository:   repository,
+		podExecutor:  podExecutor,
 	}
 }
 
@@ -49,12 +42,19 @@ type groupService interface {
 	Find(ctx context.Context, name string) (*model.Group, error)
 }
 
+type PodExecutor interface {
+	Exec(ctx context.Context, namespace, podName, container string, command []string, stdout, stderr io.Writer) error
+}
+
+type podExecutorFunc func(cluster model.Cluster) (PodExecutor, error)
+
 type service struct {
 	logger       *slog.Logger
 	s3Bucket     string
 	s3Client     S3Client
 	groupService groupService
 	repository   *repository
+	podExecutor  podExecutorFunc
 }
 
 type S3Client interface {
@@ -63,10 +63,7 @@ type S3Client interface {
 	Upload(ctx context.Context, bucket string, key string, body storage.ReadAtSeeker, size int64) error
 	Delete(bucket string, key string) error
 	Download(ctx context.Context, bucket string, key string, dst io.Writer, cb func(contentLength int64)) error
-	InitiateMultipartUpload(ctx context.Context, bucket, key, contentType string) (uploadID string, err error)
-	UploadPart(ctx context.Context, bucket, key, uploadID string, partNumber int, data []byte) (*types.CompletedPart, error)
-	CompleteMultipartUpload(ctx context.Context, bucket, key, uploadID string, completedParts []types.CompletedPart) error
-	AbortMultipartUpload(ctx context.Context, bucket, key, uploadID string) error
+	StreamUpload(ctx context.Context, bucket, key, contentType string, r io.Reader) (int64, error)
 }
 
 func (s service) FindByIdentifier(ctx context.Context, identifier string) (*model.Database, error) {
@@ -518,9 +515,6 @@ func getFormat(database *model.Database) string {
 }
 
 func (s service) SaveAs(ctx context.Context, userId uint, database *model.Database, instance *model.DeploymentInstance, stack *model.Stack, newName string, format string, done func(ctx context.Context, saved *model.Database)) (*model.Database, error) {
-	// TODO: Add to config
-	dumpPath := "/mnt/data/"
-
 	group, err := s.groupService.Find(ctx, instance.GroupName)
 	if err != nil {
 		return nil, err
@@ -530,6 +524,8 @@ func (s service) SaveAs(ctx context.Context, userId uint, database *model.Databa
 	if err != nil {
 		return nil, err
 	}
+	dump.Host = "localhost"
+	command := buildPgDumpCommand(dump, format)
 
 	newDatabase := &model.Database{
 		Name: newName,
@@ -544,105 +540,84 @@ func (s service) SaveAs(ctx context.Context, userId uint, database *model.Databa
 		return nil, err
 	}
 
-	// only use ctx for values (logging) and not cancellation signals since we create a go routine
-	// that outlives the HTTP request scope
 	ctx = context.WithoutCancel(ctx)
 	go func() {
-		var ret *forwarder.Result
-		if group.Cluster.Configuration != nil {
-			hostname, err := stack.ParameterProviders["DATABASE_HOSTNAME"].Provide(*instance)
-			if err != nil {
-				s.logError(ctx, err)
-				return
-			}
-
-			options := []*forwarder.Option{
-				{
-					RemotePort:  5432,
-					ServiceName: hostname,
-					Namespace:   instance.Group.Namespace,
-				},
-			}
-
-			kubeConfig, err := decryptYaml(group.Cluster.Configuration)
-			if err != nil {
-				s.logError(ctx, err)
-				return
-			}
-
-			ret, err = forwarder.WithForwardersEmbedConfig(context.Background(), options, kubeConfig)
-			if err != nil {
-				s.logError(ctx, err)
-				return
-			}
-			defer ret.Close()
-
-			ports, err := ret.Ready()
-			if err != nil {
-				s.logError(ctx, err)
-				return
-			}
-
-			dump.Host = "localhost"
-			dump.Port = int(ports[0][0].Local)
-		}
-
-		dump.SetPath(dumpPath)
-		fileId := uuid.New().String()
-		dump.SetFileName(fileId + ".dump")
-		dump.SetupFormat(format)
-
-		// TODO: Remove... Or at least make configurable
-		//dump.EnableVerbose()
-
-		dumpExec := dump.Exec(pg.ExecOptions{StreamPrint: true, StreamDestination: os.Stdout})
-		if dumpExec.Error != nil {
-			s.logger.ErrorContext(ctx, "Failed to dump DB", "error", dumpExec.Error.Err, "dumpOutput", dumpExec.Output)
-			return
-		}
-
-		dumpFile := path.Join(dumpPath, dumpExec.File)
-		file, err := os.Open(dumpFile) // #nosec
-		if err != nil {
-			s.logError(ctx, err)
-			return
-		}
-		defer s.removeTempFile(ctx, file)
-
-		if format == "plain" {
-			gzFileName := path.Join(dumpPath, fileId+".gz")
-			file, err = s.gz(ctx, gzFileName, database, file)
-			if err != nil {
-				s.logError(ctx, err)
-				return
-			}
-
-			defer s.removeTempFile(ctx, file)
-		}
-
-		stat, err := file.Stat()
+		podExecutor, err := s.podExecutor(group.Cluster)
 		if err != nil {
 			s.logError(ctx, err)
 			return
 		}
 
-		// This is added due to the following issue - https://github.com/aws/aws-sdk-go/issues/1962
-		_, err = file.Seek(0, 0)
-		if err != nil {
+		hostname := fmt.Sprintf(stack.HostnamePattern, instance.Name, instance.Group.Namespace)
+		// TODO: get pod by label selector instead
+		podName := strings.Split(hostname, ".")[0] + "-0"
+		namespace := instance.Group.Namespace
+
+		pr, pw := io.Pipe()
+
+		key := fmt.Sprintf("%s/%s", group.Name, newDatabase.Name)
+
+		type uploadResult struct {
+			size int64
+			err  error
+		}
+		uploadDone := make(chan uploadResult, 1)
+		go func() {
+			defer pr.Close()
+			size, err := s.s3Client.StreamUpload(ctx, s.s3Bucket, key, "application/octet-stream", pr)
+			uploadDone <- uploadResult{size, err}
+		}()
+
+		s.logger.InfoContext(ctx, "starting pg_dump", "pod", podName, "namespace", namespace, "command", strings.Join(command, " "))
+
+		if err := execPgDump(ctx, podExecutor, namespace, podName, command, pw, format, newDatabase.Name); err != nil {
+			s.logger.ErrorContext(ctx, "failed to exec pg_dump", "error", err)
+			<-uploadDone
+			return
+		}
+
+		result := <-uploadDone
+		if result.err != nil {
+			s.logError(ctx, result.err)
+			return
+		}
+
+		newDatabase.Url = fmt.Sprintf("s3://%s/%s", s.s3Bucket, key)
+		newDatabase.Size = result.size
+		if err := s.repository.Save(ctx, newDatabase); err != nil {
 			s.logError(ctx, err)
 			return
 		}
 
-		_, err = s.Upload(ctx, newDatabase, group, file, stat.Size())
-		if err != nil {
-			s.logError(ctx, err)
-			return
-		}
-
+		s.logger.InfoContext(ctx, "pg_dump completed successfully", "key", key, "size", result.size)
 		done(ctx, newDatabase)
 	}()
 
 	return newDatabase, nil
+}
+
+func execPgDump(ctx context.Context, executor PodExecutor, namespace, podName string, command []string, pw *io.PipeWriter, format string, databaseName string) error {
+	var execWriter io.WriteCloser = pw
+	var gzWriter *gzip.Writer
+	if format == "plain" {
+		gzWriter = gzip.NewWriter(pw)
+		gzWriter.Name = strings.TrimSuffix(databaseName, ".gz")
+		execWriter = gzWriter
+	}
+
+	var stderrBuf strings.Builder
+	execErr := executor.Exec(ctx, namespace, podName, "postgresql", command, execWriter, &stderrBuf)
+
+	if gzWriter != nil {
+		gzWriter.Close()
+	}
+
+	if execErr != nil {
+		pw.CloseWithError(execErr)
+		return fmt.Errorf("%w: %s", execErr, stderrBuf.String())
+	}
+	pw.Close()
+	return nil
 }
 
 func (s service) logError(ctx context.Context, err error) {
@@ -678,13 +653,6 @@ func (s service) gz(ctx context.Context, gzFile string, database *model.Database
 	if err != nil {
 		return nil, err
 	}
-
-	defer func(src *os.File) {
-		err := src.Close()
-		if err != nil {
-			s.logger.ErrorContext(ctx, "Failed to close file", "error", err)
-		}
-	}(src)
 
 	return outFile, nil
 }
@@ -729,100 +697,36 @@ func newPgDumpConfig(instance *model.DeploymentInstance, stack *model.Stack) (*p
 	return dump, nil
 }
 
+func buildPgDumpCommand(dump *pg.Dump, format string) []string {
+	options := dump.Options
+	options = append(options, dump.Postgres.Parse()...)
+	options = append(options, fmt.Sprintf("-F%s", format))
+	options = append(options, dump.IgnoreTableDataToString()...)
+
+	cmd := fmt.Sprintf("PGPASSWORD=%s pg_dump %s", dump.Password, strings.Join(options, " "))
+	return []string{"sh", "-c", cmd}
+}
+
 func (s service) StreamUpload(ctx context.Context, database model.Database, group *model.Group, body io.Reader, contentType string, contentLength int64) (model.Database, error) {
 	ctx = context.WithoutCancel(ctx)
-	stats := newUploadStats(contentLength)
 
 	key := fmt.Sprintf("%s/%s", group.Name, database.Name)
-	uploadID, err := s.s3Client.InitiateMultipartUpload(ctx, s.s3Bucket, key, contentType)
+	s.logger.InfoContext(ctx, "Uploading started", "database", database.Name, "group", group.Name)
+
+	start := time.Now()
+	size, err := s.s3Client.StreamUpload(ctx, s.s3Bucket, key, contentType, body)
 	if err != nil {
-		return model.Database{}, fmt.Errorf("failed to initiate multipart upload: %w", err)
+		return model.Database{}, err
 	}
 
-	s.logger.InfoContext(ctx, "Uploading started", "database", database.Name, "group", group.Name, "uploadId", uploadID)
-
-	var parts []types.CompletedPart
-	partNumber := 1
-
-	// Use 10MB chunks
-	const chunkSize = 10 * 1024 * 1024
-	buffer := make([]byte, chunkSize)
-
-	defer func() {
-		if err != nil {
-			_ = s.s3Client.AbortMultipartUpload(ctx, s.s3Bucket, key, uploadID)
-		}
-	}()
-
-	for {
-		n, err := io.ReadFull(body, buffer)
-		// Handle fatal errors
-		if err != nil && err != io.EOF && !errors.Is(err, io.ErrUnexpectedEOF) {
-			return model.Database{}, fmt.Errorf("failed to read from stream: %w", err)
-		}
-
-		// No data read, we're done
-		if n == 0 {
-			break
-		}
-
-		partResp, err := s.s3Client.UploadPart(ctx, s.s3Bucket, key, uploadID, partNumber, buffer[:n])
-		if err != nil {
-			return model.Database{}, fmt.Errorf("failed to upload part %d: %w", partNumber, err)
-		}
-
-		parts = append(parts, types.CompletedPart{
-			ETag:       partResp.ETag,
-			PartNumber: aws.Int32(int32(partNumber)),
-		})
-
-		stats.increment(n)
-		s.logger.InfoContext(ctx, "Uploading progress", "partNumber", partNumber, "bytes", n, "database", database.Name, "group", group.Name, "uploadId", uploadID)
-		partNumber++
-
-		// If we got ErrUnexpectedEOF, it means we got a partial read and we're done
-		if errors.Is(err, io.ErrUnexpectedEOF) {
-			break
-		}
-	}
-
-	err = s.s3Client.CompleteMultipartUpload(ctx, s.s3Bucket, key, uploadID, parts)
-	if err != nil {
-		return model.Database{}, fmt.Errorf("failed to complete multipart upload: %w", err)
-	}
-
-	stats.log(s.logger)
+	s.logger.InfoContext(ctx, "Upload completed", "contentLength", contentLength, "bytesProcessed", size, "duration", time.Since(start))
 
 	database.Url = fmt.Sprintf("s3://%s/%s", s.s3Bucket, key)
-	database.Size = stats.BytesProcessed
+	database.Size = size
 	err = s.repository.Save(ctx, &database)
 	if err != nil {
 		return model.Database{}, fmt.Errorf("failed to save database record: %w", err)
 	}
 
 	return database, nil
-}
-
-func newUploadStats(contentLength int64) *uploadStats {
-	return &uploadStats{StartTime: time.Now(), ContentLength: contentLength}
-}
-
-type uploadStats struct {
-	PartsProcessed int64
-	BytesProcessed int64
-	ContentLength  int64
-	StartTime      time.Time
-	mu             sync.Mutex
-}
-
-func (us *uploadStats) increment(size int) {
-	us.mu.Lock()
-	defer us.mu.Unlock()
-	us.PartsProcessed++
-	us.BytesProcessed += int64(size)
-}
-
-func (us *uploadStats) log(logger *slog.Logger) {
-	duration := time.Since(us.StartTime)
-	logger.Info("Upload completed", "partsProcessed", us.PartsProcessed, "contentLength", us.ContentLength, "bytesProcessed", us.BytesProcessed, "duration", duration)
 }
