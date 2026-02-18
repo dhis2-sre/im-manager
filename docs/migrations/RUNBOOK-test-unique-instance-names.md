@@ -63,8 +63,7 @@ python3 backup_group_dbs.py \
   --group "$GROUP" \
   --out ./$GROUP-db-backups.json \
   --host "$IM_HOST" \
-  --token "$ACCESS_TOKEN" \
-  --limit 10
+  --token "$ACCESS_TOKEN"
 ```
 
 Check the file:
