@@ -17,25 +17,25 @@ releases:
       - ingress:
           enabled: true
           hostname: {{ requiredEnv "INSTANCE_HOSTNAME" }}
-          path: /{{ requiredEnv "INSTANCE_NAME" }}
+          path: /{{ requiredEnv "INSTANCE_PATH_NAME" }}
           certIssuer: cert-issuer-prod
           annotations:
             nginx.ingress.kubernetes.io/proxy-body-size: 128m
       - dhis2Home: "{{ requiredEnv "DHIS2_HOME" }}"
-      - catalinaOpts: "-Dcontext.path=/{{ requiredEnv "INSTANCE_NAME" }} -Dcontext.sameSiteCookies={{ requiredEnv "SAME_SITE_COOKIES" }}"
-      - contextPath: /{{ requiredEnv "INSTANCE_NAME" }}
+      - catalinaOpts: "-Dcontext.path=/{{ requiredEnv "INSTANCE_PATH_NAME" }} -Dcontext.sameSiteCookies={{ requiredEnv "SAME_SITE_COOKIES" }}"
+      - contextPath: /{{ requiredEnv "INSTANCE_PATH_NAME" }}
       - javaOpts: "{{ requiredEnv "JAVA_OPTS" }}"
       - minReadySeconds: {{ requiredEnv "MIN_READY_SECONDS" }}
       - startupProbe:
           failureThreshold: {{ requiredEnv "STARTUP_PROBE_FAILURE_THRESHOLD" }}
           periodSeconds: {{ requiredEnv "STARTUP_PROBE_PERIOD_SECONDS" }}
-          path: /{{ requiredEnv "INSTANCE_NAME" }}
+          path: /{{ requiredEnv "INSTANCE_PATH_NAME" }}
       - livenessProbe:
           timeoutSeconds: {{ requiredEnv "LIVENESS_PROBE_TIMEOUT_SECONDS" }}
-          path: /{{ requiredEnv "INSTANCE_NAME" }}
+          path: /{{ requiredEnv "INSTANCE_PATH_NAME" }}
       - readinessProbe:
           timeoutSeconds: {{ requiredEnv "READINESS_PROBE_TIMEOUT_SECONDS" }}
-          path: /{{ requiredEnv "INSTANCE_NAME" }}
+          path: /{{ requiredEnv "INSTANCE_PATH_NAME" }}
       - commonLabels:
           im: "true"
           im-default: "true"
@@ -104,10 +104,10 @@ releases:
       - glowroot:
           enabled: {{ requiredEnv "DEPLOY_GLOWROOT" }}
           ingress:
-            path: /{{ requiredEnv "INSTANCE_NAME" }}-glowroot
+            path: /{{ requiredEnv "INSTANCE_PATH_NAME" }}-glowroot
           config:
             web:
-              contextPath: /{{ requiredEnv "INSTANCE_NAME" }}-glowroot
+              contextPath: /{{ requiredEnv "INSTANCE_PATH_NAME" }}-glowroot
 
 repositories:
   - name: dhis2

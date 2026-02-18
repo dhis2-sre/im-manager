@@ -831,7 +831,7 @@ func (s Service) FilestoreBackup(ctx context.Context, instance *model.Deployment
 
 	if group.Cluster.Configuration != nil {
 		// TODO: Don't hard code the service name, use a provider as done for the database backup
-		hostname := fmt.Sprintf("%s-%d-minio.%s.svc", instance.Name, instance.Group.ID, instance.GroupName)
+		hostname := fmt.Sprintf("%s-%d-minio.%s.svc", instance.Name, instance.Group.ID, instance.Group.Namespace)
 		serviceName := strings.Split(hostname, ".")[0]
 		options := []*forwarder.Option{
 			{
