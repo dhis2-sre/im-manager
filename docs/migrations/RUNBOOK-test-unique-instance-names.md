@@ -143,6 +143,38 @@ Confirm instances come up and DHIS2/PgAdmin can reach the DB (hostname format `{
 
 ---
 
+## Phase 6b: Uninstall orphaned Helm releases
+
+After reset, the cluster still has the **old** Helm releases (names without the group-id segment), e.g. `migrate-test-dhis2-1`, `migrate-test-dhis2-1-database`, `migrate-test-dhis2-1-minio`. The **new** releases (e.g. `migrate-test-dhis2-1-1`, `migrate-test-dhis2-1-1-database`) are the ones in use. Remove the orphaned ones so only the new releases remain.
+
+**Prerequisite:** `kubectl` context set to the cluster where the group’s instances run. Set the namespace (e.g. your group’s namespace, often `dev`) and the path to the **same backup JSON** used in Phase 2/6 (e.g. `./scripts/instances/$GROUP-db-backups.json` or wherever you saved it):
+
+```bash
+export NAMESPACE=dev
+BACKUP_JSON=./scripts/instances/$GROUP-db-backups.json   # or your path
+```
+
+Uninstall old-format releases for every deployment in the backup file. Deployment names are read from the `deploymentName` field so this works for any number of deployments with any names (e.g. prod). For each possible release (core, `-database`, `-minio`, `-pgadmin`) we only run `helm uninstall` if that release exists; that way deployments without pgadmin (or already cleaned) don't produce errors, and real failures (e.g. uninstall stuck, wrong namespace) are still visible:
+
+```bash
+for name in $(jq -r '.items[].deploymentName' "$BACKUP_JSON" | sort -u); do
+  for suffix in "" "-database" "-minio" "-pgadmin"; do
+    release="${name}${suffix}"
+    if helm status "$release" -n "$NAMESPACE" &>/dev/null; then
+      helm uninstall "$release" -n "$NAMESPACE" --wait
+    fi
+  done
+done
+```
+
+Verify only the new releases remain (names with the extra group-id segment):
+
+```bash
+helm list --namespace "$NAMESPACE" --short
+```
+
+---
+
 ## Phase 7: Restore DATABASE_ID to original values
 
 After reset, set each dhis2-db instance's DATABASE_ID parameter back to the original (pre–save-as) database id so the deployment uses the original database. The backup JSON must include `originalDatabaseId` per item (produced by the backup script in Phase 2).
