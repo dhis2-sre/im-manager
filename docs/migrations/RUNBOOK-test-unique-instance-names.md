@@ -105,7 +105,7 @@ export DATABASE_USERNAME=<IM_DB_USER>
 export DATABASE_PASSWORD=<IM_DB_PASSWORD>
 export DATABASE_NAME=<IM_DB_NAME>
 
-go run ./cmd/migrate-unique-instance-names \
+go run ../../cmd/migrate-unique-instance-names \
   -json-file ./$GROUP-db-backups.json \
   -dry-run
 ```
@@ -121,20 +121,18 @@ Replace `<IM_DB_USER>`, `<IM_DB_PASSWORD>`, `<IM_DB_NAME>` with the IM Postgres 
 Same terminal (port-forward still running), **without** `-dry-run`:
 
 ```bash
-go run ./cmd/migrate-unique-instance-names -json-file ./$GROUP-db-backups.json
+go run ../../cmd/migrate-unique-instance-names -json-file ./$GROUP-db-backups.json
 ```
 
 Then **reset** all deployments in the group so instances are recreated with the new pod names. From `scripts/instances` (with `$GROUP` and auth set):
 
 ```bash
-cd scripts/instances
 ./reset-group-deployments.sh "$GROUP"
 ```
 
 Or inline (reuse `.deployments.json` if you already have it, or run `./findDeployments.sh > .deployments.json` first):
 
 ```bash
-cd scripts/instances
 ./findDeployments.sh > .deployments.json
 for inst_id in $(jq -r ".[] | select(.name==\"$GROUP\") | .deployments[] | .instances[]? | .id" .deployments.json); do
   ./reset.sh "$inst_id"
@@ -155,8 +153,8 @@ From **repo root** (same terminal as Phase 5/6), with the backup JSON path match
 
 ```bash
 # Optional: dry-run first
-go run ./cmd/restore-database-ids -json-file ./$GROUP-db-backups.json -dry-run
+go run ../../cmd/restore-database-ids -json-file ./$GROUP-db-backups.json -dry-run
 
 # Apply
-go run ./cmd/restore-database-ids -json-file ./$GROUP-db-backups.json
+go run ../../cmd/restore-database-ids -json-file ./$GROUP-db-backups.json
 ```
