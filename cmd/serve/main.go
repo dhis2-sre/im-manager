@@ -168,7 +168,7 @@ func run() (err error) {
 		return err
 	}
 
-	instanceService, err := newInstanceService(logger, db, stackService, groupService, awsS3Client)
+	instanceService, err := newInstanceService(logger, db, stackService, groupService, awsS3Client, tokenService)
 	if err != nil {
 		return err
 	}
@@ -424,6 +424,7 @@ func getPrivateKey(ctx context.Context, logger *slog.Logger) (*rsa.PrivateKey, e
 func newStackService() (stack.Service, error) {
 	stacks, err := stack.New(
 		stack.DHIS2DB,
+		stack.MINIO,
 		stack.DHIS2Core,
 		stack.DHIS2,
 		stack.PgAdmin,
@@ -437,7 +438,7 @@ func newStackService() (stack.Service, error) {
 	return stack.NewService(stacks), nil
 }
 
-func newInstanceService(logger *slog.Logger, db *gorm.DB, stackService stack.Service, groupService *group.Service, s3Client *s3.Client) (*instance.Service, error) {
+func newInstanceService(logger *slog.Logger, db *gorm.DB, stackService stack.Service, groupService *group.Service, s3Client *s3.Client, tokenService *token.TokenService) (*instance.Service, error) {
 	instanceParameterEncryptionKey, err := requireEnv("INSTANCE_PARAMETER_ENCRYPTION_KEY")
 	if err != nil {
 		return nil, err
@@ -454,7 +455,7 @@ func newInstanceService(logger *slog.Logger, db *gorm.DB, stackService stack.Ser
 		return nil, err
 	}
 
-	return instance.NewService(logger, instanceRepository, groupService, stackService, helmfileService, s3Client, s3Bucket), nil
+	return instance.NewService(logger, instanceRepository, groupService, stackService, helmfileService, s3Client, s3Bucket, tokenService), nil
 }
 
 type rabbitMQConfig struct {
@@ -520,7 +521,9 @@ func newDatabaseHandler(ctx context.Context, logger *slog.Logger, db *gorm.DB, g
 		return database.Handler{}, err
 	}
 	databaseRepository := database.NewRepository(db)
-	databaseService := database.NewService(logger, s3Bucket, s3Client, groupService, databaseRepository)
+	databaseService := database.NewService(logger, s3Bucket, s3Client, groupService, databaseRepository, func(c model.Cluster) (database.PodExecutor, error) {
+		return instance.NewKubernetesService(c)
+	})
 
 	return database.NewHandler(logger, databaseService, groupService, instanceService, stackService), nil
 }
