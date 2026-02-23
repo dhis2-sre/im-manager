@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+set -e
+
 USER_NAME=$1
 NAMESPACE=$2
 
