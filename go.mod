@@ -11,7 +11,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.96.1
 	github.com/docker/go-connections v0.6.0
 	github.com/dominikbraun/graph v0.23.0
-	github.com/getsops/sops/v3 v3.12.0
+	github.com/getsops/sops/v3 v3.12.1
 	github.com/gin-contrib/cors v1.7.6
 	github.com/gin-contrib/sse v1.1.0
 	github.com/gin-gonic/gin v1.11.0
