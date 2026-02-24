@@ -1,4 +1,10 @@
-# Runbook: Test unique-instance-names migration (copy-paste)
+# migrate-unique-instance-names
+
+One-off migration: updates DATABASE_HOSTNAME and DATABASE_ID for deployment instances after merging feat/unique-instance-names. Read the backup JSON from backup_group_dbs.py, then run with `-dry-run` first, then without to apply.
+
+---
+
+## Runbook: Test unique-instance-names migration (copy-paste)
 
 **Goal:** 5 DHIS2 (dhis2-core + dhis2-db) + 5 DHIS2+PgAdmin (dhis2-core + dhis2-db + pgadmin) on **master**, back up, switch IM to **feat/unique-instance-names**, then run migration (dry-run then optionally apply).
 
@@ -14,7 +20,7 @@ export HTTP="http --verify=no --check-status"
 
 ---
 
-## Phase 1: IM on **master** — create 10 deployments
+### Phase 1: IM on **master** — create 10 deployments
 
 From repo root:
 
@@ -54,7 +60,7 @@ Wait until all 10 deployments are running (DHIS2 and DB up; PgAdmin up for the 5
 
 ---
 
-## Phase 2: Backup (still on **master**)
+### Phase 2: Backup (still on **master**)
 
 Still from `scripts/instances/` dir:
 
@@ -76,13 +82,13 @@ Should be 10. Keep `./$GROUP-db-backups.json` for the next phases.
 
 ---
 
-## Phase 3: Deploy **feat/unique-instance-names** on IM
+### Phase 3: Deploy **feat/unique-instance-names** on IM
 
 **Do this in your cluster/CI:** switch IM to the `feat/unique-instance-names` branch and deploy so the IM restarts. The `groups` table will get an `id` column via AutoMigrate.
 
 ---
 
-## Phase 4: Port-forward to IM Postgres
+### Phase 4: Port-forward to IM Postgres
 
 In a **dedicated terminal** (leave it open):
 
@@ -94,7 +100,7 @@ Replace `<IM_NAMESPACE>` and `<IM_POSTGRES_SVC>` with your IM Postgres namespace
 
 ---
 
-## Phase 5: Run migration (dry-run)
+### Phase 5: Run migration (dry-run)
 
 In **another terminal**, from **repo root**:
 
@@ -105,8 +111,8 @@ export DATABASE_USERNAME=<IM_DB_USER>
 export DATABASE_PASSWORD=<IM_DB_PASSWORD>
 export DATABASE_NAME=<IM_DB_NAME>
 
-go run ../../cmd/migrate-unique-instance-names \
-  -json-file ./$GROUP-db-backups.json \
+go run ./cmd/migrate-unique-instance-names \
+  -json-file ./scripts/instances/$GROUP-db-backups.json \
   -dry-run
 ```
 
@@ -116,12 +122,12 @@ Replace `<IM_DB_USER>`, `<IM_DB_PASSWORD>`, `<IM_DB_NAME>` with the IM Postgres 
 
 ---
 
-## Phase 6 (optional): Apply migration and verify
+### Phase 6 (optional): Apply migration and verify
 
 Same terminal (port-forward still running), **without** `-dry-run`:
 
 ```bash
-go run ../../cmd/migrate-unique-instance-names -json-file ./$GROUP-db-backups.json
+go run ./cmd/migrate-unique-instance-names -json-file ./scripts/instances/$GROUP-db-backups.json
 ```
 
 Then **reset** all deployments in the group so instances are recreated with the new pod names. From `scripts/instances` (with `$GROUP` and auth set):
@@ -143,11 +149,11 @@ Confirm instances come up and DHIS2/PgAdmin can reach the DB (hostname format `{
 
 ---
 
-## Phase 6b: Uninstall orphaned Helm releases
+### Phase 6b: Uninstall orphaned Helm releases
 
 After reset, the cluster still has the **old** Helm releases (names without the group-id segment), e.g. `migrate-test-dhis2-1`, `migrate-test-dhis2-1-database`, `migrate-test-dhis2-1-minio`. The **new** releases (e.g. `migrate-test-dhis2-1-1`, `migrate-test-dhis2-1-1-database`) are the ones in use. Remove the orphaned ones so only the new releases remain.
 
-**Prerequisite:** `kubectl` context set to the cluster where the group’s instances run. Set the namespace (e.g. your group’s namespace, often `dev`) and the path to the **same backup JSON** used in Phase 2/6 (e.g. `./scripts/instances/$GROUP-db-backups.json` or wherever you saved it):
+**Prerequisite:** `kubectl` context set to the cluster where the group's instances run. Set the namespace (e.g. your group's namespace, often `dev`) and the path to the **same backup JSON** used in Phase 2/6 (e.g. `./scripts/instances/$GROUP-db-backups.json` or wherever you saved it):
 
 ```bash
 export NAMESPACE=dev
@@ -175,18 +181,18 @@ helm list --namespace "$NAMESPACE" --short
 
 ---
 
-## Phase 7: Restore DATABASE_ID to original values
+### Phase 7: Restore DATABASE_ID to original values
 
 After reset, set each dhis2-db instance's DATABASE_ID parameter back to the original (pre–save-as) database id so the deployment uses the original database. The backup JSON must include `originalDatabaseId` per item (produced by the backup script in Phase 2).
 
-**Prerequisite:** Same backup JSON used for the migration (e.g. `./$GROUP-db-backups.json` from `scripts/instances`), port-forward to IM Postgres still running (same as Phase 5/6), and `DATABASE_*` env set.
+**Prerequisite:** Same backup JSON used for the migration (e.g. `./scripts/instances/$GROUP-db-backups.json`), port-forward to IM Postgres still running (same as Phase 5/6), and `DATABASE_*` env set.
 
-From **repo root** (same terminal as Phase 5/6), with the backup JSON path matching where you ran the migration (e.g. `./$GROUP-db-backups.json` if the file is in the current directory, or `./scripts/instances/$GROUP-db-backups.json` if it is in scripts/instances):
+From **repo root** (same terminal as Phase 5/6):
 
 ```bash
 # Optional: dry-run first
-go run ../../cmd/restore-database-ids -json-file ./$GROUP-db-backups.json -dry-run
+go run ./cmd/restore-database-ids -json-file ./scripts/instances/$GROUP-db-backups.json -dry-run
 
 # Apply
-go run ../../cmd/restore-database-ids -json-file ./$GROUP-db-backups.json
+go run ./cmd/restore-database-ids -json-file ./scripts/instances/$GROUP-db-backups.json
 ```

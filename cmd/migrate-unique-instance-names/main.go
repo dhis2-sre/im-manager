@@ -1,6 +1,4 @@
-// One-off migration: updates DATABASE_HOSTNAME and DATABASE_ID for deployment instances
-// after merging feat/unique-instance-names. Read the backup JSON from backup_group_dbs.py,
-// then run with -dry-run first, then without to apply.
+// One-off migration for unique-instance-names. See README.md in this directory.
 package main
 
 import (
