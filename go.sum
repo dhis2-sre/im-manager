@@ -131,8 +131,8 @@ github.com/aws/aws-sdk-go-v2/credentials v1.19.10 h1:EEhmEUFCE1Yhl7vDhNOI5OCL/iK
 github.com/aws/aws-sdk-go-v2/credentials v1.19.10/go.mod h1:RnnlFCAlxQCkN2Q379B67USkBMu1PipEEiibzYN5UTE=
 github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.18.18 h1:Ii4s+Sq3yDfaMLpjrJsqD6SmG/Wq/P5L/hw2qa78UAY=
 github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.18.18/go.mod h1:6x81qnY++ovptLE6nWQeWrpXxbnlIex+4H4eYYGcqfc=
-github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.22.2 h1:1i1SUOTLk0TbMh7+eJYxgv1r1f47BfR69LL6yaELoI0=
-github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.22.2/go.mod h1:bo7DhmS/OyVeAJTC768nEk92YKWskqJ4gn0gB5e59qQ=
+github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.22.3 h1:+mQ8NQBh7B7c2FBtppRnwkrmuwFON1XQQ+5yblomZKk=
+github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.22.3/go.mod h1:u67RKh3BRmS4FYLH+rN3N4T5fqpd9m2ttAwBJYEdosU=
 github.com/aws/aws-sdk-go-v2/internal/configsources v1.4.18 h1:F43zk1vemYIqPAwhjTjYIz0irU2EY7sOb/F5eJ3HuyM=
 github.com/aws/aws-sdk-go-v2/internal/configsources v1.4.18/go.mod h1:w1jdlZXrGKaJcNoL+Nnrj+k5wlpGXqnNrKoP22HvAug=
 github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.7.18 h1:xCeWVjj0ki0l3nruoyP2slHsGArMxeiiaoPN5QZH6YQ=
@@ -290,8 +290,8 @@ github.com/gabriel-vasile/mimetype v1.4.13 h1:46nXokslUBsAJE/wMsp5gtO500a4F3Nkz9
 github.com/gabriel-vasile/mimetype v1.4.13/go.mod h1:d+9Oxyo1wTzWdyVUPMmXFvp4F9tea18J8ufA774AB3s=
 github.com/getsops/gopgagent v0.0.0-20241224165529-7044f28e491e h1:y/1nzrdF+RPds4lfoEpNhjfmzlgZtPqyO3jMzrqDQws=
 github.com/getsops/gopgagent v0.0.0-20241224165529-7044f28e491e/go.mod h1:awFzISqLJoZLm+i9QQ4SgMNHDqljH6jWV0B36V5MrUM=
-github.com/getsops/sops/v3 v3.12.0 h1:n/hD+bINWzCPE+7VjVu0jb6dm+nItmGQuhcUBsLQzCk=
-github.com/getsops/sops/v3 v3.12.0/go.mod h1:Bs/geuL5shRiXi194TQaGFiLvzVpA6U8tTYRd84qdvM=
+github.com/getsops/sops/v3 v3.12.1 h1:DZzLNJx6EH4SZvMjI1Y814WIcOQNUtOP3WgDsHNqQTU=
+github.com/getsops/sops/v3 v3.12.1/go.mod h1:Bs/geuL5shRiXi194TQaGFiLvzVpA6U8tTYRd84qdvM=
 github.com/ghodss/yaml v1.0.0/go.mod h1:4dBDuWmgqj2HViK6kFavaiC9ZROes6MMH2rRYeMEF04=
 github.com/gin-contrib/cors v1.7.6 h1:3gQ8GMzs1Ylpf70y8bMw4fVpycXIeX1ZemuSQIsnQQY=
 github.com/gin-contrib/cors v1.7.6/go.mod h1:Ulcl+xN4jel9t1Ry8vqph23a60FwH9xVLd+3ykmTjOk=
