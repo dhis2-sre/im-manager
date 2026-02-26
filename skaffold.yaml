@@ -2,7 +2,7 @@
   createNamespace: true
   remoteChart: im-group
   repo: https://dhis2-sre.github.io/im-group
-  version: 0.3.0
+  version: 0.4.0
 
 .im-group-prod-service-account-config: &im-group-prod-service-account-config
   setValues:
