@@ -3,6 +3,7 @@ package database_test
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -19,33 +20,29 @@ import (
 	awss3 "github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/dhis2-sre/im-manager/pkg/database"
+	"github.com/dhis2-sre/im-manager/pkg/instance"
 	"github.com/dhis2-sre/im-manager/pkg/inttest"
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	"github.com/dhis2-sre/im-manager/pkg/storage"
+	userpkg "github.com/dhis2-sre/im-manager/pkg/user"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gorm.io/gorm"
 )
 
 func TestDatabaseHandler(t *testing.T) {
 	t.Parallel()
 
-	db := inttest.SetupDB(t)
-
-	s3Dir := t.TempDir()
-	s3Bucket := "database-bucket"
-	err := os.Mkdir(s3Dir+"/"+s3Bucket, 0o755)
-	require.NoError(t, err, "failed to create S3 output bucket")
-	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	s3 := inttest.SetupS3(t, s3Dir)
-	uploader := manager.NewUploader(s3.Client)
-	s3Client := storage.NewS3Client(logger, s3.Client, uploader)
+	env := setupDatabaseHandlerEnv(t)
+	db := env.db
+	var err error
 
 	databaseRepository := database.NewRepository(db)
-	databaseService := database.NewService(logger, s3Bucket, s3Client, groupService{}, databaseRepository, nil)
+	databaseService := database.NewService(env.logger, env.s3Bucket, env.s3Client, groupService{}, databaseRepository, nil)
 
 	client := inttest.SetupHTTPServer(t, func(engine *gin.Engine) {
-		databaseHandler := database.NewHandler(logger, databaseService, groupService{groupName: "packages"}, instanceService{}, stackService{})
+		databaseHandler := database.NewHandler(env.logger, databaseService, groupService{groupName: "packages"}, instanceService{}, stackService{})
 		authenticator := func(c *gin.Context) {
 			ctx := model.NewContextWithUser(c.Request.Context(), &model.User{
 				ID:    1,
@@ -63,17 +60,7 @@ func TestDatabaseHandler(t *testing.T) {
 
 	var userID uint
 	{
-		group := &model.Group{
-			Name:     "group-name",
-			Hostname: "some",
-		}
-		user := &model.User{
-			Email: "user1@dhis2.org",
-			Groups: []model.Group{
-				*group,
-			},
-		}
-		db.Create(user)
+		user, _ := userpkg.CreateTestUserWithGroup(db, "group-name", "some", "", "user1@dhis2.org")
 		userID = user.ID
 	}
 
@@ -94,7 +81,7 @@ func TestDatabaseHandler(t *testing.T) {
 		require.Equal(t, "s3://database-bucket/packages/path/name.extension", database.Url)
 		require.Equal(t, int64(13), database.Size)
 
-		actualContent := s3.GetObject(t, s3Bucket, "packages/path/name.extension")
+		actualContent := env.s3.GetObject(t, env.s3Bucket, "packages/path/name.extension")
 		require.Equalf(t, "file contents", string(actualContent), "DB in S3 should have expected content")
 
 		databaseID = strconv.FormatUint(uint64(database.ID), 10)
@@ -149,7 +136,7 @@ func TestDatabaseHandler(t *testing.T) {
 			require.Equal(t, "packages", actualDB.GroupName)
 			assert.Equal(t, userID, actualDB.UserID)
 
-			actualContent := s3.GetObject(t, s3Bucket, "packages/path/copy.extension")
+			actualContent := env.s3.GetObject(t, env.s3Bucket, "packages/path/copy.extension")
 			require.Equalf(t, "file contents", string(actualContent), "DB in S3 should have expected content")
 		}
 
@@ -183,7 +170,7 @@ func TestDatabaseHandler(t *testing.T) {
 			require.Equal(t, "path/rename.extension", actualDB.Name)
 			require.Equal(t, "packages", actualDB.GroupName)
 
-			actualContent := s3.GetObject(t, s3Bucket, "packages/path/rename.extension")
+			actualContent := env.s3.GetObject(t, env.s3Bucket, "packages/path/rename.extension")
 			require.Equalf(t, "file contents", string(actualContent), "DB in S3 should have expected content")
 		}
 
@@ -264,8 +251,8 @@ func TestDatabaseHandler(t *testing.T) {
 
 		client.Delete(t, "/databases/"+databaseID)
 
-		_, err = s3.Client.GetObject(context.TODO(), &awss3.GetObjectInput{
-			Bucket: aws.String(s3Bucket),
+		_, err = env.s3.Client.GetObject(context.TODO(), &awss3.GetObjectInput{
+			Bucket: aws.String(env.s3Bucket),
 			Key:    aws.String("packages/path/name.extension"),
 		})
 		var e *types.NoSuchKey
@@ -275,58 +262,36 @@ func TestDatabaseHandler(t *testing.T) {
 	t.Run("SaveAs", func(t *testing.T) {
 		t.Parallel()
 
-		db := inttest.SetupDB(t)
+		env := setupDatabaseHandlerEnv(t)
+		db := env.db
 
-		s3Dir := t.TempDir()
-		s3Bucket := "database-bucket"
-		require.NoError(t, os.Mkdir(s3Dir+"/"+s3Bucket, 0o755))
-		logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-		s3 := inttest.SetupS3(t, s3Dir)
-		uploader := manager.NewUploader(s3.Client)
-		s3Client := storage.NewS3Client(logger, s3.Client, uploader)
+		user, group := userpkg.CreateTestUserWithGroup(db, "packages", "some", "ns", "user1@dhis2.org")
 
-		group := &model.Group{
-			Name:      "packages",
-			Hostname:  "some",
-			Namespace: "ns",
-		}
-		user := &model.User{
-			Email:  "user1@dhis2.org",
-			Groups: []model.Group{*group},
-		}
-		db.Create(user)
-
-		sourceDB := &model.Database{
-			Name:      "source-db",
-			GroupName: "packages",
-			Type:      "database",
-			Url:       "s3://database-bucket/packages/source-db",
-			UserID:    user.ID,
-		}
-		db.Create(sourceDB)
+		sourceDB := database.CreateTestDatabaseRecord(
+			db,
+			"source-db",
+			"packages",
+			fmt.Sprintf("s3://%s/packages/source-db", env.s3Bucket),
+			user.ID,
+		)
 		sourceDBID := strconv.FormatUint(uint64(sourceDB.ID), 10)
 
-		deployment := &model.Deployment{
-			UserID:    user.ID,
-			Name:      "deploy-name",
-			GroupName: "packages",
-		}
-		db.Create(deployment)
+		deployment := instance.CreateTestDeploymentRecord(db, user.ID, "deploy-name", "packages")
 
-		instance := &model.DeploymentInstance{
-			Name:         "deploy-name",
-			GroupName:    "packages",
-			StackName:    "dhis2-db",
-			DeploymentID: deployment.ID,
-			Group:        group,
-			Parameters: model.DeploymentInstanceParameters{
+		instanceRecord := instance.CreateTestInstanceRecord(
+			db,
+			deployment.ID,
+			group,
+			"dhis2-db",
+			"deploy-name",
+			"packages",
+			model.DeploymentInstanceParameters{
 				"DATABASE_ID":       {Value: sourceDBID},
 				"DATABASE_NAME":     {Value: "dhis2"},
 				"DATABASE_USERNAME": {Value: "dhis"},
 				"DATABASE_PASSWORD": {Value: "dhis"},
 			},
-		}
-		db.Create(instance)
+		)
 
 		fakePodExecutor := &fakePodExecutor{output: []byte("pg_dump fake output")}
 		podExecutorFunc := func(_ model.Cluster) (database.PodExecutor, error) {
@@ -334,10 +299,10 @@ func TestDatabaseHandler(t *testing.T) {
 		}
 
 		databaseRepository := database.NewRepository(db)
-		databaseService := database.NewService(logger, s3Bucket, s3Client, groupService{groupName: "packages"}, databaseRepository, podExecutorFunc)
+		databaseService := database.NewService(env.logger, env.s3Bucket, env.s3Client, groupService{groupName: "packages"}, databaseRepository, podExecutorFunc)
 
 		instSvc := &saveAsInstanceService{
-			instance:   instance,
+			instance:   instanceRecord,
 			deployment: deployment,
 		}
 
@@ -348,7 +313,7 @@ func TestDatabaseHandler(t *testing.T) {
 		stSvc := &saveAsStackService{stack: stack}
 
 		client := inttest.SetupHTTPServer(t, func(engine *gin.Engine) {
-			databaseHandler := database.NewHandler(logger, databaseService, groupService{groupName: "packages"}, instSvc, stSvc)
+			databaseHandler := database.NewHandler(env.logger, databaseService, groupService{groupName: "packages"}, instSvc, stSvc)
 			authenticator := func(c *gin.Context) {
 				ctx := model.NewContextWithUser(c.Request.Context(), &model.User{
 					ID:     user.ID,
@@ -360,7 +325,7 @@ func TestDatabaseHandler(t *testing.T) {
 			database.Routes(engine, authenticator, databaseHandler)
 		})
 
-		instanceID := strconv.FormatUint(uint64(instance.ID), 10)
+		instanceID := strconv.FormatUint(uint64(instanceRecord.ID), 10)
 		body := strings.NewReader(`{"name": "saved-copy.sql.gz", "format": "plain"}`)
 		var savedDB model.Database
 		client.PostJSON(t, "/databases/save-as/"+instanceID, body, &savedDB)
@@ -377,11 +342,12 @@ func TestDatabaseHandler(t *testing.T) {
 		}, 10*time.Second, 200*time.Millisecond, "database URL should be set by async goroutine")
 
 		var finalDB model.Database
-		db.First(&finalDB, savedDB.ID)
+		err := db.First(&finalDB, savedDB.ID).Error
+		require.NoError(t, err)
 		assert.Equal(t, "s3://database-bucket/packages/saved-copy.sql.gz", finalDB.Url)
 		assert.Greater(t, finalDB.Size, int64(0))
 
-		s3Content := s3.GetObject(t, s3Bucket, "packages/saved-copy.sql.gz")
+		s3Content := env.s3.GetObject(t, env.s3Bucket, "packages/saved-copy.sql.gz")
 		assert.Greater(t, len(s3Content), 0, "S3 object should have content")
 
 		assert.False(t, instSvc.filestoreBackupCalled, "FilestoreBackup should not be called when no dhis2-core instance exists")
@@ -457,3 +423,35 @@ type saveAsStackService struct {
 func (s *saveAsStackService) Find(name string) (*model.Stack, error) {
 	return s.stack, nil
 }
+
+type databaseHandlerEnv struct {
+	db       *gorm.DB
+	s3       *inttest.S3Client
+	s3Bucket string
+	logger   *slog.Logger
+	s3Client *storage.S3Client
+}
+
+func setupDatabaseHandlerEnv(t *testing.T) *databaseHandlerEnv {
+	t.Helper()
+
+	db := inttest.SetupDB(t)
+
+	s3Dir := t.TempDir()
+	s3Bucket := "database-bucket"
+	err := os.Mkdir(s3Dir+"/"+s3Bucket, 0o755)
+	require.NoError(t, err, "failed to create S3 output bucket")
+	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
+	s3 := inttest.SetupS3(t, s3Dir)
+	uploader := manager.NewUploader(s3.Client)
+	s3Client := storage.NewS3Client(logger, s3.Client, uploader)
+
+	return &databaseHandlerEnv{
+		db:       db,
+		s3:       s3,
+		s3Bucket: s3Bucket,
+		logger:   logger,
+		s3Client: s3Client,
+	}
+}
+
