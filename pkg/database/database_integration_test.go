@@ -454,4 +454,3 @@ func setupDatabaseHandlerEnv(t *testing.T) *databaseHandlerEnv {
 		s3Client: s3Client,
 	}
 }
-
