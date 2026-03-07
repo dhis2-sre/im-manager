@@ -582,15 +582,20 @@ func (s service) SaveAs(ctx context.Context, userId uint, database *model.Databa
 			return
 		}
 
-		newDatabase.Url = fmt.Sprintf("s3://%s/%s", s.s3Bucket, key)
-		newDatabase.Size = result.size
-		if err := s.repository.Save(ctx, newDatabase); err != nil {
+		saved, err := s.repository.FindById(ctx, newDatabase.ID)
+		if err != nil {
+			s.logError(ctx, err)
+			return
+		}
+		saved.Url = fmt.Sprintf("s3://%s/%s", s.s3Bucket, key)
+		saved.Size = result.size
+		if err := s.repository.Save(ctx, saved); err != nil {
 			s.logError(ctx, err)
 			return
 		}
 
 		s.logger.InfoContext(ctx, "pg_dump completed successfully", "key", key, "size", result.size)
-		done(ctx, newDatabase)
+		done(ctx, saved)
 	}()
 
 	return newDatabase, nil
