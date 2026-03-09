@@ -262,10 +262,7 @@ func TestDatabaseHandler(t *testing.T) {
 	t.Run("SaveAs", func(t *testing.T) {
 		t.Parallel()
 
-		env := setupDatabaseHandlerEnv(t)
-		db := env.db
-
-		user, group := userpkg.CreateUserWithGroup(t, db, "packages", "some", "ns", "user1@dhis2.org")
+		user, group := userpkg.CreateUserWithGroup(t, db, "packages", "some", "ns", "user2@dhis2.org")
 
 		sourceDB := database.CreateDatabaseRecord(
 			t,
@@ -319,7 +316,7 @@ func TestDatabaseHandler(t *testing.T) {
 			authenticator := func(c *gin.Context) {
 				ctx := model.NewContextWithUser(c.Request.Context(), &model.User{
 					ID:     user.ID,
-					Email:  "user1@dhis2.org",
+					Email:  "user2@dhis2.org",
 					Groups: []model.Group{*group},
 				})
 				c.Request = c.Request.WithContext(ctx)
