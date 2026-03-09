@@ -60,7 +60,7 @@ func TestDatabaseHandler(t *testing.T) {
 
 	var userID uint
 	{
-		user, _ := userpkg.CreateTestUserWithGroup(db, "group-name", "some", "", "user1@dhis2.org")
+		user, _ := userpkg.CreateUserWithGroup(t, db, "group-name", "some", "", "user1@dhis2.org")
 		userID = user.ID
 	}
 
@@ -265,9 +265,10 @@ func TestDatabaseHandler(t *testing.T) {
 		env := setupDatabaseHandlerEnv(t)
 		db := env.db
 
-		user, group := userpkg.CreateTestUserWithGroup(db, "packages", "some", "ns", "user1@dhis2.org")
+		user, group := userpkg.CreateUserWithGroup(t, db, "packages", "some", "ns", "user1@dhis2.org")
 
-		sourceDB := database.CreateTestDatabaseRecord(
+		sourceDB := database.CreateDatabaseRecord(
+			t,
 			db,
 			"source-db",
 			"packages",
@@ -276,9 +277,10 @@ func TestDatabaseHandler(t *testing.T) {
 		)
 		sourceDBID := strconv.FormatUint(uint64(sourceDB.ID), 10)
 
-		deployment := instance.CreateTestDeploymentRecord(db, user.ID, "deploy-name", "packages")
+		deployment := instance.CreateDeploymentRecord(t, db, user.ID, "deploy-name", "packages")
 
-		instanceRecord := instance.CreateTestInstanceRecord(
+		instanceRecord := instance.CreateInstanceRecord(
+			t,
 			db,
 			deployment.ID,
 			group,

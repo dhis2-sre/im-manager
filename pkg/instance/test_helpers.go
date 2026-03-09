@@ -4,23 +4,31 @@ package instance
 // reused by external tests that depend on instance models and services.
 
 import (
+	"testing"
+
 	"github.com/dhis2-sre/im-manager/pkg/model"
+	"github.com/stretchr/testify/require"
 	"gorm.io/gorm"
 )
 
-func CreateTestDeploymentRecord(db *gorm.DB, userID uint, name, groupName string) *model.Deployment {
+func CreateDeploymentRecord(t *testing.T, db *gorm.DB, userID uint, name, groupName string) *model.Deployment {
+	t.Helper()
+
 	deployment := &model.Deployment{
 		UserID:    userID,
 		Name:      name,
 		GroupName: groupName,
 	}
 
-	db.Create(deployment)
+	err := db.Create(deployment).Error
+	require.NoError(t, err, "failed to create test deployment record")
 
 	return deployment
 }
 
-func CreateTestInstanceRecord(db *gorm.DB, deploymentID uint, group *model.Group, stackName, instanceName, groupName string, params model.DeploymentInstanceParameters) *model.DeploymentInstance {
+func CreateInstanceRecord(t *testing.T, db *gorm.DB, deploymentID uint, group *model.Group, stackName, instanceName, groupName string, params model.DeploymentInstanceParameters) *model.DeploymentInstance {
+	t.Helper()
+
 	instance := &model.DeploymentInstance{
 		Name:         instanceName,
 		GroupName:    groupName,
@@ -30,7 +38,8 @@ func CreateTestInstanceRecord(db *gorm.DB, deploymentID uint, group *model.Group
 		Parameters:   params,
 	}
 
-	db.Create(instance)
+	err := db.Create(instance).Error
+	require.NoError(t, err, "failed to create test instance record")
 
 	return instance
 }

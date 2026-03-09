@@ -17,7 +17,9 @@ import (
 	"gorm.io/gorm"
 )
 
-func CreateTestDatabaseRecord(db *gorm.DB, name, groupName, url string, userID uint) *model.Database {
+func CreateDatabaseRecord(t *testing.T, db *gorm.DB, name, groupName, url string, userID uint) *model.Database {
+	t.Helper()
+
 	database := &model.Database{
 		Name:      name,
 		GroupName: groupName,
@@ -26,7 +28,8 @@ func CreateTestDatabaseRecord(db *gorm.DB, name, groupName, url string, userID u
 		UserID:    userID,
 	}
 
-	db.Create(database)
+	err := db.Create(database).Error
+	require.NoError(t, err, "failed to create test database record")
 
 	return database
 }
