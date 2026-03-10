@@ -6,13 +6,12 @@ import (
 	"github.com/dhis2-sre/im-manager/pkg/model"
 )
 
-func NewService(clusterRepository *repository, clusterConfigKmsKey string) Service {
-	return Service{clusterRepository: clusterRepository, clusterConfigKmsKey: clusterConfigKmsKey}
+func NewService(clusterRepository *repository) Service {
+	return Service{clusterRepository: clusterRepository}
 }
 
 type Service struct {
-	clusterRepository   *repository
-	clusterConfigKmsKey string
+	clusterRepository *repository
 }
 
 func (s Service) Find(ctx context.Context, id uint) (model.Cluster, error) {
@@ -30,7 +29,11 @@ func (s Service) Save(ctx context.Context, name, description string, kubernetesC
 	}
 
 	if kubernetesConfiguration != nil {
-		encryptedConfig, err := encryptYaml(kubernetesConfiguration, s.clusterConfigKmsKey)
+		keyGroups, err := createKeyGroup()
+		if err != nil {
+			return model.Cluster{}, err
+		}
+		encryptedConfig, err := EncryptYaml(kubernetesConfiguration, keyGroups)
 		if err != nil {
 			return model.Cluster{}, err
 		}
@@ -59,7 +62,11 @@ func (s Service) Update(ctx context.Context, id uint, name, description string, 
 		cluster.Description = description
 	}
 	if kubernetesConfiguration != nil {
-		encryptedConfig, err := encryptYaml(kubernetesConfiguration, s.clusterConfigKmsKey)
+		keyGroups, err := createKeyGroup()
+		if err != nil {
+			return model.Cluster{}, err
+		}
+		encryptedConfig, err := EncryptYaml(kubernetesConfiguration, keyGroups)
 		if err != nil {
 			return model.Cluster{}, err
 		}
@@ -87,13 +94,5 @@ func (s Service) FindOrCreate(ctx context.Context, name, description string) (mo
 	return s.clusterRepository.findOrCreate(ctx, model.Cluster{
 		Name:        name,
 		Description: description,
-	})
-}
-
-func (s Service) FindOrCreateWithConfig(ctx context.Context, name, description string, configuration []byte) (model.Cluster, error) {
-	return s.clusterRepository.findOrCreate(ctx, model.Cluster{
-		Name:          name,
-		Description:   description,
-		Configuration: configuration,
 	})
 }

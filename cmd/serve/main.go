@@ -150,11 +150,7 @@ func run() (err error) {
 	userHandler := user.NewHandler(logger, hostname, authConfig.SameSiteMode, authConfig.AccessTokenExpirationSeconds, authConfig.RefreshTokenExpirationSeconds, authConfig.RefreshTokenRememberMeExpirationSeconds, publicKey, userService, tokenService)
 
 	clusterRepository := cluster.NewRepository(db)
-	clusterConfigKmsKey, err := requireEnv("CLUSTER_CONFIG_KMS_KEY")
-	if err != nil {
-		return err
-	}
-	clusterService := cluster.NewService(clusterRepository, clusterConfigKmsKey)
+	clusterService := cluster.NewService(clusterRepository)
 	clusterHandler := cluster.NewHandler(clusterService)
 
 	authentication := middleware.NewAuthentication(publicKey, userService)

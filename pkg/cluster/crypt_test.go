@@ -11,6 +11,32 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestCreateKeyGroup(t *testing.T) {
+	t.Run("age key from env", func(t *testing.T) {
+		identity, err := age.GenerateX25519Identity()
+		require.NoError(t, err)
+
+		t.Setenv("SOPS_KMS_ARN", "")
+		t.Setenv(sops_age.SopsAgeKeyEnv, identity.String())
+
+		keyGroups, err := createKeyGroup()
+
+		require.NoError(t, err)
+		assert.Len(t, keyGroups, 1)
+		assert.NotEmpty(t, keyGroups[0])
+	})
+
+	t.Run("no key provided", func(t *testing.T) {
+		t.Setenv("SOPS_KMS_ARN", "")
+		t.Setenv(sops_age.SopsAgeKeyEnv, "")
+
+		_, err := createKeyGroup()
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "no encryption key provided")
+	})
+}
+
 func TestEncryptYaml(t *testing.T) {
 	identity, err := age.GenerateX25519Identity()
 	require.NoError(t, err, "failed to generate age key pair")

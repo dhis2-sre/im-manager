@@ -44,7 +44,7 @@ func TestUserHandler(t *testing.T) {
 	userService := user.NewService("", passwordTokenTtl, userRepository, fakeDialer{t})
 
 	clusterRepository := cluster.NewRepository(db)
-	clusterService := cluster.NewService(clusterRepository, "")
+	clusterService := cluster.NewService(clusterRepository)
 
 	groupService := group.NewService(groupRepository, userService, clusterService)
 

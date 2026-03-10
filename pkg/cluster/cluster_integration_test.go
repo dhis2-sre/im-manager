@@ -2,44 +2,68 @@ package cluster_test
 
 import (
 	"context"
+	"encoding/base64"
+	"fmt"
 	"strings"
 	"testing"
 
 	filippoioage "filippo.io/age"
 	"github.com/dhis2-sre/im-manager/pkg/cluster"
-	"github.com/getsops/sops/v3"
-	sops_age "github.com/getsops/sops/v3/age"
-	"github.com/getsops/sops/v3/keys"
-
-	"github.com/go-mail/mail"
-
-	"github.com/stretchr/testify/assert"
-
 	"github.com/dhis2-sre/im-manager/pkg/group"
 	"github.com/dhis2-sre/im-manager/pkg/inttest"
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	"github.com/dhis2-sre/im-manager/pkg/user"
 	"github.com/gin-gonic/gin"
+	"github.com/go-mail/mail"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestClusterHandler(t *testing.T) {
-	t.Parallel()
-
 	db := inttest.SetupDB(t)
+
+	userRepository := user.NewRepository(db)
+	userService := user.NewService("", 900, userRepository, fakeDialer{})
+
+	clusterRepository := cluster.NewRepository(db)
+	clusterService := cluster.NewService(clusterRepository)
 
 	identity, err := filippoioage.GenerateX25519Identity()
 	require.NoError(t, err, "failed to generate age key pair")
 
-	ageKeys, err := sops_age.MasterKeysFromRecipients(identity.Recipient().String())
-	require.NoError(t, err, "failed to get master keys from age recipient")
-	var ageMasterKeys []keys.MasterKey
-	for _, k := range ageKeys {
-		ageMasterKeys = append(ageMasterKeys, k)
-	}
-	keyGroups := []sops.KeyGroup{ageMasterKeys}
+	t.Setenv("SOPS_AGE_KEY", identity.String())
 
-	k8sConfig := []byte(`apiVersion: v1
+	groupRepository := group.NewRepository(db)
+	groupService := group.NewService(groupRepository, userService, clusterService)
+
+	err = user.CreateUser(context.Background(), "admin", "admin", userService, groupService, model.AdministratorGroupName, "", "admin")
+	require.NoError(t, err, "failed to create admin user and group")
+
+	client := inttest.SetupHTTPServer(t, func(engine *gin.Engine) {
+		handler := cluster.NewHandler(clusterService)
+		authentication := TestAuthenticationMiddleware{}
+		authorization := TestAuthorizationMiddleware{}
+		cluster.Routes(engine, authentication, authorization, handler)
+	})
+
+	var createdClusterID uint
+
+	t.Run("Create", func(t *testing.T) {
+		requestBody := strings.NewReader(`{
+				"name": "name",
+				"description": "description"
+			}`)
+
+		var cluster model.Cluster
+		client.PostJSON(t, "/clusters", requestBody, &cluster)
+
+		assert.Equal(t, "name", cluster.Name)
+		assert.Equal(t, "description", cluster.Description)
+		createdClusterID = cluster.ID
+	})
+
+	t.Run("Create with configuration", func(t *testing.T) {
+		k8sConfig := []byte(`apiVersion: v1
 kind: Config
 clusters:
 - name: test
@@ -55,54 +79,26 @@ users:
 - name: test
   user:
     token: test-token`)
-	encryptedConfig, err := cluster.EncryptYaml(k8sConfig, keyGroups)
-	require.NoError(t, err, "failed to encrypt k8s config")
 
-	userRepository := user.NewRepository(db)
-	userService := user.NewService("", 900, userRepository, fakeDialer{})
-
-	clusterRepository := cluster.NewRepository(db)
-	clusterService := cluster.NewService(clusterRepository, "")
-
-	groupRepository := group.NewRepository(db)
-	groupService := group.NewService(groupRepository, userService, clusterService)
-
-	err = user.CreateUser(context.Background(), "admin", "admin", userService, groupService, model.AdministratorGroupName, "", "admin")
-	require.NoError(t, err, "failed to create admin user and group")
-
-	create, err := clusterService.FindOrCreateWithConfig(t.Context(), "default-name", "default-description", encryptedConfig)
-	assert.NoError(t, err)
-
-	client := inttest.SetupHTTPServer(t, func(engine *gin.Engine) {
-		handler := cluster.NewHandler(clusterService)
-		authentication := TestAuthenticationMiddleware{}
-		authorization := TestAuthorizationMiddleware{}
-		cluster.Routes(engine, authentication, authorization, handler)
-	})
-
-	t.Run("Create", func(t *testing.T) {
-		requestBody := strings.NewReader(`{
-				"name": "name",
-				"description": "description"
-			}`)
+		requestBody := strings.NewReader(fmt.Sprintf(`{
+			"name": "name-with-config",
+			"description": "description-with-config",
+			"rawConfig": %q
+		}`, base64.StdEncoding.EncodeToString(k8sConfig)))
 
 		var cluster model.Cluster
 		client.PostJSON(t, "/clusters", requestBody, &cluster)
 
-		assert.Equal(t, "name", cluster.Name)
-		assert.Equal(t, "description", cluster.Description)
-	})
-
-	t.Run("Create with configuration", func(t *testing.T) {
-		t.Skip("requires encryption setup")
+		assert.Equal(t, "name-with-config", cluster.Name)
+		assert.Equal(t, "description-with-config", cluster.Description)
 	})
 
 	t.Run("Read", func(t *testing.T) {
 		var cluster model.Cluster
-		client.GetJSON(t, "/clusters/1", &cluster)
+		client.GetJSON(t, "/clusters/"+fmt.Sprint(createdClusterID), &cluster)
 
-		assert.Equal(t, create.Name, cluster.Name)
-		assert.Equal(t, create.Description, cluster.Description)
+		assert.Equal(t, "name", cluster.Name)
+		assert.Equal(t, "description", cluster.Description)
 	})
 
 	t.Run("Update", func(t *testing.T) {
@@ -112,14 +108,14 @@ users:
 			}`)
 
 		var cluster model.Cluster
-		client.PutJSON(t, "/clusters/1", requestBody, &cluster)
+		client.PutJSON(t, "/clusters/"+fmt.Sprint(createdClusterID), requestBody, &cluster)
 
 		assert.Equal(t, "new-name", cluster.Name)
 		assert.Equal(t, "new-description", cluster.Description)
 	})
 
 	t.Run("Delete", func(t *testing.T) {
-		client.Delete(t, "/clusters/1")
+		client.Delete(t, "/clusters/"+fmt.Sprint(createdClusterID))
 	})
 
 	t.Run("ReadAll", func(t *testing.T) {

@@ -75,7 +75,8 @@ func TestInstanceHandler(t *testing.T) {
 			*group,
 		},
 	}
-	db.Create(user)
+	err = db.Create(user).Error
+	require.NoError(t, err, "failed to save user")
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	encryptionKey := strings.Repeat("a", 32)
