@@ -79,7 +79,7 @@ func TestBackupServiceIntegration(t *testing.T) {
 	}
 }
 
-func TestBackupServiceUnit(t *testing.T) {
+func TestBackupService(t *testing.T) {
 	t.Parallel()
 
 	testFiles := map[string][]byte{
