@@ -226,6 +226,37 @@ func runMigration(db *gorm.DB, items []backupItem, dryRun bool, logger *slog.Log
 					}
 				}
 			}
+
+			// MinIO (and potentially other stacks) also consume DATABASE_ID to locate the saved database
+			// and seed filestore. Keep DATABASE_ID consistent across the deployment during the migration.
+			var othersDatabaseID []idStack
+			if err := tx.Raw(
+				`SELECT dip.deployment_instance_id AS deployment_instance_id, di.stack_name
+				 FROM deployment_instance_parameters dip
+				 INNER JOIN deployment_instances di ON di.id = dip.deployment_instance_id
+				 WHERE di.deployment_id = ? AND dip.parameter_name = ? AND dip.deployment_instance_id != ?`,
+				inst.DeploymentID, "DATABASE_ID", inst.ID,
+			).Scan(&othersDatabaseID).Error; err != nil {
+				return err
+			}
+
+			dbIDValue := strconv.FormatUint(uint64(item.SavedDatabaseID), 10)
+			for _, o := range othersDatabaseID {
+				if dryRun {
+					logger.Info("would set same deployment instance DATABASE_ID",
+						"instance_id", o.ID, "stack", o.StackName, "value", item.SavedDatabaseID)
+				} else {
+					res := tx.Model(&model.DeploymentInstanceParameter{}).
+						Where("deployment_instance_id = ? AND parameter_name = ?", o.ID, "DATABASE_ID").
+						Update("value", dbIDValue)
+					if res.Error != nil {
+						return res.Error
+					}
+					if res.RowsAffected > 0 {
+						logger.Info("updated DATABASE_ID (same deployment)", "instance_id", o.ID, "stack", o.StackName, "value", item.SavedDatabaseID)
+					}
+				}
+			}
 		}
 
 		if dryRun {

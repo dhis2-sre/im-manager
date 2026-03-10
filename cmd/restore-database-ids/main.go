@@ -168,7 +168,7 @@ func runRestore(db *gorm.DB, items []backupItem, dryRun bool, logger *slog.Logge
 		for _, item := range items {
 			var inst model.DeploymentInstance
 			if err := tx.Where("id = ? AND stack_name = ?", item.DBInstanceID, stackDhis2DB).
-				Select("id", "name", "stack_name").First(&inst).Error; err != nil {
+				Select("id", "name", "stack_name", "deployment_id").First(&inst).Error; err != nil {
 				logger.Warn("skip: instance not found or not dhis2-db", "id", item.DBInstanceID)
 				continue
 			}
@@ -177,19 +177,56 @@ func runRestore(db *gorm.DB, items []backupItem, dryRun bool, logger *slog.Logge
 			if err != nil {
 				return err
 			}
+
+			// Restore DATABASE_ID on the dhis2-db instance itself.
 			if dryRun {
 				logger.Info("would set DATABASE_ID to original",
 					"instance_id", inst.ID, "stack", inst.StackName, "value", value)
-				continue
+			} else {
+				res := tx.Model(&model.DeploymentInstanceParameter{}).
+					Where("deployment_instance_id = ? AND parameter_name = ?", inst.ID, "DATABASE_ID").
+					Update("value", value)
+				if res.Error != nil {
+					return res.Error
+				}
+				if res.RowsAffected > 0 {
+					logger.Info("restored DATABASE_ID", "instance_id", inst.ID, "stack", inst.StackName, "value", value)
+				}
 			}
-			res := tx.Model(&model.DeploymentInstanceParameter{}).
-				Where("deployment_instance_id = ? AND parameter_name = ?", inst.ID, "DATABASE_ID").
-				Update("value", value)
-			if res.Error != nil {
-				return res.Error
+
+			// Also restore DATABASE_ID on other instances in the same deployment (e.g. MinIO)
+			// that have a DATABASE_ID parameter, so filestore seeding continues to use the
+			// same original database id/slug.
+			type idStack struct {
+				ID        uint   `gorm:"column:deployment_instance_id"`
+				StackName string `gorm:"column:stack_name"`
 			}
-			if res.RowsAffected > 0 {
-				logger.Info("restored DATABASE_ID", "instance_id", inst.ID, "stack", inst.StackName, "value", value)
+			var others []idStack
+			if err := tx.Raw(
+				`SELECT dip.deployment_instance_id AS deployment_instance_id, di.stack_name
+				 FROM deployment_instance_parameters dip
+				 INNER JOIN deployment_instances di ON di.id = dip.deployment_instance_id
+				 WHERE di.deployment_id = ? AND dip.parameter_name = ? AND dip.deployment_instance_id != ?`,
+				inst.DeploymentID, "DATABASE_ID", inst.ID,
+			).Scan(&others).Error; err != nil {
+				return err
+			}
+
+			for _, o := range others {
+				if dryRun {
+					logger.Info("would set DATABASE_ID to original (same deployment)",
+						"instance_id", o.ID, "stack", o.StackName, "value", value)
+				} else {
+					res := tx.Model(&model.DeploymentInstanceParameter{}).
+						Where("deployment_instance_id = ? AND parameter_name = ?", o.ID, "DATABASE_ID").
+						Update("value", value)
+					if res.Error != nil {
+						return res.Error
+					}
+					if res.RowsAffected > 0 {
+						logger.Info("restored DATABASE_ID (same deployment)", "instance_id", o.ID, "stack", o.StackName, "value", value)
+					}
+				}
 			}
 		}
 
