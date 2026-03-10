@@ -6,12 +6,13 @@ import (
 	"github.com/dhis2-sre/im-manager/pkg/model"
 )
 
-func NewService(clusterRepository *repository) Service {
-	return Service{clusterRepository}
+func NewService(clusterRepository *repository, clusterConfigKmsKey string) Service {
+	return Service{clusterRepository: clusterRepository, clusterConfigKmsKey: clusterConfigKmsKey}
 }
 
 type Service struct {
-	clusterRepository *repository
+	clusterRepository   *repository
+	clusterConfigKmsKey string
 }
 
 func (s Service) Find(ctx context.Context, id uint) (model.Cluster, error) {
@@ -24,9 +25,16 @@ func (s Service) FindAll(ctx context.Context) ([]model.Cluster, error) {
 
 func (s Service) Save(ctx context.Context, name, description string, kubernetesConfiguration []byte) (model.Cluster, error) {
 	cluster := model.Cluster{
-		Name:          name,
-		Description:   description,
-		Configuration: kubernetesConfiguration,
+		Name:        name,
+		Description: description,
+	}
+
+	if kubernetesConfiguration != nil {
+		encryptedConfig, err := encryptYaml(kubernetesConfiguration, s.clusterConfigKmsKey)
+		if err != nil {
+			return model.Cluster{}, err
+		}
+		cluster.Configuration = encryptedConfig
 	}
 
 	err := s.clusterRepository.save(ctx, &cluster)
@@ -51,7 +59,11 @@ func (s Service) Update(ctx context.Context, id uint, name, description string, 
 		cluster.Description = description
 	}
 	if kubernetesConfiguration != nil {
-		cluster.Configuration = kubernetesConfiguration
+		encryptedConfig, err := encryptYaml(kubernetesConfiguration, s.clusterConfigKmsKey)
+		if err != nil {
+			return model.Cluster{}, err
+		}
+		cluster.Configuration = encryptedConfig
 	}
 
 	err = s.clusterRepository.update(ctx, cluster)
@@ -75,5 +87,13 @@ func (s Service) FindOrCreate(ctx context.Context, name, description string) (mo
 	return s.clusterRepository.findOrCreate(ctx, model.Cluster{
 		Name:        name,
 		Description: description,
+	})
+}
+
+func (s Service) FindOrCreateWithConfig(ctx context.Context, name, description string, configuration []byte) (model.Cluster, error) {
+	return s.clusterRepository.findOrCreate(ctx, model.Cluster{
+		Name:          name,
+		Description:   description,
+		Configuration: configuration,
 	})
 }
