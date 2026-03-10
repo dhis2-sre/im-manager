@@ -38,6 +38,8 @@ basePath: ""
 environment:
   GIN_MODE: release
 
+sopsKmsArn: ""
+
 #groups:
 #  names: whoami
 
