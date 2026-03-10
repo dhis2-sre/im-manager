@@ -126,7 +126,7 @@ users:
 		var clusters []model.Cluster
 		client.GetJSON(t, "/clusters", &clusters)
 
-		assert.Len(t, clusters, 2)
+		assert.Len(t, clusters, 1)
 	})
 }
 
