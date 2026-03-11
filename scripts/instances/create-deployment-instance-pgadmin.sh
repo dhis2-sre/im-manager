@@ -9,7 +9,8 @@ STACK_NAME=pgadmin
 
 PGADMIN_USERNAME="pgadmin-user@dhis2.org"
 echo "PgAdmin username: $PGADMIN_USERNAME"
-PGADMIN_PASSWORD=$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c32)
+# Force subshell exit 0 so SIGPIPE from tr (when head closes) doesn't fail the script
+PGADMIN_PASSWORD=$( ( LC_ALL=C tr -dc 'A-Za-z0-9' < /dev/urandom | head -c32 ); exit 0 )
 echo "PgAdmin password: $PGADMIN_PASSWORD"
 
 echo "{
