@@ -25,10 +25,10 @@ change-log:
 	git-chglog -o CHANGELOG.md
 
 smoke-test:
-	IMAGE_TAG=$(tag) docker compose up -d prod
+	IMAGE_TAG=$(tag) docker compose --profile prod up --detach prod
 
 docker-image:
-	IMAGE_TAG=$(tag) docker compose build prod
+	IMAGE_TAG=$(tag) docker compose --profile prod build prod
 
 push-docker-image:
 	IMAGE_TAG=$(tag) docker compose push prod

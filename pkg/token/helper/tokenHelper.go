@@ -131,3 +131,47 @@ func ValidateRefreshToken(tokenString string, secretKey string) (*refreshTokenCl
 		IssuedAt:  issuedAt.(time.Time).Unix(),
 	}, nil
 }
+
+func RefreshAccessToken(token string, privateKey *rsa.PrivateKey) (string, error) {
+	user, exp, err := ValidateAccessToken(token, &privateKey.PublicKey)
+	if err != nil {
+		return "", err
+	}
+
+	remaining := exp - time.Now().Unix()
+	if remaining > 60 {
+		return token, nil
+	}
+
+	newExpirationInSeconds := 60
+	return GenerateAccessToken(user, privateKey, newExpirationInSeconds)
+}
+
+func ValidateAccessToken(tokenString string, publicKey *rsa.PublicKey) (*model.User, int64, error) {
+	token, err := jwt.Parse([]byte(tokenString), jwt.WithKey(jwa.RS256, publicKey), jwt.WithTypedClaim("user", &model.User{}))
+	if err != nil {
+		return nil, 0, err
+	}
+
+	userClaim, ok := token.Get("user")
+	if !ok {
+		return nil, 0, errors.New("user not found in claims")
+	}
+
+	user, ok := userClaim.(*model.User)
+	if !ok {
+		return nil, 0, errors.New("invalid user claim")
+	}
+
+	expClaim, ok := token.Get(jwt.ExpirationKey)
+	if !ok {
+		return nil, 0, errors.New("expiration not found in claims")
+	}
+
+	expTime, ok := expClaim.(time.Time)
+	if !ok {
+		return nil, 0, errors.New("invalid expiration type")
+	}
+
+	return user, expTime.Unix(), nil
+}

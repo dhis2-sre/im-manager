@@ -1,0 +1,53 @@
+# consumedParameters: DATABASE_ID
+helmDefaults:
+  deleteWait: true
+
+releases:
+  - name: "{{ requiredEnv "INSTANCE_NAME" }}-minio"
+    namespace: "{{ requiredEnv "INSTANCE_NAMESPACE" }}"
+    chart: bitnami/minio
+    version: "{{ requiredEnv "MINIO_CHART_VERSION" }}"
+    values:
+      - persistence:
+          size: {{ requiredEnv "MINIO_STORAGE_SIZE" }}
+        annotations:
+          helm.sh/resource-policy: keep
+      - auth:
+          rootUser: dhisdhis
+          rootPassword: dhisdhis
+          forcePassword: true
+      - defaultBuckets: dhis2
+      - image:
+          repository: bitnamilegacy/minio
+      - commonLabels:
+          im: "true"
+          im-default: "true"
+          im-deployment-id: "{{ requiredEnv "DEPLOYMENT_ID" }}"
+          im-instance-id: "{{ requiredEnv "INSTANCE_ID" }}"
+          im-id: "{{ requiredEnv "INSTANCE_ID" }}"
+          im-type: "minio"
+          im-creation-timestamp: "{{ requiredEnv "INSTANCE_CREATION_TIMESTAMP" }}"
+          im-ttl: "{{ requiredEnv "INSTANCE_TTL" }}"
+      - sidecars:
+          - name: "{{ requiredEnv "INSTANCE_NAME" }}-minio-seed"
+            # Should match the version used by the main container
+            image: bitnamilegacy/minio:2025.1.20-debian-12-r0
+            pullPolicy: {{ requiredEnv "IMAGE_PULL_POLICY" }}
+            env:
+              - name: HOSTNAME
+                value: {{ requiredEnv "HOSTNAME" }}
+              - name: DATABASE_ID
+                value: "{{ requiredEnv "DATABASE_ID" }}"
+              - name: IM_ACCESS_TOKEN
+                value: {{ requiredEnv "IM_ACCESS_TOKEN" }}
+              - name: INSTANCE_NAME
+                value: {{ requiredEnv "INSTANCE_NAME" }}
+            command:
+              - "/bin/bash"
+              - "-c"
+              - |
+                {{- readFile "./seed-minio.sh" | nindent 16 }}
+
+repositories:
+  - name: bitnami
+    url: https://charts.bitnami.com/bitnami

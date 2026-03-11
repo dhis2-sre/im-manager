@@ -1,0 +1,96 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+export PGPASSWORD=$POSTGRES_POSTGRES_PASSWORD
+
+function exec_psql() {
+  psql --username postgres --quiet --tuples-only --dbname "$DATABASE_NAME" --command "$1"
+}
+
+function restore_database() {
+  local tmp_file="$1"
+  local database_name="$2"
+  local log_file="/tmp/db_restore_$$.log"
+
+  # First attempt: pg_restore (pgc format is preferred)
+  echo "Attempting pg_restore..."
+  if pg_restore --verbose --username postgres --dbname "$database_name" --jobs 4 "$tmp_file" 2> "$log_file"; then
+    echo "pg_restore completed successfully"
+    rm "$log_file"
+    return 0
+  fi
+
+  # Check pg_restore error log for fatal errors
+  # Example error: pg_restore: error: unsupported version (1.16) in file header
+  if grep --ignore-case --extended-regexp "fatal|error" "$log_file"; then
+    echo "Fatal error during pg_restore:"
+    cat "$log_file"
+    rm "$log_file"
+    return 1
+  fi
+
+  # Second attempt: gunzip and psql (fallback for plain SQL dumps)
+  echo "pg_restore failed, attempting gunzip and psql..."
+  if gunzip --verbose --stdout "$tmp_file" 2>/dev/null | psql --usernme postgres --dbname "$database_name" 2> "$log_file"; then
+    echo "psql restore completed successfully"
+    rm "$log_file"
+    return 0
+  fi
+
+  # Check psql output for acceptable errors vs fatal errors
+  if grep --ignore-case --extended-regexp "fatal|error" "$log_file" | grep --invert-match --ignore-case --extended-regexp "notice|warning|duplicate|already exists"; then
+    echo "Fatal error during psql restore:"
+    cat "$log_file"
+    rm "$log_file"
+    return 1
+  fi
+
+  echo "Restore completed with non-fatal warnings"
+  rm "$log_file"
+  return 0
+}
+
+if [[ -z $DATABASE_ID ]]; then
+  echo "Seeding aborted. No database id found!"
+  exit 0
+fi
+
+DATABASE_DOWNLOAD_URL="$HOSTNAME/databases/$DATABASE_ID/download"
+echo "DATABASE_DOWNLOAD_URL: $DATABASE_DOWNLOAD_URL"
+
+exec_psql "create extension if not exists postgis"
+exec_psql "create extension if not exists pg_trgm"
+exec_psql "create extension if not exists btree_gin"
+
+tmp_file=$(mktemp)
+trap 'rm --force "$tmp_file"' EXIT  # Ensures cleanup on script exit
+
+curl --connect-timeout 10 --retry 5 --retry-delay 1 --fail --location "$DATABASE_DOWNLOAD_URL" --cookie "accessToken=$IM_ACCESS_TOKEN" > "$tmp_file"
+
+if ! restore_database "$tmp_file" "$DATABASE_NAME"; then
+  echo "Database restore failed"
+  exit 1
+fi
+
+## Change ownership to $DATABASE_USERNAME
+# Tables
+entities=$(exec_psql "select tablename from pg_tables where schemaname = 'public'")
+for entity in $entities; do
+  echo "Changing owner of $entity to $DATABASE_USERNAME"
+  exec_psql "alter table \"$entity\" owner to $DATABASE_USERNAME"
+done
+
+# Sequences
+entities=$(exec_psql "select sequence_name from information_schema.sequences where sequence_schema = 'public'")
+for entity in $entities; do
+  echo "Changing owner of $entity to $DATABASE_USERNAME"
+  exec_psql "alter sequence \"$entity\" owner to $DATABASE_USERNAME"
+done
+
+# Views
+entities=$(exec_psql "select table_name from information_schema.views where table_schema = 'public'")
+for entity in $entities; do
+  echo "Changing owner of $entity to $DATABASE_USERNAME"
+  exec_psql "alter view \"$entity\" owner to $DATABASE_USERNAME"
+done

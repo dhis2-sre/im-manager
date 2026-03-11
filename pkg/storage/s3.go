@@ -3,6 +3,7 @@ package storage
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -211,4 +212,58 @@ func (s S3Client) AbortMultipartUpload(ctx context.Context, bucket, key, uploadI
 		UploadId: &uploadID,
 	})
 	return err
+}
+
+func (s S3Client) StreamUpload(ctx context.Context, bucket, key, contentType string, r io.Reader) (int64, error) {
+	uploadID, err := s.InitiateMultipartUpload(ctx, bucket, key, contentType)
+	if err != nil {
+		return 0, fmt.Errorf("failed to initiate multipart upload: %w", err)
+	}
+
+	var completedParts []types.CompletedPart
+	var totalSize int64
+	partNumber := 1
+	const chunkSize = 10 * 1024 * 1024
+	buffer := make([]byte, chunkSize)
+
+	var streamErr error
+	for {
+		n, readErr := io.ReadFull(r, buffer)
+
+		isEOF := readErr == io.EOF || errors.Is(readErr, io.ErrUnexpectedEOF)
+		if readErr != nil && !isEOF {
+			streamErr = readErr
+			break
+		}
+
+		if n == 0 {
+			break
+		}
+
+		part, partErr := s.UploadPart(ctx, bucket, key, uploadID, partNumber, buffer[:n])
+		if partErr != nil {
+			_ = s.AbortMultipartUpload(ctx, bucket, key, uploadID)
+			return 0, fmt.Errorf("failed to upload part %d: %w", partNumber, partErr)
+		}
+
+		completedParts = append(completedParts, *part)
+		totalSize += int64(n)
+		s.logger.InfoContext(ctx, "StreamUpload progress", "partNumber", partNumber, "bytes", n, "key", key)
+		partNumber++
+
+		if isEOF {
+			break
+		}
+	}
+
+	if streamErr != nil {
+		_ = s.AbortMultipartUpload(ctx, bucket, key, uploadID)
+		return 0, fmt.Errorf("stream error, upload aborted: %w", streamErr)
+	}
+
+	if err := s.CompleteMultipartUpload(ctx, bucket, key, uploadID, completedParts); err != nil {
+		return 0, fmt.Errorf("failed to complete multipart upload: %w", err)
+	}
+
+	return totalSize, nil
 }

@@ -2,12 +2,9 @@ package inttest
 
 import (
 	"context"
-	"fmt"
 	"slices"
 	"testing"
 	"time"
-
-	"github.com/dhis2-sre/im-manager/pkg/model"
 
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
@@ -26,7 +23,7 @@ func SetupK8s(t *testing.T) *K8sClient {
 
 	container, err := gnomock.Start(
 		k3s.Preset(
-			k3s.WithVersion("v1.33.2-k3s1"),
+			k3s.WithVersion("v1.31.0-k3s1"),
 			func(p *k3s.P) {
 				p.K3sServerFlags = []string{"--debug"}
 			},
@@ -57,31 +54,84 @@ type K8sClient struct {
 	Config []byte
 }
 
-func (k K8sClient) AssertPodIsNotRunning(t *testing.T, instance model.DeploymentInstance) {
-	pods, err := k.Client.CoreV1().Pods(instance.Group.Namespace).List(context.TODO(), metav1.ListOptions{
-		LabelSelector: "app.kubernetes.io/instance=" + fmt.Sprintf("%s-%d", instance.Name, instance.Group.ID),
+func (k K8sClient) AssertPodIsNotRunning(t *testing.T, namespace string, instance string, timeout time.Duration) {
+	pods, err := k.Client.CoreV1().Pods(namespace).List(context.TODO(), metav1.ListOptions{
+		LabelSelector: "app.kubernetes.io/instance=" + instance,
 	})
 	require.NoError(t, err)
 
-	require.Len(t, pods.Items, 0)
-}
+	if len(pods.Items) == 0 {
+		t.Logf("Pod isn't found: %s/%s", namespace, instance)
+		return
+	}
 
-func (k K8sClient) AssertPodIsReady(t *testing.T, instance model.DeploymentInstance, namePostfix string, timeoutInSeconds time.Duration) {
 	ctx, cancel := context.WithCancel(context.Background())
-	podName := fmt.Sprintf("%s-%d%s", instance.Name, instance.Group.ID, namePostfix)
-	watch, err := k.Client.CoreV1().Pods(instance.Group.Namespace).Watch(ctx, metav1.ListOptions{
-		LabelSelector: "app.kubernetes.io/instance=" + podName,
+	watch, err := k.Client.CoreV1().Pods(namespace).Watch(ctx, metav1.ListOptions{
+		LabelSelector: "app.kubernetes.io/instance=" + instance,
 	})
-	require.NoErrorf(t, err, "failed to find pod for instance %q", podName)
+	require.NoErrorf(t, err, "failed to find pod for instance %q", instance)
 
-	t.Log("Waiting for:", podName)
-	timeout := timeoutInSeconds * time.Second
+	t.Logf("Waiting for pod to terminate: %s/%s", namespace, instance)
+	start := time.Now()
 	tm := time.NewTimer(timeout)
 	defer tm.Stop()
 	for {
 		select {
 		case <-tm.C:
-			assert.Fail(t, "timed out waiting on pod: "+instance.Group.Namespace+"/"+podName)
+			elapsed := time.Since(start)
+			assert.Failf(t, "pod not terminating", "timed out after %s waiting for %s/%s to terminate", elapsed.String(), namespace, instance)
+			cancel()
+
+			k.logAllPods(t)
+			k.logTargetPodDetails(t, namespace, instance)
+
+			return
+		case event := <-watch.ResultChan():
+			t.Log("Received pod event...")
+			_, ok := event.Object.(*v1.Pod)
+			if !ok {
+				assert.Failf(t, "failed to get pod event", "want pod event instead got %T", event.Object)
+				if !tm.Stop() {
+					<-tm.C
+				}
+				cancel()
+				return
+			}
+			// Check current pods
+			pods, err := k.Client.CoreV1().Pods(namespace).List(context.TODO(), metav1.ListOptions{
+				LabelSelector: "app.kubernetes.io/instance=" + instance,
+			})
+			require.NoError(t, err)
+
+			if len(pods.Items) == 0 {
+				elapsed := time.Since(start)
+				t.Logf("waited %s for %s/%s to terminate", elapsed, namespace, instance)
+				if !tm.Stop() {
+					<-tm.C
+				}
+				cancel()
+				return
+			}
+		}
+	}
+}
+
+func (k K8sClient) AssertPodIsReady(t *testing.T, namespace string, instance string, timeout time.Duration) {
+	ctx, cancel := context.WithCancel(context.Background())
+	watch, err := k.Client.CoreV1().Pods(namespace).Watch(ctx, metav1.ListOptions{
+		LabelSelector: "app.kubernetes.io/instance=" + instance,
+	})
+	require.NoErrorf(t, err, "failed to find pod for instance %q", instance)
+
+	t.Log("Waiting for:", instance)
+	start := time.Now()
+	tm := time.NewTimer(timeout)
+	defer tm.Stop()
+	for {
+		select {
+		case <-tm.C:
+			elapsed := time.Since(start)
+			assert.Failf(t, "failed to find pod", "timed out after %s waiting for %s/%s", elapsed.String(), namespace, instance)
 			cancel()
 
 			k.logAllPods(t)
@@ -107,7 +157,8 @@ func (k K8sClient) AssertPodIsReady(t *testing.T, instance model.DeploymentInsta
 				})
 				readyCondition := conditions[index]
 				if readyCondition.Status == "True" {
-					t.Logf("pod for instance %q is running", podName)
+					elapsed := time.Since(start)
+					t.Logf("waited %v for pod for %s/%s to be ready", elapsed, namespace, instance)
 					if !tm.Stop() {
 						<-tm.C
 					}
