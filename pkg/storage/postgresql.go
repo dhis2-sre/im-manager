@@ -39,6 +39,20 @@ func NewDatabase(logger *slog.Logger, c PostgresqlConfig) (*gorm.DB, error) {
 		return nil, err
 	}
 
+	sqlDB, err := db.DB()
+	if err != nil {
+		return nil, err
+	}
+
+	sqlDB.SetMaxOpenConns(25)
+	sqlDB.SetMaxIdleConns(5)
+	sqlDB.SetConnMaxLifetime(1 * time.Hour)
+	sqlDB.SetConnMaxIdleTime(30 * time.Minute)
+
+	if err := sqlDB.Ping(); err != nil {
+		return nil, fmt.Errorf("failed to ping database: %w", err)
+	}
+
 	if err := db.Use(otelgorm.NewPlugin()); err != nil {
 		return nil, fmt.Errorf("failed to initialize otelgorm: %v", err)
 	}
