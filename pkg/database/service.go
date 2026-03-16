@@ -551,7 +551,6 @@ func (s service) SaveAs(ctx context.Context, userId uint, database *model.Databa
 		hostname, err := stack.ParameterProviders["DATABASE_HOSTNAME"].Provide(*instance)
 		if err != nil {
 			s.logError(ctx, err)
-			<-uploadDone
 			return
 		}
 		// TODO: get pod by label selector instead

@@ -165,8 +165,8 @@ func TestInstanceHandler(t *testing.T) {
 		}
 
 		deployDeployment(t, client, deployment.ID, tokens.AccessToken)
-		if deploymentInstance.Group.ID == 0 {
-			deploymentInstance.Group = *group
+		if deploymentInstance.Group == nil || deploymentInstance.Group.ID == 0 {
+			deploymentInstance.Group = group
 		}
 		k8sClient.AssertPodIsReady(t, deploymentInstance.Group.Namespace, deploymentInstance.Name, 60, deploymentInstance.Group.ID)
 
