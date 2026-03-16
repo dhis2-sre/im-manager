@@ -5,6 +5,8 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/uptrace/opentelemetry-go-extra/otelgorm"
+
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	slogGorm "github.com/orandin/slog-gorm"
 	"gorm.io/driver/postgres"
@@ -37,6 +39,23 @@ func NewDatabase(logger *slog.Logger, c PostgresqlConfig) (*gorm.DB, error) {
 		return nil, err
 	}
 
+	sqlDB, err := db.DB()
+	if err != nil {
+		return nil, err
+	}
+
+	sqlDB.SetMaxOpenConns(25)
+	sqlDB.SetMaxIdleConns(5)
+	sqlDB.SetConnMaxLifetime(1 * time.Hour)
+	sqlDB.SetConnMaxIdleTime(30 * time.Minute)
+
+	if err := sqlDB.Ping(); err != nil {
+		return nil, fmt.Errorf("failed to ping database: %w", err)
+	}
+
+	if err := db.Use(otelgorm.NewPlugin()); err != nil {
+		return nil, fmt.Errorf("failed to initialize otelgorm: %v", err)
+	}
 	err = db.AutoMigrate(
 		&model.Deployment{},
 		&model.DeploymentInstance{},
@@ -44,7 +63,7 @@ func NewDatabase(logger *slog.Logger, c PostgresqlConfig) (*gorm.DB, error) {
 
 		&model.User{},
 		&model.Group{},
-		&model.ClusterConfiguration{},
+		&model.Cluster{},
 
 		&model.Database{},
 		&model.Lock{},
@@ -52,6 +71,25 @@ func NewDatabase(logger *slog.Logger, c PostgresqlConfig) (*gorm.DB, error) {
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open Gorm session: %v", err)
+	}
+
+	err = db.Exec("CREATE EXTENSION IF NOT EXISTS pg_trgm").Error
+	if err != nil {
+		return nil, fmt.Errorf("failed to create pg_trgm extension: %v", err)
+	}
+
+	// GORM Doesn't handle the creation of gin indexes very well so the index is created manually here
+	//dev-1           | [00] Starting service
+	//database-1      | 2025-09-21 19:29:19.904 UTC [98] ERROR:  operator class "gin_trgm_ops" does not exist for access method "btree"
+	//database-1      | 2025-09-21 19:29:19.904 UTC [98] STATEMENT:  CREATE INDEX IF NOT EXISTS "idx_databases_description" ON "databases" (description gin_trgm_ops)
+	//dev-1           | [00] {"time":"2025-09-21T19:29:19.905025751Z","level":"ERROR","msg":"ERROR: operator class \"gin_trgm_ops\" does not exist for access method \"btree\" (SQLSTATE 42704)","error":"ERROR: operator class \"gin_trgm_ops\" does not exist for access method \"btree\" (SQLSTATE 42704)","query":"CREATE INDEX IF NOT EXISTS \"idx_databases_description\" ON \"databases\" (description gin_trgm_ops)","duration":414270,"rows":0,"file":"/src/pkg/storage/postgresql.go:45"}
+	//dev-1           | [00] im-manager exited due to: failed to setup DB: failed to open Gorm session: ERROR: operator class "gin_trgm_ops" does not exist for access method "btree" (SQLSTATE 42704)exit status 1
+	//dev-1           | [00] (error exit: exit status 1)
+	//dev-1           | [00] Killing service
+	sql := "CREATE INDEX IF NOT EXISTS idx_databases_description ON databases USING gin (description gin_trgm_ops)"
+	err = db.Exec(sql).Error
+	if err != nil {
+		return nil, err
 	}
 
 	return db, nil

@@ -10,7 +10,7 @@ import (
 	"path"
 	"time"
 
-	"k8s.io/apimachinery/pkg/util/yaml"
+	"gopkg.in/yaml.v3"
 
 	"github.com/dhis2-sre/im-manager/pkg/model"
 )
@@ -57,7 +57,7 @@ func (h helmfileService) executeHelmfileCommand(ctx context.Context, token strin
 		return nil, err
 	}
 
-	stackPath := path.Join(h.stackFolder, "/", stack.Name, "/helmfile.yaml")
+	stackPath := path.Join(h.stackFolder, "/", stack.Name, "/helmfile.yaml.gotmpl")
 	if _, err = os.Stat(stackPath); err != nil {
 		return nil, err
 	}
@@ -105,7 +105,7 @@ func (h helmfileService) configureInstanceEnvironment(ctx context.Context, acces
 	// TODO: We should only inject what the stack require, currently we just blindly inject IM_ACCESS_TOKEN and others which may not be required by the stack
 	// We could probably list the required system parameters in the stacks helmfile and parse those as well as other parameters
 	instanceNameEnv := fmt.Sprintf("%s=%s", "INSTANCE_NAME", instance.Name)
-	instanceNamespaceEnv := fmt.Sprintf("%s=%s", "INSTANCE_NAMESPACE", group.Name)
+	instanceNamespaceEnv := fmt.Sprintf("%s=%s", "INSTANCE_NAMESPACE", group.Namespace)
 	instanceIdEnv := fmt.Sprintf("%s=%d", "INSTANCE_ID", instance.ID)
 	deploymentIdEnv := fmt.Sprintf("%s=%d", "DEPLOYMENT_ID", instance.DeploymentID)
 	instanceTTLEnv := fmt.Sprintf("%s=%d", "INSTANCE_TTL", ttl)
@@ -125,10 +125,6 @@ func (h helmfileService) configureInstanceEnvironment(ctx context.Context, acces
 
 	cmd.Env = h.injectEnv(ctx, cmd.Env, "KUBERNETES_SERVICE_PORT")
 	cmd.Env = h.injectEnv(ctx, cmd.Env, "KUBERNETES_PORT")
-	cmd.Env = h.injectEnv(ctx, cmd.Env, "KUBERNETES_PORT_443_TCP_ADDR")
-	cmd.Env = h.injectEnv(ctx, cmd.Env, "KUBERNETES_PORT_443_TCP_PORT")
-	cmd.Env = h.injectEnv(ctx, cmd.Env, "KUBERNETES_PORT_443_TCP_PROTO")
-	cmd.Env = h.injectEnv(ctx, cmd.Env, "KUBERNETES_PORT_443_TCP")
 	cmd.Env = h.injectEnv(ctx, cmd.Env, "KUBERNETES_SERVICE_PORT_HTTPS")
 	cmd.Env = h.injectEnv(ctx, cmd.Env, "KUBERNETES_SERVICE_HOST")
 

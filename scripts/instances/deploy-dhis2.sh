@@ -13,11 +13,16 @@ DESCRIPTION=${*:-""}
 INSTANCE_TTL=${INSTANCE_TTL:-0}
 PUBLIC=${PUBLIC:-false}
 
-DATABASE_ID=${DATABASE_ID:-test-dbs-sierra-leone-2-40-2-sql-gz}
+DATABASE_ID=${DATABASE_ID:-whoami-2-42-sql-gz}
 DATABASE_SIZE=${DATABASE_SIZE:-20Gi}
 DB_RESOURCES_REQUESTS_CPU=${DB_RESOURCES_REQUESTS_CPU:-250m}
 DB_RESOURCES_REQUESTS_MEMORY=${DB_RESOURCES_REQUESTS_MEMORY:-256Mi}
 
+MINIO_CHART_VERSION=${MINIO_CHART_VERSION:-14.7.5}
+MINIO_STORAGE_SIZE=${MINIO_STORAGE_SIZE:-8Gi}
+MINIO_IMAGE_PULL_POLICY=${MINIO_IMAGE_PULL_POLICY:-IfNotPresent}
+
+CHART_VERSION=${CHART_VERSION:-0.31.0}
 MIN_READY_SECONDS=${MIN_READY_SECONDS:-120}
 # container(s) in dhis2 pod will be restarted after that due to restartPolicy
 # 5*26=130s
@@ -27,12 +32,14 @@ LIVENESS_PROBE_TIMEOUT_SECONDS=${LIVENESS_PROBE_TIMEOUT_SECONDS:-1}
 READINESS_PROBE_TIMEOUT_SECONDS=${LIVENESS_PROBE_TIMEOUT_SECONDS:-1}
 IMAGE_REPOSITORY=${IMAGE_REPOSITORY:-core}
 IMAGE_PULL_POLICY=${IMAGE_PULL_POLICY:-IfNotPresent}
-IMAGE_TAG=${IMAGE_TAG:-2.40.2}
+IMAGE_TAG=${IMAGE_TAG:-2.42}
 CORE_RESOURCES_REQUESTS_CPU=${CORE_RESOURCES_REQUESTS_CPU:-250m}
 CORE_RESOURCES_REQUESTS_MEMORY=${CORE_RESOURCES_REQUESTS_MEMORY:-1500Mi}
 FLYWAY_MIGRATE_OUT_OF_ORDER=${FLYWAY_MIGRATE_OUT_OF_ORDER:-false}
 FLYWAY_REPAIR_BEFORE_MIGRATION=${FLYWAY_REPAIR_BEFORE_MIGRATION:-false}
 ENABLE_QUERY_LOGGING=${ENABLE_QUERY_LOGGING:-false}
+ALLOW_SUSPEND=${ALLOW_SUSPEND:-true}
+STORAGE_TYPE=${STORAGE_TYPE:-filesystem}
 
 DEPLOYMENT_ID=$(echo "{
   \"name\": \"$NAME\",
@@ -60,8 +67,27 @@ echo "{
 }" | $HTTP post "$IM_HOST/deployments/$DEPLOYMENT_ID/instance" "Authorization: Bearer $ACCESS_TOKEN"
 
 echo "{
-  \"stackName\": \"dhis2-core\",
+  \"stackName\": \"minio\",
   \"parameters\": {
+    \"MINIO_STORAGE_SIZE\": {
+      \"value\": \"8Gi\"
+    },
+    \"MINIO_CHART_VERSION\": {
+      \"value\": \"14.7.5\"
+    },
+    \"IMAGE_PULL_POLICY\": {
+      \"value\": \"IfNotPresent\"
+    }
+  }
+}" | $HTTP post "$IM_HOST/deployments/$DEPLOYMENT_ID/instance" "Authorization: Bearer $ACCESS_TOKEN"
+
+echo "{
+  \"stackName\": \"dhis2-core\",
+  \"public\": $PUBLIC,
+  \"parameters\": {
+    \"CHART_VERSION\": {
+      \"value\": \"$CHART_VERSION\"
+    },
     \"MIN_READY_SECONDS\": {
       \"value\": \"$MIN_READY_SECONDS\"
     },
@@ -103,6 +129,9 @@ echo "{
     },
     \"ENABLE_QUERY_LOGGING\": {
       \"value\": \"$ENABLE_QUERY_LOGGING\"
+    },
+    \"ALLOW_SUSPEND\": {
+      \"value\": \"$ALLOW_SUSPEND\"
     }
   }
 }" | $HTTP post "$IM_HOST/deployments/$DEPLOYMENT_ID/instance" "Authorization: Bearer $ACCESS_TOKEN"

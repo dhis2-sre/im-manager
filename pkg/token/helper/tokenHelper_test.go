@@ -66,3 +66,39 @@ func TestValidateRefreshToken(t *testing.T) {
 	assert.WithinDuration(t, time.Unix(int64(expiration), 0), time.Unix(int64(refreshTokenData.ExpiresIn.Seconds()), 0), 1*time.Second)
 	assert.WithinDuration(t, time.Now().Add(time.Duration(expiration)), time.Unix(refreshTokenData.IssuedAt, 0), 1*time.Second)
 }
+
+func TestRefreshAccessToken(t *testing.T) {
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	require.NoError(t, err)
+	user := &model.User{
+		Email: "test@example.com",
+	}
+
+	t.Run("Long expiration time", func(t *testing.T) {
+		t.Parallel()
+		t.Log("Token with remaining time > 60 seconds, should return the same token")
+
+		expirationTime, err := GenerateAccessToken(user, key, 120)
+		require.NoError(t, err)
+		refreshed, err := RefreshAccessToken(expirationTime, key)
+		assert.NoError(t, err)
+		assert.Equal(t, expirationTime, refreshed)
+	})
+
+	t.Run("Short expiration time", func(t *testing.T) {
+		t.Parallel()
+		t.Log("Token with remaining time <= 60 seconds, should generate a new token")
+
+		expirationTime, err := GenerateAccessToken(user, key, 30)
+		require.NoError(t, err)
+		refreshed, err := RefreshAccessToken(expirationTime, key)
+		assert.NoError(t, err)
+		assert.NotEqual(t, expirationTime, refreshed)
+
+		t.Log("Verify the new token has an expiration close to 60 seconds from now")
+		_, exp, err := ValidateAccessToken(refreshed, &key.PublicKey)
+		require.NoError(t, err)
+		now := time.Now().Unix()
+		assert.True(t, exp-now <= 60 && exp-now > 50, "new token expiration should be around 60 seconds")
+	})
+}

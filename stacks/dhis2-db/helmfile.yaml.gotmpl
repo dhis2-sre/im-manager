@@ -1,11 +1,17 @@
 # hostnamePattern: %s-database-postgresql.%s.svc
+helmDefaults:
+  deleteWait: true
+
 releases:
   - name: {{ requiredEnv "INSTANCE_NAME" }}-database
     namespace: "{{ requiredEnv "INSTANCE_NAMESPACE" }}"
     chart: bitnami/postgresql
     version: "{{ requiredEnv "CHART_VERSION" }}"
-    verify: false
     values:
+      # This is required since we're using our own Docker: image https://github.com/dhis2-sre/bitnami-postgresql-curl
+      - global:
+          security:
+            allowInsecureImages: true
       - commonLabels:
           im: "true"
           im-default: "true"
@@ -17,6 +23,9 @@ releases:
           im-ttl: "{{ requiredEnv "INSTANCE_TTL" }}"
 
       - primary:
+          extendedConfiguration: |-
+            dhis2.environment = 'instance-manager'
+
           extraEnvVars:
             - name: HOSTNAME
               value: {{ requiredEnv "HOSTNAME" }}

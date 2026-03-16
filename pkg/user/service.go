@@ -109,7 +109,7 @@ func (s Service) ValidateEmail(ctx context.Context, token uuid.UUID) error {
 }
 
 func (s Service) SignIn(ctx context.Context, email string, password string) (*model.User, error) {
-	unauthorizedError := "invalid email and password combination"
+	const unauthorizedError = "invalid email and password combination"
 
 	user, err := s.repository.findByEmail(ctx, email)
 	if err != nil {

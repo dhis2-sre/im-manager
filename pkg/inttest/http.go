@@ -1,11 +1,13 @@
 package inttest
 
 import (
+	"bytes"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
+	"mime/multipart"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -108,6 +110,14 @@ func (hc *HTTPClient) Post(t *testing.T, path string, requestBody io.Reader, hea
 	return hc.Do(t, http.MethodPost, path, requestBody, http.StatusCreated, headers...)
 }
 
+// Put sends an HTTP PUT request to given path. Optional headers are applied to the request. The
+// response body is read in full and returned as is. Failure to read or close the HTTP response body
+// and HTTP status other than the expected status will fail the test associated with t.
+func (hc *HTTPClient) Put(t *testing.T, path string, requestBody io.Reader, expectedStatus int, headers ...func(http.Header)) []byte {
+	t.Helper()
+	return hc.Do(t, http.MethodPut, path, requestBody, expectedStatus, headers...)
+}
+
 // Delete sends an HTTP DELETE request to given path. Optional headers are applied to the request. The
 // response body is read in full and returned as is. Failure to read or close the HTTP response body
 // and HTTP status other than 202 will fail the test associated with t.
@@ -169,6 +179,37 @@ func (hc *HTTPClient) PostJSON(t *testing.T, path string, requestBody io.Reader,
 	err := json.Unmarshal(body, &responseBody)
 	errMsg := httpClientErrMessage(http.MethodPost, path)
 	require.NoError(t, err, errMsg+": failed to unmarshal response body")
+}
+
+// PutJSON sends an HTTP PUT request to given path. Optional headers are applied to the request. The
+// optional requestBody is assumed to be JSON. The response body is unmarshalled as JSON into given
+// responseBody. Failure to read or close the HTTP response body and HTTP status other than 200
+// will fail the test associated with t.
+func (hc *HTTPClient) PutJSON(t *testing.T, path string, requestBody io.Reader, responseBody any, headers ...func(http.Header)) {
+	t.Helper()
+
+	headers = append(headers, WithHeader("Content-Type", "application/json"))
+
+	body := hc.Put(t, path, requestBody, http.StatusOK, headers...)
+
+	err := json.Unmarshal(body, &responseBody)
+	errMsg := httpClientErrMessage(http.MethodPut, path)
+	require.NoError(t, err, errMsg+": failed to unmarshal response body")
+}
+
+// PostForm sends a multipart form data POST request
+func (hc *HTTPClient) PostForm(t *testing.T, path string, form *multipart.Writer, body *bytes.Buffer, responseBody any, headers ...func(http.Header)) {
+	t.Helper()
+
+	headers = append(headers, WithHeader("Content-Type", form.FormDataContentType()))
+
+	respBody := hc.Post(t, path, body, headers...)
+
+	if responseBody != nil {
+		err := json.Unmarshal(respBody, &responseBody)
+		errMsg := httpClientErrMessage(http.MethodPost, path)
+		require.NoError(t, err, errMsg+": failed to unmarshal response body")
+	}
 }
 
 func (hc *HTTPClient) SignIn(t *testing.T, email, password string) (*http.Cookie, *http.Cookie) {

@@ -37,12 +37,13 @@ func TestStackDefinitionsAreInSyncWithHelmfile(t *testing.T) {
 	}
 
 	// helmfileParameters will not contain Go Validator or Provider functions. We therefore need to
-	// create map of stack name to parameters with parameters only containing. DefaultValue and
+	// create a map of stack name to parameters with parameters only containing. DefaultValue and
 	// Consumed as we cannot ignore fields in the assertions we use.
 	stacks := map[string]model.StackParameters{
 		"dhis2-db":      DHIS2DB.Parameters,
 		"dhis2-core":    DHIS2Core.Parameters,
 		"dhis2":         DHIS2.Parameters,
+		"minio":         MINIO.Parameters,
 		"pgadmin":       PgAdmin.Parameters,
 		"whoami-go":     WhoamiGo.Parameters,
 		"im-job-runner": IMJobRunner.Parameters,
@@ -118,7 +119,7 @@ func parseStacks(dir string) (map[string]*stack, error) {
 }
 
 func parseStack(dir, name string) (*stack, error) {
-	path := fmt.Sprintf("%s/%s/helmfile.yaml", dir, name)
+	path := fmt.Sprintf("%s/%s/helmfile.yaml.gotmpl", dir, name)
 	file, err := os.ReadFile(path) // #nosec
 	if err != nil {
 		return nil, fmt.Errorf("error reading stack %q: %v", name, err)

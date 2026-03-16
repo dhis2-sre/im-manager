@@ -18,6 +18,7 @@ func Routes(r *gin.Engine, authenticationMiddleware AuthenticationMiddleware, au
 
 	tokenAuthenticationRouter.GET("/groups/:name", handler.Find)
 	tokenAuthenticationRouter.GET("/groups/:name/details", handler.FindWithDetails)
+	tokenAuthenticationRouter.GET("/groups/:name/resources", handler.FindResources)
 	tokenAuthenticationRouter.GET("/groups", handler.FindAll)
 
 	administratorRestrictedRouter := tokenAuthenticationRouter.Group("")
@@ -25,5 +26,6 @@ func Routes(r *gin.Engine, authenticationMiddleware AuthenticationMiddleware, au
 	administratorRestrictedRouter.POST("/groups", handler.Create)
 	administratorRestrictedRouter.POST("/groups/:group/users/:userId", handler.AddUserToGroup)
 	administratorRestrictedRouter.DELETE("/groups/:group/users/:userId", handler.RemoveUserFromGroup)
-	administratorRestrictedRouter.POST("/groups/:group/cluster-configuration", handler.AddClusterConfiguration)
+	administratorRestrictedRouter.POST("/groups/:group/clusters/:clusterId", handler.AddClusterToGroup)
+	administratorRestrictedRouter.DELETE("/groups/:group/clusters/:clusterId", handler.RemoveClusterFromGroup)
 }

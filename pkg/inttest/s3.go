@@ -21,7 +21,7 @@ func SetupS3(t *testing.T, path string) *S3Client {
 		localstack.Preset(
 			localstack.WithServices(localstack.S3),
 			localstack.WithS3Files(path),
-			localstack.WithVersion("2.1.0"),
+			localstack.WithVersion("3.0.0"),
 		),
 	)
 	require.NoError(t, err, "failed to start S3")

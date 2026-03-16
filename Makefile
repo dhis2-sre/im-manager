@@ -16,14 +16,19 @@ init:
 	go install github.com/go-swagger/go-swagger/cmd/swagger@latest
 	swagger version
 
+	go install github.com/git-chglog/git-chglog/cmd/git-chglog@latest
+
 check:
 	pre-commit run --verbose --all-files --show-diff-on-failure
 
+change-log:
+	git-chglog -o CHANGELOG.md
+
 smoke-test:
-	IMAGE_TAG=$(tag) docker compose up -d prod
+	IMAGE_TAG=$(tag) docker compose --profile prod up --detach prod
 
 docker-image:
-	IMAGE_TAG=$(tag) docker compose build prod
+	IMAGE_TAG=$(tag) docker compose --profile prod build prod
 
 push-docker-image:
 	IMAGE_TAG=$(tag) docker compose push prod

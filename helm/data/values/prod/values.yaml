@@ -1,3 +1,12 @@
 groups:
-  names: dev,play,qa,meta-packages,design,research,android,implement
-  hostnames: dev.im.dhis2.org,play.im.dhis2.org,qa.im.dhis2.org,meta-packages.im.dhis2.org,design.im.dhis2.org,research.im.dhis2.org,android.im.dhis2.org,implement.im.dhis2.org
+  names: dev,play,qa,meta-packages,design,research,android,implement,emis
+  namespaces: dev,play,qa,meta-packages,design,research,android,implement,prod
+  hostnames: dev.im.dhis2.org,play.im.dhis2.org,qa.im.dhis2.org,meta-packages.im.dhis2.org,design.im.dhis2.org,research.im.dhis2.org,android.im.dhis2.org,implement.im.dhis2.org,emis.im.dhis2.org
+sopsKmsArn: "arn:aws:kms:eu-central-1:767224633206:key/da28cbd4-3c42-416f-9dbb-421dabba4bff"
+tolerations:
+  - key: im-dedicated
+    operator: Equal
+    value: "true"
+    effect: NoSchedule
+nodeSelector:
+  im-dedicated: "true"

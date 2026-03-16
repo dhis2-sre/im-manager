@@ -1,0 +1,116 @@
+# consumedParameters: DATABASE_ID, DATABASE_USERNAME, DATABASE_PASSWORD, DATABASE_NAME, DATABASE_HOSTNAME
+# hostnameVariable: DATABASE_HOSTNAME
+# stackParameters: GOOGLE_AUTH_PROJECT_ID,GOOGLE_AUTH_PRIVATE_KEY_ID,GOOGLE_AUTH_PRIVATE_KEY,GOOGLE_AUTH_CLIENT_EMAIL,GOOGLE_AUTH_CLIENT_ID
+helmDefaults:
+  deleteWait: true
+
+releases:
+  - name: "{{ requiredEnv "INSTANCE_NAME" }}"
+    namespace: "{{ requiredEnv "INSTANCE_NAMESPACE" }}"
+    chart: dhis2/core
+    version: "{{ requiredEnv "CHART_VERSION" }}"
+    values:
+      - image:
+          repository: dhis2/{{ requiredEnv "IMAGE_REPOSITORY" }}
+          tag: "{{ requiredEnv "IMAGE_TAG" }}"
+          pullPolicy: {{ requiredEnv "IMAGE_PULL_POLICY" }}
+      - ingress:
+          enabled: true
+          hostname: {{ requiredEnv "INSTANCE_HOSTNAME" }}
+          path: /{{ requiredEnv "INSTANCE_NAME" }}
+          certIssuer: cert-issuer-prod
+          annotations:
+            nginx.ingress.kubernetes.io/proxy-body-size: 128m
+      - dhis2Home: "{{ requiredEnv "DHIS2_HOME" }}"
+      - catalinaOpts: "-Dcontext.path=/{{ requiredEnv "INSTANCE_NAME" }} -Dcontext.sameSiteCookies={{ requiredEnv "SAME_SITE_COOKIES" }}"
+      - contextPath: /{{ requiredEnv "INSTANCE_NAME" }}
+      - javaOpts: "{{ requiredEnv "JAVA_OPTS" }}"
+      - minReadySeconds: {{ requiredEnv "MIN_READY_SECONDS" }}
+      - startupProbe:
+          failureThreshold: {{ requiredEnv "STARTUP_PROBE_FAILURE_THRESHOLD" }}
+          periodSeconds: {{ requiredEnv "STARTUP_PROBE_PERIOD_SECONDS" }}
+          path: /{{ requiredEnv "INSTANCE_NAME" }}
+      - livenessProbe:
+          timeoutSeconds: {{ requiredEnv "LIVENESS_PROBE_TIMEOUT_SECONDS" }}
+          path: /{{ requiredEnv "INSTANCE_NAME" }}
+      - readinessProbe:
+          timeoutSeconds: {{ requiredEnv "READINESS_PROBE_TIMEOUT_SECONDS" }}
+          path: /{{ requiredEnv "INSTANCE_NAME" }}
+      - commonLabels:
+          im: "true"
+          im-default: "true"
+          im-deployment-id: "{{ requiredEnv "DEPLOYMENT_ID" }}"
+          im-instance-id: "{{ requiredEnv "INSTANCE_ID" }}"
+          im-id: "{{ requiredEnv "INSTANCE_ID" }}"
+          im-type: "dhis2"
+          im-creation-timestamp: "{{ requiredEnv "INSTANCE_CREATION_TIMESTAMP" }}"
+          im-ttl: "{{ requiredEnv "INSTANCE_TTL" }}"
+
+      {{- if eq (requiredEnv "STORAGE_TYPE") "filesystem" }}
+      - storage:
+          volumeSize: {{ requiredEnv "FILESYSTEM_VOLUME_SIZE" }}
+      {{- end }}
+
+      {{- if eq (requiredEnv "STORAGE_TYPE") "minio" }}
+      - minIO:
+          provider: s3
+          container: dhis2
+          endpoint: http://{{ requiredEnv "INSTANCE_NAME" }}-minio.{{ requiredEnv "INSTANCE_NAMESPACE" }}.svc:9000
+          location: eu-west-1
+          identity: dhisdhis
+          secret: dhisdhis
+      {{- end }}
+
+      {{- if eq (requiredEnv "STORAGE_TYPE") "s3" }}
+      - S3:
+          provider: aws-s3
+          container: {{ requiredEnv "S3_BUCKET" }}
+          location: {{ requiredEnv "S3_REGION" }}
+          identity: {{ requiredEnv "S3_IDENTITY" }}
+          secret: {{ requiredEnv "S3_SECRET" }}
+      {{- end }}
+
+      - database:
+          username: {{ requiredEnv "DATABASE_USERNAME" }}
+          password: {{ requiredEnv "DATABASE_PASSWORD" }}
+          database: {{ requiredEnv "DATABASE_NAME" }}
+          hostname: {{ requiredEnv "DATABASE_HOSTNAME" }}
+
+      {{- if ne (requiredEnv "CUSTOM_DHIS2_CONFIG") "" }}
+      - customConfigSnippet:
+          {{- requiredEnv "CUSTOM_DHIS2_CONFIG" | nindent 10 }}
+      {{- end }}
+
+      - sessionCookieSameSite: {{ requiredEnv "SAME_SITE_COOKIES" }}
+
+      - flyway:
+          migrateOutOfOrder: {{ requiredEnv "FLYWAY_MIGRATE_OUT_OF_ORDER" }}
+          repairBeforeMigration: {{ requiredEnv "FLYWAY_REPAIR_BEFORE_MIGRATION" }}
+
+      - enableQueryLogging: {{ requiredEnv "ENABLE_QUERY_LOGGING" }}
+
+      - googleAuth:
+          projectId: "{{ requiredEnv "GOOGLE_AUTH_PROJECT_ID" }}"
+          privateKeyId: "{{ requiredEnv "GOOGLE_AUTH_PRIVATE_KEY_ID" }}"
+          privateKey: '{{ requiredEnv "GOOGLE_AUTH_PRIVATE_KEY" }}'
+          clientEmail: "{{ requiredEnv "GOOGLE_AUTH_CLIENT_EMAIL" }}"
+          clientId: "{{ requiredEnv "GOOGLE_AUTH_CLIENT_ID" }}"
+      - resources:
+          requests:
+            cpu: {{ requiredEnv "RESOURCES_REQUESTS_CPU" }}
+            memory: {{ requiredEnv "RESOURCES_REQUESTS_MEMORY" }}
+      - keda:
+          enabled: {{ requiredEnv "ALLOW_SUSPEND" }}
+      - glowroot:
+          enabled: {{ requiredEnv "DEPLOY_GLOWROOT" }}
+          ingress:
+            path: /{{ requiredEnv "INSTANCE_NAME" }}-glowroot
+          config:
+            web:
+              contextPath: /{{ requiredEnv "INSTANCE_NAME" }}-glowroot
+
+repositories:
+  - name: dhis2
+    url: https://dhis2-sre.github.io/dhis2-core-chart
+  - name: bitnami
+    url: https://charts.bitnami.com/bitnami

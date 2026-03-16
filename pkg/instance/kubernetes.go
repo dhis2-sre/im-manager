@@ -11,6 +11,10 @@ import (
 	"strings"
 	"time"
 
+	"k8s.io/apimachinery/pkg/api/resource"
+
+	metricsv1beta1 "k8s.io/metrics/pkg/client/clientset/versioned"
+
 	"github.com/dhis2-sre/im-manager/internal/errdef"
 
 	"k8s.io/apimachinery/pkg/types"
@@ -20,30 +24,38 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/tools/remotecommand"
 )
 
 type kubernetesService struct {
-	client *kubernetes.Clientset
+	client     *kubernetes.Clientset
+	restConfig *rest.Config
 }
 
 //goland:noinspection GoExportedFuncWithUnexportedType
-func NewKubernetesService(config *model.ClusterConfiguration) (*kubernetesService, error) {
-	client, err := newClient(config)
+func NewKubernetesService(config model.Cluster) (*kubernetesService, error) {
+	restConfig, err := newRestConfig(config)
+	if err != nil {
+		return nil, fmt.Errorf("error creating kube rest config: %v", err)
+	}
+
+	client, err := kubernetes.NewForConfig(restConfig)
 	if err != nil {
 		return nil, fmt.Errorf("error creating kube client: %v", err)
 	}
 
-	return &kubernetesService{client: client}, nil
+	return &kubernetesService{client: client, restConfig: restConfig}, nil
 }
 
-func commandExecutor(cmd *exec.Cmd, configuration *model.ClusterConfiguration) (stdout []byte, stderr []byte, err error) {
-	if configuration == nil {
+func commandExecutor(cmd *exec.Cmd, cluster model.Cluster) (stdout []byte, stderr []byte, err error) {
+	if cluster.Configuration == nil {
 		return runCommand(cmd)
 	}
 
-	kubeCfg, err := decryptYaml(configuration.KubernetesConfiguration)
+	kubeCfg, err := decryptYaml(cluster.Configuration)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to decrypt kubernetes config: %v", err)
 	}
@@ -96,10 +108,38 @@ func runCommand(cmd *exec.Cmd) ([]byte, []byte, error) {
 	return stdout.Bytes(), stderr.Bytes(), err
 }
 
-func newClient(configuration *model.ClusterConfiguration) (*kubernetes.Clientset, error) {
+func newMetricsClient(cluster model.Cluster) (*metricsv1beta1.Clientset, error) {
+	restClientConfig, err := newRestConfig(cluster)
+	if err != nil {
+		return nil, err
+	}
+
+	metricsClient, err := metricsv1beta1.NewForConfig(restClientConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	return metricsClient, nil
+}
+
+func newClient(configuration model.Cluster) (*kubernetes.Clientset, error) {
+	restClientConfig, err := newRestConfig(configuration)
+	if err != nil {
+		return nil, err
+	}
+
+	client, err := kubernetes.NewForConfig(restClientConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	return client, nil
+}
+
+func newRestConfig(cluster model.Cluster) (*rest.Config, error) {
 	var restClientConfig *rest.Config
-	if configuration != nil && len(configuration.KubernetesConfiguration) > 0 {
-		kubeCfg, err := decryptYaml(configuration.KubernetesConfiguration)
+	if cluster.Configuration != nil {
+		kubeCfg, err := decryptYaml(cluster.Configuration)
 		if err != nil {
 			return nil, err
 		}
@@ -121,12 +161,7 @@ func newClient(configuration *model.ClusterConfiguration) (*kubernetes.Clientset
 		}
 	}
 
-	client, err := kubernetes.NewForConfig(restClientConfig)
-	if err != nil {
-		return nil, err
-	}
-
-	return client, nil
+	return restClientConfig, nil
 }
 
 func (ks kubernetesService) getLogs(instance *model.DeploymentInstance, typeSelector string) (io.ReadCloser, error) {
@@ -144,6 +179,33 @@ func (ks kubernetesService) getLogs(instance *model.DeploymentInstance, typeSele
 		Pods(pod.Namespace).
 		GetLogs(pod.Name, &podLogOptions).
 		Stream(context.TODO())
+}
+
+func (ks kubernetesService) Exec(ctx context.Context, namespace, podName, container string, command []string, stdout, stderr io.Writer) error {
+	req := ks.client.CoreV1().RESTClient().Post().
+		Resource("pods").
+		Name(podName).
+		Namespace(namespace).
+		SubResource("exec")
+
+	req.VersionedParams(&v1.PodExecOptions{
+		Container: container,
+		Command:   command,
+		Stdin:     false,
+		Stdout:    true,
+		Stderr:    true,
+		TTY:       false,
+	}, scheme.ParameterCodec)
+
+	executor, err := remotecommand.NewSPDYExecutor(ks.restConfig, "POST", req.URL())
+	if err != nil {
+		return err
+	}
+
+	return executor.StreamWithContext(ctx, remotecommand.StreamOptions{
+		Stdout: stdout,
+		Stderr: stderr,
+	})
 }
 
 func (ks kubernetesService) getPod(instanceID uint, typeSelector string) (v1.Pod, error) {
@@ -209,7 +271,7 @@ func (ks kubernetesService) restart(instance *model.DeploymentInstance, typeSele
 	}
 
 	if instanceStack.KubernetesResource == model.StatefulSetResource {
-		statefulSets := ks.client.AppsV1().StatefulSets(instance.GroupName)
+		statefulSets := ks.client.AppsV1().StatefulSets(instance.Group.Namespace)
 		statefulSetsList, err := statefulSets.List(context.TODO(), listOptions)
 		if err != nil {
 			return err
@@ -234,7 +296,7 @@ func (ks kubernetesService) restart(instance *model.DeploymentInstance, typeSele
 	}
 
 	if instanceStack.KubernetesResource == model.DeploymentResource {
-		deployments := ks.client.AppsV1().Deployments(instance.GroupName)
+		deployments := ks.client.AppsV1().Deployments(instance.Group.Namespace)
 		deploymentList, err := deployments.List(context.TODO(), listOptions)
 		if err != nil {
 			return err
@@ -292,7 +354,7 @@ func (ks kubernetesService) deletePersistentVolumeClaim(instance *model.Deployme
 		return nil
 	}
 
-	pvcs := ks.client.CoreV1().PersistentVolumeClaims(instance.GroupName)
+	pvcs := ks.client.CoreV1().PersistentVolumeClaims(instance.Group.Namespace)
 
 	for _, pattern := range labelPatterns {
 		selector := fmt.Sprintf(pattern, instance.Name)
@@ -322,7 +384,7 @@ func (ks kubernetesService) scale(instance *model.DeploymentInstance, replicas u
 	labelSelector := fmt.Sprintf("im-id=%d", instance.ID)
 	listOptions := metav1.ListOptions{LabelSelector: labelSelector}
 
-	deployments := ks.client.AppsV1().Deployments(instance.GroupName)
+	deployments := ks.client.AppsV1().Deployments(instance.Group.Namespace)
 	deploymentList, err := deployments.List(context.TODO(), listOptions)
 	if err != nil {
 		return fmt.Errorf("error finding deployments using selector %q: %v", labelSelector, err)
@@ -335,7 +397,7 @@ func (ks kubernetesService) scale(instance *model.DeploymentInstance, replicas u
 		}
 	}
 
-	sets := ks.client.AppsV1().StatefulSets(instance.GroupName)
+	sets := ks.client.AppsV1().StatefulSets(instance.Group.Namespace)
 	setsList, err := sets.List(context.TODO(), listOptions)
 	if err != nil {
 		return fmt.Errorf("error finding StatefulSets using selector %q: %v", labelSelector, err)
@@ -349,6 +411,80 @@ func (ks kubernetesService) scale(instance *model.DeploymentInstance, replicas u
 	}
 
 	return nil
+}
+
+type ClusterResources struct {
+	CPU        string
+	Memory     string
+	Autoscaled bool
+	Nodes      int
+}
+
+func FindResources(cluster model.Cluster) (ClusterResources, error) {
+	client, err := newClient(cluster)
+	if err != nil {
+		return ClusterResources{}, err
+	}
+
+	metricsClient, err := newMetricsClient(cluster)
+	if err != nil {
+		return ClusterResources{}, err
+	}
+
+	nodes, err := client.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		return ClusterResources{}, err
+	}
+
+	nodeMetrics, err := metricsClient.MetricsV1beta1().NodeMetricses().List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		return ClusterResources{}, err
+	}
+
+	var totalCPUUsed, totalMemUsed, totalCPUAlloc, totalMemAlloc resource.Quantity
+
+	for _, node := range nodes.Items {
+		name := node.Name
+		allocCPU := node.Status.Allocatable["cpu"]
+		allocMem := node.Status.Allocatable["memory"]
+
+		var usedCPU, usedMem resource.Quantity
+		for _, metric := range nodeMetrics.Items {
+			if metric.Name == name {
+				usedCPU = metric.Usage["cpu"]
+				usedMem = metric.Usage["memory"]
+				break
+			}
+		}
+		/*
+			cpuPercent := percent(usedCPU.MilliValue(), allocCPU.MilliValue())
+			memPercent := percent(usedMem.Value(), allocMem.Value())
+
+			fmt.Printf("- %s\n", name)
+			fmt.Printf("  CPU: %s / %s (%.1f%%)\n", usedCPU.String(), allocCPU.String(), cpuPercent)
+			fmt.Printf("  MEM: %s / %s (%.1f%%)\n", usedMem.String(), allocMem.String(), memPercent)
+		*/
+		totalCPUUsed.Add(usedCPU)
+		totalMemUsed.Add(usedMem)
+		totalCPUAlloc.Add(allocCPU)
+		totalMemAlloc.Add(allocMem)
+	}
+
+	clusterCPUPercent := percent(totalCPUUsed.MilliValue(), totalCPUAlloc.MilliValue())
+	clusterMemPercent := percent(totalMemUsed.Value(), totalMemAlloc.Value())
+
+	return ClusterResources{
+		CPU:    fmt.Sprintf("%.1f%%", clusterCPUPercent),
+		Memory: fmt.Sprintf("%.1f%%", clusterMemPercent),
+		Nodes:  len(nodes.Items),
+	}, nil
+}
+
+func percent(used, total int64) float64 {
+	if total == 0 {
+		return 0.0
+	}
+	return (float64(used) / float64(total)) * 100
 }
 
 // scaler allows updating the desired scale of a resource as well as getting the current desired and

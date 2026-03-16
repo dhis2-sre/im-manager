@@ -7,6 +7,8 @@ import (
 	"io"
 	"net/http"
 
+	"github.com/dhis2-sre/im-manager/pkg/stack"
+
 	"github.com/dhis2-sre/im-manager/internal/errdef"
 
 	"github.com/dhis2-sre/im-manager/internal/handler"
@@ -14,8 +16,9 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func NewHandler(groupService groupServiceHandler, instanceService *Service, defaultTTL uint) Handler {
+func NewHandler(stackService stack.Service, groupService groupServiceHandler, instanceService *Service, defaultTTL uint) Handler {
 	return Handler{
+		stackService:    stackService,
 		groupService:    groupService,
 		instanceService: instanceService,
 		defaultTTL:      defaultTTL,
@@ -23,6 +26,7 @@ func NewHandler(groupService groupServiceHandler, instanceService *Service, defa
 }
 
 type Handler struct {
+	stackService    stack.Service
 	groupService    groupServiceHandler
 	instanceService *Service
 	defaultTTL      uint
@@ -30,13 +34,6 @@ type Handler struct {
 
 type groupServiceHandler interface {
 	Find(ctx context.Context, name string) (*model.Group, error)
-}
-
-type SaveDeploymentRequest struct {
-	Name        string `json:"name" binding:"required,dns_rfc1035_label"`
-	Description string `json:"description"`
-	Group       string `json:"group" binding:"required"`
-	TTL         uint   `json:"ttl"`
 }
 
 func (h Handler) DeployDeployment(c *gin.Context) {
@@ -98,7 +95,45 @@ func (h Handler) DeployDeployment(c *gin.Context) {
 		return
 	}
 
+	err = h.stripDeploymentSensitiveParameterValues(deployment)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
 	c.JSON(http.StatusOK, deployment)
+}
+
+func (h Handler) stripDeploymentSensitiveParameterValues(deployment *model.Deployment) error {
+	for _, instance := range deployment.Instances {
+		err := h.stripInstanceSensitiveParameterValues(instance)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (h Handler) stripInstanceSensitiveParameterValues(instance *model.DeploymentInstance) error {
+	stack, err := h.stackService.Find(instance.StackName)
+	if err != nil {
+		return err
+	}
+
+	for index, parameter := range instance.Parameters {
+		if stack.Parameters[parameter.ParameterName].Sensitive {
+			parameter.Value = "***"
+			instance.Parameters[index] = parameter
+		}
+	}
+	return nil
+}
+
+type SaveDeploymentRequest struct {
+	Name        string `json:"name" binding:"required,dns_rfc1035_label"`
+	Description string `json:"description"`
+	Group       string `json:"group" binding:"required"`
+	TTL         uint   `json:"ttl"`
 }
 
 func (h Handler) SaveDeployment(c *gin.Context) {
@@ -167,6 +202,12 @@ func (h Handler) SaveDeployment(c *gin.Context) {
 		return
 	}
 
+	err = h.stripDeploymentSensitiveParameterValues(deployment)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
 	c.JSON(http.StatusCreated, deployment)
 }
 
@@ -209,6 +250,12 @@ func (h Handler) FindDeploymentById(c *gin.Context) {
 	if !canRead {
 		unauthorized := errdef.NewUnauthorized("read access denied")
 		_ = c.Error(unauthorized)
+		return
+	}
+
+	err = h.stripDeploymentSensitiveParameterValues(deployment)
+	if err != nil {
+		_ = c.Error(err)
 		return
 	}
 
@@ -285,6 +332,12 @@ func (h Handler) SaveInstance(c *gin.Context) {
 		return
 	}
 
+	err = h.stripInstanceSensitiveParameterValues(instance)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
 	c.JSON(http.StatusCreated, instance)
 }
 
@@ -343,6 +396,45 @@ func (h Handler) Pause(c *gin.Context) {
 	}
 
 	c.Status(http.StatusAccepted)
+}
+
+// InstanceWithDetails instance
+func (h Handler) InstanceWithDetails(c *gin.Context) {
+	// swagger:route PUT /instances/{id}/details instanceWithDetails
+	//
+	// Instance with details
+	//
+	// Returns the details of an instance including parameters
+	//
+	// Security:
+	//	oauth2:
+	//
+	// responses:
+	//	202:
+	//	401: Error
+	//	403: Error
+	//	404: Error
+	//	415: Error
+	id, ok := handler.GetPathParameter(c, "id")
+	if !ok {
+		return
+	}
+
+	ctx := c.Request.Context()
+
+	instance, err := h.instanceService.FindDeploymentInstanceById(ctx, id)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	err = h.stripInstanceSensitiveParameterValues(instance)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	c.JSON(http.StatusOK, instance)
 }
 
 // Reset instance
@@ -689,6 +781,17 @@ func (h Handler) FindDeployments(c *gin.Context) {
 		return
 	}
 
+	for i, group := range groupsWithDeployments {
+		for j, deployment := range group.Deployments {
+			err := h.stripDeploymentSensitiveParameterValues(deployment)
+			if err != nil {
+				_ = c.Error(err)
+				return
+			}
+			groupsWithDeployments[i].Deployments[j] = deployment
+		}
+	}
+
 	c.JSON(http.StatusOK, groupsWithDeployments)
 }
 
@@ -821,4 +924,141 @@ func (h Handler) Status(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, status)
+}
+
+// UpdateInstance updates an existing deployment instance
+func (h Handler) UpdateInstance(c *gin.Context) {
+	// swagger:route PUT /deployments/{id}/instance/{instanceId} updateInstance
+	//
+	// Update a Deployment Instance
+	//
+	// Update a Deployment Instance ...
+	//
+	// Security:
+	//	oauth2:
+	//
+	// responses:
+	//	200: DeploymentInstance
+	//	401: Error
+	//	403: Error
+	//	404: Error
+	//	415: Error
+	deploymentId, ok := handler.GetPathParameter(c, "id")
+	if !ok {
+		return
+	}
+
+	instanceId, ok := handler.GetPathParameter(c, "instanceId")
+	if !ok {
+		return
+	}
+
+	var request SaveInstanceRequest
+	if err := handler.DataBinder(c, &request); err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	ctx := c.Request.Context()
+	user, err := handler.GetUserFromContext(ctx)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	deployment, err := h.instanceService.FindDeploymentById(ctx, deploymentId)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	canWrite := handler.CanWriteDeployment(user, deployment)
+	if !canWrite {
+		unauthorized := errdef.NewUnauthorized("write access denied")
+		_ = c.Error(unauthorized)
+		return
+	}
+
+	token, err := handler.GetTokenFromRequest(c)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	instance, err := h.instanceService.UpdateInstance(ctx, token, deploymentId, instanceId, request.Parameters, request.Public)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	c.JSON(http.StatusOK, instance)
+}
+
+type UpdateDeploymentRequest struct {
+	TTL         uint   `json:"ttl"`
+	Description string `json:"description"`
+}
+
+// UpdateDeployment updates an existing Deployment's TTL and description
+func (h Handler) UpdateDeployment(c *gin.Context) {
+	// swagger:route PUT /deployments/{id} updateDeployment
+	//
+	// Update a Deployment
+	//
+	// Update a Deployment ...
+	//
+	// Security:
+	//   oauth2:
+	//
+	// Responses:
+	//   200: Deployment
+	//   400: Error
+	//   401: Error
+	//   403: Error
+	//   404: Error
+	//   500: Error
+	id, ok := handler.GetPathParameter(c, "id")
+	if !ok {
+		return
+	}
+
+	var request UpdateDeploymentRequest
+	if err := handler.DataBinder(c, &request); err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	token, err := handler.GetTokenFromRequest(c)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	ctx := c.Request.Context()
+	user, err := handler.GetUserFromContext(ctx)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	deployment, err := h.instanceService.FindDeploymentById(ctx, id)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	canWrite := handler.CanWriteDeployment(user, deployment)
+	if !canWrite {
+		unauthorized := errdef.NewUnauthorized("write access denied")
+		_ = c.Error(unauthorized)
+		return
+	}
+
+	updatedDeployment, err := h.instanceService.UpdateDeployment(ctx, token, id, request.TTL, request.Description)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	c.JSON(http.StatusOK, updatedDeployment)
 }

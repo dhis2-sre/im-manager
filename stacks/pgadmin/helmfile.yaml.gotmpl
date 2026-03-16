@@ -6,7 +6,7 @@ releases:
     chart: runix/pgadmin4
     version: "{{ requiredEnv "CHART_VERSION" }}"
     values:
-      - podLabels:
+      - commonLabels:
           im: "true"
           im-default: "true"
           im-deployment-id: "{{ requiredEnv "DEPLOYMENT_ID" }}"

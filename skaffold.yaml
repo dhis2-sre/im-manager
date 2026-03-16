@@ -2,7 +2,7 @@
   createNamespace: true
   remoteChart: im-group
   repo: https://dhis2-sre.github.io/im-group
-  version: 0.3.0
+  version: 0.4.0
 
 .im-group-prod-service-account-config: &im-group-prod-service-account-config
   setValues:
@@ -28,6 +28,16 @@ deploy:
   tolerateFailuresUntilDeadline: true
   helm:
     releases:
+      - name: im-jaeger-{{ .ENVIRONMENT }}
+        namespace: instance-manager-{{ .CLASSIFICATION }}
+        createNamespace: true
+        remoteChart: jaeger
+        repo: https://jaegertracing.github.io/helm-charts
+        version: 3.4.1
+        upgradeOnChange: true
+        valuesFiles:
+          - helm/data/values/{{ .CLASSIFICATION }}/jaeger.yaml
+
       - name: im-rabbitmq-{{ .ENVIRONMENT }}
         namespace: instance-manager-{{ .CLASSIFICATION }}
         createNamespace: true
@@ -36,27 +46,31 @@ deploy:
         version: 14.4.2
         upgradeOnChange: true
         useHelmSecrets: true
-        setValues:
-          extraPlugins: "rabbitmq_stream rabbitmq_stream_management"
-          service:
-            extraPorts:
-            - name: streams
-              port: 5552
-              targetPort: 5552
         valuesFiles:
           - helm/data/secrets/{{ .CLASSIFICATION }}/rabbitmq.yaml
+          - helm/data/values/{{ .CLASSIFICATION }}/rabbitmq.yaml
+        setValueTemplates:
+          global:
+            security:
+              allowInsecureImages: true
+          image:
+            repository: bitnamilegacy/rabbitmq
 
-      - name: im-manager-redis-{{ .ENVIRONMENT }}
+      - name: im-redis-{{ .ENVIRONMENT }}
         namespace: instance-manager-{{ .CLASSIFICATION }}
         createNamespace: true
         remoteChart: redis
         repo: https://charts.bitnami.com/bitnami
-        version: 18.2.2
+        version: 23.2.12
         upgradeOnChange: true
-        setValues:
-          architecture: standalone
-          auth:
-            enabled: false
+        valuesFiles:
+          - helm/data/values/{{ .CLASSIFICATION }}/redis.yaml
+        setValueTemplates:
+          global:
+            security:
+              allowInsecureImages: true
+          image:
+            repository: bitnamilegacy/redis
 
       - name: im-manager-postgresql-{{ .ENVIRONMENT }}
         namespace: instance-manager-{{ .CLASSIFICATION }}
@@ -69,6 +83,12 @@ deploy:
         valuesFiles:
           - helm/data/secrets/{{ .CLASSIFICATION }}/postgresql.yaml
           - helm/data/values/{{ .CLASSIFICATION }}/postgresql.yaml
+        setValueTemplates:
+          global:
+            security:
+              allowInsecureImages: true
+          image:
+            repository: bitnamilegacy/postgresql
 
       - name: im-manager-{{ .ENVIRONMENT }}
         namespace: instance-manager-{{ .CLASSIFICATION }}
@@ -88,13 +108,15 @@ deploy:
             hostname: "{{ .API_HOSTNAME }}"
             certIssuer: cert-issuer-prod
           redis:
-            host: im-manager-redis-{{ .ENVIRONMENT }}-master.instance-manager-{{ .CLASSIFICATION }}.svc
+            host: im-redis-{{ .ENVIRONMENT }}-master.instance-manager-{{ .CLASSIFICATION }}.svc
           environment:
             ENVIRONMENT: "{{ .ENVIRONMENT }}"
             CLASSIFICATION: "{{ .CLASSIFICATION }}"
             HOSTNAME: "{{ .API_HOSTNAME }}"
             UI_URL: "{{ .UI_URL }}"
             INSTANCE_SERVICE_HOST: im-manager-{{ .ENVIRONMENT }}.instance-manager-{{ .CLASSIFICATION }}.svc:8080
+            JAEGER_HOST: im-jaeger-{{ .ENVIRONMENT }}-collector.instance-manager-{{ .CLASSIFICATION }}.svc
+            JAEGER_PORT: "14268"
             DATABASE_HOST: im-manager-postgresql-{{ .ENVIRONMENT }}.instance-manager-{{ .CLASSIFICATION }}.svc
             DATABASE_PORT: "5432"
             RABBITMQ_HOST: im-rabbitmq-{{ .ENVIRONMENT }}.instance-manager-{{ .CLASSIFICATION }}.svc
@@ -104,6 +126,7 @@ deploy:
             S3_REGION: eu-west-1
             DEFAULT_TTL: "172800" # 48 hours
             PASSWORD_TOKEN_TTL: "900" # 15 minutes
+            LOG_PRETTY_PRINT: "{{ .LOG_PRETTY_PRINT }}"
         useHelmSecrets: true
         valuesFiles:
           - helm/data/secrets/{{ .CLASSIFICATION }}/values.yaml
@@ -112,6 +135,16 @@ deploy:
 profiles:
   - name: dev
     patches:
+      - op: add
+        path: /deploy/helm/releases/-
+        value:
+          name: im-group-dev-dev
+          namespace: dev
+          <<: *im-group-chart-config
+          setValueTemplates:
+            serviceAccount:
+              name: im-manager-{{ .ENVIRONMENT }}
+              namespace: instance-manager-{{ .CLASSIFICATION }}
       - op: add
         path: /deploy/helm/releases/-
         value:
@@ -184,4 +217,18 @@ profiles:
         value:
           name: im-group-implement
           namespace: implement
+          <<: [ *im-group-chart-config, *im-group-prod-service-account-config ]
+
+      - op: add
+        path: /deploy/helm/releases/-
+        value:
+          name: im-group-emis
+          namespace: emis
+          <<: [ *im-group-chart-config, *im-group-prod-service-account-config ]
+
+      - op: add
+        path: /deploy/helm/releases/-
+        value:
+          name: im-group-prod
+          namespace: prod
           <<: [ *im-group-chart-config, *im-group-prod-service-account-config ]

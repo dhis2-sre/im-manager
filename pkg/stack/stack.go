@@ -134,7 +134,7 @@ func ValidateConsumedParameters(stacks []model.Stack) error {
 
 const ifNotPresent = "IfNotPresent"
 
-// Stack representing ../../stacks/dhis2-db/helmfile.yaml
+// Stack representing ../../stacks/dhis2-db/helmfile.yaml.gotmpl
 var DHIS2DB = model.Stack{
 	// TODO: Remove HostnamePattern once stacks 2.0 are the default
 	HostnamePattern: "%s-database-postgresql.%s.svc",
@@ -143,8 +143,8 @@ var DHIS2DB = model.Stack{
 		"DATABASE_ID":               {Priority: 1, DisplayName: "Database"},
 		"DATABASE_SIZE":             {Priority: 2, DisplayName: "Database Size", DefaultValue: &dhis2DBDefaults.dbSize},
 		"DATABASE_NAME":             {Priority: 3, DisplayName: "Database Name", DefaultValue: &dhis2DBDefaults.dbName},
-		"DATABASE_PASSWORD":         {Priority: 4, DisplayName: "Database Password", DefaultValue: &dhis2DBDefaults.dbPassword},
-		"DATABASE_USERNAME":         {Priority: 5, DisplayName: "Database Username", DefaultValue: &dhis2DBDefaults.dbUsername},
+		"DATABASE_PASSWORD":         {Priority: 4, DisplayName: "Database Password", DefaultValue: &dhis2DBDefaults.dbPassword, Sensitive: true},
+		"DATABASE_USERNAME":         {Priority: 5, DisplayName: "Database Username", DefaultValue: &dhis2DBDefaults.dbUsername, Sensitive: true},
 		"DATABASE_VERSION":          {Priority: 6, DisplayName: "Database Version", DefaultValue: &dhis2DBDefaults.dbVersion},
 		"RESOURCES_REQUESTS_CPU":    {Priority: 7, DisplayName: "Resources Requests CPU", DefaultValue: &dhis2DBDefaults.resourcesRequestsCPU},
 		"RESOURCES_REQUESTS_MEMORY": {Priority: 8, DisplayName: "Resources Requests Memory", DefaultValue: &dhis2DBDefaults.resourcesRequestsMemory},
@@ -155,6 +155,11 @@ var DHIS2DB = model.Stack{
 	},
 	KubernetesResource: model.StatefulSetResource,
 }
+
+// Provides the PostgreSQL hostname of an instance.
+var postgresHostnameProvider = model.ParameterProviderFunc(func(instance model.DeploymentInstance) (string, error) {
+	return fmt.Sprintf("%s-database-postgresql.%s.svc", instance.Name, instance.Group.Namespace), nil
+})
 
 var dhis2DBDefaults = struct {
 	chartVersion            string
@@ -167,28 +172,66 @@ var dhis2DBDefaults = struct {
 	resourcesRequestsCPU    string
 	resourcesRequestsMemory string
 }{
-	chartVersion:            "12.6.2",
+	chartVersion:            "16.4.5",
 	dbName:                  "dhis2",
 	dbPassword:              "dhis",
 	dbSize:                  "20Gi",
 	dbUsername:              "dhis",
-	dbVersion:               "13",
+	dbVersion:               "16",
 	resourcesRequestsCPU:    "250m",
 	resourcesRequestsMemory: "256Mi",
 }
 
-// Stack representing ../../stacks/dhis2-core/helmfile.yaml
+// Stack representing ../../stacks/minio/helmfile.yaml.gotmpl
+var MINIO = model.Stack{
+	Name: "minio",
+	Parameters: model.StackParameters{
+		"MINIO_STORAGE_SIZE":  {Priority: 1, DisplayName: "Storage Size", DefaultValue: &minIODefaults.storageSize},
+		"MINIO_CHART_VERSION": {Priority: 2, DisplayName: "Chart Version", DefaultValue: &minIODefaults.chartVersion},
+		"IMAGE_PULL_POLICY":   {Priority: 3, DisplayName: "Image Pull Policy", DefaultValue: &minIODefaults.imagePullPolicy, Validator: imagePullPolicy},
+		"DATABASE_ID":         {Priority: 0, DisplayName: "Database", Consumed: true},
+	},
+	ParameterProviders: model.ParameterProviders{
+		"MINIO_HOSTNAME": minioHostnameProvider,
+	},
+	Requires:           []model.Stack{DHIS2DB},
+	KubernetesResource: model.DeploymentResource,
+}
+
+// Provides the Minio hostname of an instance.
+var minioHostnameProvider = model.ParameterProviderFunc(func(instance model.DeploymentInstance) (string, error) {
+	return fmt.Sprintf("%s-minio.%s.svc", instance.Name, instance.Group.Namespace), nil
+})
+
+var storageCompanionProvider = model.RequireCompanionFunc(func(parameter model.DeploymentInstanceParameter) (*model.Stack, error) {
+	if parameter.Value == minIOStorage {
+		return &MINIO, nil
+	}
+	return nil, nil
+})
+
+var minIODefaults = struct {
+	chartVersion    string
+	storageSize     string
+	imagePullPolicy string
+}{
+	chartVersion:    "14.7.5",
+	storageSize:     "8Gi",
+	imagePullPolicy: ifNotPresent,
+}
+
+// Stack representing ../../stacks/dhis2-core/helmfile.yaml.gotmpl
 var DHIS2Core = model.Stack{
 	Name: "dhis2-core",
 	Parameters: model.StackParameters{
 		"IMAGE_TAG":                       {Priority: 1, DisplayName: "Image Tag", DefaultValue: &dhis2CoreDefaults.imageTag},
 		"IMAGE_REPOSITORY":                {Priority: 2, DisplayName: "Image Repository", DefaultValue: &dhis2CoreDefaults.imageRepository},
 		"IMAGE_PULL_POLICY":               {Priority: 3, DisplayName: "Image Pull Policy", DefaultValue: &dhis2CoreDefaults.imagePullPolicy, Validator: imagePullPolicy},
-		"STORAGE_TYPE":                    {Priority: 4, DisplayName: "Storage type", DefaultValue: &dhis2CoreDefaults.storageType, Validator: storage},
+		"STORAGE_TYPE":                    {Priority: 4, DisplayName: "Storage type", DefaultValue: &dhis2CoreDefaults.storageType, Validator: storage, RequireCompanion: storageCompanionProvider},
 		"S3_BUCKET":                       {Priority: 5, DisplayName: "S3 bucket", DefaultValue: &dhis2CoreDefaults.s3Bucket},
-		"S3_REGION":                       {Priority: 6, DisplayName: "S3 region", DefaultValue: &dhis2CoreDefaults.s3Region},
-		"S3_IDENTITY":                     {Priority: 7, DisplayName: "S3 identity", DefaultValue: &dhis2CoreDefaults.s3Identity},
-		"S3_SECRET":                       {Priority: 8, DisplayName: "S3 secret", DefaultValue: &dhis2CoreDefaults.s3Secret},
+		"S3_REGION":                       {Priority: 6, DisplayName: "S3 region", DefaultValue: &dhis2CoreDefaults.s3Region, Sensitive: true},
+		"S3_IDENTITY":                     {Priority: 7, DisplayName: "S3 identity", DefaultValue: &dhis2CoreDefaults.s3Identity, Sensitive: true},
+		"S3_SECRET":                       {Priority: 8, DisplayName: "S3 secret", DefaultValue: &dhis2CoreDefaults.s3Secret, Sensitive: true},
 		"DHIS2_HOME":                      {Priority: 9, DisplayName: "DHIS2 Home Directory", DefaultValue: &dhis2CoreDefaults.dhis2Home},
 		"FLYWAY_MIGRATE_OUT_OF_ORDER":     {Priority: 10, DisplayName: "Flyway Migrate Out Of Order", DefaultValue: &dhis2CoreDefaults.flywayMigrateOutOfOrder},
 		"FLYWAY_REPAIR_BEFORE_MIGRATION":  {Priority: 11, DisplayName: "Flyway Repair Before Migration", DefaultValue: &dhis2CoreDefaults.flywayRepairBeforeMigration},
@@ -201,30 +244,36 @@ var DHIS2Core = model.Stack{
 		"STARTUP_PROBE_PERIOD_SECONDS":    {Priority: 18, DisplayName: "Startup Probe Period Seconds", DefaultValue: &dhis2CoreDefaults.startupProbePeriodSeconds},
 		"JAVA_OPTS":                       {Priority: 19, DisplayName: "JAVA_OPTS", DefaultValue: &dhis2CoreDefaults.javaOpts},
 		"CHART_VERSION":                   {Priority: 20, DisplayName: "Chart Version", DefaultValue: &dhis2CoreDefaults.chartVersion},
-		"MINIO_CHART_VERSION":             {Priority: 21, DisplayName: "MinIO Chart Version", DefaultValue: &dhis2CoreDefaults.minIOChartVersion},
-		"MINIO_STORAGE_SIZE":              {Priority: 22, DisplayName: "MinIO Storage Size", DefaultValue: &dhis2CoreDefaults.minIOStorageSize},
-		"ENABLE_QUERY_LOGGING":            {Priority: 23, DisplayName: "Enable Query Logging", DefaultValue: &dhis2CoreDefaults.enableQueryLogging},
-		"GOOGLE_AUTH_PROJECT_ID":          {Priority: 0, DisplayName: "Google auth project id", DefaultValue: &dhis2CoreDefaults.googleAuthClientId},
-		"GOOGLE_AUTH_PRIVATE_KEY":         {Priority: 0, DisplayName: "Google auth private key", DefaultValue: &dhis2CoreDefaults.googleAuthPrivateKey},
-		"GOOGLE_AUTH_PRIVATE_KEY_ID":      {Priority: 0, DisplayName: "Google auth private key id", DefaultValue: &dhis2CoreDefaults.googleAuthPrivateKeyId},
-		"GOOGLE_AUTH_CLIENT_EMAIL":        {Priority: 0, DisplayName: "Google auth client email", DefaultValue: &dhis2CoreDefaults.googleAuthClientEmail},
-		"GOOGLE_AUTH_CLIENT_ID":           {Priority: 0, DisplayName: "Google auth client id", DefaultValue: &dhis2CoreDefaults.googleAuthClientId},
+		"ENABLE_QUERY_LOGGING":            {Priority: 21, DisplayName: "Enable Query Logging", DefaultValue: &dhis2CoreDefaults.enableQueryLogging},
+		"FILESYSTEM_VOLUME_SIZE":          {Priority: 22, DisplayName: "Filesystem volume size (only in effect if \"Storage\" is set to \"filesystem\")", DefaultValue: &dhis2CoreDefaults.filesystemVolumeSize, Sensitive: true},
+		"SAME_SITE_COOKIES":               {Priority: 23, DisplayName: "Same site cookies", DefaultValue: &dhis2CoreDefaults.sameSiteCookies, Validator: sameSiteCookies},
+		"CUSTOM_DHIS2_CONFIG":             {Priority: 24, DisplayName: "Custom DHIS2 config (applied to top of dhis.conf)", DefaultValue: &dhis2CoreDefaults.customDhis2Config, Sensitive: true},
+		"ALLOW_SUSPEND":                   {Priority: 25, DisplayName: "Allow the application to be suspended", DefaultValue: &dhis2CoreDefaults.allowSuspend},
+		"DEPLOY_GLOWROOT":                 {Priority: 26, DisplayName: "Deploy Glowroot", DefaultValue: &dhis2CoreDefaults.deployGlowroot},
+		"GOOGLE_AUTH_PROJECT_ID":          {Priority: 0, DisplayName: "Google auth project id", DefaultValue: &dhis2CoreDefaults.googleAuthClientId, Sensitive: true},
+		"GOOGLE_AUTH_PRIVATE_KEY":         {Priority: 0, DisplayName: "Google auth private key", DefaultValue: &dhis2CoreDefaults.googleAuthPrivateKey, Sensitive: true},
+		"GOOGLE_AUTH_PRIVATE_KEY_ID":      {Priority: 0, DisplayName: "Google auth private key id", DefaultValue: &dhis2CoreDefaults.googleAuthPrivateKeyId, Sensitive: true},
+		"GOOGLE_AUTH_CLIENT_EMAIL":        {Priority: 0, DisplayName: "Google auth client email", DefaultValue: &dhis2CoreDefaults.googleAuthClientEmail, Sensitive: true},
+		"GOOGLE_AUTH_CLIENT_ID":           {Priority: 0, DisplayName: "Google auth client id", DefaultValue: &dhis2CoreDefaults.googleAuthClientId, Sensitive: true},
 		"DATABASE_HOSTNAME":               {Priority: 0, DisplayName: "Database Hostname", Consumed: true},
 		"DATABASE_NAME":                   {Priority: 0, DisplayName: "Database Name", Consumed: true},
-		"DATABASE_PASSWORD":               {Priority: 0, DisplayName: "Database Password", Consumed: true},
-		"DATABASE_USERNAME":               {Priority: 0, DisplayName: "Database Username", Consumed: true},
+		"DATABASE_PASSWORD":               {Priority: 0, DisplayName: "Database Password", Consumed: true, Sensitive: true},
+		"DATABASE_USERNAME":               {Priority: 0, DisplayName: "Database Username", Consumed: true, Sensitive: true},
 	},
 	Requires: []model.Stack{
 		DHIS2DB,
+	},
+	Companions: []model.Stack{
+		MINIO,
 	},
 	KubernetesResource: model.DeploymentResource,
 }
 
 var dhis2CoreDefaults = struct {
 	chartVersion                 string
-	minIOChartVersion            string
-	minIOStorageSize             string
 	storageType                  string
+	sameSiteCookies              string
+	filesystemVolumeSize         string
 	s3Bucket                     string
 	s3Region                     string
 	s3Identity                   string
@@ -244,16 +293,19 @@ var dhis2CoreDefaults = struct {
 	resourcesRequestsMemory      string
 	startupProbeFailureThreshold string
 	startupProbePeriodSeconds    string
+	customDhis2Config            string
+	allowSuspend                 string
+	deployGlowroot               string
 	googleAuthProjectId          string
 	googleAuthPrivateKey         string
 	googleAuthPrivateKeyId       string
 	googleAuthClientEmail        string
 	googleAuthClientId           string
 }{
-	chartVersion:                 "0.20.0",
-	minIOChartVersion:            "14.7.5",
-	minIOStorageSize:             "8Gi",
+	chartVersion:                 "0.32.1",
 	storageType:                  minIOStorage,
+	sameSiteCookies:              lax,
+	filesystemVolumeSize:         "8Gi",
 	s3Bucket:                     "dhis2",
 	s3Region:                     "eu-west-1",
 	s3Identity:                   "-",
@@ -273,6 +325,9 @@ var dhis2CoreDefaults = struct {
 	resourcesRequestsMemory:      "1500Mi",
 	startupProbeFailureThreshold: "26",
 	startupProbePeriodSeconds:    "5",
+	customDhis2Config:            " ",
+	allowSuspend:                 "true",
+	deployGlowroot:               "false",
 	googleAuthProjectId:          " ", // TODO: " " doesn't need to be used here as with `javaOpts` since the googleAuth* parameters are stack parameters and therefor always populated
 	googleAuthPrivateKey:         " ", // However the web client currently doesn't support these empty parameter so for now
 	googleAuthPrivateKeyId:       " ",
@@ -280,7 +335,7 @@ var dhis2CoreDefaults = struct {
 	googleAuthClientId:           " ",
 }
 
-// Stack representing ../../stacks/dhis2/helmfile.yaml
+// Stack representing ../../stacks/dhis2/helmfile.yaml.gotmpl
 var DHIS2 = model.Stack{
 	// TODO: Remove HostnamePattern once stacks 2.0 are the default
 	HostnamePattern: "%s-database-postgresql.%s.svc",
@@ -291,9 +346,9 @@ var DHIS2 = model.Stack{
 		"IMAGE_PULL_POLICY":               {Priority: 3, DisplayName: "Image Pull Policy", DefaultValue: &dhis2CoreDefaults.imagePullPolicy, Validator: imagePullPolicy},
 		"DATABASE_ID":                     {Priority: 4, DisplayName: "Database"},
 		"DATABASE_NAME":                   {Priority: 5, DisplayName: "Database Name", DefaultValue: &dhis2DBDefaults.dbName},
-		"DATABASE_PASSWORD":               {Priority: 6, DisplayName: "Database Password", DefaultValue: &dhis2DBDefaults.dbPassword},
+		"DATABASE_PASSWORD":               {Priority: 6, DisplayName: "Database Password", DefaultValue: &dhis2DBDefaults.dbPassword, Sensitive: true},
 		"DATABASE_SIZE":                   {Priority: 7, DisplayName: "Database Size", DefaultValue: &dhis2DBDefaults.dbSize},
-		"DATABASE_USERNAME":               {Priority: 8, DisplayName: "Database Username", DefaultValue: &dhis2DBDefaults.dbUsername},
+		"DATABASE_USERNAME":               {Priority: 8, DisplayName: "Database Username", DefaultValue: &dhis2DBDefaults.dbUsername, Sensitive: true},
 		"DATABASE_VERSION":                {Priority: 9, DisplayName: "Database Version", DefaultValue: &dhis2DBDefaults.dbVersion},
 		"INSTALL_REDIS":                   {Priority: 10, DisplayName: "Install Redis", DefaultValue: &dhis2Defaults.installRedis},
 		"DHIS2_HOME":                      {Priority: 11, DisplayName: "DHIS2 Home Directory", DefaultValue: &dhis2CoreDefaults.dhis2Home},
@@ -311,11 +366,11 @@ var DHIS2 = model.Stack{
 		"CHART_VERSION":                   {Priority: 23, DisplayName: "Chart Version", DefaultValue: &dhis2CoreDefaults.chartVersion},
 		"JAVA_OPTS":                       {Priority: 24, DisplayName: "JAVA Options", DefaultValue: &dhis2CoreDefaults.javaOpts},
 		"ENABLE_QUERY_LOGGING":            {Priority: 25, DisplayName: "Enable Query Logging", DefaultValue: &dhis2CoreDefaults.enableQueryLogging},
-		"GOOGLE_AUTH_PROJECT_ID":          {Priority: 0, DisplayName: "Google auth project id", DefaultValue: &dhis2CoreDefaults.googleAuthClientId},
-		"GOOGLE_AUTH_PRIVATE_KEY":         {Priority: 0, DisplayName: "Google auth private key", DefaultValue: &dhis2CoreDefaults.googleAuthPrivateKey},
-		"GOOGLE_AUTH_PRIVATE_KEY_ID":      {Priority: 0, DisplayName: "Google auth private key id", DefaultValue: &dhis2CoreDefaults.googleAuthPrivateKeyId},
-		"GOOGLE_AUTH_CLIENT_EMAIL":        {Priority: 0, DisplayName: "Google auth client email", DefaultValue: &dhis2CoreDefaults.googleAuthClientEmail},
-		"GOOGLE_AUTH_CLIENT_ID":           {Priority: 0, DisplayName: "Google auth client id", DefaultValue: &dhis2CoreDefaults.googleAuthClientId},
+		"GOOGLE_AUTH_PROJECT_ID":          {Priority: 0, DisplayName: "Google auth project id", DefaultValue: &dhis2CoreDefaults.googleAuthClientId, Sensitive: true},
+		"GOOGLE_AUTH_PRIVATE_KEY":         {Priority: 0, DisplayName: "Google auth private key", DefaultValue: &dhis2CoreDefaults.googleAuthPrivateKey, Sensitive: true},
+		"GOOGLE_AUTH_PRIVATE_KEY_ID":      {Priority: 0, DisplayName: "Google auth private key id", DefaultValue: &dhis2CoreDefaults.googleAuthPrivateKeyId, Sensitive: true},
+		"GOOGLE_AUTH_CLIENT_EMAIL":        {Priority: 0, DisplayName: "Google auth client email", DefaultValue: &dhis2CoreDefaults.googleAuthClientEmail, Sensitive: true},
+		"GOOGLE_AUTH_CLIENT_ID":           {Priority: 0, DisplayName: "Google auth client id", DefaultValue: &dhis2CoreDefaults.googleAuthClientId, Sensitive: true},
 	},
 	ParameterProviders: model.ParameterProviders{
 		"DATABASE_HOSTNAME": postgresHostnameProvider,
@@ -328,16 +383,16 @@ var dhis2Defaults = struct {
 	installRedis: "false",
 }
 
-// Stack representing ../../stacks/pgadmin/helmfile.yaml
+// Stack representing ../../stacks/pgadmin/helmfile.yaml.gotmpl
 var PgAdmin = model.Stack{
 	Name: "pgadmin",
 	Parameters: model.StackParameters{
-		"PGADMIN_USERNAME":  {Priority: 1, DisplayName: "pgAdmin Username"},
-		"PGADMIN_PASSWORD":  {Priority: 2, DisplayName: "pgAdmin Password"},
+		"PGADMIN_USERNAME":  {Priority: 1, DisplayName: "pgAdmin Username", Sensitive: true},
+		"PGADMIN_PASSWORD":  {Priority: 2, DisplayName: "pgAdmin Password", Sensitive: true},
 		"CHART_VERSION":     {Priority: 3, DisplayName: "Chart Version", DefaultValue: &pgAdminDefaults.chartVersion},
 		"DATABASE_HOSTNAME": {Priority: 0, DisplayName: "Database Hostname", Consumed: true},
 		"DATABASE_NAME":     {Priority: 0, DisplayName: "Database Name", Consumed: true},
-		"DATABASE_USERNAME": {Priority: 0, DisplayName: "Database Username", Consumed: true},
+		"DATABASE_USERNAME": {Priority: 0, DisplayName: "Database Username", Consumed: true, Sensitive: true},
 	},
 	Requires: []model.Stack{
 		DHIS2DB,
@@ -348,10 +403,10 @@ var PgAdmin = model.Stack{
 var pgAdminDefaults = struct {
 	chartVersion string
 }{
-	chartVersion: "1.25.1",
+	chartVersion: "1.33.3",
 }
 
-// Stack representing ../../stacks/whoami-go/helmfile.yaml
+// Stack representing ../../stacks/whoami-go/helmfile.yaml.gotmpl
 var WhoamiGo = model.Stack{
 	Name: "whoami-go",
 	Parameters: model.StackParameters{
@@ -378,7 +433,7 @@ var whoamiGoDefaults = struct {
 	replicaCount:    "1",
 }
 
-// Stack representing ../../stacks/im-job-runner/helmfile.yaml
+// Stack representing ../../stacks/im-job-runner/helmfile.yaml.gotmpl
 var IMJobRunner = model.Stack{
 	Name: "im-job-runner",
 	Parameters: model.StackParameters{
@@ -386,9 +441,9 @@ var IMJobRunner = model.Stack{
 		"PAYLOAD":                 {Priority: 0, DisplayName: "Payload", DefaultValue: &imJobRunnerDefaults.payload},
 		"DHIS2_DATABASE_DATABASE": {Priority: 0, DisplayName: "DHIS2 Database Name", DefaultValue: &dhis2DBDefaults.dbName},
 		"DHIS2_DATABASE_HOSTNAME": {Priority: 0, DisplayName: "DHIS2 Database Hostname", DefaultValue: &imJobRunnerDefaults.dbHostname},
-		"DHIS2_DATABASE_PASSWORD": {Priority: 0, DisplayName: "DHIS2 Database Password", DefaultValue: &dhis2DBDefaults.dbPassword},
+		"DHIS2_DATABASE_PASSWORD": {Priority: 0, DisplayName: "DHIS2 Database Password", DefaultValue: &dhis2DBDefaults.dbPassword, Sensitive: true},
 		"DHIS2_DATABASE_PORT":     {Priority: 0, DisplayName: "DHIS2 Database Port", DefaultValue: &imJobRunnerDefaults.dbPort},
-		"DHIS2_DATABASE_USERNAME": {Priority: 0, DisplayName: "DHIS2 Database Username", DefaultValue: &dhis2DBDefaults.dbUsername},
+		"DHIS2_DATABASE_USERNAME": {Priority: 0, DisplayName: "DHIS2 Database Username", DefaultValue: &dhis2DBDefaults.dbUsername, Sensitive: true},
 		"DHIS2_HOSTNAME":          {Priority: 0, DisplayName: "DHIS2 Hostname", DefaultValue: &imJobRunnerDefaults.dhis2Hostname},
 		"CHART_VERSION":           {Priority: 0, DisplayName: "Chart Version", DefaultValue: &imJobRunnerDefaults.chartVersion},
 	},
@@ -408,11 +463,6 @@ var imJobRunnerDefaults = struct {
 	payload:       "-",
 }
 
-// Provides the PostgreSQL hostname of an instance.
-var postgresHostnameProvider = model.ParameterProviderFunc(func(instance model.DeploymentInstance) (string, error) {
-	return fmt.Sprintf("%s-database-postgresql.%s.svc", instance.Name, instance.GroupName), nil
-})
-
 // imagePullPolicy validates a value is a valid Kubernetes image pull policy.
 var imagePullPolicy = OneOf(string(k8s.PullAlways), string(k8s.PullNever), string(k8s.PullIfNotPresent))
 
@@ -423,7 +473,16 @@ const (
 )
 
 // storage validates the value is one of our storage types.
-var storage = OneOf(minIOStorage, s3Storage)
+var storage = OneOf(minIOStorage, s3Storage, filesystemStorage)
+
+const (
+	strict = "strict"
+	lax    = "lax"
+	none   = "none"
+)
+
+// sameSiteCookies validates the value is one of our same site cookie types.
+var sameSiteCookies = OneOf(strict, lax, none)
 
 // OneOf creates a function returning an error when called with a value that is not any of the given
 // validValues.

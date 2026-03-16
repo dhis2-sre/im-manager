@@ -37,6 +37,19 @@ import (
 	"strings"
 	"time"
 
+	"github.com/dhis2-sre/im-manager/pkg/cluster"
+
+	"github.com/dhis2-sre/im-manager/pkg/inspector"
+
+	"go.opentelemetry.io/otel/sdk/resource"
+	semconv "go.opentelemetry.io/otel/semconv/v1.27.0"
+
+	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/exporters/jaeger"
+	"go.opentelemetry.io/otel/propagation"
+	"go.opentelemetry.io/otel/sdk/trace"
+
 	"github.com/gin-gonic/gin"
 	"github.com/go-mail/mail"
 	"github.com/go-redis/redis"
@@ -62,7 +75,6 @@ import (
 	"github.com/dhis2-sre/im-manager/pkg/integration"
 	"github.com/dhis2-sre/im-manager/pkg/stack"
 	"github.com/dhis2-sre/im-manager/pkg/storage"
-	"github.com/dhis2-sre/rabbitmq-client/pkg/rabbitmq"
 )
 
 func main() {
@@ -80,8 +92,19 @@ func run() (err error) {
 		}
 	}()
 
+	shutdown, err := initTracer()
+	defer shutdown()
+	if err != nil {
+		return err
+	}
+
 	ctx := context.Background()
-	logger := slog.New(log.New(slog.NewJSONHandler(os.Stdout, nil)))
+
+	prettyPrint, exists := os.LookupEnv("LOG_PRETTY_PRINT")
+	enablePrettyPrint := exists && prettyPrint == "true"
+
+	options := log.PrettyJSONHandlerOptions{PrettyPrint: enablePrettyPrint}
+	logger := slog.New(log.New(log.NewPrettyJSONHandler(os.Stdout, &options)))
 
 	db, err := newDB(logger)
 	if err != nil {
@@ -126,9 +149,13 @@ func run() (err error) {
 	}
 	userHandler := user.NewHandler(logger, hostname, authConfig.SameSiteMode, authConfig.AccessTokenExpirationSeconds, authConfig.RefreshTokenExpirationSeconds, authConfig.RefreshTokenRememberMeExpirationSeconds, publicKey, userService, tokenService)
 
+	clusterRepository := cluster.NewRepository(db)
+	clusterService := cluster.NewService(clusterRepository)
+	clusterHandler := cluster.NewHandler(clusterService)
+
 	authentication := middleware.NewAuthentication(publicKey, userService)
 	groupRepository := group.NewRepository(db)
-	groupService := group.NewService(groupRepository, userService)
+	groupService := group.NewService(groupRepository, userService, clusterService)
 	groupHandler := group.NewHandler(groupService)
 
 	stackService, err := newStackService()
@@ -136,35 +163,19 @@ func run() (err error) {
 		return err
 	}
 
-	instanceService, err := newInstanceService(logger, db, stackService, groupService)
+	awsS3Client, err := newAWSS3Client(ctx)
 	if err != nil {
 		return err
 	}
 
-	rabbitmqConfig, err := newRabbitMQ()
-	if err != nil {
-		return err
-	}
-	consumer, err := rabbitmq.NewConsumer(
-		rabbitmqConfig.GetURI(),
-		rabbitmq.WithConnectionName(hostname),
-		rabbitmq.WithConsumerTagPrefix(hostname),
-		rabbitmq.WithLogger(logger.WithGroup("rabbitmq")),
-	)
-	if err != nil {
-		return fmt.Errorf("failed to setup RabbitMQ consumer: %v", err)
-	}
-	defer consumer.Close()
-
-	ttlDestroyConsumer := instance.NewTTLDestroyConsumer(logger, consumer, instanceService)
-	err = ttlDestroyConsumer.Consume()
+	instanceService, err := newInstanceService(logger, db, stackService, groupService, awsS3Client, tokenService)
 	if err != nil {
 		return err
 	}
 
 	stackHandler := stack.NewHandler(stackService)
 
-	instanceHandler, err := newInstanceHandler(groupService, instanceService)
+	instanceHandler, err := newInstanceHandler(stackService, groupService, instanceService)
 	if err != nil {
 		return err
 	}
@@ -184,7 +195,17 @@ func run() (err error) {
 		return err
 	}
 
+	rabbitmqConfig, err := newRabbitMQ()
+	if err != nil {
+		return err
+	}
+
 	eventHandler, err := newEventHandler(ctx, logger, rabbitmqConfig)
+	if err != nil {
+		return err
+	}
+
+	_, err = createDefaultCluster(ctx, clusterService)
 	if err != nil {
 		return err
 	}
@@ -204,11 +225,18 @@ func run() (err error) {
 		return err
 	}
 
+	ins := inspector.NewInspector(logger, instanceService, inspector.NewTTLDestroyHandler(logger, instanceService))
+	// TODO: Graceful shutdown... ?
+	go ins.Inspect(ctx)
+
 	r, err := newGinEngine(logger)
 	if err != nil {
 		return err
 	}
 
+	r.Use(otelgin.Middleware("im")) // Attach OpenTelemetry middleware
+
+	cluster.Routes(r, authentication, authorization, clusterHandler)
 	group.Routes(r, authentication, authorization, groupHandler)
 	user.Routes(r, authentication, authorization, userHandler)
 	stack.Routes(r, authentication.TokenAuthentication, stackHandler)
@@ -396,6 +424,7 @@ func getPrivateKey(ctx context.Context, logger *slog.Logger) (*rsa.PrivateKey, e
 func newStackService() (stack.Service, error) {
 	stacks, err := stack.New(
 		stack.DHIS2DB,
+		stack.MINIO,
 		stack.DHIS2Core,
 		stack.DHIS2,
 		stack.PgAdmin,
@@ -409,7 +438,7 @@ func newStackService() (stack.Service, error) {
 	return stack.NewService(stacks), nil
 }
 
-func newInstanceService(logger *slog.Logger, db *gorm.DB, stackService stack.Service, groupService *group.Service) (*instance.Service, error) {
+func newInstanceService(logger *slog.Logger, db *gorm.DB, stackService stack.Service, groupService *group.Service, s3Client *s3.Client, tokenService *token.TokenService) (*instance.Service, error) {
 	instanceParameterEncryptionKey, err := requireEnv("INSTANCE_PARAMETER_ENCRYPTION_KEY")
 	if err != nil {
 		return nil, err
@@ -421,7 +450,12 @@ func newInstanceService(logger *slog.Logger, db *gorm.DB, stackService stack.Ser
 	}
 	helmfileService := instance.NewHelmfileService(logger, stackService, "./stacks", classification)
 
-	return instance.NewService(logger, instanceRepository, groupService, stackService, helmfileService), nil
+	s3Bucket, err := requireEnv("S3_BUCKET")
+	if err != nil {
+		return nil, err
+	}
+
+	return instance.NewService(logger, instanceRepository, groupService, stackService, helmfileService, s3Client, s3Bucket, tokenService), nil
 }
 
 type rabbitMQConfig struct {
@@ -468,13 +502,13 @@ func newRabbitMQ() (rabbitMQConfig, error) {
 	}, nil
 }
 
-func newInstanceHandler(groupService *group.Service, instanceService *instance.Service) (instance.Handler, error) {
+func newInstanceHandler(stackService stack.Service, groupService *group.Service, instanceService *instance.Service) (instance.Handler, error) {
 	defaultTTL, err := requireEnvAsUint("DEFAULT_TTL")
 	if err != nil {
 		return instance.Handler{}, err
 	}
 
-	return instance.NewHandler(groupService, instanceService, defaultTTL), nil
+	return instance.NewHandler(stackService, groupService, instanceService, defaultTTL), nil
 }
 
 func newDatabaseHandler(ctx context.Context, logger *slog.Logger, db *gorm.DB, groupService *group.Service, instanceService *instance.Service, stackService stack.Service) (database.Handler, error) {
@@ -487,12 +521,24 @@ func newDatabaseHandler(ctx context.Context, logger *slog.Logger, db *gorm.DB, g
 		return database.Handler{}, err
 	}
 	databaseRepository := database.NewRepository(db)
-	databaseService := database.NewService(logger, s3Bucket, s3Client, groupService, databaseRepository)
+	databaseService := database.NewService(logger, s3Bucket, s3Client, groupService, databaseRepository, func(c model.Cluster) (database.PodExecutor, error) {
+		return instance.NewKubernetesService(c)
+	})
 
 	return database.NewHandler(logger, databaseService, groupService, instanceService, stackService), nil
 }
 
 func newS3Client(ctx context.Context, logger *slog.Logger) (*storage.S3Client, error) {
+	awsClient, err := newAWSS3Client(ctx)
+	if err != nil {
+		return nil, err
+	}
+	uploader := manager.NewUploader(awsClient)
+
+	return storage.NewS3Client(logger, awsClient, uploader), nil
+}
+
+func newAWSS3Client(ctx context.Context) (*s3.Client, error) {
 	s3Region, err := requireEnv("S3_REGION")
 	if err != nil {
 		return nil, err
@@ -517,9 +563,8 @@ func newS3Client(ctx context.Context, logger *slog.Logger) (*storage.S3Client, e
 	s3AWSClient := s3.NewFromConfig(s3Config, func(o *s3.Options) {
 		o.UsePathStyle = true
 	})
-	uploader := manager.NewUploader(s3AWSClient)
 
-	return storage.NewS3Client(logger, s3AWSClient, uploader), nil
+	return s3AWSClient, nil
 }
 
 func newIntegrationHandler() (integration.Handler, error) {
@@ -572,12 +617,21 @@ func newEventHandler(ctx context.Context, logger *slog.Logger, rabbitmqConfig ra
 	return event.NewHandler(logger, env, streamName), nil
 }
 
+func createDefaultCluster(ctx context.Context, clusterService cluster.Service) (model.Cluster, error) {
+	return clusterService.FindOrCreate(ctx, "default", "The cluster where IM is hosted")
+}
+
 type groupService interface {
-	FindOrCreate(ctx context.Context, name string, hostname string, deployable bool) (*model.Group, error)
+	FindOrCreate(ctx context.Context, name string, namespace string, hostname string, deployable bool) (*model.Group, error)
 }
 
 func createGroups(ctx context.Context, logger *slog.Logger, groupService groupService) error {
 	groupNames, err := requireEnvAsArray("GROUP_NAMES")
+	if err != nil {
+		return err
+	}
+
+	groupNamespaces, err := requireEnvAsArray("GROUP_NAMESPACES")
 	if err != nil {
 		return err
 	}
@@ -589,15 +643,16 @@ func createGroups(ctx context.Context, logger *slog.Logger, groupService groupSe
 		return fmt.Errorf("want arrays to be of equal size, instead got \"GROUP_NAMES\"=%v \"GROUP_HOSTNAMES\"=%v", groupNames, groupHostnames)
 	}
 
-	groups := make([]struct{ Name, Hostname string }, len(groupNames))
+	groups := make([]struct{ Name, Namespaces, Hostname string }, len(groupNames))
 	for i := 0; i < len(groupNames); i++ {
 		groups[i].Name = groupNames[i]
+		groups[i].Namespaces = groupNamespaces[i]
 		groups[i].Hostname = groupHostnames[i]
 	}
 
 	logger.InfoContext(ctx, "Creating groups...")
 	for _, g := range groups {
-		newGroup, err := groupService.FindOrCreate(ctx, g.Name, g.Hostname, true)
+		newGroup, err := groupService.FindOrCreate(ctx, g.Name, g.Namespaces, g.Hostname, true)
 		if err != nil {
 			return fmt.Errorf("error creating group: %v", err)
 		}
@@ -619,7 +674,7 @@ func createAdminUser(ctx context.Context, userService *user.Service, groupServic
 		return err
 	}
 
-	return user.CreateUser(ctx, adminEmail, adminPassword, userService, groupService, model.AdministratorGroupName, "admin")
+	return user.CreateUser(ctx, adminEmail, adminPassword, userService, groupService, model.AdministratorGroupName, "", "admin")
 }
 
 func createE2ETestUser(ctx context.Context, userService *user.Service, groupService *group.Service) error {
@@ -632,7 +687,7 @@ func createE2ETestUser(ctx context.Context, userService *user.Service, groupServ
 		return err
 	}
 
-	return user.CreateUser(ctx, testEmail, testPassword, userService, groupService, model.DefaultGroupName, "e2e test")
+	return user.CreateUser(ctx, testEmail, testPassword, userService, groupService, model.DefaultGroupName, model.DefaultGroupName, "e2e test")
 }
 
 func newGinEngine(logger *slog.Logger) (*gin.Engine, error) {
@@ -706,4 +761,35 @@ func requireEnvAsArray(key string) ([]string, error) {
 		return nil, err
 	}
 	return strings.Split(value, ","), nil
+}
+
+func initTracer() (func(), error) {
+	host, err := requireEnv("JAEGER_HOST")
+	if err != nil {
+		return nil, err
+	}
+	port, err := requireEnvAsUint("JAEGER_PORT")
+	if err != nil {
+		return nil, err
+	}
+
+	endpoint := fmt.Sprintf("http://%s:%d/api/traces", host, port)
+	exporter, err := jaeger.New(jaeger.WithCollectorEndpoint(jaeger.WithEndpoint(endpoint)))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Jaeger exporter: %v", err)
+	}
+
+	environment, err := requireEnv("ENVIRONMENT")
+	if err != nil {
+		return nil, err
+	}
+
+	resources := trace.WithResource(resource.NewWithAttributes(semconv.SchemaURL, semconv.ServiceNameKey.String(fmt.Sprintf("%s-api", environment))))
+	tracerProvider := trace.NewTracerProvider(trace.WithBatcher(exporter), resources)
+	otel.SetTracerProvider(tracerProvider)
+
+	otel.SetTextMapPropagator(propagation.TraceContext{})
+
+	// Return shutdown function
+	return func() { _ = tracerProvider.Shutdown(context.Background()) }, nil
 }

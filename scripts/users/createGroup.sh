@@ -3,15 +3,17 @@
 set -euo pipefail
 
 NAME=$1
-DESCRIPTION=$2
-HOSTNAME=$2
-DEPLOYABLE=${3:-false}
+NAMESPACE=$2
+DESCRIPTION=$3
+HOSTNAME=$4
+DEPLOYABLE=${5:-false}
 
 source ./auth.sh Admin
 
 echo "{
   \"name\": \"$NAME\",
-  \"description\": \"$HOSTNAME\",
+  \"namespace\": \"$NAMESPACE\",
+  \"description\": \"$DESCRIPTION\",
   \"hostname\": \"$HOSTNAME\",
   \"deployable\": $DEPLOYABLE
 }" | $HTTP post "$IM_HOST/groups" "Authorization: Bearer $ACCESS_TOKEN"

@@ -1,12 +1,9 @@
 package database_test
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
-	"io"
 	"log/slog"
-	"mime/multipart"
 	"net/http"
 	"os"
 	"strconv"
@@ -43,7 +40,7 @@ func TestDatabaseHandler(t *testing.T) {
 	s3Client := storage.NewS3Client(logger, s3.Client, uploader)
 
 	databaseRepository := database.NewRepository(db)
-	databaseService := database.NewService(logger, s3Bucket, s3Client, groupService{}, databaseRepository)
+	databaseService := database.NewService(logger, s3Bucket, s3Client, groupService{}, databaseRepository, nil)
 
 	client := inttest.SetupHTTPServer(t, func(engine *gin.Engine) {
 		databaseHandler := database.NewHandler(logger, databaseService, groupService{groupName: "packages"}, instanceService{}, stackService{})
@@ -62,38 +59,7 @@ func TestDatabaseHandler(t *testing.T) {
 		database.Routes(engine, authenticator, databaseHandler)
 	})
 
-	var databaseID string
-	{
-		t.Log("Upload")
-
-		var b bytes.Buffer
-		w := multipart.NewWriter(&b)
-		err := w.WriteField("group", "packages")
-		require.NoError(t, err, "failed to write form field")
-		err = w.WriteField("name", "path/name.extension")
-		require.NoError(t, err, "failed to write form field")
-		f, err := w.CreateFormFile("database", "mydb")
-		require.NoError(t, err, "failed to create form file")
-		_, err = io.WriteString(f, "file contents")
-		require.NoError(t, err, "failed to write file")
-		_ = w.Close()
-
-		body := client.Post(t, "/databases", &b, inttest.WithHeader("Content-Type", w.FormDataContentType()))
-
-		var database model.Database
-		err = json.Unmarshal(body, &database)
-		require.NoError(t, err, "POST /databases: failed to unmarshal HTTP response body")
-		require.Equal(t, "path/name.extension", database.Name)
-		require.Equal(t, "packages", database.GroupName)
-		require.Equal(t, "s3://database-bucket/packages/path/name.extension", database.Url)
-
-		actualContent := s3.GetObject(t, s3Bucket, "packages/path/name.extension")
-		require.Equalf(t, "file contents", string(actualContent), "DB in S3 should have expected content")
-
-		databaseID = strconv.FormatUint(uint64(database.ID), 10)
-	}
-
-	var instanceID string
+	var userID uint
 	{
 		group := &model.Group{
 			Name:     "group-name",
@@ -106,18 +72,44 @@ func TestDatabaseHandler(t *testing.T) {
 			},
 		}
 		db.Create(user)
+		userID = user.ID
+	}
 
+	var databaseID string
+	{
+		t.Log("Upload")
+
+		requestBody := strings.NewReader("file contents")
+		nameHeader := inttest.WithHeader("X-Upload-Name", "path/name.extension")
+		groupHeader := inttest.WithHeader("X-Upload-Group", "packages")
+		body := client.Put(t, "/databases", requestBody, http.StatusCreated, nameHeader, groupHeader)
+
+		var database model.Database
+		err = json.Unmarshal(body, &database)
+		require.NoError(t, err, "POST /databases: failed to unmarshal HTTP response body")
+		require.Equal(t, "path/name.extension", database.Name)
+		require.Equal(t, "packages", database.GroupName)
+		require.Equal(t, "s3://database-bucket/packages/path/name.extension", database.Url)
+		require.Equal(t, int64(13), database.Size)
+
+		actualContent := s3.GetObject(t, s3Bucket, "packages/path/name.extension")
+		require.Equalf(t, "file contents", string(actualContent), "DB in S3 should have expected content")
+
+		databaseID = strconv.FormatUint(uint64(database.ID), 10)
+	}
+
+	var instanceID string
+	{
 		deployment := &model.Deployment{
-			UserID:    user.ID,
+			UserID:    userID,
 			Name:      "name",
-			GroupName: group.Name,
+			GroupName: "group-name",
 		}
 		db.Create(deployment)
 
 		instance := &model.DeploymentInstance{
-			ID:           0,
 			Name:         "name",
-			GroupName:    group.Name,
+			GroupName:    "group-name",
 			StackName:    "dhis2",
 			DeploymentID: deployment.ID,
 		}
@@ -132,6 +124,7 @@ func TestDatabaseHandler(t *testing.T) {
 
 		assert.Equal(t, "path/name.extension", actualDB.Name)
 		assert.Equal(t, "packages", actualDB.GroupName)
+		assert.Equal(t, userID, actualDB.UserID)
 	})
 
 	t.Run("Download", func(t *testing.T) {
@@ -152,6 +145,7 @@ func TestDatabaseHandler(t *testing.T) {
 
 			require.Equal(t, "path/copy.extension", actualDB.Name)
 			require.Equal(t, "packages", actualDB.GroupName)
+			assert.Equal(t, userID, actualDB.UserID)
 
 			actualContent := s3.GetObject(t, s3Bucket, "packages/path/copy.extension")
 			require.Equalf(t, "file contents", string(actualContent), "DB in S3 should have expected content")
@@ -171,6 +165,40 @@ func TestDatabaseHandler(t *testing.T) {
 				names = append(names, d.Name)
 			}
 			assert.ElementsMatchf(t, []string{"path/name.extension", "path/copy.extension"}, names, "GET /databases failed: should return original and copied DB")
+		}
+	})
+
+	t.Run("Update", func(t *testing.T) {
+		{
+			t.Log("Update")
+
+			requestBody := strings.NewReader(`{"name": "path/rename.extension", "description": "some new description"}`)
+			response := client.Do(t, http.MethodPut, "/databases/"+databaseID, requestBody, http.StatusOK, inttest.WithHeader("Content-Type", "application/json"))
+			var actualDB model.Database
+			err := json.Unmarshal(response, &actualDB)
+			assert.NoError(t, err)
+
+			require.Equal(t, "path/rename.extension", actualDB.Name)
+			require.Equal(t, "packages", actualDB.GroupName)
+
+			actualContent := s3.GetObject(t, s3Bucket, "packages/path/rename.extension")
+			require.Equalf(t, "file contents", string(actualContent), "DB in S3 should have expected content")
+		}
+
+		{
+			t.Log("GetAll")
+
+			var groupDBs []database.GroupsWithDatabases
+			client.GetJSON(t, "/databases", &groupDBs)
+
+			require.Len(t, groupDBs, 1)
+			groupDB := groupDBs[0]
+			assert.Equal(t, "packages", groupDB.Name, "GET /databases failed")
+			var names []string
+			for _, d := range groupDB.Databases {
+				names = append(names, d.Name)
+			}
+			assert.ElementsMatchf(t, []string{"path/rename.extension", "path/copy.extension"}, names, "GET /databases failed: should return original and copied DB")
 		}
 	})
 
@@ -254,6 +282,14 @@ func (gs groupService) Find(ctx context.Context, name string) (*model.Group, err
 }
 
 type instanceService struct{}
+
+func (is instanceService) FindDeploymentById(ctx context.Context, id uint) (*model.Deployment, error) {
+	panic("implement me")
+}
+
+func (is instanceService) FilestoreBackup(ctx context.Context, instance *model.DeploymentInstance, name string, database *model.Database) error {
+	panic("implement me")
+}
 
 func (is instanceService) FindDecryptedDeploymentInstanceById(ctx context.Context, id uint) (*model.DeploymentInstance, error) {
 	panic("implement me")

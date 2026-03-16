@@ -220,7 +220,7 @@ func NewRabbitMQ(ctx context.Context, options ...rabbitMQOption) (*rabbitmqConta
 		exposedPorts = append(exposedPorts, fmt.Sprintf("%s:%s", streamPort, natStreamPort))
 	}
 	req := testcontainers.ContainerRequest{
-		Image: "bitnami/rabbitmq:3.13",
+		Image: "bitnamilegacy/rabbitmq:3.13",
 		Env: map[string]string{
 			"RABBITMQ_USERNAME":                    user,
 			"RABBITMQ_PASSWORD":                    pw,
