@@ -8,7 +8,6 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -24,17 +23,13 @@ import (
 	"github.com/getsops/sops/v3"
 
 	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
+	"github.com/dhis2-sre/im-manager/pkg/cluster"
 	"github.com/dhis2-sre/im-manager/pkg/database"
 	"github.com/dhis2-sre/im-manager/pkg/storage"
 
 	"filippo.io/age"
-	"github.com/getsops/sops/v3/aes"
 	sops_age "github.com/getsops/sops/v3/age"
-	"github.com/getsops/sops/v3/cmd/sops/common"
 	"github.com/getsops/sops/v3/keys"
-	"github.com/getsops/sops/v3/keyservice"
-	"github.com/getsops/sops/v3/stores/yaml"
-	"github.com/getsops/sops/v3/version"
 
 	"github.com/dhis2-sre/im-manager/pkg/instance"
 	"github.com/dhis2-sre/im-manager/pkg/inttest"
@@ -52,9 +47,20 @@ func TestInstanceHandler(t *testing.T) {
 
 	identity, err := age.GenerateX25519Identity()
 	require.NoError(t, err, "failed to generate age key pair")
-	t.Setenv("SOPS_KMS_ARN", "") // make sure not to use key stored in AWS
-	t.Setenv(sops_age.SopsAgeKeyEnv, identity.String())
-	k8sConfig := encryptUsingAge(t, identity, k8sClient.Config)
+
+	t.Setenv("SOPS_AGE_KEY", identity.String())
+
+	ageKeys, err := sops_age.MasterKeysFromRecipients(identity.Recipient().String())
+	require.NoError(t, err, "failed to get master keys from age recipient")
+	var ageMasterKeys []keys.MasterKey
+	for _, k := range ageKeys {
+		ageMasterKeys = append(ageMasterKeys, k)
+	}
+	keyGroups := []sops.KeyGroup{ageMasterKeys}
+
+	var k8sConfig []byte
+	k8sConfig, err = cluster.EncryptYaml(k8sClient.Config, keyGroups)
+	require.NoError(t, err, "failed to encrypt k8s config")
 
 	group := &model.Group{
 		ID:         1,
@@ -73,7 +79,8 @@ func TestInstanceHandler(t *testing.T) {
 			*group,
 		},
 	}
-	db.Create(user)
+	err = db.Create(user).Error
+	require.NoError(t, err, "failed to save user")
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	encryptionKey := strings.Repeat("a", 32)
@@ -299,50 +306,6 @@ func TestInstanceHandler(t *testing.T) {
 		assert.Equal(t, "0.7.0", updatedInstance.Parameters["IMAGE_TAG"].Value)
 		assert.True(t, updatedInstance.Public)
 	})
-}
-
-func encryptUsingAge(t *testing.T, identity *age.X25519Identity, yamlData []byte) []byte {
-	inputStore := &yaml.Store{}
-	branches, err := inputStore.LoadPlainFile(yamlData)
-	require.NoError(t, err, "failed to load file")
-
-	ageKeys, err := sops_age.MasterKeysFromRecipients(identity.Recipient().String())
-	require.NoError(t, err, "failed to get master keys from age recipient")
-	var ageMasterKeys []keys.MasterKey
-	for _, k := range ageKeys {
-		ageMasterKeys = append(ageMasterKeys, k)
-	}
-	keyGroups := []sops.KeyGroup{ageMasterKeys}
-	keyServices := []keyservice.KeyServiceClient{keyservice.NewLocalClient()}
-
-	tree := sops.Tree{
-		Branches: branches,
-		Metadata: sops.Metadata{
-			KeyGroups:         keyGroups,
-			UnencryptedSuffix: "",
-			EncryptedSuffix:   "",
-			UnencryptedRegex:  "",
-			EncryptedRegex:    "",
-			Version:           version.Version,
-			ShamirThreshold:   0,
-		},
-		FilePath: "",
-	}
-	dataKey, errs := tree.GenerateDataKeyWithKeyServices(keyServices)
-	require.NoError(t, errors.Join(errs...), "failed to generate data key")
-
-	err = common.EncryptTree(common.EncryptTreeOpts{
-		DataKey: dataKey,
-		Tree:    &tree,
-		Cipher:  aes.NewCipher(),
-	})
-	require.NoError(t, err, "failed to encrypt")
-
-	outputStore := &yaml.Store{}
-	encryptedFile, err := outputStore.EmitEncryptedFile(tree)
-	require.NoError(t, err, "failed to emit encrypted yaml file")
-
-	return encryptedFile
 }
 
 func uploadDatabase(t *testing.T, client *inttest.HTTPClient, name, content, authToken string) string {

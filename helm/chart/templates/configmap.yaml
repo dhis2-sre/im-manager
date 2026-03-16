@@ -19,4 +19,5 @@ data:
   GROUP_NAMESPACES: {{ .Values.groups.namespaces }}
   GROUP_HOSTNAMES: {{ .Values.groups.hostnames }}
   CORS_ALLOWED_ORIGINS: {{ join "," .Values.corsAllowOrigins | quote }}
+  SOPS_KMS_ARN: {{ .Values.sopsKmsArn | quote }}
 {{- end }}
