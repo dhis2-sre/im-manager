@@ -83,7 +83,7 @@ func TestInstanceHandler(t *testing.T) {
 	stackService := stack.NewService(stacks)
 	// classification 'test' does not actually exist, this is used to decrypt the stack parameters
 	helmfileService := instance.NewHelmfileService(logger, stackService, "../../stacks", "test")
-	instanceService := instance.NewService(logger, instanceRepo, groupService, stackService, helmfileService, nil, "")
+	instanceService := instance.NewService(logger, instanceRepo, groupService, stackService, helmfileService, nil, "", nil)
 
 	s3Dir := t.TempDir()
 	s3Bucket := "database-bucket"
@@ -93,7 +93,7 @@ func TestInstanceHandler(t *testing.T) {
 	uploader := manager.NewUploader(s3.Client)
 	s3Client := storage.NewS3Client(logger, s3.Client, uploader)
 	databaseRepository := database.NewRepository(db)
-	databaseService := database.NewService(logger, s3Bucket, s3Client, groupService, databaseRepository)
+	databaseService := database.NewService(logger, s3Bucket, s3Client, groupService, databaseRepository, nil)
 
 	authenticator := func(c *gin.Context) {
 		ctx := model.NewContextWithUser(c.Request.Context(), user)
