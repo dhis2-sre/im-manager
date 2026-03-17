@@ -182,9 +182,21 @@ var postgresHostnameProvider = model.ParameterProviderFunc(func(instance model.D
 })
 
 var dorisDefaults = struct {
-	chartVersion string
+	chartVersion                   string
+	replicasFrontend               string
+	replicasBackend                string
+	frontendResourceRequestsCPU    string
+	frontendResourceRequestsMemory string
+	frontendResourceLimitsCPU      string
+	frontendResourceLimitsMemory   string
 }{
-	chartVersion: "25.8.0",
+	chartVersion:                   "25.8.0",
+	replicasFrontend:               "1",
+	replicasBackend:                "1",
+	frontendResourceRequestsCPU:    "4",
+	frontendResourceRequestsMemory: "8Gi",
+	frontendResourceLimitsCPU:      "16",
+	frontendResourceLimitsMemory:   "32Gi",
 }
 
 // Stack representing ../../stacks/doris/helmfile.yaml.gotmpl
@@ -193,7 +205,14 @@ var DORIS = model.Stack{
 	HostnamePattern: "%s-helm-fe-1.%s.svc",
 	Name:            "doris",
 	Parameters: model.StackParameters{
-		"CHART_VERSION": {Priority: 1, DisplayName: "Chart Version", DefaultValue: &dorisDefaults.chartVersion},
+		"CHART_VERSION":                     {Priority: 1, DisplayName: "Chart Version", DefaultValue: &dorisDefaults.chartVersion},
+		"FRONTEND_REPLICAS":                 {Priority: 2, DisplayName: "Frontend Replicas", DefaultValue: &dorisDefaults.replicasFrontend},
+		"BACKEND_REPLICAS":                  {Priority: 3, DisplayName: "Backend Replicas", DefaultValue: &dorisDefaults.replicasBackend},
+		"FRONTEND_RESOURCE_REQUESTS_CPU":    {Priority: 4, DisplayName: "Frontend CPU Requests", DefaultValue: &dorisDefaults.frontendResourceRequestsCPU},
+		"FRONTEND_RESOURCE_REQUESTS_MEMORY": {Priority: 5, DisplayName: "Backend Replicas", DefaultValue: &dorisDefaults.frontendResourceRequestsMemory},
+		"FRONTEND_RESOURCE_LIMITS_CPU":      {Priority: 6, DisplayName: "Backend Replicas", DefaultValue: &dorisDefaults.frontendResourceLimitsCPU},
+		"FRONTEND_RESOURCE_LIMITS_MEMORY":   {Priority: 7, DisplayName: "Backend Replicas", DefaultValue: &dorisDefaults.frontendResourceLimitsMemory},
+
 		//		"RESOURCES_REQUESTS_CPU":    {Priority: 7, DisplayName: "Resources Requests CPU", DefaultValue: &dorisDefaults.resourcesRequestsCPU},
 		//		"RESOURCES_},
 	},
@@ -393,8 +412,7 @@ var dhis2CoreDefaults = struct {
 	googleAuthPrivateKeyId:       " ",
 	googleAuthClientEmail:        " ",
 	googleAuthClientId:           " ",
-	// TODO: Make false before merge
-	enableDoris: "true",
+	enableDoris:                  "false",
 }
 
 // Stack representing ../../stacks/dhis2/helmfile.yaml.gotmpl
