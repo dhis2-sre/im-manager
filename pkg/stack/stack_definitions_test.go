@@ -41,6 +41,7 @@ func TestStackDefinitionsAreInSyncWithHelmfile(t *testing.T) {
 	// Consumed as we cannot ignore fields in the assertions we use.
 	stacks := map[string]model.StackParameters{
 		"dhis2-db":      DHIS2DB.Parameters,
+		"doris":         DORIS.Parameters,
 		"dhis2-core":    DHIS2Core.Parameters,
 		"dhis2":         DHIS2.Parameters,
 		"minio":         MINIO.Parameters,
