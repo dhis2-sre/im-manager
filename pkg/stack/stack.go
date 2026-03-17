@@ -212,9 +212,6 @@ var DORIS = model.Stack{
 		"FRONTEND_RESOURCE_REQUESTS_MEMORY": {Priority: 5, DisplayName: "Backend Replicas", DefaultValue: &dorisDefaults.frontendResourceRequestsMemory},
 		"FRONTEND_RESOURCE_LIMITS_CPU":      {Priority: 6, DisplayName: "Backend Replicas", DefaultValue: &dorisDefaults.frontendResourceLimitsCPU},
 		"FRONTEND_RESOURCE_LIMITS_MEMORY":   {Priority: 7, DisplayName: "Backend Replicas", DefaultValue: &dorisDefaults.frontendResourceLimitsMemory},
-
-		//		"RESOURCES_REQUESTS_CPU":    {Priority: 7, DisplayName: "Resources Requests CPU", DefaultValue: &dorisDefaults.resourcesRequestsCPU},
-		//		"RESOURCES_},
 	},
 	ParameterProviders: model.ParameterProviders{
 		"DORIS_HOSTNAME": dorisHostnameProvider,

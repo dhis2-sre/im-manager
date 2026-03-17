@@ -22,14 +22,14 @@ releases:
             im-type: "doris"
             im-creation-timestamp: "{{ requiredEnv "INSTANCE_CREATION_TIMESTAMP" }}"
             im-ttl: "{{ requiredEnv "INSTANCE_TTL" }}"
-          replicas: 1
+          replicas: "{{ requiredEnv "FRONTEND_REPLICAS" }}"
           resource:
             requests:
-              cpu: 4
-              memory: 8Gi
+              cpu: "{{ requiredEnv "FRONTEND_RESOURCE_REQUESTS_CPU" }}"
+              memory: "{{ requiredEnv "FRONTEND_RESOURCE_REQUESTS_MEMORY" }}"
             limits:
-              cpu: 16
-              memory: 32Gi
+              cpu: "{{ requiredEnv "FRONTEND_RESOURCE_LIMITS_CPU" }}"
+              memory: "{{ requiredEnv "FRONTEND_RESOURCE_LIMITS_MEMORY" }}"
       - beSpec:
           image:
             repository: dhis2/apache-doris
@@ -43,7 +43,7 @@ releases:
             im-type: "doris"
             im-creation-timestamp: "{{ requiredEnv "INSTANCE_CREATION_TIMESTAMP" }}"
             im-ttl: "{{ requiredEnv "INSTANCE_TTL" }}"
-          replicas: 1
+          replicas: "{{ requiredEnv "BACKEND_REPLICAS" }}"
           resource:
             requests:
               cpu: 4
