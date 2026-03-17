@@ -1,0 +1,57 @@
+helmDefaults:
+  deleteWait: true
+
+releases:
+  - name: "{{ requiredEnv "INSTANCE_NAME" }}-doris"
+    namespace: "{{ requiredEnv "INSTANCE_NAMESPACE" }}"
+    chart: selectdb/doris
+    version: "{{ requiredEnv "CHART_VERSION" }}"
+    values:
+      - dorisCluster:
+          name: "{{ requiredEnv "INSTANCE_NAME" }}-doris"
+      - feSpec:
+          image:
+            repository: dhis2/apache-doris
+            tag: fe-2.1.7-postgres
+          labels:
+            im: "true"
+            im-default: "true"
+            im-deployment-id: "{{ requiredEnv "DEPLOYMENT_ID" }}"
+            im-instance-id: "{{ requiredEnv "INSTANCE_ID" }}"
+            im-id: "{{ requiredEnv "INSTANCE_ID" }}"
+            im-type: "doris"
+            im-creation-timestamp: "{{ requiredEnv "INSTANCE_CREATION_TIMESTAMP" }}"
+            im-ttl: "{{ requiredEnv "INSTANCE_TTL" }}"
+          replicas: 1
+          resource:
+            requests:
+              cpu: 4
+              memory: 8Gi
+            limits:
+              cpu: 16
+              memory: 32Gi
+      - beSpec:
+          image:
+            repository: dhis2/apache-doris
+            tag: be-2.1.7-postgres
+          labels:
+            im: "true"
+            im-default: "true"
+            im-deployment-id: "{{ requiredEnv "DEPLOYMENT_ID" }}"
+            im-instance-id: "{{ requiredEnv "INSTANCE_ID" }}"
+            im-id: "{{ requiredEnv "INSTANCE_ID" }}"
+            im-type: "doris"
+            im-creation-timestamp: "{{ requiredEnv "INSTANCE_CREATION_TIMESTAMP" }}"
+            im-ttl: "{{ requiredEnv "INSTANCE_TTL" }}"
+          replicas: 1
+          resource:
+            requests:
+              cpu: 4
+              memory: 8Gi
+            limits:
+              cpu: 8
+              memory: 16Gi
+
+repositories:
+  - name: selectdb
+    url: https://charts.selectdb.com
