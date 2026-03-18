@@ -60,4 +60,12 @@ rules:
       - get
       - create
       - delete
-      - patch
+# Doris
+  - apiGroups:
+      - doris.selectdb.com
+    resources:
+      - dorisclusters
+    verbs:
+      - get
+      - create
+      - delete

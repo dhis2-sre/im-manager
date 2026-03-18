@@ -1,0 +1,12 @@
+helmDefaults:
+  deleteWait: true
+  createNamespace: true
+
+releases:
+  - name: operator
+    namespace: doris
+    chart: selectdb/doris-operator
+
+repositories:
+  - name: selectdb
+    url: https://charts.selectdb.com

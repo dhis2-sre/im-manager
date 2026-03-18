@@ -74,10 +74,11 @@ func ValidateNoCycles(stacks []model.Stack) (graph.Graph[string, model.Stack], e
 }
 
 // ValidateConsumedParameters validates all consumed parameters are provided by exactly one of the
-// required stacks. Required stacks need to provide at least one consumed parameter.
+// required or companion stacks. Required stacks need to provide at least one consumed parameter.
+// Companion stacks are optional but can provide consumed parameters.
 func ValidateConsumedParameters(stacks []model.Stack) error {
 	var errs []error
-	for _, stack := range stacks { // validate each stacks consumed parameters are provided by its required stacks
+	for _, stack := range stacks { // validate each stacks consumed parameters are provided by its required or companion stacks
 		requiredStacks := make(map[string]int)
 		for _, requiredStack := range stack.Requires {
 			requiredStacks[requiredStack.Name] = 0
@@ -92,7 +93,7 @@ func ValidateConsumedParameters(stacks []model.Stack) error {
 			consumedParameterProviders[name] = 0
 		}
 
-		// generate frequency map of provided parameters
+		// generate frequency map of provided parameters from required stacks
 		for _, requiredStack := range stack.Requires {
 			for parameterName, parameter := range requiredStack.Parameters {
 				if parameter.Consumed { // consumed parameters cannot be provided
@@ -109,6 +110,25 @@ func ValidateConsumedParameters(stacks []model.Stack) error {
 				if ok {
 					consumedParameterProviders[parameterName]++
 					requiredStacks[requiredStack.Name]++
+				}
+			}
+		}
+
+		// generate frequency map of provided parameters from companion stacks
+		for _, companionStack := range stack.Companions {
+			for parameterName, parameter := range companionStack.Parameters {
+				if parameter.Consumed { // consumed parameters cannot be provided
+					continue
+				}
+				_, ok := consumedParameterProviders[parameterName]
+				if ok {
+					consumedParameterProviders[parameterName]++
+				}
+			}
+			for parameterName := range companionStack.ParameterProviders {
+				_, ok := consumedParameterProviders[parameterName]
+				if ok {
+					consumedParameterProviders[parameterName]++
 				}
 			}
 		}
@@ -161,6 +181,49 @@ var postgresHostnameProvider = model.ParameterProviderFunc(func(instance model.D
 	return fmt.Sprintf("%s-%d-database-postgresql.%s.svc", instance.Name, instance.Group.ID, instance.Group.Namespace), nil
 })
 
+var dorisDefaults = struct {
+	chartVersion                   string
+	replicasFrontend               string
+	replicasBackend                string
+	frontendResourceRequestsCPU    string
+	frontendResourceRequestsMemory string
+	frontendResourceLimitsCPU      string
+	frontendResourceLimitsMemory   string
+}{
+	chartVersion:                   "25.8.0",
+	replicasFrontend:               "1",
+	replicasBackend:                "1",
+	frontendResourceRequestsCPU:    "4",
+	frontendResourceRequestsMemory: "8Gi",
+	frontendResourceLimitsCPU:      "16",
+	frontendResourceLimitsMemory:   "32Gi",
+}
+
+// Stack representing ../../stacks/doris/helmfile.yaml.gotmpl
+var DORIS = model.Stack{
+	// TODO: Remove HostnamePattern once stacks 2.0 are the default
+	HostnamePattern: "%s-helm-fe-1.%s.svc",
+	Name:            "doris",
+	Parameters: model.StackParameters{
+		"CHART_VERSION":                     {Priority: 1, DisplayName: "Chart Version", DefaultValue: &dorisDefaults.chartVersion},
+		"FRONTEND_REPLICAS":                 {Priority: 2, DisplayName: "Frontend Replicas", DefaultValue: &dorisDefaults.replicasFrontend},
+		"BACKEND_REPLICAS":                  {Priority: 3, DisplayName: "Backend Replicas", DefaultValue: &dorisDefaults.replicasBackend},
+		"FRONTEND_RESOURCE_REQUESTS_CPU":    {Priority: 4, DisplayName: "Frontend CPU Requests", DefaultValue: &dorisDefaults.frontendResourceRequestsCPU},
+		"FRONTEND_RESOURCE_REQUESTS_MEMORY": {Priority: 5, DisplayName: "Backend Replicas", DefaultValue: &dorisDefaults.frontendResourceRequestsMemory},
+		"FRONTEND_RESOURCE_LIMITS_CPU":      {Priority: 6, DisplayName: "Backend Replicas", DefaultValue: &dorisDefaults.frontendResourceLimitsCPU},
+		"FRONTEND_RESOURCE_LIMITS_MEMORY":   {Priority: 7, DisplayName: "Backend Replicas", DefaultValue: &dorisDefaults.frontendResourceLimitsMemory},
+	},
+	ParameterProviders: model.ParameterProviders{
+		"DORIS_HOSTNAME": dorisHostnameProvider,
+	},
+	KubernetesResource: model.StatefulSetResource,
+}
+
+// Provides the Doris hostname of an instance.
+var dorisHostnameProvider = model.ParameterProviderFunc(func(instance model.DeploymentInstance) (string, error) {
+	return fmt.Sprintf("%s-doris-fe-internal.%s.svc", instance.Name, instance.Group.Namespace), nil
+})
+
 var dhis2DBDefaults = struct {
 	chartVersion            string
 	dbID                    string
@@ -206,6 +269,14 @@ var minioHostnameProvider = model.ParameterProviderFunc(func(instance model.Depl
 var storageCompanionProvider = model.RequireCompanionFunc(func(parameter model.DeploymentInstanceParameter) (*model.Stack, error) {
 	if parameter.Value == minIOStorage {
 		return &MINIO, nil
+	}
+	return nil, nil
+})
+
+// TODO: Is something wrong with this pattern? ENABLE_DORIS == true, return the stack... But shouldn't it be for DORIS_HOSTNAME?
+var dorisCompanionProvider = model.RequireCompanionFunc(func(parameter model.DeploymentInstanceParameter) (*model.Stack, error) {
+	if parameter.Value == "true" {
+		return &DORIS, nil
 	}
 	return nil, nil
 })
@@ -259,12 +330,16 @@ var DHIS2Core = model.Stack{
 		"DATABASE_NAME":                   {Priority: 0, DisplayName: "Database Name", Consumed: true},
 		"DATABASE_PASSWORD":               {Priority: 0, DisplayName: "Database Password", Consumed: true, Sensitive: true},
 		"DATABASE_USERNAME":               {Priority: 0, DisplayName: "Database Username", Consumed: true, Sensitive: true},
+		"ENABLE_DORIS":                    {Priority: 0, DisplayName: "Enable Doris", DefaultValue: &dhis2CoreDefaults.enableDoris, RequireCompanion: dorisCompanionProvider},
+		"DORIS_HOSTNAME":                  {Priority: 0, DisplayName: "Doris Hostname", Consumed: true},
+		"MINIO_HOSTNAME":                  {Priority: 0, DisplayName: "MinIO Hostname", Consumed: true},
 	},
 	Requires: []model.Stack{
 		DHIS2DB,
 	},
 	Companions: []model.Stack{
 		MINIO,
+		DORIS,
 	},
 	KubernetesResource: model.DeploymentResource,
 }
@@ -301,8 +376,9 @@ var dhis2CoreDefaults = struct {
 	googleAuthPrivateKeyId       string
 	googleAuthClientEmail        string
 	googleAuthClientId           string
+	enableDoris                  string
 }{
-	chartVersion:                 "0.32.1",
+	chartVersion:                 "0.34.6",
 	storageType:                  minIOStorage,
 	sameSiteCookies:              lax,
 	filesystemVolumeSize:         "8Gi",
@@ -333,6 +409,7 @@ var dhis2CoreDefaults = struct {
 	googleAuthPrivateKeyId:       " ",
 	googleAuthClientEmail:        " ",
 	googleAuthClientId:           " ",
+	enableDoris:                  "false",
 }
 
 // Stack representing ../../stacks/dhis2/helmfile.yaml.gotmpl
