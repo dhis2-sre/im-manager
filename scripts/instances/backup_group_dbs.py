@@ -102,6 +102,23 @@ def _request(session: requests.Session, auth: Auth, method: str, url: str, json_
     return resp.json()
 
 
+def _is_transient_network_error(exc: Exception) -> bool:
+    if isinstance(exc, requests.exceptions.Timeout):
+        return True
+    if isinstance(exc, requests.exceptions.ConnectionError):
+        return True
+    msg = str(exc).lower()
+    transient_markers = (
+        "remote end closed connection without response",
+        "connection aborted",
+        "read timed out",
+        "timed out",
+        "connection reset",
+        "broken pipe",
+    )
+    return any(marker in msg for marker in transient_markers)
+
+
 def _get_group_deployments(deployments_json: list, group: str) -> List[dict]:
     for g in deployments_json:
         if g.get("name") == group:
@@ -114,6 +131,30 @@ def _find_instance_id(deployment: dict, stack_name: str) -> Optional[int]:
         if inst.get("stackName") == stack_name:
             inst_id = inst.get("id")
             return int(inst_id) if inst_id is not None else None
+    return None
+
+
+def _find_database_by_name(
+    session: requests.Session,
+    auth: Auth,
+    host: str,
+    group: str,
+    db_name: str,
+) -> Optional[dict]:
+    """
+    Best-effort recovery helper:
+    If save-as request succeeds server-side but client connection drops before response,
+    find the created database by exact name in GET /databases output.
+    """
+    groups_with_databases = _request(session, auth, "GET", f"{host}/databases", timeout=120)
+    if not isinstance(groups_with_databases, list):
+        return None
+    for g in groups_with_databases:
+        if str(g.get("name") or "") != group:
+            continue
+        for d in g.get("databases") or []:
+            if str(d.get("name") or "") == db_name:
+                return d if isinstance(d, dict) else None
     return None
 
 
@@ -191,35 +232,72 @@ def _start_backup(
     session: requests.Session,
     host: str,
     auth: Auth,
+    group: str,
     dep_id: int,
     dep_name: str,
     db_instance_id: int,
     backup_name: str,
     fmt: str,
     original_database_id: Union[int, str],
+    max_start_retries: int,
+    retry_backoff_seconds: int,
 ) -> PendingBackup:
     print(f"[{dep_name}] saving database via save-as on instance {db_instance_id} as '{backup_name}'")
-    save_resp = _request(
-        session,
-        auth,
-        "POST",
-        f"{host}/databases/save-as/{db_instance_id}",
-        json_body={"name": backup_name, "format": fmt},
-        timeout=120,
-    )
-    saved_db_id_raw = (save_resp or {}).get("id")
-    if saved_db_id_raw is None:
-        raise RuntimeError(f"[{dep_name}] save-as response missing id: {save_resp}")
-    saved_db_id = int(saved_db_id_raw)
-    print(f"[{dep_name}] started backup, database id={saved_db_id}")
-    return PendingBackup(
-        deployment_id=dep_id,
-        deployment_name=dep_name,
-        db_instance_id=db_instance_id,
-        saved_database_id=saved_db_id,
-        saved_database_name=backup_name,
-        original_database_id=original_database_id,
-    )
+    attempts = max(1, max_start_retries)
+    for attempt in range(1, attempts + 1):
+        try:
+            save_resp = _request(
+                session,
+                auth,
+                "POST",
+                f"{host}/databases/save-as/{db_instance_id}",
+                json_body={"name": backup_name, "format": fmt},
+                timeout=120,
+            )
+            saved_db_id_raw = (save_resp or {}).get("id")
+            if saved_db_id_raw is None:
+                raise RuntimeError(f"[{dep_name}] save-as response missing id: {save_resp}")
+            saved_db_id = int(saved_db_id_raw)
+            print(f"[{dep_name}] started backup, database id={saved_db_id}")
+            return PendingBackup(
+                deployment_id=dep_id,
+                deployment_name=dep_name,
+                db_instance_id=db_instance_id,
+                saved_database_id=saved_db_id,
+                saved_database_name=backup_name,
+                original_database_id=original_database_id,
+            )
+        except Exception as e:
+            # Transient connection losses can happen after IM has already started save-as.
+            # Recover by checking if the named database now exists.
+            if _is_transient_network_error(e):
+                try:
+                    recovered = _find_database_by_name(session, auth, host, group, backup_name)
+                except Exception:
+                    recovered = None
+                if recovered and recovered.get("id") is not None:
+                    recovered_id = int(recovered["id"])
+                    print(
+                        f"[{dep_name}] save-as response was interrupted; recovered database id={recovered_id} by name '{backup_name}'"
+                    )
+                    return PendingBackup(
+                        deployment_id=dep_id,
+                        deployment_name=dep_name,
+                        db_instance_id=db_instance_id,
+                        saved_database_id=recovered_id,
+                        saved_database_name=backup_name,
+                        original_database_id=original_database_id,
+                    )
+                if attempt < attempts:
+                    sleep_seconds = max(1, retry_backoff_seconds) * attempt
+                    print(
+                        f"[{dep_name}] transient save-as error (attempt {attempt}/{attempts}): {e}; retrying in {sleep_seconds}s",
+                        file=sys.stderr,
+                    )
+                    time.sleep(sleep_seconds)
+                    continue
+            raise
+    raise RuntimeError(f"[{dep_name}] failed to start backup after {attempts} attempts")
 
 
 def _wait_and_finalize(
@@ -257,6 +335,8 @@ def main() -> int:
     parser.add_argument("--limit", type=int, default=0)
     parser.add_argument("--deployment-name", default="", help="Only back up a single deployment by name")
     parser.add_argument("--parallel", action="store_true", help="Start all backups first, then poll for completion concurrently")
+    parser.add_argument("--start-retries", type=int, default=3, help="Retries for save-as start on transient network errors")
+    parser.add_argument("--retry-backoff-seconds", type=int, default=2, help="Base backoff seconds between save-as retries")
 
     args = parser.parse_args()
 
@@ -316,7 +396,18 @@ def main() -> int:
         for dep_id, dep_name, db_instance_id, backup_name, original_db_id in targets:
             try:
                 p = _start_backup(
-                    session, host, auth, dep_id, dep_name, db_instance_id, backup_name, args.format, original_db_id
+                    session,
+                    host,
+                    auth,
+                    group,
+                    dep_id,
+                    dep_name,
+                    db_instance_id,
+                    backup_name,
+                    args.format,
+                    original_db_id,
+                    args.start_retries,
+                    args.retry_backoff_seconds,
                 )
                 pending.append(p)
             except Exception as e:
@@ -343,7 +434,18 @@ def main() -> int:
         for dep_id, dep_name, db_instance_id, backup_name, original_db_id in targets:
             try:
                 p = _start_backup(
-                    session, host, auth, dep_id, dep_name, db_instance_id, backup_name, args.format, original_db_id
+                    session,
+                    host,
+                    auth,
+                    group,
+                    dep_id,
+                    dep_name,
+                    db_instance_id,
+                    backup_name,
+                    args.format,
+                    original_db_id,
+                    args.start_retries,
+                    args.retry_backoff_seconds,
                 )
                 item = _wait_and_finalize(session, host, auth, p, args.poll_interval, args.timeout_seconds)
                 items.append(item)
