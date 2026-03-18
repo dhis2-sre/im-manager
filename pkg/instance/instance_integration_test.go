@@ -60,6 +60,7 @@ func TestInstanceHandler(t *testing.T) {
 	require.NoError(t, err, "failed to encrypt k8s config")
 
 	group := &model.Group{
+		ID:         1,
 		Name:       "group-name",
 		Namespace:  "group-name",
 		Hostname:   "some",
@@ -164,12 +165,12 @@ func TestInstanceHandler(t *testing.T) {
 		}
 
 		deployDeployment(t, client, deployment.ID, tokens.AccessToken)
-		k8sClient.AssertPodIsReady(t, deploymentInstance.Group.Namespace, deploymentInstance.Name, 60)
+		k8sClient.AssertPodIsReady(t, deploymentInstance.Group.Namespace, deploymentInstance.Name, 60, deploymentInstance.Group.ID)
 
 		// TODO:		t.Log("Save as deployment")
 
 		destroyDeployment(t, client, deployment.ID, tokens.AccessToken)
-		k8sClient.AssertPodIsNotRunning(t, deploymentInstance.Group.Namespace, deploymentInstance.Name, 10)
+		k8sClient.AssertPodIsNotRunning(t, deploymentInstance.Group.Namespace, deploymentInstance.Name, 10, deploymentInstance.Group.ID)
 	})
 
 	t.Run("GetPublicDeployments", func(t *testing.T) {
@@ -198,16 +199,17 @@ func TestInstanceHandler(t *testing.T) {
 		deploymentInstance := createDHIS2DBInstance(t, client, deployment.ID, databaseID, tokens.AccessToken)
 		deploymentInstance = createMinioInstance(t, client, deployment.ID, tokens.AccessToken)
 		deploymentInstance = createDHIS2CoreInstance(t, client, deployment.ID, tokens.AccessToken, WithParameter("ALLOW_SUSPEND", "false"))
+		groupedName := fmt.Sprintf("%s-%d", deploymentInstance.Name, deploymentInstance.Group.ID)
 
 		deployDeployment(t, client, deployment.ID, tokens.AccessToken)
-		k8sClient.AssertPodIsReady(t, deploymentInstance.Group.Namespace, deploymentInstance.Name+"-database", 30)
-		k8sClient.AssertPodIsReady(t, deploymentInstance.Group.Namespace, deploymentInstance.Name+"-minio", 30)
-		k8sClient.AssertPodIsReady(t, deploymentInstance.Group.Namespace, deploymentInstance.Name, 90)
+		k8sClient.AssertPodIsReady(t, deploymentInstance.Group.Namespace, groupedName+"-database", 30)
+		k8sClient.AssertPodIsReady(t, deploymentInstance.Group.Namespace, groupedName+"-minio", 30)
+		k8sClient.AssertPodIsReady(t, deploymentInstance.Group.Namespace, deploymentInstance.Name, 90, deploymentInstance.Group.ID)
 
 		destroyDeployment(t, client, deployment.ID, tokens.AccessToken)
-		k8sClient.AssertPodIsNotRunning(t, deploymentInstance.Group.Namespace, deploymentInstance.Name, 10)
-		k8sClient.AssertPodIsNotRunning(t, deploymentInstance.Group.Namespace, deploymentInstance.Name+"-minio", 30)
-		k8sClient.AssertPodIsNotRunning(t, deploymentInstance.Group.Namespace, deploymentInstance.Name+"-database", 10)
+		k8sClient.AssertPodIsNotRunning(t, deploymentInstance.Group.Namespace, deploymentInstance.Name, 10, deploymentInstance.Group.ID)
+		k8sClient.AssertPodIsNotRunning(t, deploymentInstance.Group.Namespace, groupedName+"-minio", 30)
+		k8sClient.AssertPodIsNotRunning(t, deploymentInstance.Group.Namespace, groupedName+"-database", 10)
 	})
 
 	t.Run("UpdateDeployment", func(t *testing.T) {
