@@ -1,4 +1,34 @@
 
+<a name="v0.65.0"></a>
+## [v0.65.0](https://github.com/dhis2-sre/im-manager/compare/ls...v0.65.0)
+
+> 2026-03-19
+
+### Chore
+
+* use latest ubuntu image for runners ([#1402](https://github.com/dhis2-sre/im-manager/issues/1402))
+* update im-group chart version to 0.4.0 ([#1379](https://github.com/dhis2-sre/im-manager/issues/1379))
+* util scripts for creating, and deleting, restricted users on K3s ([#1370](https://github.com/dhis2-sre/im-manager/issues/1370))
+* update IM cluster role to allow remote pod exec ([#1361](https://github.com/dhis2-sre/im-manager/issues/1361))
+* use mc mirror instead of recursive copy ([#1369](https://github.com/dhis2-sre/im-manager/issues/1369))
+
+### Feat
+
+* unique instance names ([#1410](https://github.com/dhis2-sre/im-manager/issues/1410))
+* Postgresql connection pool ([#1401](https://github.com/dhis2-sre/im-manager/issues/1401))
+* encrypt Kubernetes cluster config server side ([#1396](https://github.com/dhis2-sre/im-manager/issues/1396))
+
+
+<a name="ls"></a>
+## [ls](https://github.com/dhis2-sre/im-manager/compare/v0.64.0...ls)
+
+> 2026-02-20
+
+### Chore
+
+* generate change log for v0.64.0
+
+
 <a name="v0.64.0"></a>
 ## [v0.64.0](https://github.com/dhis2-sre/im-manager/compare/v0.63.0...v0.64.0)
 
@@ -487,7 +517,7 @@
 
 
 <a name="v0.44.0"></a>
-## [v0.44.0](https://github.com/dhis2-sre/im-manager/compare/v0.42.0...v0.44.0)
+## [v0.44.0](https://github.com/dhis2-sre/im-manager/compare/v0.41.0...v0.44.0)
 
 > 2024-11-27
 
@@ -497,14 +527,14 @@
 * use PAT
 
 
-<a name="v0.42.0"></a>
-## [v0.42.0](https://github.com/dhis2-sre/im-manager/compare/v0.41.0...v0.42.0)
+<a name="v0.41.0"></a>
+## [v0.41.0](https://github.com/dhis2-sre/im-manager/compare/v0.42.0...v0.41.0)
 
 > 2024-11-20
 
 
-<a name="v0.41.0"></a>
-## [v0.41.0](https://github.com/dhis2-sre/im-manager/compare/v0.40.0...v0.41.0)
+<a name="v0.42.0"></a>
+## [v0.42.0](https://github.com/dhis2-sre/im-manager/compare/v0.40.0...v0.42.0)
 
 > 2024-11-20
 
@@ -1694,7 +1724,7 @@
 
 
 <a name="v0.5.10"></a>
-## [v0.5.10](https://github.com/dhis2-sre/im-manager/compare/v0.5.5...v0.5.10)
+## [v0.5.10](https://github.com/dhis2-sre/im-manager/compare/v0.5.8...v0.5.10)
 
 > 2022-04-11
 
@@ -1704,18 +1734,8 @@
 * Use func names with argument signatures to change ownership [DEVOPS-102]
 
 
-<a name="v0.5.5"></a>
-## [v0.5.5](https://github.com/dhis2-sre/im-manager/compare/v0.5.9...v0.5.5)
-
-> 2022-04-11
-
-### Fix
-
-* Use func names with argument signatures to change ownership [DEVOPS-102]
-
-
-<a name="v0.5.9"></a>
-## [v0.5.9](https://github.com/dhis2-sre/im-manager/compare/v0.5.7...v0.5.9)
+<a name="v0.5.8"></a>
+## [v0.5.8](https://github.com/dhis2-sre/im-manager/compare/v0.5.7...v0.5.8)
 
 > 2022-04-11
 
@@ -1735,7 +1755,7 @@
 
 
 <a name="v0.5.6"></a>
-## [v0.5.6](https://github.com/dhis2-sre/im-manager/compare/v0.5.8...v0.5.6)
+## [v0.5.6](https://github.com/dhis2-sre/im-manager/compare/v0.5.5...v0.5.6)
 
 > 2022-04-11
 
@@ -1744,8 +1764,8 @@
 * Use func names with argument signatures to change ownership [DEVOPS-102]
 
 
-<a name="v0.5.8"></a>
-## [v0.5.8](https://github.com/dhis2-sre/im-manager/compare/v0.5.3...v0.5.8)
+<a name="v0.5.5"></a>
+## [v0.5.5](https://github.com/dhis2-sre/im-manager/compare/v0.5.9...v0.5.5)
 
 > 2022-04-11
 
@@ -1754,14 +1774,24 @@
 * Use func names with argument signatures to change ownership [DEVOPS-102]
 
 
-<a name="v0.5.3"></a>
-## [v0.5.3](https://github.com/dhis2-sre/im-manager/compare/v0.5.4...v0.5.3)
+<a name="v0.5.9"></a>
+## [v0.5.9](https://github.com/dhis2-sre/im-manager/compare/v0.5.4...v0.5.9)
+
+> 2022-04-11
+
+### Fix
+
+* Use func names with argument signatures to change ownership [DEVOPS-102]
+
+
+<a name="v0.5.4"></a>
+## [v0.5.4](https://github.com/dhis2-sre/im-manager/compare/v0.5.3...v0.5.4)
 
 > 2022-04-08
 
 
-<a name="v0.5.4"></a>
-## [v0.5.4](https://github.com/dhis2-sre/im-manager/compare/v0.5.2...v0.5.4)
+<a name="v0.5.3"></a>
+## [v0.5.3](https://github.com/dhis2-sre/im-manager/compare/v0.5.2...v0.5.3)
 
 > 2022-04-08
 
