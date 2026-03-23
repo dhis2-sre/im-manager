@@ -5,12 +5,21 @@ set -euo pipefail
 source ./auth.sh
 
 GROUP="${1:-${GROUP:?Set GROUP (e.g. whoami)}}"
+DEPLOYMENT_NAME="${2:-}"
 
 ./findDeployments.sh > .deployments.json
 # Get deployment id and name per deployment (list endpoint may not include all instances)
-deployments_list=$(jq -r --arg g "$GROUP" '.[] | select(.name==$g) | .deployments[] | "\(.id) \(.name)"' .deployments.json)
+if [[ -n "$DEPLOYMENT_NAME" ]]; then
+  deployments_list=$(jq -r --arg g "$GROUP" --arg n "$DEPLOYMENT_NAME" '.[] | select(.name==$g) | .deployments[] | select(.name==$n) | "\(.id) \(.name)"' .deployments.json)
+else
+  deployments_list=$(jq -r --arg g "$GROUP" '.[] | select(.name==$g) | .deployments[] | "\(.id) \(.name)"' .deployments.json)
+fi
 if [[ -z "$deployments_list" ]]; then
-  echo "No deployments found for group $GROUP"
+  if [[ -n "$DEPLOYMENT_NAME" ]]; then
+    echo "No deployment named \"$DEPLOYMENT_NAME\" found in group $GROUP"
+  else
+    echo "No deployments found for group $GROUP"
+  fi
   exit 0
 fi
 while IFS= read -r line; do
@@ -32,4 +41,8 @@ while IFS= read -r line; do
     ./reset.sh "$inst_id" < /dev/null
   done <<< "$instances"
 done <<< "$deployments_list"
-echo "Done resetting all deployments in group $GROUP"
+if [[ -n "$DEPLOYMENT_NAME" ]]; then
+  echo "Done resetting deployment \"$DEPLOYMENT_NAME\" in group $GROUP"
+else
+  echo "Done resetting all deployments in group $GROUP"
+fi
