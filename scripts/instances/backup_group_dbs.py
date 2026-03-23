@@ -333,7 +333,11 @@ def main() -> int:
     parser.add_argument("--timeout-seconds", type=int, default=600)
     parser.add_argument("--format", default="plain", choices=["plain", "custom"], help="Database backup format")
     parser.add_argument("--limit", type=int, default=0)
-    parser.add_argument("--deployment-name", default="", help="Only back up a single deployment by name")
+    parser.add_argument(
+        "--deployment-name",
+        default="",
+        help="Back up a single deployment by name within --group (output JSON will contain one item)",
+    )
     parser.add_argument("--parallel", action="store_true", help="Start all backups first, then poll for completion concurrently")
     parser.add_argument("--start-retries", type=int, default=3, help="Retries for save-as start on transient network errors")
     parser.add_argument("--retry-backoff-seconds", type=int, default=2, help="Base backoff seconds between save-as retries")
@@ -352,9 +356,17 @@ def main() -> int:
 
     deployments_json = _request(session, auth, "GET", f"{host}/deployments")
     group_deployments = _get_group_deployments(deployments_json, group)
+    total_in_group = len(group_deployments)
 
     if args.deployment_name:
         group_deployments = [d for d in group_deployments if d.get("name") == args.deployment_name]
+        if not group_deployments:
+            print(
+                f"Deployment {args.deployment_name!r} not found in group {group!r}. "
+                f"Found {total_in_group} deployment(s) in that group.",
+                file=sys.stderr,
+            )
+            return 1
 
     if not group_deployments:
         print(f"No deployments found in group: {group}", file=sys.stderr)
@@ -386,6 +398,14 @@ def main() -> int:
 
     if not targets:
         print("No valid deployments to back up.", file=sys.stderr)
+        return 1
+
+    if args.deployment_name and len(targets) != 1:
+        print(
+            f"Expected exactly 1 valid target for deployment {args.deployment_name!r} in group {group!r}, "
+            f"got {len(targets)}. Refusing to continue.",
+            file=sys.stderr,
+        )
         return 1
 
     items: List[BackupItem] = []
