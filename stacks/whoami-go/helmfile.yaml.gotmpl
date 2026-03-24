@@ -12,7 +12,7 @@ releases:
       - ingress:
           enabled: true
           hostname: {{ requiredEnv "INSTANCE_HOSTNAME" }}
-          path: /{{ requiredEnv "INSTANCE_NAME" }}
+          path: /{{ requiredEnv "INSTANCE_PATH_NAME" }}
           certIssuer: cert-issuer-prod
       - commonLabels:
           im: "true"

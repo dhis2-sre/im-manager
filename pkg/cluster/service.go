@@ -7,7 +7,7 @@ import (
 )
 
 func NewService(clusterRepository *repository) Service {
-	return Service{clusterRepository}
+	return Service{clusterRepository: clusterRepository}
 }
 
 type Service struct {
@@ -24,9 +24,20 @@ func (s Service) FindAll(ctx context.Context) ([]model.Cluster, error) {
 
 func (s Service) Save(ctx context.Context, name, description string, kubernetesConfiguration []byte) (model.Cluster, error) {
 	cluster := model.Cluster{
-		Name:          name,
-		Description:   description,
-		Configuration: kubernetesConfiguration,
+		Name:        name,
+		Description: description,
+	}
+
+	if kubernetesConfiguration != nil {
+		keyGroups, err := createKeyGroup()
+		if err != nil {
+			return model.Cluster{}, err
+		}
+		encryptedConfig, err := EncryptYaml(kubernetesConfiguration, keyGroups)
+		if err != nil {
+			return model.Cluster{}, err
+		}
+		cluster.Configuration = encryptedConfig
 	}
 
 	err := s.clusterRepository.save(ctx, &cluster)
@@ -51,7 +62,15 @@ func (s Service) Update(ctx context.Context, id uint, name, description string, 
 		cluster.Description = description
 	}
 	if kubernetesConfiguration != nil {
-		cluster.Configuration = kubernetesConfiguration
+		keyGroups, err := createKeyGroup()
+		if err != nil {
+			return model.Cluster{}, err
+		}
+		encryptedConfig, err := EncryptYaml(kubernetesConfiguration, keyGroups)
+		if err != nil {
+			return model.Cluster{}, err
+		}
+		cluster.Configuration = encryptedConfig
 	}
 
 	err = s.clusterRepository.update(ctx, cluster)

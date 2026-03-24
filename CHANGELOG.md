@@ -1,12 +1,95 @@
 
+<a name="v0.65.0"></a>
+## [v0.65.0](https://github.com/dhis2-sre/im-manager/compare/ls...v0.65.0)
+
+> 2026-03-19
+
+### Chore
+
+* use latest ubuntu image for runners ([#1402](https://github.com/dhis2-sre/im-manager/issues/1402))
+* update im-group chart version to 0.4.0 ([#1379](https://github.com/dhis2-sre/im-manager/issues/1379))
+* util scripts for creating, and deleting, restricted users on K3s ([#1370](https://github.com/dhis2-sre/im-manager/issues/1370))
+* update IM cluster role to allow remote pod exec ([#1361](https://github.com/dhis2-sre/im-manager/issues/1361))
+* use mc mirror instead of recursive copy ([#1369](https://github.com/dhis2-sre/im-manager/issues/1369))
+
+### Feat
+
+* unique instance names ([#1410](https://github.com/dhis2-sre/im-manager/issues/1410))
+* Postgresql connection pool ([#1401](https://github.com/dhis2-sre/im-manager/issues/1401))
+* encrypt Kubernetes cluster config server side ([#1396](https://github.com/dhis2-sre/im-manager/issues/1396))
+
+
+<a name="ls"></a>
+## [ls](https://github.com/dhis2-sre/im-manager/compare/v0.64.0...ls)
+
+> 2026-02-20
+
+### Chore
+
+* generate change log for v0.64.0
+
+
+<a name="v0.64.0"></a>
+## [v0.64.0](https://github.com/dhis2-sre/im-manager/compare/v0.63.0...v0.64.0)
+
+> 2026-02-16
+
+### Chore
+
+* remove DATABASE_ID from minio stack params as it's consumed ([#1358](https://github.com/dhis2-sre/im-manager/issues/1358))
+* make sure the access token won't expire before it can be used to download the database ([#1344](https://github.com/dhis2-sre/im-manager/issues/1344))
+
+### Feat
+
+* companions ([#1256](https://github.com/dhis2-sre/im-manager/issues/1256))
+
+### Refactor
+
+* use remotecommand instead of port-forwarding for executing pg_dump ([#1349](https://github.com/dhis2-sre/im-manager/issues/1349))
+
+### Test
+
+* helper functions ([#1350](https://github.com/dhis2-sre/im-manager/issues/1350))
+* refresh access token ([#1348](https://github.com/dhis2-sre/im-manager/issues/1348))
+
+
+<a name="v0.63.0"></a>
+## [v0.63.0](https://github.com/dhis2-sre/im-manager/compare/0.62.1...v0.63.0)
+
+> 2026-02-03
+
+### Chore
+
+* allow suspending by default ([#1333](https://github.com/dhis2-sre/im-manager/issues/1333))
+
+
+<a name="0.62.1"></a>
+## [0.62.1](https://github.com/dhis2-sre/im-manager/compare/v0.62.1...0.62.1)
+
+> 2025-12-22
+
+### Chore
+
+* generate change log for v0.62.1
+
+
 <a name="v0.62.1"></a>
-## [v0.62.1](https://github.com/dhis2-sre/im-manager/compare/v0.62.0...v0.62.1)
+## [v0.62.1](https://github.com/dhis2-sre/im-manager/compare/0.62.0...v0.62.1)
 
 > 2025-12-22
 
 ### Chore
 
 * bump default dhis2-core chart version ([#1321](https://github.com/dhis2-sre/im-manager/issues/1321))
+
+
+<a name="0.62.0"></a>
+## [0.62.0](https://github.com/dhis2-sre/im-manager/compare/v0.62.0...0.62.0)
+
+> 2025-12-22
+
+### Chore
+
 * generate change log for v0.62.0
 
 
