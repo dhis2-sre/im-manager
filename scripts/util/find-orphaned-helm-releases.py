@@ -55,6 +55,7 @@ class Deployment:
     namespace: str
     cluster: str
     group: str
+    group_id: int
     environment: str
 
 
@@ -166,19 +167,23 @@ def get_deployments_by_environment(access_token: str, im_host: str, environment:
 
     groups_data = response.json()
 
-    deployments = [
-        Deployment(
-            name=deployment_data["name"].strip(),
-            namespace=deployment_data["group"]["namespace"].strip(),
-            cluster=normalize_cluster_name(cluster_map[deployment_data["group"]["clusterId"]].name)
-            if (cluster_id := deployment_data["group"].get("clusterId")) and cluster_id in cluster_map
-            else "default",
-            group=group_data.get("name", "").strip(),
-            environment=environment
-        )
-        for group_data in groups_data
-        for deployment_data in group_data["deployments"]
-    ]
+    deployments = []
+    for group_data in groups_data:
+        for deployment_data in group_data["deployments"]:
+            group_id = deployment_data["group"]["id"]
+
+            deployments.append(
+                Deployment(
+                    name=deployment_data["name"].strip(),
+                    namespace=deployment_data["group"]["namespace"].strip(),
+                    cluster=normalize_cluster_name(cluster_map[deployment_data["group"]["clusterId"]].name)
+                    if (cluster_id := deployment_data["group"].get("clusterId")) and cluster_id in cluster_map
+                    else "default",
+                    group=group_data.get("name", "").strip(),
+                    group_id=group_id,
+                    environment=environment
+                )
+            )
 
     print(f"Found {len(deployments)} deployments in Instance Manager ({environment})\n")
     return deployments
@@ -289,7 +294,8 @@ def find_orphaned_releases(
     im_deployments_by_cluster = defaultdict(set)
     for deployments in deployments_by_env.values():
         for deployment in deployments:
-            im_deployments_by_cluster[deployment.cluster].add((deployment.namespace, deployment.name))
+            release_name = f"{deployment.name}-{deployment.group_id}"
+            im_deployments_by_cluster[deployment.cluster].add((deployment.namespace, release_name))
 
     helm_releases_by_cluster = defaultdict(set)
     kubeconfig_to_cluster = {}
