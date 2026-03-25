@@ -1,4 +1,19 @@
 
+<a name="v0.65.1"></a>
+## [v0.65.1](https://github.com/dhis2-sre/im-manager/compare/v0.65.0...v0.65.1)
+
+> 2026-03-25
+
+### Chore
+
+* move jaeger deployment to IM nodes ([#1420](https://github.com/dhis2-sre/im-manager/issues/1420))
+* generate change log for v0.65.0
+
+### Ci
+
+* add group id to orpahned instances finder script ([#1416](https://github.com/dhis2-sre/im-manager/issues/1416))
+
+
 <a name="v0.65.0"></a>
 ## [v0.65.0](https://github.com/dhis2-sre/im-manager/compare/ls...v0.65.0)
 
