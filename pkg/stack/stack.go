@@ -233,7 +233,7 @@ var DORIS = model.Stack{
 
 // Provides the Doris hostname of an instance.
 var dorisHostnameProvider = model.ParameterProviderFunc(func(instance model.DeploymentInstance) (string, error) {
-	return fmt.Sprintf("%s-doris-fe-internal.%s.svc", instance.Name, instance.Group.Namespace), nil
+	return fmt.Sprintf("%s-%d-doris-fe-internal.%s.svc", instance.Name, instance.Group.ID, instance.Group.Namespace), nil
 })
 
 var dhis2DBDefaults = struct {
