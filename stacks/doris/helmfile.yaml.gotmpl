@@ -1,6 +1,3 @@
-helmDefaults:
-  deleteWait: true
-
 releases:
   - name: "{{ requiredEnv "INSTANCE_NAME" }}-doris"
     namespace: "{{ requiredEnv "INSTANCE_NAMESPACE" }}"
@@ -46,11 +43,11 @@ releases:
           replicas: "{{ requiredEnv "BACKEND_REPLICAS" }}"
           resource:
             requests:
-              cpu: 4
-              memory: 8Gi
+              cpu: "{{ requiredEnv "BACKEND_RESOURCE_REQUESTS_CPU" }}"
+              memory: "{{ requiredEnv "BACKEND_RESOURCE_REQUESTS_MEMORY" }}"
             limits:
-              cpu: 8
-              memory: 16Gi
+              cpu: "{{ requiredEnv "BACKEND_RESOURCE_LIMITS_CPU" }}"
+              memory: "{{ requiredEnv "BACKEND_RESOURCE_LIMITS_MEMORY" }}"
 
 repositories:
   - name: selectdb

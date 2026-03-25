@@ -189,6 +189,10 @@ var dorisDefaults = struct {
 	frontendResourceRequestsMemory string
 	frontendResourceLimitsCPU      string
 	frontendResourceLimitsMemory   string
+	backendResourceRequestsCPU     string
+	backendResourceRequestsMemory  string
+	backendResourceLimitsCPU       string
+	backendResourceLimitsMemory    string
 }{
 	chartVersion:                   "25.8.0",
 	replicasFrontend:               "1",
@@ -197,6 +201,10 @@ var dorisDefaults = struct {
 	frontendResourceRequestsMemory: "8Gi",
 	frontendResourceLimitsCPU:      "16",
 	frontendResourceLimitsMemory:   "32Gi",
+	backendResourceRequestsCPU:     "4",
+	backendResourceRequestsMemory:  "8Gi",
+	backendResourceLimitsCPU:       "16",
+	backendResourceLimitsMemory:    "32Gi",
 }
 
 // Stack representing ../../stacks/doris/helmfile.yaml.gotmpl
@@ -209,9 +217,13 @@ var DORIS = model.Stack{
 		"FRONTEND_REPLICAS":                 {Priority: 2, DisplayName: "Frontend Replicas", DefaultValue: &dorisDefaults.replicasFrontend},
 		"BACKEND_REPLICAS":                  {Priority: 3, DisplayName: "Backend Replicas", DefaultValue: &dorisDefaults.replicasBackend},
 		"FRONTEND_RESOURCE_REQUESTS_CPU":    {Priority: 4, DisplayName: "Frontend CPU Requests", DefaultValue: &dorisDefaults.frontendResourceRequestsCPU},
-		"FRONTEND_RESOURCE_REQUESTS_MEMORY": {Priority: 5, DisplayName: "Backend Replicas", DefaultValue: &dorisDefaults.frontendResourceRequestsMemory},
-		"FRONTEND_RESOURCE_LIMITS_CPU":      {Priority: 6, DisplayName: "Backend Replicas", DefaultValue: &dorisDefaults.frontendResourceLimitsCPU},
-		"FRONTEND_RESOURCE_LIMITS_MEMORY":   {Priority: 7, DisplayName: "Backend Replicas", DefaultValue: &dorisDefaults.frontendResourceLimitsMemory},
+		"FRONTEND_RESOURCE_REQUESTS_MEMORY": {Priority: 5, DisplayName: "Frontend Replicas", DefaultValue: &dorisDefaults.frontendResourceRequestsMemory},
+		"FRONTEND_RESOURCE_LIMITS_CPU":      {Priority: 6, DisplayName: "Frontend Replicas", DefaultValue: &dorisDefaults.frontendResourceLimitsCPU},
+		"FRONTEND_RESOURCE_LIMITS_MEMORY":   {Priority: 7, DisplayName: "Frontend Replicas", DefaultValue: &dorisDefaults.frontendResourceLimitsMemory},
+		"BACKEND_RESOURCE_REQUESTS_CPU":     {Priority: 4, DisplayName: "Backend CPU Requests", DefaultValue: &dorisDefaults.backendResourceRequestsCPU},
+		"BACKEND_RESOURCE_REQUESTS_MEMORY":  {Priority: 5, DisplayName: "Backend Replicas", DefaultValue: &dorisDefaults.backendResourceRequestsMemory},
+		"BACKEND_RESOURCE_LIMITS_CPU":       {Priority: 6, DisplayName: "Backend Replicas", DefaultValue: &dorisDefaults.backendResourceLimitsCPU},
+		"BACKEND_RESOURCE_LIMITS_MEMORY":    {Priority: 7, DisplayName: "Backend Replicas", DefaultValue: &dorisDefaults.backendResourceLimitsMemory},
 	},
 	ParameterProviders: model.ParameterProviders{
 		"DORIS_HOSTNAME": dorisHostnameProvider,
