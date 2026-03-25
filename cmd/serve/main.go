@@ -210,12 +210,12 @@ func run() (err error) {
 		return err
 	}
 
-	err = createGroups(ctx, logger, groupService)
+	err = createAdminUser(ctx, userService, groupService)
 	if err != nil {
 		return err
 	}
 
-	err = createAdminUser(ctx, userService, groupService)
+	err = createGroups(ctx, logger, groupService)
 	if err != nil {
 		return err
 	}
