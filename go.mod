@@ -5,7 +5,7 @@ go 1.25.0
 require (
 	filippo.io/age v1.3.1
 	github.com/anthhub/forwarder v1.1.0
-	github.com/aws/aws-sdk-go-v2 v1.41.4
+	github.com/aws/aws-sdk-go-v2 v1.41.5
 	github.com/aws/aws-sdk-go-v2/config v1.32.12
 	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.22.9
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.97.2
