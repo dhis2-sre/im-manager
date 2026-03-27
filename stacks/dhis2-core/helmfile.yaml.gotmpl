@@ -101,6 +101,7 @@ releases:
             memory: {{ requiredEnv "RESOURCES_REQUESTS_MEMORY" }}
       - keda:
           enabled: {{ requiredEnv "ALLOW_SUSPEND" }}
+          scaledownPeriod: 3600
       - glowroot:
           enabled: {{ requiredEnv "DEPLOY_GLOWROOT" }}
           ingress:
