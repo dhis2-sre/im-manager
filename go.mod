@@ -13,7 +13,7 @@ require (
 	github.com/dominikbraun/graph v0.23.0
 	github.com/getsops/sops/v3 v3.12.2
 	github.com/gin-contrib/cors v1.7.7
-	github.com/gin-contrib/sse v1.1.0
+	github.com/gin-contrib/sse v1.1.1
 	github.com/gin-gonic/gin v1.12.0
 	github.com/go-mail/mail v2.3.1+incompatible
 	github.com/go-openapi/runtime v0.29.3
