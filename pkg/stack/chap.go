@@ -38,7 +38,7 @@ var chapDBDefaults = struct {
 	dbPassword   string
 	dbVersion    string
 }{
-	chartVersion: "0.1.0",
+	chartVersion: "0.1.1",
 	dbSize:       "10Gi",
 	dbName:       "chap_core",
 	dbPassword:   "chap",
@@ -100,7 +100,7 @@ var chapWorkerDefaults = struct {
 	imageTag        string
 	imagePullPolicy string
 }{
-	chartVersion:    "0.1.0",
+	chartVersion:    "0.1.1",
 	imageTag:        "latest",
 	imagePullPolicy: ifNotPresent,
 }
@@ -132,7 +132,7 @@ var chapCoreDefaults = struct {
 	googleServiceAccountEmail      string
 	googleServiceAccountPrivateKey string
 }{
-	chartVersion:                   "0.1.0",
+	chartVersion:                   "0.1.1",
 	imageTag:                       "latest",
 	imagePullPolicy:                ifNotPresent,
 	googleServiceAccountEmail:      " ",
