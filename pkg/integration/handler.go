@@ -11,22 +11,18 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func NewHandler(client DockerHubClient, instanceManagerHost string) Handler {
+func NewHandler(dockerHubClient, ghcrClient RegistryClient, instanceManagerHost string) Handler {
 	return Handler{
-		dockerHubClient:     client,
+		dockerHubClient:     dockerHubClient,
+		ghcrClient:          ghcrClient,
 		instanceManagerHost: instanceManagerHost,
 	}
 }
 
 type Handler struct {
-	dockerHubClient     DockerHubClient
+	dockerHubClient     RegistryClient
+	ghcrClient          RegistryClient
 	instanceManagerHost string
-}
-
-type DockerHubClient interface {
-	GetImages(organization string) ([]string, error)
-	GetTags(organization, repository string) ([]string, error)
-	ImageExists(organization, repository, tag string) error
 }
 
 type Request struct {
@@ -145,7 +141,13 @@ func (h Handler) Integrations(c *gin.Context) {
 			return
 		}
 
-		tags, err := h.dockerHubClient.GetTags(organization, repository)
+		registry, _ := payload["registry"].(string)
+		client := h.dockerHubClient
+		if registry == "ghcr" {
+			client = h.ghcrClient
+		}
+
+		tags, err := client.GetTags(organization, repository)
 		if err != nil {
 			_ = c.Error(err)
 			return

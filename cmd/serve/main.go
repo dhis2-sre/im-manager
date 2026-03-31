@@ -596,12 +596,14 @@ func newIntegrationHandler() (integration.Handler, error) {
 			Password: password,
 		})
 
+	ghcrClient := integration.NewGhcrClient()
+
 	instanceServiceHost, err := requireEnv("INSTANCE_SERVICE_HOST")
 	if err != nil {
 		return integration.Handler{}, err
 	}
 
-	return integration.NewHandler(dockerHubClient, instanceServiceHost), nil
+	return integration.NewHandler(dockerHubClient, ghcrClient, instanceServiceHost), nil
 }
 
 func newEventHandler(ctx context.Context, logger *slog.Logger, rabbitmqConfig rabbitMQConfig) (event.Handler, error) {
