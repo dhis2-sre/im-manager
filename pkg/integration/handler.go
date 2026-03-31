@@ -141,7 +141,11 @@ func (h Handler) Integrations(c *gin.Context) {
 			return
 		}
 
-		registry, _ := payload["registry"].(string)
+		registry, ok := payload["registry"].(string)
+		if !ok {
+			_ = c.Error(fmt.Errorf("\"registry\" must be a string"))
+			return
+		}
 		client := h.dockerHubClient
 		if registry == "ghcr" {
 			client = h.ghcrClient
