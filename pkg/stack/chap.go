@@ -41,7 +41,7 @@ var chapDBDefaults = struct {
 	chartVersion: "0.1.0",
 	dbSize:       "10Gi",
 	dbName:       "chap_core",
-	dbPassword:   "changeme",
+	dbPassword:   "chap",
 	dbVersion:    "17",
 }
 
@@ -74,8 +74,8 @@ var chapValkeyDefaults = struct {
 	password     string
 }{
 	chartVersion: "0.9.2",
-	storageSize:  "8Gi",
-	password:     "changeme",
+	storageSize:  "10Gi",
+	password:     "chap",
 }
 
 // Stack representing ../../stacks/chap-worker/helmfile.yaml.gotmpl
