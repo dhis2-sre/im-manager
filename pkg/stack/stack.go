@@ -250,6 +250,7 @@ var DHIS2Core = model.Stack{
 		"CUSTOM_DHIS2_CONFIG":             {Priority: 24, DisplayName: "Custom DHIS2 config (applied to top of dhis.conf)", DefaultValue: &dhis2CoreDefaults.customDhis2Config, Sensitive: true},
 		"ALLOW_SUSPEND":                   {Priority: 25, DisplayName: "Allow the application to be suspended", DefaultValue: &dhis2CoreDefaults.allowSuspend},
 		"DEPLOY_GLOWROOT":                 {Priority: 26, DisplayName: "Deploy Glowroot", DefaultValue: &dhis2CoreDefaults.deployGlowroot},
+		"DEPLOY_CHAP":                     {Priority: 27, DisplayName: "Deploy CHAP", DefaultValue: &dhis2CoreDefaults.deployChap},
 		"GOOGLE_AUTH_PROJECT_ID":          {Priority: 0, DisplayName: "Google auth project id", DefaultValue: &dhis2CoreDefaults.googleAuthClientId, Sensitive: true},
 		"GOOGLE_AUTH_PRIVATE_KEY":         {Priority: 0, DisplayName: "Google auth private key", DefaultValue: &dhis2CoreDefaults.googleAuthPrivateKey, Sensitive: true},
 		"GOOGLE_AUTH_PRIVATE_KEY_ID":      {Priority: 0, DisplayName: "Google auth private key id", DefaultValue: &dhis2CoreDefaults.googleAuthPrivateKeyId, Sensitive: true},
@@ -265,6 +266,7 @@ var DHIS2Core = model.Stack{
 	},
 	Companions: []model.Stack{
 		MINIO,
+		ChapCore,
 	},
 	KubernetesResource: model.DeploymentResource,
 }
@@ -296,6 +298,7 @@ var dhis2CoreDefaults = struct {
 	customDhis2Config            string
 	allowSuspend                 string
 	deployGlowroot               string
+	deployChap                   string
 	googleAuthProjectId          string
 	googleAuthPrivateKey         string
 	googleAuthPrivateKeyId       string
@@ -328,6 +331,7 @@ var dhis2CoreDefaults = struct {
 	customDhis2Config:            " ",
 	allowSuspend:                 "true",
 	deployGlowroot:               "false",
+	deployChap:                   "false",
 	googleAuthProjectId:          " ", // TODO: " " doesn't need to be used here as with `javaOpts` since the googleAuth* parameters are stack parameters and therefor always populated
 	googleAuthPrivateKey:         " ", // However the web client currently doesn't support these empty parameter so for now
 	googleAuthPrivateKeyId:       " ",
