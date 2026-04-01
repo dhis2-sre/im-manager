@@ -89,8 +89,8 @@ releases:
           installApps:
             enabled: true
             apps:
-              name: Modeling
-              version: latest
+              - name: Modeling
+                version: latest
       {{- end }}
 
       - sessionCookieSameSite: {{ requiredEnv "SAME_SITE_COOKIES" }}
