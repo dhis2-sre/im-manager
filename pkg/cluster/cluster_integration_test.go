@@ -1,29 +1,25 @@
 package cluster_test
 
 import (
-	"bytes"
 	"context"
-	"mime/multipart"
+	"encoding/base64"
+	"fmt"
 	"strings"
 	"testing"
 
+	filippoioage "filippo.io/age"
 	"github.com/dhis2-sre/im-manager/pkg/cluster"
-
-	"github.com/go-mail/mail"
-
-	"github.com/stretchr/testify/assert"
-
 	"github.com/dhis2-sre/im-manager/pkg/group"
 	"github.com/dhis2-sre/im-manager/pkg/inttest"
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	"github.com/dhis2-sre/im-manager/pkg/user"
 	"github.com/gin-gonic/gin"
+	"github.com/go-mail/mail"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestClusterHandler(t *testing.T) {
-	t.Parallel()
-
 	db := inttest.SetupDB(t)
 
 	userRepository := user.NewRepository(db)
@@ -32,14 +28,16 @@ func TestClusterHandler(t *testing.T) {
 	clusterRepository := cluster.NewRepository(db)
 	clusterService := cluster.NewService(clusterRepository)
 
+	identity, err := filippoioage.GenerateX25519Identity()
+	require.NoError(t, err, "failed to generate age key pair")
+
+	t.Setenv("SOPS_AGE_KEY", identity.String())
+
 	groupRepository := group.NewRepository(db)
 	groupService := group.NewService(groupRepository, userService, clusterService)
 
-	err := user.CreateUser(context.Background(), "admin", "admin", userService, groupService, model.AdministratorGroupName, "", "admin")
+	err = user.CreateUser(context.Background(), "admin", "admin", userService, groupService, model.AdministratorGroupName, "", "admin")
 	require.NoError(t, err, "failed to create admin user and group")
-
-	create, err := clusterService.FindOrCreate(t.Context(), "default-name", "default-description")
-	assert.NoError(t, err)
 
 	client := inttest.SetupHTTPServer(t, func(engine *gin.Engine) {
 		handler := cluster.NewHandler(clusterService)
@@ -47,6 +45,8 @@ func TestClusterHandler(t *testing.T) {
 		authorization := TestAuthorizationMiddleware{}
 		cluster.Routes(engine, authentication, authorization, handler)
 	})
+
+	var createdClusterID uint
 
 	t.Run("Create", func(t *testing.T) {
 		requestBody := strings.NewReader(`{
@@ -59,35 +59,46 @@ func TestClusterHandler(t *testing.T) {
 
 		assert.Equal(t, "name", cluster.Name)
 		assert.Equal(t, "description", cluster.Description)
+		createdClusterID = cluster.ID
 	})
 
 	t.Run("Create with configuration", func(t *testing.T) {
-		var b bytes.Buffer
-		w := multipart.NewWriter(&b)
+		k8sConfig := []byte(`apiVersion: v1
+kind: Config
+clusters:
+- name: test
+  cluster:
+    server: https://localhost:6443
+contexts:
+- name: test
+  context:
+    cluster: test
+    user: test
+current-context: test
+users:
+- name: test
+  user:
+    token: test-token`)
 
-		_ = w.WriteField("name", "name-with-configuration")
-		_ = w.WriteField("description", "description")
-
-		part, err := w.CreateFormFile("kubernetesConfiguration", "config.yaml")
-		require.NoError(t, err)
-		_, err = part.Write([]byte("kubernetesConfiguration"))
-		require.NoError(t, err)
-
-		w.Close()
+		requestBody := strings.NewReader(fmt.Sprintf(`{
+			"name": "name-with-config",
+			"description": "description-with-config",
+			"rawConfig": %q
+		}`, base64.StdEncoding.EncodeToString(k8sConfig)))
 
 		var cluster model.Cluster
-		client.PostForm(t, "/clusters", w, &b, &cluster)
+		client.PostJSON(t, "/clusters", requestBody, &cluster)
 
-		assert.Equal(t, "name-with-configuration", cluster.Name)
-		assert.Equal(t, "description", cluster.Description)
+		assert.Equal(t, "name-with-config", cluster.Name)
+		assert.Equal(t, "description-with-config", cluster.Description)
 	})
 
 	t.Run("Read", func(t *testing.T) {
 		var cluster model.Cluster
-		client.GetJSON(t, "/clusters/1", &cluster)
+		client.GetJSON(t, "/clusters/"+fmt.Sprint(createdClusterID), &cluster)
 
-		assert.Equal(t, create.Name, cluster.Name)
-		assert.Equal(t, create.Description, cluster.Description)
+		assert.Equal(t, "name", cluster.Name)
+		assert.Equal(t, "description", cluster.Description)
 	})
 
 	t.Run("Update", func(t *testing.T) {
@@ -97,21 +108,21 @@ func TestClusterHandler(t *testing.T) {
 			}`)
 
 		var cluster model.Cluster
-		client.PutJSON(t, "/clusters/1", requestBody, &cluster)
+		client.PutJSON(t, "/clusters/"+fmt.Sprint(createdClusterID), requestBody, &cluster)
 
 		assert.Equal(t, "new-name", cluster.Name)
 		assert.Equal(t, "new-description", cluster.Description)
 	})
 
 	t.Run("Delete", func(t *testing.T) {
-		client.Delete(t, "/clusters/1")
+		client.Delete(t, "/clusters/"+fmt.Sprint(createdClusterID))
 	})
 
 	t.Run("ReadAll", func(t *testing.T) {
 		var clusters []model.Cluster
 		client.GetJSON(t, "/clusters", &clusters)
 
-		assert.Len(t, clusters, 2)
+		assert.Len(t, clusters, 1)
 	})
 }
 
