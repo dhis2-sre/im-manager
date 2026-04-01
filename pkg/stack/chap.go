@@ -136,7 +136,7 @@ var chapCoreDefaults = struct {
 	dhis2Username                  string
 	dhis2Password                  string
 }{
-	chartVersion:                   "0.1.4",
+	chartVersion:                   "0.1.5",
 	imageTag:                       "latest",
 	imagePullPolicy:                ifNotPresent,
 	googleServiceAccountEmail:      " ",

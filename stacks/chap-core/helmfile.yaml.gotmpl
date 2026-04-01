@@ -1,6 +1,7 @@
 # consumedParameters: DATABASE_HOSTNAME,DATABASE_NAME,DATABASE_SECRET,REDIS_HOST,REDIS_SECRET
 helmDefaults:
   deleteWait: true
+  timeout: 420
 
 releases:
   - name: "{{ requiredEnv "INSTANCE_NAME" }}-chap-core"
