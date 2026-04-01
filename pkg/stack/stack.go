@@ -133,6 +133,7 @@ func ValidateConsumedParameters(stacks []model.Stack) error {
 }
 
 const ifNotPresent = "IfNotPresent"
+const always = "Always"
 
 // Stack representing ../../stacks/dhis2-db/helmfile.yaml.gotmpl
 var DHIS2DB = model.Stack{

@@ -38,7 +38,7 @@ var chapDBDefaults = struct {
 	dbPassword   string
 	dbVersion    string
 }{
-	chartVersion: "0.1.2",
+	chartVersion: "0.1.3",
 	dbSize:       "10Gi",
 	dbName:       "chap_core",
 	dbPassword:   "chap",
@@ -102,7 +102,7 @@ var chapWorkerDefaults = struct {
 }{
 	chartVersion:    "0.1.1",
 	imageTag:        "latest",
-	imagePullPolicy: ifNotPresent,
+	imagePullPolicy: always,
 }
 
 // Stack representing ../../stacks/chap-core/helmfile.yaml.gotmpl
@@ -136,9 +136,9 @@ var chapCoreDefaults = struct {
 	dhis2Username                  string
 	dhis2Password                  string
 }{
-	chartVersion:                   "0.1.5",
+	chartVersion:                   "0.1.6",
 	imageTag:                       "latest",
-	imagePullPolicy:                ifNotPresent,
+	imagePullPolicy:                always,
 	googleServiceAccountEmail:      " ",
 	googleServiceAccountPrivateKey: " ",
 	dhis2Username:                  "system",
