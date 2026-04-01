@@ -18,11 +18,13 @@ releases:
           annotations:
             cert-manager.io/cluster-issuer: cert-issuer-prod
             nginx.ingress.kubernetes.io/proxy-body-size: 128m
+            nginx.ingress.kubernetes.io/rewrite-target: /$2
+            nginx.ingress.kubernetes.io/use-regex: "true"
           hosts:
             - host: {{ requiredEnv "INSTANCE_HOSTNAME" }}
               paths:
-                - path: /
-                  pathType: Prefix
+                - path: /{{ requiredEnv "INSTANCE_NAME" }}(/|$)(.*)
+                  pathType: ImplementationSpecific
           tls:
             - secretName: "{{ requiredEnv "INSTANCE_NAME" }}-chap-core-tls"
               hosts:
