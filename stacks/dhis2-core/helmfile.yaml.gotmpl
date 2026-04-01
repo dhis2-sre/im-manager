@@ -84,6 +84,15 @@ releases:
           {{- end }}
       {{- end }}
 
+      {{- if eq (requiredEnv "DEPLOY_CHAP") "true" }}
+      - jobs:
+          installApps:
+            enabled: true
+            apps:
+              name: Modeling
+              version: latest
+      {{- end }}
+
       - sessionCookieSameSite: {{ requiredEnv "SAME_SITE_COOKIES" }}
 
       - flyway:
