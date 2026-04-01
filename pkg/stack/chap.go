@@ -114,6 +114,8 @@ var ChapCore = model.Stack{
 		"CHART_VERSION":                      {Priority: 3, DisplayName: "Chart Version", DefaultValue: &chapCoreDefaults.chartVersion},
 		"GOOGLE_SERVICE_ACCOUNT_EMAIL":       {Priority: 4, DisplayName: "Google Service Account Email", DefaultValue: &chapCoreDefaults.googleServiceAccountEmail, Sensitive: true},
 		"GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY": {Priority: 5, DisplayName: "Google Service Account Key", DefaultValue: &chapCoreDefaults.googleServiceAccountPrivateKey, Sensitive: true},
+		"DHIS2_USERNAME":                     {Priority: 6, DisplayName: "DHIS2 Username", DefaultValue: &chapCoreDefaults.dhis2Username},
+		"DHIS2_PASSWORD":                     {Priority: 7, DisplayName: "DHIS2 Password", DefaultValue: &chapCoreDefaults.dhis2Password, Sensitive: true},
 		"DATABASE_HOSTNAME":                  {Priority: 0, DisplayName: "Database Hostname", Consumed: true},
 		"DATABASE_SECRET":                    {Priority: 0, DisplayName: "Database Secret", Consumed: true},
 		"DATABASE_NAME":                      {Priority: 0, DisplayName: "Database Name", Consumed: true},
@@ -131,10 +133,14 @@ var chapCoreDefaults = struct {
 	imagePullPolicy                string
 	googleServiceAccountEmail      string
 	googleServiceAccountPrivateKey string
+	dhis2Username                  string
+	dhis2Password                  string
 }{
-	chartVersion:                   "0.1.1",
+	chartVersion:                   "0.1.4",
 	imageTag:                       "latest",
 	imagePullPolicy:                ifNotPresent,
 	googleServiceAccountEmail:      " ",
 	googleServiceAccountPrivateKey: " ",
+	dhis2Username:                  "system",
+	dhis2Password:                  "System123",
 }
