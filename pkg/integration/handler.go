@@ -58,7 +58,13 @@ func (h Handler) ImageExists(c *gin.Context) {
 		return
 	}
 
-	err := h.dockerHubClient.ImageExists("dhis2", repository, tag)
+	organization := c.DefaultQuery("organization", "dhis2")
+	client := h.dockerHubClient
+	if registry, ok := c.GetQuery("registry"); ok && registry == "ghcr" {
+		client = h.ghcrClient
+	}
+
+	err := client.ImageExists(organization, repository, tag)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -142,7 +148,8 @@ func (h Handler) Integrations(c *gin.Context) {
 		}
 
 		client := h.dockerHubClient
-		if registry, ok := payload["registry"]; ok && registry == "ghcr" {
+		registry, ok := payload["registry"]
+		if ok && registry == "ghcr" {
 			client = h.ghcrClient
 		}
 

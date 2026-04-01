@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"slices"
+	"strings"
 )
 
 //goland:noinspection GoExportedFuncWithUnexportedType
@@ -45,7 +47,7 @@ func (g *ghcrClient) GetTags(organization, repository string) ([]string, error) 
 		return nil, err
 	}
 
-	url := fmt.Sprintf("https://ghcr.io/v2/%s/%s/tags/list", organization, repository)
+	url := fmt.Sprintf("https://ghcr.io/v2/%s/%s/tags/list?n=10000", organization, repository)
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
@@ -70,7 +72,9 @@ func (g *ghcrClient) GetTags(organization, repository string) ([]string, error) 
 		return nil, err
 	}
 
-	return body.Tags, nil
+	return slices.DeleteFunc(body.Tags, func(tag string) bool {
+		return strings.HasPrefix(tag, "sha256-")
+	}), nil
 }
 
 func (g *ghcrClient) ImageExists(organization, repository, tag string) error {
