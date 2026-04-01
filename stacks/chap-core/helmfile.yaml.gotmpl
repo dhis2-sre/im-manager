@@ -11,6 +11,7 @@ releases:
       - image:
           tag: "{{ requiredEnv "IMAGE_TAG" }}"
           pullPolicy: {{ requiredEnv "IMAGE_PULL_POLICY" }}
+      - fullnameOverride: "{{ requiredEnv "INSTANCE_NAME" }}-chap-core"
       - ingress:
           enabled: true
           className: nginx
