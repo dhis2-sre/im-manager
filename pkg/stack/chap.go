@@ -38,7 +38,7 @@ var chapDBDefaults = struct {
 	dbPassword   string
 	dbVersion    string
 }{
-	chartVersion: "0.1.1",
+	chartVersion: "0.1.2",
 	dbSize:       "10Gi",
 	dbName:       "chap_core",
 	dbPassword:   "chap",
