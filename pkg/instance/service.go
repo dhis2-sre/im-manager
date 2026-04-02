@@ -416,6 +416,7 @@ func (s Service) deployDeploymentInstance(ctx context.Context, token string, ins
 	}
 	*/
 	if err != nil {
+		// TODO: This is a hack to detect if the helmfile operation is already in progress.
 		if strings.Contains(string(deployErrorLog), "another operation (install/upgrade/rollback) is in progress") {
 			s.logger.WarnContext(ctx, "Helm operation already in progress, skipping", "instance", instance.Name, "stack", instance.StackName, "deployment", instance.DeploymentID, "errorLog", deployErrorLog)
 			return nil
