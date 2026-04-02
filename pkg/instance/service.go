@@ -416,7 +416,11 @@ func (s Service) deployDeploymentInstance(ctx context.Context, token string, ins
 	}
 	*/
 	if err != nil {
-		return err
+		if strings.Contains(string(deployErrorLog), "another operation (install/upgrade/rollback) is in progress") {
+			s.logger.WarnContext(ctx, "Helm operation already in progress, skipping", "instance", instance.Name, "stack", instance.StackName, "deployment", instance.DeploymentID, "errorLog", deployErrorLog)
+			return nil
+		}
+		return fmt.Errorf("%w: %s", err, deployErrorLog)
 	}
 
 	// TODO: Encrypt before saving? Yes...
