@@ -25,7 +25,7 @@ releases:
           privateKey: '{{ requiredEnv "GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY" }}'
       - dhis2:
           enabled: true
-          hostname: "{{ requiredEnv "INSTANCE_HOSTNAME" }}/{{ requiredEnv "INSTANCE_NAME" }}"
+          hostname: "{{ requiredEnv "INSTANCE_HOSTNAME" }}/{{ requiredEnv "INSTANCE_PATH_NAME" }}"
           username: "{{ requiredEnv "DHIS2_USERNAME" }}"
           password: "{{ requiredEnv "DHIS2_PASSWORD" }}"
       - commonLabels:

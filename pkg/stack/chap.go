@@ -24,11 +24,11 @@ var ChapDB = model.Stack{
 }
 
 var chapDBHostnameProvider = model.ParameterProviderFunc(func(instance model.DeploymentInstance) (string, error) {
-	return fmt.Sprintf("%s-chap-db-postgres-rw.%s.svc", instance.Name, instance.Group.Namespace), nil
+	return fmt.Sprintf("%s-%d-chap-db-postgres-rw.%s.svc", instance.Name, instance.Group.ID, instance.Group.Namespace), nil
 })
 
 var chapDBSecretProvider = model.ParameterProviderFunc(func(instance model.DeploymentInstance) (string, error) {
-	return fmt.Sprintf("%s-chap-db-postgres", instance.Name), nil
+	return fmt.Sprintf("%s-%d-chap-db-postgres", instance.Name, instance.Group.ID), nil
 })
 
 var chapDBDefaults = struct {
@@ -61,11 +61,11 @@ var ChapValkey = model.Stack{
 }
 
 var chapValkeyHostnameProvider = model.ParameterProviderFunc(func(instance model.DeploymentInstance) (string, error) {
-	return fmt.Sprintf("%s-chap-valkey.%s.svc", instance.Name, instance.Group.Namespace), nil
+	return fmt.Sprintf("%s-%d-chap-valkey.%s.svc", instance.Name, instance.Group.ID, instance.Group.Namespace), nil
 })
 
 var chapValkeySecretProvider = model.ParameterProviderFunc(func(instance model.DeploymentInstance) (string, error) {
-	return fmt.Sprintf("%s-chap-valkey-auth", instance.Name), nil
+	return fmt.Sprintf("%s-%d-chap-valkey-auth", instance.Name, instance.Group.ID), nil
 })
 
 var chapValkeyDefaults = struct {
@@ -136,7 +136,7 @@ var chapCoreDefaults = struct {
 	dhis2Username                  string
 	dhis2Password                  string
 }{
-	chartVersion:                   "0.1.6",
+	chartVersion:                   "0.1.7",
 	imageTag:                       "latest",
 	imagePullPolicy:                always,
 	googleServiceAccountEmail:      " ",
