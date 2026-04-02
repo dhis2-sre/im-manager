@@ -369,11 +369,6 @@ func addDefaultParameterValues(instanceParameters model.DeploymentInstanceParame
 }
 
 func (s Service) DeployDeployment(ctx context.Context, token string, deployment *model.Deployment) error {
-	refreshedToken, err := s.tokenService.RefreshAccessToken(token)
-	if err != nil {
-		return err
-	}
-
 	deploymentGraph, err := s.validateNoCycles(deployment.Instances)
 	if err != nil {
 		return err
@@ -387,7 +382,12 @@ func (s Service) DeployDeployment(ctx context.Context, token string, deployment 
 	deployment.Instances = instances
 
 	for _, instance := range instances {
-		err := s.deployDeploymentInstance(ctx, refreshedToken, instance, deployment.TTL)
+		var err error
+		token, err = s.tokenService.RefreshAccessToken(token)
+		if err != nil {
+			return err
+		}
+		err = s.deployDeploymentInstance(ctx, token, instance, deployment.TTL)
 		if err != nil {
 			return fmt.Errorf("failed to deploy instance(%s) %q: %v", instance.StackName, instance.Name, err)
 		}
