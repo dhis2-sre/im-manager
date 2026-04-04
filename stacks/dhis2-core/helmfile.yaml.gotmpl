@@ -1,6 +1,6 @@
 # consumedParameters: DATABASE_ID, DATABASE_USERNAME, DATABASE_PASSWORD, DATABASE_NAME, DATABASE_HOSTNAME
 # hostnameVariable: DATABASE_HOSTNAME
-# stackParameters: GOOGLE_AUTH_PROJECT_ID,GOOGLE_AUTH_PRIVATE_KEY_ID,GOOGLE_AUTH_PRIVATE_KEY,GOOGLE_AUTH_CLIENT_EMAIL,GOOGLE_AUTH_CLIENT_ID
+# stackParameters: DEPLOY_CHAP,GOOGLE_AUTH_PROJECT_ID,GOOGLE_AUTH_PRIVATE_KEY_ID,GOOGLE_AUTH_PRIVATE_KEY,GOOGLE_AUTH_CLIENT_EMAIL,GOOGLE_AUTH_CLIENT_ID
 helmDefaults:
   deleteWait: true
 
@@ -76,9 +76,21 @@ releases:
           database: {{ requiredEnv "DATABASE_NAME" }}
           hostname: {{ requiredEnv "DATABASE_HOSTNAME" }}
 
-      {{- if ne (requiredEnv "CUSTOM_DHIS2_CONFIG") "" }}
+      {{- if or (ne (requiredEnv "CUSTOM_DHIS2_CONFIG") "") (eq (requiredEnv "DEPLOY_CHAP") "true") }}
       - customConfigSnippet:
           {{- requiredEnv "CUSTOM_DHIS2_CONFIG" | nindent 10 }}
+          {{- if eq (requiredEnv "DEPLOY_CHAP") "true" }}
+          route.remote_servers_allowed=http://*
+          {{- end }}
+      {{- end }}
+
+      {{- if eq (requiredEnv "DEPLOY_CHAP") "true" }}
+      - jobs:
+          installApps:
+            enabled: true
+            apps:
+              - name: Modeling
+                version: latest
       {{- end }}
 
       - sessionCookieSameSite: {{ requiredEnv "SAME_SITE_COOKIES" }}
