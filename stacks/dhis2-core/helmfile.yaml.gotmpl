@@ -1,4 +1,4 @@
-# consumedParameters: DATABASE_ID, DATABASE_USERNAME, DATABASE_PASSWORD, DATABASE_NAME, DATABASE_HOSTNAME
+# consumedParameters: DATABASE_ID, DATABASE_USERNAME, DATABASE_PASSWORD, DATABASE_NAME, DATABASE_HOSTNAME, MINIO_HOSTNAME, DORIS_HOSTNAME
 # hostnameVariable: DATABASE_HOSTNAME
 # stackParameters: GOOGLE_AUTH_PROJECT_ID,GOOGLE_AUTH_PRIVATE_KEY_ID,GOOGLE_AUTH_PRIVATE_KEY,GOOGLE_AUTH_CLIENT_EMAIL,GOOGLE_AUTH_CLIENT_ID
 helmDefaults:
@@ -55,7 +55,7 @@ releases:
       - minIO:
           provider: s3
           container: dhis2
-          endpoint: http://{{ requiredEnv "INSTANCE_NAME" }}-minio.{{ requiredEnv "INSTANCE_NAMESPACE" }}.svc:9000
+          endpoint: http://{{ requiredEnv "MINIO_HOSTNAME" }}:9000
           location: eu-west-1
           identity: dhisdhis
           secret: dhisdhis
@@ -109,6 +109,21 @@ releases:
           config:
             web:
               contextPath: /{{ requiredEnv "INSTANCE_PATH_NAME" }}-glowroot
+
+      # TODO: Enable readOnlyRootFilesystem once java tmp dir is fixed on the chart
+      - securityContext:
+          readOnlyRootFilesystem: false
+
+      {{- if eq (requiredEnv "ENABLE_DORIS") "true" }}
+      - doris:
+          hostname: {{ requiredEnv "DORIS_HOSTNAME" }}
+          port: 9030
+          useSSL: false
+          database: dhis2
+          createDatabase: true
+          username: root
+          password: ""
+      {{- end }}
 
 repositories:
   - name: dhis2

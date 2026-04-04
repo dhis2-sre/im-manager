@@ -424,6 +424,7 @@ func getPrivateKey(ctx context.Context, logger *slog.Logger) (*rsa.PrivateKey, e
 func newStackService() (stack.Service, error) {
 	stacks, err := stack.New(
 		stack.DHIS2DB,
+		stack.DORIS,
 		stack.MINIO,
 		stack.DHIS2Core,
 		stack.DHIS2,
