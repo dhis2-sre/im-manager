@@ -76,6 +76,9 @@ releases:
           database: {{ requiredEnv "DATABASE_NAME" }}
           hostname: {{ requiredEnv "DATABASE_HOSTNAME" }}
 
+      - dhisConfig: |
+          server.base.url = https://{{ requiredEnv "INSTANCE_HOSTNAME" }}/{{ requiredEnv "INSTANCE_PATH_NAME" }}
+
       {{- if ne (requiredEnv "CUSTOM_DHIS2_CONFIG") "" }}
       - customConfigSnippet:
           {{- requiredEnv "CUSTOM_DHIS2_CONFIG" | nindent 10 }}
