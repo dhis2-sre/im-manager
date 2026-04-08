@@ -3,10 +3,10 @@ x-k3s-common: &k3s-common
   privileged: true
   command: server
   environment:
-    - K3S_KUBECONFIG_OUTPUT=/output/kubeconfig.yaml
-    - K3S_KUBECONFIG_MODE=666
+    K3S_KUBECONFIG_OUTPUT: /output/kubeconfig.yaml
+    K3S_KUBECONFIG_MODE: 666
 
-x-k3s-register: &k3s-register
+x-register: &k3s-register
   image: curlimages/curl:7.82.0
   extra_hosts:
     - "host.docker.internal:host-gateway"
@@ -15,12 +15,15 @@ x-k3s-register: &k3s-register
     - k3s-config-dev:/output
   command: [ "/bin/sh", "/scripts/register-k3s-cluster.sh" ]
 
+x-register-env: &k3s-register-env
+  IM_HOSTNAME: "host.docker.internal:8080"
+  ADMIN_USER_EMAIL: ${ADMIN_USER_EMAIL}
+  ADMIN_USER_PASSWORD: ${ADMIN_USER_PASSWORD}
+
 services:
   k3s-dev:
     <<: *k3s-common
     ports:
-      #- "80:80"
-      #- "443:443"
       - "6443:6443"
     volumes:
       - k3s-data-dev:/var/lib/rancher/k3s
@@ -29,9 +32,7 @@ services:
   k3s-dev-register:
     <<: *k3s-register
     environment:
-      IM_HOSTNAME: "host.docker.internal:8080"
-      IM_ADMIN_EMAIL: "andreas@dhis2.org"
-      IM_ADMIN_PASSWORD: "somepassword"
+      <<: *k3s-register-env
       GROUP_NAME: dev
       GROUP_HOSTNAME: dev
       GROUP_NAMESPACE: dev
@@ -39,8 +40,6 @@ services:
   k3s-test:
     <<: *k3s-common
     ports:
-      #- "80:80"
-      #- "443:443"
       - "6444:6443"
     volumes:
       - k3s-data-test:/var/lib/rancher/k3s
@@ -49,9 +48,7 @@ services:
   k3s-test-register:
     <<: *k3s-register
     environment:
-      IM_HOSTNAME: "host.docker.internal:8080"
-      IM_ADMIN_EMAIL: "andreas@dhis2.org"
-      IM_ADMIN_PASSWORD: "somepassword"
+      <<: *k3s-register-env
       GROUP_NAME: test
       GROUP_HOSTNAME: test
       GROUP_NAMESPACE: test
@@ -59,8 +56,6 @@ services:
   k3s-prod:
     <<: *k3s-common
     ports:
-      #- "80:80"
-      #- "443:443"
       - "6445:6443"
     volumes:
       - k3s-data-prod:/var/lib/rancher/k3s
@@ -69,9 +64,7 @@ services:
   k3s-prod-register:
     <<: *k3s-register
     environment:
-      IM_HOSTNAME: "host.docker.internal:8080"
-      IM_ADMIN_EMAIL: "andreas@dhis2.org"
-      IM_ADMIN_PASSWORD: "somepassword"
+      <<: *k3s-register-env
       GROUP_NAME: prod
       GROUP_HOSTNAME: prod
       GROUP_NAMESPACE: prod
