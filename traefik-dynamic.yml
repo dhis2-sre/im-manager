@@ -1,5 +1,13 @@
 http:
   routers:
+    im-web-client:
+      rule: "Host(`im.127-0-0-1.nip.io`)"
+      service: im-web-client
+      entryPoints: [web]
+    im-api:
+      rule: "Host(`api.im.127-0-0-1.nip.io`)"
+      service: im-api
+      entryPoints: [web]
     dev-cluster:
       rule: "HostRegexp(`^.+\\.dev\\.im\\.`)"
       service: k3s-dev
@@ -14,6 +22,14 @@ http:
       entryPoints: [web]
 
   services:
+    im-web-client:
+      loadBalancer:
+        servers:
+          - url: "http://im-web-client:8080"
+    im-api:
+      loadBalancer:
+        servers:
+          - url: "http://host.docker.internal:8080"
     k3s-dev:
       loadBalancer:
         servers:

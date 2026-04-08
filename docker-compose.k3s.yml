@@ -37,6 +37,8 @@ services:
       - --providers.file.filename=/etc/traefik/dynamic.yml
     ports:
       - "80:80"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - ./traefik-dynamic.yml:/etc/traefik/dynamic.yml:ro
     depends_on:
