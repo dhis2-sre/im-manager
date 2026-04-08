@@ -1,7 +1,6 @@
 x-k3s-common: &k3s-common
   image: rancher/k3s:v1.31.1-k3s1
   privileged: true
-  command: server
   environment:
     K3S_KUBECONFIG_OUTPUT: /output/kubeconfig.yaml
     K3S_KUBECONFIG_MODE: 666
@@ -50,6 +49,7 @@ services:
 
   k3s-dev:
     <<: *k3s-common
+    command: server --tls-san k3s-dev
     ports:
       - "6443:6443"
     volumes:
@@ -69,6 +69,7 @@ services:
 
   k3s-test:
     <<: *k3s-common
+    command: server --tls-san k3s-test
     ports:
       - "6444:6443"
     volumes:
@@ -88,6 +89,7 @@ services:
 
   k3s-prod:
     <<: *k3s-common
+    command: server --tls-san k3s-prod
     ports:
       - "6445:6443"
     volumes:
