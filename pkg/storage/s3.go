@@ -13,6 +13,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
+	"github.com/dhis2-sre/im-manager/internal/errdef"
 )
 
 func NewS3Client(logger *slog.Logger, client AWSS3Client, uploader AWSS3Uploader) *S3Client {
@@ -114,6 +115,14 @@ func (s S3Client) Download(ctx context.Context, bucket string, key string, dst i
 		Key:    aws.String(key),
 	})
 	if err != nil {
+		var noBucket *types.NoSuchBucket
+		var noKey *types.NoSuchKey
+		if errors.As(err, &noBucket) {
+			return errdef.NewNotFound("bucket %q does not exist", bucket)
+		}
+		if errors.As(err, &noKey) {
+			return errdef.NewNotFound("key %q not found in bucket %q", key, bucket)
+		}
 		return fmt.Errorf("error downloading object from bucket %q using key %q: %s", bucket, key, err)
 	}
 
