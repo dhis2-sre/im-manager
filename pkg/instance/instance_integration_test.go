@@ -1,18 +1,13 @@
 package instance_test
 
 import (
-	"bytes"
 	"context"
 	"crypto/rand"
 	"crypto/rsa"
-	"encoding/json"
 	"fmt"
-	"io"
 	"log/slog"
-	"mime/multipart"
 	"net/http"
 	"os"
-	"strconv"
 	"strings"
 	"testing"
 
@@ -130,7 +125,7 @@ func TestInstanceHandler(t *testing.T) {
 	tokens, err := tokenService.GetTokens(user, "", false)
 	require.NoError(t, err, "failed to get tokens")
 
-	databaseID := uploadDatabase(t, client, "path/name.extension", "select now();", tokens.AccessToken)
+	databaseID := database.UploadTestDatabase(t, client, "path/name.extension", "select now();", "group-name", inttest.WithAuthToken(tokens.AccessToken))
 
 	t.Run("DeployDeploymentWithoutInstances", func(t *testing.T) {
 		t.Parallel()
@@ -240,36 +235,6 @@ func TestInstanceHandler(t *testing.T) {
 	})
 }
 
-func uploadDatabase(t *testing.T, client *inttest.HTTPClient, name, content, authToken string) string {
-	t.Helper()
-
-	var b bytes.Buffer
-	w := multipart.NewWriter(&b)
-
-	err := w.WriteField("group", "group-name")
-	require.NoError(t, err, "failed to write form field")
-	err = w.WriteField("name", name)
-	require.NoError(t, err, "failed to write form field")
-
-	f, err := w.CreateFormFile("database", "mydb")
-	require.NoError(t, err, "failed to create form file")
-	_, err = io.WriteString(f, content)
-	require.NoError(t, err, "failed to write file")
-	_ = w.Close()
-
-	body := client.Put(t, "/databases", &b, http.StatusCreated,
-		inttest.WithHeader("X-Upload-Group", "group-name"),
-		inttest.WithHeader("X-Upload-Name", name),
-		inttest.WithHeader("X-Upload-Description", "Test database"),
-		inttest.WithAuthToken(authToken),
-	)
-
-	var actualDB model.Database
-	err = json.Unmarshal(body, &actualDB)
-	require.NoError(t, err, "failed to unmarshal database response")
-
-	return strconv.FormatUint(uint64(actualDB.ID), 10)
-}
 
 type groupService struct {
 	group *model.Group
