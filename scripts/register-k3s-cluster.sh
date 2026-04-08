@@ -24,11 +24,14 @@ curl --request POST "http://${IM_HOSTNAME}/groups" \
     "deployable": true
   }'
 
+KUBECONFIG=$(mktemp)
+sed "s|127.0.0.1:6443|k3s-${GROUP_NAME}:6443|" /output/kubeconfig.yaml > "${KUBECONFIG}"
+
 CLUSTER_RESPONSE=$(curl --request POST "http://${IM_HOSTNAME}/clusters" \
   --header "Authorization: Bearer ${ACCESS_TOKEN}" \
   --form "name=${GROUP_NAME}" \
   --form "description=K3s ${GROUP_NAME} cluster" \
-  --form "kubernetesConfiguration=@/output/kubeconfig.yaml")
+  --form "kubernetesConfiguration=@${KUBECONFIG}")
 CLUSTER_ID=$(echo "${CLUSTER_RESPONSE}" | grep -o '"id":[0-9]*' | sed 's/"id"://' | tr -d '"')
 
 curl --request POST "http://${IM_HOSTNAME}/groups/${GROUP_NAME}/clusters/${CLUSTER_ID}" --header "Authorization: Bearer ${ACCESS_TOKEN}"
