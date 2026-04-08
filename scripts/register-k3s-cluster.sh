@@ -15,7 +15,7 @@ curl --request POST "http://${IM_HOSTNAME}/groups" \
   --header "Content-Type: application/json" \
   --data-raw '{
     "name": "'${GROUP_NAME}'",
-    "hostname": "'${GROUP_HOSTNAME}'",
+    "hostname": "'${GROUP_HOSTNAME}.im.127-0-0-1.nip.io'",
     "namespace": "'${GROUP_NAMESPACE}'",
     "description": "'${GROUP_NAME}' group",
     "deployable": true
