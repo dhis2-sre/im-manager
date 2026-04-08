@@ -4,6 +4,9 @@ set -e
 echo "Waiting for /output/kubeconfig.yaml..."
 until [ -f /output/kubeconfig.yaml ]; do sleep 2; done
 
+echo "Waiting for IM at http://${IM_HOSTNAME}..."
+until curl --silent --output /dev/null --connect-timeout 2 "http://${IM_HOSTNAME}/health"; do sleep 2; done
+
 ACCESS_TOKEN=$(curl --silent --dump-header - --request POST "http://${IM_HOSTNAME}/tokens" \
   --user "${IM_ADMIN_EMAIL}:${IM_ADMIN_PASSWORD}" \
   --header "Content-Type: application/json" \
