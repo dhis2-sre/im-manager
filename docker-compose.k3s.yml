@@ -18,15 +18,19 @@ x-register: &k3s-register
     - "host.docker.internal:host-gateway"
   volumes:
     - ./scripts:/scripts
-    - k3s-config-dev:/output
   command: [ "/bin/sh", "/scripts/register-k3s-cluster.sh" ]
 
 x-register-env: &k3s-register-env
   IM_HOSTNAME: "host.docker.internal:8080"
-  ADMIN_USER_EMAIL: ${ADMIN_USER_EMAIL}
-  ADMIN_USER_PASSWORD: ${ADMIN_USER_PASSWORD}
+  IM_ADMIN_EMAIL: ${ADMIN_USER_EMAIL}
+  IM_ADMIN_PASSWORD: ${ADMIN_USER_PASSWORD}
 
 services:
+  im-web-client:
+    image: dhis2/im-web-client:local
+    ports:
+      - "3000:8080"
+
   traefik:
     image: traefik:v3
     command:
@@ -54,6 +58,9 @@ services:
 
   k3s-dev-register:
     <<: *k3s-register
+    volumes:
+      - ./scripts:/scripts
+      - k3s-config-dev:/output
     environment:
       <<: *k3s-register-env
       GROUP_NAME: dev
@@ -70,6 +77,9 @@ services:
 
   k3s-test-register:
     <<: *k3s-register
+    volumes:
+      - ./scripts:/scripts
+      - k3s-config-test:/output
     environment:
       <<: *k3s-register-env
       GROUP_NAME: test
@@ -86,6 +96,9 @@ services:
 
   k3s-prod-register:
     <<: *k3s-register
+    volumes:
+      - ./scripts:/scripts
+      - k3s-config-prod:/output
     environment:
       <<: *k3s-register-env
       GROUP_NAME: prod
