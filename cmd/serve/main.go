@@ -147,7 +147,7 @@ func run() (err error) {
 	if err != nil {
 		return err
 	}
-	userHandler := user.NewHandler(logger, hostname, authConfig.SameSiteMode, authConfig.AccessTokenExpirationSeconds, authConfig.RefreshTokenExpirationSeconds, authConfig.RefreshTokenRememberMeExpirationSeconds, publicKey, userService, tokenService)
+	userHandler := user.NewHandler(logger, hostname, authConfig.SameSiteMode, authConfig.CookieSecure, authConfig.AccessTokenExpirationSeconds, authConfig.RefreshTokenExpirationSeconds, authConfig.RefreshTokenRememberMeExpirationSeconds, publicKey, userService, tokenService)
 
 	clusterRepository := cluster.NewRepository(db)
 	encryptor, err := newEncryptor(err)
@@ -347,6 +347,7 @@ func newRedis() (*redis.Client, error) {
 
 type authenticationConfig struct {
 	SameSiteMode                            http.SameSite
+	CookieSecure                            bool
 	RefreshTokenSecretKey                   string
 	AccessTokenExpirationSeconds            int
 	RefreshTokenExpirationSeconds           int
@@ -375,8 +376,11 @@ func newAuthenticationConfig() (authenticationConfig, error) {
 		return authenticationConfig{}, err
 	}
 
+	cookieSecure := os.Getenv("COOKIE_SECURE") != "false"
+
 	return authenticationConfig{
 		SameSiteMode:                            mode,
+		CookieSecure:                            cookieSecure,
 		RefreshTokenSecretKey:                   refreshTokenSecretKey,
 		AccessTokenExpirationSeconds:            accessTokenExpirationSeconds,
 		RefreshTokenExpirationSeconds:           refreshTokenExpirationSeconds,
