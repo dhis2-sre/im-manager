@@ -1,0 +1,28 @@
+http:
+  routers:
+    dev-cluster:
+      rule: "HostRegexp(`^.+\\.dev\\.im\\.`)"
+      service: k3s-dev
+      entryPoints: [web]
+    test-cluster:
+      rule: "HostRegexp(`^.+\\.test\\.im\\.`)"
+      service: k3s-test
+      entryPoints: [web]
+    prod-cluster:
+      rule: "HostRegexp(`^.+\\.prod\\.im\\.`)"
+      service: k3s-prod
+      entryPoints: [web]
+
+  services:
+    k3s-dev:
+      loadBalancer:
+        servers:
+          - url: "http://k3s-dev"
+    k3s-test:
+      loadBalancer:
+        servers:
+          - url: "http://k3s-test"
+    k3s-prod:
+      loadBalancer:
+        servers:
+          - url: "http://k3s-prod"
