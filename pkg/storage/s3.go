@@ -13,6 +13,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
+	smithy "github.com/aws/smithy-go"
 	"github.com/dhis2-sre/im-manager/internal/errdef"
 )
 
@@ -178,6 +179,10 @@ func (s S3Client) InitiateMultipartUpload(ctx context.Context, bucket, key, cont
 	}
 	resp, err := s.client.CreateMultipartUpload(ctx, input)
 	if err != nil {
+		var apiErr smithy.APIError
+		if errors.As(err, &apiErr) && apiErr.ErrorCode() == "InvalidAccessKeyId" {
+			return "", errdef.NewServiceUnavailable("invalid AWS access key ID: %s", apiErr.ErrorMessage())
+		}
 		return "", err
 	}
 	return *resp.UploadId, nil

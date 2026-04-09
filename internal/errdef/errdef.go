@@ -74,3 +74,16 @@ func IsConflict(err error) bool {
 	var e conflict
 	return errors.As(err, &e)
 }
+
+// NewServiceUnavailable creates an error representing an unavailable upstream service.
+func NewServiceUnavailable(format string, a ...any) error {
+	return serviceUnavailable{fmt.Errorf(format, a...)}
+}
+
+type serviceUnavailable struct{ error }
+
+// IsServiceUnavailable returns true if err is an error representing an unavailable upstream service.
+func IsServiceUnavailable(err error) bool {
+	var e serviceUnavailable
+	return errors.As(err, &e)
+}
