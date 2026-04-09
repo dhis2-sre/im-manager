@@ -1,0 +1,118 @@
+x-k3s-common: &k3s-common
+  image: rancher/k3s:v1.31.1-k3s1
+  privileged: true
+  environment:
+    K3S_KUBECONFIG_OUTPUT: /output/kubeconfig.yaml
+    K3S_KUBECONFIG_MODE: 666
+  healthcheck:
+    test: ["CMD", "kubectl", "get", "nodes"]
+    interval: 10s
+    timeout: 2s
+    retries: 3
+    start_period: 30s
+
+x-register: &k3s-register
+  image: curlimages/curl:7.82.0
+  extra_hosts:
+    - "host.docker.internal:host-gateway"
+  volumes:
+    - ./scripts:/scripts
+  command: [ "/bin/sh", "/scripts/register-k3s-cluster.sh" ]
+
+x-register-env: &k3s-register-env
+  IM_HOSTNAME: "host.docker.internal:8080"
+  IM_ADMIN_EMAIL: ${ADMIN_USER_EMAIL}
+  IM_ADMIN_PASSWORD: ${ADMIN_USER_PASSWORD}
+
+services:
+  im-web-client:
+    image: dhis2/im-web-client:local
+    ports:
+      - "3000:8080"
+
+  traefik:
+    image: traefik:v3
+    command:
+      - --entrypoints.web.address=:80
+      - --providers.file.filename=/etc/traefik/dynamic.yml
+    ports:
+      - "80:80"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./traefik-dynamic.yml:/etc/traefik/dynamic.yml:ro
+    depends_on:
+      k3s-dev:
+        condition: service_healthy
+      k3s-test:
+        condition: service_healthy
+      k3s-prod:
+        condition: service_healthy
+
+  k3s-dev:
+    <<: *k3s-common
+    command: server --tls-san k3s-dev
+    ports:
+      - "6443:6443"
+    volumes:
+      - k3s-data-dev:/var/lib/rancher/k3s
+      - k3s-config-dev:/output
+
+  k3s-dev-register:
+    <<: *k3s-register
+    volumes:
+      - ./scripts:/scripts
+      - k3s-config-dev:/output
+    environment:
+      <<: *k3s-register-env
+      GROUP_NAME: dev
+      GROUP_HOSTNAME: dev
+      GROUP_NAMESPACE: dev
+
+  k3s-test:
+    <<: *k3s-common
+    command: server --tls-san k3s-test
+    ports:
+      - "6444:6443"
+    volumes:
+      - k3s-data-test:/var/lib/rancher/k3s
+      - k3s-config-test:/output
+
+  k3s-test-register:
+    <<: *k3s-register
+    volumes:
+      - ./scripts:/scripts
+      - k3s-config-test:/output
+    environment:
+      <<: *k3s-register-env
+      GROUP_NAME: test
+      GROUP_HOSTNAME: test
+      GROUP_NAMESPACE: test
+
+  k3s-prod:
+    <<: *k3s-common
+    command: server --tls-san k3s-prod
+    ports:
+      - "6445:6443"
+    volumes:
+      - k3s-data-prod:/var/lib/rancher/k3s
+      - k3s-config-prod:/output
+
+  k3s-prod-register:
+    <<: *k3s-register
+    volumes:
+      - ./scripts:/scripts
+      - k3s-config-prod:/output
+    environment:
+      <<: *k3s-register-env
+      GROUP_NAME: prod
+      GROUP_HOSTNAME: prod
+      GROUP_NAMESPACE: prod
+
+volumes:
+  k3s-data-dev:
+  k3s-config-dev:
+  k3s-data-test:
+  k3s-config-test:
+  k3s-data-prod:
+  k3s-config-prod:

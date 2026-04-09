@@ -34,6 +34,8 @@ func ErrorHandler() gin.HandlerFunc {
 			c.String(http.StatusUnauthorized, err.Error())
 		} else if errdef.IsConflict(err) {
 			c.String(http.StatusConflict, err.Error())
+		} else if errdef.IsServiceUnavailable(err) {
+			c.String(http.StatusServiceUnavailable, err.Error())
 		} else {
 			var body string
 			if id, ok := GetCorrelationID(c.Request.Context()); ok {
