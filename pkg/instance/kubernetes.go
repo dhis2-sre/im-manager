@@ -176,11 +176,18 @@ func (ks kubernetesService) getLogs(instance *model.DeploymentInstance, typeSele
 		Container: pod.Spec.Containers[0].Name,
 	}
 
-	return ks.client.
+	stream, err := ks.client.
 		CoreV1().
 		Pods(pod.Namespace).
 		GetLogs(pod.Name, &podLogOptions).
 		Stream(context.TODO())
+	if err != nil {
+		if strings.Contains(err.Error(), "ContainerCreating") || strings.Contains(err.Error(), "waiting to start") {
+			return nil, errdef.NewConflict("instance is still starting up, logs not available yet")
+		}
+		return nil, err
+	}
+	return stream, nil
 }
 
 func (ks kubernetesService) Exec(ctx context.Context, namespace, podName, container string, command []string, stdout, stderr io.Writer) error {
