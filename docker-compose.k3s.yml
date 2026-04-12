@@ -27,8 +27,8 @@ x-register-env: &k3s-register-env
 services:
   im-web-client:
     image: dhis2/im-web-client:local
-    ports:
-      - "3000:8080"
+    environment:
+      API_URL: "http://api.im.127-0-0-1.nip.io"
 
   traefik:
     image: traefik:v3
