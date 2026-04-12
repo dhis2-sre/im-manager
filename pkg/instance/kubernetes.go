@@ -172,6 +172,8 @@ func (ks kubernetesService) getLogs(instance *model.DeploymentInstance, typeSele
 
 	podLogOptions := v1.PodLogOptions{
 		Follow: true,
+		// TODO: Just getting the first container isn't ideal. Ideally we would have an endpoint which returns all containers and allow the user to select one. However this is beyond the scope of the current changes and simply getting the first prevents a 500 error
+		Container: pod.Spec.Containers[0].Name,
 	}
 
 	return ks.client.
