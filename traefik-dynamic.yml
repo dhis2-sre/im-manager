@@ -9,15 +9,15 @@ http:
       service: im-api
       entryPoints: [web]
     dev-cluster:
-      rule: "HostRegexp(`^.+\\.dev\\.im\\.`)"
+      rule: "HostRegexp(`^.+\\.dev\\.im\\..+$`)"
       service: k3s-dev
       entryPoints: [web]
     test-cluster:
-      rule: "HostRegexp(`^.+\\.test\\.im\\.`)"
+      rule: "HostRegexp(`^.+\\.test\\.im\\..+$`)"
       service: k3s-test
       entryPoints: [web]
     prod-cluster:
-      rule: "HostRegexp(`^.+\\.prod\\.im\\.`)"
+      rule: "HostRegexp(`^.+\\.prod\\.im\\..+$`)"
       service: k3s-prod
       entryPoints: [web]
 
