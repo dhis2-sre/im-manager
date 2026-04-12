@@ -10,17 +10,17 @@ x-k3s-common: &k3s-common
     timeout: 2s
     retries: 3
     start_period: 30s
+  profiles: [k3s]
 
 x-register: &k3s-register
   image: curlimages/curl:7.82.0
-  extra_hosts:
-    - "host.docker.internal:host-gateway"
   volumes:
     - ./scripts:/scripts
   command: [ "/bin/sh", "/scripts/register-k3s-cluster.sh" ]
+  profiles: [k3s]
 
 x-register-env: &k3s-register-env
-  IM_HOSTNAME: "host.docker.internal:8080"
+  IM_HOSTNAME: "${IM_HOSTNAME:-prod:8080}"
   IM_ADMIN_EMAIL: ${ADMIN_USER_EMAIL}
   IM_ADMIN_PASSWORD: ${ADMIN_USER_PASSWORD}
 
@@ -29,6 +29,7 @@ services:
     image: dhis2/im-web-client:local
     environment:
       API_URL: "http://api.im.127-0-0-1.nip.io"
+    profiles: [k3s]
 
   traefik:
     image: traefik:v3
@@ -37,8 +38,6 @@ services:
       - --providers.file.filename=/etc/traefik/dynamic.yml
     ports:
       - "80:80"
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     volumes:
       - ./traefik-dynamic.yml:/etc/traefik/dynamic.yml:ro
     depends_on:
@@ -48,6 +47,7 @@ services:
         condition: service_healthy
       k3s-prod:
         condition: service_healthy
+    profiles: [k3s]
 
   k3s-dev:
     <<: *k3s-common
