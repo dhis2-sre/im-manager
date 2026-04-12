@@ -13,7 +13,8 @@ releases:
           enabled: true
           hostname: {{ requiredEnv "INSTANCE_HOSTNAME" }}
           path: /{{ requiredEnv "INSTANCE_PATH_NAME" }}
-          certIssuer: cert-issuer-prod
+          certIssuer: "{{ env "CERT_ISSUER" }}"
+          className: "{{ env "INGRESS_CLASS" }}"
       - commonLabels:
           im: "true"
           im-default: "true"
