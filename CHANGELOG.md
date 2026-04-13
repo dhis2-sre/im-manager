@@ -1,4 +1,28 @@
 
+<a name="v0.65.2"></a>
+## [v0.65.2](https://github.com/dhis2-sre/im-manager/compare/0.65.1...v0.65.2)
+
+> 2026-04-07
+
+### Chore
+
+* increase KEDA scale down period ([#1426](https://github.com/dhis2-sre/im-manager/issues/1426))
+
+### Fix
+
+* add missing server.base.url ([#1443](https://github.com/dhis2-sre/im-manager/issues/1443))
+
+
+<a name="0.65.1"></a>
+## [0.65.1](https://github.com/dhis2-sre/im-manager/compare/v0.65.1...0.65.1)
+
+> 2026-03-25
+
+### Chore
+
+* generate change log for v0.65.1
+
+
 <a name="v0.65.1"></a>
 ## [v0.65.1](https://github.com/dhis2-sre/im-manager/compare/v0.65.0...v0.65.1)
 
@@ -15,7 +39,7 @@
 
 
 <a name="v0.65.0"></a>
-## [v0.65.0](https://github.com/dhis2-sre/im-manager/compare/ls...v0.65.0)
+## [v0.65.0](https://github.com/dhis2-sre/im-manager/compare/v0.64.0...v0.65.0)
 
 > 2026-03-19
 
@@ -26,22 +50,13 @@
 * util scripts for creating, and deleting, restricted users on K3s ([#1370](https://github.com/dhis2-sre/im-manager/issues/1370))
 * update IM cluster role to allow remote pod exec ([#1361](https://github.com/dhis2-sre/im-manager/issues/1361))
 * use mc mirror instead of recursive copy ([#1369](https://github.com/dhis2-sre/im-manager/issues/1369))
+* generate change log for v0.64.0
 
 ### Feat
 
 * unique instance names ([#1410](https://github.com/dhis2-sre/im-manager/issues/1410))
 * Postgresql connection pool ([#1401](https://github.com/dhis2-sre/im-manager/issues/1401))
 * encrypt Kubernetes cluster config server side ([#1396](https://github.com/dhis2-sre/im-manager/issues/1396))
-
-
-<a name="ls"></a>
-## [ls](https://github.com/dhis2-sre/im-manager/compare/v0.64.0...ls)
-
-> 2026-02-20
-
-### Chore
-
-* generate change log for v0.64.0
 
 
 <a name="v0.64.0"></a>
