@@ -23,13 +23,17 @@ releases:
               paths:
                 - path: /{{ requiredEnv "INSTANCE_PATH_NAME" }}-pgadmin
                   pathType: Prefix
+          {{- if env "CERT_ISSUER" }}
           annotations:
-            cert-manager.io/cluster-issuer: cert-issuer-prod
+            cert-manager.io/cluster-issuer: "{{ env "CERT_ISSUER" }}"
             ingress.kubernetes.io/ssl-redirect: "true"
+          {{- end }}
+          {{- if env "CERT_ISSUER" }}
           tls:
             - secretName: "{{ requiredEnv "INSTANCE_HOSTNAME" | replace "." "-" }}-tls"
               hosts:
                 - {{ requiredEnv "INSTANCE_HOSTNAME" | quote }}
+          {{- end }}
       - env:
           # TODO: https://jira.dhis2.org/browse/DEVOPS-136
           email: {{ requiredEnv "PGADMIN_USERNAME" }}

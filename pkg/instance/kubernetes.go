@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	metricsv1beta1 "k8s.io/metrics/pkg/client/clientset/versioned"
 
@@ -23,6 +24,7 @@ import (
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
@@ -164,6 +166,78 @@ func newRestConfig(cluster model.Cluster) (*rest.Config, error) {
 	return restClientConfig, nil
 }
 
+// discoverIngressClass returns the IngressClass name to use for this cluster.
+//
+// Selection rules (in priority order):
+//  1. If any IngressClass carries the annotation
+//     "ingressclass.kubernetes.io/is-default-class=true", that one is used.
+//     This is the standard Kubernetes convention for marking a cluster default.
+//  2. If exactly one IngressClass exists (with no default annotation), it is
+//     used - there is no ambiguity when only one option is present.
+//  3. If multiple IngressClasses exist but none is marked default, an error is
+//     returned. The operator must annotate one with
+//     ingressclass.kubernetes.io/is-default-class=true.
+//  4. If no IngressClasses exist at all, "" is returned silently.
+func discoverIngressClass(ctx context.Context, cluster model.Cluster) (string, error) {
+	client, err := newClient(cluster)
+	if err != nil {
+		return "", err
+	}
+	classes, err := client.NetworkingV1().IngressClasses().List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return "", fmt.Errorf("listing IngressClasses: %w", err)
+	}
+	for _, ic := range classes.Items {
+		if ic.Annotations["ingressclass.kubernetes.io/is-default-class"] == "true" {
+			return ic.Name, nil
+		}
+	}
+	switch len(classes.Items) {
+	case 0:
+		return "", nil
+	case 1:
+		return classes.Items[0].Name, nil
+	default:
+		return "", fmt.Errorf("found %d IngressClasses but none is annotated as default — annotate one with ingressclass.kubernetes.io/is-default-class=true", len(classes.Items))
+	}
+}
+
+// discoverCertIssuer returns the cert-manager ClusterIssuer name to use for
+// this cluster.
+//
+// Selection rules:
+//  1. If exactly one ClusterIssuer exists, it is used — unambiguous.
+//  2. If multiple ClusterIssuers exist we cannot choose safely (there is no
+//     "default issuer" concept in cert-manager), so an error is returned.
+//     The operator must configure the cert issuer explicitly.
+//  3. If no ClusterIssuers exist, "" is returned silently — the cluster may
+//     not use cert-manager at all, which is a valid setup.
+//  4. If the ClusterIssuer CRD itself is not installed (API error), "" is
+//     returned silently — cert-manager is not present on this cluster.
+func discoverCertIssuer(ctx context.Context, cluster model.Cluster) (string, error) {
+	restConfig, err := newRestConfig(cluster)
+	if err != nil {
+		return "", err
+	}
+	dynClient, err := dynamic.NewForConfig(restConfig)
+	if err != nil {
+		return "", err
+	}
+	gvr := schema.GroupVersionResource{Group: "cert-manager.io", Version: "v1", Resource: "clusterissuers"}
+	issuers, err := dynClient.Resource(gvr).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return "", nil // cert-manager CRD not installed - not an error
+	}
+	switch len(issuers.Items) {
+	case 0:
+		return "", nil
+	case 1:
+		return issuers.Items[0].GetName(), nil
+	default:
+		return "", fmt.Errorf("found %d ClusterIssuers — cannot auto-select, configure the cert issuer explicitly", len(issuers.Items))
+	}
+}
+
 func (ks kubernetesService) getLogs(instance *model.DeploymentInstance, typeSelector string) (io.ReadCloser, error) {
 	pod, err := ks.getPod(instance.ID, typeSelector)
 	if err != nil {
@@ -172,13 +246,22 @@ func (ks kubernetesService) getLogs(instance *model.DeploymentInstance, typeSele
 
 	podLogOptions := v1.PodLogOptions{
 		Follow: true,
+		// TODO: Just getting the first container isn't ideal. Ideally we would have an endpoint which returns all containers and allow the user to select one. However this is beyond the scope of the current changes and simply getting the first prevents a 500 error
+		Container: pod.Spec.Containers[0].Name,
 	}
 
-	return ks.client.
+	stream, err := ks.client.
 		CoreV1().
 		Pods(pod.Namespace).
 		GetLogs(pod.Name, &podLogOptions).
 		Stream(context.TODO())
+	if err != nil {
+		if strings.Contains(err.Error(), "ContainerCreating") || strings.Contains(err.Error(), "waiting to start") {
+			return nil, errdef.NewConflict("instance is still starting up, logs not available yet")
+		}
+		return nil, err
+	}
+	return stream, nil
 }
 
 func (ks kubernetesService) Exec(ctx context.Context, namespace, podName, container string, command []string, stdout, stderr io.Writer) error {

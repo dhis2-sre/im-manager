@@ -77,6 +77,8 @@ func (h helmfileService) executeHelmfileCommand(ctx context.Context, token strin
 type stackParameters map[string]string
 
 func (h helmfileService) loadStackParameters(stackName string) (stackParameters, error) {
+	// TODO: stack parameter files are KMS-encrypted; re-encrypt with age before re-enabling
+	return nil, nil
 	//goland:noinspection GoImportUsedAsName
 	path := fmt.Sprintf("%s/%s/parameters/%s.yaml", h.stackFolder, stackName, h.classification)
 	data, err := os.ReadFile(path) // #nosec
@@ -129,6 +131,18 @@ func (h helmfileService) configureInstanceEnvironment(ctx context.Context, acces
 	cmd.Env = h.injectEnv(ctx, cmd.Env, "KUBERNETES_PORT")
 	cmd.Env = h.injectEnv(ctx, cmd.Env, "KUBERNETES_SERVICE_PORT_HTTPS")
 	cmd.Env = h.injectEnv(ctx, cmd.Env, "KUBERNETES_SERVICE_HOST")
+
+	ingressClass, err := discoverIngressClass(ctx, group.Cluster)
+	if err != nil {
+		h.logger.WarnContext(ctx, "Failed to discover ingress class", "error", err)
+	}
+	cmd.Env = append(cmd.Env, fmt.Sprintf("INGRESS_CLASS=%s", ingressClass))
+
+	certIssuer, err := discoverCertIssuer(ctx, group.Cluster)
+	if err != nil {
+		h.logger.WarnContext(ctx, "Failed to discover cert issuer", "error", err)
+	}
+	cmd.Env = append(cmd.Env, fmt.Sprintf("CERT_ISSUER=%s", certIssuer))
 
 	for name, parameter := range instance.Parameters {
 		instanceEnv := fmt.Sprintf("%s=%s", name, parameter.Value)
