@@ -31,7 +31,7 @@ import (
 )
 
 type kubernetesService struct {
-	client     *kubernetes.Clientset
+	client     kubernetes.Interface
 	restConfig *rest.Config
 }
 
@@ -357,7 +357,7 @@ func (ks kubernetesService) deletePersistentVolumeClaim(instance *model.Deployme
 	pvcs := ks.client.CoreV1().PersistentVolumeClaims(instance.Group.Namespace)
 
 	for _, pattern := range labelPatterns {
-		selector := fmt.Sprintf(pattern, instance.Name)
+		selector := fmt.Sprintf(pattern, fmt.Sprintf("%s-%d", instance.Name, instance.Group.ID))
 		listOptions := metav1.ListOptions{LabelSelector: selector}
 		list, err := pvcs.List(context.TODO(), listOptions)
 		if err != nil {
