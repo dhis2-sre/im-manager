@@ -1,0 +1,4 @@
+ARG TAG=be-2.1.7
+FROM apache/doris:${TAG}
+ARG TIER=be
+ADD postgresql-42.7.5.jar /opt/apache-doris/${TIER}/jdbc_drivers/postgresql.jar

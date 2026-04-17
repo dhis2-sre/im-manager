@@ -307,7 +307,6 @@ func resolveConsumedParameters(deployment *model.Deployment, instance *model.Dep
 		}
 
 		for _, requiredStack := range stack.Requires {
-			// consume from instance parameters
 			sourceInstance := findInstanceByStackName(requiredStack.Name, deployment)
 			if sourceInstance == nil {
 				return errdef.NewNotFound("failed to find required instance %q of instance %q", sourceInstance.Name, instance.Name)
@@ -317,12 +316,33 @@ func resolveConsumedParameters(deployment *model.Deployment, instance *model.Dep
 				parameter.Value = sourceInstanceParameter.Value
 			}
 
-			// consume from provider
 			if provider, ok := requiredStack.ParameterProviders[name]; ok {
 				sourceInstance.Group = instance.Group
 				value, err := provider.Provide(*sourceInstance)
 				if err != nil {
 					return fmt.Errorf("failed to provide value for instance %q parameter %q: %v", instance.Name, name, err)
+				}
+				parameter.Value = value
+			}
+
+			instance.Parameters[name] = parameter
+		}
+
+		for _, companionStack := range stack.Companions {
+			sourceInstance := findInstanceByStackName(companionStack.Name, deployment)
+			if sourceInstance == nil {
+				continue
+			}
+
+			if sourceInstanceParameter, ok := sourceInstance.Parameters[name]; ok {
+				parameter.Value = sourceInstanceParameter.Value
+			}
+
+			if provider, ok := companionStack.ParameterProviders[name]; ok {
+				sourceInstance.Group = instance.Group
+				value, err := provider.Provide(*sourceInstance)
+				if err != nil {
+					return fmt.Errorf("failed to provide value for instance %q parameter %q from companion: %v", instance.Name, name, err)
 				}
 				parameter.Value = value
 			}
@@ -400,6 +420,10 @@ func (s Service) deployDeploymentInstance(ctx context.Context, token string, ins
 	group, err := s.groupService.Find(ctx, instance.GroupName)
 	if err != nil {
 		return err
+	}
+
+	if group.Namespace == "" {
+		return errdef.NewBadRequest("group %q has no namespace set", group.Name)
 	}
 
 	syncCmd, err := s.helmfileService.sync(ctx, token, instance, group, ttl)
