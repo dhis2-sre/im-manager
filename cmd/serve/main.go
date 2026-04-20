@@ -209,22 +209,12 @@ func run() (err error) {
 		return err
 	}
 
-	_, err = createDefaultCluster(ctx, clusterService)
-	if err != nil {
-		return err
-	}
-
 	err = createAdminUser(ctx, userService, groupService)
 	if err != nil {
 		return err
 	}
 
 	err = createGroups(ctx, logger, groupService)
-	if err != nil {
-		return err
-	}
-
-	err = createE2ETestUser(ctx, userService, groupService)
 	if err != nil {
 		return err
 	}
@@ -633,10 +623,6 @@ func newEventHandler(ctx context.Context, logger *slog.Logger, rabbitmqConfig ra
 	return event.NewHandler(logger, env, streamName), nil
 }
 
-func createDefaultCluster(ctx context.Context, clusterService cluster.Service) (model.Cluster, error) {
-	return clusterService.FindOrCreate(ctx, "default", "The cluster where IM is hosted")
-}
-
 type groupService interface {
 	FindOrCreate(ctx context.Context, name string, namespace string, hostname string, deployable bool) (*model.Group, error)
 }
@@ -645,6 +631,10 @@ func createGroups(ctx context.Context, logger *slog.Logger, groupService groupSe
 	groupNames, err := requireEnvAsArray("GROUP_NAMES")
 	if err != nil {
 		return err
+	}
+
+	if len(groupNames) == 0 || groupNames[0] == "" {
+		return nil
 	}
 
 	groupNamespaces, err := requireEnvAsArray("GROUP_NAMESPACES")
@@ -691,19 +681,6 @@ func createAdminUser(ctx context.Context, userService *user.Service, groupServic
 	}
 
 	return user.CreateUser(ctx, adminEmail, adminPassword, userService, groupService, model.AdministratorGroupName, "", "admin")
-}
-
-func createE2ETestUser(ctx context.Context, userService *user.Service, groupService *group.Service) error {
-	testEmail, err := requireEnv("E2E_TEST_USER_EMAIL")
-	if err != nil {
-		return err
-	}
-	testPassword, err := requireEnv("E2E_TEST_USER_PASSWORD")
-	if err != nil {
-		return err
-	}
-
-	return user.CreateUser(ctx, testEmail, testPassword, userService, groupService, model.DefaultGroupName, model.DefaultGroupName, "e2e test")
 }
 
 func newGinEngine(logger *slog.Logger) (*gin.Engine, error) {
