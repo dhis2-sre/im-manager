@@ -28,7 +28,7 @@ require (
 	github.com/orandin/slog-gorm v1.4.0
 	github.com/orlangure/gnomock v0.0.0-00010101000000-000000000000
 	github.com/rabbitmq/amqp091-go v1.10.0
-	github.com/rabbitmq/rabbitmq-stream-go-client v1.7.1
+	github.com/rabbitmq/rabbitmq-stream-go-client v1.8.0
 	github.com/stretchr/testify v1.11.1
 	github.com/testcontainers/testcontainers-go v0.41.0
 	github.com/testcontainers/testcontainers-go/modules/minio v0.41.0
@@ -189,7 +189,7 @@ require (
 	github.com/jinzhu/now v1.1.5 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.13-0.20220915233716-71ac16282d12 // indirect
-	github.com/klauspost/compress v1.18.4 // indirect
+	github.com/klauspost/compress v1.18.5 // indirect
 	github.com/klauspost/cpuid/v2 v2.3.0 // indirect
 	github.com/klauspost/crc32 v1.3.0 // indirect
 	github.com/kylelemons/godebug v1.1.0 // indirect
