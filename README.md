@@ -6,7 +6,7 @@ If you just want to see what the application looks like you can find some screen
 
 1. Start by copying the `.env.example` file into a new `.env` file:
 
-```
+```shell
 cp .env.example .env
 ```
 
