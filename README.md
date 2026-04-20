@@ -40,6 +40,20 @@ make init
 make dev
 ```
 
+### Start local IM with k3s clusters
+
+Brings up IM together with three in-Docker k3s clusters (`dev`, `test`, `prod`) that IM can deploy DHIS2 instances into, fronted by Traefik.
+
+Set `CLASSIFICATION=local` in `.env`, then with `direnv` active:
+
+```shell
+docker compose up
+```
+
+- UI: http://im.127-0-0-1.nip.io
+- API: http://api.im.127-0-0-1.nip.io
+- Deployed instances: `http://<instance>.<dev|test|prod>.im.127-0-0-1.nip.io`
+
 ## Encryption
 
 Cluster kubeconfigs are encrypted at rest using [SOPS](https://github.com/getsops/sops). Exactly one encryption backend must be configured. The application fails at startup if neither (or both) are set.
