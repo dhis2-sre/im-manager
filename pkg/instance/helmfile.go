@@ -77,8 +77,6 @@ func (h helmfileService) executeHelmfileCommand(ctx context.Context, token strin
 type stackParameters map[string]string
 
 func (h helmfileService) loadStackParameters(stackName string) (stackParameters, error) {
-	// TODO: stack parameter files are KMS-encrypted; re-encrypt with age before re-enabling
-	return nil, nil
 	//goland:noinspection GoImportUsedAsName
 	path := fmt.Sprintf("%s/%s/parameters/%s.yaml", h.stackFolder, stackName, h.classification)
 	data, err := os.ReadFile(path) // #nosec
