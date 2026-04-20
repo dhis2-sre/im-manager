@@ -7,7 +7,7 @@ require (
 	github.com/anthhub/forwarder v1.1.0
 	github.com/aws/aws-sdk-go-v2 v1.41.6
 	github.com/aws/aws-sdk-go-v2/config v1.32.16
-	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.22.13
+	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.22.15
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.99.1
 	github.com/docker/go-connections v0.7.0
 	github.com/dominikbraun/graph v0.23.0
