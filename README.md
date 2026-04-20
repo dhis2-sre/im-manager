@@ -1,8 +1,10 @@
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/dhis2-sre/im-manager)
+
 # Instance Manager
 
 Instance Manager is a web application that manages the lifecycle of DHIS2 instances.
 
-## Getting Started
+# Getting Started
 
 If you just want to see what the application looks like you can find some screenshots [here](./docs/screenshots).
 
