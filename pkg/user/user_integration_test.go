@@ -44,7 +44,7 @@ func TestUserHandler(t *testing.T) {
 	userService := user.NewService("", passwordTokenTtl, userRepository, fakeDialer{t})
 
 	clusterRepository := cluster.NewRepository(db)
-	clusterService := cluster.NewService(clusterRepository)
+	clusterService := cluster.NewService(clusterRepository, cluster.Encryptor{})
 
 	groupService := group.NewService(groupRepository, userService, clusterService)
 
@@ -65,7 +65,7 @@ func TestUserHandler(t *testing.T) {
 	require.NoError(t, err)
 
 	client := inttest.SetupHTTPServer(t, func(engine *gin.Engine) {
-		userHandler := user.NewHandler(logger, "hostname", http.SameSiteStrictMode, 10, 20, 30, key.PublicKey, userService, tokenService)
+		userHandler := user.NewHandler(logger, "hostname", http.SameSiteStrictMode, true, 10, 20, 30, key.PublicKey, userService, tokenService)
 		user.Routes(engine, authentication, authorization, userHandler)
 	})
 

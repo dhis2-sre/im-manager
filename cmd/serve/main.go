@@ -147,10 +147,14 @@ func run() (err error) {
 	if err != nil {
 		return err
 	}
-	userHandler := user.NewHandler(logger, hostname, authConfig.SameSiteMode, authConfig.AccessTokenExpirationSeconds, authConfig.RefreshTokenExpirationSeconds, authConfig.RefreshTokenRememberMeExpirationSeconds, publicKey, userService, tokenService)
+	userHandler := user.NewHandler(logger, hostname, authConfig.SameSiteMode, authConfig.CookieSecure, authConfig.AccessTokenExpirationSeconds, authConfig.RefreshTokenExpirationSeconds, authConfig.RefreshTokenRememberMeExpirationSeconds, publicKey, userService, tokenService)
 
 	clusterRepository := cluster.NewRepository(db)
-	clusterService := cluster.NewService(clusterRepository)
+	encryptor, err := newEncryptor(err)
+	if err != nil {
+		return err
+	}
+	clusterService := cluster.NewService(clusterRepository, encryptor)
 	clusterHandler := cluster.NewHandler(clusterService)
 
 	authentication := middleware.NewAuthentication(publicKey, userService)
@@ -205,22 +209,12 @@ func run() (err error) {
 		return err
 	}
 
-	_, err = createDefaultCluster(ctx, clusterService)
-	if err != nil {
-		return err
-	}
-
 	err = createAdminUser(ctx, userService, groupService)
 	if err != nil {
 		return err
 	}
 
 	err = createGroups(ctx, logger, groupService)
-	if err != nil {
-		return err
-	}
-
-	err = createE2ETestUser(ctx, userService, groupService)
 	if err != nil {
 		return err
 	}
@@ -250,6 +244,14 @@ func run() (err error) {
 		return fmt.Errorf("failed to start the HTTP server: %v", err)
 	}
 	return nil
+}
+
+func newEncryptor(err error) (cluster.Encryptor, error) {
+	encryptor, err := cluster.NewEncryptor(os.Getenv("SOPS_KMS_ARN"), os.Getenv("SOPS_AGE_KEY"))
+	if err != nil {
+		return cluster.Encryptor{}, err
+	}
+	return encryptor, nil
 }
 
 func newDB(logger *slog.Logger) (*gorm.DB, error) {
@@ -335,6 +337,7 @@ func newRedis() (*redis.Client, error) {
 
 type authenticationConfig struct {
 	SameSiteMode                            http.SameSite
+	CookieSecure                            bool
 	RefreshTokenSecretKey                   string
 	AccessTokenExpirationSeconds            int
 	RefreshTokenExpirationSeconds           int
@@ -363,8 +366,11 @@ func newAuthenticationConfig() (authenticationConfig, error) {
 		return authenticationConfig{}, err
 	}
 
+	cookieSecure := os.Getenv("COOKIE_SECURE") != "false"
+
 	return authenticationConfig{
 		SameSiteMode:                            mode,
+		CookieSecure:                            cookieSecure,
 		RefreshTokenSecretKey:                   refreshTokenSecretKey,
 		AccessTokenExpirationSeconds:            accessTokenExpirationSeconds,
 		RefreshTokenExpirationSeconds:           refreshTokenExpirationSeconds,
@@ -617,10 +623,6 @@ func newEventHandler(ctx context.Context, logger *slog.Logger, rabbitmqConfig ra
 	return event.NewHandler(logger, env, streamName), nil
 }
 
-func createDefaultCluster(ctx context.Context, clusterService cluster.Service) (model.Cluster, error) {
-	return clusterService.FindOrCreate(ctx, "default", "The cluster where IM is hosted")
-}
-
 type groupService interface {
 	FindOrCreate(ctx context.Context, name string, namespace string, hostname string, deployable bool) (*model.Group, error)
 }
@@ -629,6 +631,10 @@ func createGroups(ctx context.Context, logger *slog.Logger, groupService groupSe
 	groupNames, err := requireEnvAsArray("GROUP_NAMES")
 	if err != nil {
 		return err
+	}
+
+	if len(groupNames) == 0 || groupNames[0] == "" {
+		return nil
 	}
 
 	groupNamespaces, err := requireEnvAsArray("GROUP_NAMESPACES")
@@ -675,19 +681,6 @@ func createAdminUser(ctx context.Context, userService *user.Service, groupServic
 	}
 
 	return user.CreateUser(ctx, adminEmail, adminPassword, userService, groupService, model.AdministratorGroupName, "", "admin")
-}
-
-func createE2ETestUser(ctx context.Context, userService *user.Service, groupService *group.Service) error {
-	testEmail, err := requireEnv("E2E_TEST_USER_EMAIL")
-	if err != nil {
-		return err
-	}
-	testPassword, err := requireEnv("E2E_TEST_USER_PASSWORD")
-	if err != nil {
-		return err
-	}
-
-	return user.CreateUser(ctx, testEmail, testPassword, userService, groupService, model.DefaultGroupName, model.DefaultGroupName, "e2e test")
 }
 
 func newGinEngine(logger *slog.Logger) (*gin.Engine, error) {
