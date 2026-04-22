@@ -99,6 +99,80 @@ func (h Handler) AddUserToGroup(c *gin.Context) {
 	c.Status(http.StatusCreated)
 }
 
+// AddAdminUserToGroup adds a user as a group admin
+func (h Handler) AddAdminUserToGroup(c *gin.Context) {
+	// swagger:route POST /groups/{group}/admins/{userId} addAdminUserToGroup
+	//
+	// Add admin user to group
+	//
+	// Add a user as an admin of a group...
+	//
+	// security:
+	//   oauth2:
+	//
+	// responses:
+	//   201:
+	//   400: Error
+	//   401: Error
+	//   403: Error
+	//   404: Error
+	groupName := c.Param("group")
+
+	userId, ok := handler.GetPathParameter(c, "userId")
+	if !ok {
+		return
+	}
+
+	err := h.groupService.AddAdminUser(c.Request.Context(), groupName, userId)
+	if err != nil {
+		if errdef.IsNotFound(err) {
+			_ = c.AbortWithError(http.StatusNotFound, err)
+		} else {
+			_ = c.Error(err)
+		}
+		return
+	}
+
+	c.Status(http.StatusCreated)
+}
+
+// RemoveAdminUserFromGroup removes a user as a group admin
+func (h Handler) RemoveAdminUserFromGroup(c *gin.Context) {
+	// swagger:route DELETE /groups/{group}/admins/{userId} removeAdminUserFromGroup
+	//
+	// Remove admin user from group
+	//
+	// Remove a user as an admin of a group...
+	//
+	// security:
+	//   oauth2:
+	//
+	// responses:
+	//   204:
+	//   400: Error
+	//   401: Error
+	//   403: Error
+	//   404: Error
+	groupName := c.Param("group")
+
+	userId, ok := handler.GetPathParameter(c, "userId")
+	if !ok {
+		return
+	}
+
+	err := h.groupService.RemoveAdminUser(c.Request.Context(), groupName, userId)
+	if err != nil {
+		if errdef.IsNotFound(err) {
+			_ = c.AbortWithError(http.StatusNotFound, err)
+		} else {
+			_ = c.Error(err)
+		}
+		return
+	}
+
+	c.Status(http.StatusNoContent)
+}
+
 // RemoveUserFromGroup group
 func (h Handler) RemoveUserFromGroup(c *gin.Context) {
 	// swagger:route DELETE /groups/{group}/users/{userId} removeUserFromGroup
