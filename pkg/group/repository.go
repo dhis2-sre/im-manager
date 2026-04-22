@@ -159,6 +159,16 @@ func (r repository) removeUser(ctx context.Context, group *model.Group, user *mo
 	return r.db.WithContext(ctx).Model(&group).Association("Users").Delete([]*model.User{user})
 }
 
+func (r repository) addAdminUser(ctx context.Context, group *model.Group, user *model.User) error {
+	ctx = context.WithoutCancel(ctx)
+	return r.db.WithContext(ctx).Model(&group).Association("AdminUsers").Append([]*model.User{user})
+}
+
+func (r repository) removeAdminUser(ctx context.Context, group *model.Group, user *model.User) error {
+	ctx = context.WithoutCancel(ctx)
+	return r.db.WithContext(ctx).Model(&group).Association("AdminUsers").Delete([]*model.User{user})
+}
+
 func (r repository) findByGroupNames(ctx context.Context, groupNames []string) ([]model.Group, error) {
 	var databases []model.Group
 	err := r.db.

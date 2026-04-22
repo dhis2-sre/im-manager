@@ -113,6 +113,32 @@ func TestGroupHandler(t *testing.T) {
 			client.Do(t, http.MethodDelete, path, nil, http.StatusNoContent)
 		}
 
+		t.Run("AddAdminUserToGroup", func(t *testing.T) {
+			path := fmt.Sprintf("/groups/%s/admins/%s", groupName, userId)
+
+			client.Do(t, http.MethodPost, path, nil, http.StatusCreated)
+
+			detailsPath := fmt.Sprintf("/groups/%s/details", groupName)
+			var g model.Group
+			client.GetJSON(t, detailsPath, &g)
+			require.Equal(t, groupName, g.Name)
+			require.Len(t, g.AdminUsers, 1)
+			require.Equal(t, user.ID, g.AdminUsers[0].ID)
+		})
+
+		t.Run("RemoveAdminUserFromGroup", func(t *testing.T) {
+			addPath := fmt.Sprintf("/groups/%s/admins/%s", groupName, userId)
+			client.Do(t, http.MethodPost, addPath, nil, http.StatusCreated)
+
+			removePath := fmt.Sprintf("/groups/%s/admins/%s", groupName, userId)
+			client.Do(t, http.MethodDelete, removePath, nil, http.StatusNoContent)
+
+			detailsPath := fmt.Sprintf("/groups/%s/details", groupName)
+			var g model.Group
+			client.GetJSON(t, detailsPath, &g)
+			require.Empty(t, g.AdminUsers)
+		})
+
 		t.Run("AddClusterToGroup", func(t *testing.T) {
 			group, err := groupService.Find(t.Context(), groupName)
 			assert.NoError(t, err)

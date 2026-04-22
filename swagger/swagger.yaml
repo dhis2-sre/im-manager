@@ -1519,6 +1519,65 @@ paths:
             security:
                 - oauth2: []
             summary: Create group
+    /groups/{group}/admins/{userId}:
+        delete:
+            description: Remove a user as an admin of a group...
+            operationId: removeAdminUserFromGroup
+            parameters:
+                - in: path
+                  name: group
+                  required: true
+                  type: string
+                  x-go-name: Group
+                - format: uint64
+                  in: path
+                  name: userId
+                  required: true
+                  type: integer
+                  x-go-name: UserID
+            responses:
+                "204":
+                    description: ""
+                "400":
+                    $ref: '#/responses/Error'
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Remove admin user from group
+        post:
+            description: Add a user as an admin of a group...
+            operationId: addAdminUserToGroup
+            parameters:
+                - in: path
+                  name: group
+                  required: true
+                  type: string
+                  x-go-name: Group
+                - format: uint64
+                  in: path
+                  name: userId
+                  required: true
+                  type: integer
+                  x-go-name: UserID
+            responses:
+                "201":
+                    description: ""
+                "400":
+                    $ref: '#/responses/Error'
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Add admin user to group
     /groups/{group}/clusters/{clusterId}:
         delete:
             description: Remove a cluster from a group...
