@@ -138,7 +138,7 @@ func (r repository) findOrCreate(ctx context.Context, group *model.Group) (*mode
 	err := r.db.
 		WithContext(ctx).
 		Where(model.Group{Name: group.Name}).
-		Attrs(model.Group{Hostname: group.Hostname, Deployable: group.Deployable}).
+		Attrs(model.Group{Namespace: group.Namespace, Hostname: group.Hostname, Deployable: group.Deployable}).
 		FirstOrCreate(&g).Error
 	return g, err
 }

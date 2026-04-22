@@ -166,6 +166,23 @@ func TestGroupHandler(t *testing.T) {
 			assert.Nil(t, group.ClusterID)
 		})
 
+		t.Run("FindOrCreatePersistsAllFields", func(t *testing.T) {
+			t.Parallel()
+
+			g, err := groupService.FindOrCreate(t.Context(), "find-or-create-group", "find-or-create-namespace", "find-or-create-hostname.com", true)
+			require.NoError(t, err)
+			assert.Equal(t, "find-or-create-group", g.Name)
+			assert.Equal(t, "find-or-create-namespace", g.Namespace)
+			assert.Equal(t, "find-or-create-hostname.com", g.Hostname)
+			assert.True(t, g.Deployable)
+
+			persisted, err := groupService.Find(t.Context(), "find-or-create-group")
+			require.NoError(t, err)
+			assert.Equal(t, "find-or-create-namespace", persisted.Namespace)
+			assert.Equal(t, "find-or-create-hostname.com", persisted.Hostname)
+			assert.True(t, persisted.Deployable)
+		})
+
 		t.Run("CreateDeployableGroup", func(t *testing.T) {
 			t.Parallel()
 
