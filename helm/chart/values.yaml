@@ -13,7 +13,7 @@ refreshTokenExpirationInSeconds: 900 # 15 minutes
 refreshTokenRememberMeExpirationInSeconds: "2592000" # 30 days
 
 redis:
-  host: redis-master.namespace.svc
+  host: im-redis-valkey.namespace.svc
   port: "6379"
 
 groups:

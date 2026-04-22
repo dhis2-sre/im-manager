@@ -1,3 +1,5 @@
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/dhis2-sre/im-manager)
+
 # Getting Started
 
 If you just want to see what the application looks like you can find some screenshots [here](./docs/screenshots).

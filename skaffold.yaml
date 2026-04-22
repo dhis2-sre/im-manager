@@ -59,18 +59,12 @@ deploy:
       - name: im-redis-{{ .ENVIRONMENT }}
         namespace: instance-manager-{{ .CLASSIFICATION }}
         createNamespace: true
-        remoteChart: redis
-        repo: https://charts.bitnami.com/bitnami
-        version: 23.2.12
+        remoteChart: valkey
+        repo: https://valkey.io/valkey-helm
+        version: 0.9.2
         upgradeOnChange: true
         valuesFiles:
           - helm/data/values/{{ .CLASSIFICATION }}/redis.yaml
-        setValueTemplates:
-          global:
-            security:
-              allowInsecureImages: true
-          image:
-            repository: bitnamilegacy/redis
 
       - name: im-manager-postgresql-{{ .ENVIRONMENT }}
         namespace: instance-manager-{{ .CLASSIFICATION }}
@@ -108,7 +102,7 @@ deploy:
             hostname: "{{ .API_HOSTNAME }}"
             certIssuer: cert-issuer-prod
           redis:
-            host: im-redis-{{ .ENVIRONMENT }}-master.instance-manager-{{ .CLASSIFICATION }}.svc
+            host: im-redis-{{ .ENVIRONMENT }}-valkey.instance-manager-{{ .CLASSIFICATION }}.svc
           environment:
             ENVIRONMENT: "{{ .ENVIRONMENT }}"
             CLASSIFICATION: "{{ .CLASSIFICATION }}"

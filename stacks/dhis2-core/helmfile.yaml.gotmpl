@@ -76,12 +76,15 @@ releases:
           database: {{ requiredEnv "DATABASE_NAME" }}
           hostname: {{ requiredEnv "DATABASE_HOSTNAME" }}
 
-      {{- if or (ne (requiredEnv "CUSTOM_DHIS2_CONFIG") "") (eq (requiredEnv "DEPLOY_CHAP") "true") }}
-      - customConfigSnippet:
-          {{- requiredEnv "CUSTOM_DHIS2_CONFIG" | nindent 10 }}
+      - dhisConfig: |
+          server.base.url = https://{{ requiredEnv "INSTANCE_HOSTNAME" }}/{{ requiredEnv "INSTANCE_PATH_NAME" }}
           {{- if eq (requiredEnv "DEPLOY_CHAP") "true" }}
           route.remote_servers_allowed=http://*
           {{- end }}
+
+      {{- if ne (requiredEnv "CUSTOM_DHIS2_CONFIG") "" }}
+      - customConfigSnippet:
+          {{- requiredEnv "CUSTOM_DHIS2_CONFIG" | nindent 10 }}
       {{- end }}
 
       {{- if eq (requiredEnv "DEPLOY_CHAP") "true" }}
