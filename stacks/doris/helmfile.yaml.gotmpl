@@ -1,0 +1,54 @@
+releases:
+  - name: "{{ requiredEnv "INSTANCE_NAME" }}-doris"
+    namespace: "{{ requiredEnv "INSTANCE_NAMESPACE" }}"
+    chart: selectdb/doris
+    version: "{{ requiredEnv "CHART_VERSION" }}"
+    values:
+      - dorisCluster:
+          name: "{{ requiredEnv "INSTANCE_NAME" }}-doris"
+      - feSpec:
+          image:
+            repository: dhis2/apache-doris
+            tag: fe-2.1.7-postgres
+          labels:
+            im: "true"
+            im-default: "true"
+            im-deployment-id: "{{ requiredEnv "DEPLOYMENT_ID" }}"
+            im-instance-id: "{{ requiredEnv "INSTANCE_ID" }}"
+            im-id: "{{ requiredEnv "INSTANCE_ID" }}"
+            im-type: "doris"
+            im-creation-timestamp: "{{ requiredEnv "INSTANCE_CREATION_TIMESTAMP" }}"
+            im-ttl: "{{ requiredEnv "INSTANCE_TTL" }}"
+          replicas: "{{ requiredEnv "FRONTEND_REPLICAS" }}"
+          resource:
+            requests:
+              cpu: "{{ requiredEnv "FRONTEND_RESOURCE_REQUESTS_CPU" }}"
+              memory: "{{ requiredEnv "FRONTEND_RESOURCE_REQUESTS_MEMORY" }}"
+            limits:
+              cpu: "{{ requiredEnv "FRONTEND_RESOURCE_LIMITS_CPU" }}"
+              memory: "{{ requiredEnv "FRONTEND_RESOURCE_LIMITS_MEMORY" }}"
+      - beSpec:
+          image:
+            repository: dhis2/apache-doris
+            tag: be-2.1.7-postgres
+          labels:
+            im: "true"
+            im-default: "true"
+            im-deployment-id: "{{ requiredEnv "DEPLOYMENT_ID" }}"
+            im-instance-id: "{{ requiredEnv "INSTANCE_ID" }}"
+            im-id: "{{ requiredEnv "INSTANCE_ID" }}"
+            im-type: "doris"
+            im-creation-timestamp: "{{ requiredEnv "INSTANCE_CREATION_TIMESTAMP" }}"
+            im-ttl: "{{ requiredEnv "INSTANCE_TTL" }}"
+          replicas: "{{ requiredEnv "BACKEND_REPLICAS" }}"
+          resource:
+            requests:
+              cpu: "{{ requiredEnv "BACKEND_RESOURCE_REQUESTS_CPU" }}"
+              memory: "{{ requiredEnv "BACKEND_RESOURCE_REQUESTS_MEMORY" }}"
+            limits:
+              cpu: "{{ requiredEnv "BACKEND_RESOURCE_LIMITS_CPU" }}"
+              memory: "{{ requiredEnv "BACKEND_RESOURCE_LIMITS_MEMORY" }}"
+
+repositories:
+  - name: selectdb
+    url: https://charts.selectdb.com

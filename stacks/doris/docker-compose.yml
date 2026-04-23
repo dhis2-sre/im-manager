@@ -1,0 +1,17 @@
+services:
+  be:
+    build:
+      context: .
+      dockerfile: Dockerfile.doris
+      args:
+        TAG: be-2.1.7
+        TIER: be
+    image: dhis2/apache-doris:be-2.1.7-postgres
+  fe:
+    build:
+      context: .
+      dockerfile: Dockerfile.doris
+      args:
+        TAG: fe-2.1.7
+        TIER: fe
+    image: dhis2/apache-doris:fe-2.1.7-postgres
