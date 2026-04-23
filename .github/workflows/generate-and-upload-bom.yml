@@ -1,0 +1,35 @@
+name: "This workflow creates bill of material and uploads it to Dependency-Track each night"
+
+on:
+  schedule:
+    - cron: "0 0 * * *"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref }}
+  cancel-in-progress: true
+
+jobs:
+  create-bom:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ">=1.24.0"
+      - name: Download cyclonedx-gomod
+        uses: CycloneDX/gh-gomod-generate-sbom@v2
+        with:
+          version: v1
+      - name: Generate SBOM with cyclonedx-gomod
+        run: cyclonedx-gomod mod -licenses -json -output sbom.json
+      - name: Upload SBOM to DependencyTrack
+        env:
+          DEPENDENCY_TRACK_API: "https://dt.security.dhis2.org/api/v1/bom"
+        run: |
+          curl -X POST "$DEPENDENCY_TRACK_API" \
+              --fail-with-body \
+             -H "Content-Type: multipart/form-data" \
+             -H "X-Api-Key: ${{ secrets.DEPENDENCYTRACK_APIKEY }}" \
+             -F "project=8e5839b0-886c-42b1-960f-fe9399ecde91" \
+             -F "bom=@sbom.json"
