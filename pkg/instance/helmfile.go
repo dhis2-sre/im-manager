@@ -16,13 +16,41 @@ import (
 )
 
 //goland:noinspection GoExportedFuncWithUnexportedType
-func NewHelmfileService(logger *slog.Logger, stackService stackService, stackFolder string, classification string) helmfileService {
+func NewHelmfileService(logger *slog.Logger, stackService stackService, stackFolder string, classification string) (helmfileService, error) {
+	helmfileBin, err := resolveBinary("helmfile", "HELMFILE_BIN")
+	if err != nil {
+		return helmfileService{}, err
+	}
+	helmBin, err := resolveBinary("helm", "HELM_BIN")
+	if err != nil {
+		return helmfileService{}, err
+	}
+	logger.Info("Resolved helmfile service binaries", "helmfile", helmfileBin, "helm", helmBin)
+
 	return helmfileService{
 		logger:         logger,
 		stackService:   stackService,
 		stackFolder:    stackFolder,
 		classification: classification,
+		helmfileBin:    helmfileBin,
+		helmBin:        helmBin,
+	}, nil
+}
+
+// resolveBinary returns an absolute path to name, resolved once at startup.
+// An explicit override via envVar wins; otherwise PATH is consulted.
+func resolveBinary(name, envVar string) (string, error) {
+	if override := os.Getenv(envVar); override != "" {
+		if _, err := os.Stat(override); err != nil {
+			return "", fmt.Errorf("%s=%q: %w", envVar, override, err)
+		}
+		return override, nil
 	}
+	resolved, err := exec.LookPath(name)
+	if err != nil {
+		return "", fmt.Errorf("%s binary not found in PATH (set %s to override): %w", name, envVar, err)
+	}
+	return resolved, nil
 }
 
 type helmfileService struct {
@@ -30,6 +58,8 @@ type helmfileService struct {
 	stackService   stackService
 	stackFolder    string
 	classification string
+	helmfileBin    string
+	helmBin        string
 }
 
 type stackService interface {
@@ -49,7 +79,7 @@ func (h helmfileService) destroy(ctx context.Context, instance *model.Deployment
 // * STACKS_FOLDER is configured on the host so if that can be tampered the attacker already has access
 // * stack.Name is populated by reading the name of a folder and even if that folder name could contain something malicious it won't be running in a shell anyway
 // * stackPath is concatenated using path.Join which also cleans the path and furthermore it's existence is validated
-// * Binaries are executed using their full path and not from $PATH which would be very difficult to exploit anyway
+// * Binaries are executed using an absolute path resolved once at startup (via exec.LookPath or an explicit env override); PATH is not consulted per request
 func (h helmfileService) executeHelmfileCommand(ctx context.Context, token string, instance *model.DeploymentInstance, group *model.Group, ttl uint, operation string) (*exec.Cmd, error) {
 	//goland:noinspection GoImportUsedAsName
 	stack, err := h.stackService.Find(instance.StackName)
@@ -67,7 +97,7 @@ func (h helmfileService) executeHelmfileCommand(ctx context.Context, token strin
 		return nil, err
 	}
 
-	cmd := exec.Command("/usr/bin/helmfile", "--helm-binary", "/usr/bin/helm", "-f", stackPath, operation) // #nosec
+	cmd := exec.Command(h.helmfileBin, "--helm-binary", h.helmBin, "-f", stackPath, operation) // #nosec
 	h.logger.InfoContext(ctx, "Executing helmfile command", "command", cmd.String())
 	h.configureInstanceEnvironment(ctx, token, instance, group, ttl, stackParameters, cmd)
 
