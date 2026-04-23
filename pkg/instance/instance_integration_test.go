@@ -92,7 +92,8 @@ func TestInstanceHandler(t *testing.T) {
 	}
 	stackService := stack.NewService(stacks)
 	// classification 'test' does not actually exist, this is used to decrypt the stack parameters
-	helmfileService := instance.NewHelmfileService(logger, stackService, "../../stacks", "test")
+	helmfileService, err := instance.NewHelmfileService(logger, stackService, "../../stacks", "test")
+	require.NoError(t, err, "failed to create helmfile service")
 	tokenRepository := token.NewRepository(redis)
 	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	require.NoError(t, err, "failed to generate RSA private key")
@@ -237,6 +238,38 @@ func TestInstanceHandler(t *testing.T) {
 		assert.Equal(t, deploymentInstance.ID, updatedInstance.ID)
 		assert.Equal(t, "0.7.0", updatedInstance.Parameters["IMAGE_TAG"].Value)
 		assert.True(t, updatedInstance.Public)
+	})
+
+	t.Run("UpdateDeploymentInstancePreservesOtherParameters", func(t *testing.T) {
+		t.Parallel()
+		deployment := createDeployment(t, client, "test-deployment-instance-preserve", tokens.AccessToken, WithDescription("some description"))
+
+		deploymentInstance := createWhoamiInstance(t, client, deployment.ID, tokens.AccessToken,
+			WithParameter("IMAGE_TAG", "0.6.0"),
+			WithParameter("IMAGE_PULL_POLICY", "IfNotPresent"))
+
+		updatedInstance := updateInstance(t, client, deploymentInstance, tokens.AccessToken,
+			WithParameter("IMAGE_PULL_POLICY", "Always"))
+
+		assert.Equal(t, "Always", updatedInstance.Parameters["IMAGE_PULL_POLICY"].Value)
+		assert.Equal(t, "0.6.0", updatedInstance.Parameters["IMAGE_TAG"].Value,
+			"IMAGE_TAG should be preserved when omitted from the patch body")
+	})
+
+	t.Run("UpdateDeploymentInstancePublicOnly", func(t *testing.T) {
+		t.Parallel()
+		deployment := createDeployment(t, client, "test-deployment-instance-public-only", tokens.AccessToken, WithDescription("some description"))
+
+		deploymentInstance := createWhoamiInstance(t, client, deployment.ID, tokens.AccessToken,
+			WithParameter("IMAGE_TAG", "0.6.0"),
+			WithPublic(false))
+
+		updatedInstance := updateInstance(t, client, deploymentInstance, tokens.AccessToken,
+			WithPublic(true))
+
+		assert.True(t, updatedInstance.Public)
+		assert.Equal(t, "0.6.0", updatedInstance.Parameters["IMAGE_TAG"].Value,
+			"parameters should be preserved when the patch body only changes public")
 	})
 }
 
