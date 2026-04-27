@@ -235,7 +235,6 @@ func TestInstanceHandler(t *testing.T) {
 	})
 }
 
-
 type groupService struct {
 	group *model.Group
 }
