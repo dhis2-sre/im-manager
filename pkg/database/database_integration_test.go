@@ -308,6 +308,11 @@ func TestDatabaseHandler(t *testing.T) {
 		stack := &model.Stack{
 			Name:            "dhis2-db",
 			HostnamePattern: "%s-database-postgresql.%s.svc",
+			ParameterProviders: model.ParameterProviders{
+				"DATABASE_HOSTNAME": model.ParameterProviderFunc(func(instance model.DeploymentInstance) (string, error) {
+					return fmt.Sprintf("%s-%d-database-postgresql.%s.svc", instance.Name, instance.Group.ID, instance.Group.Namespace), nil
+				}),
+			},
 		}
 		stSvc := &saveAsStackService{stack: stack}
 

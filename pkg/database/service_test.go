@@ -124,6 +124,11 @@ func setupSaveAsServiceFixture(t *testing.T) saveAsServiceFixture {
 	stack := &model.Stack{
 		Name:            "dhis2-db",
 		HostnamePattern: "%s-database-postgresql.%s.svc",
+		ParameterProviders: model.ParameterProviders{
+			"DATABASE_HOSTNAME": model.ParameterProviderFunc(func(instance model.DeploymentInstance) (string, error) {
+				return instance.Name + "-database-postgresql." + instance.Group.Namespace + ".svc", nil
+			}),
+		},
 	}
 
 	return saveAsServiceFixture{
