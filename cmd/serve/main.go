@@ -246,9 +246,19 @@ func run() (err error) {
 	event.Routes(r, authentication.TokenAuthentication, eventHandler)
 
 	logger.InfoContext(ctx, "Listening and serving HTTP")
-	if err := r.Run(); err != nil {
+	//	if err := r.Run(); err != nil {
+	//		return fmt.Errorf("failed to start the HTTP server: %v", err)
+	//	}
+	server := &http.Server{
+		Addr:         ":8080",
+		Handler:      r,
+		WriteTimeout: 240 * time.Second,
+		ReadTimeout:  240 * time.Second,
+	}
+	if err := server.ListenAndServe(); err != nil {
 		return fmt.Errorf("failed to start the HTTP server: %v", err)
 	}
+
 	return nil
 }
 
@@ -430,6 +440,10 @@ func newStackService() (stack.Service, error) {
 		stack.PgAdmin,
 		stack.WhoamiGo,
 		stack.IMJobRunner,
+		stack.ChapDB,
+		stack.ChapValkey,
+		stack.ChapWorker,
+		stack.ChapCore,
 	)
 	if err != nil {
 		return stack.Service{}, fmt.Errorf("error in stack config: %v", err)
@@ -582,12 +596,14 @@ func newIntegrationHandler() (integration.Handler, error) {
 			Password: password,
 		})
 
+	ghcrClient := integration.NewGhcrClient()
+
 	instanceServiceHost, err := requireEnv("INSTANCE_SERVICE_HOST")
 	if err != nil {
 		return integration.Handler{}, err
 	}
 
-	return integration.NewHandler(dockerHubClient, instanceServiceHost), nil
+	return integration.NewHandler(dockerHubClient, ghcrClient, instanceServiceHost), nil
 }
 
 func newEventHandler(ctx context.Context, logger *slog.Logger, rabbitmqConfig rabbitMQConfig) (event.Handler, error) {
