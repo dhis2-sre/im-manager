@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/dhis2-sre/im-manager/pkg/model"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"gorm.io/gorm"
 )
@@ -21,8 +22,9 @@ func CreateUserWithGroup(t *testing.T, db *gorm.DB, groupName, hostname, namespa
 	}
 
 	user := &model.User{
-		Email:  email,
-		Groups: []model.Group{*group},
+		Email:      email,
+		EmailToken: uuid.New(),
+		Groups:     []model.Group{*group},
 	}
 
 	err := db.Create(user).Error
