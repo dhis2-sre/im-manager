@@ -7,8 +7,8 @@ require (
 	github.com/anthhub/forwarder v1.1.0
 	github.com/aws/aws-sdk-go-v2 v1.41.6
 	github.com/aws/aws-sdk-go-v2/config v1.32.16
-	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.22.15
-	github.com/aws/aws-sdk-go-v2/service/s3 v1.99.1
+	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.22.16
+	github.com/aws/aws-sdk-go-v2/service/s3 v1.100.0
 	github.com/docker/go-connections v0.7.0
 	github.com/dominikbraun/graph v0.23.0
 	github.com/getsops/sops/v3 v3.12.2
@@ -27,7 +27,7 @@ require (
 	github.com/minio/minio-go/v7 v7.0.100
 	github.com/orandin/slog-gorm v1.4.0
 	github.com/orlangure/gnomock v0.0.0-00010101000000-000000000000
-	github.com/rabbitmq/amqp091-go v1.10.0
+	github.com/rabbitmq/amqp091-go v1.11.0
 	github.com/rabbitmq/rabbitmq-stream-go-client v1.8.0
 	github.com/stretchr/testify v1.11.1
 	github.com/testcontainers/testcontainers-go v0.41.0
