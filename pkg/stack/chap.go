@@ -38,7 +38,7 @@ var chapDBDefaults = struct {
 	dbPassword   string
 	dbVersion    string
 }{
-	chartVersion: "0.1.3",
+	chartVersion: "0.1.4",
 	dbSize:       "10Gi",
 	dbName:       "chap_core",
 	dbPassword:   "chap",
@@ -136,7 +136,7 @@ var chapCoreDefaults = struct {
 	dhis2Username                  string
 	dhis2Password                  string
 }{
-	chartVersion:                   "0.1.8",
+	chartVersion:                   "0.1.9",
 	imageTag:                       "latest",
 	imagePullPolicy:                always,
 	googleServiceAccountEmail:      " ",
