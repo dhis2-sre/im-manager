@@ -87,7 +87,8 @@ func TestInstanceHandler(t *testing.T) {
 	}
 	stackService := stack.NewService(stacks)
 	// classification 'test' does not actually exist, this is used to decrypt the stack parameters
-	helmfileService := instance.NewHelmfileService(logger, stackService, "../../stacks", "test")
+	helmfileService, err := instance.NewHelmfileService(logger, stackService, "../../stacks", "test")
+	require.NoError(t, err, "failed to create helmfile service")
 	tokenRepository := token.NewRepository(redis)
 	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	require.NoError(t, err, "failed to generate RSA private key")

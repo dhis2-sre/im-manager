@@ -448,7 +448,10 @@ func newInstanceService(logger *slog.Logger, db *gorm.DB, stackService stack.Ser
 	if err != nil {
 		return nil, err
 	}
-	helmfileService := instance.NewHelmfileService(logger, stackService, "./stacks", classification)
+	helmfileService, err := instance.NewHelmfileService(logger, stackService, "./stacks", classification)
+	if err != nil {
+		return nil, err
+	}
 
 	s3Bucket, err := requireEnv("S3_BUCKET")
 	if err != nil {
