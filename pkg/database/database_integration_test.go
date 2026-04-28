@@ -262,7 +262,7 @@ func TestDatabaseHandler(t *testing.T) {
 	t.Run("SaveAs", func(t *testing.T) {
 		t.Parallel()
 
-		user, group := userpkg.CreateUserWithGroup(t, db, "packages", "some", "ns", "user2@dhis2.org")
+		user, group := userpkg.CreateUserWithGroup(t, db, "packages", "packages-host", "ns", "user2@dhis2.org")
 
 		sourceDB := database.CreateDatabaseRecord(
 			t,
