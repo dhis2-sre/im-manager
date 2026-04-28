@@ -17,38 +17,31 @@ import (
 
 //goland:noinspection GoExportedFuncWithUnexportedType
 func NewHelmfileService(logger *slog.Logger, stackService stackService, stackFolder string, classification string) (helmfileService, error) {
-	helmfileBin, err := resolveBinary("helmfile", "HELMFILE_BIN")
+	helmfileBinary, err := resolveBinary("helmfile")
 	if err != nil {
 		return helmfileService{}, err
 	}
-	helmBin, err := resolveBinary("helm", "HELM_BIN")
+	helmBinary, err := resolveBinary("helm")
 	if err != nil {
 		return helmfileService{}, err
 	}
-	logger.Info("Resolved helmfile service binaries", "helmfile", helmfileBin, "helm", helmBin)
+	logger.Info("Resolved helmfile service binaries", "helmfile", helmfileBinary, "helm", helmBinary)
 
 	return helmfileService{
 		logger:         logger,
 		stackService:   stackService,
 		stackFolder:    stackFolder,
 		classification: classification,
-		helmfileBin:    helmfileBin,
-		helmBin:        helmBin,
+		helmfileBinary: helmfileBinary,
+		helmBinary:     helmBinary,
 	}, nil
 }
 
-// resolveBinary returns an absolute path to name, resolved once at startup.
-// An explicit override via envVar wins; otherwise PATH is consulted.
-func resolveBinary(name, envVar string) (string, error) {
-	if override := os.Getenv(envVar); override != "" {
-		if _, err := os.Stat(override); err != nil {
-			return "", fmt.Errorf("%s=%q: %w", envVar, override, err)
-		}
-		return override, nil
-	}
+// resolveBinary returns an absolute path to name, resolved once at startup via PATH.
+func resolveBinary(name string) (string, error) {
 	resolved, err := exec.LookPath(name)
 	if err != nil {
-		return "", fmt.Errorf("%s binary not found in PATH (set %s to override): %w", name, envVar, err)
+		return "", fmt.Errorf("%s binary not found in PATH: %w", name, err)
 	}
 	return resolved, nil
 }
@@ -58,8 +51,8 @@ type helmfileService struct {
 	stackService   stackService
 	stackFolder    string
 	classification string
-	helmfileBin    string
-	helmBin        string
+	helmfileBinary string
+	helmBinary     string
 }
 
 type stackService interface {
@@ -97,7 +90,7 @@ func (h helmfileService) executeHelmfileCommand(ctx context.Context, token strin
 		return nil, err
 	}
 
-	cmd := exec.Command(h.helmfileBin, "--helm-binary", h.helmBin, "-f", stackPath, operation) // #nosec
+	cmd := exec.Command(h.helmfileBinary, "--helm-binary", h.helmBinary, "-f", stackPath, operation) // #nosec
 	h.logger.InfoContext(ctx, "Executing helmfile command", "command", cmd.String())
 	h.configureInstanceEnvironment(ctx, token, instance, group, ttl, stackParameters, cmd)
 
