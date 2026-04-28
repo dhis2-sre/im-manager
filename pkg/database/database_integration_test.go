@@ -3,14 +3,11 @@ package database_test
 import (
 	"context"
 	"encoding/json"
-	"fmt"
-	"io"
 	"log/slog"
 	"net/http"
 	"os"
 	"strconv"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
@@ -20,7 +17,6 @@ import (
 	awss3 "github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/dhis2-sre/im-manager/pkg/database"
-	"github.com/dhis2-sre/im-manager/pkg/instance"
 	"github.com/dhis2-sre/im-manager/pkg/inttest"
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	"github.com/dhis2-sre/im-manager/pkg/storage"
@@ -259,103 +255,6 @@ func TestDatabaseHandler(t *testing.T) {
 		require.ErrorAsf(t, err, &e, "DELETE \"/databases/%s\" failed: DB should be deleted from S3", databaseID)
 	}
 
-	t.Run("SaveAs", func(t *testing.T) {
-		t.Parallel()
-
-		user, group := userpkg.CreateUserWithGroup(t, db, "packages", "packages-host", "ns", "user2@dhis2.org")
-
-		sourceDB := database.CreateDatabaseRecord(
-			t,
-			db,
-			"source-db",
-			"packages",
-			fmt.Sprintf("s3://%s/packages/source-db", env.s3Bucket),
-			user.ID,
-		)
-		sourceDBID := strconv.FormatUint(uint64(sourceDB.ID), 10)
-
-		deployment := instance.CreateDeploymentRecord(t, db, user.ID, "deploy-name", "packages")
-
-		instanceRecord := instance.CreateInstanceRecord(
-			t,
-			db,
-			deployment.ID,
-			group,
-			"dhis2-db",
-			"deploy-name",
-			"packages",
-			model.DeploymentInstanceParameters{
-				"DATABASE_ID":       {Value: sourceDBID},
-				"DATABASE_NAME":     {Value: "dhis2"},
-				"DATABASE_USERNAME": {Value: "dhis"},
-				"DATABASE_PASSWORD": {Value: "dhis"},
-			},
-		)
-
-		fakePodExecutor := &fakePodExecutor{output: []byte("pg_dump fake output")}
-		podExecutorFunc := func(_ model.Cluster) (database.PodExecutor, error) {
-			return fakePodExecutor, nil
-		}
-
-		databaseRepository := database.NewRepository(db)
-		databaseService := database.NewService(env.logger, env.s3Bucket, env.s3Client, groupService{groupName: "packages"}, databaseRepository, podExecutorFunc)
-
-		instSvc := &saveAsInstanceService{
-			instance:   instanceRecord,
-			deployment: deployment,
-		}
-
-		stack := &model.Stack{
-			Name:            "dhis2-db",
-			HostnamePattern: "%s-database-postgresql.%s.svc",
-			ParameterProviders: model.ParameterProviders{
-				"DATABASE_HOSTNAME": model.ParameterProviderFunc(func(instance model.DeploymentInstance) (string, error) {
-					return fmt.Sprintf("%s-%d-database-postgresql.%s.svc", instance.Name, instance.Group.ID, instance.Group.Namespace), nil
-				}),
-			},
-		}
-		stSvc := &saveAsStackService{stack: stack}
-
-		client := inttest.SetupHTTPServer(t, func(engine *gin.Engine) {
-			databaseHandler := database.NewHandler(env.logger, databaseService, groupService{groupName: "packages"}, instSvc, stSvc)
-			authenticator := func(c *gin.Context) {
-				ctx := model.NewContextWithUser(c.Request.Context(), &model.User{
-					ID:     user.ID,
-					Email:  "user2@dhis2.org",
-					Groups: []model.Group{*group},
-				})
-				c.Request = c.Request.WithContext(ctx)
-			}
-			database.Routes(engine, authenticator, databaseHandler)
-		})
-
-		instanceID := strconv.FormatUint(uint64(instanceRecord.ID), 10)
-		body := strings.NewReader(`{"name": "saved-copy.sql.gz", "format": "plain"}`)
-		var savedDB model.Database
-		client.PostJSON(t, "/databases/save-as/"+instanceID, body, &savedDB)
-
-		assert.Equal(t, "saved-copy.sql.gz", savedDB.Name)
-		assert.Equal(t, "packages", savedDB.GroupName)
-
-		require.Eventually(t, func() bool {
-			var d model.Database
-			if err := db.First(&d, savedDB.ID).Error; err != nil {
-				return false
-			}
-			return d.Url != ""
-		}, 10*time.Second, 200*time.Millisecond, "database URL should be set by async goroutine")
-
-		var finalDB model.Database
-		err := db.First(&finalDB, savedDB.ID).Error
-		require.NoError(t, err)
-		assert.Equal(t, "s3://database-bucket/packages/saved-copy.sql.gz", finalDB.Url)
-		assert.Greater(t, finalDB.Size, int64(0))
-
-		s3Content := env.s3.GetObject(t, env.s3Bucket, "packages/saved-copy.sql.gz")
-		assert.Greater(t, len(s3Content), 0, "S3 object should have content")
-
-		assert.False(t, instSvc.filestoreBackupCalled, "FilestoreBackup should not be called when no dhis2-core instance exists")
-	})
 }
 
 type groupService struct {
@@ -387,45 +286,6 @@ type stackService struct{}
 
 func (ss stackService) Find(name string) (*model.Stack, error) {
 	return nil, nil
-}
-
-type fakePodExecutor struct {
-	output []byte
-}
-
-func (f *fakePodExecutor) Exec(ctx context.Context, namespace, pod, container string, command []string, stdout, stderr io.Writer) error {
-	_, err := stdout.Write(f.output)
-	return err
-}
-
-type saveAsInstanceService struct {
-	instance              *model.DeploymentInstance
-	deployment            *model.Deployment
-	filestoreBackupCalled bool
-	mu                    sync.Mutex
-}
-
-func (s *saveAsInstanceService) FindDecryptedDeploymentInstanceById(ctx context.Context, id uint) (*model.DeploymentInstance, error) {
-	return s.instance, nil
-}
-
-func (s *saveAsInstanceService) FindDeploymentById(ctx context.Context, id uint) (*model.Deployment, error) {
-	return s.deployment, nil
-}
-
-func (s *saveAsInstanceService) FilestoreBackup(ctx context.Context, instance *model.DeploymentInstance, name string, database *model.Database) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.filestoreBackupCalled = true
-	return nil
-}
-
-type saveAsStackService struct {
-	stack *model.Stack
-}
-
-func (s *saveAsStackService) Find(name string) (*model.Stack, error) {
-	return s.stack, nil
 }
 
 type databaseHandlerEnv struct {

@@ -8,8 +8,10 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/dhis2-sre/im-manager/pkg/token"
 	"github.com/getsops/sops/v3"
@@ -104,7 +106,9 @@ func TestInstanceHandler(t *testing.T) {
 	uploader := manager.NewUploader(s3.Client)
 	s3Client := storage.NewS3Client(logger, s3.Client, uploader)
 	databaseRepository := database.NewRepository(db)
-	databaseService := database.NewService(logger, s3Bucket, s3Client, groupService, databaseRepository, nil)
+	databaseService := database.NewService(logger, s3Bucket, s3Client, groupService, databaseRepository, func(c model.Cluster) (database.PodExecutor, error) {
+		return instance.NewKubernetesService(c)
+	})
 
 	authenticator := func(c *gin.Context) {
 		ctx := model.NewContextWithUser(c.Request.Context(), user)
@@ -163,8 +167,6 @@ func TestInstanceHandler(t *testing.T) {
 		deployDeployment(t, client, deployment.ID, tokens.AccessToken)
 		k8sClient.AssertPodIsReady(t, deploymentInstance.Group.Namespace, deploymentInstance.Name, 60, deploymentInstance.Group.ID)
 
-		// TODO:		t.Log("Save as deployment")
-
 		destroyDeployment(t, client, deployment.ID, tokens.AccessToken)
 		k8sClient.AssertPodIsNotRunning(t, deploymentInstance.Group.Namespace, deploymentInstance.Name, 10, deploymentInstance.Group.ID)
 	})
@@ -206,6 +208,43 @@ func TestInstanceHandler(t *testing.T) {
 		k8sClient.AssertPodIsNotRunning(t, deploymentInstance.Group.Namespace, deploymentInstance.Name, 10, deploymentInstance.Group.ID)
 		k8sClient.AssertPodIsNotRunning(t, deploymentInstance.Group.Namespace, groupedName+"-minio", 30)
 		k8sClient.AssertPodIsNotRunning(t, deploymentInstance.Group.Namespace, groupedName+"-database", 10)
+	})
+
+	t.Run("SaveAsDatabase", func(t *testing.T) {
+		t.Parallel()
+		deployment := createDeployment(t, client, "save-as-deployment", tokens.AccessToken)
+		dbInstance := createDHIS2DBInstance(t, client, deployment.ID, databaseID, tokens.AccessToken)
+
+		deployDeployment(t, client, deployment.ID, tokens.AccessToken)
+		groupedName := fmt.Sprintf("%s-%d", dbInstance.Name, dbInstance.Group.ID)
+		k8sClient.AssertPodIsReady(t, dbInstance.Group.Namespace, groupedName+"-database", 60)
+
+		body := strings.NewReader(`{"name": "saved-copy.sql.gz", "format": "plain"}`)
+		var savedDB model.Database
+		instanceIDStr := strconv.FormatUint(uint64(dbInstance.ID), 10)
+		client.PostJSON(t, "/databases/save-as/"+instanceIDStr, body, &savedDB, inttest.WithAuthToken(tokens.AccessToken))
+
+		assert.Equal(t, "saved-copy.sql.gz", savedDB.Name)
+		assert.Equal(t, "group-name", savedDB.GroupName)
+
+		require.Eventually(t, func() bool {
+			var d model.Database
+			if err := db.First(&d, savedDB.ID).Error; err != nil {
+				return false
+			}
+			return d.Url != ""
+		}, 60*time.Second, 500*time.Millisecond, "database URL should be set by async goroutine")
+
+		var finalDB model.Database
+		err := db.First(&finalDB, savedDB.ID).Error
+		require.NoError(t, err)
+		assert.Equal(t, fmt.Sprintf("s3://%s/group-name/saved-copy.sql.gz", s3Bucket), finalDB.Url)
+		assert.Greater(t, finalDB.Size, int64(0))
+
+		s3Content := s3.GetObject(t, s3Bucket, "group-name/saved-copy.sql.gz")
+		assert.Greater(t, len(s3Content), 0, "S3 object should have content")
+
+		destroyDeployment(t, client, deployment.ID, tokens.AccessToken)
 	})
 
 	t.Run("UpdateDeployment", func(t *testing.T) {

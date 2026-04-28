@@ -14,25 +14,7 @@ import (
 	"github.com/dhis2-sre/im-manager/pkg/inttest"
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	"github.com/stretchr/testify/require"
-	"gorm.io/gorm"
 )
-
-func CreateDatabaseRecord(t *testing.T, db *gorm.DB, name, groupName, url string, userID uint) *model.Database {
-	t.Helper()
-
-	database := &model.Database{
-		Name:      name,
-		GroupName: groupName,
-		Type:      "database",
-		Url:       url,
-		UserID:    userID,
-	}
-
-	err := db.Create(database).Error
-	require.NoError(t, err, "failed to create test database record")
-
-	return database
-}
 
 func UploadTestDatabase(t *testing.T, client *inttest.HTTPClient, name, content, group string, headers ...func(http.Header)) string {
 	t.Helper()
