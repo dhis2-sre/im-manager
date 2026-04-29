@@ -597,6 +597,15 @@ definitions:
                 x-go-name: TTL
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
+    UpdateInstanceRequest:
+        properties:
+            parameters:
+                $ref: '#/definitions/parameters'
+            public:
+                type: boolean
+                x-go-name: Public
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
     User:
         description: User domain object defining a user
         properties:
@@ -1401,7 +1410,7 @@ paths:
             security:
                 - oauth2: []
             summary: Delete deployment instance
-        put:
+        patch:
             description: Update a Deployment Instance ...
             operationId: updateInstance
             parameters:
@@ -1422,7 +1431,7 @@ paths:
                   name: Payload
                   required: true
                   schema:
-                    $ref: '#/definitions/SaveInstanceRequest'
+                    $ref: '#/definitions/UpdateInstanceRequest'
             responses:
                 "200":
                     $ref: '#/responses/DeploymentInstance'

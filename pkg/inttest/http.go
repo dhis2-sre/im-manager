@@ -118,6 +118,11 @@ func (hc *HTTPClient) Put(t *testing.T, path string, requestBody io.Reader, expe
 	return hc.Do(t, http.MethodPut, path, requestBody, expectedStatus, headers...)
 }
 
+func (hc *HTTPClient) Patch(t *testing.T, path string, requestBody io.Reader, expectedStatus int, headers ...func(http.Header)) []byte {
+	t.Helper()
+	return hc.Do(t, http.MethodPatch, path, requestBody, expectedStatus, headers...)
+}
+
 // Delete sends an HTTP DELETE request to given path. Optional headers are applied to the request. The
 // response body is read in full and returned as is. Failure to read or close the HTTP response body
 // and HTTP status other than 202 will fail the test associated with t.
@@ -194,6 +199,22 @@ func (hc *HTTPClient) PutJSON(t *testing.T, path string, requestBody io.Reader, 
 
 	err := json.Unmarshal(body, &responseBody)
 	errMsg := httpClientErrMessage(http.MethodPut, path)
+	require.NoError(t, err, errMsg+": failed to unmarshal response body")
+}
+
+// PatchJSON sends an HTTP PATCH request to given path. Optional headers are applied to the request.
+// The optional requestBody is assumed to be JSON. The response body is unmarshalled as JSON into
+// given responseBody. Failure to read or close the HTTP response body and HTTP status other than
+// 200 will fail the test associated with t.
+func (hc *HTTPClient) PatchJSON(t *testing.T, path string, requestBody io.Reader, responseBody any, headers ...func(http.Header)) {
+	t.Helper()
+
+	headers = append(headers, WithHeader("Content-Type", "application/json"))
+
+	body := hc.Patch(t, path, requestBody, http.StatusOK, headers...)
+
+	err := json.Unmarshal(body, &responseBody)
+	errMsg := httpClientErrMessage(http.MethodPatch, path)
 	require.NoError(t, err, errMsg+": failed to unmarshal response body")
 }
 

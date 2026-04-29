@@ -933,7 +933,7 @@ func newMinioClient(accessKey, secretKey, endpoint string, useSSL bool) (*minio.
 	return minioClient, nil
 }
 
-func (s Service) UpdateInstance(ctx context.Context, token string, deploymentId, instanceId uint, parameters parameters, public bool) (*model.DeploymentInstance, error) {
+func (s Service) UpdateInstance(ctx context.Context, token string, deploymentId, instanceId uint, parameters parameters, public *bool) (*model.DeploymentInstance, error) {
 	instance, err := s.FindDecryptedDeploymentInstanceById(ctx, instanceId)
 	if err != nil {
 		return nil, err
@@ -943,16 +943,16 @@ func (s Service) UpdateInstance(ctx context.Context, token string, deploymentId,
 		return nil, errdef.NewBadRequest("instance %d does not belong to deployment %d", instanceId, deploymentId)
 	}
 
-	instance.Public = public
+	if public != nil {
+		instance.Public = *public
+	}
 
-	instanceParameters := make(model.DeploymentInstanceParameters, len(parameters))
 	for name, parameter := range parameters {
-		instanceParameters[name] = model.DeploymentInstanceParameter{
+		instance.Parameters[name] = model.DeploymentInstanceParameter{
 			ParameterName: name,
 			Value:         parameter.Value,
 		}
 	}
-	instance.Parameters = instanceParameters
 
 	err = s.rejectConsumedParameters(instance)
 	if err != nil {
