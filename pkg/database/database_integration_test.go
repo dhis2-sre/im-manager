@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-
 	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
 	awss3 "github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
@@ -24,21 +23,27 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gorm.io/gorm"
 )
 
 func TestDatabaseHandler(t *testing.T) {
 	t.Parallel()
 
-	env := setupDatabaseHandlerEnv(t)
-	db := env.db
-	var err error
+	db := inttest.SetupDB(t)
+
+	s3Dir := t.TempDir()
+	s3Bucket := "database-bucket"
+	err := os.Mkdir(s3Dir+"/"+s3Bucket, 0o755)
+	require.NoError(t, err, "failed to create S3 output bucket")
+	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
+	s3 := inttest.SetupS3(t, s3Dir)
+	uploader := manager.NewUploader(s3.Client)
+	s3Client := storage.NewS3Client(logger, s3.Client, uploader)
 
 	databaseRepository := database.NewRepository(db)
-	databaseService := database.NewService(env.logger, env.s3Bucket, env.s3Client, groupService{}, databaseRepository, nil)
+	databaseService := database.NewService(logger, s3Bucket, s3Client, groupService{}, databaseRepository, nil)
 
 	client := inttest.SetupHTTPServer(t, func(engine *gin.Engine) {
-		databaseHandler := database.NewHandler(env.logger, databaseService, groupService{groupName: "packages"}, instanceService{}, stackService{})
+		databaseHandler := database.NewHandler(logger, databaseService, groupService{groupName: "packages"}, instanceService{}, stackService{})
 		authenticator := func(c *gin.Context) {
 			ctx := model.NewContextWithUser(c.Request.Context(), &model.User{
 				ID:    1,
@@ -77,7 +82,7 @@ func TestDatabaseHandler(t *testing.T) {
 		require.Equal(t, "s3://database-bucket/packages/path/name.extension", database.Url)
 		require.Equal(t, int64(13), database.Size)
 
-		actualContent := env.s3.GetObject(t, env.s3Bucket, "packages/path/name.extension")
+		actualContent := s3.GetObject(t, s3Bucket, "packages/path/name.extension")
 		require.Equalf(t, "file contents", string(actualContent), "DB in S3 should have expected content")
 
 		databaseID = strconv.FormatUint(uint64(database.ID), 10)
@@ -132,7 +137,7 @@ func TestDatabaseHandler(t *testing.T) {
 			require.Equal(t, "packages", actualDB.GroupName)
 			assert.Equal(t, userID, actualDB.UserID)
 
-			actualContent := env.s3.GetObject(t, env.s3Bucket, "packages/path/copy.extension")
+			actualContent := s3.GetObject(t, s3Bucket, "packages/path/copy.extension")
 			require.Equalf(t, "file contents", string(actualContent), "DB in S3 should have expected content")
 		}
 
@@ -166,7 +171,7 @@ func TestDatabaseHandler(t *testing.T) {
 			require.Equal(t, "path/rename.extension", actualDB.Name)
 			require.Equal(t, "packages", actualDB.GroupName)
 
-			actualContent := env.s3.GetObject(t, env.s3Bucket, "packages/path/rename.extension")
+			actualContent := s3.GetObject(t, s3Bucket, "packages/path/rename.extension")
 			require.Equalf(t, "file contents", string(actualContent), "DB in S3 should have expected content")
 		}
 
@@ -247,8 +252,8 @@ func TestDatabaseHandler(t *testing.T) {
 
 		client.Delete(t, "/databases/"+databaseID)
 
-		_, err = env.s3.Client.GetObject(context.TODO(), &awss3.GetObjectInput{
-			Bucket: aws.String(env.s3Bucket),
+		_, err = s3.Client.GetObject(context.TODO(), &awss3.GetObjectInput{
+			Bucket: aws.String(s3Bucket),
 			Key:    aws.String("packages/path/name.extension"),
 		})
 		var e *types.NoSuchKey
@@ -286,35 +291,4 @@ type stackService struct{}
 
 func (ss stackService) Find(name string) (*model.Stack, error) {
 	return nil, nil
-}
-
-type databaseHandlerEnv struct {
-	db       *gorm.DB
-	s3       *inttest.S3Client
-	s3Bucket string
-	logger   *slog.Logger
-	s3Client *storage.S3Client
-}
-
-func setupDatabaseHandlerEnv(t *testing.T) *databaseHandlerEnv {
-	t.Helper()
-
-	db := inttest.SetupDB(t)
-
-	s3Dir := t.TempDir()
-	s3Bucket := "database-bucket"
-	err := os.Mkdir(s3Dir+"/"+s3Bucket, 0o755)
-	require.NoError(t, err, "failed to create S3 output bucket")
-	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	s3 := inttest.SetupS3(t, s3Dir)
-	uploader := manager.NewUploader(s3.Client)
-	s3Client := storage.NewS3Client(logger, s3.Client, uploader)
-
-	return &databaseHandlerEnv{
-		db:       db,
-		s3:       s3,
-		s3Bucket: s3Bucket,
-		logger:   logger,
-		s3Client: s3Client,
-	}
 }
