@@ -4,22 +4,17 @@ import (
 	"testing"
 
 	"filippo.io/age"
-	"github.com/getsops/sops/v3"
-	sops_age "github.com/getsops/sops/v3/age"
-	"github.com/getsops/sops/v3/keys"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func TestCreateKeyGroup(t *testing.T) {
-	t.Run("age key from env", func(t *testing.T) {
+func TestEncryptor(t *testing.T) {
+	t.Run("age key", func(t *testing.T) {
 		identity, err := age.GenerateX25519Identity()
 		require.NoError(t, err)
 
-		t.Setenv("SOPS_KMS_ARN", "")
-		t.Setenv(sops_age.SopsAgeKeyEnv, identity.String())
-
-		keyGroups, err := createKeyGroup()
+		e := Encryptor{AgeKey: identity.String()}
+		keyGroups, err := e.keyGroups()
 
 		require.NoError(t, err)
 		assert.Len(t, keyGroups, 1)
@@ -27,13 +22,26 @@ func TestCreateKeyGroup(t *testing.T) {
 	})
 
 	t.Run("no key provided", func(t *testing.T) {
-		t.Setenv("SOPS_KMS_ARN", "")
-		t.Setenv(sops_age.SopsAgeKeyEnv, "")
-
-		_, err := createKeyGroup()
+		_, err := Encryptor{}.keyGroups()
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "no encryption key provided")
+	})
+}
+
+func TestNewEncryptor(t *testing.T) {
+	t.Run("exactly one must be set", func(t *testing.T) {
+		_, err := NewEncryptor("", "")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "exactly one")
+	})
+
+	t.Run("both set is rejected", func(t *testing.T) {
+		identity, err := age.GenerateX25519Identity()
+		require.NoError(t, err)
+		_, err = NewEncryptor("arn:aws:kms:us-east-1:123456789012:key/test", identity.String())
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "exactly one")
 	})
 }
 
@@ -41,17 +49,9 @@ func TestEncryptYaml(t *testing.T) {
 	identity, err := age.GenerateX25519Identity()
 	require.NoError(t, err, "failed to generate age key pair")
 
-	t.Setenv("SOPS_KMS_ARN", "")
-	t.Setenv(sops_age.SopsAgeKeyEnv, identity.String())
-
-	ageKeys, err := sops_age.MasterKeysFromRecipients(identity.Recipient().String())
-	require.NoError(t, err, "failed to get master keys from age recipient")
-
-	var ageMasterKeys []keys.MasterKey
-	for _, k := range ageKeys {
-		ageMasterKeys = append(ageMasterKeys, k)
-	}
-	keyGroups := []sops.KeyGroup{ageMasterKeys}
+	e := Encryptor{AgeKey: identity.String()}
+	keyGroups, err := e.keyGroups()
+	require.NoError(t, err)
 
 	t.Run("valid yaml encryption", func(t *testing.T) {
 		yamlData := []byte("database:\n  host: localhost\n  port: 5432\n")
