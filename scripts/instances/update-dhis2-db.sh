@@ -32,4 +32,4 @@ echo "{
       \"value\": \"$DB_RESOURCES_REQUESTS_MEMORY\"
     }
   }
-}" | $HTTP put "$IM_HOST/deployments/$DEPLOYMENT_ID/instance/$INSTANCE_ID" "Authorization: Bearer $ACCESS_TOKEN"
+}" | $HTTP patch "$IM_HOST/deployments/$DEPLOYMENT_ID/instance/$INSTANCE_ID" "Authorization: Bearer $ACCESS_TOKEN"

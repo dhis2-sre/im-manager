@@ -77,17 +77,13 @@ func createInstance(t *testing.T, client *inttest.HTTPClient, deploymentID uint,
 func updateInstance(t *testing.T, client *inttest.HTTPClient, instance model.DeploymentInstance, authToken string, opts ...InstanceOption) model.DeploymentInstance {
 	t.Helper()
 
-	builder := &instanceBuilder{
-		stackName: instance.StackName,
-	}
+	builder := &instanceBuilder{}
 
 	for _, opt := range opts {
 		opt(builder)
 	}
 
-	payload := map[string]any{
-		"stackName": builder.stackName,
-	}
+	payload := map[string]any{}
 
 	if len(builder.parameters) > 0 {
 		payload["parameters"] = builder.parameters
@@ -102,7 +98,7 @@ func updateInstance(t *testing.T, client *inttest.HTTPClient, instance model.Dep
 
 	var updatedInstance model.DeploymentInstance
 	path := fmt.Sprintf("/deployments/%d/instance/%d", instance.DeploymentID, instance.ID)
-	client.PutJSON(t, path, strings.NewReader(string(jsonData)), &updatedInstance, inttest.WithAuthToken(authToken))
+	client.PatchJSON(t, path, strings.NewReader(string(jsonData)), &updatedInstance, inttest.WithAuthToken(authToken))
 
 	return updatedInstance
 }
