@@ -5,11 +5,11 @@ go 1.25.0
 require (
 	filippo.io/age v1.3.1
 	github.com/anthhub/forwarder v1.1.0
-	github.com/aws/aws-sdk-go-v2 v1.41.6
+	github.com/aws/aws-sdk-go-v2 v1.41.7
 	github.com/aws/aws-sdk-go-v2/config v1.32.16
 	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.22.16
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.100.0
-	github.com/aws/smithy-go v1.25.0
+	github.com/aws/smithy-go v1.25.1
 	github.com/docker/go-connections v0.7.0
 	github.com/dominikbraun/graph v0.23.0
 	github.com/getsops/sops/v3 v3.12.2
