@@ -947,16 +947,26 @@ func (s Service) UpdateInstance(ctx context.Context, token string, deploymentId,
 		instance.Public = *public
 	}
 
+	stack, err := s.stackService.Find(instance.StackName)
+	if err != nil {
+		return nil, err
+	}
+
+	var consumedErrs []error
+	for name := range parameters {
+		if stack.Parameters[name].Consumed {
+			consumedErrs = append(consumedErrs, fmt.Errorf("consumed parameters can't be supplied by the user: %s", name))
+		}
+	}
+	if err := errors.Join(consumedErrs...); err != nil {
+		return nil, err
+	}
+
 	for name, parameter := range parameters {
 		instance.Parameters[name] = model.DeploymentInstanceParameter{
 			ParameterName: name,
 			Value:         parameter.Value,
 		}
-	}
-
-	err = s.rejectConsumedParameters(instance)
-	if err != nil {
-		return nil, err
 	}
 
 	deployment, err := s.FindDeploymentById(ctx, deploymentId)
@@ -984,11 +994,6 @@ func (s Service) UpdateInstance(ctx context.Context, token string, deploymentId,
 	err = s.resolveParameters(decryptedDeployment)
 	if err != nil {
 		return nil, errdef.NewBadRequest("failed to resolve parameters: %v", err)
-	}
-
-	stack, err := s.stackService.Find(instance.StackName)
-	if err != nil {
-		return nil, err
 	}
 
 	err = s.instanceRepository.SaveInstance(ctx, instance, stack)
