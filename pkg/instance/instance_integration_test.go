@@ -1,20 +1,17 @@
 package instance_test
 
 import (
-	"bytes"
 	"context"
 	"crypto/rand"
 	"crypto/rsa"
-	"encoding/json"
 	"fmt"
-	"io"
 	"log/slog"
-	"mime/multipart"
 	"net/http"
 	"os"
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/dhis2-sre/im-manager/pkg/token"
 	"github.com/getsops/sops/v3"
@@ -109,7 +106,9 @@ func TestInstanceHandler(t *testing.T) {
 	uploader := manager.NewUploader(s3.Client)
 	s3Client := storage.NewS3Client(logger, s3.Client, uploader)
 	databaseRepository := database.NewRepository(db)
-	databaseService := database.NewService(logger, s3Bucket, s3Client, groupService, databaseRepository, nil)
+	databaseService := database.NewService(logger, s3Bucket, s3Client, groupService, databaseRepository, func(c model.Cluster) (database.PodExecutor, error) {
+		return instance.NewKubernetesService(c)
+	})
 
 	authenticator := func(c *gin.Context) {
 		ctx := model.NewContextWithUser(c.Request.Context(), user)
@@ -131,7 +130,7 @@ func TestInstanceHandler(t *testing.T) {
 	tokens, err := tokenService.GetTokens(user, "", false)
 	require.NoError(t, err, "failed to get tokens")
 
-	databaseID := uploadDatabase(t, client, "path/name.extension", "select now();", tokens.AccessToken)
+	databaseID := database.UploadTestDatabase(t, client, "path/name.extension", "select now();", "group-name", inttest.WithAuthToken(tokens.AccessToken))
 
 	t.Run("DeployDeploymentWithoutInstances", func(t *testing.T) {
 		t.Parallel()
@@ -167,8 +166,6 @@ func TestInstanceHandler(t *testing.T) {
 
 		deployDeployment(t, client, deployment.ID, tokens.AccessToken)
 		k8sClient.AssertPodIsReady(t, deploymentInstance.Group.Namespace, deploymentInstance.Name, 60, deploymentInstance.Group.ID)
-
-		// TODO:		t.Log("Save as deployment")
 
 		destroyDeployment(t, client, deployment.ID, tokens.AccessToken)
 		k8sClient.AssertPodIsNotRunning(t, deploymentInstance.Group.Namespace, deploymentInstance.Name, 10, deploymentInstance.Group.ID)
@@ -211,6 +208,43 @@ func TestInstanceHandler(t *testing.T) {
 		k8sClient.AssertPodIsNotRunning(t, deploymentInstance.Group.Namespace, deploymentInstance.Name, 10, deploymentInstance.Group.ID)
 		k8sClient.AssertPodIsNotRunning(t, deploymentInstance.Group.Namespace, groupedName+"-minio", 30)
 		k8sClient.AssertPodIsNotRunning(t, deploymentInstance.Group.Namespace, groupedName+"-database", 10)
+	})
+
+	t.Run("SaveAsDatabase", func(t *testing.T) {
+		t.Parallel()
+		deployment := createDeployment(t, client, "save-as-deployment", tokens.AccessToken)
+		dbInstance := createDHIS2DBInstance(t, client, deployment.ID, databaseID, tokens.AccessToken)
+
+		deployDeployment(t, client, deployment.ID, tokens.AccessToken)
+		groupedName := fmt.Sprintf("%s-%d", dbInstance.Name, dbInstance.Group.ID)
+		k8sClient.AssertPodIsReady(t, dbInstance.Group.Namespace, groupedName+"-database", 60)
+
+		body := strings.NewReader(`{"name": "saved-copy.sql.gz", "format": "plain"}`)
+		var savedDB model.Database
+		instanceIDStr := strconv.FormatUint(uint64(dbInstance.ID), 10)
+		client.PostJSON(t, "/databases/save-as/"+instanceIDStr, body, &savedDB, inttest.WithAuthToken(tokens.AccessToken))
+
+		assert.Equal(t, "saved-copy.sql.gz", savedDB.Name)
+		assert.Equal(t, "group-name", savedDB.GroupName)
+
+		require.Eventually(t, func() bool {
+			var d model.Database
+			if err := db.First(&d, savedDB.ID).Error; err != nil {
+				return false
+			}
+			return d.Url != ""
+		}, 60*time.Second, 500*time.Millisecond, "database URL should be set by async goroutine")
+
+		var finalDB model.Database
+		err := db.First(&finalDB, savedDB.ID).Error
+		require.NoError(t, err)
+		assert.Equal(t, fmt.Sprintf("s3://%s/group-name/saved-copy.sql.gz", s3Bucket), finalDB.Url)
+		assert.Greater(t, finalDB.Size, int64(0))
+
+		s3Content := s3.GetObject(t, s3Bucket, "group-name/saved-copy.sql.gz")
+		assert.Greater(t, len(s3Content), 0, "S3 object should have content")
+
+		destroyDeployment(t, client, deployment.ID, tokens.AccessToken)
 	})
 
 	t.Run("UpdateDeployment", func(t *testing.T) {
@@ -271,37 +305,6 @@ func TestInstanceHandler(t *testing.T) {
 		assert.Equal(t, "0.6.0", updatedInstance.Parameters["IMAGE_TAG"].Value,
 			"parameters should be preserved when the patch body only changes public")
 	})
-}
-
-func uploadDatabase(t *testing.T, client *inttest.HTTPClient, name, content, authToken string) string {
-	t.Helper()
-
-	var b bytes.Buffer
-	w := multipart.NewWriter(&b)
-
-	err := w.WriteField("group", "group-name")
-	require.NoError(t, err, "failed to write form field")
-	err = w.WriteField("name", name)
-	require.NoError(t, err, "failed to write form field")
-
-	f, err := w.CreateFormFile("database", "mydb")
-	require.NoError(t, err, "failed to create form file")
-	_, err = io.WriteString(f, content)
-	require.NoError(t, err, "failed to write file")
-	_ = w.Close()
-
-	body := client.Put(t, "/databases", &b, http.StatusCreated,
-		inttest.WithHeader("X-Upload-Group", "group-name"),
-		inttest.WithHeader("X-Upload-Name", name),
-		inttest.WithHeader("X-Upload-Description", "Test database"),
-		inttest.WithAuthToken(authToken),
-	)
-
-	var actualDB model.Database
-	err = json.Unmarshal(body, &actualDB)
-	require.NoError(t, err, "failed to unmarshal database response")
-
-	return strconv.FormatUint(uint64(actualDB.ID), 10)
 }
 
 type groupService struct {
