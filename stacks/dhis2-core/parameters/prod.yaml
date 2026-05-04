@@ -6,13 +6,22 @@ GOOGLE_AUTH_CLIENT_ID: ENC[AES256_GCM,data:3guKiVOqGUl4+9l8FBLam9FmrJmA,iv:ASZbf
 sops:
     kms:
         - arn: arn:aws:kms:eu-central-1:767224633206:alias/im-prod-secrets
-          created_at: "2023-05-25T09:03:41Z"
-          enc: AQICAHgT8e97X192OKPTpaXOewhDtMqGDOe1qFP0c6FMw0ekSQHjbsikNxjsMwxtfpTl/ecEAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMYomEG2IOj1sMG3ADAgEQgDsNaBYyrO3M5+lkbMYh+tfFaYlgdaU4FrkXoKlUdoinzy0jbJn65SWCUKoPogYjDFPYsyWugu/KA40k/w==
+          created_at: "2026-04-20T18:25:23Z"
+          enc: AQICAHiFSy1MW2ZIokcHMxd18pfQEetfBp48bd2xlu+FnIYl3AGIm8sv5nk/qz2AsHGwISdDAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMfthLtoiojbONe6NWAgEQgDsqaOfUOvmvqIXNB89J7seWId+4jIJpTzSHEm/UYL1is37Lvpn1lrIq0xYTXwSKfQQHVH0zK2zYPiB1dQ==
           aws_profile: ""
     gcp_kms: []
     azure_kv: []
     hc_vault: []
-    age: []
+    age:
+        - recipient: age1s0tw7t9e4a4ft6pnp8nxthmh6976hvr8r6f8wcyvz703vzu9ysyqtedavq
+          enc: |
+            -----BEGIN AGE ENCRYPTED FILE-----
+            YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBxSmg4NHBqeGxDUFRsT0Y0
+            NmxxTUVPSnFmTkFHcm0xbU11S3I3dDJyZW5JCjdrbUJ1V2luWEYwaHVNdVQ3NWk2
+            SElUVXBDSkZPeEtMWU8xemZ0V3duejAKLS0tIHd4MERxTHNNRE1lclJaS0IzeDRi
+            NlBvNGJSVmZzV0lOamFYL3JPaTNNRGcK99BhaK0/+kxDp1+NtMUCFIhmhTgSEdIp
+            v36YrQwXE+B7MoljIWoXZcU7yAyUxgRUUg2/O4ovKjtYiO6QMvj/dg==
+            -----END AGE ENCRYPTED FILE-----
     lastmodified: "2022-06-21T13:37:55Z"
     mac: ENC[AES256_GCM,data:8VTBRIMHjik/otnSyGY14iDwfTSSYxOCD4J9yC/Rj5pC5kGhEsJE686MeyyHZ2ntxc4mI/Ha15pWNjmIUbohr8EpeifcjdOktWpIufycWgc1wXMCVZ+OU0+E0fY3hQMpDuwUNLHvy+yI5ndbbdy82P/EvL7I/QIK+PBytTLTUp0=,iv:k+MkNiyJS5DN68SPbq2V29V6huznj6U4CZ9YDWTz9wc=,tag:c82mEVVUfNb+mVQvVxvPBA==,type:str]
     pgp: []

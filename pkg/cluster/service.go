@@ -6,12 +6,13 @@ import (
 	"github.com/dhis2-sre/im-manager/pkg/model"
 )
 
-func NewService(clusterRepository *repository) Service {
-	return Service{clusterRepository: clusterRepository}
+func NewService(clusterRepository *repository, encryptor Encryptor) Service {
+	return Service{clusterRepository: clusterRepository, encryptor: encryptor}
 }
 
 type Service struct {
 	clusterRepository *repository
+	encryptor         Encryptor
 }
 
 func (s Service) Find(ctx context.Context, id uint) (model.Cluster, error) {
@@ -29,7 +30,7 @@ func (s Service) Save(ctx context.Context, name, description string, kubernetesC
 	}
 
 	if kubernetesConfiguration != nil {
-		keyGroups, err := createKeyGroup()
+		keyGroups, err := s.encryptor.keyGroups()
 		if err != nil {
 			return model.Cluster{}, err
 		}
@@ -62,7 +63,7 @@ func (s Service) Update(ctx context.Context, id uint, name, description string, 
 		cluster.Description = description
 	}
 	if kubernetesConfiguration != nil {
-		keyGroups, err := createKeyGroup()
+		keyGroups, err := s.encryptor.keyGroups()
 		if err != nil {
 			return model.Cluster{}, err
 		}

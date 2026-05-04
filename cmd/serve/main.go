@@ -147,10 +147,14 @@ func run() (err error) {
 	if err != nil {
 		return err
 	}
-	userHandler := user.NewHandler(logger, hostname, authConfig.SameSiteMode, authConfig.AccessTokenExpirationSeconds, authConfig.RefreshTokenExpirationSeconds, authConfig.RefreshTokenRememberMeExpirationSeconds, publicKey, userService, tokenService)
+	userHandler := user.NewHandler(logger, hostname, authConfig.SameSiteMode, authConfig.CookieSecure, authConfig.AccessTokenExpirationSeconds, authConfig.RefreshTokenExpirationSeconds, authConfig.RefreshTokenRememberMeExpirationSeconds, publicKey, userService, tokenService)
 
 	clusterRepository := cluster.NewRepository(db)
-	clusterService := cluster.NewService(clusterRepository)
+	encryptor, err := newEncryptor(err)
+	if err != nil {
+		return err
+	}
+	clusterService := cluster.NewService(clusterRepository, encryptor)
 	clusterHandler := cluster.NewHandler(clusterService)
 
 	authentication := middleware.NewAuthentication(publicKey, userService)
@@ -252,6 +256,14 @@ func run() (err error) {
 	return nil
 }
 
+func newEncryptor(err error) (cluster.Encryptor, error) {
+	encryptor, err := cluster.NewEncryptor(os.Getenv("SOPS_KMS_ARN"), os.Getenv("SOPS_AGE_KEY"))
+	if err != nil {
+		return cluster.Encryptor{}, err
+	}
+	return encryptor, nil
+}
+
 func newDB(logger *slog.Logger) (*gorm.DB, error) {
 	host, err := requireEnv("DATABASE_HOST")
 	if err != nil {
@@ -335,6 +347,7 @@ func newRedis() (*redis.Client, error) {
 
 type authenticationConfig struct {
 	SameSiteMode                            http.SameSite
+	CookieSecure                            bool
 	RefreshTokenSecretKey                   string
 	AccessTokenExpirationSeconds            int
 	RefreshTokenExpirationSeconds           int
@@ -363,8 +376,11 @@ func newAuthenticationConfig() (authenticationConfig, error) {
 		return authenticationConfig{}, err
 	}
 
+	cookieSecure := os.Getenv("COOKIE_SECURE") != "false"
+
 	return authenticationConfig{
 		SameSiteMode:                            mode,
+		CookieSecure:                            cookieSecure,
 		RefreshTokenSecretKey:                   refreshTokenSecretKey,
 		AccessTokenExpirationSeconds:            accessTokenExpirationSeconds,
 		RefreshTokenExpirationSeconds:           refreshTokenExpirationSeconds,

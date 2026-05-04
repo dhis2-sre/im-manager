@@ -36,6 +36,9 @@ push-docker-image:
 dev:
 	docker compose --profile dev up
 
+prod:
+	docker compose --profile prod up
+
 test:
 	go test -race ./...
 

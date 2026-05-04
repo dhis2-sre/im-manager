@@ -153,6 +153,18 @@ func (h helmfileService) configureInstanceEnvironment(ctx context.Context, acces
 	cmd.Env = h.injectEnv(ctx, cmd.Env, "KUBERNETES_SERVICE_PORT_HTTPS")
 	cmd.Env = h.injectEnv(ctx, cmd.Env, "KUBERNETES_SERVICE_HOST")
 
+	ingressClass, err := discoverIngressClass(ctx, group.Cluster)
+	if err != nil {
+		h.logger.WarnContext(ctx, "Failed to discover ingress class", "error", err)
+	}
+	cmd.Env = append(cmd.Env, fmt.Sprintf("INGRESS_CLASS=%s", ingressClass))
+
+	certIssuer, err := discoverCertIssuer(ctx, group.Cluster)
+	if err != nil {
+		h.logger.WarnContext(ctx, "Failed to discover cert issuer", "error", err)
+	}
+	cmd.Env = append(cmd.Env, fmt.Sprintf("CERT_ISSUER=%s", certIssuer))
+
 	for name, parameter := range instance.Parameters {
 		instanceEnv := fmt.Sprintf("%s=%s", name, parameter.Value)
 		cmd.Env = append(cmd.Env, instanceEnv)

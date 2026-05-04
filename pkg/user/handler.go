@@ -23,11 +23,12 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func NewHandler(logger *slog.Logger, hostname string, sameSiteMode http.SameSite, accessTokenExpirationSeconds int, refreshTokenExpirationSeconds int, refreshTokenRememberMeExpirationSeconds int, publicKey rsa.PublicKey, userService *Service, tokenService tokenService) Handler {
+func NewHandler(logger *slog.Logger, hostname string, sameSiteMode http.SameSite, cookieSecure bool, accessTokenExpirationSeconds int, refreshTokenExpirationSeconds int, refreshTokenRememberMeExpirationSeconds int, publicKey rsa.PublicKey, userService *Service, tokenService tokenService) Handler {
 	return Handler{
 		logger:                                  logger,
 		hostname:                                hostname,
 		sameSiteMode:                            sameSiteMode,
+		cookieSecure:                            cookieSecure,
 		accessTokenExpirationSeconds:            accessTokenExpirationSeconds,
 		refreshTokenExpirationSeconds:           refreshTokenExpirationSeconds,
 		refreshTokenRememberMeExpirationSeconds: refreshTokenRememberMeExpirationSeconds,
@@ -41,6 +42,7 @@ type Handler struct {
 	logger                                  *slog.Logger
 	hostname                                string
 	sameSiteMode                            http.SameSite
+	cookieSecure                            bool
 	accessTokenExpirationSeconds            int
 	refreshTokenExpirationSeconds           int
 	refreshTokenRememberMeExpirationSeconds int
@@ -331,12 +333,12 @@ func (h Handler) RefreshToken(c *gin.Context) {
 
 func (h Handler) setCookies(c *gin.Context, tokens *token.Tokens, rememberMe bool) {
 	c.SetSameSite(h.sameSiteMode)
-	c.SetCookie("accessToken", tokens.AccessToken, h.accessTokenExpirationSeconds, "/", "", true, true)
+	c.SetCookie("accessToken", tokens.AccessToken, h.accessTokenExpirationSeconds, "/", "", h.cookieSecure, true)
 	if rememberMe {
-		c.SetCookie("refreshToken", tokens.RefreshToken, h.refreshTokenRememberMeExpirationSeconds, "/refresh", "", true, true)
-		c.SetCookie("rememberMe", "true", h.refreshTokenRememberMeExpirationSeconds, "/refresh", "", true, true)
+		c.SetCookie("refreshToken", tokens.RefreshToken, h.refreshTokenRememberMeExpirationSeconds, "/refresh", "", h.cookieSecure, true)
+		c.SetCookie("rememberMe", "true", h.refreshTokenRememberMeExpirationSeconds, "/refresh", "", h.cookieSecure, true)
 	} else {
-		c.SetCookie("refreshToken", tokens.RefreshToken, h.refreshTokenExpirationSeconds, "/refresh", "", true, true)
+		c.SetCookie("refreshToken", tokens.RefreshToken, h.refreshTokenExpirationSeconds, "/refresh", "", h.cookieSecure, true)
 	}
 }
 
