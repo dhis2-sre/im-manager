@@ -157,6 +157,7 @@ services:
       - minio:/data
     profiles:
       - dev
+      - prod
 
   minio-bucket:
     image: minio/mc:RELEASE.2023-07-21T20-44-27Z
@@ -174,6 +175,7 @@ services:
         mc mb dev/${S3_BUCKET}"
     profiles:
       - dev
+      - prod
 
 volumes:
   database:

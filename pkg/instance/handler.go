@@ -926,9 +926,16 @@ func (h Handler) Status(c *gin.Context) {
 	c.JSON(http.StatusOK, status)
 }
 
-// UpdateInstance updates an existing deployment instance
+type UpdateInstanceRequest struct {
+	Parameters parameters `json:"parameters"`
+	Public     *bool      `json:"public"`
+}
+
+// UpdateInstance partially updates an existing deployment instance. Only
+// parameters present in the request body are modified; all others are
+// preserved. Public is only changed when provided.
 func (h Handler) UpdateInstance(c *gin.Context) {
-	// swagger:route PUT /deployments/{id}/instance/{instanceId} updateInstance
+	// swagger:route PATCH /deployments/{id}/instance/{instanceId} updateInstance
 	//
 	// Update a Deployment Instance
 	//
@@ -953,7 +960,7 @@ func (h Handler) UpdateInstance(c *gin.Context) {
 		return
 	}
 
-	var request SaveInstanceRequest
+	var request UpdateInstanceRequest
 	if err := handler.DataBinder(c, &request); err != nil {
 		_ = c.Error(err)
 		return

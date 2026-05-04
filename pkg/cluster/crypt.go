@@ -2,7 +2,6 @@ package cluster
 
 import (
 	"fmt"
-	"os"
 
 	filippoioage "filippo.io/age"
 	"github.com/getsops/sops/v3"
@@ -16,16 +15,32 @@ import (
 	"github.com/getsops/sops/v3/version"
 )
 
-func createKeyGroup() ([]sops.KeyGroup, error) {
-	if kmsArn := os.Getenv("SOPS_KMS_ARN"); kmsArn != "" {
-		masterKeys := kms.MasterKeysFromArnString(kmsArn, nil, "")
+type Encryptor struct {
+	KmsArn string
+	AgeKey string
+}
+
+func NewEncryptor(kmsArn, ageKey string) (Encryptor, error) {
+	if (kmsArn == "") == (ageKey == "") {
+		return Encryptor{}, fmt.Errorf("exactly one of SOPS_KMS_ARN or SOPS_AGE_KEY must be set")
+	}
+	return Encryptor{KmsArn: kmsArn, AgeKey: ageKey}, nil
+}
+
+func (e Encryptor) keyGroups() ([]sops.KeyGroup, error) {
+	var keyGroups []sops.KeyGroup
+
+	if e.KmsArn != "" {
+		masterKeys := kms.MasterKeysFromArnString(e.KmsArn, nil, "")
 		var kmsMasterKeys []keys.MasterKey
 		for _, k := range masterKeys {
 			kmsMasterKeys = append(kmsMasterKeys, k)
 		}
-		return []sops.KeyGroup{kmsMasterKeys}, nil
-	} else if ageKey := os.Getenv("SOPS_AGE_KEY"); ageKey != "" {
-		identity, err := filippoioage.ParseX25519Identity(ageKey)
+		keyGroups = append(keyGroups, kmsMasterKeys)
+	}
+
+	if e.AgeKey != "" {
+		identity, err := filippoioage.ParseX25519Identity(e.AgeKey)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse age identity: %w", err)
 		}
@@ -37,10 +52,14 @@ func createKeyGroup() ([]sops.KeyGroup, error) {
 		for _, k := range ageKeys {
 			ageMasterKeys = append(ageMasterKeys, k)
 		}
-		return []sops.KeyGroup{ageMasterKeys}, nil
+		keyGroups = append(keyGroups, ageMasterKeys)
 	}
 
-	return nil, fmt.Errorf("no encryption key provided: set SOPS_KMS_ARN or SOPS_AGE_KEY")
+	if len(keyGroups) == 0 {
+		return nil, fmt.Errorf("no encryption key provided: set SOPS_KMS_ARN or SOPS_AGE_KEY")
+	}
+
+	return keyGroups, nil
 }
 
 func EncryptYaml(data []byte, keyGroups []sops.KeyGroup) ([]byte, error) {

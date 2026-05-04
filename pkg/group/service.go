@@ -97,6 +97,34 @@ func (s *Service) RemoveUser(ctx context.Context, groupName string, userId uint)
 	return s.groupRepository.removeUser(ctx, group, u)
 }
 
+func (s *Service) AddAdminUser(ctx context.Context, groupName string, userId uint) error {
+	group, err := s.Find(ctx, groupName)
+	if err != nil {
+		return err
+	}
+
+	u, err := s.userService.FindById(ctx, userId)
+	if err != nil {
+		return err
+	}
+
+	return s.groupRepository.addAdminUser(ctx, group, u)
+}
+
+func (s *Service) RemoveAdminUser(ctx context.Context, groupName string, userId uint) error {
+	group, err := s.Find(ctx, groupName)
+	if err != nil {
+		return err
+	}
+
+	u, err := s.userService.FindById(ctx, userId)
+	if err != nil {
+		return err
+	}
+
+	return s.groupRepository.removeAdminUser(ctx, group, u)
+}
+
 func (s *Service) FindAll(ctx context.Context, user *model.User, deployable bool) ([]model.Group, error) {
 	return s.groupRepository.findAll(ctx, user, deployable)
 }

@@ -122,7 +122,7 @@ type _ struct {
 	// Update instance request body parameter
 	// in: body
 	// required: true
-	Payload SaveInstanceRequest
+	Payload UpdateInstanceRequest
 }
 
 // swagger:parameters updateDeployment

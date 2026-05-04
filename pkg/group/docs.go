@@ -10,7 +10,7 @@ type _ struct {
 	Body CreateGroupRequest
 }
 
-// swagger:parameters addUserToGroup removeUserFromGroup
+// swagger:parameters addUserToGroup removeUserFromGroup addAdminUserToGroup removeAdminUserFromGroup
 type _ struct {
 	// in: path
 	// required: true

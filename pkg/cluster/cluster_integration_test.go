@@ -26,12 +26,14 @@ func TestClusterHandler(t *testing.T) {
 	userService := user.NewService("", 900, userRepository, fakeDialer{})
 
 	clusterRepository := cluster.NewRepository(db)
-	clusterService := cluster.NewService(clusterRepository)
 
 	identity, err := filippoioage.GenerateX25519Identity()
 	require.NoError(t, err, "failed to generate age key pair")
 
-	t.Setenv("SOPS_AGE_KEY", identity.String())
+	encryptor, err := cluster.NewEncryptor("", identity.String())
+	require.NoError(t, err)
+
+	clusterService := cluster.NewService(clusterRepository, encryptor)
 
 	groupRepository := group.NewRepository(db)
 	groupService := group.NewService(groupRepository, userService, clusterService)

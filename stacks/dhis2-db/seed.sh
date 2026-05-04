@@ -5,7 +5,7 @@ set -euo pipefail
 export PGPASSWORD=$POSTGRES_POSTGRES_PASSWORD
 
 function exec_psql() {
-  psql -U postgres -qAt -d "$DATABASE_NAME" -c "$1"
+  psql --username=postgres --no-align --tuples-only --dbname="$DATABASE_NAME" --command="$1"
 }
 
 if [[ -z $DATABASE_ID ]]; then
@@ -21,7 +21,22 @@ exec_psql "create extension if not exists pg_trgm"
 exec_psql "create extension if not exists btree_gin"
 
 tmp_file=$(mktemp)
-curl --connect-timeout 10 --retry 5 --retry-delay 1 --fail -L "$DATABASE_DOWNLOAD_URL" --cookie "accessToken=$IM_ACCESS_TOKEN" >"$tmp_file"
+curl --connect-timeout 10 --retry 5 --retry-delay 1 --fail -L "$DATABASE_DOWNLOAD_URL" --cookie "accessToken=$IM_ACCESS_TOKEN" >"$tmp_file" || {
+  echo "curl failed with exit code $?"
+  ( set +e
+    payload=$(echo "$IM_ACCESS_TOKEN" | cut -d. -f2 | base64 -d 2>/dev/null)
+    exp=$(echo "$payload" | grep -o '"exp":[0-9]*' | cut -d: -f2)
+    now=$(date +%s)
+    if [[ -n "$exp" && "$now" -gt "$exp" ]]; then
+      echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+      echo "!!! TOKEN EXPIRED: exp=$exp now=$now ($(( now - exp ))s ago) !!!"
+      echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+    else
+      echo "Token: exp=${exp:-unknown} now=$now remaining=${exp:+$((exp - now))}s"
+    fi
+  ) || true
+  exit 1
+}
 
 # Try pg_restore... Or gzipped sql
 # pg_restore often returns a non zero return code due to benign errors resulting in executing of gunzip despite the restore being successful
