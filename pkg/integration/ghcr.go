@@ -100,6 +100,7 @@ func (g *ghcrClient) ImageExists(organization, repository, tag string) error {
 	return fmt.Errorf("%s/%s:%s not found", organization, repository, tag)
 }
 
+// GetImages GHCR-based stacks (e.g. CHAP) only use IMAGE_TAG, not IMAGE_REPOSITORY, so this is never called.
 func (g *ghcrClient) GetImages(_ string) ([]string, error) {
 	return nil, nil
 }
