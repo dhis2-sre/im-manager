@@ -47,6 +47,10 @@ func TestStackDefinitionsAreInSyncWithHelmfile(t *testing.T) {
 		"pgadmin":       PgAdmin.Parameters,
 		"whoami-go":     WhoamiGo.Parameters,
 		"im-job-runner": IMJobRunner.Parameters,
+		"chap-db":       ChapDB.Parameters,
+		"chap-valkey":   ChapValkey.Parameters,
+		"chap-worker":   ChapWorker.Parameters,
+		"chap-core":     ChapCore.Parameters,
 	}
 	stackDefinitions := make(map[string]model.StackParameters)
 	for stackName, stackParameters := range stacks {

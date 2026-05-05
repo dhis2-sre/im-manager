@@ -103,6 +103,8 @@ ingress:
     nginx.ingress.kubernetes.io/client-body-buffer-size: "10m"
     # Increase the proxy response buffer size to fix the response headers limit issue.
     nginx.ingress.kubernetes.io/proxy-buffer-size: "16k"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
 
 resources: {}
   # We usually recommend not to specify default resources and to leave this as a conscious
