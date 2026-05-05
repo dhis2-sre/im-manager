@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-
 	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
 	awss3 "github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
@@ -20,6 +19,7 @@ import (
 	"github.com/dhis2-sre/im-manager/pkg/inttest"
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	"github.com/dhis2-sre/im-manager/pkg/storage"
+	userpkg "github.com/dhis2-sre/im-manager/pkg/user"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -61,17 +61,7 @@ func TestDatabaseHandler(t *testing.T) {
 
 	var userID uint
 	{
-		group := &model.Group{
-			Name:     "group-name",
-			Hostname: "some",
-		}
-		user := &model.User{
-			Email: "user1@dhis2.org",
-			Groups: []model.Group{
-				*group,
-			},
-		}
-		db.Create(user)
+		user, _ := userpkg.CreateUserWithGroup(t, db, "group-name", "some", "", "user1@dhis2.org")
 		userID = user.ID
 	}
 
@@ -269,6 +259,7 @@ func TestDatabaseHandler(t *testing.T) {
 		var e *types.NoSuchKey
 		require.ErrorAsf(t, err, &e, "DELETE \"/databases/%s\" failed: DB should be deleted from S3", databaseID)
 	}
+
 }
 
 type groupService struct {
@@ -277,7 +268,8 @@ type groupService struct {
 
 func (gs groupService) Find(ctx context.Context, name string) (*model.Group, error) {
 	return &model.Group{
-		Name: gs.groupName,
+		Name:      gs.groupName,
+		Namespace: "ns",
 	}, nil
 }
 
