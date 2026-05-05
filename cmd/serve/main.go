@@ -250,9 +250,9 @@ func run() (err error) {
 	event.Routes(r, authentication.TokenAuthentication, eventHandler)
 
 	logger.InfoContext(ctx, "Listening and serving HTTP")
-	//	if err := r.Run(); err != nil {
-	//		return fmt.Errorf("failed to start the HTTP server: %v", err)
-	//	}
+	if err := r.Run(); err != nil {
+		return fmt.Errorf("failed to start the HTTP server: %v", err)
+	}
 	server := &http.Server{
 		Addr:         ":8080",
 		Handler:      r,
