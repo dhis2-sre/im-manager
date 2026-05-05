@@ -50,9 +50,9 @@ func UploadTestDatabase(t *testing.T, client *inttest.HTTPClient, name, content,
 
 	body := client.Put(t, "/databases", &buffer, http.StatusCreated, baseHeaders...)
 
-	var actualDB model.Database
-	err = json.Unmarshal(body, &actualDB)
+	var database model.Database
+	err = json.Unmarshal(body, &database)
 	require.NoError(t, err, "failed to unmarshal database response")
 
-	return strconv.FormatUint(uint64(actualDB.ID), 10)
+	return strconv.FormatUint(uint64(database.ID), 10)
 }
