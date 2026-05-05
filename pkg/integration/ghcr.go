@@ -26,6 +26,10 @@ func (g *ghcrClient) getToken(organization, repository string) (string, error) {
 	}
 	defer response.Body.Close()
 
+	if response.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("ghcr token request failed with status %d", response.StatusCode)
+	}
+
 	b, err := io.ReadAll(response.Body)
 	if err != nil {
 		return "", err
@@ -59,6 +63,10 @@ func (g *ghcrClient) GetTags(organization, repository string) ([]string, error) 
 		return nil, err
 	}
 	defer response.Body.Close()
+
+	if response.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("ghcr tags request failed with status %d", response.StatusCode)
+	}
 
 	b, err := io.ReadAll(response.Body)
 	if err != nil {
