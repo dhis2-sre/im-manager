@@ -109,18 +109,16 @@ var chapWorkerDefaults = struct {
 var ChapCore = model.Stack{
 	Name: "chap-core",
 	Parameters: model.StackParameters{
-		"IMAGE_TAG":                          {Priority: 1, DisplayName: "Image Tag", DefaultValue: &chapCoreDefaults.imageTag},
-		"IMAGE_PULL_POLICY":                  {Priority: 2, DisplayName: "Image Pull Policy", DefaultValue: &chapCoreDefaults.imagePullPolicy, Validator: imagePullPolicy},
-		"CHART_VERSION":                      {Priority: 3, DisplayName: "Chart Version", DefaultValue: &chapCoreDefaults.chartVersion},
-		"GOOGLE_SERVICE_ACCOUNT_EMAIL":       {Priority: 4, DisplayName: "Google Service Account Email", DefaultValue: &chapCoreDefaults.googleServiceAccountEmail, Sensitive: true},
-		"GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY": {Priority: 5, DisplayName: "Google Service Account Key", DefaultValue: &chapCoreDefaults.googleServiceAccountPrivateKey, Sensitive: true},
-		"DHIS2_USERNAME":                     {Priority: 6, DisplayName: "DHIS2 Username", DefaultValue: &chapCoreDefaults.dhis2Username},
-		"DHIS2_PASSWORD":                     {Priority: 7, DisplayName: "DHIS2 Password", DefaultValue: &chapCoreDefaults.dhis2Password, Sensitive: true},
-		"DATABASE_HOSTNAME":                  {Priority: 0, DisplayName: "Database Hostname", Consumed: true},
-		"DATABASE_SECRET":                    {Priority: 0, DisplayName: "Database Secret", Consumed: true},
-		"DATABASE_NAME":                      {Priority: 0, DisplayName: "Database Name", Consumed: true},
-		"REDIS_HOST":                         {Priority: 0, DisplayName: "Redis Host", Consumed: true},
-		"REDIS_SECRET":                       {Priority: 0, DisplayName: "Redis Secret", Consumed: true},
+		"IMAGE_TAG":         {Priority: 1, DisplayName: "Image Tag", DefaultValue: &chapCoreDefaults.imageTag},
+		"IMAGE_PULL_POLICY": {Priority: 2, DisplayName: "Image Pull Policy", DefaultValue: &chapCoreDefaults.imagePullPolicy, Validator: imagePullPolicy},
+		"CHART_VERSION":     {Priority: 3, DisplayName: "Chart Version", DefaultValue: &chapCoreDefaults.chartVersion},
+		"DHIS2_USERNAME":    {Priority: 6, DisplayName: "DHIS2 Username", DefaultValue: &chapCoreDefaults.dhis2Username},
+		"DHIS2_PASSWORD":    {Priority: 7, DisplayName: "DHIS2 Password", DefaultValue: &chapCoreDefaults.dhis2Password, Sensitive: true},
+		"DATABASE_HOSTNAME": {Priority: 0, DisplayName: "Database Hostname", Consumed: true},
+		"DATABASE_SECRET":   {Priority: 0, DisplayName: "Database Secret", Consumed: true},
+		"DATABASE_NAME":     {Priority: 0, DisplayName: "Database Name", Consumed: true},
+		"REDIS_HOST":        {Priority: 0, DisplayName: "Redis Host", Consumed: true},
+		"REDIS_SECRET":      {Priority: 0, DisplayName: "Redis Secret", Consumed: true},
 	},
 	Requires:           []model.Stack{ChapDB, ChapValkey},
 	Companions:         []model.Stack{ChapWorker},
@@ -128,19 +126,15 @@ var ChapCore = model.Stack{
 }
 
 var chapCoreDefaults = struct {
-	chartVersion                   string
-	imageTag                       string
-	imagePullPolicy                string
-	googleServiceAccountEmail      string
-	googleServiceAccountPrivateKey string
-	dhis2Username                  string
-	dhis2Password                  string
+	chartVersion    string
+	imageTag        string
+	imagePullPolicy string
+	dhis2Username   string
+	dhis2Password   string
 }{
-	chartVersion:                   "0.1.9",
-	imageTag:                       "latest",
-	imagePullPolicy:                always,
-	googleServiceAccountEmail:      " ",
-	googleServiceAccountPrivateKey: " ",
-	dhis2Username:                  "system",
-	dhis2Password:                  "System123",
+	chartVersion:    "0.1.10",
+	imageTag:        "latest",
+	imagePullPolicy: always,
+	dhis2Username:   "system",
+	dhis2Password:   "System123",
 }
