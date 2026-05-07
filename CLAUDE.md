@@ -19,6 +19,7 @@ go test ./pkg/token/... -run TestRefreshAccessToken   # single test
 make check            # pre-commit: goimports, go-mod-tidy, golangci-lint, swagger validation, commitizen
 make swagger          # regenerate swagger/swagger.yaml from code annotations
 make keys             # generate the RSA private key required by .env's PRIVATE_KEY
+skaffold run -p dev   # run im-manager + deps via skaffold (dev profile)
 ```
 
 `make test` runs everything together — `*_integration_test.go` files have **no build tag**. They use `pkg/inttest` which
