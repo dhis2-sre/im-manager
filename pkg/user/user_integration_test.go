@@ -61,7 +61,7 @@ func TestUserHandler(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	redis := inttest.SetupRedis(t)
 	tokenRepository := token.NewRepository(redis)
-	tokenService, err := token.NewService(logger, tokenRepository, key, 10, "secret", 20, 30)
+	tokenService, err := token.NewService(logger, tokenRepository, key, 10, 5, "secret", 20, 30)
 	require.NoError(t, err)
 
 	client := inttest.SetupHTTPServer(t, func(engine *gin.Engine) {

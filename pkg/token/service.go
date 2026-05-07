@@ -22,6 +22,7 @@ func NewService(
 	tokenRepository repository,
 	privateKey *rsa.PrivateKey,
 	accessTokenExpirationSeconds int,
+	refreshAccessTokenExpirationSeconds int,
 	refreshTokenSecretKey string,
 	refreshTokenExpirationSeconds int,
 	refreshTokenRememberMeExpirationSeconds int,
@@ -31,6 +32,7 @@ func NewService(
 		repository:                              tokenRepository,
 		privateKey:                              privateKey,
 		accessTokenExpirationSeconds:            accessTokenExpirationSeconds,
+		refreshAccessTokenExpirationSeconds:     refreshAccessTokenExpirationSeconds,
 		refreshTokenSecretKey:                   refreshTokenSecretKey,
 		refreshTokenExpirationSeconds:           refreshTokenExpirationSeconds,
 		refreshTokenRememberMeExpirationSeconds: refreshTokenRememberMeExpirationSeconds,
@@ -63,6 +65,7 @@ type TokenService struct {
 	repository                              repository
 	privateKey                              *rsa.PrivateKey
 	accessTokenExpirationSeconds            int
+	refreshAccessTokenExpirationSeconds     int
 	refreshTokenSecretKey                   string
 	refreshTokenExpirationSeconds           int
 	refreshTokenRememberMeExpirationSeconds int
@@ -127,5 +130,5 @@ func (t TokenService) SignOut(userId uint) error {
 }
 
 func (t TokenService) RefreshAccessToken(accessToken string) (string, error) {
-	return helper.RefreshAccessToken(accessToken, t.privateKey)
+	return helper.RefreshAccessToken(accessToken, t.privateKey, t.refreshAccessTokenExpirationSeconds)
 }
