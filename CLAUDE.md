@@ -81,14 +81,7 @@ recovery mechanism.
 
 ## Release
 
-Tag-driven (`v*.*.*`). Generate the changelog first:
-
-```bash
-git tag v0.X.0
-make change-log
-git commit CHANGELOG.md -m "chore: generate change log"
-git push --tags
-```
+See [README.md#release](README.md#release) for release steps.
 
 GitHub Actions (`.github/workflows/build-test-deploy.yaml`) delegates to a reusable workflow in
 `dhis2-sre/gha-workflows` for image build + deploy. PR events deploy a feature env into the `instance-manager-feature`
