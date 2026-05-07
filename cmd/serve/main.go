@@ -137,7 +137,7 @@ func run() (err error) {
 	if err != nil {
 		return err
 	}
-	tokenService, err := token.NewService(logger, tokenRepository, privateKey, authConfig.AccessTokenExpirationSeconds, authConfig.RefreshTokenSecretKey, authConfig.RefreshTokenExpirationSeconds, authConfig.RefreshTokenRememberMeExpirationSeconds)
+	tokenService, err := token.NewService(logger, tokenRepository, privateKey, authConfig.AccessTokenExpirationSeconds, authConfig.RefreshAccessTokenExpirationSeconds, authConfig.RefreshTokenSecretKey, authConfig.RefreshTokenExpirationSeconds, authConfig.RefreshTokenRememberMeExpirationSeconds)
 	if err != nil {
 		return err
 	}
@@ -360,6 +360,7 @@ type authenticationConfig struct {
 	CookieSecure                            bool
 	RefreshTokenSecretKey                   string
 	AccessTokenExpirationSeconds            int
+	RefreshAccessTokenExpirationSeconds     int
 	RefreshTokenExpirationSeconds           int
 	RefreshTokenRememberMeExpirationSeconds int
 }
@@ -374,6 +375,10 @@ func newAuthenticationConfig() (authenticationConfig, error) {
 		return authenticationConfig{}, err
 	}
 	accessTokenExpirationSeconds, err := requireEnvAsInt("ACCESS_TOKEN_EXPIRATION_IN_SECONDS")
+	if err != nil {
+		return authenticationConfig{}, err
+	}
+	refreshAccessTokenExpirationSeconds, err := requireEnvAsInt("REFRESH_ACCESS_TOKEN_EXPIRATION_IN_SECONDS")
 	if err != nil {
 		return authenticationConfig{}, err
 	}
@@ -393,6 +398,7 @@ func newAuthenticationConfig() (authenticationConfig, error) {
 		CookieSecure:                            cookieSecure,
 		RefreshTokenSecretKey:                   refreshTokenSecretKey,
 		AccessTokenExpirationSeconds:            accessTokenExpirationSeconds,
+		RefreshAccessTokenExpirationSeconds:     refreshAccessTokenExpirationSeconds,
 		RefreshTokenExpirationSeconds:           refreshTokenExpirationSeconds,
 		RefreshTokenRememberMeExpirationSeconds: refreshTokenRememberMeExpirationSeconds,
 	}, nil
