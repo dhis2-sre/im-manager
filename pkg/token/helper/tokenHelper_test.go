@@ -74,31 +74,33 @@ func TestRefreshAccessToken(t *testing.T) {
 		Email: "test@example.com",
 	}
 
+	const refreshExpiration = 60
+
 	t.Run("Long expiration time", func(t *testing.T) {
 		t.Parallel()
-		t.Log("Token with remaining time > 60 seconds, should return the same token")
+		t.Log("Token with remaining time > refresh expiration, should return the same token")
 
 		expirationTime, err := GenerateAccessToken(user, key, 120)
 		require.NoError(t, err)
-		refreshed, err := RefreshAccessToken(expirationTime, key)
+		refreshed, err := RefreshAccessToken(expirationTime, key, refreshExpiration)
 		assert.NoError(t, err)
 		assert.Equal(t, expirationTime, refreshed)
 	})
 
 	t.Run("Short expiration time", func(t *testing.T) {
 		t.Parallel()
-		t.Log("Token with remaining time <= 60 seconds, should generate a new token")
+		t.Log("Token with remaining time <= refresh expiration, should generate a new token")
 
 		expirationTime, err := GenerateAccessToken(user, key, 30)
 		require.NoError(t, err)
-		refreshed, err := RefreshAccessToken(expirationTime, key)
+		refreshed, err := RefreshAccessToken(expirationTime, key, refreshExpiration)
 		assert.NoError(t, err)
 		assert.NotEqual(t, expirationTime, refreshed)
 
-		t.Log("Verify the new token has an expiration close to 60 seconds from now")
+		t.Log("Verify the new token has an expiration close to the refresh expiration from now")
 		_, exp, err := ValidateAccessToken(refreshed, &key.PublicKey)
 		require.NoError(t, err)
 		now := time.Now().Unix()
-		assert.True(t, exp-now <= 60 && exp-now > 50, "new token expiration should be around 60 seconds")
+		assert.True(t, exp-now <= refreshExpiration && exp-now > refreshExpiration-10, "new token expiration should be around %d seconds", refreshExpiration)
 	})
 }
