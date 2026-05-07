@@ -55,6 +55,12 @@ jobs:
 
           ORPHANED_COUNT=$(grep 'Orphaned Deployments only in Helm' /tmp/find-helm-releases-output | grep --only-matching --regexp='[0-9]\+' || echo "0")
           echo "orphaned_count=$ORPHANED_COUNT" >> $GITHUB_OUTPUT
+
+          {
+            echo "orphaned_list<<ORPHANS_EOF"
+            sed -n '/^Orphaned Deployments only in Helm/,/^$/p' /tmp/find-helm-releases-output | sed '$d'
+            echo "ORPHANS_EOF"
+          } >> $GITHUB_OUTPUT
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -70,6 +76,10 @@ jobs:
 
             ${{ steps.find-orphaned-releases.outputs.orphaned_count }} orphaned deployment(s) detected.
 
-            View details and uninstall commands in the GitHub Actions logs (step: "Find orphaned Helm Releases"):
+            ```
+            ${{ steps.find-orphaned-releases.outputs.orphaned_list }}
+            ```
+
+            View uninstall commands in the GitHub Actions logs (step: "Find orphaned Helm Releases"):
             https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
           SLACK_COLOR: 'failure'
