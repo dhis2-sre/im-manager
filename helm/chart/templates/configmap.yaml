@@ -12,6 +12,7 @@ data:
 {{- end }}
   SAME_SITE_MODE: {{ .Values.sameSiteMode }}
   ACCESS_TOKEN_EXPIRATION_IN_SECONDS: {{ .Values.accessTokenExpirationInSeconds | quote }}
+  REFRESH_ACCESS_TOKEN_EXPIRATION_IN_SECONDS: {{ .Values.refreshAccessTokenExpirationInSeconds | quote }}
   REFRESH_TOKEN_EXPIRATION_IN_SECONDS: {{ .Values.refreshTokenExpirationInSeconds | quote }}
   REFRESH_TOKEN_REMEMBER_ME_EXPIRATION_IN_SECONDS: {{ .Values.refreshTokenRememberMeExpirationInSeconds | quote }}
 

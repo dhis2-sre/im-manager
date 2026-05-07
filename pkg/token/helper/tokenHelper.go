@@ -132,18 +132,17 @@ func ValidateRefreshToken(tokenString string, secretKey string) (*refreshTokenCl
 	}, nil
 }
 
-func RefreshAccessToken(token string, privateKey *rsa.PrivateKey) (string, error) {
+func RefreshAccessToken(token string, privateKey *rsa.PrivateKey, newExpirationInSeconds int) (string, error) {
 	user, exp, err := ValidateAccessToken(token, &privateKey.PublicKey)
 	if err != nil {
 		return "", err
 	}
 
 	remaining := exp - time.Now().Unix()
-	if remaining > 60 {
+	if remaining > int64(newExpirationInSeconds) {
 		return token, nil
 	}
 
-	newExpirationInSeconds := 60
 	return GenerateAccessToken(user, privateKey, newExpirationInSeconds)
 }
 
