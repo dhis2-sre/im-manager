@@ -1,6 +1,6 @@
 FROM golang:1.26.2-alpine3.23 AS build
 
-ARG TARGETARCH
+ARG TARGETARCH=amd64
 
 # https://kubernetes.io/docs/tasks/tools/install-kubectl-linux/
 ARG KUBECTL_VERSION=v1.33.3
