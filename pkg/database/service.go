@@ -395,9 +395,7 @@ func (s service) updateFS(ctx context.Context, d *model.Database) error {
 		return err
 	}
 
-	d.Url = fmt.Sprintf("s3://%s/%s", s.s3Bucket, destination)
-
-	updateSlug(d)
+	fs.Url = fmt.Sprintf("s3://%s/%s", s.s3Bucket, destination)
 
 	return s.repository.Update(ctx, fs)
 }

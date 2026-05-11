@@ -94,6 +94,20 @@ git commit CHANGELOG.md -m "chore: generate change log"
 git push
 ```
 
+# Migrations
+
+Schema changes are handled by GORM's `AutoMigrate` in `pkg/storage/postgresql.go`. Data migrations — including backfilling new stack parameters into existing instances — use `go-gormigrate/gormigrate` and live in `pkg/storage/migrations/`.
+
+When to add a migration:
+- A new stack parameter is added to `pkg/stack/` — existing instances won't have it, so backfill the default value
+- A model field is renamed or removed — data in existing rows may need to be transformed
+- Any change that leaves existing database rows in an inconsistent state relative to the new code
+
+How to add a migration:
+1. Create `pkg/storage/migrations/<timestamp>_<description>.go` with a single function returning `*gormigrate.Migration`
+2. Add it to the slice in `pkg/storage/migrations/migrations.go`
+3. Use a timestamp ID in the format `YYYYMMDDNNN` (e.g. `20260511000`)
+
 # Add a group
 
 * Add group in IM (either through the UI or by using the user script found [here](scripts/users/createGroup.sh)

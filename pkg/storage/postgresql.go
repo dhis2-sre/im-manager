@@ -5,6 +5,8 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/dhis2-sre/im-manager/pkg/storage/migrations"
+	"github.com/go-gormigrate/gormigrate/v2"
 	"github.com/uptrace/opentelemetry-go-extra/otelgorm"
 
 	"github.com/dhis2-sre/im-manager/pkg/model"
@@ -76,6 +78,11 @@ func NewDatabase(logger *slog.Logger, c PostgresqlConfig) (*gorm.DB, error) {
 	err = db.Exec("CREATE EXTENSION IF NOT EXISTS pg_trgm").Error
 	if err != nil {
 		return nil, fmt.Errorf("failed to create pg_trgm extension: %v", err)
+	}
+
+	m := gormigrate.New(db, gormigrate.DefaultOptions, migrations.All())
+	if err := m.Migrate(); err != nil {
+		return nil, fmt.Errorf("failed to run migrations: %w", err)
 	}
 
 	// GORM Doesn't handle the creation of gin indexes very well so the index is created manually here
