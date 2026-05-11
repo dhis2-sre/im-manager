@@ -97,6 +97,10 @@ definitions:
         x-go-package: github.com/dhis2-sre/im-manager/pkg/database
     CreateGroupRequest:
         properties:
+            clusterId:
+                format: uint64
+                type: integer
+                x-go-name: ClusterID
             deployable:
                 type: boolean
                 x-go-name: Deployable

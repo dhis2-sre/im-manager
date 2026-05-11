@@ -27,6 +27,7 @@ type CreateGroupRequest struct {
 	Description string `json:"description" binding:"required"`
 	Hostname    string `json:"hostname" binding:"required"`
 	Deployable  bool   `json:"deployable"`
+	ClusterID   *uint  `json:"clusterId"`
 }
 
 // Create group
@@ -53,7 +54,7 @@ func (h Handler) Create(c *gin.Context) {
 		return
 	}
 
-	group, err := h.groupService.Create(c.Request.Context(), request.Name, request.Namespace, request.Description, request.Hostname, request.Deployable)
+	group, err := h.groupService.Create(c.Request.Context(), request.Name, request.Namespace, request.Description, request.Hostname, request.Deployable, request.ClusterID)
 	if err != nil {
 		_ = c.Error(err)
 		return
