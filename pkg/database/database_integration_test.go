@@ -159,6 +159,33 @@ func TestDatabaseHandler(t *testing.T) {
 	})
 
 	t.Run("Update", func(t *testing.T) {
+		var filestoreID string
+		{
+			t.Log("Setup filestore")
+
+			_, err := s3.Client.PutObject(context.TODO(), &awss3.PutObjectInput{
+				Bucket: aws.String(s3Bucket),
+				Key:    aws.String("packages/path/name-fs.tar.gz"),
+				Body:   strings.NewReader("filestore contents"),
+			})
+			require.NoError(t, err)
+
+			filestoreRecord := &model.Database{
+				Name:      "path/name-fs.tar.gz",
+				GroupName: "packages",
+				Url:       "s3://database-bucket/packages/path/name-fs.tar.gz",
+				Type:      "fs",
+				UserID:    userID,
+			}
+			require.NoError(t, db.Create(filestoreRecord).Error)
+
+			dbID, err := strconv.ParseUint(databaseID, 10, 64)
+			require.NoError(t, err)
+			require.NoError(t, db.Model(&model.Database{}).Where("id = ?", dbID).Update("filestore_id", filestoreRecord.ID).Error)
+
+			filestoreID = strconv.FormatUint(uint64(filestoreRecord.ID), 10)
+		}
+
 		{
 			t.Log("Update")
 
@@ -173,6 +200,13 @@ func TestDatabaseHandler(t *testing.T) {
 
 			actualContent := s3.GetObject(t, s3Bucket, "packages/path/rename.extension")
 			require.Equalf(t, "file contents", string(actualContent), "DB in S3 should have expected content")
+		}
+
+		{
+			t.Log("Filestore download after rename")
+
+			actualContent := client.Get(t, "/databases/"+filestoreID+"/download")
+			require.Equal(t, "filestore contents", string(actualContent))
 		}
 
 		{
