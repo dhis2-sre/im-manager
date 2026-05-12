@@ -130,6 +130,9 @@ profiles:
   - name: dev
     patches:
       - op: add
+        path: /deploy/helm/releases/4/setValueTemplates/corsAllowOrigins/-
+        value: "https://*.im-feat.dhis2.org"
+      - op: add
         path: /deploy/helm/releases/-
         value:
           name: im-group-dev-dev

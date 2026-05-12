@@ -20,6 +20,7 @@ func GetEngine(logger *slog.Logger, basePath string, allowedOrigins []string) (*
 	corsConfig := cors.DefaultConfig()
 	// Without specifying origins, secure cookies won't work
 	corsConfig.AllowOrigins = allowedOrigins
+	corsConfig.AllowWildcard = true
 	corsConfig.AllowCredentials = true
 	corsConfig.AddAllowHeaders("authorization", "X-Upload-Group", "X-Upload-Name", "X-Upload-Description")
 	corsConfig.AddExposeHeaders("Content-Disposition")
