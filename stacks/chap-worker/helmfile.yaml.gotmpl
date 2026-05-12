@@ -1,0 +1,33 @@
+# consumedParameters: DATABASE_HOSTNAME,DATABASE_NAME,DATABASE_SECRET,REDIS_HOST,REDIS_SECRET
+helmDefaults:
+  deleteWait: true
+
+releases:
+  - name: "{{ requiredEnv "INSTANCE_NAME" }}-chap-worker"
+    namespace: "{{ requiredEnv "INSTANCE_NAMESPACE" }}"
+    chart: chap/chap-worker
+    version: "{{ requiredEnv "CHART_VERSION" }}"
+    values:
+      - image:
+          tag: "{{ requiredEnv "IMAGE_TAG" }}"
+          pullPolicy: {{ requiredEnv "IMAGE_PULL_POLICY" }}
+      - postgres:
+          host: "{{ requiredEnv "DATABASE_HOSTNAME" }}"
+          database: {{ requiredEnv "DATABASE_NAME" }}
+          existingSecret: "{{ requiredEnv "DATABASE_SECRET" }}"
+      - valkey:
+          host: "{{ requiredEnv "REDIS_HOST" }}"
+          existingSecret: "{{ requiredEnv "REDIS_SECRET" }}"
+      - commonLabels:
+          im: "true"
+          im-default: "true"
+          im-deployment-id: "{{ requiredEnv "DEPLOYMENT_ID" }}"
+          im-instance-id: "{{ requiredEnv "INSTANCE_ID" }}"
+          im-id: "{{ requiredEnv "INSTANCE_ID" }}"
+          im-type: "chap-worker"
+          im-creation-timestamp: "{{ requiredEnv "INSTANCE_CREATION_TIMESTAMP" }}"
+          im-ttl: "{{ requiredEnv "INSTANCE_TTL" }}"
+
+repositories:
+  - name: chap
+    url: https://dhis2-chap.github.io/chap-core/

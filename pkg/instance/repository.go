@@ -63,7 +63,7 @@ func (r repository) SaveDeployment(ctx context.Context, deployment *model.Deploy
 	// cancellation can lead to rollbacks which we should decide individually.
 	ctx = context.WithoutCancel(ctx)
 
-	err := r.db.WithContext(ctx).Create(&deployment).Error
+	err := r.db.WithContext(ctx).Save(&deployment).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrDuplicatedKey) {
 			return errdef.NewDuplicated("a deployment named %q already exists", deployment.Name)
@@ -81,6 +81,7 @@ func (r repository) FindDeploymentById(ctx context.Context, id uint) (*model.Dep
 		Joins("Group").
 		Joins("User").
 		Preload("Instances.GormParameters").
+		Preload("Instances.Group").
 		First(&deployment, id).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -96,7 +97,7 @@ func (r repository) FindDeploymentInstanceById(ctx context.Context, id uint) (*m
 	var instance *model.DeploymentInstance
 	err := r.db.
 		WithContext(ctx).
-		Joins("Group").
+		Joins("Group.Cluster").
 		Preload("GormParameters").
 		First(&instance, id).Error
 	if err != nil {
@@ -175,6 +176,7 @@ func (r repository) FindDeployments(ctx context.Context, groupNames []string) ([
 		Joins("Group").
 		Joins("User").
 		Preload("Instances").
+		Preload("Instances.Lock").
 		Order("updated_at desc").
 		Find(&deployments).Error
 
@@ -217,6 +219,20 @@ func (r repository) RecordBackup(ctx context.Context, database *model.Database) 
 
 func (r repository) SaveDatabase(ctx context.Context, database *model.Database) error {
 	return r.db.WithContext(ctx).Save(&database).Error
+}
+
+func (r repository) FindAllDeployments(ctx context.Context) ([]model.Deployment, error) {
+	var deployments []model.Deployment
+	err := r.db.WithContext(ctx).
+		Preload("Instances").
+		Find(&deployments).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return []model.Deployment{}, nil
+		}
+		return nil, fmt.Errorf("failed to find deployments: %v", err)
+	}
+	return deployments, err
 }
 
 func encryptParameters(key string, instance *model.DeploymentInstance, stack *model.Stack) error {

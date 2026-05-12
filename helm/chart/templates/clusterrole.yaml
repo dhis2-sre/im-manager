@@ -18,10 +18,46 @@ rules:
     verbs:
       - list
   - apiGroups:
+      - ""
+    resources:
+      - pods/exec
+    verbs:
+      - create
+# For getting resources
+  - apiGroups:
+      - ""
+    resources:
+      - nodes
+    verbs:
+      - list
+  - apiGroups:
+      - metrics.k8s.io
+    resources:
+      - nodes
+    verbs:
+      - list
+  - apiGroups:
       - policy
     resources:
       - poddisruptionbudgets
     verbs:
       - get
       - create
+      - patch
       - delete
+  - apiGroups:
+      - networking.k8s.io
+    resources:
+      - networkpolicies
+    verbs:
+      - patch
+# KEDA
+  - apiGroups:
+      - http.keda.sh
+    resources:
+      - httpscaledobjects
+    verbs:
+      - get
+      - create
+      - delete
+      - patch

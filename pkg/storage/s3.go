@@ -1,7 +1,9 @@
 package storage
 
 import (
+	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -11,6 +13,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
+	smithy "github.com/aws/smithy-go"
+	"github.com/dhis2-sre/im-manager/internal/errdef"
 )
 
 func NewS3Client(logger *slog.Logger, client AWSS3Client, uploader AWSS3Uploader) *S3Client {
@@ -31,6 +35,10 @@ type AWSS3Client interface {
 	CopyObject(ctx context.Context, params *s3.CopyObjectInput, optFns ...func(*s3.Options)) (*s3.CopyObjectOutput, error)
 	DeleteObject(ctx context.Context, params *s3.DeleteObjectInput, optFns ...func(*s3.Options)) (*s3.DeleteObjectOutput, error)
 	GetObject(ctx context.Context, params *s3.GetObjectInput, optFns ...func(*s3.Options)) (*s3.GetObjectOutput, error)
+	CreateMultipartUpload(ctx context.Context, params *s3.CreateMultipartUploadInput, optFns ...func(*s3.Options)) (*s3.CreateMultipartUploadOutput, error)
+	UploadPart(ctx context.Context, params *s3.UploadPartInput, optFns ...func(*s3.Options)) (*s3.UploadPartOutput, error)
+	CompleteMultipartUpload(ctx context.Context, params *s3.CompleteMultipartUploadInput, optFns ...func(*s3.Options)) (*s3.CompleteMultipartUploadOutput, error)
+	AbortMultipartUpload(ctx context.Context, params *s3.AbortMultipartUploadInput, optFns ...func(*s3.Options)) (*s3.AbortMultipartUploadOutput, error)
 }
 
 type AWSS3Uploader interface {
@@ -108,6 +116,14 @@ func (s S3Client) Download(ctx context.Context, bucket string, key string, dst i
 		Key:    aws.String(key),
 	})
 	if err != nil {
+		var noBucket *types.NoSuchBucket
+		var noKey *types.NoSuchKey
+		if errors.As(err, &noBucket) {
+			return errdef.NewNotFound("bucket %q does not exist", bucket)
+		}
+		if errors.As(err, &noKey) {
+			return errdef.NewNotFound("key %q not found in bucket %q", key, bucket)
+		}
 		return fmt.Errorf("error downloading object from bucket %q using key %q: %s", bucket, key, err)
 	}
 
@@ -153,4 +169,115 @@ func (r *progressReader) ReadAt(p []byte, off int64) (int, error) {
 
 func (r *progressReader) Seek(offset int64, whence int) (int64, error) {
 	return r.fp.Seek(offset, whence)
+}
+
+func (s S3Client) InitiateMultipartUpload(ctx context.Context, bucket, key, contentType string) (string, error) {
+	input := &s3.CreateMultipartUploadInput{
+		Bucket:      &bucket,
+		Key:         &key,
+		ContentType: &contentType,
+	}
+	resp, err := s.client.CreateMultipartUpload(ctx, input)
+	if err != nil {
+		var apiErr smithy.APIError
+		if errors.As(err, &apiErr) && apiErr.ErrorCode() == "InvalidAccessKeyId" {
+			return "", errdef.NewServiceUnavailable("invalid AWS access key ID: %s", apiErr.ErrorMessage())
+		}
+		return "", err
+	}
+	return *resp.UploadId, nil
+}
+
+func (s S3Client) UploadPart(ctx context.Context, bucket, key, uploadID string, partNumber int, data []byte) (*types.CompletedPart, error) {
+	resp, err := s.client.UploadPart(ctx, &s3.UploadPartInput{
+		Bucket:     &bucket,
+		Key:        &key,
+		UploadId:   &uploadID,
+		PartNumber: aws.Int32(int32(partNumber)),
+		Body:       bytes.NewReader(data),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	completedPart := &types.CompletedPart{
+		ETag:       resp.ETag,
+		PartNumber: aws.Int32(int32(partNumber)),
+	}
+	return completedPart, nil
+}
+
+func (s S3Client) CompleteMultipartUpload(ctx context.Context, bucket, key, uploadID string, completedParts []types.CompletedPart) error {
+	_, err := s.client.CompleteMultipartUpload(ctx, &s3.CompleteMultipartUploadInput{
+		Bucket:   &bucket,
+		Key:      &key,
+		UploadId: &uploadID,
+		MultipartUpload: &types.CompletedMultipartUpload{
+			Parts: completedParts,
+		},
+	})
+	return err
+}
+
+func (s S3Client) AbortMultipartUpload(ctx context.Context, bucket, key, uploadID string) error {
+	_, err := s.client.AbortMultipartUpload(ctx, &s3.AbortMultipartUploadInput{
+		Bucket:   &bucket,
+		Key:      &key,
+		UploadId: &uploadID,
+	})
+	return err
+}
+
+func (s S3Client) StreamUpload(ctx context.Context, bucket, key, contentType string, r io.Reader) (int64, error) {
+	uploadID, err := s.InitiateMultipartUpload(ctx, bucket, key, contentType)
+	if err != nil {
+		return 0, fmt.Errorf("failed to initiate multipart upload: %w", err)
+	}
+
+	var completedParts []types.CompletedPart
+	var totalSize int64
+	partNumber := 1
+	const chunkSize = 10 * 1024 * 1024
+	buffer := make([]byte, chunkSize)
+
+	var streamErr error
+	for {
+		n, readErr := io.ReadFull(r, buffer)
+
+		isEOF := readErr == io.EOF || errors.Is(readErr, io.ErrUnexpectedEOF)
+		if readErr != nil && !isEOF {
+			streamErr = readErr
+			break
+		}
+
+		if n == 0 {
+			break
+		}
+
+		part, partErr := s.UploadPart(ctx, bucket, key, uploadID, partNumber, buffer[:n])
+		if partErr != nil {
+			_ = s.AbortMultipartUpload(ctx, bucket, key, uploadID)
+			return 0, fmt.Errorf("failed to upload part %d: %w", partNumber, partErr)
+		}
+
+		completedParts = append(completedParts, *part)
+		totalSize += int64(n)
+		s.logger.InfoContext(ctx, "StreamUpload progress", "partNumber", partNumber, "bytes", n, "key", key)
+		partNumber++
+
+		if isEOF {
+			break
+		}
+	}
+
+	if streamErr != nil {
+		_ = s.AbortMultipartUpload(ctx, bucket, key, uploadID)
+		return 0, fmt.Errorf("stream error, upload aborted: %w", streamErr)
+	}
+
+	if err := s.CompleteMultipartUpload(ctx, bucket, key, uploadID, completedParts); err != nil {
+		return 0, fmt.Errorf("failed to complete multipart upload: %w", err)
+	}
+
+	return totalSize, nil
 }

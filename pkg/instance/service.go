@@ -6,15 +6,19 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"iter"
 	"log/slog"
+	"maps"
 	"os/exec"
 	"slices"
 	"strings"
+	"time"
 
+	"github.com/anthhub/forwarder"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/dhis2-sre/im-manager/pkg/token"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
-	"golang.org/x/exp/maps"
 
 	v1 "k8s.io/api/core/v1"
 
@@ -26,7 +30,7 @@ import (
 	"github.com/dhis2-sre/im-manager/pkg/model"
 )
 
-func NewService(logger *slog.Logger, instanceRepository *repository, groupService groupService, stackService stack.Service, helmfileService helmfile, s3Client *s3.Client, s3Bucket string) *Service {
+func NewService(logger *slog.Logger, instanceRepository *repository, groupService groupService, stackService stack.Service, helmfileService helmfile, s3Client *s3.Client, s3Bucket string, tokenService *token.TokenService) *Service {
 	return &Service{
 		logger:             logger,
 		instanceRepository: instanceRepository,
@@ -35,6 +39,7 @@ func NewService(logger *slog.Logger, instanceRepository *repository, groupServic
 		helmfileService:    helmfileService,
 		s3Client:           s3Client,
 		s3Bucket:           s3Bucket,
+		tokenService:       tokenService,
 	}
 }
 
@@ -56,6 +61,7 @@ type Service struct {
 	helmfileService    helmfile
 	s3Client           *s3.Client
 	s3Bucket           string
+	tokenService       *token.TokenService
 }
 
 func (s Service) SaveDeployment(ctx context.Context, deployment *model.Deployment) error {
@@ -105,7 +111,7 @@ func (s Service) FindDecryptedDeploymentInstanceById(ctx context.Context, id uin
 }
 
 func (s Service) SaveInstance(ctx context.Context, instance *model.DeploymentInstance) error {
-	err := s.rejectConsumedParameters(instance)
+	err := s.rejectConsumedParameters(instance.StackName, maps.Keys(instance.Parameters))
 	if err != nil {
 		return err
 	}
@@ -140,14 +146,14 @@ func (s Service) SaveInstance(ctx context.Context, instance *model.DeploymentIns
 	return s.instanceRepository.SaveInstance(ctx, instance, stack)
 }
 
-func (s Service) rejectConsumedParameters(instance *model.DeploymentInstance) error {
-	stack, err := s.stackService.Find(instance.StackName)
+func (s Service) rejectConsumedParameters(stackName string, paramNames iter.Seq[string]) error {
+	stack, err := s.stackService.Find(stackName)
 	if err != nil {
 		return err
 	}
 
 	var errs []error
-	for name := range instance.Parameters {
+	for name := range paramNames {
 		if stack.Parameters[name].Consumed {
 			errs = append(errs, fmt.Errorf("consumed parameters can't be supplied by the user: %s", name))
 		}
@@ -206,17 +212,44 @@ func (s Service) validateNoCycles(instances []*model.DeploymentInstance) (graph.
 		if err != nil {
 			return nil, err
 		}
+
+		for _, instanceParameter := range src.Parameters {
+			stackParameter := stack.Parameters[instanceParameter.ParameterName]
+			if stackParameter.RequireCompanion != nil {
+				companion, err := stackParameter.RequireCompanion.Require(instanceParameter)
+				if err != nil {
+					return nil, fmt.Errorf("failed to check companion for parameter %q: %v", instanceParameter.ParameterName, err)
+				}
+				if companion != nil {
+					companionStackName := companion.Name
+					err := g.AddEdge(src.StackName, companionStackName)
+					// TODO: Fix error messages so they're unique and not the same as for required stacks
+					if err != nil {
+						if errors.Is(err, graph.ErrEdgeAlreadyExists) {
+							return nil, fmt.Errorf("instance %q requires %q more than once", src.Name, companionStackName)
+						} else if errors.Is(err, graph.ErrEdgeCreatesCycle) {
+							return nil, fmt.Errorf("link from instance %q to stack %q creates a cycle", src.Name, companionStackName)
+						} else if errors.Is(err, graph.ErrVertexNotFound) {
+							return nil, fmt.Errorf("%q is required by %q", companionStackName, src.StackName)
+						}
+						return nil, fmt.Errorf("failed linking instance %q with instance %q: %v", src.Name, companionStackName, err)
+					}
+				}
+			}
+		}
+
 		for _, requiredStack := range stack.Requires {
-			err := g.AddEdge(src.StackName, requiredStack.Name)
+			requiredStackName := requiredStack.Name
+			err := g.AddEdge(src.StackName, requiredStackName)
 			if err != nil {
 				if errors.Is(err, graph.ErrEdgeAlreadyExists) {
-					return nil, fmt.Errorf("instance %q requires %q more than once", src.Name, requiredStack.Name)
+					return nil, fmt.Errorf("instance %q requires %q more than once", src.Name, requiredStackName)
 				} else if errors.Is(err, graph.ErrEdgeCreatesCycle) {
-					return nil, fmt.Errorf("link from instance %q to stack %q creates a cycle", src.Name, requiredStack.Name)
+					return nil, fmt.Errorf("link from instance %q to stack %q creates a cycle", src.Name, requiredStackName)
 				} else if errors.Is(err, graph.ErrVertexNotFound) {
-					return nil, fmt.Errorf("%q is required by %q", requiredStack.Name, src.StackName)
+					return nil, fmt.Errorf("%q is required by %q", requiredStackName, src.StackName)
 				}
-				return nil, fmt.Errorf("failed linking instance %q with instance %q: %v", src.Name, requiredStack.Name, err)
+				return nil, fmt.Errorf("failed linking instance %q with instance %q: %v", src.Name, requiredStackName, err)
 			}
 		}
 	}
@@ -287,6 +320,7 @@ func resolveConsumedParameters(deployment *model.Deployment, instance *model.Dep
 
 			// consume from provider
 			if provider, ok := requiredStack.ParameterProviders[name]; ok {
+				sourceInstance.Group = instance.Group
 				value, err := provider.Provide(*sourceInstance)
 				if err != nil {
 					return fmt.Errorf("failed to provide value for instance %q parameter %q: %v", instance.Name, name, err)
@@ -349,7 +383,12 @@ func (s Service) DeployDeployment(ctx context.Context, token string, deployment 
 	deployment.Instances = instances
 
 	for _, instance := range instances {
-		err := s.deployDeploymentInstance(ctx, token, instance, deployment.TTL)
+		var err error
+		token, err = s.tokenService.RefreshAccessToken(token)
+		if err != nil {
+			return err
+		}
+		err = s.deployDeploymentInstance(ctx, token, instance, deployment.TTL)
 		if err != nil {
 			return fmt.Errorf("failed to deploy instance(%s) %q: %v", instance.StackName, instance.Name, err)
 		}
@@ -369,7 +408,7 @@ func (s Service) deployDeploymentInstance(ctx context.Context, token string, ins
 		return err
 	}
 
-	deployLog, deployErrorLog, err := commandExecutor(syncCmd, group.ClusterConfiguration)
+	deployLog, deployErrorLog, err := commandExecutor(syncCmd, group.Cluster)
 	// In recent versions of helmfile most of the command output is sent to stderr https://github.com/roboll/helmfile/pull/583
 	s.logger.InfoContext(ctx, "Deploy log", "log", string(deployLog), "errorLog", string(deployErrorLog))
 	/* TODO: return error log if relevant
@@ -378,7 +417,12 @@ func (s Service) deployDeploymentInstance(ctx context.Context, token string, ins
 	}
 	*/
 	if err != nil {
-		return err
+		// TODO: This is a hack to detect if the helmfile operation is already in progress.
+		if strings.Contains(string(deployErrorLog), "another operation (install/upgrade/rollback) is in progress") {
+			s.logger.WarnContext(ctx, "Helm operation already in progress, skipping", "instance", instance.Name, "stack", instance.StackName, "deployment", instance.DeploymentID, "errorLog", deployErrorLog)
+			return nil
+		}
+		return fmt.Errorf("%w: %s", err, deployErrorLog)
 	}
 
 	// TODO: Encrypt before saving? Yes...
@@ -460,14 +504,14 @@ func (s Service) destroyDeploymentInstance(ctx context.Context, instance *model.
 		return err
 	}
 
-	destroyLog, destroyErrorLog, err := commandExecutor(destroyCmd, group.ClusterConfiguration)
+	destroyLog, destroyErrorLog, err := commandExecutor(destroyCmd, group.Cluster)
 	// In recent versions of helmfile most of the command output is sent to stderr https://github.com/roboll/helmfile/pull/583
 	s.logger.InfoContext(ctx, "Destroy log", "log", destroyLog, "errorLog", destroyErrorLog)
 	if err != nil {
 		return err
 	}
 
-	ks, err := NewKubernetesService(group.ClusterConfiguration)
+	ks, err := NewKubernetesService(group.Cluster)
 	if err != nil {
 		return err
 	}
@@ -497,7 +541,7 @@ func (s Service) Pause(ctx context.Context, instance *model.DeploymentInstance) 
 		return err
 	}
 
-	ks, err := NewKubernetesService(group.ClusterConfiguration)
+	ks, err := NewKubernetesService(group.Cluster)
 	if err != nil {
 		return err
 	}
@@ -511,7 +555,7 @@ func (s Service) Resume(ctx context.Context, instance *model.DeploymentInstance)
 		return err
 	}
 
-	ks, err := NewKubernetesService(group.ClusterConfiguration)
+	ks, err := NewKubernetesService(group.Cluster)
 	if err != nil {
 		return err
 	}
@@ -525,7 +569,7 @@ func (s Service) Restart(ctx context.Context, instance *model.DeploymentInstance
 		return err
 	}
 
-	ks, err := NewKubernetesService(group.ClusterConfiguration)
+	ks, err := NewKubernetesService(group.Cluster)
 	if err != nil {
 		return err
 	}
@@ -539,7 +583,7 @@ func (s Service) Restart(ctx context.Context, instance *model.DeploymentInstance
 }
 
 func (s Service) Logs(instance *model.DeploymentInstance, group *model.Group, typeSelector string) (io.ReadCloser, error) {
-	ks, err := NewKubernetesService(group.ClusterConfiguration)
+	ks, err := NewKubernetesService(group.Cluster)
 	if err != nil {
 		return nil, err
 	}
@@ -560,7 +604,7 @@ func (s Service) FindDeployments(ctx context.Context, user *model.User) ([]Group
 	for _, group := range groups {
 		groupsByName[group.Name] = group
 	}
-	groupNames := maps.Keys(groupsByName)
+	groupNames := slices.Collect(maps.Keys(groupsByName))
 
 	deployments, err := s.instanceRepository.FindDeployments(ctx, groupNames)
 	if err != nil {
@@ -583,7 +627,7 @@ func (s Service) groupDeployments(deployments []*model.Deployment) ([]GroupWithD
 	}
 
 	groupsWithDeployments := make([]GroupWithDeployments, len(groupsByName))
-	for i, name := range maps.Keys(groupsByName) {
+	for i, name := range slices.Collect(maps.Keys(groupsByName)) {
 		groupWithDeployments := groupsWithDeployments[i]
 		groupWithDeployments.Name = name
 		groupWithDeployments.Hostname = groupsByName[name].Hostname
@@ -608,9 +652,10 @@ func (s Service) groupDeployments(deployments []*model.Deployment) ([]GroupWithD
 }
 
 type PublicInstance struct {
-	Name        string `json:"name"`
-	Description string `json:"description"`
-	Hostname    string `json:"hostname"`
+	Name        string    `json:"name"`
+	Description string    `json:"description"`
+	Hostname    string    `json:"hostname"`
+	UpdatedAt   time.Time `json:"updatedAt"`
 }
 
 type Category struct {
@@ -659,6 +704,7 @@ func (s Service) groupPublicInstances(instances []*model.DeploymentInstance) ([]
 					Name:        instance.Name,
 					Description: instance.Deployment.Description,
 					Hostname:    fmt.Sprintf("https://%s/%s", instance.Group.Hostname, instance.Name),
+					UpdatedAt:   instance.UpdatedAt,
 				}
 				if strings.HasPrefix(instance.Name, "dev") {
 					devCategory.Instances = append(devCategory.Instances, publicInstance)
@@ -704,7 +750,7 @@ const (
 )
 
 func (s Service) GetStatus(instance *model.DeploymentInstance) (InstanceStatus, error) {
-	ks, err := NewKubernetesService(instance.Group.ClusterConfiguration)
+	ks, err := NewKubernetesService(instance.Group.Cluster)
 	if err != nil {
 		return "", err
 	}
@@ -712,6 +758,7 @@ func (s Service) GetStatus(instance *model.DeploymentInstance) (InstanceStatus, 
 	pod, err := ks.getPod(instance.ID, "")
 	if err != nil {
 		if errdef.IsNotFound(err) {
+			s.logger.Info("Pod not found, assuming not deployed", "instance", instance.ID, "group", instance.GroupName, "error", err)
 			return NotDeployed, nil
 		}
 		return "", err
@@ -778,20 +825,67 @@ func (s Service) Reset(ctx context.Context, token string, instance *model.Deploy
 }
 
 func (s Service) FilestoreBackup(ctx context.Context, instance *model.DeploymentInstance, name string, database *model.Database) error {
-	s.logger.InfoContext(ctx, "save again", "database", database)
-
-	endpoint := fmt.Sprintf("%s-minio.%s.svc:9000", instance.Name, instance.GroupName)
-	minioClient, err := newMinioClient("dhisdhis", "dhisdhis", endpoint, false)
+	group, err := s.groupService.Find(ctx, instance.GroupName)
 	if err != nil {
 		return err
+	}
+
+	var minioClient *minio.Client
+	var minioEndpoint string
+
+	minioEndpoint = fmt.Sprintf("%s-%d-minio.%s.svc:9000", instance.Name, instance.Group.ID, instance.Group.Namespace)
+
+	if group.Cluster.Configuration != nil {
+		// TODO: Don't hard code the service name, use a provider as done for the database backup
+		hostname := fmt.Sprintf("%s-%d-minio.%s.svc", instance.Name, instance.Group.ID, instance.Group.Namespace)
+		serviceName := strings.Split(hostname, ".")[0]
+		options := []*forwarder.Option{
+			{
+				RemotePort:  9000,
+				ServiceName: serviceName,
+				Namespace:   instance.Group.Namespace,
+			},
+		}
+
+		kubeConfig, err := decryptYaml(group.Cluster.Configuration)
+		if err != nil {
+			return err
+		}
+
+		ret, err := forwarder.WithForwardersEmbedConfig(context.Background(), options, kubeConfig)
+		if err != nil {
+			return err
+		}
+		defer ret.Close()
+
+		ports, err := ret.Ready()
+		if err != nil {
+			return err
+		}
+
+		minioEndpoint = fmt.Sprintf("localhost:%d", ports[0][0].Local)
+	}
+
+	minioClient, err = newMinioClient("dhisdhis", "dhisdhis", minioEndpoint, false)
+	if err != nil {
+		return err
+	}
+
+	// Test MinIO connection before proceeding
+	_, err = minioClient.ListBuckets(ctx)
+	if err != nil {
+		return fmt.Errorf("MinIO connection test failed: %v", err)
 	}
 
 	source := NewMinioBackupSource(s.logger, minioClient, "dhis2")
 	backupService := NewBackupService(s.logger, source, s.s3Client)
 
-	name = strings.TrimSuffix(name, ".pgc")
-	name = strings.TrimSuffix(name, ".tar.gz")
-	key := fmt.Sprintf("%s/%s-%s.tar.gz", instance.GroupName, name, "fs")
+	baseName := name
+	baseName = strings.TrimSuffix(baseName, ".sql.gz")
+	baseName = strings.TrimSuffix(baseName, ".pgc")
+	baseName = strings.TrimSuffix(baseName, ".tar.gz")
+
+	key := fmt.Sprintf("%s/%s-%s.tar.gz", instance.GroupName, baseName, "fs")
 	err = backupService.PerformBackup(ctx, s.s3Bucket, key)
 	if err != nil {
 		return err
@@ -799,7 +893,7 @@ func (s Service) FilestoreBackup(ctx context.Context, instance *model.Deployment
 
 	// Record backup in database
 	s3Uri := fmt.Sprintf("s3://%s/%s", s.s3Bucket, key)
-	filestore, err := s.recordBackup(ctx, instance.GroupName, s3Uri, name+"-fs.tar.gz")
+	filestore, err := s.recordBackup(ctx, instance.GroupName, s3Uri, baseName+"-fs.tar.gz", database.UserID)
 	if err != nil {
 		return err
 	}
@@ -814,12 +908,13 @@ func (s Service) FilestoreBackup(ctx context.Context, instance *model.Deployment
 	return nil
 }
 
-func (s Service) recordBackup(ctx context.Context, groupName, s3uri, name string) (*model.Database, error) {
+func (s Service) recordBackup(ctx context.Context, groupName, s3uri, name string, userID uint) (*model.Database, error) {
 	database := &model.Database{
 		Name:      name,
 		GroupName: groupName,
 		Url:       s3uri,
 		Type:      "fs",
+		UserID:    userID,
 	}
 	err := s.instanceRepository.RecordBackup(ctx, database)
 	if err != nil {
@@ -827,6 +922,10 @@ func (s Service) recordBackup(ctx context.Context, groupName, s3uri, name string
 	}
 
 	return database, nil
+}
+
+func (s Service) FindAllDeployments(ctx context.Context) ([]model.Deployment, error) {
+	return s.instanceRepository.FindAllDeployments(ctx)
 }
 
 func newMinioClient(accessKey, secretKey, endpoint string, useSSL bool) (*minio.Client, error) {
@@ -838,4 +937,110 @@ func newMinioClient(accessKey, secretKey, endpoint string, useSSL bool) (*minio.
 		return nil, fmt.Errorf("failed to create MinIO client: %v", err)
 	}
 	return minioClient, nil
+}
+
+func (s Service) UpdateInstance(ctx context.Context, token string, deploymentId, instanceId uint, parameters parameters, public *bool) (*model.DeploymentInstance, error) {
+	instance, err := s.FindDecryptedDeploymentInstanceById(ctx, instanceId)
+	if err != nil {
+		return nil, err
+	}
+
+	if instance.DeploymentID != deploymentId {
+		return nil, errdef.NewBadRequest("instance %d does not belong to deployment %d", instanceId, deploymentId)
+	}
+
+	if public != nil {
+		instance.Public = *public
+	}
+
+	if err := s.rejectConsumedParameters(instance.StackName, maps.Keys(parameters)); err != nil {
+		return nil, err
+	}
+
+	for name, parameter := range parameters {
+		instance.Parameters[name] = model.DeploymentInstanceParameter{
+			ParameterName: name,
+			Value:         parameter.Value,
+		}
+	}
+
+	deployment, err := s.FindDeploymentById(ctx, deploymentId)
+	if err != nil {
+		return nil, err
+	}
+
+	decryptedDeployment, err := s.decryptDeployment(deployment)
+	if err != nil {
+		return nil, err
+	}
+
+	for i, inst := range decryptedDeployment.Instances {
+		if inst.ID == instanceId {
+			decryptedDeployment.Instances[i] = instance
+			break
+		}
+	}
+
+	_, err = s.validateNoCycles(decryptedDeployment.Instances)
+	if err != nil {
+		return nil, errdef.NewBadRequest("failed to validate instance: %v", err)
+	}
+
+	err = s.resolveParameters(decryptedDeployment)
+	if err != nil {
+		return nil, errdef.NewBadRequest("failed to resolve parameters: %v", err)
+	}
+
+	stack, err := s.stackService.Find(instance.StackName)
+	if err != nil {
+		return nil, err
+	}
+
+	err = s.instanceRepository.SaveInstance(ctx, instance, stack)
+	if err != nil {
+		return nil, err
+	}
+
+	decryptedInstance, err := s.FindDecryptedDeploymentInstanceById(ctx, instanceId)
+	if err != nil {
+		return nil, err
+	}
+
+	refreshedToken, err := s.tokenService.RefreshAccessToken(token)
+	if err != nil {
+		return nil, err
+	}
+
+	err = s.deployDeploymentInstance(ctx, refreshedToken, decryptedInstance, deployment.TTL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to deploy updated instance: %v", err)
+	}
+
+	return instance, nil
+}
+
+func (s Service) UpdateDeployment(ctx context.Context, token string, deploymentId uint, ttl uint, description string) (*model.Deployment, error) {
+	deployment, err := s.FindDecryptedDeploymentById(ctx, deploymentId)
+	if err != nil {
+		return nil, err
+	}
+
+	ttlChanged := deployment.TTL != ttl
+
+	deployment.TTL = ttl
+	deployment.Description = description
+
+	err = s.instanceRepository.SaveDeployment(ctx, deployment)
+	if err != nil {
+		return nil, err
+	}
+
+	if ttlChanged {
+		err = s.DeployDeployment(ctx, token, deployment)
+		if err != nil {
+			return nil, fmt.Errorf("failed to redeploy instances: %v", err)
+		}
+	}
+
+	return deployment, nil
 }

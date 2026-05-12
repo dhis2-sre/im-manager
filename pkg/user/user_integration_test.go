@@ -16,6 +16,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dhis2-sre/im-manager/pkg/cluster"
+
 	"github.com/google/uuid"
 
 	"github.com/go-mail/mail"
@@ -35,14 +37,19 @@ func TestUserHandler(t *testing.T) {
 	t.Parallel()
 
 	db := inttest.SetupDB(t)
+	groupRepository := group.NewRepository(db)
+
 	userRepository := user.NewRepository(db)
 	const passwordTokenTtl = 10
 	userService := user.NewService("", passwordTokenTtl, userRepository, fakeDialer{t})
-	groupRepository := group.NewRepository(db)
-	groupService := group.NewService(groupRepository, userService)
+
+	clusterRepository := cluster.NewRepository(db)
+	clusterService := cluster.NewService(clusterRepository, cluster.Encryptor{})
+
+	groupService := group.NewService(groupRepository, userService, clusterService)
 
 	userCount.Increment()
-	err := user.CreateUser(context.Background(), "admin", "admin", userService, groupService, model.AdministratorGroupName, "admin")
+	err := user.CreateUser(context.Background(), "admin", "admin", userService, groupService, model.AdministratorGroupName, "", "admin")
 	require.NoError(t, err, "failed to create admin user and group")
 	userCount.Done()
 
@@ -54,11 +61,11 @@ func TestUserHandler(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	redis := inttest.SetupRedis(t)
 	tokenRepository := token.NewRepository(redis)
-	tokenService, err := token.NewService(logger, tokenRepository, key, 10, "secret", 20, 30)
+	tokenService, err := token.NewService(logger, tokenRepository, key, 10, 5, "secret", 20, 30)
 	require.NoError(t, err)
 
 	client := inttest.SetupHTTPServer(t, func(engine *gin.Engine) {
-		userHandler := user.NewHandler(logger, "hostname", http.SameSiteStrictMode, 10, 20, 30, key.PublicKey, userService, tokenService)
+		userHandler := user.NewHandler(logger, "hostname", http.SameSiteStrictMode, true, 10, 20, 30, key.PublicKey, userService, tokenService)
 		user.Routes(engine, authentication, authorization, userHandler)
 	})
 
@@ -514,8 +521,6 @@ func TestUserHandler(t *testing.T) {
 	})
 
 	t.Run("AsAdmin", func(t *testing.T) {
-		t.Parallel()
-
 		var adminAccessToken *http.Cookie
 		{
 			t.Log("SignIn")

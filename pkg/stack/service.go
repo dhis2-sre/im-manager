@@ -17,7 +17,7 @@ type Service struct {
 func (s Service) Find(name string) (*model.Stack, error) {
 	stack, ok := s.stacks[name]
 	if !ok {
-		return nil, errdef.NewNotFound("stack not found")
+		return nil, errdef.NewNotFound("stack not found: %s", name)
 	}
 	return &stack, nil
 }

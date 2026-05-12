@@ -1,6 +1,7 @@
 image:
   pullPolicy: Always
 sameSiteMode: none
+sopsKmsArn: "arn:aws:kms:eu-central-1:767224633206:alias/im-nonprod-secrets"
 tolerations:
   - key: im-dedicated
     operator: Equal

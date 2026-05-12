@@ -12,7 +12,7 @@ import (
 // User domain object defining a user
 // swagger:model
 type User struct {
-	ID               uint           `json:"id" gorm:"primarykey"`
+	ID               uint           `json:"id" gorm:"primaryKey"`
 	CreatedAt        time.Time      `json:"createdAt"`
 	UpdatedAt        time.Time      `json:"updatedAt"`
 	Email            string         `json:"email" gorm:"index;unique"`
@@ -22,6 +22,7 @@ type User struct {
 	PasswordToken    sql.NullString `json:"-"`
 	PasswordTokenTTL uint           `json:"-"`
 	Groups           []Group        `json:"groups" gorm:"many2many:user_groups;constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
+	Databases        []Database     `json:"databases" gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
 	AdminGroups      []Group        `json:"adminGroups" gorm:"many2many:user_groups_admin;constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
 }
 

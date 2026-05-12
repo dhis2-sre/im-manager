@@ -16,13 +16,34 @@ import (
 )
 
 //goland:noinspection GoExportedFuncWithUnexportedType
-func NewHelmfileService(logger *slog.Logger, stackService stackService, stackFolder string, classification string) helmfileService {
+func NewHelmfileService(logger *slog.Logger, stackService stackService, stackFolder string, classification string) (helmfileService, error) {
+	helmfileBinary, err := resolveBinary("helmfile")
+	if err != nil {
+		return helmfileService{}, err
+	}
+	helmBinary, err := resolveBinary("helm")
+	if err != nil {
+		return helmfileService{}, err
+	}
+	logger.Info("Resolved helmfile service binaries", "helmfile", helmfileBinary, "helm", helmBinary)
+
 	return helmfileService{
 		logger:         logger,
 		stackService:   stackService,
 		stackFolder:    stackFolder,
 		classification: classification,
+		helmfileBinary: helmfileBinary,
+		helmBinary:     helmBinary,
+	}, nil
+}
+
+// resolveBinary returns an absolute path to name, resolved once at startup via PATH.
+func resolveBinary(name string) (string, error) {
+	resolved, err := exec.LookPath(name)
+	if err != nil {
+		return "", fmt.Errorf("%s binary not found in PATH: %w", name, err)
 	}
+	return resolved, nil
 }
 
 type helmfileService struct {
@@ -30,6 +51,8 @@ type helmfileService struct {
 	stackService   stackService
 	stackFolder    string
 	classification string
+	helmfileBinary string
+	helmBinary     string
 }
 
 type stackService interface {
@@ -49,7 +72,7 @@ func (h helmfileService) destroy(ctx context.Context, instance *model.Deployment
 // * STACKS_FOLDER is configured on the host so if that can be tampered the attacker already has access
 // * stack.Name is populated by reading the name of a folder and even if that folder name could contain something malicious it won't be running in a shell anyway
 // * stackPath is concatenated using path.Join which also cleans the path and furthermore it's existence is validated
-// * Binaries are executed using their full path and not from $PATH which would be very difficult to exploit anyway
+// * Binaries are executed using an absolute path resolved once at startup (via exec.LookPath or an explicit env override); PATH is not consulted per request
 func (h helmfileService) executeHelmfileCommand(ctx context.Context, token string, instance *model.DeploymentInstance, group *model.Group, ttl uint, operation string) (*exec.Cmd, error) {
 	//goland:noinspection GoImportUsedAsName
 	stack, err := h.stackService.Find(instance.StackName)
@@ -57,7 +80,7 @@ func (h helmfileService) executeHelmfileCommand(ctx context.Context, token strin
 		return nil, err
 	}
 
-	stackPath := path.Join(h.stackFolder, "/", stack.Name, "/helmfile.yaml")
+	stackPath := path.Join(h.stackFolder, "/", stack.Name, "/helmfile.yaml.gotmpl")
 	if _, err = os.Stat(stackPath); err != nil {
 		return nil, err
 	}
@@ -67,7 +90,7 @@ func (h helmfileService) executeHelmfileCommand(ctx context.Context, token strin
 		return nil, err
 	}
 
-	cmd := exec.Command("/usr/bin/helmfile", "--helm-binary", "/usr/bin/helm", "-f", stackPath, operation) // #nosec
+	cmd := exec.Command(h.helmfileBinary, "--helm-binary", h.helmBinary, "-f", stackPath, operation) // #nosec
 	h.logger.InfoContext(ctx, "Executing helmfile command", "command", cmd.String())
 	h.configureInstanceEnvironment(ctx, token, instance, group, ttl, stackParameters, cmd)
 
@@ -104,8 +127,10 @@ func (h helmfileService) loadStackParameters(stackName string) (stackParameters,
 func (h helmfileService) configureInstanceEnvironment(ctx context.Context, accessToken string, instance *model.DeploymentInstance, group *model.Group, ttl uint, stackParameters stackParameters, cmd *exec.Cmd) {
 	// TODO: We should only inject what the stack require, currently we just blindly inject IM_ACCESS_TOKEN and others which may not be required by the stack
 	// We could probably list the required system parameters in the stacks helmfile and parse those as well as other parameters
-	instanceNameEnv := fmt.Sprintf("%s=%s", "INSTANCE_NAME", instance.Name)
-	instanceNamespaceEnv := fmt.Sprintf("%s=%s", "INSTANCE_NAMESPACE", group.Name)
+	// INSTANCE_NAME: unique name for K8s/Helm (release names, services). INSTANCE_PATH_NAME: deployment name for URL path/context (group-based subdomain already makes URL unique).
+	instanceNameEnv := fmt.Sprintf("%s=%s-%d", "INSTANCE_NAME", instance.Name, group.ID)
+	instancePathNameEnv := fmt.Sprintf("%s=%s", "INSTANCE_PATH_NAME", instance.Name)
+	instanceNamespaceEnv := fmt.Sprintf("%s=%s", "INSTANCE_NAMESPACE", group.Namespace)
 	instanceIdEnv := fmt.Sprintf("%s=%d", "INSTANCE_ID", instance.ID)
 	deploymentIdEnv := fmt.Sprintf("%s=%d", "DEPLOYMENT_ID", instance.DeploymentID)
 	instanceTTLEnv := fmt.Sprintf("%s=%d", "INSTANCE_TTL", ttl)
@@ -113,7 +138,7 @@ func (h helmfileService) configureInstanceEnvironment(ctx context.Context, acces
 	imTokenEnv := fmt.Sprintf("%s=%s", "IM_ACCESS_TOKEN", accessToken)
 	homeEnv := fmt.Sprintf("%s=%s", "HOME", "/tmp")
 	imCreationTimestamp := fmt.Sprintf("%s=%d", "INSTANCE_CREATION_TIMESTAMP", time.Now().Unix())
-	cmd.Env = append(cmd.Env, instanceNameEnv, instanceNamespaceEnv, instanceIdEnv, deploymentIdEnv, instanceTTLEnv, instanceHostnameEnv, imTokenEnv, homeEnv, imCreationTimestamp)
+	cmd.Env = append(cmd.Env, instanceNameEnv, instancePathNameEnv, instanceNamespaceEnv, instanceIdEnv, deploymentIdEnv, instanceTTLEnv, instanceHostnameEnv, imTokenEnv, homeEnv, imCreationTimestamp)
 
 	cmd.Env = h.injectEnv(ctx, cmd.Env, "HOSTNAME")
 	cmd.Env = h.injectEnv(ctx, cmd.Env, "AWS_ACCESS_KEY_ID")
@@ -125,12 +150,20 @@ func (h helmfileService) configureInstanceEnvironment(ctx context.Context, acces
 
 	cmd.Env = h.injectEnv(ctx, cmd.Env, "KUBERNETES_SERVICE_PORT")
 	cmd.Env = h.injectEnv(ctx, cmd.Env, "KUBERNETES_PORT")
-	cmd.Env = h.injectEnv(ctx, cmd.Env, "KUBERNETES_PORT_443_TCP_ADDR")
-	cmd.Env = h.injectEnv(ctx, cmd.Env, "KUBERNETES_PORT_443_TCP_PORT")
-	cmd.Env = h.injectEnv(ctx, cmd.Env, "KUBERNETES_PORT_443_TCP_PROTO")
-	cmd.Env = h.injectEnv(ctx, cmd.Env, "KUBERNETES_PORT_443_TCP")
 	cmd.Env = h.injectEnv(ctx, cmd.Env, "KUBERNETES_SERVICE_PORT_HTTPS")
 	cmd.Env = h.injectEnv(ctx, cmd.Env, "KUBERNETES_SERVICE_HOST")
+
+	ingressClass, err := discoverIngressClass(ctx, group.Cluster)
+	if err != nil {
+		h.logger.WarnContext(ctx, "Failed to discover ingress class", "error", err)
+	}
+	cmd.Env = append(cmd.Env, fmt.Sprintf("INGRESS_CLASS=%s", ingressClass))
+
+	certIssuer, err := discoverCertIssuer(ctx, group.Cluster)
+	if err != nil {
+		h.logger.WarnContext(ctx, "Failed to discover cert issuer", "error", err)
+	}
+	cmd.Env = append(cmd.Env, fmt.Sprintf("CERT_ISSUER=%s", certIssuer))
 
 	for name, parameter := range instance.Parameters {
 		instanceEnv := fmt.Sprintf("%s=%s", name, parameter.Value)

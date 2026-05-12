@@ -22,15 +22,17 @@ func NewService(
 	tokenRepository repository,
 	privateKey *rsa.PrivateKey,
 	accessTokenExpirationSeconds int,
+	refreshAccessTokenExpirationSeconds int,
 	refreshTokenSecretKey string,
 	refreshTokenExpirationSeconds int,
 	refreshTokenRememberMeExpirationSeconds int,
-) (*tokenService, error) {
-	return &tokenService{
+) (*TokenService, error) {
+	return &TokenService{
 		logger:                                  logger,
 		repository:                              tokenRepository,
 		privateKey:                              privateKey,
 		accessTokenExpirationSeconds:            accessTokenExpirationSeconds,
+		refreshAccessTokenExpirationSeconds:     refreshAccessTokenExpirationSeconds,
 		refreshTokenSecretKey:                   refreshTokenSecretKey,
 		refreshTokenExpirationSeconds:           refreshTokenExpirationSeconds,
 		refreshTokenRememberMeExpirationSeconds: refreshTokenRememberMeExpirationSeconds,
@@ -58,17 +60,18 @@ type RefreshTokenData struct {
 	UserId      uint
 }
 
-type tokenService struct {
+type TokenService struct {
 	logger                                  *slog.Logger
 	repository                              repository
 	privateKey                              *rsa.PrivateKey
 	accessTokenExpirationSeconds            int
+	refreshAccessTokenExpirationSeconds     int
 	refreshTokenSecretKey                   string
 	refreshTokenExpirationSeconds           int
 	refreshTokenRememberMeExpirationSeconds int
 }
 
-func (t tokenService) GetTokens(user *model.User, previousRefreshTokenId string, rememberMe bool) (*Tokens, error) {
+func (t TokenService) GetTokens(user *model.User, previousRefreshTokenId string, rememberMe bool) (*Tokens, error) {
 	if previousRefreshTokenId != "" {
 		if err := t.repository.DeleteRefreshToken(user.ID, previousRefreshTokenId); err != nil {
 			return nil, errdef.NewUnauthorized("could not delete previous refreshToken for user.Id: %d, tokenId: %s", user.ID, previousRefreshTokenId)
@@ -102,7 +105,7 @@ func (t tokenService) GetTokens(user *model.User, previousRefreshTokenId string,
 	}, nil
 }
 
-func (t tokenService) ValidateRefreshToken(ctx context.Context, tokenString string) (*RefreshTokenData, error) {
+func (t TokenService) ValidateRefreshToken(ctx context.Context, tokenString string) (*RefreshTokenData, error) {
 	claims, err := helper.ValidateRefreshToken(tokenString, t.refreshTokenSecretKey)
 	if err != nil {
 		t.logger.ErrorContext(ctx, "Unable to validate token", "error", err, "token", tokenString)
@@ -122,6 +125,10 @@ func (t tokenService) ValidateRefreshToken(ctx context.Context, tokenString stri
 	}, nil
 }
 
-func (t tokenService) SignOut(userId uint) error {
+func (t TokenService) SignOut(userId uint) error {
 	return t.repository.DeleteRefreshTokens(userId)
+}
+
+func (t TokenService) RefreshAccessToken(accessToken string) (string, error) {
+	return helper.RefreshAccessToken(accessToken, t.privateKey, t.refreshAccessTokenExpirationSeconds)
 }

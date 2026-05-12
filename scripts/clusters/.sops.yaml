@@ -1,0 +1,3 @@
+# Catch-all rule to encrypt kubeconfigs for remote clusters with the ./clusters/create.sh script.
+creation_rules:
+  - kms: 'arn:aws:kms:eu-central-1:767224633206:alias/im-nonprod-secrets'

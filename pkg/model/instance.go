@@ -38,6 +38,8 @@ type DeploymentInstance struct {
 	//	Stack     *Stack `json:"stack,omitempty"`
 	StackName string `json:"stackName" gorm:"index:deployment_instance_name_group_stack_idx,unique"`
 
+	Lock *Lock `gorm:"foreignKey:InstanceID"`
+
 	DeploymentID uint        `json:"deploymentId"`
 	Deployment   *Deployment `json:"deployment,omitempty"`
 

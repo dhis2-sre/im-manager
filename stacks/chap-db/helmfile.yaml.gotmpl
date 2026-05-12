@@ -1,0 +1,29 @@
+helmDefaults:
+  deleteWait: true
+
+releases:
+  - name: "{{ requiredEnv "INSTANCE_NAME" }}-chap-db"
+    namespace: "{{ requiredEnv "INSTANCE_NAMESPACE" }}"
+    chart: chap/chap-db
+    version: "{{ requiredEnv "CHART_VERSION" }}"
+    values:
+      - postgresql:
+          password: "{{ requiredEnv "DATABASE_PASSWORD" }}"
+          cnpg:
+            cluster:
+              storageSize: {{ requiredEnv "DATABASE_SIZE" }}
+              version: "{{ requiredEnv "DATABASE_VERSION" }}"
+              database: {{ requiredEnv "DATABASE_NAME" }}
+      - commonLabels:
+          im: "true"
+          im-default: "true"
+          im-deployment-id: "{{ requiredEnv "DEPLOYMENT_ID" }}"
+          im-instance-id: "{{ requiredEnv "INSTANCE_ID" }}"
+          im-id: "{{ requiredEnv "INSTANCE_ID" }}"
+          im-type: "chap-db"
+          im-creation-timestamp: "{{ requiredEnv "INSTANCE_CREATION_TIMESTAMP" }}"
+          im-ttl: "{{ requiredEnv "INSTANCE_TTL" }}"
+
+repositories:
+  - name: chap
+    url: https://dhis2-chap.github.io/chap-core/

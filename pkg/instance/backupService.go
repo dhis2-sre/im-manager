@@ -92,7 +92,7 @@ func (s *BackupService) PerformBackup(ctx context.Context, s3Bucket, key string)
 		return fmt.Errorf("backup failed: %v", err)
 	}
 
-	s.logBackupStats(stats)
+	s.logBackupStats(ctx, stats)
 	return nil
 }
 
@@ -122,8 +122,6 @@ func (s *BackupService) createTarGzStream(ctx context.Context, w io.Writer, stat
 }
 
 func (s *BackupService) processSingleObject(ctx context.Context, tw *tar.Writer, object BackupObject, stats *BackupStats) error {
-	s.logger.InfoContext(ctx, "Processing object", "path", object.Path)
-
 	reader, err := s.source.Get(ctx, object.Path)
 	if err != nil {
 		return fmt.Errorf("failed to get object %s: %v", object.Path, err)
@@ -239,9 +237,9 @@ func (s *BackupService) abortMultipartUpload(ctx context.Context, bucket, key, u
 	return err
 }
 
-func (s *BackupService) logBackupStats(stats *BackupStats) {
+func (s *BackupService) logBackupStats(ctx context.Context, stats *BackupStats) {
 	duration := time.Since(stats.StartTime)
-	s.logger.Info("Backup completed",
+	s.logger.InfoContext(ctx, "Filestore backup completed",
 		"objects_processed", stats.ObjectsProcessed,
 		"bytes_processed", stats.BytesProcessed,
 		"duration", duration)

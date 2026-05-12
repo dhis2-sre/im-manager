@@ -9,7 +9,7 @@ func Routes(router *gin.Engine, authenticator gin.HandlerFunc, handler Handler) 
 
 	tokenAuthenticationRouter := router.Group("/databases")
 	tokenAuthenticationRouter.Use(authenticator)
-	tokenAuthenticationRouter.POST("", handler.Upload)
+	tokenAuthenticationRouter.PUT("", handler.Upload)
 	tokenAuthenticationRouter.POST("/:id/copy", handler.Copy)
 	tokenAuthenticationRouter.GET("/:id/download", handler.Download)
 	tokenAuthenticationRouter.GET("", handler.List)

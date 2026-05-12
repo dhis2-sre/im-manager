@@ -8,6 +8,8 @@ creation_rules:
 
   - path_regex: 'stacks/.*/parameters/prod\.yaml$'
     kms: 'arn:aws:kms:eu-central-1:767224633206:alias/im-prod-secrets'
+    age: 'age1s0tw7t9e4a4ft6pnp8nxthmh6976hvr8r6f8wcyvz703vzu9ysyqtedavq'
 
   - path_regex: 'stacks/.*/parameters/.*\.yaml$'
     kms: 'arn:aws:kms:eu-central-1:767224633206:alias/im-nonprod-secrets'
+    age: 'age1s0tw7t9e4a4ft6pnp8nxthmh6976hvr8r6f8wcyvz703vzu9ysyqtedavq'

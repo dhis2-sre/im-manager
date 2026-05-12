@@ -60,6 +60,7 @@ func (r repository) FindById(ctx context.Context, id uint) (*model.Database, err
 	err := r.db.
 		WithContext(ctx).
 		Preload("Lock").
+		Joins("User").
 		First(&d, id).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, errdef.NewNotFound("database not found by id: %d", id)
@@ -108,7 +109,7 @@ func (r repository) Lock(ctx context.Context, databaseId, instanceId, userId uin
 		}
 
 		if d.Lock != nil && d.Lock.InstanceID != 0 {
-			return errdef.NewBadRequest("database already locked by user %q and instance %q", userId, d.Lock.InstanceID)
+			return errdef.NewBadRequest("database already locked by user %d and instance %d", userId, d.Lock.InstanceID)
 		}
 
 		lock = &model.Lock{
@@ -185,12 +186,15 @@ func (r repository) FindByGroupNames(ctx context.Context, groupNames []string) (
 	query := r.db.WithContext(ctx)
 	isAdmin := slices.Contains(groupNames, model.AdministratorGroupName)
 	if !isAdmin {
-		query = query.Where("group_name IN ?", groupNames)
+		query = query.Where("Databases.group_name IN ?", groupNames)
 	}
 
 	err := query.
 		Where("type = ?", "database").
 		Order("updated_at desc").
+		Joins("User").
+		Joins("Lock.User").
+		Joins("Lock.Instance").
 		Find(&databases).Error
 
 	return databases, err
