@@ -76,7 +76,7 @@ func (h Handler) SignUp(c *gin.Context) {
 	//   415: Error
 	var request signUpRequest
 	if err := handler.DataBinder(c, &request); err != nil {
-		_ = c.Error(handleSignUpErrors(err))
+		_ = c.Error(handleValidationErrors(err))
 		return
 	}
 
@@ -89,29 +89,7 @@ func (h Handler) SignUp(c *gin.Context) {
 	c.JSON(http.StatusCreated, user)
 }
 
-func handleSignUpErrors(err error) error {
-	var validationErrors validator.ValidationErrors
-	ok := errors.As(err, &validationErrors)
-	if !ok {
-		return errdef.NewBadRequest("Error binding data: %+v", err)
-	}
-
-	var errs error
-	for _, fieldError := range validationErrors {
-		if fieldError.Field() == "Password" && (fieldError.Tag() == "gte" || fieldError.Tag() == "lte") {
-			badRequest := errdef.NewBadRequest("password must be between 24 and 128 characters")
-			errs = errors.Join(errs, badRequest)
-		}
-
-		if fieldError.Field() == "Email" && fieldError.Tag() == "email" {
-			badRequest := errdef.NewBadRequest("invalid email provided: %s", fieldError.Value())
-			errs = errors.Join(errs, badRequest)
-		}
-	}
-	return errs
-}
-
-func handleResetPasswordErrors(err error) error {
+func handleValidationErrors(err error) error {
 	var validationErrors validator.ValidationErrors
 	if !errors.As(err, &validationErrors) {
 		return errdef.NewBadRequest("%s", err)
@@ -119,12 +97,14 @@ func handleResetPasswordErrors(err error) error {
 
 	var errs error
 	for _, fieldError := range validationErrors {
-		if fieldError.Field() == "Password" && (fieldError.Tag() == "gte" || fieldError.Tag() == "lte") {
+		switch {
+		case fieldError.Field() == "Password" && (fieldError.Tag() == "gte" || fieldError.Tag() == "lte"):
 			errs = errors.Join(errs, errdef.NewBadRequest("password must be between 24 and 128 characters"))
+		case fieldError.Field() == "Email" && fieldError.Tag() == "email":
+			errs = errors.Join(errs, errdef.NewBadRequest("invalid email provided: %s", fieldError.Value()))
+		default:
+			errs = errors.Join(errs, errdef.NewBadRequest("%s", fieldError.Error()))
 		}
-	}
-	if errs == nil {
-		return errdef.NewBadRequest("%s", err)
 	}
 	return errs
 }
@@ -218,7 +198,7 @@ func (h Handler) ResetPassword(c *gin.Context) {
 	//   415: Error
 	var request ResetPasswordRequest
 	if err := handler.DataBinder(c, &request); err != nil {
-		_ = c.Error(handleResetPasswordErrors(err))
+		_ = c.Error(handleValidationErrors(err))
 		return
 	}
 
