@@ -286,16 +286,19 @@ func TestInstanceHandler(t *testing.T) {
 		t.Parallel()
 		deployment := createDeployment(t, client, "test-deployment-instance-update", tokens.AccessToken, WithDescription("some description"))
 
-		deploymentInstance := createWhoamiInstance(t, client, deployment.ID, tokens.AccessToken,
-			WithParameter("IMAGE_TAG", "0.6.0"),
+		createDHIS2DBInstance(t, client, deployment.ID, databaseID, tokens.AccessToken)
+		createMinioInstance(t, client, deployment.ID, tokens.AccessToken)
+		deploymentInstance := createDHIS2CoreInstance(t, client, deployment.ID, tokens.AccessToken,
+			WithParameter("IMAGE_TAG", "2.42.0"),
+			WithParameter("ALLOW_SUSPEND", "false"),
 			WithPublic(false))
 
 		updatedInstance := updateInstance(t, client, deploymentInstance, tokens.AccessToken,
-			WithParameter("IMAGE_TAG", "0.7.0"),
+			WithParameter("IMAGE_TAG", "2.43.0"),
 			WithPublic(true))
 
 		assert.Equal(t, deploymentInstance.ID, updatedInstance.ID)
-		assert.Equal(t, "0.7.0", updatedInstance.Parameters["IMAGE_TAG"].Value)
+		assert.Equal(t, "2.43.0", updatedInstance.Parameters["IMAGE_TAG"].Value)
 		assert.True(t, updatedInstance.Public)
 	})
 

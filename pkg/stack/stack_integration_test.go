@@ -6,7 +6,6 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/dhis2-sre/im-manager/pkg/inttest"
-	"github.com/dhis2-sre/im-manager/pkg/model"
 	"github.com/dhis2-sre/im-manager/pkg/stack"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -35,19 +34,25 @@ func TestStackHandler(t *testing.T) {
 	t.Run("GetStack", func(t *testing.T) {
 		t.Parallel()
 
-		// TODO: Don't use dto here... Use model.Stack once we actually return it
 		var dhis2 stack.Stack
 		client.GetJSON(t, "/stacks/dhis2", &dhis2)
 
 		assert.Equal(t, "dhis2", dhis2.Name)
+		assert.NotEmpty(t, dhis2.Parameters)
 	})
 
 	t.Run("GetAllStacks", func(t *testing.T) {
 		t.Parallel()
 
-		var stacks []model.Stack
+		var stacks []stack.Stack
 		client.GetJSON(t, "/stacks", &stacks)
 
 		assert.NotEmpty(t, stacks)
+		for _, s := range stacks {
+			assert.NotEmpty(t, s.Name)
+			for _, p := range s.Parameters {
+				assert.NotEmpty(t, p.ParameterName, "parameter in stack %q must include parameterName", s.Name)
+			}
+		}
 	})
 }
