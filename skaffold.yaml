@@ -45,7 +45,6 @@ deploy:
         repo: https://charts.bitnami.com/bitnami
         version: 14.4.2
         upgradeOnChange: true
-        wait: true
         useHelmSecrets: true
         valuesFiles:
           - helm/data/secrets/{{ .CLASSIFICATION }}/rabbitmq.yaml
