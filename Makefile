@@ -8,9 +8,6 @@ init:
 	pre-commit clean
 	pre-commit install --install-hooks --overwrite
 
-	go install github.com/direnv/direnv@latest
-	direnv version
-
 	go install golang.org/x/tools/cmd/goimports@latest
 
 	go install github.com/go-swagger/go-swagger/cmd/swagger@latest
