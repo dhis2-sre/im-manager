@@ -417,7 +417,7 @@ func (s service) FindExternalDownload(ctx context.Context, uuid uuid.UUID) (*mod
 	return s.repository.FindExternalDownload(ctx, uuid)
 }
 
-func (s service) Save(ctx context.Context, userId uint, database *model.Database, instance *model.DeploymentInstance, stack *model.Stack) error {
+func (s service) Save(ctx context.Context, userId uint, database *model.Database, instance *model.DeploymentInstance, stack *model.Stack, done func(ctx context.Context, saved *model.Database)) error {
 	lock := database.Lock
 	isLocked := lock != nil
 	if isLocked && (lock.InstanceID != instance.ID || lock.UserID != userId) {
@@ -499,6 +499,10 @@ func (s service) Save(ctx context.Context, userId uint, database *model.Database
 				s.logError(ctx, err)
 				return
 			}
+		}
+
+		if done != nil {
+			done(ctx, database)
 		}
 	})
 
