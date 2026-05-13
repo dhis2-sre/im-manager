@@ -200,7 +200,7 @@ func (h Handler) ResetPassword(c *gin.Context) {
 	//   415: Error
 	var request ResetPasswordRequest
 	if err := handler.DataBinder(c, &request); err != nil {
-		_ = c.Error(err)
+		_ = c.Error(errdef.NewBadRequest("%s", err))
 		return
 	}
 

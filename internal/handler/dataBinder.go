@@ -1,11 +1,9 @@
 package handler
 
 import (
-	"errors"
-
 	"github.com/dhis2-sre/im-manager/internal/errdef"
+
 	"github.com/gin-gonic/gin"
-	"github.com/go-playground/validator/v10"
 )
 
 func DataBinder(c *gin.Context, req interface{}) error {
@@ -14,10 +12,6 @@ func DataBinder(c *gin.Context, req interface{}) error {
 	}
 
 	if err := c.ShouldBind(req); err != nil {
-		var ve validator.ValidationErrors
-		if errors.As(err, &ve) {
-			return errdef.NewBadRequest("%s", err.Error())
-		}
 		return err
 	}
 
