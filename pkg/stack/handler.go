@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/dhis2-sre/im-manager/internal/errdef"
+	"github.com/dhis2-sre/im-manager/pkg/model"
 
 	"github.com/gin-gonic/gin"
 )
@@ -49,17 +50,16 @@ func (h Handler) Find(c *gin.Context) {
 		return
 	}
 
-	// TODO: Remove this and just return the stack once the front end has caught up
-	s := Stack{}
-	s.Name = stack.Name
+	c.JSON(http.StatusOK, toResponseStack(*stack))
+}
 
-	requires := make([]Stack, len(stack.Requires))
+func toResponseStack(stack model.Stack) Stack {
+	s := Stack{Name: stack.Name}
+
+	s.Requires = make([]Stack, len(stack.Requires))
 	for i, require := range stack.Requires {
-		requires[i] = Stack{
-			Name: require.Name,
-		}
+		s.Requires[i] = Stack{Name: require.Name}
 	}
-	s.Requires = requires
 
 	for parameterName, parameter := range stack.Parameters {
 		s.Parameters = append(s.Parameters, StackParameter{
@@ -72,7 +72,7 @@ func (h Handler) Find(c *gin.Context) {
 		})
 	}
 
-	c.JSON(http.StatusOK, s)
+	return s
 }
 
 // swagger:model StackParameter
@@ -114,5 +114,10 @@ func (h Handler) FindAll(c *gin.Context) {
 		_ = c.Error(fmt.Errorf("error loading stacks: %w", err))
 		return
 	}
-	c.JSON(http.StatusOK, stacks)
+
+	response := make([]Stack, len(stacks))
+	for i, stack := range stacks {
+		response[i] = toResponseStack(stack)
+	}
+	c.JSON(http.StatusOK, response)
 }

@@ -247,6 +247,31 @@ func TestInstanceHandler(t *testing.T) {
 		destroyDeployment(t, client, deployment.ID, tokens.AccessToken)
 	})
 
+	t.Run("SaveDatabase", func(t *testing.T) {
+		t.Parallel()
+
+		dbID := database.UploadTestDatabase(t, client, "save-test.sql.gz", "select now();", "group-name", inttest.WithAuthToken(tokens.AccessToken))
+
+		deployment := createDeployment(t, client, "save-deployment", tokens.AccessToken)
+		dbInstance := createDHIS2DBInstance(t, client, deployment.ID, dbID, tokens.AccessToken)
+
+		deployDeployment(t, client, deployment.ID, tokens.AccessToken)
+		groupedName := fmt.Sprintf("%s-%d", dbInstance.Name, dbInstance.Group.ID)
+		k8sClient.AssertPodIsReady(t, dbInstance.Group.Namespace, groupedName+"-database", 60)
+
+		originalSize := len(s3.GetObject(t, s3Bucket, "group-name/save-test.sql.gz"))
+
+		instanceIDStr := strconv.FormatUint(uint64(dbInstance.ID), 10)
+		client.Do(t, http.MethodPost, "/databases/save/"+instanceIDStr, nil, http.StatusAccepted, inttest.WithAuthToken(tokens.AccessToken))
+
+		require.Eventually(t, func() bool {
+			content := s3.GetObject(t, s3Bucket, "group-name/save-test.sql.gz")
+			return len(content) > originalSize
+		}, 60*time.Second, 500*time.Millisecond, "saved database in S3 should grow beyond the uploaded placeholder")
+
+		destroyDeployment(t, client, deployment.ID, tokens.AccessToken)
+	})
+
 	t.Run("UpdateDeployment", func(t *testing.T) {
 		t.Parallel()
 		deployment := createDeployment(t, client, "test-deployment-update", tokens.AccessToken, WithDescription("initial description"), WithTTL(86400))
@@ -261,16 +286,19 @@ func TestInstanceHandler(t *testing.T) {
 		t.Parallel()
 		deployment := createDeployment(t, client, "test-deployment-instance-update", tokens.AccessToken, WithDescription("some description"))
 
-		deploymentInstance := createWhoamiInstance(t, client, deployment.ID, tokens.AccessToken,
-			WithParameter("IMAGE_TAG", "0.6.0"),
+		createDHIS2DBInstance(t, client, deployment.ID, databaseID, tokens.AccessToken)
+		createMinioInstance(t, client, deployment.ID, tokens.AccessToken)
+		deploymentInstance := createDHIS2CoreInstance(t, client, deployment.ID, tokens.AccessToken,
+			WithParameter("IMAGE_TAG", "2.42.0"),
+			WithParameter("ALLOW_SUSPEND", "false"),
 			WithPublic(false))
 
 		updatedInstance := updateInstance(t, client, deploymentInstance, tokens.AccessToken,
-			WithParameter("IMAGE_TAG", "0.7.0"),
+			WithParameter("IMAGE_TAG", "2.43.0"),
 			WithPublic(true))
 
 		assert.Equal(t, deploymentInstance.ID, updatedInstance.ID)
-		assert.Equal(t, "0.7.0", updatedInstance.Parameters["IMAGE_TAG"].Value)
+		assert.Equal(t, "2.43.0", updatedInstance.Parameters["IMAGE_TAG"].Value)
 		assert.True(t, updatedInstance.Public)
 	})
 

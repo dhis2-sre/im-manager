@@ -309,7 +309,26 @@ func (h Handler) Save(c *gin.Context) {
 		return
 	}
 
-	err = h.databaseService.Save(ctx, user.ID, database, instance, stack)
+	deployment, err := h.instanceService.FindDeploymentById(ctx, instance.DeploymentID)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	coreInstance, err := getInstanceByStack("dhis2-core", deployment.Instances)
+	if err != nil && !errdef.IsNotFound(err) {
+		_ = c.Error(err)
+		return
+	}
+
+	err = h.databaseService.Save(ctx, user.ID, database, instance, stack, func(ctx context.Context, saved *model.Database) {
+		if coreInstance == nil {
+			return
+		}
+		if err := h.instanceService.FilestoreBackup(ctx, coreInstance, saved.Name, saved); err != nil {
+			h.logger.ErrorContext(ctx, "filestore backup failed", "groupName", saved.GroupName, "databaseName", saved.Name, "error", err)
+		}
+	})
 	if err != nil {
 		_ = c.Error(err)
 		return
