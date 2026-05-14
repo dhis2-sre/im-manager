@@ -302,9 +302,20 @@ func (h Handler) SaveInstance(c *gin.Context) {
 	}
 
 	ctx := c.Request.Context()
+	user, err := handler.GetUserFromContext(ctx)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
 	deployment, err := h.instanceService.FindDeploymentById(ctx, deploymentId)
 	if err != nil {
 		_ = c.Error(err)
+		return
+	}
+
+	if canWrite := handler.CanWriteDeployment(user, deployment); !canWrite {
+		_ = c.AbortWithError(http.StatusUnauthorized, fmt.Errorf("write access denied"))
 		return
 	}
 
