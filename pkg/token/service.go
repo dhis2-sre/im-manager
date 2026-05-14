@@ -108,7 +108,7 @@ func (t TokenService) GetTokens(user *model.User, previousRefreshTokenId string,
 func (t TokenService) ValidateRefreshToken(ctx context.Context, tokenString string) (*RefreshTokenData, error) {
 	claims, err := helper.ValidateRefreshToken(tokenString, t.refreshTokenSecretKey)
 	if err != nil {
-		t.logger.ErrorContext(ctx, "Unable to validate token", "error", err, "token", tokenString)
+		t.logger.ErrorContext(ctx, "Unable to validate token", "error", err)
 		return nil, errors.New("unable to verify refresh token")
 	}
 
