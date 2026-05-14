@@ -818,13 +818,8 @@ func (h Handler) ExternalDownload(c *gin.Context) {
 	//
 	// Download a given database without authentication
 	//
-	// Security:
-	//	oauth2:
-	//
 	// Responses:
 	//	200: DownloadDatabaseResponse
-	//	401: Error
-	//	403: Error
 	//	404: Error
 	//	415: Error
 	uuidParam := c.Param("uuid")
