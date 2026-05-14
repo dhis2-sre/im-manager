@@ -312,19 +312,13 @@ func (h Handler) RefreshToken(c *gin.Context) {
 		return
 	}
 
-	var rememberMe bool
-	rememberMeCookie, _ := c.Cookie("rememberMe")
-	if rememberMeCookie == "true" {
-		rememberMe = true
-	}
-
-	tokens, err := h.tokenService.GetTokens(user, refreshToken.ID.String(), rememberMe)
+	tokens, err := h.tokenService.GetTokens(user, refreshToken.ID.String(), refreshToken.RememberMe)
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
 
-	h.setCookies(c, tokens, rememberMe)
+	h.setCookies(c, tokens, refreshToken.RememberMe)
 
 	c.Status(http.StatusCreated)
 }

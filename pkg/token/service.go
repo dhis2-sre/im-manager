@@ -58,6 +58,7 @@ type RefreshTokenData struct {
 	SignedToken string
 	ID          uuid.UUID
 	UserId      uint
+	RememberMe  bool
 }
 
 type TokenService struct {
@@ -88,7 +89,7 @@ func (t TokenService) GetTokens(user *model.User, previousRefreshTokenId string,
 		expiration = t.refreshTokenRememberMeExpirationSeconds
 	}
 
-	refreshToken, err := helper.GenerateRefreshToken(user, t.refreshTokenSecretKey, expiration)
+	refreshToken, err := helper.GenerateRefreshToken(user, t.refreshTokenSecretKey, expiration, rememberMe)
 	if err != nil {
 		return nil, fmt.Errorf("error generating refreshToken for user: %+v\nError: %s", user, err)
 	}
@@ -122,6 +123,7 @@ func (t TokenService) ValidateRefreshToken(ctx context.Context, tokenString stri
 		SignedToken: tokenString,
 		ID:          tokenId,
 		UserId:      claims.UserId,
+		RememberMe:  claims.RememberMe,
 	}, nil
 }
 
