@@ -135,6 +135,9 @@ func (t TokenService) RefreshAccessToken(accessToken string) (string, error) {
 	return helper.RefreshAccessToken(accessToken, t.privateKey, t.refreshAccessTokenExpirationSeconds)
 }
 
+// extractUserIdInsecure does a best-effort extraction of the userId claim from a JWT without
+// verifying the signature. It is used only for logging context when validation has already failed,
+// so parse errors are intentionally ignored — the caller's error is the one that matters.
 func extractUserIdInsecure(tokenString string) any {
 	token, err := jwt.ParseInsecure([]byte(tokenString))
 	if err != nil {
