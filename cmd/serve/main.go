@@ -480,6 +480,15 @@ func newInstanceService(logger *slog.Logger, db *gorm.DB, stackService stack.Ser
 		return nil, err
 	}
 	instanceRepository := instance.NewRepository(db, instanceParameterEncryptionKey)
+
+	allStacks, err := stackService.FindAll()
+	if err != nil {
+		return nil, fmt.Errorf("failed to load stacks for encryption migration: %v", err)
+	}
+	if err := instanceRepository.MigrateLegacyEncryption(allStacks); err != nil {
+		return nil, fmt.Errorf("failed to migrate legacy parameter encryption: %v", err)
+	}
+
 	classification, err := requireEnv("CLASSIFICATION")
 	if err != nil {
 		return nil, err

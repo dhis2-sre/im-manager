@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strings"
 
 	"github.com/gosimple/slug"
 
@@ -24,6 +25,54 @@ func NewRepository(db *gorm.DB, instanceParameterEncryptionKey string) *reposito
 type repository struct {
 	db                             *gorm.DB
 	instanceParameterEncryptionKey string
+}
+
+// MigrateLegacyEncryption re-encrypts all AES-CFB instance parameters to AES-GCM.
+// It is idempotent: parameters already in GCM format (v2: prefix) are skipped.
+func (r repository) MigrateLegacyEncryption(stacks []model.Stack) error {
+	sensitiveParams := map[string]map[string]bool{}
+	for _, s := range stacks {
+		m := map[string]bool{}
+		for name, p := range s.Parameters {
+			if p.Sensitive {
+				m[name] = true
+			}
+		}
+		sensitiveParams[s.Name] = m
+	}
+
+	var params []model.DeploymentInstanceParameter
+	if err := r.db.Find(&params).Error; err != nil {
+		return fmt.Errorf("failed to load instance parameters: %w", err)
+	}
+
+	for _, param := range params {
+		if !sensitiveParams[param.StackName][param.ParameterName] {
+			continue
+		}
+		if strings.HasPrefix(param.Value, gcmPrefix) {
+			continue
+		}
+
+		plaintext, err := decryptCFB(r.instanceParameterEncryptionKey, param.Value)
+		if err != nil {
+			return fmt.Errorf("failed to decrypt legacy parameter %q on instance %d: %w", param.ParameterName, param.DeploymentInstanceID, err)
+		}
+
+		encrypted, err := encryptText(r.instanceParameterEncryptionKey, plaintext)
+		if err != nil {
+			return fmt.Errorf("failed to re-encrypt parameter %q on instance %d: %w", param.ParameterName, param.DeploymentInstanceID, err)
+		}
+
+		err = r.db.Model(&param).
+			Where("deployment_instance_id = ? AND parameter_name = ?", param.DeploymentInstanceID, param.ParameterName).
+			Update("value", encrypted).Error
+		if err != nil {
+			return fmt.Errorf("failed to save re-encrypted parameter %q on instance %d: %w", param.ParameterName, param.DeploymentInstanceID, err)
+		}
+	}
+
+	return nil
 }
 
 func (r repository) DeleteDeploymentInstance(ctx context.Context, instance *model.DeploymentInstance) error {
