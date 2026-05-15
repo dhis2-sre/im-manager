@@ -23,6 +23,9 @@ ARG AWS_IAM_AUTHENTICATOR_CHECKSUM_AMD64=aef183b5b92f2cb135107234c7440f43638caa3
 ARG AWS_IAM_AUTHENTICATOR_CHECKSUM_ARM64=80ab2b0d5a139e55408c785703e8fef8f4974a73409046b3e13df19b2a780a51
 
 # https://github.com/cespare/reflex/releases
+# reflex has no pre-built binaries; go install verifies the module against the Go
+# checksum database (sum.golang.org), which provides tamper-evident verification.
+# GONOSUMDB="" (the default) is set explicitly to confirm the sum DB is not bypassed.
 ARG REFLEX_VERSION=v0.3.1
 
 RUN apk add gcc musl-dev git && \
@@ -51,7 +54,7 @@ RUN apk add gcc musl-dev git && \
     install -o root -g root -m 0755 aws-iam-authenticator /usr/bin/aws-iam-authenticator
 
 WORKDIR /src
-RUN go install github.com/cespare/reflex@${REFLEX_VERSION}
+RUN GONOSUMDB="" go install github.com/cespare/reflex@${REFLEX_VERSION}
 COPY go.mod go.sum ./
 RUN go mod download -x
 COPY . .
