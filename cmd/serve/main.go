@@ -566,8 +566,8 @@ func newDatabaseHandler(ctx context.Context, logger *slog.Logger, db *gorm.DB, g
 		return database.Handler{}, err
 	}
 	databaseRepository := database.NewRepository(db)
-	notificationRepo := notification.NewRepository(db)
-	publisher, err := notification.NewPublisher(logger, env, streamName, notificationRepo)
+	notificationRepository := notification.NewRepository(db)
+	publisher, err := notification.NewPublisher(logger, env, streamName, notificationRepository)
 	if err != nil {
 		return database.Handler{}, fmt.Errorf("failed to create database notification publisher: %w", err)
 	}
