@@ -225,7 +225,7 @@ func (h Handler) SaveAs(c *gin.Context) {
 			return
 		}
 		publishFS := func(status, errMsg string) {
-			publishEvent(ctx, h.logger, h.publisher, user.ID, saved.GroupName, kindFilestoreBackup, databaseEvent{
+			h.publisher.Publish(ctx, user.ID, saved.GroupName, kindFilestoreBackup, databaseEvent{
 				Status:       status,
 				DatabaseID:   saved.ID,
 				DatabaseName: saved.Name,
@@ -335,7 +335,7 @@ func (h Handler) Save(c *gin.Context) {
 			return
 		}
 		publishFS := func(status, errMsg string) {
-			publishEvent(ctx, h.logger, h.publisher, user.ID, saved.GroupName, kindFilestoreBackup, databaseEvent{
+			h.publisher.Publish(ctx, user.ID, saved.GroupName, kindFilestoreBackup, databaseEvent{
 				Status:       status,
 				DatabaseID:   saved.ID,
 				DatabaseName: saved.Name,

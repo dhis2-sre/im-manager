@@ -27,9 +27,10 @@ import (
 )
 
 // Publisher publishes notifications for async database operations.
-// The implementation owns JSON marshaling — callers pass typed payloads.
+// The implementation owns JSON marshaling and error handling — callers pass typed
+// payloads and never see failures.
 type Publisher interface {
-	Publish(ctx context.Context, userID uint, groupName, kind string, payload any) error
+	Publish(ctx context.Context, userID uint, groupName, kind string, payload any)
 }
 
 //goland:noinspection GoExportedFuncWithUnexportedType
@@ -553,7 +554,7 @@ func (s service) SaveAs(ctx context.Context, userId uint, database *model.Databa
 	ctx = context.WithoutCancel(ctx)
 	go func() {
 		publish := func(status, errMsg string, size int64) {
-			publishEvent(ctx, s.logger, s.publisher, userId, newDatabase.GroupName, kindDatabaseSave, databaseEvent{
+			s.publisher.Publish(ctx, userId, newDatabase.GroupName, kindDatabaseSave, databaseEvent{
 				Status:       status,
 				DatabaseID:   newDatabase.ID,
 				DatabaseName: newDatabase.Name,

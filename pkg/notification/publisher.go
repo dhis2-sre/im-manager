@@ -55,10 +55,11 @@ func (p *Publisher) Close() error {
 	return p.producer.Close()
 }
 
-func (p *Publisher) Publish(ctx context.Context, userID uint, groupName, kind string, payload any) error {
+func (p *Publisher) Publish(ctx context.Context, userID uint, groupName, kind string, payload any) {
 	data, err := json.Marshal(payload)
 	if err != nil {
-		return fmt.Errorf("marshal notification payload: %w", err)
+		p.logger.ErrorContext(ctx, "Failed to marshal notification payload", "kind", kind, "error", err)
+		return
 	}
 
 	n := &model.Notification{
@@ -68,7 +69,8 @@ func (p *Publisher) Publish(ctx context.Context, userID uint, groupName, kind st
 		Data:      string(data),
 	}
 	if err := p.repository.create(ctx, n); err != nil {
-		return fmt.Errorf("failed to persist notification: %w", err)
+		p.logger.ErrorContext(ctx, "Failed to persist notification", "kind", kind, "error", err)
+		return
 	}
 
 	msg := amqp.NewMessage(data)
@@ -82,6 +84,4 @@ func (p *Publisher) Publish(ctx context.Context, userID uint, groupName, kind st
 	if err := p.producer.Send(msg); err != nil {
 		p.logger.ErrorContext(ctx, "Failed to send notification to RabbitMQ", "kind", kind, "error", err)
 	}
-
-	return nil
 }

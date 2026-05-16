@@ -40,10 +40,10 @@ func TestDatabaseHandler(t *testing.T) {
 	s3Client := storage.NewS3Client(logger, s3.Client, uploader)
 
 	databaseRepository := database.NewRepository(db)
-	databaseService := database.NewService(logger, s3Bucket, s3Client, groupService{}, databaseRepository, nil, nil)
+	databaseService := database.NewService(logger, s3Bucket, s3Client, groupService{}, databaseRepository, nil, noopPublisher{})
 
 	client := inttest.SetupHTTPServer(t, func(engine *gin.Engine) {
-		databaseHandler := database.NewHandler(logger, databaseService, groupService{groupName: "packages"}, instanceService{}, stackService{}, nil)
+		databaseHandler := database.NewHandler(logger, databaseService, groupService{groupName: "packages"}, instanceService{}, stackService{}, noopPublisher{})
 		authenticator := func(c *gin.Context) {
 			ctx := model.NewContextWithUser(c.Request.Context(), &model.User{
 				ID:    1,
@@ -326,3 +326,7 @@ type stackService struct{}
 func (ss stackService) Find(name string) (*model.Stack, error) {
 	return nil, nil
 }
+
+type noopPublisher struct{}
+
+func (noopPublisher) Publish(context.Context, uint, string, string, any) {}
