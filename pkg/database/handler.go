@@ -38,6 +38,15 @@ type Handler struct {
 	publisher       Publisher
 }
 
+func (h Handler) publishFilestoreBackup(ctx context.Context, userID uint, db *model.Database, status, errMsg string) {
+	h.publisher.Publish(ctx, userID, db.GroupName, kindFilestoreBackup, databaseEvent{
+		Status:       status,
+		DatabaseID:   db.ID,
+		DatabaseName: db.Name,
+		Error:        errMsg,
+	})
+}
+
 type instanceService interface {
 	FindDecryptedDeploymentInstanceById(ctx context.Context, id uint) (*model.DeploymentInstance, error)
 	FindDeploymentById(ctx context.Context, id uint) (*model.Deployment, error)
@@ -224,21 +233,13 @@ func (h Handler) SaveAs(c *gin.Context) {
 		if coreInstance == nil {
 			return
 		}
-		publishFS := func(status, errMsg string) {
-			h.publisher.Publish(ctx, user.ID, saved.GroupName, kindFilestoreBackup, databaseEvent{
-				Status:       status,
-				DatabaseID:   saved.ID,
-				DatabaseName: saved.Name,
-				Error:        errMsg,
-			})
-		}
-		publishFS("started", "")
+		h.publishFilestoreBackup(ctx, user.ID, saved, "started", "")
 		if err := h.instanceService.FilestoreBackup(ctx, coreInstance, saved.Name, saved); err != nil {
 			h.logger.ErrorContext(ctx, "filestore backup failed", "groupName", saved.GroupName, "databaseName", saved.Name, "error", err)
-			publishFS("error", err.Error())
+			h.publishFilestoreBackup(ctx, user.ID, saved, "error", err.Error())
 			return
 		}
-		publishFS("success", "")
+		h.publishFilestoreBackup(ctx, user.ID, saved, "success", "")
 	})
 	if err != nil {
 		_ = c.Error(err)
@@ -334,21 +335,13 @@ func (h Handler) Save(c *gin.Context) {
 		if coreInstance == nil {
 			return
 		}
-		publishFS := func(status, errMsg string) {
-			h.publisher.Publish(ctx, user.ID, saved.GroupName, kindFilestoreBackup, databaseEvent{
-				Status:       status,
-				DatabaseID:   saved.ID,
-				DatabaseName: saved.Name,
-				Error:        errMsg,
-			})
-		}
-		publishFS("started", "")
+		h.publishFilestoreBackup(ctx, user.ID, saved, "started", "")
 		if err := h.instanceService.FilestoreBackup(ctx, coreInstance, saved.Name, saved); err != nil {
 			h.logger.ErrorContext(ctx, "filestore backup failed", "groupName", saved.GroupName, "databaseName", saved.Name, "error", err)
-			publishFS("error", err.Error())
+			h.publishFilestoreBackup(ctx, user.ID, saved, "error", err.Error())
 			return
 		}
-		publishFS("success", "")
+		h.publishFilestoreBackup(ctx, user.ID, saved, "success", "")
 	})
 	if err != nil {
 		_ = c.Error(err)
