@@ -554,13 +554,7 @@ func (s service) SaveAs(ctx context.Context, userId uint, database *model.Databa
 	ctx = context.WithoutCancel(ctx)
 	go func() {
 		publish := func(status, errMsg string, size int64) {
-			s.publisher.Publish(ctx, userId, newDatabase.GroupName, kindDatabaseSave, databaseEvent{
-				Status:       status,
-				DatabaseID:   newDatabase.ID,
-				DatabaseName: newDatabase.Name,
-				Size:         size,
-				Error:        errMsg,
-			})
+			s.publisher.Publish(ctx, userId, newDatabase.GroupName, kindDatabaseSave, newDatabaseEvent(newDatabase, status, errMsg, size))
 		}
 
 		podExecutor, err := s.podExecutor(group.Cluster)
