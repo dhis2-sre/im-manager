@@ -4,7 +4,6 @@ import (
 	"cmp"
 	"compress/gzip"
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
@@ -28,8 +27,9 @@ import (
 )
 
 // Publisher publishes notifications for async database operations.
+// The implementation owns JSON marshaling — callers pass typed payloads.
 type Publisher interface {
-	Publish(ctx context.Context, userID uint, groupName, kind string, data []byte) error
+	Publish(ctx context.Context, userID uint, groupName, kind string, payload any) error
 }
 
 //goland:noinspection GoExportedFuncWithUnexportedType
@@ -553,30 +553,13 @@ func (s service) SaveAs(ctx context.Context, userId uint, database *model.Databa
 	ctx = context.WithoutCancel(ctx)
 	go func() {
 		publish := func(status, errMsg string, size int64) {
-			if s.publisher == nil {
-				return
-			}
-			type payload struct {
-				Status       string `json:"status"`
-				DatabaseID   uint   `json:"databaseId"`
-				DatabaseName string `json:"databaseName"`
-				Size         int64  `json:"size,omitempty"`
-				Error        string `json:"error,omitempty"`
-			}
-			data, err := json.Marshal(payload{
+			publishEvent(ctx, s.logger, s.publisher, userId, newDatabase.GroupName, kindDatabaseSave, databaseEvent{
 				Status:       status,
 				DatabaseID:   newDatabase.ID,
 				DatabaseName: newDatabase.Name,
 				Size:         size,
 				Error:        errMsg,
 			})
-			if err != nil {
-				s.logger.ErrorContext(ctx, "failed to marshal save notification", "error", err)
-				return
-			}
-			if err := s.publisher.Publish(ctx, userId, group.Name, "database-save", data); err != nil {
-				s.logger.ErrorContext(ctx, "failed to publish save notification", "error", err)
-			}
 		}
 
 		podExecutor, err := s.podExecutor(group.Cluster)

@@ -2,6 +2,7 @@ package notification
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"strconv"
@@ -54,7 +55,12 @@ func (p *Publisher) Close() error {
 	return p.producer.Close()
 }
 
-func (p *Publisher) Publish(ctx context.Context, userID uint, groupName, kind string, data []byte) error {
+func (p *Publisher) Publish(ctx context.Context, userID uint, groupName, kind string, payload any) error {
+	data, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("marshal notification payload: %w", err)
+	}
+
 	n := &model.Notification{
 		UserID:    userID,
 		GroupName: groupName,

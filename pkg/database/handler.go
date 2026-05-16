@@ -2,7 +2,6 @@ package database
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -37,31 +36,6 @@ type Handler struct {
 	instanceService instanceService
 	stackService    stackService
 	publisher       Publisher
-}
-
-func (h Handler) publishFilestoreBackup(ctx context.Context, userID uint, database *model.Database, status, errMsg string) {
-	if h.publisher == nil {
-		return
-	}
-	type payload struct {
-		Status       string `json:"status"`
-		DatabaseID   uint   `json:"databaseId"`
-		DatabaseName string `json:"databaseName"`
-		Error        string `json:"error,omitempty"`
-	}
-	data, err := json.Marshal(payload{
-		Status:       status,
-		DatabaseID:   database.ID,
-		DatabaseName: database.Name,
-		Error:        errMsg,
-	})
-	if err != nil {
-		h.logger.ErrorContext(ctx, "failed to marshal filestore-backup notification", "error", err)
-		return
-	}
-	if err := h.publisher.Publish(ctx, userID, database.GroupName, "filestore-backup", data); err != nil {
-		h.logger.ErrorContext(ctx, "failed to publish filestore-backup notification", "error", err)
-	}
 }
 
 type instanceService interface {
@@ -250,13 +224,21 @@ func (h Handler) SaveAs(c *gin.Context) {
 		if coreInstance == nil {
 			return
 		}
-		h.publishFilestoreBackup(ctx, user.ID, saved, "started", "")
+		publishFS := func(status, errMsg string) {
+			publishEvent(ctx, h.logger, h.publisher, user.ID, saved.GroupName, kindFilestoreBackup, databaseEvent{
+				Status:       status,
+				DatabaseID:   saved.ID,
+				DatabaseName: saved.Name,
+				Error:        errMsg,
+			})
+		}
+		publishFS("started", "")
 		if err := h.instanceService.FilestoreBackup(ctx, coreInstance, saved.Name, saved); err != nil {
 			h.logger.ErrorContext(ctx, "filestore backup failed", "groupName", saved.GroupName, "databaseName", saved.Name, "error", err)
-			h.publishFilestoreBackup(ctx, user.ID, saved, "error", err.Error())
+			publishFS("error", err.Error())
 			return
 		}
-		h.publishFilestoreBackup(ctx, user.ID, saved, "success", "")
+		publishFS("success", "")
 	})
 	if err != nil {
 		_ = c.Error(err)
@@ -352,13 +334,21 @@ func (h Handler) Save(c *gin.Context) {
 		if coreInstance == nil {
 			return
 		}
-		h.publishFilestoreBackup(ctx, user.ID, saved, "started", "")
+		publishFS := func(status, errMsg string) {
+			publishEvent(ctx, h.logger, h.publisher, user.ID, saved.GroupName, kindFilestoreBackup, databaseEvent{
+				Status:       status,
+				DatabaseID:   saved.ID,
+				DatabaseName: saved.Name,
+				Error:        errMsg,
+			})
+		}
+		publishFS("started", "")
 		if err := h.instanceService.FilestoreBackup(ctx, coreInstance, saved.Name, saved); err != nil {
 			h.logger.ErrorContext(ctx, "filestore backup failed", "groupName", saved.GroupName, "databaseName", saved.Name, "error", err)
-			h.publishFilestoreBackup(ctx, user.ID, saved, "error", err.Error())
+			publishFS("error", err.Error())
 			return
 		}
-		h.publishFilestoreBackup(ctx, user.ID, saved, "success", "")
+		publishFS("success", "")
 	})
 	if err != nil {
 		_ = c.Error(err)
