@@ -207,16 +207,16 @@ func (h Handler) SaveAs(c *gin.Context) {
 		return
 	}
 
-	var coreInstance *model.DeploymentInstance
-	if deployment, err := h.instanceService.FindDeploymentById(ctx, instance.DeploymentID); err != nil {
-		h.logger.ErrorContext(ctx, "failed to find deployment, skipping filestore backup", "deploymentId", instance.DeploymentID, "error", err)
-	} else {
-		ci, err := getInstanceByStack("dhis2-core", deployment.Instances)
-		if err != nil && !errdef.IsNotFound(err) {
-			h.logger.ErrorContext(ctx, "failed to find dhis2-core instance, skipping filestore backup", "error", err)
-		} else {
-			coreInstance = ci
-		}
+	deployment, err := h.instanceService.FindDeploymentById(ctx, instance.DeploymentID)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	coreInstance, err := getInstanceByStack("dhis2-core", deployment.Instances)
+	if err != nil && !errdef.IsNotFound(err) {
+		_ = c.Error(err)
+		return
 	}
 
 	savedDatabase, err := h.databaseService.SaveAs(ctx, user.ID, database, instance, stack, request.Name, request.Format, func(ctx context.Context, saved *model.Database) {
