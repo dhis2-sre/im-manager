@@ -445,6 +445,34 @@ definitions:
             keys to sets of values.
         type: object
         x-go-package: net/textproto
+    Notification:
+        properties:
+            createdAt:
+                format: date-time
+                type: string
+                x-go-name: CreatedAt
+            data:
+                type: string
+                x-go-name: Data
+            groupName:
+                type: string
+                x-go-name: GroupName
+            id:
+                format: uint64
+                type: integer
+                x-go-name: ID
+            kind:
+                type: string
+                x-go-name: Kind
+            read:
+                type: boolean
+                x-go-name: Read
+            userId:
+                format: uint64
+                type: integer
+                x-go-name: UserID
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/model
     PublicInstance:
         properties:
             description:
@@ -2057,6 +2085,57 @@ paths:
             security:
                 - oauth2: []
             summary: User details
+    /notifications:
+        get:
+            description: List notifications for the authenticated user, ordered newest first.
+            operationId: listNotifications
+            responses:
+                "200":
+                    $ref: '#/responses/Notification'
+                "401":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: List notifications
+    /notifications/{id}/read:
+        put:
+            description: Mark a notification as read by its id.
+            operationId: markNotificationRead
+            parameters:
+                - format: uint64
+                  in: path
+                  name: id
+                  required: true
+                  type: integer
+                  x-go-name: ID
+            responses:
+                "204":
+                    description: ""
+                "401":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Mark notification as read
+    /notifications/read-all:
+        put:
+            description: Mark all notifications as read for the authenticated user.
+            operationId: markAllNotificationsRead
+            responses:
+                "204":
+                    description: ""
+                "401":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Mark all notifications as read
     /refresh:
         post:
             description: Refresh user tokens
@@ -2386,6 +2465,12 @@ responses:
         description: ""
         schema:
             $ref: '#/definitions/Lock'
+    Notification:
+        description: ""
+        schema:
+            items:
+                $ref: '#/definitions/Notification'
+            type: array
     Response:
         description: ""
         schema:

@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"compress/gzip"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
@@ -26,8 +27,13 @@ import (
 	"github.com/google/uuid"
 )
 
+// Publisher publishes notifications for async database operations.
+type Publisher interface {
+	Publish(ctx context.Context, userID uint, groupName, kind string, data []byte) error
+}
+
 //goland:noinspection GoExportedFuncWithUnexportedType
-func NewService(logger *slog.Logger, s3Bucket string, s3Client S3Client, groupService groupService, repository *repository, podExecutor podExecutorFunc) *service {
+func NewService(logger *slog.Logger, s3Bucket string, s3Client S3Client, groupService groupService, repository *repository, podExecutor podExecutorFunc, publisher Publisher) *service {
 	return &service{
 		logger:       logger,
 		s3Bucket:     s3Bucket,
@@ -35,6 +41,7 @@ func NewService(logger *slog.Logger, s3Bucket string, s3Client S3Client, groupSe
 		groupService: groupService,
 		repository:   repository,
 		podExecutor:  podExecutor,
+		publisher:    publisher,
 	}
 }
 
@@ -55,6 +62,7 @@ type service struct {
 	groupService groupService
 	repository   *repository
 	podExecutor  podExecutorFunc
+	publisher    Publisher
 }
 
 type S3Client interface {
@@ -544,15 +552,44 @@ func (s service) SaveAs(ctx context.Context, userId uint, database *model.Databa
 
 	ctx = context.WithoutCancel(ctx)
 	go func() {
+		publish := func(status, errMsg string, size int64) {
+			if s.publisher == nil {
+				return
+			}
+			type payload struct {
+				Status       string `json:"status"`
+				DatabaseID   uint   `json:"databaseId"`
+				DatabaseName string `json:"databaseName"`
+				Size         int64  `json:"size,omitempty"`
+				Error        string `json:"error,omitempty"`
+			}
+			data, err := json.Marshal(payload{
+				Status:       status,
+				DatabaseID:   newDatabase.ID,
+				DatabaseName: newDatabase.Name,
+				Size:         size,
+				Error:        errMsg,
+			})
+			if err != nil {
+				s.logger.ErrorContext(ctx, "failed to marshal save notification", "error", err)
+				return
+			}
+			if err := s.publisher.Publish(ctx, userId, group.Name, "database-save", data); err != nil {
+				s.logger.ErrorContext(ctx, "failed to publish save notification", "error", err)
+			}
+		}
+
 		podExecutor, err := s.podExecutor(group.Cluster)
 		if err != nil {
 			s.logError(ctx, err)
+			publish("error", err.Error(), 0)
 			return
 		}
 
 		hostname, err := stack.ParameterProviders["DATABASE_HOSTNAME"].Provide(*instance)
 		if err != nil {
 			s.logError(ctx, err)
+			publish("error", err.Error(), 0)
 			return
 		}
 		// TODO: get pod by label selector instead
@@ -575,32 +612,38 @@ func (s service) SaveAs(ctx context.Context, userId uint, database *model.Databa
 		}()
 
 		s.logger.InfoContext(ctx, "starting pg_dump", "pod", podName, "namespace", namespace, "command", strings.Join(command, " "))
+		publish("started", "", 0)
 
 		if err := execPgDump(ctx, podExecutor, namespace, podName, command, pw, format, newDatabase.Name); err != nil {
 			s.logger.ErrorContext(ctx, "failed to exec pg_dump", "error", err)
 			<-uploadDone
+			publish("error", err.Error(), 0)
 			return
 		}
 
 		result := <-uploadDone
 		if result.err != nil {
 			s.logError(ctx, result.err)
+			publish("error", result.err.Error(), 0)
 			return
 		}
 
 		saved, err := s.repository.FindById(ctx, newDatabase.ID)
 		if err != nil {
 			s.logError(ctx, err)
+			publish("error", err.Error(), 0)
 			return
 		}
 		saved.Url = fmt.Sprintf("s3://%s/%s", s.s3Bucket, key)
 		saved.Size = result.size
 		if err := s.repository.Save(ctx, saved); err != nil {
 			s.logError(ctx, err)
+			publish("error", err.Error(), 0)
 			return
 		}
 
 		s.logger.InfoContext(ctx, "pg_dump completed successfully", "key", key, "size", result.size)
+		publish("success", "", result.size)
 		done(ctx, saved)
 	}()
 
