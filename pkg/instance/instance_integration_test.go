@@ -108,7 +108,7 @@ func TestInstanceHandler(t *testing.T) {
 	databaseRepository := database.NewRepository(db)
 	databaseService := database.NewService(logger, s3Bucket, s3Client, groupService, databaseRepository, func(c model.Cluster) (database.PodExecutor, error) {
 		return instance.NewKubernetesService(c)
-	}, noopPublisher{})
+	}, noopPublisher{}, func(context.Context, *model.DeploymentInstance, string, *model.Database) error { return nil })
 
 	authenticator := func(c *gin.Context) {
 		ctx := model.NewContextWithUser(c.Request.Context(), user)
@@ -119,7 +119,7 @@ func TestInstanceHandler(t *testing.T) {
 		instanceHandler := instance.NewHandler(stackService, groupService, instanceService, twoDayTTL)
 		instance.Routes(engine, authenticator, instanceHandler)
 
-		databaseHandler := database.NewHandler(logger, databaseService, groupService, instanceService, stackService, noopPublisher{})
+		databaseHandler := database.NewHandler(logger, databaseService, groupService, instanceService, stackService)
 		database.Routes(engine, authenticator, databaseHandler)
 	})
 

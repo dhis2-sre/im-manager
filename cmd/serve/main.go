@@ -573,9 +573,9 @@ func newDatabaseHandler(ctx context.Context, logger *slog.Logger, db *gorm.DB, g
 	}
 	databaseService := database.NewService(logger, s3Bucket, s3Client, groupService, databaseRepository, func(c model.Cluster) (database.PodExecutor, error) {
 		return instance.NewKubernetesService(c)
-	}, publisher)
+	}, publisher, instanceService.FilestoreBackup)
 
-	return database.NewHandler(logger, databaseService, groupService, instanceService, stackService, publisher), nil
+	return database.NewHandler(logger, databaseService, groupService, instanceService, stackService), nil
 }
 
 func newS3Client(ctx context.Context, logger *slog.Logger) (*storage.S3Client, error) {

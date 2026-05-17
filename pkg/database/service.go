@@ -34,15 +34,16 @@ type Publisher interface {
 }
 
 //goland:noinspection GoExportedFuncWithUnexportedType
-func NewService(logger *slog.Logger, s3Bucket string, s3Client S3Client, groupService groupService, repository *repository, podExecutor podExecutorFunc, publisher Publisher) *service {
+func NewService(logger *slog.Logger, s3Bucket string, s3Client S3Client, groupService groupService, repository *repository, podExecutor podExecutorFunc, publisher Publisher, filestoreBackup FilestoreBackuper) *service {
 	return &service{
-		logger:       logger,
-		s3Bucket:     s3Bucket,
-		s3Client:     s3Client,
-		groupService: groupService,
-		repository:   repository,
-		podExecutor:  podExecutor,
-		publisher:    publisher,
+		logger:          logger,
+		s3Bucket:        s3Bucket,
+		s3Client:        s3Client,
+		groupService:    groupService,
+		repository:      repository,
+		podExecutor:     podExecutor,
+		publisher:       publisher,
+		filestoreBackup: filestoreBackup,
 	}
 }
 
@@ -56,14 +57,19 @@ type PodExecutor interface {
 
 type podExecutorFunc func(cluster model.Cluster) (PodExecutor, error)
 
+// FilestoreBackuper backs up the file store associated with a database. Used after pg_dump
+// inside service.SaveAs's goroutine so the HTTP request returns quickly.
+type FilestoreBackuper func(ctx context.Context, instance *model.DeploymentInstance, name string, database *model.Database) error
+
 type service struct {
-	logger       *slog.Logger
-	s3Bucket     string
-	s3Client     S3Client
-	groupService groupService
-	repository   *repository
-	podExecutor  podExecutorFunc
-	publisher    Publisher
+	logger          *slog.Logger
+	s3Bucket        string
+	s3Client        S3Client
+	groupService    groupService
+	repository      *repository
+	podExecutor     podExecutorFunc
+	publisher       Publisher
+	filestoreBackup FilestoreBackuper
 }
 
 type S3Client interface {
@@ -426,7 +432,7 @@ func (s service) FindExternalDownload(ctx context.Context, uuid uuid.UUID) (*mod
 	return s.repository.FindExternalDownload(ctx, uuid)
 }
 
-func (s service) Save(ctx context.Context, userId uint, database *model.Database, instance *model.DeploymentInstance, stack *model.Stack, done func(ctx context.Context, saved *model.Database)) error {
+func (s service) Save(ctx context.Context, userId uint, database *model.Database, instance *model.DeploymentInstance, stack *model.Stack, coreInstance *model.DeploymentInstance) error {
 	lock := database.Lock
 	isLocked := lock != nil
 	if isLocked && (lock.InstanceID != instance.ID || lock.UserID != userId) {
@@ -448,7 +454,7 @@ func (s service) Save(ctx context.Context, userId uint, database *model.Database
 
 	tmpName := uuid.New().String()
 	format := getFormat(database)
-	_, err := s.SaveAs(ctx, database.UserID, database, instance, stack, tmpName, format, func(ctx context.Context, saved *model.Database) {
+	_, err := s.SaveAs(ctx, database.UserID, instance, stack, coreInstance, tmpName, format, func(ctx context.Context, saved *model.Database) {
 		defer func() {
 			if !isLocked {
 				err := s.repository.Unlock(ctx, database.ID)
@@ -501,6 +507,9 @@ func (s service) Save(ctx context.Context, userId uint, database *model.Database
 			s.logError(ctx, err)
 			return
 		}
+		// Align in-memory saved with the now-renamed/ID-swapped row so the SaveAs
+		// goroutine's downstream filestore-backup step refetches the correct row.
+		saved.ID = database.ID
 
 		if database.Lock != nil {
 			_, err := s.repository.Lock(ctx, database.ID, database.Lock.InstanceID, database.Lock.UserID)
@@ -508,10 +517,6 @@ func (s service) Save(ctx context.Context, userId uint, database *model.Database
 				s.logError(ctx, err)
 				return
 			}
-		}
-
-		if done != nil {
-			done(ctx, database)
 		}
 	})
 
@@ -525,7 +530,7 @@ func getFormat(database *model.Database) string {
 	return "plain"
 }
 
-func (s service) SaveAs(ctx context.Context, userId uint, database *model.Database, instance *model.DeploymentInstance, stack *model.Stack, newName string, format string, done func(ctx context.Context, saved *model.Database)) (*model.Database, error) {
+func (s service) SaveAs(ctx context.Context, userId uint, instance *model.DeploymentInstance, stack *model.Stack, coreInstance *model.DeploymentInstance, newName string, format string, done func(ctx context.Context, saved *model.Database)) (*model.Database, error) {
 	group, err := s.groupService.Find(ctx, instance.GroupName)
 	if err != nil {
 		return nil, err
@@ -622,7 +627,29 @@ func (s service) SaveAs(ctx context.Context, userId uint, database *model.Databa
 
 		s.logger.InfoContext(ctx, "pg_dump completed successfully", "key", key, "size", result.size)
 		publish("success", "", result.size)
-		done(ctx, saved)
+
+		if done != nil {
+			done(ctx, saved)
+		}
+
+		if coreInstance == nil {
+			return
+		}
+
+		// Refetch in case done mutated row identity (Save renames + ID-swaps).
+		// This also ensures filestoreBackup writes back a struct with up-to-date fields.
+		fsTarget, err := s.repository.FindById(ctx, saved.ID)
+		if err != nil {
+			s.logger.ErrorContext(ctx, "failed to refetch database for filestore backup", "id", saved.ID, "error", err)
+			return
+		}
+		s.publisher.Publish(ctx, userId, fsTarget.GroupName, kindFilestoreBackup, newDatabaseEvent(fsTarget, "started", "", 0))
+		if err := s.filestoreBackup(ctx, coreInstance, fsTarget.Name, fsTarget); err != nil {
+			s.logger.ErrorContext(ctx, "filestore backup failed", "groupName", fsTarget.GroupName, "databaseName", fsTarget.Name, "error", err)
+			s.publisher.Publish(ctx, userId, fsTarget.GroupName, kindFilestoreBackup, newDatabaseEvent(fsTarget, "error", err.Error(), 0))
+			return
+		}
+		s.publisher.Publish(ctx, userId, fsTarget.GroupName, kindFilestoreBackup, newDatabaseEvent(fsTarget, "success", "", 0))
 	}()
 
 	return newDatabase, nil
