@@ -573,7 +573,7 @@ func newDatabaseHandler(ctx context.Context, logger *slog.Logger, db *gorm.DB, g
 	}
 	databaseService := database.NewService(logger, s3Bucket, s3Client, groupService, databaseRepository, func(c model.Cluster) (database.PodExecutor, error) {
 		return instance.NewKubernetesService(c)
-	}, publisher, instanceService.FilestoreBackup)
+	}, publisher, instanceService)
 
 	return database.NewHandler(logger, databaseService, groupService, instanceService, stackService), nil
 }

@@ -34,16 +34,16 @@ type Publisher interface {
 }
 
 //goland:noinspection GoExportedFuncWithUnexportedType
-func NewService(logger *slog.Logger, s3Bucket string, s3Client S3Client, groupService groupService, repository *repository, podExecutor podExecutorFunc, publisher Publisher, filestoreBackup FilestoreBackuper) *service {
+func NewService(logger *slog.Logger, s3Bucket string, s3Client S3Client, groupService groupService, repository *repository, podExecutor podExecutorFunc, publisher Publisher, filestoreBackuper FilestoreBackuper) *service {
 	return &service{
-		logger:          logger,
-		s3Bucket:        s3Bucket,
-		s3Client:        s3Client,
-		groupService:    groupService,
-		repository:      repository,
-		podExecutor:     podExecutor,
-		publisher:       publisher,
-		filestoreBackup: filestoreBackup,
+		logger:            logger,
+		s3Bucket:          s3Bucket,
+		s3Client:          s3Client,
+		groupService:      groupService,
+		repository:        repository,
+		podExecutor:       podExecutor,
+		publisher:         publisher,
+		filestoreBackuper: filestoreBackuper,
 	}
 }
 
@@ -59,17 +59,19 @@ type podExecutorFunc func(cluster model.Cluster) (PodExecutor, error)
 
 // FilestoreBackuper backs up the file store associated with a database. Used after pg_dump
 // inside service.SaveAs's goroutine so the HTTP request returns quickly.
-type FilestoreBackuper func(ctx context.Context, instance *model.DeploymentInstance, name string, database *model.Database) error
+type FilestoreBackuper interface {
+	FilestoreBackup(ctx context.Context, instance *model.DeploymentInstance, name string, database *model.Database) error
+}
 
 type service struct {
-	logger          *slog.Logger
-	s3Bucket        string
-	s3Client        S3Client
-	groupService    groupService
-	repository      *repository
-	podExecutor     podExecutorFunc
-	publisher       Publisher
-	filestoreBackup FilestoreBackuper
+	logger            *slog.Logger
+	s3Bucket          string
+	s3Client          S3Client
+	groupService      groupService
+	repository        *repository
+	podExecutor       podExecutorFunc
+	publisher         Publisher
+	filestoreBackuper FilestoreBackuper
 }
 
 type S3Client interface {
@@ -644,7 +646,7 @@ func (s service) SaveAs(ctx context.Context, userId uint, instance *model.Deploy
 			return
 		}
 		s.publisher.Publish(ctx, userId, fsTarget.GroupName, kindFilestoreBackup, newDatabaseEvent(fsTarget, "started", "", 0))
-		if err := s.filestoreBackup(ctx, coreInstance, fsTarget.Name, fsTarget); err != nil {
+		if err := s.filestoreBackuper.FilestoreBackup(ctx, coreInstance, fsTarget.Name, fsTarget); err != nil {
 			s.logger.ErrorContext(ctx, "filestore backup failed", "groupName", fsTarget.GroupName, "databaseName", fsTarget.Name, "error", err)
 			s.publisher.Publish(ctx, userId, fsTarget.GroupName, kindFilestoreBackup, newDatabaseEvent(fsTarget, "error", err.Error(), 0))
 			return
