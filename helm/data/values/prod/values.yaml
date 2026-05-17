@@ -10,3 +10,5 @@ tolerations:
     effect: NoSchedule
 nodeSelector:
   im-dedicated: "true"
+google:
+  clientId: 239000133173-kuo3uvcbk4e76rk4ce3hegfehu364riv.apps.googleusercontent.com
