@@ -5,13 +5,16 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func Routes(r *gin.Engine, authenticationMiddleware middleware.AuthenticationMiddleware, authorizationMiddleware middleware.AuthorizationMiddleware, handler Handler) {
+func Routes(r *gin.Engine, authenticationMiddleware middleware.AuthenticationMiddleware, authorizationMiddleware middleware.AuthorizationMiddleware, handler Handler, oauthHandler OAuthHandler) {
 	r.POST("/users", handler.SignUp)
 	r.DELETE("/users", handler.SignOut)
 	r.POST("/refresh", handler.RefreshToken)
 	r.POST("/users/validate", handler.ValidateEmail)
 	r.POST("/users/request-reset", handler.RequestPasswordReset)
 	r.POST("/users/reset-password", handler.ResetPassword)
+
+	r.GET("/auth/:provider", oauthHandler.BeginAuth)
+	r.GET("/auth/:provider/callback", oauthHandler.Callback)
 
 	basicAuthenticationRouter := r.Group("")
 	basicAuthenticationRouter.Use(authenticationMiddleware.BasicAuthentication)

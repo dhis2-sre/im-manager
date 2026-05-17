@@ -103,6 +103,8 @@ deploy:
             certIssuer: cert-issuer-prod
           redis:
             host: im-redis-{{ .ENVIRONMENT }}-valkey.instance-manager-{{ .CLASSIFICATION }}.svc
+          google:
+            callbackUrl: "https://{{ .API_HOSTNAME }}/auth/google/callback"
           environment:
             ENVIRONMENT: "{{ .ENVIRONMENT }}"
             CLASSIFICATION: "{{ .CLASSIFICATION }}"

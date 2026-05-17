@@ -53,6 +53,10 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/go-mail/mail"
 	"github.com/go-redis/redis"
+	"github.com/gorilla/sessions"
+	"github.com/markbates/goth"
+	"github.com/markbates/goth/gothic"
+	"github.com/markbates/goth/providers/google"
 	"github.com/rabbitmq/rabbitmq-stream-go-client/pkg/stream"
 	"gorm.io/gorm"
 
@@ -149,6 +153,15 @@ func run() (err error) {
 	}
 	userHandler := user.NewHandler(logger, hostname, authConfig.SameSiteMode, authConfig.CookieSecure, authConfig.AccessTokenExpirationSeconds, authConfig.RefreshTokenExpirationSeconds, authConfig.RefreshTokenRememberMeExpirationSeconds, publicKey, userService, tokenService)
 
+	uiURL, err := requireEnv("UI_URL")
+	if err != nil {
+		return err
+	}
+	if err := setupGoogleOAuth(authConfig.SameSiteMode, authConfig.CookieSecure); err != nil {
+		return err
+	}
+	oauthHandler := user.NewOAuthHandler(logger, uiURL, authConfig.SameSiteMode, authConfig.CookieSecure, authConfig.AccessTokenExpirationSeconds, authConfig.RefreshTokenExpirationSeconds, userService, tokenService)
+
 	clusterRepository := cluster.NewRepository(db)
 	encryptor, err := newEncryptor(err)
 	if err != nil {
@@ -242,7 +255,7 @@ func run() (err error) {
 
 	cluster.Routes(r, authentication, authorization, clusterHandler)
 	group.Routes(r, authentication, authorization, groupHandler)
-	user.Routes(r, authentication, authorization, userHandler)
+	user.Routes(r, authentication, authorization, userHandler, oauthHandler)
 	stack.Routes(r, authentication.TokenAuthentication, stackHandler)
 	integration.Routes(r, authentication, integrationHandler)
 	database.Routes(r, authentication.TokenAuthentication, databaseHandler)
@@ -262,6 +275,41 @@ func run() (err error) {
 	if err := server.ListenAndServe(); err != nil {
 		return fmt.Errorf("failed to start the HTTP server: %v", err)
 	}
+
+	return nil
+}
+
+// setupGoogleOAuth configures the shared gothic cookie store and registers the Google provider.
+// The OAuth state cookie is forced to SameSite=Lax (regardless of the app's SAME_SITE_MODE) so
+// that it survives the cross-site redirect from Google back to the callback URL. Strict would
+// drop the cookie and the callback would always fail with a state mismatch.
+func setupGoogleOAuth(_ http.SameSite, cookieSecure bool) error {
+	clientID, err := requireEnv("GOOGLE_CLIENT_ID")
+	if err != nil {
+		return err
+	}
+	clientSecret, err := requireEnv("GOOGLE_CLIENT_SECRET")
+	if err != nil {
+		return err
+	}
+	callbackURL, err := requireEnv("GOOGLE_CALLBACK_URL")
+	if err != nil {
+		return err
+	}
+	sessionSecret, err := requireEnv("SESSION_SECRET")
+	if err != nil {
+		return err
+	}
+
+	store := sessions.NewCookieStore([]byte(sessionSecret))
+	store.Options.Path = "/"
+	store.Options.HttpOnly = true
+	store.Options.Secure = cookieSecure
+	store.Options.SameSite = http.SameSiteLaxMode
+	store.MaxAge(600)
+	gothic.Store = store
+
+	goth.UseProviders(google.New(clientID, clientSecret, callbackURL, "email", "profile"))
 
 	return nil
 }
