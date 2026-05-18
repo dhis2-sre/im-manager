@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"mime"
 	"net/http"
 	"path"
 	"strconv"
@@ -586,7 +587,7 @@ func (h Handler) Download(c *gin.Context) {
 	}
 
 	_, file := path.Split(d.Url)
-	c.Header("Content-Disposition", "attachment; filename="+file)
+	c.Header("Content-Disposition", mime.FormatMediaType("attachment", map[string]string{"filename": file}))
 	c.Header("Content-Description", "File Transfer")
 	c.Header("Content-Transfer-Encoding", "binary")
 	c.Header("Content-Type", "application/octet-stream")
@@ -849,7 +850,7 @@ func (h Handler) ExternalDownload(c *gin.Context) {
 	}
 
 	_, file := path.Split(d.Url)
-	c.Header("Content-Disposition", "attachment; filename="+file)
+	c.Header("Content-Disposition", mime.FormatMediaType("attachment", map[string]string{"filename": file}))
 	c.Header("Content-Description", "File Transfer")
 	c.Header("Content-Transfer-Encoding", "binary")
 	c.Header("Content-Type", "application/octet-stream")
