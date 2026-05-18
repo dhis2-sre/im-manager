@@ -756,6 +756,10 @@ func (h Handler) canAccess(c *gin.Context, d *model.Database) error {
 	return nil
 }
 
+// maxExternalDownloadExpirationSeconds is the maximum time a database can be downloaded without
+// authentication. 30 is simply chosen for the sake of having a reasonable default.
+const maxExternalDownloadExpirationSeconds uint = 30 * 24 * 60 * 60 // 30 days
+
 type CreateExternalDatabaseRequest struct {
 	// Expiration time in seconds
 	Expiration uint `json:"expiration" binding:"required"`
@@ -786,6 +790,11 @@ func (h Handler) CreateExternalDownload(c *gin.Context) {
 	var request CreateExternalDatabaseRequest
 	if err := handler.DataBinder(c, &request); err != nil {
 		_ = c.Error(err)
+		return
+	}
+
+	if request.Expiration > maxExternalDownloadExpirationSeconds {
+		_ = c.Error(errdef.NewBadRequest("expiration must not exceed 30 days (%d seconds)", maxExternalDownloadExpirationSeconds))
 		return
 	}
 
