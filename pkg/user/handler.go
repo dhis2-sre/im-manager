@@ -457,9 +457,21 @@ func (h Handler) FindById(c *gin.Context) {
 		return
 	}
 
-	userWithGroups, err := h.userService.FindById(c.Request.Context(), id)
+	ctx := c.Request.Context()
+	caller, err := handler.GetUserFromContext(ctx)
 	if err != nil {
 		_ = c.Error(err)
+		return
+	}
+
+	userWithGroups, err := h.userService.FindById(ctx, id)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	if !handler.CanAccessUser(caller, userWithGroups) {
+		_ = c.AbortWithError(http.StatusForbidden, errdef.NewForbidden("access denied"))
 		return
 	}
 
