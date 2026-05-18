@@ -5,11 +5,15 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"regexp"
 	"sort"
 
+	"github.com/dhis2-sre/im-manager/internal/errdef"
 	"github.com/dhis2-sre/im-manager/internal/handler"
 	"github.com/gin-gonic/gin"
 )
+
+var imageRefPattern = regexp.MustCompile(`^[a-zA-Z0-9._-]+$`)
 
 func NewHandler(dockerHubClient, ghcrClient RegistryClient, instanceManagerHost string) Handler {
 	return Handler{
@@ -59,6 +63,13 @@ func (h Handler) ImageExists(c *gin.Context) {
 	}
 
 	organization := c.DefaultQuery("organization", "dhis2")
+	for name, val := range map[string]string{"organization": organization, "repository": repository, "tag": tag} {
+		if !imageRefPattern.MatchString(val) {
+			_ = c.AbortWithError(http.StatusBadRequest, errdef.NewBadRequest("invalid %s: %q", name, val))
+			return
+		}
+	}
+
 	client := h.dockerHubClient
 	if registry, ok := c.GetQuery("registry"); ok && registry == "ghcr" {
 		client = h.ghcrClient

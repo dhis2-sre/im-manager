@@ -1152,25 +1152,19 @@ paths:
             description: Download a given database without authentication
             operationId: externalDownloadDatabase
             parameters:
-                - format: uint64
+                - format: uuid
                   in: path
                   name: uuid
                   required: true
-                  type: integer
+                  type: string
                   x-go-name: UUID
             responses:
                 "200":
                     $ref: '#/responses/DownloadDatabaseResponse'
-                "401":
-                    $ref: '#/responses/Error'
-                "403":
-                    $ref: '#/responses/Error'
                 "404":
                     $ref: '#/responses/Error'
                 "415":
                     $ref: '#/responses/Error'
-            security:
-                - oauth2: []
             summary: Externally download database
     /databases/save-as/{instanceId}:
         post:

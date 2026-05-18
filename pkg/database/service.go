@@ -759,8 +759,7 @@ func buildPgDumpCommand(dump *pg.Dump, format string) []string {
 	options = append(options, fmt.Sprintf("-F%s", format))
 	options = append(options, dump.IgnoreTableDataToString()...)
 
-	cmd := fmt.Sprintf("PGPASSWORD=%s pg_dump %s", dump.Password, strings.Join(options, " "))
-	return []string{"sh", "-c", cmd}
+	return append([]string{"env", "PGPASSWORD=" + dump.Password, "pg_dump"}, options...)
 }
 
 func (s service) StreamUpload(ctx context.Context, database model.Database, group *model.Group, body io.Reader, contentType string, contentLength int64) (model.Database, error) {

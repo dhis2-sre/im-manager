@@ -302,9 +302,11 @@ func newDB(logger *slog.Logger) (*gorm.DB, error) {
 		return nil, err
 	}
 
+	logQueries := os.Getenv("DATABASE_LOG_QUERIES") == "true"
+
 	db, err := storage.NewDatabase(
 		logger,
-		storage.PostgresqlConfig{Host: host, Port: port, Username: username, Password: password, DatabaseName: name},
+		storage.PostgresqlConfig{Host: host, Port: port, Username: username, Password: password, DatabaseName: name, LogQueries: logQueries},
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to setup DB: %v", err)
@@ -485,7 +487,10 @@ func newInstanceService(logger *slog.Logger, db *gorm.DB, stackService stack.Ser
 	if err != nil {
 		return nil, err
 	}
-	instanceRepository := instance.NewRepository(db, instanceParameterEncryptionKey)
+	instanceRepository, err := instance.NewRepository(db, instanceParameterEncryptionKey)
+	if err != nil {
+		return nil, err
+	}
 	classification, err := requireEnv("CLASSIFICATION")
 	if err != nil {
 		return nil, err

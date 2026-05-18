@@ -78,7 +78,8 @@ func TestInstanceHandler(t *testing.T) {
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	encryptionKey := strings.Repeat("a", 32)
-	instanceRepo := instance.NewRepository(db, encryptionKey)
+	instanceRepo, err := instance.NewRepository(db, encryptionKey)
+	require.NoError(t, err)
 	groupService := groupService{group: group}
 	stacks := stack.Stacks{
 		"minio":      stack.MINIO,
