@@ -296,9 +296,11 @@ func newDB(logger *slog.Logger) (*gorm.DB, error) {
 		return nil, err
 	}
 
+	logQueries := os.Getenv("DATABASE_LOG_QUERIES") == "true"
+
 	db, err := storage.NewDatabase(
 		logger,
-		storage.PostgresqlConfig{Host: host, Port: port, Username: username, Password: password, DatabaseName: name},
+		storage.PostgresqlConfig{Host: host, Port: port, Username: username, Password: password, DatabaseName: name, LogQueries: logQueries},
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to setup DB: %v", err)

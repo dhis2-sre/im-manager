@@ -121,6 +121,7 @@ deploy:
             DEFAULT_TTL: "172800" # 48 hours
             PASSWORD_TOKEN_TTL: "900" # 15 minutes
             LOG_PRETTY_PRINT: "{{ .LOG_PRETTY_PRINT }}"
+            DATABASE_LOG_QUERIES: "{{ .DATABASE_LOG_QUERIES }}"
         useHelmSecrets: true
         valuesFiles:
           - helm/data/secrets/{{ .CLASSIFICATION }}/values.yaml
