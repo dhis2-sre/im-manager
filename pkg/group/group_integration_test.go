@@ -42,12 +42,21 @@ func TestGroupHandler(t *testing.T) {
 	err = user.CreateUser(context.Background(), "admin", "admin", userService, groupService, model.AdministratorGroupName, "", "admin")
 	require.NoError(t, err, "failed to create admin user and group")
 
-	client := inttest.SetupHTTPServer(t, func(engine *gin.Engine) {
-		handler := group.NewHandler(groupService)
-		authentication := TestAuthenticationMiddleware{}
-		authorization := TestAuthorizationMiddleware{}
-		group.Routes(engine, authentication, authorization, handler)
-	})
+	adminBase, err := userService.FindOrCreate(context.Background(), "admin", "admin")
+	require.NoError(t, err)
+	adminUser, err := userService.FindById(context.Background(), adminBase.ID)
+	require.NoError(t, err)
+
+	newClient := func(u *model.User) *inttest.HTTPClient {
+		return inttest.SetupHTTPServer(t, func(engine *gin.Engine) {
+			handler := group.NewHandler(groupService)
+			authentication := TestAuthenticationMiddleware{user: u}
+			authorization := TestAuthorizationMiddleware{}
+			group.Routes(engine, authentication, authorization, handler)
+		})
+	}
+
+	client := newClient(adminUser)
 
 	var userId string
 	var user *model.User
@@ -251,6 +260,18 @@ func TestGroupHandler(t *testing.T) {
 
 			require.Equal(t, "group \"non-existing-group\" doesn't exist", string(response))
 		})
+
+		t.Run("FindGroupAsForbiddenNonMember", func(t *testing.T) {
+			nonMember, err := userService.FindOrCreate(context.Background(), "nonmember@dhis2.org", "oneoneoneoneoneoneone111")
+			require.NoError(t, err)
+			nonMemberWithGroups, err := userService.FindById(context.Background(), nonMember.ID)
+			require.NoError(t, err)
+
+			nonMemberClient := newClient(nonMemberWithGroups)
+
+			nonMemberClient.Do(t, http.MethodGet, fmt.Sprintf("/groups/%s", groupName), nil, http.StatusForbidden)
+			nonMemberClient.Do(t, http.MethodGet, fmt.Sprintf("/groups/%s/details", groupName), nil, http.StatusForbidden)
+		})
 	})
 }
 
@@ -260,9 +281,17 @@ func (f fakeDialer) DialAndSend(m ...*mail.Message) error {
 	panic("not implemented")
 }
 
-type TestAuthenticationMiddleware struct{}
+type TestAuthenticationMiddleware struct {
+	user *model.User
+}
 
-func (t TestAuthenticationMiddleware) TokenAuthentication(c *gin.Context) {}
+func (m TestAuthenticationMiddleware) TokenAuthentication(c *gin.Context) {
+	if m.user != nil {
+		ctx := model.NewContextWithUser(c.Request.Context(), m.user)
+		c.Request = c.Request.WithContext(ctx)
+	}
+	c.Next()
+}
 
 type TestAuthorizationMiddleware struct{}
 

@@ -481,7 +481,10 @@ func newInstanceService(logger *slog.Logger, db *gorm.DB, stackService stack.Ser
 	if err != nil {
 		return nil, err
 	}
-	instanceRepository := instance.NewRepository(db, instanceParameterEncryptionKey)
+	instanceRepository, err := instance.NewRepository(db, instanceParameterEncryptionKey)
+	if err != nil {
+		return nil, err
+	}
 	classification, err := requireEnv("CLASSIFICATION")
 	if err != nil {
 		return nil, err

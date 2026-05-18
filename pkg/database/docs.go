@@ -87,7 +87,8 @@ type _ struct {
 type _ struct {
 	// in: path
 	// required: true
-	UUID uint `json:"uuid"`
+	// swagger:strfmt uuid
+	UUID string `json:"uuid"`
 }
 
 // swagger:response DownloadDatabaseResponse
