@@ -14,11 +14,16 @@ import (
 )
 
 //goland:noinspection GoExportedFuncWithUnexportedType
-func NewRepository(db *gorm.DB, instanceParameterEncryptionKey string) *repository {
+func NewRepository(db *gorm.DB, instanceParameterEncryptionKey string) (*repository, error) {
+	switch len(instanceParameterEncryptionKey) {
+	case 16, 24, 32:
+	default:
+		return nil, fmt.Errorf("INSTANCE_PARAMETER_ENCRYPTION_KEY must be 16, 24, or 32 bytes, got %d", len(instanceParameterEncryptionKey))
+	}
 	return &repository{
 		db:                             db,
 		instanceParameterEncryptionKey: instanceParameterEncryptionKey,
-	}
+	}, nil
 }
 
 type repository struct {

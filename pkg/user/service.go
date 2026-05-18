@@ -55,14 +55,14 @@ func (s Service) SignUp(ctx context.Context, email string, password string) (*mo
 		Password:   hashedPassword,
 	}
 
-	err = s.sendValidationEmail(user)
-	if err != nil {
-		return nil, fmt.Errorf("failed to send validation email: %s", err)
-	}
-
 	err = s.repository.create(ctx, user)
 	if err != nil {
 		return nil, err
+	}
+
+	err = s.sendValidationEmail(user)
+	if err != nil {
+		return nil, fmt.Errorf("failed to send validation email: %s", err)
 	}
 
 	return user, nil

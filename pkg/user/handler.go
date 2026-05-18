@@ -312,19 +312,13 @@ func (h Handler) RefreshToken(c *gin.Context) {
 		return
 	}
 
-	var rememberMe bool
-	rememberMeCookie, _ := c.Cookie("rememberMe")
-	if rememberMeCookie == "true" {
-		rememberMe = true
-	}
-
-	tokens, err := h.tokenService.GetTokens(user, refreshToken.ID.String(), rememberMe)
+	tokens, err := h.tokenService.GetTokens(user, refreshToken.ID.String(), refreshToken.RememberMe)
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
 
-	h.setCookies(c, tokens, rememberMe)
+	h.setCookies(c, tokens, refreshToken.RememberMe)
 
 	c.Status(http.StatusCreated)
 }
@@ -463,9 +457,21 @@ func (h Handler) FindById(c *gin.Context) {
 		return
 	}
 
-	userWithGroups, err := h.userService.FindById(c.Request.Context(), id)
+	ctx := c.Request.Context()
+	caller, err := handler.GetUserFromContext(ctx)
 	if err != nil {
 		_ = c.Error(err)
+		return
+	}
+
+	userWithGroups, err := h.userService.FindById(ctx, id)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	if !handler.CanAccessUser(caller, userWithGroups) {
+		_ = c.AbortWithError(http.StatusForbidden, errdef.NewForbidden("access denied"))
 		return
 	}
 
@@ -549,7 +555,7 @@ func (h Handler) Delete(c *gin.Context) {
 
 type updateUserRequest struct {
 	Email    string `json:"email" binding:"omitempty,email"`
-	Password string `json:"password" binding:"omitempty,gte=16,lte=128"`
+	Password string `json:"password" binding:"omitempty,gte=24,lte=128"`
 }
 
 // Update user
