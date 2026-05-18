@@ -18,7 +18,7 @@ require (
 	github.com/gin-gonic/gin v1.12.0
 	github.com/go-gormigrate/gormigrate/v2 v2.1.5
 	github.com/go-mail/mail v2.3.1+incompatible
-	github.com/go-openapi/runtime v0.29.5
+	github.com/go-openapi/runtime v0.30.0
 	github.com/go-playground/validator/v10 v10.30.2
 	github.com/go-redis/redis v6.15.9+incompatible
 	github.com/google/uuid v1.6.0
@@ -45,10 +45,10 @@ require (
 	gopkg.in/yaml.v3 v3.0.1
 	gorm.io/driver/postgres v1.6.0
 	gorm.io/gorm v1.31.1
-	k8s.io/api v0.36.0
-	k8s.io/apimachinery v0.36.0
-	k8s.io/client-go v0.36.0
-	k8s.io/metrics v0.36.0
+	k8s.io/api v0.36.1
+	k8s.io/apimachinery v0.36.1
+	k8s.io/client-go v0.36.1
+	k8s.io/metrics v0.36.1
 )
 
 replace github.com/orlangure/gnomock => github.com/dhis2-sre/gnomock v0.0.0-20251214062604-f1351b78378b
@@ -137,6 +137,7 @@ require (
 	github.com/go-openapi/jsonpointer v0.22.5 // indirect
 	github.com/go-openapi/jsonreference v0.21.5 // indirect
 	github.com/go-openapi/loads v0.23.3 // indirect
+	github.com/go-openapi/runtime/server-middleware v0.30.0 // indirect
 	github.com/go-openapi/spec v0.22.4 // indirect
 	github.com/go-openapi/strfmt v0.26.2 // indirect
 	github.com/go-openapi/swag v0.23.1 // indirect
@@ -297,7 +298,7 @@ require (
 	k8s.io/cli-runtime v0.32.1 // indirect
 	k8s.io/klog/v2 v2.140.0 // indirect
 	k8s.io/kube-openapi v0.0.0-20260317180543-43fb72c5454a // indirect
-	k8s.io/streaming v0.36.0 // indirect
+	k8s.io/streaming v0.36.1 // indirect
 	k8s.io/utils v0.0.0-20260210185600-b8788abfbbc2 // indirect
 	sigs.k8s.io/json v0.0.0-20250730193827-2d320260d730 // indirect
 	sigs.k8s.io/kustomize/api v0.19.0 // indirect
