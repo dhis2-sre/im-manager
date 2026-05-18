@@ -543,7 +543,7 @@ func (h Handler) Delete(c *gin.Context) {
 
 type updateUserRequest struct {
 	Email    string `json:"email" binding:"omitempty,email"`
-	Password string `json:"password" binding:"omitempty,gte=16,lte=128"`
+	Password string `json:"password" binding:"omitempty,gte=24,lte=128"`
 }
 
 // Update user
