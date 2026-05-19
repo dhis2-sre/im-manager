@@ -60,6 +60,7 @@ func (r repository) FindById(ctx context.Context, id uint) (*model.Database, err
 	err := r.db.
 		WithContext(ctx).
 		Preload("Lock").
+		Joins("User").
 		First(&d, id).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, errdef.NewNotFound("database not found by id: %d", id)

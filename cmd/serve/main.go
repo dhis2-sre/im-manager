@@ -53,6 +53,10 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/go-mail/mail"
 	"github.com/go-redis/redis"
+	"github.com/gorilla/sessions"
+	"github.com/markbates/goth"
+	"github.com/markbates/goth/gothic"
+	"github.com/markbates/goth/providers/google"
 	"github.com/rabbitmq/rabbitmq-stream-go-client/pkg/stream"
 	"gorm.io/gorm"
 
@@ -73,6 +77,7 @@ import (
 	"github.com/dhis2-sre/im-manager/internal/server"
 	"github.com/dhis2-sre/im-manager/pkg/instance"
 	"github.com/dhis2-sre/im-manager/pkg/integration"
+	"github.com/dhis2-sre/im-manager/pkg/notification"
 	"github.com/dhis2-sre/im-manager/pkg/stack"
 	"github.com/dhis2-sre/im-manager/pkg/storage"
 )
@@ -149,6 +154,15 @@ func run() (err error) {
 	}
 	userHandler := user.NewHandler(logger, hostname, authConfig.SameSiteMode, authConfig.CookieSecure, authConfig.AccessTokenExpirationSeconds, authConfig.RefreshTokenExpirationSeconds, authConfig.RefreshTokenRememberMeExpirationSeconds, publicKey, userService, tokenService)
 
+	uiURL, err := requireEnv("UI_URL")
+	if err != nil {
+		return err
+	}
+	if err := setupGoogleOAuth(authConfig.SameSiteMode, authConfig.CookieSecure); err != nil {
+		return err
+	}
+	oauthHandler := user.NewOAuthHandler(logger, uiURL, authConfig.SameSiteMode, authConfig.CookieSecure, authConfig.AccessTokenExpirationSeconds, authConfig.RefreshTokenExpirationSeconds, userService, tokenService)
+
 	clusterRepository := cluster.NewRepository(db)
 	encryptor, err := newEncryptor(err)
 	if err != nil {
@@ -184,7 +198,19 @@ func run() (err error) {
 		return err
 	}
 
-	databaseHandler, err := newDatabaseHandler(ctx, logger, db, groupService, instanceService, stackService)
+	rabbitmqConfig, err := newRabbitMQ()
+	if err != nil {
+		return err
+	}
+
+	streamEnv, streamName, err := newStreamEnvironment(ctx, logger, rabbitmqConfig)
+	if err != nil {
+		return err
+	}
+
+	notificationHandler := newNotificationHandler(logger, db)
+
+	databaseHandler, err := newDatabaseHandler(ctx, logger, db, groupService, instanceService, stackService, streamEnv, streamName)
 	if err != nil {
 		return err
 	}
@@ -199,15 +225,7 @@ func run() (err error) {
 		return err
 	}
 
-	rabbitmqConfig, err := newRabbitMQ()
-	if err != nil {
-		return err
-	}
-
-	eventHandler, err := newEventHandler(ctx, logger, rabbitmqConfig)
-	if err != nil {
-		return err
-	}
+	eventHandler := event.NewHandler(logger, streamEnv, streamName)
 
 	_, err = createDefaultCluster(ctx, clusterService)
 	if err != nil {
@@ -242,12 +260,13 @@ func run() (err error) {
 
 	cluster.Routes(r, authentication, authorization, clusterHandler)
 	group.Routes(r, authentication, authorization, groupHandler)
-	user.Routes(r, authentication, authorization, userHandler)
+	user.Routes(r, authentication, authorization, userHandler, oauthHandler)
 	stack.Routes(r, authentication.TokenAuthentication, stackHandler)
 	integration.Routes(r, authentication, integrationHandler)
 	database.Routes(r, authentication.TokenAuthentication, databaseHandler)
 	instance.Routes(r, authentication.TokenAuthentication, instanceHandler)
 	event.Routes(r, authentication.TokenAuthentication, eventHandler)
+	notification.Routes(r, authentication.TokenAuthentication, notificationHandler)
 
 	logger.InfoContext(ctx, "Listening and serving HTTP")
 	if err := r.Run(); err != nil {
@@ -262,6 +281,41 @@ func run() (err error) {
 	if err := server.ListenAndServe(); err != nil {
 		return fmt.Errorf("failed to start the HTTP server: %v", err)
 	}
+
+	return nil
+}
+
+// setupGoogleOAuth configures the shared gothic cookie store and registers the Google provider.
+// The OAuth state cookie is forced to SameSite=Lax (regardless of the app's SAME_SITE_MODE) so
+// that it survives the cross-site redirect from Google back to the callback URL. Strict would
+// drop the cookie and the callback would always fail with a state mismatch.
+func setupGoogleOAuth(_ http.SameSite, cookieSecure bool) error {
+	clientID, err := requireEnv("GOOGLE_CLIENT_ID")
+	if err != nil {
+		return err
+	}
+	clientSecret, err := requireEnv("GOOGLE_CLIENT_SECRET")
+	if err != nil {
+		return err
+	}
+	callbackURL, err := requireEnv("GOOGLE_CALLBACK_URL")
+	if err != nil {
+		return err
+	}
+	sessionSecret, err := requireEnv("SESSION_SECRET")
+	if err != nil {
+		return err
+	}
+
+	store := sessions.NewCookieStore([]byte(sessionSecret))
+	store.Options.Path = "/"
+	store.Options.HttpOnly = true
+	store.Options.Secure = cookieSecure
+	store.Options.SameSite = http.SameSiteLaxMode
+	store.MaxAge(600)
+	gothic.Store = store
+
+	goth.UseProviders(google.New(clientID, clientSecret, callbackURL, "email", "profile"))
 
 	return nil
 }
@@ -296,9 +350,11 @@ func newDB(logger *slog.Logger) (*gorm.DB, error) {
 		return nil, err
 	}
 
+	logQueries := os.Getenv("DATABASE_LOG_QUERIES") == "true"
+
 	db, err := storage.NewDatabase(
 		logger,
-		storage.PostgresqlConfig{Host: host, Port: port, Username: username, Password: password, DatabaseName: name},
+		storage.PostgresqlConfig{Host: host, Port: port, Username: username, Password: password, DatabaseName: name, LogQueries: logQueries},
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to setup DB: %v", err)
@@ -479,7 +535,10 @@ func newInstanceService(logger *slog.Logger, db *gorm.DB, stackService stack.Ser
 	if err != nil {
 		return nil, err
 	}
-	instanceRepository := instance.NewRepository(db, instanceParameterEncryptionKey)
+	instanceRepository, err := instance.NewRepository(db, instanceParameterEncryptionKey)
+	if err != nil {
+		return nil, err
+	}
 	classification, err := requireEnv("CLASSIFICATION")
 	if err != nil {
 		return nil, err
@@ -550,7 +609,7 @@ func newInstanceHandler(stackService stack.Service, groupService *group.Service,
 	return instance.NewHandler(stackService, groupService, instanceService, defaultTTL), nil
 }
 
-func newDatabaseHandler(ctx context.Context, logger *slog.Logger, db *gorm.DB, groupService *group.Service, instanceService *instance.Service, stackService stack.Service) (database.Handler, error) {
+func newDatabaseHandler(ctx context.Context, logger *slog.Logger, db *gorm.DB, groupService *group.Service, instanceService *instance.Service, stackService stack.Service, env *stream.Environment, streamName string) (database.Handler, error) {
 	s3Bucket, err := requireEnv("S3_BUCKET")
 	if err != nil {
 		return database.Handler{}, err
@@ -560,9 +619,14 @@ func newDatabaseHandler(ctx context.Context, logger *slog.Logger, db *gorm.DB, g
 		return database.Handler{}, err
 	}
 	databaseRepository := database.NewRepository(db)
+	notificationRepository := notification.NewRepository(db)
+	publisher, err := notification.NewPublisher(logger, env, streamName, notificationRepository)
+	if err != nil {
+		return database.Handler{}, fmt.Errorf("failed to create database notification publisher: %w", err)
+	}
 	databaseService := database.NewService(logger, s3Bucket, s3Client, groupService, databaseRepository, func(c model.Cluster) (database.PodExecutor, error) {
 		return instance.NewKubernetesService(c)
-	})
+	}, publisher, instanceService)
 
 	return database.NewHandler(logger, databaseService, groupService, instanceService, stackService), nil
 }
@@ -631,7 +695,7 @@ func newIntegrationHandler() (integration.Handler, error) {
 	return integration.NewHandler(dockerHubClient, ghcrClient, instanceServiceHost), nil
 }
 
-func newEventHandler(ctx context.Context, logger *slog.Logger, rabbitmqConfig rabbitMQConfig) (event.Handler, error) {
+func newStreamEnvironment(ctx context.Context, logger *slog.Logger, rabbitmqConfig rabbitMQConfig) (*stream.Environment, string, error) {
 	logger.InfoContext(ctx, "Connecting with RabbitMQ stream client", "host", rabbitmqConfig.Host, "port", rabbitmqConfig.StreamPort)
 	env, err := stream.NewEnvironment(
 		stream.NewEnvironmentOptions().
@@ -642,7 +706,7 @@ func newEventHandler(ctx context.Context, logger *slog.Logger, rabbitmqConfig ra
 			SetAddressResolver(stream.AddressResolver{Host: rabbitmqConfig.Host, Port: rabbitmqConfig.StreamPort}),
 	)
 	if err != nil {
-		return event.Handler{}, fmt.Errorf("failed to connect with RabbitMQ stream client: %v", err)
+		return nil, "", fmt.Errorf("failed to connect with RabbitMQ stream client: %v", err)
 	}
 	logger.InfoContext(ctx, "Connected with RabbitMQ stream client", "host", rabbitmqConfig.Host, "port", rabbitmqConfig.StreamPort)
 
@@ -652,10 +716,16 @@ func newEventHandler(ctx context.Context, logger *slog.Logger, rabbitmqConfig ra
 			SetMaxSegmentSizeBytes(stream.ByteCapacity{}.MB(1)).
 			SetMaxAge(1*time.Hour))
 	if err != nil {
-		return event.Handler{}, fmt.Errorf("failed to declare RabbitMQ stream %q: %v", streamName, err)
+		return nil, "", fmt.Errorf("failed to declare RabbitMQ stream %q: %v", streamName, err)
 	}
 
-	return event.NewHandler(logger, env, streamName), nil
+	return env, streamName, nil
+}
+
+func newNotificationHandler(logger *slog.Logger, db *gorm.DB) notification.Handler {
+	repo := notification.NewRepository(db)
+	svc := notification.NewService(repo)
+	return notification.NewHandler(logger, svc)
 }
 
 func createDefaultCluster(ctx context.Context, clusterService cluster.Service) (model.Cluster, error) {

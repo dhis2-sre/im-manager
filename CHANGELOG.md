@@ -1,4 +1,53 @@
 
+<a name="0.69.0"></a>
+## [0.69.0](https://github.com/dhis2-sre/im-manager/compare/0.68.0...0.69.0)
+
+> 2026-05-11
+
+### Fix
+
+* join user in FindById ([#1491](https://github.com/dhis2-sre/im-manager/issues/1491))
+* update filestore URL when renaming a database ([#1490](https://github.com/dhis2-sre/im-manager/issues/1490))
+
+
+<a name="0.68.0"></a>
+## [0.68.0](https://github.com/dhis2-sre/im-manager/compare/v0.68.0...0.68.0)
+
+> 2026-05-11
+
+### Chore
+
+* generate change log
+
+
+<a name="v0.68.0"></a>
+## [v0.68.0](https://github.com/dhis2-sre/im-manager/compare/0.67.0...v0.68.0)
+
+> 2026-05-11
+
+### Chore
+
+* bump go version to 1.26.2 ([#1485](https://github.com/dhis2-sre/im-manager/issues/1485))
+
+### Docs
+
+* add CLAUDE.md with repo guidance ([#1483](https://github.com/dhis2-sre/im-manager/issues/1483))
+
+### Feat
+
+* add gormigrate and backfill DEPLOY_CHAP for existing instances ([#1489](https://github.com/dhis2-sre/im-manager/issues/1489))
+
+
+<a name="0.67.0"></a>
+## [0.67.0](https://github.com/dhis2-sre/im-manager/compare/v0.67.0...0.67.0)
+
+> 2026-05-07
+
+### Chore
+
+* generate change log
+
+
 <a name="v0.67.0"></a>
 ## [v0.67.0](https://github.com/dhis2-sre/im-manager/compare/v0.66.0...v0.67.0)
 
@@ -621,7 +670,7 @@
 
 
 <a name="v0.43.0"></a>
-## [v0.43.0](https://github.com/dhis2-sre/im-manager/compare/v0.41.0...v0.43.0)
+## [v0.43.0](https://github.com/dhis2-sre/im-manager/compare/v0.42.0...v0.43.0)
 
 > 2024-11-27
 
@@ -631,14 +680,14 @@
 * use PAT
 
 
-<a name="v0.41.0"></a>
-## [v0.41.0](https://github.com/dhis2-sre/im-manager/compare/v0.42.0...v0.41.0)
+<a name="v0.42.0"></a>
+## [v0.42.0](https://github.com/dhis2-sre/im-manager/compare/v0.41.0...v0.42.0)
 
 > 2024-11-20
 
 
-<a name="v0.42.0"></a>
-## [v0.42.0](https://github.com/dhis2-sre/im-manager/compare/v0.40.0...v0.42.0)
+<a name="v0.41.0"></a>
+## [v0.41.0](https://github.com/dhis2-sre/im-manager/compare/v0.40.0...v0.41.0)
 
 > 2024-11-20
 
@@ -1862,13 +1911,42 @@
 
 
 <a name="v0.5.10"></a>
-## [v0.5.10](https://github.com/dhis2-sre/im-manager/compare/v0.5.7...v0.5.10)
+## [v0.5.10](https://github.com/dhis2-sre/im-manager/compare/v0.5.9...v0.5.10)
 
 > 2022-04-11
 
 ### Fix
 
 * Only change the ownership of generate_uid() func [DEVOPS-102]
+
+
+<a name="v0.5.9"></a>
+## [v0.5.9](https://github.com/dhis2-sre/im-manager/compare/v0.5.8...v0.5.9)
+
+> 2022-04-11
+
+### Fix
+
+* Use func names with argument signatures to change ownership [DEVOPS-102]
+
+
+<a name="v0.5.8"></a>
+## [v0.5.8](https://github.com/dhis2-sre/im-manager/compare/v0.5.5...v0.5.8)
+
+> 2022-04-11
+
+### Fix
+
+* Use func names with argument signatures to change ownership [DEVOPS-102]
+
+
+<a name="v0.5.5"></a>
+## [v0.5.5](https://github.com/dhis2-sre/im-manager/compare/v0.5.7...v0.5.5)
+
+> 2022-04-11
+
+### Fix
+
 * Use func names with argument signatures to change ownership [DEVOPS-102]
 
 
@@ -1883,7 +1961,7 @@
 
 
 <a name="v0.5.6"></a>
-## [v0.5.6](https://github.com/dhis2-sre/im-manager/compare/v0.5.5...v0.5.6)
+## [v0.5.6](https://github.com/dhis2-sre/im-manager/compare/v0.5.3...v0.5.6)
 
 > 2022-04-11
 
@@ -1892,44 +1970,14 @@
 * Use func names with argument signatures to change ownership [DEVOPS-102]
 
 
-<a name="v0.5.5"></a>
-## [v0.5.5](https://github.com/dhis2-sre/im-manager/compare/v0.5.9...v0.5.5)
-
-> 2022-04-11
-
-### Fix
-
-* Use func names with argument signatures to change ownership [DEVOPS-102]
-
-
-<a name="v0.5.9"></a>
-## [v0.5.9](https://github.com/dhis2-sre/im-manager/compare/v0.5.8...v0.5.9)
-
-> 2022-04-11
-
-### Fix
-
-* Use func names with argument signatures to change ownership [DEVOPS-102]
-
-
-<a name="v0.5.8"></a>
-## [v0.5.8](https://github.com/dhis2-sre/im-manager/compare/v0.5.4...v0.5.8)
-
-> 2022-04-11
-
-### Fix
-
-* Use func names with argument signatures to change ownership [DEVOPS-102]
-
-
-<a name="v0.5.4"></a>
-## [v0.5.4](https://github.com/dhis2-sre/im-manager/compare/v0.5.3...v0.5.4)
+<a name="v0.5.3"></a>
+## [v0.5.3](https://github.com/dhis2-sre/im-manager/compare/v0.5.4...v0.5.3)
 
 > 2022-04-08
 
 
-<a name="v0.5.3"></a>
-## [v0.5.3](https://github.com/dhis2-sre/im-manager/compare/v0.5.2...v0.5.3)
+<a name="v0.5.4"></a>
+## [v0.5.4](https://github.com/dhis2-sre/im-manager/compare/v0.5.2...v0.5.4)
 
 > 2022-04-08
 

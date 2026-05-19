@@ -6,7 +6,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"iter"
 	"log/slog"
+	"maps"
 	"os/exec"
 	"slices"
 	"strings"
@@ -17,7 +19,6 @@ import (
 	"github.com/dhis2-sre/im-manager/pkg/token"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
-	"golang.org/x/exp/maps"
 
 	v1 "k8s.io/api/core/v1"
 
@@ -110,7 +111,7 @@ func (s Service) FindDecryptedDeploymentInstanceById(ctx context.Context, id uin
 }
 
 func (s Service) SaveInstance(ctx context.Context, instance *model.DeploymentInstance) error {
-	err := s.rejectConsumedParameters(instance)
+	err := s.rejectConsumedParameters(instance.StackName, maps.Keys(instance.Parameters))
 	if err != nil {
 		return err
 	}
@@ -145,14 +146,14 @@ func (s Service) SaveInstance(ctx context.Context, instance *model.DeploymentIns
 	return s.instanceRepository.SaveInstance(ctx, instance, stack)
 }
 
-func (s Service) rejectConsumedParameters(instance *model.DeploymentInstance) error {
-	stack, err := s.stackService.Find(instance.StackName)
+func (s Service) rejectConsumedParameters(stackName string, paramNames iter.Seq[string]) error {
+	stack, err := s.stackService.Find(stackName)
 	if err != nil {
 		return err
 	}
 
 	var errs []error
-	for name := range instance.Parameters {
+	for name := range paramNames {
 		if stack.Parameters[name].Consumed {
 			errs = append(errs, fmt.Errorf("consumed parameters can't be supplied by the user: %s", name))
 		}
@@ -603,7 +604,7 @@ func (s Service) FindDeployments(ctx context.Context, user *model.User) ([]Group
 	for _, group := range groups {
 		groupsByName[group.Name] = group
 	}
-	groupNames := maps.Keys(groupsByName)
+	groupNames := slices.Collect(maps.Keys(groupsByName))
 
 	deployments, err := s.instanceRepository.FindDeployments(ctx, groupNames)
 	if err != nil {
@@ -626,7 +627,7 @@ func (s Service) groupDeployments(deployments []*model.Deployment) ([]GroupWithD
 	}
 
 	groupsWithDeployments := make([]GroupWithDeployments, len(groupsByName))
-	for i, name := range maps.Keys(groupsByName) {
+	for i, name := range slices.Collect(maps.Keys(groupsByName)) {
 		groupWithDeployments := groupsWithDeployments[i]
 		groupWithDeployments.Name = name
 		groupWithDeployments.Hostname = groupsByName[name].Hostname
@@ -952,16 +953,15 @@ func (s Service) UpdateInstance(ctx context.Context, token string, deploymentId,
 		instance.Public = *public
 	}
 
+	if err := s.rejectConsumedParameters(instance.StackName, maps.Keys(parameters)); err != nil {
+		return nil, err
+	}
+
 	for name, parameter := range parameters {
 		instance.Parameters[name] = model.DeploymentInstanceParameter{
 			ParameterName: name,
 			Value:         parameter.Value,
 		}
-	}
-
-	err = s.rejectConsumedParameters(instance)
-	if err != nil {
-		return nil, err
 	}
 
 	deployment, err := s.FindDeploymentById(ctx, deploymentId)

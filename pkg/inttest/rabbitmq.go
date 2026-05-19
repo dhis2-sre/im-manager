@@ -11,7 +11,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/docker/go-connections/nat"
 	amqpgo "github.com/rabbitmq/amqp091-go"
 	"github.com/rabbitmq/rabbitmq-stream-go-client/pkg/stream"
 	"github.com/stretchr/testify/require"
@@ -152,7 +151,7 @@ func (rc *rabbitmqContainer) AMQPURI(ctx context.Context) (string, error) {
 }
 
 func (rc *rabbitmqContainer) ExposedAMQPPort(ctx context.Context) (string, error) {
-	port, err := rc.MappedPort(ctx, nat.Port(natAMQPPort))
+	port, err := rc.MappedPort(ctx, natAMQPPort)
 	if err != nil {
 		return "", err
 	}
@@ -172,7 +171,7 @@ func (rc *rabbitmqContainer) StreamURI(ctx context.Context) (string, error) {
 }
 
 func (rc *rabbitmqContainer) ExposedStreamPort(ctx context.Context) (string, error) {
-	port, err := rc.MappedPort(ctx, nat.Port(natStreamPort))
+	port, err := rc.MappedPort(ctx, natStreamPort)
 	if err != nil {
 		return "", err
 	}

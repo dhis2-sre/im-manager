@@ -5,6 +5,8 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/dhis2-sre/im-manager/pkg/storage/migrations"
+	"github.com/go-gormigrate/gormigrate/v2"
 	"github.com/uptrace/opentelemetry-go-extra/otelgorm"
 
 	"github.com/dhis2-sre/im-manager/pkg/model"
@@ -19,14 +21,19 @@ type PostgresqlConfig struct {
 	Username     string
 	Password     string
 	DatabaseName string
+	LogQueries   bool
 }
 
 func NewDatabase(logger *slog.Logger, c PostgresqlConfig) (*gorm.DB, error) {
-	gormLogger := slogGorm.New(
+	gormLoggerOpts := []slogGorm.Option{
 		slogGorm.WithHandler(logger.Handler()),
 		slogGorm.WithRecordNotFoundError(),
-		slogGorm.WithSlowThreshold(200*time.Millisecond),
-	)
+		slogGorm.WithSlowThreshold(200 * time.Millisecond),
+	}
+	if c.LogQueries {
+		gormLoggerOpts = append(gormLoggerOpts, slogGorm.WithTraceAll())
+	}
+	gormLogger := slogGorm.New(gormLoggerOpts...)
 
 	databaseConfig := gorm.Config{
 		Logger:         gormLogger,
@@ -68,6 +75,8 @@ func NewDatabase(logger *slog.Logger, c PostgresqlConfig) (*gorm.DB, error) {
 		&model.Database{},
 		&model.Lock{},
 		&model.ExternalDownload{},
+
+		&model.Notification{},
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open Gorm session: %v", err)
@@ -76,6 +85,11 @@ func NewDatabase(logger *slog.Logger, c PostgresqlConfig) (*gorm.DB, error) {
 	err = db.Exec("CREATE EXTENSION IF NOT EXISTS pg_trgm").Error
 	if err != nil {
 		return nil, fmt.Errorf("failed to create pg_trgm extension: %v", err)
+	}
+
+	m := gormigrate.New(db, gormigrate.DefaultOptions, migrations.All())
+	if err := m.Migrate(); err != nil {
+		return nil, fmt.Errorf("failed to run migrations: %w", err)
 	}
 
 	// GORM Doesn't handle the creation of gin indexes very well so the index is created manually here

@@ -13,6 +13,11 @@ refreshAccessTokenExpirationInSeconds: 1800 # 30 minutes
 refreshTokenExpirationInSeconds: 900 # 15 minutes
 refreshTokenRememberMeExpirationInSeconds: "2592000" # 30 days
 
+# Google SSO. clientSecret and sessionSecret live in the sops-encrypted secrets values file.
+google:
+  clientId: ""
+  callbackUrl: ""
+
 redis:
   host: im-redis-valkey.namespace.svc
   port: "6379"
@@ -104,6 +109,7 @@ ingress:
     nginx.ingress.kubernetes.io/client-body-buffer-size: "10m"
     # Increase the proxy response buffer size to fix the response headers limit issue.
     nginx.ingress.kubernetes.io/proxy-buffer-size: "16k"
+    nginx.ingress.kubernetes.io/proxy-busy-buffers-size: "32k"
     nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
     nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
 

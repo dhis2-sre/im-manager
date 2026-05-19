@@ -36,13 +36,21 @@ func (s *Service) FindWithDetails(ctx context.Context, name string) (*model.Grou
 	return s.groupRepository.findWithDetails(ctx, name)
 }
 
-func (s *Service) Create(ctx context.Context, name, namespace, description, hostname string, deployable bool) (*model.Group, error) {
+func (s *Service) Create(ctx context.Context, name, namespace, description, hostname string, deployable bool, clusterID *uint) (*model.Group, error) {
 	group := &model.Group{
 		Name:        name,
 		Namespace:   namespace,
 		Description: description,
 		Hostname:    hostname,
 		Deployable:  deployable,
+	}
+
+	if clusterID != nil {
+		c, err := s.clusterService.Find(ctx, *clusterID)
+		if err != nil {
+			return nil, err
+		}
+		group.ClusterID = &c.ID
 	}
 
 	err := s.groupRepository.create(ctx, group)

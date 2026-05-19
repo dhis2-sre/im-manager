@@ -40,7 +40,7 @@ func TestGenerateRefreshToken(t *testing.T) {
 	expiration := 12
 	signedStringPrefix := "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9."
 
-	tokenData, err := GenerateRefreshToken(user, secretKey, expiration)
+	tokenData, err := GenerateRefreshToken(user, secretKey, expiration, false)
 	assert.NoError(t, err)
 
 	assert.Equal(t, expiration, int(tokenData.ExpiresIn.Seconds()))
@@ -56,7 +56,7 @@ func TestValidateRefreshToken(t *testing.T) {
 
 	expiration := 12
 
-	tokenData, err := GenerateRefreshToken(user, secretKey, expiration)
+	tokenData, err := GenerateRefreshToken(user, secretKey, expiration, false)
 	assert.NoError(t, err)
 
 	refreshTokenData, err := ValidateRefreshToken(tokenData.SignedString, secretKey)

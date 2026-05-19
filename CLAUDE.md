@@ -80,6 +80,10 @@ recovery mechanism.
   secrets in `helm/data/secrets/`. Skaffold (`skaffold.yaml`) deploys it.
 - `stacks/` are the helmfile stacks IM **deploys to other clusters** for DHIS2 instances. Different system entirely.
 
+## Migrations
+
+See [README.md#migrations](README.md#migrations). Any model change or new stack parameter that leaves existing rows inconsistent requires a migration.
+
 ## Release
 
 See [README.md#release](README.md#release) for release steps.
