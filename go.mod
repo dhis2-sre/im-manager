@@ -28,6 +28,7 @@ require (
 	github.com/lib/pq v1.12.3
 	github.com/markbates/goth v1.82.0
 	github.com/minio/minio-go/v7 v7.1.0
+	github.com/moby/moby/api v1.54.2
 	github.com/orandin/slog-gorm v1.4.0
 	github.com/orlangure/gnomock v0.0.0-00010101000000-000000000000
 	github.com/rabbitmq/amqp091-go v1.11.0
@@ -218,7 +219,6 @@ require (
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
 	github.com/moby/docker-image-spec v1.3.1 // indirect
 	github.com/moby/go-archive v0.2.0 // indirect
-	github.com/moby/moby/api v1.54.2 // indirect
 	github.com/moby/moby/client v0.4.1 // indirect
 	github.com/moby/patternmatcher v0.6.1 // indirect
 	github.com/moby/spdystream v0.5.1 // indirect
