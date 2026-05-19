@@ -7,6 +7,10 @@ on:
     branches: [ master ]
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 env:
   DEPLOY_ENVIRONMENT: ${{ (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'deploy')) }}
 
@@ -15,6 +19,8 @@ jobs:
     if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'deploy')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    outputs:
+      conclusion: ${{ steps.trigger.outputs.workflow_conclusion }}
     steps:
       - name: Wait for deploy
         if: ${{ env.DEPLOY_ENVIRONMENT == 'true' }}
@@ -50,6 +56,7 @@ jobs:
       # Don't set environment variable "API_URL" in this workflow with the action below.
       # See https://github.com/convictional/trigger-workflow-and-wait/issues/62#issuecomment-1843267732
       - name: Trigger E2E Playwright tests
+        id: trigger
         uses: convictional/trigger-workflow-and-wait@v1.6.5
         with:
           owner: dhis2-sre
@@ -61,7 +68,7 @@ jobs:
 
   send-slack-message:
     runs-on: ubuntu-latest
-    if: always() && contains(needs.*.result, 'failure') && github.ref == 'refs/heads/master'
+    if: always() && needs.e2e.result == 'failure' && needs.e2e.outputs.conclusion != 'cancelled' && github.ref == 'refs/heads/master'
     needs: [ e2e ]
     steps:
       - uses: rtCamp/action-slack-notify@v2
