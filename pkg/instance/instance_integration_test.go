@@ -109,7 +109,7 @@ func TestInstanceHandler(t *testing.T) {
 	databaseRepository := database.NewRepository(db)
 	databaseService := database.NewService(logger, s3Bucket, s3Client, groupService, databaseRepository, func(c model.Cluster) (database.PodExecutor, error) {
 		return instance.NewKubernetesService(c)
-	})
+	}, noopPublisher{}, noopFilestoreBackuper{})
 
 	authenticator := func(c *gin.Context) {
 		ctx := model.NewContextWithUser(c.Request.Context(), user)
@@ -346,4 +346,14 @@ func (gs groupService) FindByGroupNames(ctx context.Context, groupNames []string
 
 func (gs groupService) Find(ctx context.Context, name string) (*model.Group, error) {
 	return gs.group, nil
+}
+
+type noopPublisher struct{}
+
+func (noopPublisher) Publish(context.Context, uint, string, string, any) {}
+
+type noopFilestoreBackuper struct{}
+
+func (noopFilestoreBackuper) FilestoreBackup(context.Context, *model.DeploymentInstance, string, *model.Database) error {
+	return nil
 }
