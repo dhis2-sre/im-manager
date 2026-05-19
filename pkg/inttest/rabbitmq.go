@@ -11,7 +11,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/docker/go-connections/nat"
+	"github.com/moby/moby/api/types/container"
+	mobynet "github.com/moby/moby/api/types/network"
 	amqpgo "github.com/rabbitmq/amqp091-go"
 	"github.com/rabbitmq/rabbitmq-stream-go-client/pkg/stream"
 	"github.com/stretchr/testify/require"
@@ -152,7 +153,7 @@ func (rc *rabbitmqContainer) AMQPURI(ctx context.Context) (string, error) {
 }
 
 func (rc *rabbitmqContainer) ExposedAMQPPort(ctx context.Context) (string, error) {
-	port, err := rc.MappedPort(ctx, nat.Port(natAMQPPort))
+	port, err := rc.MappedPort(ctx, natAMQPPort)
 	if err != nil {
 		return "", err
 	}
@@ -172,7 +173,7 @@ func (rc *rabbitmqContainer) StreamURI(ctx context.Context) (string, error) {
 }
 
 func (rc *rabbitmqContainer) ExposedStreamPort(ctx context.Context) (string, error) {
-	port, err := rc.MappedPort(ctx, nat.Port(natStreamPort))
+	port, err := rc.MappedPort(ctx, natStreamPort)
 	if err != nil {
 		return "", err
 	}
@@ -217,7 +218,7 @@ func NewRabbitMQ(ctx context.Context, options ...rabbitMQOption) (*rabbitmqConta
 	natPortMgmt := "15672/tcp"
 	exposedPorts := []string{natAMQPPort, natPortMgmt}
 	if opts.exposeStreaming {
-		exposedPorts = append(exposedPorts, fmt.Sprintf("%s:%s", streamPort, natStreamPort))
+		exposedPorts = append(exposedPorts, natStreamPort)
 	}
 	req := testcontainers.ContainerRequest{
 		Image: "bitnamilegacy/rabbitmq:3.13",
@@ -243,6 +244,16 @@ func NewRabbitMQ(ctx context.Context, options ...rabbitMQOption) (*rabbitmqConta
 		req.Networks = []string{opts.network}
 		req.NetworkAliases = map[string][]string{
 			opts.network: {opts.networkAlias},
+		}
+	}
+	if opts.exposeStreaming {
+		req.HostConfigModifier = func(hc *container.HostConfig) {
+			if hc.PortBindings == nil {
+				hc.PortBindings = mobynet.PortMap{}
+			}
+			hc.PortBindings[mobynet.MustParsePort(natStreamPort)] = []mobynet.PortBinding{
+				{HostPort: streamPort},
+			}
 		}
 	}
 
