@@ -57,6 +57,30 @@ func IsGroupAdministrator(groupName string, groups []model.Group) bool {
 	return isMemberOf(groupName, groups)
 }
 
+func CanAccessGroup(user *model.User, groupName string) bool {
+	return IsAdministrator(user) ||
+		isMemberOf(groupName, user.Groups) ||
+		IsGroupAdministrator(groupName, user.AdminGroups)
+}
+
+func CanAccessUser(caller *model.User, target *model.User) bool {
+	return IsAdministrator(caller) || caller.ID == target.ID || sharesGroup(caller, target)
+}
+
+func sharesGroup(caller *model.User, target *model.User) bool {
+	for _, g := range target.Groups {
+		if isMemberOf(g.Name, caller.Groups) || isMemberOf(g.Name, caller.AdminGroups) {
+			return true
+		}
+	}
+	for _, g := range target.AdminGroups {
+		if isMemberOf(g.Name, caller.Groups) || isMemberOf(g.Name, caller.AdminGroups) {
+			return true
+		}
+	}
+	return false
+}
+
 // GetUserFromContext returns the User value stored in ctx, if any otherwise it returns an error.
 func GetUserFromContext(ctx context.Context) (*model.User, error) {
 	user, ok := model.GetUserFromContext(ctx)

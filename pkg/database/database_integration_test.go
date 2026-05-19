@@ -40,7 +40,7 @@ func TestDatabaseHandler(t *testing.T) {
 	s3Client := storage.NewS3Client(logger, s3.Client, uploader)
 
 	databaseRepository := database.NewRepository(db)
-	databaseService := database.NewService(logger, s3Bucket, s3Client, groupService{}, databaseRepository, nil)
+	databaseService := database.NewService(logger, s3Bucket, s3Client, groupService{}, databaseRepository, nil, noopPublisher{}, noopFilestoreBackuper{})
 
 	client := inttest.SetupHTTPServer(t, func(engine *gin.Engine) {
 		databaseHandler := database.NewHandler(logger, databaseService, groupService{groupName: "packages"}, instanceService{}, stackService{})
@@ -325,4 +325,14 @@ type stackService struct{}
 
 func (ss stackService) Find(name string) (*model.Stack, error) {
 	return nil, nil
+}
+
+type noopPublisher struct{}
+
+func (noopPublisher) Publish(context.Context, uint, string, string, any) {}
+
+type noopFilestoreBackuper struct{}
+
+func (noopFilestoreBackuper) FilestoreBackup(context.Context, *model.DeploymentInstance, string, *model.Database) error {
+	return nil
 }
