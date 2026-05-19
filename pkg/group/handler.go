@@ -27,6 +27,7 @@ type CreateGroupRequest struct {
 	Description string `json:"description" binding:"required"`
 	Hostname    string `json:"hostname" binding:"required"`
 	Deployable  bool   `json:"deployable"`
+	ClusterID   *uint  `json:"clusterId"`
 }
 
 // Create group
@@ -53,7 +54,7 @@ func (h Handler) Create(c *gin.Context) {
 		return
 	}
 
-	group, err := h.groupService.Create(c.Request.Context(), request.Name, request.Namespace, request.Description, request.Hostname, request.Deployable)
+	group, err := h.groupService.Create(c.Request.Context(), request.Name, request.Namespace, request.Description, request.Hostname, request.Deployable, request.ClusterID)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -225,6 +226,17 @@ func (h Handler) Find(c *gin.Context) {
 	//   oauth2:
 	name := c.Param("name")
 
+	user, err := handler.GetUserFromContext(c.Request.Context())
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	if !handler.CanAccessGroup(user, name) {
+		_ = c.AbortWithError(http.StatusForbidden, errdef.NewForbidden("access denied"))
+		return
+	}
+
 	group, err := h.groupService.Find(c.Request.Context(), name)
 	if err != nil {
 		_ = c.Error(err)
@@ -252,6 +264,17 @@ func (h Handler) FindWithDetails(c *gin.Context) {
 	// security:
 	//   oauth2:
 	name := c.Param("name")
+
+	user, err := handler.GetUserFromContext(c.Request.Context())
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	if !handler.CanAccessGroup(user, name) {
+		_ = c.AbortWithError(http.StatusForbidden, errdef.NewForbidden("access denied"))
+		return
+	}
 
 	group, err := h.groupService.FindWithDetails(c.Request.Context(), name)
 	if err != nil {
@@ -323,6 +346,17 @@ func (h Handler) FindResources(c *gin.Context) {
 	name := c.Param("name")
 	if name == "" {
 		_ = c.AbortWithError(http.StatusBadRequest, errors.New("group name not found"))
+		return
+	}
+
+	user, err := handler.GetUserFromContext(c.Request.Context())
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	if !handler.CanAccessGroup(user, name) {
+		_ = c.AbortWithError(http.StatusForbidden, errdef.NewForbidden("access denied"))
 		return
 	}
 

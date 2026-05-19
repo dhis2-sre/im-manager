@@ -306,7 +306,7 @@ var dhis2CoreDefaults = struct {
 	googleAuthClientEmail        string
 	googleAuthClientId           string
 }{
-	chartVersion:                 "0.34.7",
+	chartVersion:                 "0.34.9",
 	storageType:                  minIOStorage,
 	sameSiteCookies:              lax,
 	filesystemVolumeSize:         "8Gi",

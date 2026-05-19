@@ -40,7 +40,7 @@ func TestDatabaseHandler(t *testing.T) {
 	s3Client := storage.NewS3Client(logger, s3.Client, uploader)
 
 	databaseRepository := database.NewRepository(db)
-	databaseService := database.NewService(logger, s3Bucket, s3Client, groupService{}, databaseRepository, nil)
+	databaseService := database.NewService(logger, s3Bucket, s3Client, groupService{}, databaseRepository, nil, noopPublisher{}, noopFilestoreBackuper{})
 
 	client := inttest.SetupHTTPServer(t, func(engine *gin.Engine) {
 		databaseHandler := database.NewHandler(logger, databaseService, groupService{groupName: "packages"}, instanceService{}, stackService{})
@@ -159,6 +159,33 @@ func TestDatabaseHandler(t *testing.T) {
 	})
 
 	t.Run("Update", func(t *testing.T) {
+		var filestoreID string
+		{
+			t.Log("Setup filestore")
+
+			_, err := s3.Client.PutObject(context.TODO(), &awss3.PutObjectInput{
+				Bucket: aws.String(s3Bucket),
+				Key:    aws.String("packages/path/name-fs.tar.gz"),
+				Body:   strings.NewReader("filestore contents"),
+			})
+			require.NoError(t, err)
+
+			filestoreRecord := &model.Database{
+				Name:      "path/name-fs.tar.gz",
+				GroupName: "packages",
+				Url:       "s3://database-bucket/packages/path/name-fs.tar.gz",
+				Type:      "fs",
+				UserID:    userID,
+			}
+			require.NoError(t, db.Create(filestoreRecord).Error)
+
+			dbID, err := strconv.ParseUint(databaseID, 10, 64)
+			require.NoError(t, err)
+			require.NoError(t, db.Model(&model.Database{}).Where("id = ?", dbID).Update("filestore_id", filestoreRecord.ID).Error)
+
+			filestoreID = strconv.FormatUint(uint64(filestoreRecord.ID), 10)
+		}
+
 		{
 			t.Log("Update")
 
@@ -173,6 +200,13 @@ func TestDatabaseHandler(t *testing.T) {
 
 			actualContent := s3.GetObject(t, s3Bucket, "packages/path/rename.extension")
 			require.Equalf(t, "file contents", string(actualContent), "DB in S3 should have expected content")
+		}
+
+		{
+			t.Log("Filestore download after rename")
+
+			actualContent := client.Get(t, "/databases/"+filestoreID+"/download")
+			require.Equal(t, "filestore contents", string(actualContent))
 		}
 
 		{
@@ -291,4 +325,14 @@ type stackService struct{}
 
 func (ss stackService) Find(name string) (*model.Stack, error) {
 	return nil, nil
+}
+
+type noopPublisher struct{}
+
+func (noopPublisher) Publish(context.Context, uint, string, string, any) {}
+
+type noopFilestoreBackuper struct{}
+
+func (noopFilestoreBackuper) FilestoreBackup(context.Context, *model.DeploymentInstance, string, *model.Database) error {
+	return nil
 }

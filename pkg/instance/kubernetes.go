@@ -409,7 +409,7 @@ func (ks kubernetesService) restart(instance *model.DeploymentInstance, typeSele
 func (ks kubernetesService) pause(instance *model.DeploymentInstance) error {
 	err := ks.scale(instance, 0)
 	if err != nil {
-		return fmt.Errorf("failed to pause instance %q: %v", instance.ID, err)
+		return fmt.Errorf("failed to pause instance %d: %v", instance.ID, err)
 	}
 
 	return nil
@@ -418,7 +418,7 @@ func (ks kubernetesService) pause(instance *model.DeploymentInstance) error {
 func (ks kubernetesService) resume(instance *model.DeploymentInstance) error {
 	err := ks.scale(instance, 1)
 	if err != nil {
-		return fmt.Errorf("failed to resume instance %q: %v", instance.ID, err)
+		return fmt.Errorf("failed to resume instance %d: %v", instance.ID, err)
 	}
 
 	return nil

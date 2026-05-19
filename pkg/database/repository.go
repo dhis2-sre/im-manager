@@ -60,6 +60,7 @@ func (r repository) FindById(ctx context.Context, id uint) (*model.Database, err
 	err := r.db.
 		WithContext(ctx).
 		Preload("Lock").
+		Joins("User").
 		First(&d, id).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, errdef.NewNotFound("database not found by id: %d", id)
@@ -108,7 +109,7 @@ func (r repository) Lock(ctx context.Context, databaseId, instanceId, userId uin
 		}
 
 		if d.Lock != nil && d.Lock.InstanceID != 0 {
-			return errdef.NewBadRequest("database already locked by user %q and instance %q", userId, d.Lock.InstanceID)
+			return errdef.NewBadRequest("database already locked by user %d and instance %d", userId, d.Lock.InstanceID)
 		}
 
 		lock = &model.Lock{

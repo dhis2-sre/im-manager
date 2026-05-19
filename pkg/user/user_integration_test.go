@@ -61,12 +61,13 @@ func TestUserHandler(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	redis := inttest.SetupRedis(t)
 	tokenRepository := token.NewRepository(redis)
-	tokenService, err := token.NewService(logger, tokenRepository, key, 10, "secret", 20, 30)
+	tokenService, err := token.NewService(logger, tokenRepository, key, 10, 5, "secret", 20, 30)
 	require.NoError(t, err)
 
 	client := inttest.SetupHTTPServer(t, func(engine *gin.Engine) {
 		userHandler := user.NewHandler(logger, "hostname", http.SameSiteStrictMode, true, 10, 20, 30, key.PublicKey, userService, tokenService)
-		user.Routes(engine, authentication, authorization, userHandler)
+		oauthHandler := user.NewOAuthHandler(logger, "http://localhost", http.SameSiteLaxMode, true, 10, 20, userService, tokenService)
+		user.Routes(engine, authentication, authorization, userHandler, oauthHandler)
 	})
 
 	t.Run("SignUp", func(t *testing.T) {
@@ -349,14 +350,18 @@ func TestUserHandler(t *testing.T) {
 				t.Log("RefreshTokensUsingCookieWithRememberMe")
 
 				_, email, password := createUser(t, client, userService)
-				_, refreshToken := client.SignIn(t, email, password)
+				signInReq := client.NewRequest(t, http.MethodPost, "/tokens", jsonBody(`{"rememberMe": true}`), inttest.WithBasicAuth(email, password), inttest.WithHeader("Content-Type", "application/json"))
+				signInResp, err := client.Client.Do(signInReq)
+				require.NoError(t, err)
+				t.Cleanup(func() { require.NoError(t, signInResp.Body.Close()) })
+				require.Equal(t, http.StatusCreated, signInResp.StatusCode)
+				refreshToken := findCookieByName("refreshToken", signInResp.Cookies())
+				require.NotNil(t, refreshToken)
+
 				request := client.NewRequest(t, http.MethodPost, "/refresh", jsonBody(`{}`), inttest.WithHeader("Content-Type", "application/json"))
 				refreshCookie := &http.Cookie{Name: "refreshToken", Value: refreshToken.Value, Path: "/refresh"}
 				require.NoError(t, refreshCookie.Valid())
 				request.AddCookie(refreshCookie)
-				rememberMeCookie := &http.Cookie{Name: "rememberMe", Value: "true", Path: "/refresh"}
-				require.NoError(t, rememberMeCookie.Valid())
-				request.AddCookie(rememberMeCookie)
 
 				response, err := client.Client.Do(request)
 				require.NoError(t, err)

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/lestrrat-go/jwx/v2/jwt"
 
 	"github.com/dhis2-sre/im-manager/internal/errdef"
 
@@ -22,6 +23,7 @@ func NewService(
 	tokenRepository repository,
 	privateKey *rsa.PrivateKey,
 	accessTokenExpirationSeconds int,
+	refreshAccessTokenExpirationSeconds int,
 	refreshTokenSecretKey string,
 	refreshTokenExpirationSeconds int,
 	refreshTokenRememberMeExpirationSeconds int,
@@ -31,6 +33,7 @@ func NewService(
 		repository:                              tokenRepository,
 		privateKey:                              privateKey,
 		accessTokenExpirationSeconds:            accessTokenExpirationSeconds,
+		refreshAccessTokenExpirationSeconds:     refreshAccessTokenExpirationSeconds,
 		refreshTokenSecretKey:                   refreshTokenSecretKey,
 		refreshTokenExpirationSeconds:           refreshTokenExpirationSeconds,
 		refreshTokenRememberMeExpirationSeconds: refreshTokenRememberMeExpirationSeconds,
@@ -56,6 +59,7 @@ type RefreshTokenData struct {
 	SignedToken string
 	ID          uuid.UUID
 	UserId      uint
+	RememberMe  bool
 }
 
 type TokenService struct {
@@ -63,6 +67,7 @@ type TokenService struct {
 	repository                              repository
 	privateKey                              *rsa.PrivateKey
 	accessTokenExpirationSeconds            int
+	refreshAccessTokenExpirationSeconds     int
 	refreshTokenSecretKey                   string
 	refreshTokenExpirationSeconds           int
 	refreshTokenRememberMeExpirationSeconds int
@@ -85,7 +90,7 @@ func (t TokenService) GetTokens(user *model.User, previousRefreshTokenId string,
 		expiration = t.refreshTokenRememberMeExpirationSeconds
 	}
 
-	refreshToken, err := helper.GenerateRefreshToken(user, t.refreshTokenSecretKey, expiration)
+	refreshToken, err := helper.GenerateRefreshToken(user, t.refreshTokenSecretKey, expiration, rememberMe)
 	if err != nil {
 		return nil, fmt.Errorf("error generating refreshToken for user: %+v\nError: %s", user, err)
 	}
@@ -105,7 +110,8 @@ func (t TokenService) GetTokens(user *model.User, previousRefreshTokenId string,
 func (t TokenService) ValidateRefreshToken(ctx context.Context, tokenString string) (*RefreshTokenData, error) {
 	claims, err := helper.ValidateRefreshToken(tokenString, t.refreshTokenSecretKey)
 	if err != nil {
-		t.logger.ErrorContext(ctx, "Unable to validate token", "error", err, "token", tokenString)
+		userId := extractUserIdInsecure(tokenString)
+		t.logger.ErrorContext(ctx, "Unable to validate token", "error", err, "userId", userId)
 		return nil, errors.New("unable to verify refresh token")
 	}
 
@@ -119,6 +125,7 @@ func (t TokenService) ValidateRefreshToken(ctx context.Context, tokenString stri
 		SignedToken: tokenString,
 		ID:          tokenId,
 		UserId:      claims.UserId,
+		RememberMe:  claims.RememberMe,
 	}, nil
 }
 
@@ -127,5 +134,20 @@ func (t TokenService) SignOut(userId uint) error {
 }
 
 func (t TokenService) RefreshAccessToken(accessToken string) (string, error) {
-	return helper.RefreshAccessToken(accessToken, t.privateKey)
+	return helper.RefreshAccessToken(accessToken, t.privateKey, t.refreshAccessTokenExpirationSeconds)
+}
+
+// extractUserIdInsecure does a best-effort extraction of the userId claim from a JWT without
+// verifying the signature. It is used only for logging context when validation has already failed,
+// so parse errors are intentionally ignored — the caller's error is the one that matters.
+func extractUserIdInsecure(tokenString string) any {
+	token, err := jwt.ParseInsecure([]byte(tokenString))
+	if err != nil {
+		return "unknown"
+	}
+	userId, ok := token.Get("userId")
+	if !ok {
+		return "unknown"
+	}
+	return userId
 }

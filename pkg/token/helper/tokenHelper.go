@@ -48,7 +48,7 @@ type refreshToken struct {
 }
 
 //goland:noinspection GoExportedFuncWithUnexportedType
-func GenerateRefreshToken(user *model.User, secretKey string, expirationInSeconds int) (*refreshToken, error) {
+func GenerateRefreshToken(user *model.User, secretKey string, expirationInSeconds int, rememberMe bool) (*refreshToken, error) {
 	currentTime := time.Now()
 	tokenExpiration := currentTime.Add(time.Duration(expirationInSeconds) * time.Second)
 
@@ -75,6 +75,11 @@ func GenerateRefreshToken(user *model.User, secretKey string, expirationInSecond
 		return nil, err
 	}
 
+	err = token.Set("rememberMe", rememberMe)
+	if err != nil {
+		return nil, err
+	}
+
 	signed, err := jwt.Sign(token, jwt.WithKey(jwa.HS256, []byte(secretKey)))
 	if err != nil {
 		return nil, err
@@ -88,10 +93,11 @@ func GenerateRefreshToken(user *model.User, secretKey string, expirationInSecond
 }
 
 type refreshTokenClaims struct {
-	UserId    uint          `json:"uid"`
-	ID        string        `json:"jti"`
-	ExpiresIn time.Duration `json:"exp"`
-	IssuedAt  int64         `json:"iat"`
+	UserId     uint          `json:"uid"`
+	ID         string        `json:"jti"`
+	ExpiresIn  time.Duration `json:"exp"`
+	IssuedAt   int64         `json:"iat"`
+	RememberMe bool          `json:"rememberMe"`
 }
 
 //goland:noinspection GoExportedFuncWithUnexportedType
@@ -124,26 +130,29 @@ func ValidateRefreshToken(tokenString string, secretKey string) (*refreshTokenCl
 		return nil, fmt.Errorf("%s not found in claims", jwt.IssuedAtKey)
 	}
 
+	rememberMe, _ := token.Get("rememberMe")
+	rememberMeBool, _ := rememberMe.(bool)
+
 	return &refreshTokenClaims{
-		UserId:    uint(userId.(float64)),
-		ID:        fmt.Sprintf("%v", id),
-		ExpiresIn: time.Until(tokenExpiration.(time.Time)),
-		IssuedAt:  issuedAt.(time.Time).Unix(),
+		UserId:     uint(userId.(float64)),
+		ID:         fmt.Sprintf("%v", id),
+		ExpiresIn:  time.Until(tokenExpiration.(time.Time)),
+		IssuedAt:   issuedAt.(time.Time).Unix(),
+		RememberMe: rememberMeBool,
 	}, nil
 }
 
-func RefreshAccessToken(token string, privateKey *rsa.PrivateKey) (string, error) {
+func RefreshAccessToken(token string, privateKey *rsa.PrivateKey, newExpirationInSeconds int) (string, error) {
 	user, exp, err := ValidateAccessToken(token, &privateKey.PublicKey)
 	if err != nil {
 		return "", err
 	}
 
 	remaining := exp - time.Now().Unix()
-	if remaining > 60 {
+	if remaining > int64(newExpirationInSeconds) {
 		return token, nil
 	}
 
-	newExpirationInSeconds := 60
 	return GenerateAccessToken(user, privateKey, newExpirationInSeconds)
 }
 
