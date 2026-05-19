@@ -21,14 +21,19 @@ type PostgresqlConfig struct {
 	Username     string
 	Password     string
 	DatabaseName string
+	LogQueries   bool
 }
 
 func NewDatabase(logger *slog.Logger, c PostgresqlConfig) (*gorm.DB, error) {
-	gormLogger := slogGorm.New(
+	gormLoggerOpts := []slogGorm.Option{
 		slogGorm.WithHandler(logger.Handler()),
 		slogGorm.WithRecordNotFoundError(),
-		slogGorm.WithSlowThreshold(200*time.Millisecond),
-	)
+		slogGorm.WithSlowThreshold(200 * time.Millisecond),
+	}
+	if c.LogQueries {
+		gormLoggerOpts = append(gormLoggerOpts, slogGorm.WithTraceAll())
+	}
+	gormLogger := slogGorm.New(gormLoggerOpts...)
 
 	databaseConfig := gorm.Config{
 		Logger:         gormLogger,
@@ -70,6 +75,8 @@ func NewDatabase(logger *slog.Logger, c PostgresqlConfig) (*gorm.DB, error) {
 		&model.Database{},
 		&model.Lock{},
 		&model.ExternalDownload{},
+
+		&model.Notification{},
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open Gorm session: %v", err)

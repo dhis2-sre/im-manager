@@ -96,6 +96,8 @@ deploy:
             certIssuer: cert-issuer-prod
           redis:
             host: im-redis-{{ .ENVIRONMENT }}-valkey.instance-manager-{{ .CLASSIFICATION }}.svc
+          google:
+            callbackUrl: "https://{{ .API_HOSTNAME }}/auth/google/callback"
           environment:
             ENVIRONMENT: "{{ .ENVIRONMENT }}"
             CLASSIFICATION: "{{ .CLASSIFICATION }}"
@@ -114,6 +116,7 @@ deploy:
             DEFAULT_TTL: "172800" # 48 hours
             PASSWORD_TOKEN_TTL: "900" # 15 minutes
             LOG_PRETTY_PRINT: "{{ .LOG_PRETTY_PRINT }}"
+            DATABASE_LOG_QUERIES: "{{ .DATABASE_LOG_QUERIES }}"
         useHelmSecrets: true
         valuesFiles:
           - helm/data/secrets/{{ .CLASSIFICATION }}/values.yaml

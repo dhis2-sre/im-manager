@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"mime"
 	"net/http"
 	"path"
 	"strconv"
@@ -39,7 +40,6 @@ type Handler struct {
 type instanceService interface {
 	FindDecryptedDeploymentInstanceById(ctx context.Context, id uint) (*model.DeploymentInstance, error)
 	FindDeploymentById(ctx context.Context, id uint) (*model.Deployment, error)
-	FilestoreBackup(ctx context.Context, instance *model.DeploymentInstance, name string, database *model.Database) error
 }
 
 type stackService interface {
@@ -205,15 +205,6 @@ func (h Handler) SaveAs(c *gin.Context) {
 		return
 	}
 
-	savedDatabase, err := h.databaseService.SaveAs(ctx, user.ID, database, instance, stack, request.Name, request.Format, func(ctx context.Context, saved *model.Database) {
-		h.logger.InfoContext(ctx, "Save an instances database as", "groupName", saved.GroupName, "databaseName", saved.Name, "instanceName", instance.Name)
-	})
-	if err != nil {
-		_ = c.Error(err)
-		return
-	}
-
-	// Backup file store
 	deployment, err := h.instanceService.FindDeploymentById(ctx, instance.DeploymentID)
 	if err != nil {
 		_ = c.Error(err)
@@ -221,16 +212,12 @@ func (h Handler) SaveAs(c *gin.Context) {
 	}
 
 	coreInstance, err := getInstanceByStack("dhis2-core", deployment.Instances)
-	if err != nil {
-		if errdef.IsNotFound(err) {
-			c.JSON(http.StatusCreated, savedDatabase)
-			return
-		}
+	if err != nil && !errdef.IsNotFound(err) {
 		_ = c.Error(err)
 		return
 	}
 
-	err = h.instanceService.FilestoreBackup(ctx, coreInstance, savedDatabase.Name, savedDatabase)
+	savedDatabase, err := h.databaseService.SaveAs(ctx, user.ID, instance, stack, coreInstance, request.Name, request.Format, nil)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -309,8 +296,19 @@ func (h Handler) Save(c *gin.Context) {
 		return
 	}
 
-	err = h.databaseService.Save(ctx, user.ID, database, instance, stack)
+	deployment, err := h.instanceService.FindDeploymentById(ctx, instance.DeploymentID)
 	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	coreInstance, err := getInstanceByStack("dhis2-core", deployment.Instances)
+	if err != nil && !errdef.IsNotFound(err) {
+		_ = c.Error(err)
+		return
+	}
+
+	if err := h.databaseService.Save(ctx, user.ID, database, instance, stack, coreInstance); err != nil {
 		_ = c.Error(err)
 		return
 	}
@@ -567,7 +565,7 @@ func (h Handler) Download(c *gin.Context) {
 	}
 
 	_, file := path.Split(d.Url)
-	c.Header("Content-Disposition", "attachment; filename="+file)
+	c.Header("Content-Disposition", mime.FormatMediaType("attachment", map[string]string{"filename": file}))
 	c.Header("Content-Description", "File Transfer")
 	c.Header("Content-Transfer-Encoding", "binary")
 	c.Header("Content-Type", "application/octet-stream")
@@ -736,6 +734,10 @@ func (h Handler) canAccess(c *gin.Context, d *model.Database) error {
 	return nil
 }
 
+// maxExternalDownloadExpirationSeconds is the maximum time a database can be downloaded without
+// authentication. 30 is simply chosen for the sake of having a reasonable default.
+const maxExternalDownloadExpirationSeconds uint = 30 * 24 * 60 * 60 // 30 days
+
 type CreateExternalDatabaseRequest struct {
 	// Expiration time in seconds
 	Expiration uint `json:"expiration" binding:"required"`
@@ -769,6 +771,11 @@ func (h Handler) CreateExternalDownload(c *gin.Context) {
 		return
 	}
 
+	if request.Expiration > maxExternalDownloadExpirationSeconds {
+		_ = c.Error(errdef.NewBadRequest("expiration must not exceed 30 days (%d seconds)", maxExternalDownloadExpirationSeconds))
+		return
+	}
+
 	ctx := c.Request.Context()
 	d, err := h.databaseService.FindById(ctx, id)
 	if err != nil {
@@ -799,13 +806,8 @@ func (h Handler) ExternalDownload(c *gin.Context) {
 	//
 	// Download a given database without authentication
 	//
-	// Security:
-	//	oauth2:
-	//
 	// Responses:
 	//	200: DownloadDatabaseResponse
-	//	401: Error
-	//	403: Error
 	//	404: Error
 	//	415: Error
 	uuidParam := c.Param("uuid")
@@ -835,7 +837,7 @@ func (h Handler) ExternalDownload(c *gin.Context) {
 	}
 
 	_, file := path.Split(d.Url)
-	c.Header("Content-Disposition", "attachment; filename="+file)
+	c.Header("Content-Disposition", mime.FormatMediaType("attachment", map[string]string{"filename": file}))
 	c.Header("Content-Description", "File Transfer")
 	c.Header("Content-Transfer-Encoding", "binary")
 	c.Header("Content-Type", "application/octet-stream")

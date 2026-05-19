@@ -53,7 +53,7 @@ services:
     <<: *common-dev-test
     ports:
       - "8080:8080"
-    command: reflex -r "Dockerfile|\.go|\.yml$$" -s -- sh -c "go run ./cmd/serve"
+    command: go run ./cmd/serve
     depends_on:
       database:
         condition: service_healthy
