@@ -85,9 +85,6 @@ deploy:
         createNamespace: true
         chartPath: helm/chart
         setValueTemplates:
-          corsAllowOrigins:
-            - "{{ .UI_URL }}"
-            - http://localhost:3000
           image:
             repository: dhis2/im-manager
           serviceAccount:
@@ -126,8 +123,12 @@ profiles:
   - name: dev
     patches:
       - op: add
-        path: /deploy/helm/releases/4/setValueTemplates/corsAllowOrigins/-
-        value: "https://*.im-feat.dhis2.org"
+        path: /deploy/helm/releases/4/setValueTemplates/corsAllowOrigins
+        value:
+          - "{{ .UI_URL }}"
+          - "http://localhost:3000"
+          - "http://localhost:5173"
+          - "https://*.im-feat.dhis2.org"
       - op: add
         path: /deploy/helm/releases/-
         value:
@@ -151,6 +152,11 @@ profiles:
 
   - name: prod
     patches:
+      - op: add
+        path: /deploy/helm/releases/4/setValueTemplates/corsAllowOrigins
+        value:
+          - "{{ .UI_URL }}"
+
       - op: add
         path: /deploy/helm/releases/-
         value:

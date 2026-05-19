@@ -732,7 +732,6 @@ func createE2ETestUser(ctx context.Context, userService *user.Service, groupServ
 }
 
 func newGinEngine(logger *slog.Logger) (*gin.Engine, error) {
-	// TODO: This is a hack! Allowed origins for different environments should be applied using skaffold profiles... But I can't get it working!
 	allowedOrigins, err := requireEnvAsArray("CORS_ALLOWED_ORIGINS")
 	if err != nil {
 		return nil, err
@@ -740,13 +739,6 @@ func newGinEngine(logger *slog.Logger) (*gin.Engine, error) {
 	basePath, err := requireEnv("BASE_PATH")
 	if err != nil {
 		return nil, err
-	}
-	environment, err := requireEnv("ENVIRONMENT")
-	if err != nil {
-		return nil, err
-	}
-	if environment != "production" {
-		allowedOrigins = append(allowedOrigins, "http://localhost:3000", "http://localhost:5173")
 	}
 
 	r, err := server.GetEngine(logger, basePath, allowedOrigins)
