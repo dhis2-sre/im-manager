@@ -80,60 +80,34 @@ func (s Service) sendValidationEmail(user *model.User) error {
 }
 
 const (
-	/* General Web App
-	iterations = 2         // Number of iterations
-	memory     = 64 * 1024 // 64 MB memory usage
-	threads    = 2         // Number of parallel threads
-	*/
-	// High-Security App (admin logins, banking, crypto, IM)
-	iterations = 3          // Number of hashing passes
-	memory     = 128 * 1024 // 128MB memory usage
-	threads    = 4          // Number of threads
+	argon2Iterations = 3
+	argon2Memory     = 128 * 1024
+	argon2Threads    = 4
+	argon2KeyLen     = 32
+	argon2SaltLen    = 16
 
-	keyLen  = 32 // Length of derived key
-	saltLen = 32 // Salt length
-
-	minPasswordLength = 24 // Minimum password length
+	minPasswordLength = 24
 )
 
-// hashPassword generates a hash of a password using Argon2id.
-//
-// The function generates a random salt and returns the complete hash string in the standardized format:
-// $argon2id$v=19$m=memory,t=iterations,p=threads$salt$hash
-//
-// Security features:
-// - Uses Argon2id - winner of the Password Hashing Competition, designed to be resistant against GPU/ASIC attacks
-// - Implements high-security parameters: 128MB memory, 3 iterations, 4 threads
-// - Generates cryptographically secure 32-byte random salt to prevent rainbow table attacks
-// - Produces 32-byte key length for final hash
-// - Stores complete parameter set with hash for future-proof verification
-//
-// Parameters:
-//   - password: The plaintext password to hash
-//
-// Returns:
-//   - string: The encoded password hash containing all parameters
-//   - error: Any error that occurred during the hashing process
+// hashPassword returns an Argon2id-encoded hash in the standard
+// $argon2id$v=19$m=...,t=...,p=...$salt$hash format.
 func hashPassword(password string) (string, error) {
 	if len(password) < minPasswordLength {
 		return "", fmt.Errorf("password must be at least %d characters long", minPasswordLength)
 	}
 
-	salt := make([]byte, saltLen)
+	salt := make([]byte, argon2SaltLen)
 	if _, err := rand.Read(salt); err != nil {
 		return "", fmt.Errorf("failed to generate salt: %w", err)
 	}
 
-	// Derive the key
-	hash := argon2.IDKey([]byte(password), salt, iterations, memory, threads, keyLen)
+	hash := argon2.IDKey([]byte(password), salt, argon2Iterations, argon2Memory, argon2Threads, argon2KeyLen)
 
-	// Encode hash, salt, and parameters as a single string
-	format := "$argon2id$v=19$m=%d,t=%d,p=%d$%s$%s"
-	encodedSalt := base64.RawStdEncoding.EncodeToString(salt)
-	encodedHash := base64.RawStdEncoding.EncodeToString(hash)
-	hashStr := fmt.Sprintf(format, memory, iterations, threads, encodedSalt, encodedHash)
-
-	return hashStr, nil
+	return fmt.Sprintf("$argon2id$v=19$m=%d,t=%d,p=%d$%s$%s",
+		argon2Memory, argon2Iterations, argon2Threads,
+		base64.RawStdEncoding.EncodeToString(salt),
+		base64.RawStdEncoding.EncodeToString(hash),
+	), nil
 }
 
 func (s Service) ValidateEmail(ctx context.Context, token uuid.UUID) error {
@@ -173,32 +147,17 @@ func (s Service) SignIn(ctx context.Context, email string, password string) (*mo
 	return user, nil
 }
 
-// comparePasswords compares a stored password hash with a supplied plaintext password.
-// It uses Argon2id to verify if the supplied password matches the stored hash.
-//
-// The stored password hash is expected to be in the format:
-// $argon2id$v=19$m=memory,t=iterations,p=threads$salt$hash
-//
-// Security features:
-// - Implements constant-time comparison to prevent timing attacks
-// - Wipe memory buffers to prevent memory-based attacks
-//
-// Parameters:
-//   - storedPassword: The complete hash string from the database
-//   - suppliedPassword: The plaintext password to verify
-//
-// Returns:
-//   - bool: true if passwords match, false otherwise
-//   - error: Any error that occurred during the comparison process
+// comparePasswords verifies suppliedPassword against an Argon2id-encoded hash
+// using constant-time comparison.
 func comparePasswords(storedPassword string, suppliedPassword string) (bool, error) {
 	parts := strings.Split(storedPassword, "$")
 	if len(parts) != 6 {
 		return false, fmt.Errorf("invalid password hash")
 	}
 
-	var memory, iterations, threads int
-	_, err := fmt.Sscanf(parts[3], "m=%d,t=%d,p=%d", &memory, &iterations, &threads)
-	if err != nil {
+	var memory, iterations uint32
+	var threads uint8
+	if _, err := fmt.Sscanf(parts[3], "m=%d,t=%d,p=%d", &memory, &iterations, &threads); err != nil {
 		return false, fmt.Errorf("invalid password parameters")
 	}
 
@@ -212,21 +171,7 @@ func comparePasswords(storedPassword string, suppliedPassword string) (bool, err
 		return false, fmt.Errorf("failed to decode hash")
 	}
 
-	// Convert password to mutable byte slice
-	suppliedBytes := []byte(suppliedPassword)
-	defer func() {
-		for i := range suppliedBytes {
-			suppliedBytes[i] = 0
-		}
-	}() // Wipe password from memory
-
-	// Compute Argon2 hash
-	computedHash := argon2.IDKey(suppliedBytes, salt, uint32(iterations), uint32(memory), uint8(threads), uint32(len(expectedHash)))
-	defer func() {
-		for i := range computedHash {
-			computedHash[i] = 0
-		}
-	}() // Wipe computed hash
+	computedHash := argon2.IDKey([]byte(suppliedPassword), salt, iterations, memory, threads, uint32(len(expectedHash)))
 
 	return subtle.ConstantTimeCompare(computedHash, expectedHash) == 1, nil
 }
