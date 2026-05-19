@@ -75,6 +75,8 @@ func NewDatabase(logger *slog.Logger, c PostgresqlConfig) (*gorm.DB, error) {
 		&model.Database{},
 		&model.Lock{},
 		&model.ExternalDownload{},
+
+		&model.Notification{},
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open Gorm session: %v", err)
