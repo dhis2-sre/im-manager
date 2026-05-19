@@ -13,6 +13,11 @@ refreshAccessTokenExpirationInSeconds: 1800 # 30 minutes
 refreshTokenExpirationInSeconds: 900 # 15 minutes
 refreshTokenRememberMeExpirationInSeconds: "2592000" # 30 days
 
+# Google SSO. clientSecret and sessionSecret live in the sops-encrypted secrets values file.
+google:
+  clientId: ""
+  callbackUrl: ""
+
 redis:
   host: im-redis-valkey.namespace.svc
   port: "6379"

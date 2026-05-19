@@ -66,7 +66,8 @@ func TestUserHandler(t *testing.T) {
 
 	client := inttest.SetupHTTPServer(t, func(engine *gin.Engine) {
 		userHandler := user.NewHandler(logger, "hostname", http.SameSiteStrictMode, true, 10, 20, 30, key.PublicKey, userService, tokenService)
-		user.Routes(engine, authentication, authorization, userHandler)
+		oauthHandler := user.NewOAuthHandler(logger, "http://localhost", http.SameSiteLaxMode, true, 10, 20, userService, tokenService)
+		user.Routes(engine, authentication, authorization, userHandler, oauthHandler)
 	})
 
 	t.Run("SignUp", func(t *testing.T) {
