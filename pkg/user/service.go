@@ -177,6 +177,41 @@ func (s Service) FindOrCreate(ctx context.Context, email string, password string
 	return s.repository.findOrCreate(ctx, user)
 }
 
+// SignInWithSSO looks up a user by email, creating a new validated account with an
+// unusable password when none exists. Used by the OAuth callback after the identity
+// provider has verified the email. New users get no group membership and must be
+// granted access by an administrator before they can do anything useful.
+func (s Service) SignInWithSSO(ctx context.Context, email string) (*model.User, error) {
+	randomPassword := make([]byte, 32)
+	if _, err := rand.Read(randomPassword); err != nil {
+		return nil, fmt.Errorf("failed to generate random password: %s", err)
+	}
+	hashed, err := hashPassword(hex.EncodeToString(randomPassword))
+	if err != nil {
+		return nil, fmt.Errorf("failed to hash random password: %s", err)
+	}
+
+	candidate := &model.User{
+		Email:      email,
+		EmailToken: uuid.New(),
+		Password:   hashed,
+	}
+
+	user, err := s.repository.findOrCreate(ctx, candidate)
+	if err != nil {
+		return nil, err
+	}
+
+	if !user.Validated {
+		user.Validated = true
+		if err := s.repository.save(ctx, user); err != nil {
+			return nil, err
+		}
+	}
+
+	return user, nil
+}
+
 func (s Service) Delete(ctx context.Context, id uint) error {
 	return s.repository.delete(ctx, id)
 }
