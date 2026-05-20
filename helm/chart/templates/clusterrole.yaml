@@ -51,6 +51,12 @@ rules:
       - ingressclasses
     verbs:
       - list
+  - apiGroups:
+      - cert-manager.io
+    resources:
+      - clusterissuers
+    verbs:
+      - list
 # KEDA
   - apiGroups:
       - http.keda.sh
