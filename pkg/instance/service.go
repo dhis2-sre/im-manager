@@ -390,7 +390,7 @@ func (s Service) DeployDeployment(ctx context.Context, token string, deployment 
 		}
 		err = s.deployDeploymentInstance(ctx, token, instance, deployment.TTL)
 		if err != nil {
-			return fmt.Errorf("failed to deploy instance(%s) %q: %v", instance.StackName, instance.Name, err)
+			return fmt.Errorf("failed to deploy instance(%s) %q: %w", instance.StackName, instance.Name, err)
 		}
 	}
 
@@ -421,6 +421,10 @@ func (s Service) deployDeploymentInstance(ctx context.Context, token string, ins
 		if strings.Contains(string(deployErrorLog), "another operation (install/upgrade/rollback) is in progress") {
 			s.logger.WarnContext(ctx, "Helm operation already in progress, skipping", "instance", instance.Name, "stack", instance.StackName, "deployment", instance.DeploymentID, "errorLog", deployErrorLog)
 			return nil
+		}
+		if classified := classifyHelmfileError(string(deployErrorLog)); classified != nil {
+			s.logger.ErrorContext(ctx, "Helmfile sync failed with recognized error", "instance", instance.Name, "stack", instance.StackName, "deployment", instance.DeploymentID, "errorLog", string(deployErrorLog))
+			return classified
 		}
 		return fmt.Errorf("%w: %s", err, deployErrorLog)
 	}
