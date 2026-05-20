@@ -35,14 +35,8 @@ releases:
             image: bitnamilegacy/minio:2025.1.20-debian-12-r0
             pullPolicy: {{ requiredEnv "IMAGE_PULL_POLICY" }}
             env:
-              - name: HOSTNAME
-                value: {{ requiredEnv "HOSTNAME" }}
-              - name: DATABASE_ID
-                value: "{{ requiredEnv "DATABASE_ID" }}"
-              - name: IM_ACCESS_TOKEN
-                value: {{ requiredEnv "IM_ACCESS_TOKEN" }}
-              - name: INSTANCE_NAME
-                value: {{ requiredEnv "INSTANCE_NAME" }}
+              - name: FILESTORE_DOWNLOAD_URL
+                value: {{ env "FILESTORE_DOWNLOAD_URL" | default "" }}
             command:
               - "/bin/bash"
               - "-c"

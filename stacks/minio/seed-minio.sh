@@ -33,21 +33,14 @@ seed_file=local/dhis2/seeded.txt
 if mc stat $seed_file >/dev/null 2>&1; then
   echo "Already seeded, skipping..."
 else
-  DATABASE_URL="$HOSTNAME/databases/$DATABASE_ID"
-  echo "DATABASE_URL: $DATABASE_URL"
-  if ! FILESTORE_ID=$(curl --connect-timeout 10 --retry 5 --retry-delay 1 --fail --show-error -L "$DATABASE_URL" --cookie "accessToken=$IM_ACCESS_TOKEN" | jq -r '.filestoreId'); then
-    echo "Failed to fetch database information from $DATABASE_URL"
-    exit 1
-  fi
-  if [[ "$FILESTORE_ID" == "0" ]]; then
-    echo "No filestore id associated with database"
+  if [[ -z "${FILESTORE_DOWNLOAD_URL:-}" ]]; then
+    echo "No filestore to seed"
   else
-    echo "Filestore ID: $FILESTORE_ID"
+    echo "Filestore download URL: $FILESTORE_DOWNLOAD_URL"
     echo "Seeding..."
 
     tmp_file=$(mktemp)
-    FILESTORE_DOWNLOAD_URL="$HOSTNAME/databases/$FILESTORE_ID/download"
-    if ! curl --connect-timeout 10 --retry 5 --retry-delay 1 --fail --show-error -L "$FILESTORE_DOWNLOAD_URL" --cookie "accessToken=$IM_ACCESS_TOKEN" > "$tmp_file"; then
+    if ! curl --connect-timeout 10 --retry 5 --retry-delay 1 --fail --show-error -L "$FILESTORE_DOWNLOAD_URL" > "$tmp_file"; then
       echo "Failed to download filestore from $FILESTORE_DOWNLOAD_URL"
       exit 1
     fi

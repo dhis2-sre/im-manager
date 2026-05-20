@@ -93,10 +93,8 @@ releases:
           extraEnvVars:
             - name: HOSTNAME
               value: {{ requiredEnv "HOSTNAME" }}
-            - name: DATABASE_ID
-              value: "{{ requiredEnv "DATABASE_ID" }}"
-            - name: IM_ACCESS_TOKEN
-              value: {{ requiredEnv "IM_ACCESS_TOKEN" }}
+            - name: DATABASE_DOWNLOAD_URL
+              value: {{ env "DATABASE_DOWNLOAD_URL" | default "" }}
             - name: DATABASE_USERNAME
               value: {{ requiredEnv "DATABASE_USERNAME" }}
             - name: DATABASE_PASSWORD

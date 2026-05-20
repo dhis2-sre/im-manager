@@ -9,8 +9,10 @@ import (
 	"iter"
 	"log/slog"
 	"maps"
+	"os"
 	"os/exec"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -49,8 +51,13 @@ type groupService interface {
 }
 
 type helmfile interface {
-	sync(ctx context.Context, token string, instance *model.DeploymentInstance, group *model.Group, ttl uint) (*exec.Cmd, error)
+	sync(ctx context.Context, token string, instance *model.DeploymentInstance, group *model.Group, ttl uint, extraEnv map[string]string) (*exec.Cmd, error)
 	destroy(ctx context.Context, instance *model.DeploymentInstance, group *model.Group) (*exec.Cmd, error)
+}
+
+type externalDownloadCreator interface {
+	FindById(ctx context.Context, id uint) (*model.Database, error)
+	CreateExternalDownload(ctx context.Context, databaseID uint, expiration uint) (*model.ExternalDownload, error)
 }
 
 type Service struct {
@@ -62,6 +69,53 @@ type Service struct {
 	s3Client           *s3.Client
 	s3Bucket           string
 	tokenService       *token.TokenService
+	externalDownloads  externalDownloadCreator
+}
+
+func (s *Service) SetExternalDownloads(creator externalDownloadCreator) {
+	s.externalDownloads = creator
+}
+
+const seedDownloadTTLSeconds uint = 1800
+
+func (s Service) buildSeedEnv(ctx context.Context, instance *model.DeploymentInstance) (map[string]string, error) {
+	param, ok := instance.Parameters["DATABASE_ID"]
+	if !ok {
+		return nil, nil
+	}
+
+	databaseID, err := strconv.ParseUint(param.Value, 10, 64)
+	if err != nil || databaseID == 0 {
+		return nil, nil
+	}
+
+	if s.externalDownloads == nil {
+		return nil, fmt.Errorf("external download service not configured; cannot create seed URLs for DATABASE_ID=%s", param.Value)
+	}
+
+	hostname := os.Getenv("HOSTNAME")
+	extraEnv := make(map[string]string)
+
+	db, err := s.externalDownloads.FindById(ctx, uint(databaseID))
+	if err != nil {
+		return nil, fmt.Errorf("database %d not found: %w", databaseID, err)
+	}
+
+	dbDownload, err := s.externalDownloads.CreateExternalDownload(ctx, db.ID, seedDownloadTTLSeconds)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create seed download link for database %d: %w", db.ID, err)
+	}
+	extraEnv["DATABASE_DOWNLOAD_URL"] = hostname + "/databases/external/" + dbDownload.UUID.String()
+
+	if db.FilestoreID != 0 {
+		fsDownload, err := s.externalDownloads.CreateExternalDownload(ctx, db.FilestoreID, seedDownloadTTLSeconds)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create seed download link for filestore %d: %w", db.FilestoreID, err)
+		}
+		extraEnv["FILESTORE_DOWNLOAD_URL"] = hostname + "/databases/external/" + fsDownload.UUID.String()
+	}
+
+	return extraEnv, nil
 }
 
 func (s Service) SaveDeployment(ctx context.Context, deployment *model.Deployment) error {
@@ -403,7 +457,12 @@ func (s Service) deployDeploymentInstance(ctx context.Context, token string, ins
 		return err
 	}
 
-	syncCmd, err := s.helmfileService.sync(ctx, token, instance, group, ttl)
+	extraEnv, err := s.buildSeedEnv(ctx, instance)
+	if err != nil {
+		return fmt.Errorf("failed to build seed environment: %w", err)
+	}
+
+	syncCmd, err := s.helmfileService.sync(ctx, token, instance, group, ttl, extraEnv)
 	if err != nil {
 		return err
 	}
