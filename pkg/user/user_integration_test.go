@@ -77,11 +77,11 @@ func TestUserHandler(t *testing.T) {
 
 		var user model.User
 		userCount.Increment()
+		defer userCount.Done()
 		client.PostJSON(t, "/users", jsonBody(`{
 			"email":    "user@dhis2.org",
 			"password": "oneoneoneoneoneoneone111"
 		}`), &user)
-		userCount.Done()
 
 		assert.Equal(t, "user@dhis2.org", user.Email)
 		assert.Empty(t, user.Password)
@@ -441,11 +441,11 @@ func TestUserHandler(t *testing.T) {
 
 				var user model.User
 				userCount.Increment()
+				defer userCount.Done()
 				client.PostJSON(t, "/users", jsonBody(`{
 					"email":    "no-email-validation@dhis2.org",
 					"password": "oneoneoneoneoneoneone111"
 				}`), &user)
-				userCount.Done()
 
 				require.Equal(t, "no-email-validation@dhis2.org", user.Email)
 				require.Empty(t, user.Password)
@@ -602,13 +602,13 @@ func createUser(t *testing.T, client *inttest.HTTPClient, userService *user.Serv
 	t.Helper()
 
 	userCount.Increment()
+	defer userCount.Done()
 	email := fmt.Sprintf("user%d@dhis2.org", userCount.Value())
 	password := uuid.NewString()
 	requestBody := jsonBody(`{"email": "%s", "password": "%s"}`, email, password)
 
 	var user model.User
 	client.PostJSON(t, "/users", requestBody, &user)
-	userCount.Done()
 
 	require.Equal(t, email, user.Email)
 	require.Empty(t, user.Password)
