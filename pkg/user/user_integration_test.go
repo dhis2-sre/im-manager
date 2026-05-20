@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/rsa"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"log/slog"
@@ -19,6 +20,7 @@ import (
 	"github.com/dhis2-sre/im-manager/pkg/cluster"
 
 	"github.com/google/uuid"
+	"golang.org/x/crypto/scrypt"
 
 	"github.com/go-mail/mail"
 
@@ -105,6 +107,30 @@ func TestUserHandler(t *testing.T) {
 		client.GetJSON(t, "/me", &me, inttest.WithAuthToken(accessToken.Value))
 		assert.Equal(t, "user@dhis2.org", me.Email)
 		assert.True(t, me.Validated)
+	})
+
+	t.Run("LegacyPasswordMigrationOnSignIn", func(t *testing.T) {
+		t.Parallel()
+
+		email := "legacy@dhis2.org"
+		password := "legacypasswordlegacypassword"
+
+		userCount.Increment()
+		u, err := userService.FindOrCreate(context.Background(), email, password)
+		require.NoError(t, err)
+		userCount.Done()
+
+		u.Password = legacyScryptHashFixture(t, password)
+		u.Validated = true
+		err = userService.Save(context.Background(), u)
+		require.NoError(t, err)
+
+		_, _ = client.SignIn(t, email, password)
+
+		migrated, err := userService.FindById(context.Background(), u.ID)
+		require.NoError(t, err)
+		assert.True(t, strings.HasPrefix(migrated.Password, "$argon2id$"),
+			"expected stored hash to be upgraded to argon2id, got %q", migrated.Password)
 	})
 
 	t.Run("SignOut", func(t *testing.T) {
@@ -643,4 +669,16 @@ func findCookieByName(name string, cookies []*http.Cookie) *http.Cookie {
 
 func jsonBody(format string, args ...any) io.Reader {
 	return strings.NewReader(fmt.Sprintf(format, args...))
+}
+
+// legacyScryptHashFixture produces a hash in the pre-Argon2id encoding so the
+// migration path can be exercised end-to-end.
+func legacyScryptHashFixture(t *testing.T, password string) string {
+	t.Helper()
+	salt := make([]byte, 32)
+	_, err := rand.Read(salt)
+	require.NoError(t, err)
+	hash, err := scrypt.Key([]byte(password), salt, 32768, 8, 1, 32)
+	require.NoError(t, err)
+	return fmt.Sprintf("%s.%s", hex.EncodeToString(hash), hex.EncodeToString(salt))
 }

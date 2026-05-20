@@ -3,20 +3,23 @@ package user
 import (
 	"context"
 	"crypto/rand"
+	"crypto/subtle"
 	"database/sql"
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
+	"log/slog"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
+	"golang.org/x/crypto/argon2"
+	"golang.org/x/crypto/scrypt"
 
 	"github.com/dhis2-sre/im-manager/internal/errdef"
 
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	"github.com/go-mail/mail"
-	"golang.org/x/crypto/scrypt"
 )
 
 func NewService(uiUrl string, passwordTokenTtl uint, repository *repository, dialer dailer) *Service {
@@ -79,23 +82,34 @@ func (s Service) sendValidationEmail(user *model.User) error {
 	return s.dailer.DialAndSend(m)
 }
 
+const (
+	argon2idIterations = 3
+	argon2idMemory     = 128 * 1024
+	argon2idThreads    = 4
+	argon2idKeyLen     = 32
+	argon2idSaltLen    = 16
+)
+
+// hashPassword returns an Argon2id-encoded hash in the standard
+// $argon2id$v=19$m=...,t=...,p=...$salt$hash format.
 func hashPassword(password string) (string, error) {
-	// example for making salt - https://play.golang.org/p/_Aw6WeWC42I
-	salt := make([]byte, 32)
-	_, err := rand.Read(salt)
-	if err != nil {
-		return "", err
+	salt := make([]byte, argon2idSaltLen)
+	if _, err := rand.Read(salt); err != nil {
+		return "", fmt.Errorf("failed to generate salt: %w", err)
 	}
 
-	// using recommended cost parameters from - https://godoc.org/golang.org/x/crypto/scrypt
-	hash, err := scrypt.Key([]byte(password), salt, 32768, 8, 1, 32)
-	if err != nil {
-		return "", err
-	}
+	hash := argon2.IDKey([]byte(password), salt, argon2idIterations, argon2idMemory, argon2idThreads, argon2idKeyLen)
 
-	hashedPassword := fmt.Sprintf("%s.%s", hex.EncodeToString(hash), hex.EncodeToString(salt))
+	return fmt.Sprintf("$argon2id$v=19$m=%d,t=%d,p=%d$%s$%s",
+		argon2idMemory, argon2idIterations, argon2idThreads,
+		base64.RawStdEncoding.EncodeToString(salt),
+		base64.RawStdEncoding.EncodeToString(hash),
+	), nil
+}
 
-	return hashedPassword, nil
+// isLegacyHash reports whether a stored hash is in the pre-Argon2id scrypt format.
+func isLegacyHash(storedPassword string) bool {
+	return !strings.HasPrefix(storedPassword, "$argon2id$")
 }
 
 func (s Service) ValidateEmail(ctx context.Context, token uuid.UUID) error {
@@ -121,7 +135,7 @@ func (s Service) SignIn(ctx context.Context, email string, password string) (*mo
 
 	match, err := comparePasswords(user.Password, password)
 	if err != nil {
-		return nil, fmt.Errorf("password hashing failed: %s", err)
+		return nil, fmt.Errorf("password comparison failed: %s", err)
 	}
 
 	if !match {
@@ -132,26 +146,85 @@ func (s Service) SignIn(ctx context.Context, email string, password string) (*mo
 		return nil, errdef.NewForbidden("account not validated")
 	}
 
+	if isLegacyHash(user.Password) {
+		s.migrateLegacyPassword(ctx, user, password)
+	}
+
 	return user, nil
 }
 
-func comparePasswords(storedPassword string, suppliedPassword string) (bool, error) {
+func comparePasswords(storedPassword, suppliedPassword string) (bool, error) {
+	if isLegacyHash(storedPassword) {
+		return compareLegacyScryptPassword(storedPassword, suppliedPassword)
+	}
+	return compareArgon2idPassword(storedPassword, suppliedPassword)
+}
+
+func compareArgon2idPassword(storedPassword, suppliedPassword string) (bool, error) {
+	parts := strings.Split(storedPassword, "$")
+	if len(parts) != 6 {
+		return false, fmt.Errorf("invalid argon2id hash")
+	}
+
+	var memory, iterations uint32
+	var threads uint8
+	if _, err := fmt.Sscanf(parts[3], "m=%d,t=%d,p=%d", &memory, &iterations, &threads); err != nil {
+		return false, fmt.Errorf("invalid argon2id parameters")
+	}
+
+	salt, err := base64.RawStdEncoding.DecodeString(parts[4])
+	if err != nil {
+		return false, fmt.Errorf("failed to decode salt")
+	}
+
+	expectedHash, err := base64.RawStdEncoding.DecodeString(parts[5])
+	if err != nil {
+		return false, fmt.Errorf("failed to decode hash")
+	}
+
+	computedHash := argon2.IDKey([]byte(suppliedPassword), salt, iterations, memory, threads, uint32(len(expectedHash))) //nolint:gosec // length bounded by base64-decoded hash field
+
+	return subtle.ConstantTimeCompare(computedHash, expectedHash) == 1, nil
+}
+
+func compareLegacyScryptPassword(storedPassword, suppliedPassword string) (bool, error) {
 	passwordAndSalt := strings.Split(storedPassword, ".")
 	if len(passwordAndSalt) != 2 {
-		return false, fmt.Errorf("wrong password/salt format: %s", storedPassword)
+		return false, fmt.Errorf("invalid legacy password hash")
+	}
+
+	expectedHash, err := hex.DecodeString(passwordAndSalt[0])
+	if err != nil {
+		return false, fmt.Errorf("failed to decode hash")
 	}
 
 	salt, err := hex.DecodeString(passwordAndSalt[1])
 	if err != nil {
-		return false, fmt.Errorf("unable to verify user password")
+		return false, fmt.Errorf("failed to decode salt")
 	}
 
-	hash, err := scrypt.Key([]byte(suppliedPassword), salt, 32768, 8, 1, 32)
+	computedHash, err := scrypt.Key([]byte(suppliedPassword), salt, 32768, 8, 1, 32)
 	if err != nil {
 		return false, err
 	}
 
-	return hex.EncodeToString(hash) == passwordAndSalt[0], nil
+	return subtle.ConstantTimeCompare(computedHash, expectedHash) == 1, nil
+}
+
+// migrateLegacyPassword rehashes a legacy scrypt-hashed password with Argon2id
+// and persists it. Failures don't fail the sign-in; the next successful
+// sign-in retries.
+func (s Service) migrateLegacyPassword(ctx context.Context, user *model.User, password string) {
+	newHash, err := hashPassword(password)
+	if err != nil {
+		slog.Default().WarnContext(ctx, "failed to rehash legacy password", "userId", user.ID, "error", err)
+		return
+	}
+
+	user.Password = newHash
+	if err := s.repository.save(ctx, user); err != nil {
+		slog.Default().WarnContext(ctx, "failed to persist rehashed password", "userId", user.ID, "error", err)
+	}
 }
 
 func (s Service) FindAll(ctx context.Context) ([]*model.User, error) {
