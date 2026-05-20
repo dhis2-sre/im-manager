@@ -1,69 +1,63 @@
 #!/bin/bash
+# Restarts a range of DHIS2 instances via restart.sh.
+# With -b, only restarts instances returning HTTP 503 (broken).
 
 set -euo pipefail
 
-# Function to display usage
 print_usage() {
-  echo "Usage: $0 -g GROUP -i INSTANCES -n NAME [-s START_NUM] [-f]"
+  echo "Usage: $0 -g GROUP -i END_NUM -n NAME [-s START_NUM] [-b]"
   echo "Options:"
   echo "  -g GROUP      DHIS2 group/domain"
-  echo "  -i INSTANCES  Number of instances"
+  echo "  -i END_NUM    Last instance number (range is [START_NUM, END_NUM])"
   echo "  -n NAME       Instance name prefix"
   echo "  -s START_NUM  Starting instance number (default: 1)"
-  echo "  -f           Force reset (only reset if 503 error)"
+  echo "  -b           Only restart instances returning HTTP 503 (broken)"
   exit 1
 }
 
-# Default values
 START_NUM=1
-FORCE_RESET="false"
+BROKEN_ONLY="false"
 
-# Parse command line arguments
-while getopts ":g:i:n:s:fh" opt; do
+while getopts ":g:i:n:s:bh" opt; do
   case $opt in
     g) GROUP="$OPTARG" ;;
-    i) INSTANCES="$OPTARG" ;;
+    i) END_NUM="$OPTARG" ;;
     n) NAME="$OPTARG" ;;
     s) START_NUM="$OPTARG" ;;
-    f) FORCE_RESET="true" ;;
+    b) BROKEN_ONLY="true" ;;
     h) print_usage ;;
     \?) echo "Invalid option -$OPTARG" >&2; print_usage ;;
     :) echo "Option -$OPTARG requires an argument" >&2; print_usage ;;
   esac
 done
 
-# Verify required arguments
-if [ -z "${GROUP:-}" ] || [ -z "${INSTANCES:-}" ] || [ -z "${NAME:-}" ]; then
+if [ -z "${GROUP:-}" ] || [ -z "${END_NUM:-}" ] || [ -z "${NAME:-}" ]; then
   echo "Error: Missing required arguments" >&2
   print_usage
 fi
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/resolve-group-host.sh"
+GROUP_HOST=$(resolve_group_host "$GROUP")
 
-# Main loop
-for ((i = START_NUM; i < INSTANCES + 1; i++)); do
+for ((i = START_NUM; i < END_NUM + 1; i++)); do
   # Ensure each deploy get a fresh access token
   rm -f .access_token_cache
   source ./auth.sh
-  # zero pad the number
   zi=$(printf "%02d" $i)
   instance_name="$NAME-$zi"
-  
-  # Get instance details and extract core instance ID
+
   instance_data=$(./findByName.sh "$GROUP" "$instance_name")
 
-
   instance_id=$(echo "$instance_data" | jq -r '.instances[] | select(.stackName=="dhis2-core") | .id')
-  
+
   if [ -z "$instance_id" ]; then
     echo "Error: Could not find core instance ID for $instance_name" >&2
     continue
   fi
 
-  # If an "f" argument (force reset) is given, then check https://qa.im.dhis2.org/$instance_name
-  # and if it returns a 503 - only then run the reset.
-  # if no "f" argument then always run the reset
-  if [ "$FORCE_RESET" = "true" ]; then
-    if curl -s -o /dev/null -w "%{http_code}" https://qa.im.dhis2.org/$instance_name | grep -q "503"; then
+  if [ "$BROKEN_ONLY" = "true" ]; then
+    if curl -s -o /dev/null -w "%{http_code}" "https://$GROUP_HOST/$instance_name" | grep -q "503"; then
       echo "503 returned, running restart"
       ./restart.sh "$instance_id"
     else
@@ -73,5 +67,4 @@ for ((i = START_NUM; i < INSTANCES + 1; i++)); do
     echo "./restart.sh $instance_id"
     ./restart.sh "$instance_id"
   fi
-done 
-  
+done

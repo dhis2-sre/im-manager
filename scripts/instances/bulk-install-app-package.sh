@@ -1,13 +1,14 @@
 #!/bin/bash
+# Installs an app across a range of DHIS2 instances.
+# Either uploads a local file (-f) or installs by App Hub ID (-a).
 
 set -euo pipefail
 
-# Function to display usage
 print_usage() {
-  echo "Usage: $0 -g GROUP -i INSTANCES -n NAME (-f FILE | -a APP_ID) [-s START_NUM] [-u USERNAME] [-p PASSWORD]"
+  echo "Usage: $0 -g GROUP -i END_NUM -n NAME (-f FILE | -a APP_ID) [-s START_NUM] [-u USERNAME] [-p PASSWORD]"
   echo "Options:"
   echo "  -g GROUP      DHIS2 group/domain"
-  echo "  -i INSTANCES  Number of instances"
+  echo "  -i END_NUM    Last instance number (range is [START_NUM, END_NUM])"
   echo "  -n NAME       Instance name prefix"
   echo "  -f FILE       File to upload"
   echo "  -a APP_ID     App Hub ID to install"
@@ -17,16 +18,14 @@ print_usage() {
   exit 1
 }
 
-# Default values
 START_NUM=1
 USERNAME="admin"
 PASSWORD="district"
 
-# Parse command line arguments
 while getopts ":g:i:n:s:u:p:f:a:h" opt; do
   case $opt in
     g) GROUP="$OPTARG" ;;
-    i) INSTANCES="$OPTARG" ;;
+    i) END_NUM="$OPTARG" ;;
     n) NAME="$OPTARG" ;;
     s) START_NUM="$OPTARG" ;;
     u) USERNAME="$OPTARG" ;;
@@ -39,13 +38,11 @@ while getopts ":g:i:n:s:u:p:f:a:h" opt; do
   esac
 done
 
-# Verify required arguments
-if [ -z "${GROUP:-}" ] || [ -z "${INSTANCES:-}" ] || [ -z "${NAME:-}" ]; then
+if [ -z "${GROUP:-}" ] || [ -z "${END_NUM:-}" ] || [ -z "${NAME:-}" ]; then
   echo "Error: Missing required arguments" >&2
   print_usage
 fi
 
-# Verify either FILE or APP_ID is provided, but not both
 if [ -z "${FILE:-}" ] && [ -z "${APP_ID:-}" ]; then
   echo "Error: Either -f FILE or -a APP_ID must be provided" >&2
   print_usage
@@ -54,25 +51,24 @@ elif [ -n "${FILE:-}" ] && [ -n "${APP_ID:-}" ]; then
   print_usage
 fi
 
-# If FILE is provided, verify it exists
 if [ -n "${FILE:-}" ] && [ ! -f "$FILE" ]; then
   echo "Error: File '$FILE' not found" >&2
   exit 1
 fi
 
-for ((i = START_NUM; i < INSTANCES + 1; i++)); do
-  # zero pad the number
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/resolve-group-host.sh"
+GROUP_HOST=$(resolve_group_host "$GROUP")
+
+for ((i = START_NUM; i < END_NUM + 1; i++)); do
   zi=$(printf "%02d" $i)
   if [ -n "${FILE:-}" ]; then
-    # File upload mode
     http --auth "$USERNAME:$PASSWORD" \
-      --form POST "https://$GROUP.im.dhis2.org/$NAME-$zi/api/apps" \
+      --form POST "https://$GROUP_HOST/$NAME-$zi/api/apps" \
       file@"$FILE"
   else
     echo "Installing app $APP_ID on $NAME-$zi"
-    echo "http --auth $USERNAME:$PASSWORD POST https://$GROUP.im.dhis2.org/$NAME-$zi/api/appHub/$APP_ID"
-    # App Hub installation mode
     http --auth "$USERNAME:$PASSWORD" \
-      POST "https://$GROUP.im.dhis2.org/$NAME-$zi/api/appHub/$APP_ID"
+      POST "https://$GROUP_HOST/$NAME-$zi/api/appHub/$APP_ID"
   fi
-done 
+done

@@ -1,13 +1,14 @@
 #!/bin/bash
+# Triggers analytics resourceTables generation across a range of DHIS2 instances.
+# With -c, only triggers when the analytics endpoint returns HTTP 409.
 
 set -euo pipefail
 
-# Function to display usage
 print_usage() {
-  echo "Usage: $0 -g GROUP -i INSTANCES -n NAME [-s START_NUM] [-u USERNAME] [-p PASSWORD] [-c]"
+  echo "Usage: $0 -g GROUP -i END_NUM -n NAME [-s START_NUM] [-u USERNAME] [-p PASSWORD] [-c]"
   echo "Options:"
   echo "  -g GROUP      DHIS2 group/domain"
-  echo "  -i INSTANCES  Number of instances"
+  echo "  -i END_NUM    Last instance number (range is [START_NUM, END_NUM])"
   echo "  -n NAME       Instance name prefix"
   echo "  -s START_NUM  Starting instance number (default: 1)"
   echo "  -u USERNAME   Username for authentication (default: admin)"
@@ -16,17 +17,15 @@ print_usage() {
   exit 1
 }
 
-# Default values
 START_NUM=1
 USERNAME="admin"
 PASSWORD="district"
 CONDITIONAL="false"
 
-# Parse command line arguments
 while getopts ":g:i:n:s:u:p:ch" opt; do
   case $opt in
     g) GROUP="$OPTARG" ;;
-    i) INSTANCES="$OPTARG" ;;
+    i) END_NUM="$OPTARG" ;;
     n) NAME="$OPTARG" ;;
     s) START_NUM="$OPTARG" ;;
     u) USERNAME="$OPTARG" ;;
@@ -38,8 +37,7 @@ while getopts ":g:i:n:s:u:p:ch" opt; do
   esac
 done
 
-# Verify required arguments
-if [ -z "${GROUP:-}" ] || [ -z "${INSTANCES:-}" ] || [ -z "${NAME:-}" ]; then
+if [ -z "${GROUP:-}" ] || [ -z "${END_NUM:-}" ] || [ -z "${NAME:-}" ]; then
   echo "Error: Missing required arguments" >&2
   print_usage
 fi
@@ -48,27 +46,28 @@ if [ -z "$START_NUM" ]; then
   START_NUM=1
 fi
 
-for ((i = START_NUM; i < INSTANCES + 1; i++)); do
-  # zero pad the number
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/resolve-group-host.sh"
+GROUP_HOST=$(resolve_group_host "$GROUP")
+
+for ((i = START_NUM; i < END_NUM + 1; i++)); do
   zi=$(printf "%02d" $i)
   echo "Processing $NAME-$zi"
   if [ "$CONDITIONAL" = "true" ]; then
     echo "Conditional mode"
-    # Check analytics endpoint first
     status_code=$(curl -s -o /dev/null -w "%{http_code}" \
       --user "$USERNAME:$PASSWORD" \
-      "https://$GROUP.im.dhis2.org/$NAME-$zi/api/analytics/dataValueSet.json?dimension=ou%3ATEQlaapDQoK%3BVth0fbpFcsO%3BbL4ooGhyHRQ%3BjmIPBj66vD6%3BqhqAxPSTUXp%3BLEVEL-wjP19dkFeIk&dimension=pe%3ALAST_12_MONTHS&dimension=dx%3AsB79w2hiLp8&showHierarchy=false&hierarchyMeta=false&includeMetadataDetails=true&includeNumDen=true&skipRounding=false&completedOnly=false")
-    
+      "https://$GROUP_HOST/$NAME-$zi/api/analytics/dataValueSet.json?dimension=ou%3ATEQlaapDQoK%3BVth0fbpFcsO%3BbL4ooGhyHRQ%3BjmIPBj66vD6%3BqhqAxPSTUXp%3BLEVEL-wjP19dkFeIk&dimension=pe%3ALAST_12_MONTHS&dimension=dx%3AsB79w2hiLp8&showHierarchy=false&hierarchyMeta=false&includeMetadataDetails=true&includeNumDen=true&skipRounding=false&completedOnly=false")
+
     if [ "$status_code" = "409" ]; then
       echo "$NAME-$zi : Analytics returned 409, running"
       curl -s -X POST --user "$USERNAME:$PASSWORD" \
-        "https://$GROUP.im.dhis2.org/$NAME-$zi/api/resourceTables/analytics"
+        "https://$GROUP_HOST/$NAME-$zi/api/resourceTables/analytics"
     else
       echo "$NAME-$zi : Analytics returned $status_code, skipping"
     fi
   else
-    # Always run analytics in non-conditional mode
     curl -s -X POST --user "$USERNAME:$PASSWORD" \
-      "https://$GROUP.im.dhis2.org/$NAME-$zi/api/resourceTables/analytics"
+      "https://$GROUP_HOST/$NAME-$zi/api/resourceTables/analytics"
   fi
 done
