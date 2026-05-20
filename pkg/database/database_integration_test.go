@@ -1,12 +1,9 @@
 package database_test
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
-	"io"
 	"log/slog"
-	"mime/multipart"
 	"net/http"
 	"os"
 	"strconv"
@@ -15,7 +12,6 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-
 	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
 	awss3 "github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
@@ -23,6 +19,7 @@ import (
 	"github.com/dhis2-sre/im-manager/pkg/inttest"
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	"github.com/dhis2-sre/im-manager/pkg/storage"
+	userpkg "github.com/dhis2-sre/im-manager/pkg/user"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -43,7 +40,7 @@ func TestDatabaseHandler(t *testing.T) {
 	s3Client := storage.NewS3Client(logger, s3.Client, uploader)
 
 	databaseRepository := database.NewRepository(db)
-	databaseService := database.NewService(logger, s3Bucket, s3Client, groupService{}, databaseRepository)
+	databaseService := database.NewService(logger, s3Bucket, s3Client, groupService{}, databaseRepository, nil, noopPublisher{}, noopFilestoreBackuper{})
 
 	client := inttest.SetupHTTPServer(t, func(engine *gin.Engine) {
 		databaseHandler := database.NewHandler(logger, databaseService, groupService{groupName: "packages"}, instanceService{}, stackService{})
@@ -62,23 +59,20 @@ func TestDatabaseHandler(t *testing.T) {
 		database.Routes(engine, authenticator, databaseHandler)
 	})
 
+	var userID uint
+	{
+		user, _ := userpkg.CreateUserWithGroup(t, db, "group-name", "some", "", "user1@dhis2.org")
+		userID = user.ID
+	}
+
 	var databaseID string
 	{
 		t.Log("Upload")
 
-		var b bytes.Buffer
-		w := multipart.NewWriter(&b)
-		err := w.WriteField("group", "packages")
-		require.NoError(t, err, "failed to write form field")
-		err = w.WriteField("name", "path/name.extension")
-		require.NoError(t, err, "failed to write form field")
-		f, err := w.CreateFormFile("database", "mydb")
-		require.NoError(t, err, "failed to create form file")
-		_, err = io.WriteString(f, "file contents")
-		require.NoError(t, err, "failed to write file")
-		_ = w.Close()
-
-		body := client.Post(t, "/databases", &b, inttest.WithHeader("Content-Type", w.FormDataContentType()))
+		requestBody := strings.NewReader("file contents")
+		nameHeader := inttest.WithHeader("X-Upload-Name", "path/name.extension")
+		groupHeader := inttest.WithHeader("X-Upload-Group", "packages")
+		body := client.Put(t, "/databases", requestBody, http.StatusCreated, nameHeader, groupHeader)
 
 		var database model.Database
 		err = json.Unmarshal(body, &database)
@@ -86,6 +80,7 @@ func TestDatabaseHandler(t *testing.T) {
 		require.Equal(t, "path/name.extension", database.Name)
 		require.Equal(t, "packages", database.GroupName)
 		require.Equal(t, "s3://database-bucket/packages/path/name.extension", database.Url)
+		require.Equal(t, int64(13), database.Size)
 
 		actualContent := s3.GetObject(t, s3Bucket, "packages/path/name.extension")
 		require.Equalf(t, "file contents", string(actualContent), "DB in S3 should have expected content")
@@ -95,29 +90,16 @@ func TestDatabaseHandler(t *testing.T) {
 
 	var instanceID string
 	{
-		group := &model.Group{
-			Name:     "group-name",
-			Hostname: "some",
-		}
-		user := &model.User{
-			Email: "user1@dhis2.org",
-			Groups: []model.Group{
-				*group,
-			},
-		}
-		db.Create(user)
-
 		deployment := &model.Deployment{
-			UserID:    user.ID,
+			UserID:    userID,
 			Name:      "name",
-			GroupName: group.Name,
+			GroupName: "group-name",
 		}
 		db.Create(deployment)
 
 		instance := &model.DeploymentInstance{
-			ID:           0,
 			Name:         "name",
-			GroupName:    group.Name,
+			GroupName:    "group-name",
 			StackName:    "dhis2",
 			DeploymentID: deployment.ID,
 		}
@@ -132,6 +114,7 @@ func TestDatabaseHandler(t *testing.T) {
 
 		assert.Equal(t, "path/name.extension", actualDB.Name)
 		assert.Equal(t, "packages", actualDB.GroupName)
+		assert.Equal(t, userID, actualDB.UserID)
 	})
 
 	t.Run("Download", func(t *testing.T) {
@@ -152,6 +135,7 @@ func TestDatabaseHandler(t *testing.T) {
 
 			require.Equal(t, "path/copy.extension", actualDB.Name)
 			require.Equal(t, "packages", actualDB.GroupName)
+			assert.Equal(t, userID, actualDB.UserID)
 
 			actualContent := s3.GetObject(t, s3Bucket, "packages/path/copy.extension")
 			require.Equalf(t, "file contents", string(actualContent), "DB in S3 should have expected content")
@@ -175,10 +159,37 @@ func TestDatabaseHandler(t *testing.T) {
 	})
 
 	t.Run("Update", func(t *testing.T) {
+		var filestoreID string
+		{
+			t.Log("Setup filestore")
+
+			_, err := s3.Client.PutObject(context.TODO(), &awss3.PutObjectInput{
+				Bucket: aws.String(s3Bucket),
+				Key:    aws.String("packages/path/name-fs.tar.gz"),
+				Body:   strings.NewReader("filestore contents"),
+			})
+			require.NoError(t, err)
+
+			filestoreRecord := &model.Database{
+				Name:      "path/name-fs.tar.gz",
+				GroupName: "packages",
+				Url:       "s3://database-bucket/packages/path/name-fs.tar.gz",
+				Type:      "fs",
+				UserID:    userID,
+			}
+			require.NoError(t, db.Create(filestoreRecord).Error)
+
+			dbID, err := strconv.ParseUint(databaseID, 10, 64)
+			require.NoError(t, err)
+			require.NoError(t, db.Model(&model.Database{}).Where("id = ?", dbID).Update("filestore_id", filestoreRecord.ID).Error)
+
+			filestoreID = strconv.FormatUint(uint64(filestoreRecord.ID), 10)
+		}
+
 		{
 			t.Log("Update")
 
-			requestBody := strings.NewReader(`{"name": "path/rename.extension"}`)
+			requestBody := strings.NewReader(`{"name": "path/rename.extension", "description": "some new description"}`)
 			response := client.Do(t, http.MethodPut, "/databases/"+databaseID, requestBody, http.StatusOK, inttest.WithHeader("Content-Type", "application/json"))
 			var actualDB model.Database
 			err := json.Unmarshal(response, &actualDB)
@@ -189,6 +200,13 @@ func TestDatabaseHandler(t *testing.T) {
 
 			actualContent := s3.GetObject(t, s3Bucket, "packages/path/rename.extension")
 			require.Equalf(t, "file contents", string(actualContent), "DB in S3 should have expected content")
+		}
+
+		{
+			t.Log("Filestore download after rename")
+
+			actualContent := client.Get(t, "/databases/"+filestoreID+"/download")
+			require.Equal(t, "filestore contents", string(actualContent))
 		}
 
 		{
@@ -275,6 +293,7 @@ func TestDatabaseHandler(t *testing.T) {
 		var e *types.NoSuchKey
 		require.ErrorAsf(t, err, &e, "DELETE \"/databases/%s\" failed: DB should be deleted from S3", databaseID)
 	}
+
 }
 
 type groupService struct {
@@ -283,7 +302,8 @@ type groupService struct {
 
 func (gs groupService) Find(ctx context.Context, name string) (*model.Group, error) {
 	return &model.Group{
-		Name: gs.groupName,
+		Name:      gs.groupName,
+		Namespace: "ns",
 	}, nil
 }
 
@@ -305,4 +325,14 @@ type stackService struct{}
 
 func (ss stackService) Find(name string) (*model.Stack, error) {
 	return nil, nil
+}
+
+type noopPublisher struct{}
+
+func (noopPublisher) Publish(context.Context, uint, string, string, any) {}
+
+type noopFilestoreBackuper struct{}
+
+func (noopFilestoreBackuper) FilestoreBackup(context.Context, *model.DeploymentInstance, string, *model.Database) error {
+	return nil
 }

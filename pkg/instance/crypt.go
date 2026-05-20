@@ -3,14 +3,17 @@ package instance
 import (
 	"crypto/aes"
 	"crypto/cipher"
+	"crypto/rand"
 	"encoding/base64"
 	"fmt"
+	"io"
+	"strings"
 
-	"go.mozilla.org/sops/v3/cmd/sops/formats"
-	"go.mozilla.org/sops/v3/decrypt"
+	"github.com/getsops/sops/v3/cmd/sops/formats"
+	"github.com/getsops/sops/v3/decrypt"
 )
 
-var iv = []byte{83, 108, 97, 118, 97, 32, 85, 107, 114, 97, 105, 110, 105, 33, 33, 33}
+const gcmPrefix = "v2:"
 
 func encryptText(key string, text string) (string, error) {
 	block, err := aes.NewCipher([]byte(key))
@@ -18,18 +21,61 @@ func encryptText(key string, text string) (string, error) {
 		return "", fmt.Errorf("failed to create AES cipher: %v", err)
 	}
 
-	plainText := []byte(text)
-	cfb := cipher.NewCFBEncrypter(block, iv)
-	cipherText := make([]byte, len(plainText))
-	cfb.XORKeyStream(cipherText, plainText)
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return "", fmt.Errorf("failed to create GCM: %v", err)
+	}
 
-	base64Encoded := base64.StdEncoding.EncodeToString(cipherText)
+	nonce := make([]byte, gcm.NonceSize())
+	if _, err = io.ReadFull(rand.Reader, nonce); err != nil {
+		return "", fmt.Errorf("failed to generate nonce: %v", err)
+	}
 
-	return base64Encoded, nil
+	cipherText := gcm.Seal(nonce, nonce, []byte(text), nil)
+	return gcmPrefix + base64.StdEncoding.EncodeToString(cipherText), nil
 }
 
 func decryptText(key string, text string) (string, error) {
-	cipherText, err := base64.StdEncoding.DecodeString(text)
+	if strings.HasPrefix(text, gcmPrefix) {
+		return decryptGCM(key, text[len(gcmPrefix):])
+	}
+	return decryptCFB(key, text)
+}
+
+func decryptGCM(key string, encoded string) (string, error) {
+	cipherText, err := base64.StdEncoding.DecodeString(encoded)
+	if err != nil {
+		return "", fmt.Errorf("failed to base64 decode: %v", err)
+	}
+
+	block, err := aes.NewCipher([]byte(key))
+	if err != nil {
+		return "", fmt.Errorf("failed to create AES cipher: %v", err)
+	}
+
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return "", fmt.Errorf("failed to create GCM: %v", err)
+	}
+
+	nonceSize := gcm.NonceSize()
+	if len(cipherText) < nonceSize {
+		return "", fmt.Errorf("ciphertext too short")
+	}
+
+	nonce, cipherText := cipherText[:nonceSize], cipherText[nonceSize:]
+	plainText, err := gcm.Open(nil, nonce, cipherText, nil)
+	if err != nil {
+		return "", fmt.Errorf("failed to decrypt: %v", err)
+	}
+
+	return string(plainText), nil
+}
+
+// decryptCFB decrypts legacy AES-CFB ciphertext with the static IV.
+// Only used for backward compatibility with existing database rows.
+func decryptCFB(key string, encoded string) (string, error) {
+	cipherText, err := base64.StdEncoding.DecodeString(encoded)
 	if err != nil {
 		return "", err
 	}
@@ -39,6 +85,7 @@ func decryptText(key string, text string) (string, error) {
 		return "", err
 	}
 
+	iv := []byte{83, 108, 97, 118, 97, 32, 85, 107, 114, 97, 105, 110, 105, 33, 33, 33}
 	cfb := cipher.NewCFBDecrypter(block, iv)
 	plainText := make([]byte, len(cipherText))
 	cfb.XORKeyStream(plainText, cipherText)

@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/dhis2-sre/im-manager/pkg/cluster"
+
 	"github.com/go-mail/mail"
 
 	"github.com/stretchr/testify/assert"
@@ -24,20 +26,37 @@ func TestGroupHandler(t *testing.T) {
 	t.Parallel()
 
 	db := inttest.SetupDB(t)
+	groupRepository := group.NewRepository(db)
+
 	userRepository := user.NewRepository(db)
 	userService := user.NewService("", 900, userRepository, fakeDialer{})
-	groupRepository := group.NewRepository(db)
-	groupService := group.NewService(groupRepository, userService)
 
-	err := user.CreateUser(context.Background(), "admin", "admin", userService, groupService, model.AdministratorGroupName, "admin")
+	clusterRepository := cluster.NewRepository(db)
+	clusterService := cluster.NewService(clusterRepository, cluster.Encryptor{})
+
+	groupService := group.NewService(groupRepository, userService, clusterService)
+
+	cluster, err := clusterService.FindOrCreate(t.Context(), "default-name", "default-description")
+	assert.NoError(t, err)
+
+	err = user.CreateUser(context.Background(), "admin", "admin", userService, groupService, model.AdministratorGroupName, "", "admin")
 	require.NoError(t, err, "failed to create admin user and group")
 
-	client := inttest.SetupHTTPServer(t, func(engine *gin.Engine) {
-		handler := group.NewHandler(groupService)
-		authentication := TestAuthenticationMiddleware{}
-		authorization := TestAuthorizationMiddleware{}
-		group.Routes(engine, authentication, authorization, handler)
-	})
+	adminBase, err := userService.FindOrCreate(context.Background(), "admin", "admin")
+	require.NoError(t, err)
+	adminUser, err := userService.FindById(context.Background(), adminBase.ID)
+	require.NoError(t, err)
+
+	newClient := func(u *model.User) *inttest.HTTPClient {
+		return inttest.SetupHTTPServer(t, func(engine *gin.Engine) {
+			handler := group.NewHandler(groupService)
+			authentication := TestAuthenticationMiddleware{user: u}
+			authorization := TestAuthorizationMiddleware{}
+			group.Routes(engine, authentication, authorization, handler)
+		})
+	}
+
+	client := newClient(adminUser)
 
 	var userId string
 	var user *model.User
@@ -51,6 +70,7 @@ func TestGroupHandler(t *testing.T) {
 	{
 		requestBody := strings.NewReader(`{
 			"name": "test-group",
+			"namespace": "test-group-namespace",
 			"description": "test-group-description",
 			"hostname": "test-hostname.com"
 		}`)
@@ -59,6 +79,7 @@ func TestGroupHandler(t *testing.T) {
 		client.PostJSON(t, "/groups", requestBody, &group)
 
 		require.Equal(t, "test-group", group.Name)
+		require.Equal(t, "test-group-namespace", group.Namespace)
 		require.Equal(t, "test-group-description", group.Description)
 		require.Equal(t, "test-hostname.com", group.Hostname)
 		require.False(t, group.Deployable)
@@ -101,11 +122,82 @@ func TestGroupHandler(t *testing.T) {
 			client.Do(t, http.MethodDelete, path, nil, http.StatusNoContent)
 		}
 
+		t.Run("AddAdminUserToGroup", func(t *testing.T) {
+			path := fmt.Sprintf("/groups/%s/admins/%s", groupName, userId)
+
+			client.Do(t, http.MethodPost, path, nil, http.StatusCreated)
+
+			detailsPath := fmt.Sprintf("/groups/%s/details", groupName)
+			var g model.Group
+			client.GetJSON(t, detailsPath, &g)
+			require.Equal(t, groupName, g.Name)
+			require.Len(t, g.AdminUsers, 1)
+			require.Equal(t, user.ID, g.AdminUsers[0].ID)
+		})
+
+		t.Run("RemoveAdminUserFromGroup", func(t *testing.T) {
+			addPath := fmt.Sprintf("/groups/%s/admins/%s", groupName, userId)
+			client.Do(t, http.MethodPost, addPath, nil, http.StatusCreated)
+
+			removePath := fmt.Sprintf("/groups/%s/admins/%s", groupName, userId)
+			client.Do(t, http.MethodDelete, removePath, nil, http.StatusNoContent)
+
+			detailsPath := fmt.Sprintf("/groups/%s/details", groupName)
+			var g model.Group
+			client.GetJSON(t, detailsPath, &g)
+			require.Empty(t, g.AdminUsers)
+		})
+
+		t.Run("AddClusterToGroup", func(t *testing.T) {
+			group, err := groupService.Find(t.Context(), groupName)
+			assert.NoError(t, err)
+			assert.Nil(t, group.ClusterID)
+
+			path := fmt.Sprintf("/groups/%s/clusters/%d", groupName, cluster.ID)
+			client.Post(t, path, nil)
+
+			group, err = groupService.Find(t.Context(), groupName)
+			assert.NoError(t, err)
+			assert.Equal(t, cluster.ID, *group.ClusterID)
+		})
+
+		t.Run("RemoveClusterFromGroup", func(t *testing.T) {
+			group, err := groupService.Find(t.Context(), groupName)
+			assert.NoError(t, err)
+			assert.NotNil(t, group.ClusterID)
+			assert.Equal(t, cluster.ID, *group.ClusterID)
+
+			path := fmt.Sprintf("/groups/%s/clusters/%d", groupName, cluster.ID)
+			client.Delete(t, path)
+
+			group, err = groupService.Find(t.Context(), groupName)
+			assert.NoError(t, err)
+			assert.Nil(t, group.ClusterID)
+		})
+
+		t.Run("FindOrCreatePersistsAllFields", func(t *testing.T) {
+			t.Parallel()
+
+			g, err := groupService.FindOrCreate(t.Context(), "find-or-create-group", "find-or-create-namespace", "find-or-create-hostname.com", true)
+			require.NoError(t, err)
+			assert.Equal(t, "find-or-create-group", g.Name)
+			assert.Equal(t, "find-or-create-namespace", g.Namespace)
+			assert.Equal(t, "find-or-create-hostname.com", g.Hostname)
+			assert.True(t, g.Deployable)
+
+			persisted, err := groupService.Find(t.Context(), "find-or-create-group")
+			require.NoError(t, err)
+			assert.Equal(t, "find-or-create-namespace", persisted.Namespace)
+			assert.Equal(t, "find-or-create-hostname.com", persisted.Hostname)
+			assert.True(t, persisted.Deployable)
+		})
+
 		t.Run("CreateDeployableGroup", func(t *testing.T) {
 			t.Parallel()
 
 			requestBody := strings.NewReader(`{
 				"name": "deployable-test-group",
+				"namespace": "deployable-test-group-namespace",
 				"description": "deployable-test-group-description",
 				"hostname": "deployable-test-hostname.com",
 				"deployable": true
@@ -115,6 +207,7 @@ func TestGroupHandler(t *testing.T) {
 			client.PostJSON(t, "/groups", requestBody, &group)
 
 			assert.Equal(t, "deployable-test-group", group.Name)
+			assert.Equal(t, "deployable-test-group-namespace", group.Namespace)
 			assert.Equal(t, "deployable-test-group-description", group.Description)
 			assert.Equal(t, "deployable-test-hostname.com", group.Hostname)
 			assert.True(t, group.Deployable)
@@ -167,6 +260,18 @@ func TestGroupHandler(t *testing.T) {
 
 			require.Equal(t, "group \"non-existing-group\" doesn't exist", string(response))
 		})
+
+		t.Run("FindGroupAsForbiddenNonMember", func(t *testing.T) {
+			nonMember, err := userService.FindOrCreate(context.Background(), "nonmember@dhis2.org", "oneoneoneoneoneoneone111")
+			require.NoError(t, err)
+			nonMemberWithGroups, err := userService.FindById(context.Background(), nonMember.ID)
+			require.NoError(t, err)
+
+			nonMemberClient := newClient(nonMemberWithGroups)
+
+			nonMemberClient.Do(t, http.MethodGet, fmt.Sprintf("/groups/%s", groupName), nil, http.StatusForbidden)
+			nonMemberClient.Do(t, http.MethodGet, fmt.Sprintf("/groups/%s/details", groupName), nil, http.StatusForbidden)
+		})
 	})
 }
 
@@ -176,9 +281,17 @@ func (f fakeDialer) DialAndSend(m ...*mail.Message) error {
 	panic("not implemented")
 }
 
-type TestAuthenticationMiddleware struct{}
+type TestAuthenticationMiddleware struct {
+	user *model.User
+}
 
-func (t TestAuthenticationMiddleware) TokenAuthentication(c *gin.Context) {}
+func (m TestAuthenticationMiddleware) TokenAuthentication(c *gin.Context) {
+	if m.user != nil {
+		ctx := model.NewContextWithUser(c.Request.Context(), m.user)
+		c.Request = c.Request.WithContext(ctx)
+	}
+	c.Next()
+}
 
 type TestAuthorizationMiddleware struct{}
 

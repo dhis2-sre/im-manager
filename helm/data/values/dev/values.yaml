@@ -1,6 +1,7 @@
 image:
   pullPolicy: Always
 sameSiteMode: none
+sopsKmsArn: "arn:aws:kms:eu-central-1:767224633206:alias/im-nonprod-secrets"
 tolerations:
   - key: im-dedicated
     operator: Equal
@@ -8,3 +9,5 @@ tolerations:
     effect: NoSchedule
 nodeSelector:
   im-dedicated: "true"
+google:
+  clientId: 239000133173-u633cksu6r1a1k55omarr4r6pg3hb88g.apps.googleusercontent.com

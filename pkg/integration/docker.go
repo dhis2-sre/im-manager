@@ -10,6 +10,12 @@ import (
 	"github.com/dhis2-sre/im-manager/internal/errdef"
 )
 
+type RegistryClient interface {
+	GetImages(organization string) ([]string, error)
+	GetTags(organization, repository string) ([]string, error)
+	ImageExists(organization, repository, tag string) error
+}
+
 type DockerHubConfig struct {
 	Username string
 	Password string

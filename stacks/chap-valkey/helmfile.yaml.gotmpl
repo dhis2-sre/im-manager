@@ -1,0 +1,32 @@
+helmDefaults:
+  deleteWait: true
+
+releases:
+  - name: "{{ requiredEnv "INSTANCE_NAME" }}-chap-valkey"
+    namespace: "{{ requiredEnv "INSTANCE_NAMESPACE" }}"
+    chart: valkey/valkey
+    version: "{{ requiredEnv "CHART_VERSION" }}"
+    values:
+      - fullnameOverride: "{{ requiredEnv "INSTANCE_NAME" }}-chap-valkey"
+      - auth:
+          enabled: true
+          aclUsers:
+            default:
+              password: "{{ requiredEnv "REDIS_PASSWORD" }}"
+              permissions: "~* &* +@all"
+      - persistence:
+          enabled: true
+          size: {{ requiredEnv "REDIS_STORAGE_SIZE" }}
+      - commonLabels:
+          im: "true"
+          im-default: "true"
+          im-deployment-id: "{{ requiredEnv "DEPLOYMENT_ID" }}"
+          im-instance-id: "{{ requiredEnv "INSTANCE_ID" }}"
+          im-id: "{{ requiredEnv "INSTANCE_ID" }}"
+          im-type: "chap-valkey"
+          im-creation-timestamp: "{{ requiredEnv "INSTANCE_CREATION_TIMESTAMP" }}"
+          im-ttl: "{{ requiredEnv "INSTANCE_TTL" }}"
+
+repositories:
+  - name: valkey
+    url: https://valkey.io/valkey-helm/

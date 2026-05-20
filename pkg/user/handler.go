@@ -23,11 +23,12 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func NewHandler(logger *slog.Logger, hostname string, sameSiteMode http.SameSite, accessTokenExpirationSeconds int, refreshTokenExpirationSeconds int, refreshTokenRememberMeExpirationSeconds int, publicKey rsa.PublicKey, userService *Service, tokenService tokenService) Handler {
+func NewHandler(logger *slog.Logger, hostname string, sameSiteMode http.SameSite, cookieSecure bool, accessTokenExpirationSeconds int, refreshTokenExpirationSeconds int, refreshTokenRememberMeExpirationSeconds int, publicKey rsa.PublicKey, userService *Service, tokenService tokenService) Handler {
 	return Handler{
 		logger:                                  logger,
 		hostname:                                hostname,
 		sameSiteMode:                            sameSiteMode,
+		cookieSecure:                            cookieSecure,
 		accessTokenExpirationSeconds:            accessTokenExpirationSeconds,
 		refreshTokenExpirationSeconds:           refreshTokenExpirationSeconds,
 		refreshTokenRememberMeExpirationSeconds: refreshTokenRememberMeExpirationSeconds,
@@ -41,6 +42,7 @@ type Handler struct {
 	logger                                  *slog.Logger
 	hostname                                string
 	sameSiteMode                            http.SameSite
+	cookieSecure                            bool
 	accessTokenExpirationSeconds            int
 	refreshTokenExpirationSeconds           int
 	refreshTokenRememberMeExpirationSeconds int
@@ -74,7 +76,7 @@ func (h Handler) SignUp(c *gin.Context) {
 	//   415: Error
 	var request signUpRequest
 	if err := handler.DataBinder(c, &request); err != nil {
-		_ = c.Error(handleSignUpErrors(err))
+		_ = c.Error(handleValidationErrors(err))
 		return
 	}
 
@@ -87,23 +89,21 @@ func (h Handler) SignUp(c *gin.Context) {
 	c.JSON(http.StatusCreated, user)
 }
 
-func handleSignUpErrors(err error) error {
+func handleValidationErrors(err error) error {
 	var validationErrors validator.ValidationErrors
-	ok := errors.As(err, &validationErrors)
-	if !ok {
-		return errdef.NewBadRequest("Error binding data: %+v", err)
+	if !errors.As(err, &validationErrors) {
+		return errdef.NewBadRequest("%s", err)
 	}
 
 	var errs error
 	for _, fieldError := range validationErrors {
-		if fieldError.Field() == "Password" && (fieldError.Tag() == "gte" || fieldError.Tag() == "lte") {
-			badRequest := errdef.NewBadRequest("password must be between 24 and 128 characters")
-			errs = errors.Join(errs, badRequest)
-		}
-
-		if fieldError.Field() == "Email" && fieldError.Tag() == "email" {
-			badRequest := errdef.NewBadRequest("invalid email provided: %s", fieldError.Value())
-			errs = errors.Join(errs, badRequest)
+		switch {
+		case fieldError.Field() == "Password" && (fieldError.Tag() == "gte" || fieldError.Tag() == "lte"):
+			errs = errors.Join(errs, errdef.NewBadRequest("password must be between 24 and 128 characters"))
+		case fieldError.Field() == "Email" && fieldError.Tag() == "email":
+			errs = errors.Join(errs, errdef.NewBadRequest("invalid email provided: %s", fieldError.Value()))
+		default:
+			errs = errors.Join(errs, errdef.NewBadRequest("%s", fieldError.Error()))
 		}
 	}
 	return errs
@@ -198,7 +198,7 @@ func (h Handler) ResetPassword(c *gin.Context) {
 	//   415: Error
 	var request ResetPasswordRequest
 	if err := handler.DataBinder(c, &request); err != nil {
-		_ = c.Error(err)
+		_ = c.Error(handleValidationErrors(err))
 		return
 	}
 
@@ -312,31 +312,25 @@ func (h Handler) RefreshToken(c *gin.Context) {
 		return
 	}
 
-	var rememberMe bool
-	rememberMeCookie, _ := c.Cookie("rememberMe")
-	if rememberMeCookie == "true" {
-		rememberMe = true
-	}
-
-	tokens, err := h.tokenService.GetTokens(user, refreshToken.ID.String(), rememberMe)
+	tokens, err := h.tokenService.GetTokens(user, refreshToken.ID.String(), refreshToken.RememberMe)
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
 
-	h.setCookies(c, tokens, rememberMe)
+	h.setCookies(c, tokens, refreshToken.RememberMe)
 
 	c.Status(http.StatusCreated)
 }
 
 func (h Handler) setCookies(c *gin.Context, tokens *token.Tokens, rememberMe bool) {
 	c.SetSameSite(h.sameSiteMode)
-	c.SetCookie("accessToken", tokens.AccessToken, h.accessTokenExpirationSeconds, "/", h.hostname, true, true)
+	c.SetCookie("accessToken", tokens.AccessToken, h.accessTokenExpirationSeconds, "/", "", h.cookieSecure, true)
 	if rememberMe {
-		c.SetCookie("refreshToken", tokens.RefreshToken, h.refreshTokenRememberMeExpirationSeconds, "/refresh", h.hostname, true, true)
-		c.SetCookie("rememberMe", "true", h.refreshTokenRememberMeExpirationSeconds, "/refresh", h.hostname, true, true)
+		c.SetCookie("refreshToken", tokens.RefreshToken, h.refreshTokenRememberMeExpirationSeconds, "/refresh", "", h.cookieSecure, true)
+		c.SetCookie("rememberMe", "true", h.refreshTokenRememberMeExpirationSeconds, "/refresh", "", h.cookieSecure, true)
 	} else {
-		c.SetCookie("refreshToken", tokens.RefreshToken, h.refreshTokenExpirationSeconds, "/refresh", h.hostname, true, true)
+		c.SetCookie("refreshToken", tokens.RefreshToken, h.refreshTokenExpirationSeconds, "/refresh", "", h.cookieSecure, true)
 	}
 }
 
@@ -463,9 +457,21 @@ func (h Handler) FindById(c *gin.Context) {
 		return
 	}
 
-	userWithGroups, err := h.userService.FindById(c.Request.Context(), id)
+	ctx := c.Request.Context()
+	caller, err := handler.GetUserFromContext(ctx)
 	if err != nil {
 		_ = c.Error(err)
+		return
+	}
+
+	userWithGroups, err := h.userService.FindById(ctx, id)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	if !handler.CanAccessUser(caller, userWithGroups) {
+		_ = c.AbortWithError(http.StatusForbidden, errdef.NewForbidden("access denied"))
 		return
 	}
 
@@ -549,7 +555,7 @@ func (h Handler) Delete(c *gin.Context) {
 
 type updateUserRequest struct {
 	Email    string `json:"email" binding:"omitempty,email"`
-	Password string `json:"password" binding:"omitempty,gte=16,lte=128"`
+	Password string `json:"password" binding:"omitempty,gte=24,lte=128"`
 }
 
 // Update user

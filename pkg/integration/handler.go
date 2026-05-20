@@ -5,28 +5,28 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"regexp"
 	"sort"
 
+	"github.com/dhis2-sre/im-manager/internal/errdef"
 	"github.com/dhis2-sre/im-manager/internal/handler"
 	"github.com/gin-gonic/gin"
 )
 
-func NewHandler(client DockerHubClient, instanceManagerHost string) Handler {
+var imageRefPattern = regexp.MustCompile(`^[a-zA-Z0-9._-]+$`)
+
+func NewHandler(dockerHubClient, ghcrClient RegistryClient, instanceManagerHost string) Handler {
 	return Handler{
-		dockerHubClient:     client,
+		dockerHubClient:     dockerHubClient,
+		ghcrClient:          ghcrClient,
 		instanceManagerHost: instanceManagerHost,
 	}
 }
 
 type Handler struct {
-	dockerHubClient     DockerHubClient
+	dockerHubClient     RegistryClient
+	ghcrClient          RegistryClient
 	instanceManagerHost string
-}
-
-type DockerHubClient interface {
-	GetImages(organization string) ([]string, error)
-	GetTags(organization, repository string) ([]string, error)
-	ImageExists(organization, repository, tag string) error
 }
 
 type Request struct {
@@ -62,7 +62,20 @@ func (h Handler) ImageExists(c *gin.Context) {
 		return
 	}
 
-	err := h.dockerHubClient.ImageExists("dhis2", repository, tag)
+	organization := c.DefaultQuery("organization", "dhis2")
+	for name, val := range map[string]string{"organization": organization, "repository": repository, "tag": tag} {
+		if !imageRefPattern.MatchString(val) {
+			_ = c.AbortWithError(http.StatusBadRequest, errdef.NewBadRequest("invalid %s: %q", name, val))
+			return
+		}
+	}
+
+	client := h.dockerHubClient
+	if registry, ok := c.GetQuery("registry"); ok && registry == "ghcr" {
+		client = h.ghcrClient
+	}
+
+	err := client.ImageExists(organization, repository, tag)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -145,7 +158,13 @@ func (h Handler) Integrations(c *gin.Context) {
 			return
 		}
 
-		tags, err := h.dockerHubClient.GetTags(organization, repository)
+		client := h.dockerHubClient
+		registry, ok := payload["registry"]
+		if ok && registry == "ghcr" {
+			client = h.ghcrClient
+		}
+
+		tags, err := client.GetTags(organization, repository)
 		if err != nil {
 			_ = c.Error(err)
 			return

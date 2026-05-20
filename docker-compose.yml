@@ -1,3 +1,10 @@
+# These variables are exported from the .envrc file and are not available in the .env file so we need to pass them explicitly.
+x-envrc-vars: &envrc-vars
+  environment:
+    HOSTNAME: ${HOSTNAME}
+    UI_URL: ${UI_URL}
+    API_HOSTNAME: ${API_HOSTNAME}
+
 x-service: &common-dev-test
   build:
     context: .
@@ -7,6 +14,7 @@ x-service: &common-dev-test
   volumes:
     - .:/src
   working_dir: /src
+  <<: *envrc-vars
 
 services:
   prod:
@@ -14,6 +22,7 @@ services:
     build: .
     env_file:
       - .env
+    <<: *envrc-vars
     ports:
       - "8080:8080"
     depends_on:
@@ -22,6 +31,8 @@ services:
       rabbitmq:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      jaeger:
         condition: service_healthy
     profiles:
       - prod
@@ -42,7 +53,7 @@ services:
     <<: *common-dev-test
     ports:
       - "8080:8080"
-    command: reflex -r "Dockerfile|\.go|\.yml$$" -s -- sh -c "go run ./cmd/serve"
+    command: go run ./cmd/serve
     depends_on:
       database:
         condition: service_healthy
@@ -52,14 +63,21 @@ services:
         condition: service_healthy
       minio:
         condition: service_healthy
+      jaeger:
+        condition: service_healthy
     profiles:
       - dev
 
   jaeger:
-    image: jaegertracing/all-in-one:1.6.0
+    image: jaegertracing/all-in-one:1.76.0
     ports:
-      - "14268:14268"
+      - "14269:14269"
       - "16686:16686"
+    healthcheck:
+      test: [ "CMD", "wget", "--spider", "--quiet", "http://localhost:14269" ]
+      interval: 5s
+      timeout: 3s
+      retries: 5
     profiles:
       - dev
       - prod
@@ -78,13 +96,14 @@ services:
       timeout: 3s
       retries: 5
     volumes:
+      - ./init-scripts:/docker-entrypoint-initdb.d:ro
       - database:/var/lib/postgresql/data
     profiles:
       - dev
       - prod
 
   rabbitmq:
-    image: bitnami/rabbitmq:3.13
+    image: bitnamilegacy/rabbitmq:3.13
     ports:
       - "127.0.0.1:5552:5552" # Stream
       - "127.0.0.1:5672:5672" # regular AMQP
@@ -106,11 +125,11 @@ services:
       - prod
 
   redis:
-    image: redis:6.2.5-alpine3.14
+    image: valkey/valkey:8.1.1
     ports:
       - "6379:6379"
     healthcheck:
-      test: [ "CMD", "redis-cli", "ping", "|", "grep", "PONG" ]
+      test: [ "CMD", "valkey-cli", "ping", "|", "grep", "PONG" ]
       interval: 5s
       timeout: 3s
       retries: 5
@@ -138,6 +157,7 @@ services:
       - minio:/data
     profiles:
       - dev
+      - prod
 
   minio-bucket:
     image: minio/mc:RELEASE.2023-07-21T20-44-27Z
@@ -155,6 +175,7 @@ services:
         mc mb dev/${S3_BUCKET}"
     profiles:
       - dev
+      - prod
 
 volumes:
   database:

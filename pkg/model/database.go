@@ -13,23 +13,26 @@ type Database struct {
 	UpdatedAt         time.Time          `json:"updatedAt"`
 	Name              string             `json:"name" gorm:"index:database_name_group_idx,unique"`
 	GroupName         string             `json:"groupName" gorm:"index:database_name_group_idx,unique"`
+	Description       string             `json:"description" gorm:"type:text"`
 	Url               string             `json:"url"` // s3... Path?
 	ExternalDownloads []ExternalDownload `json:"externalDownloads" gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
 	Lock              *Lock              `json:"lock" gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
 	Slug              string             `json:"slug" gorm:"uniqueIndex"`
-	// TODO: Sql or fs?
-	Type        string    `json:"type"`
-	FilestoreID uint      `json:"filestoreId"`
-	Filestore   *Database `json:"filestore" gorm:"foreignKey:ID"`
+	Type              string             `json:"type"` // TODO: Strictly sql or fs?
+	FilestoreID       uint               `json:"filestoreId"`
+	Filestore         *Database          `json:"filestore" gorm:"foreignKey:ID"`
+	UserID            uint               `json:"userId"`
+	User              User               `json:"user"`
+	Size              int64              `json:"size"`
 }
 
 // swagger:model
 type Lock struct {
 	DatabaseID uint               `json:"databaseId" gorm:"primaryKey"`
 	InstanceID uint               `json:"instanceId"`
-	Instance   DeploymentInstance `json:"-"`
+	Instance   DeploymentInstance `json:"instance,omitempty"`
 	UserID     uint               `json:"userId"`
-	User       User               `json:"-"`
+	User       User               `json:"user,omitempty"`
 }
 
 // swagger:model

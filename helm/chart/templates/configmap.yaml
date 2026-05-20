@@ -12,10 +12,16 @@ data:
 {{- end }}
   SAME_SITE_MODE: {{ .Values.sameSiteMode }}
   ACCESS_TOKEN_EXPIRATION_IN_SECONDS: {{ .Values.accessTokenExpirationInSeconds | quote }}
+  REFRESH_ACCESS_TOKEN_EXPIRATION_IN_SECONDS: {{ .Values.refreshAccessTokenExpirationInSeconds | quote }}
   REFRESH_TOKEN_EXPIRATION_IN_SECONDS: {{ .Values.refreshTokenExpirationInSeconds | quote }}
   REFRESH_TOKEN_REMEMBER_ME_EXPIRATION_IN_SECONDS: {{ .Values.refreshTokenRememberMeExpirationInSeconds | quote }}
 
   GROUP_NAMES: {{ .Values.groups.names }}
+  GROUP_NAMESPACES: {{ .Values.groups.namespaces }}
   GROUP_HOSTNAMES: {{ .Values.groups.hostnames }}
   CORS_ALLOWED_ORIGINS: {{ join "," .Values.corsAllowOrigins | quote }}
+  SOPS_KMS_ARN: {{ .Values.sopsKmsArn | quote }}
+
+  GOOGLE_CLIENT_ID: {{ .Values.google.clientId | quote }}
+  GOOGLE_CALLBACK_URL: {{ .Values.google.callbackUrl | quote }}
 {{- end }}

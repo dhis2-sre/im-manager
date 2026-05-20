@@ -7,14 +7,20 @@ on:
     branches: [ master ]
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 env:
   DEPLOY_ENVIRONMENT: ${{ (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'deploy')) }}
 
 jobs:
   e2e:
     if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'deploy')) }}
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     timeout-minutes: 30
+    outputs:
+      conclusion: ${{ steps.trigger.outputs.workflow_conclusion }}
     steps:
       - name: Wait for deploy
         if: ${{ env.DEPLOY_ENVIRONMENT == 'true' }}
@@ -29,9 +35,8 @@ jobs:
 
       - name: Construct tests target URL
         run: |
-          BASE_HOSTNAME="api.im.dhis2.org"
-
           if [[ "$DEPLOY_ENVIRONMENT" == 'true' ]]; then
+            # Feature environment
             # convert to lower case
             HEAD_BRANCH_LOWERCASE=${GITHUB_HEAD_REF,,}
 
@@ -42,14 +47,16 @@ jobs:
             # the rest of the chars up to the limit are saved for the static part of the release names
             SANITIZED_HEAD_BRANCH=${HEAD_BRANCH_LOWERCASE_NO_NONALPHANUMERIC::25}
 
-            echo "TARGET_URL=https://$SANITIZED_HEAD_BRANCH.$BASE_HOSTNAME" >> $GITHUB_ENV
+            echo "TARGET_URL=https://$SANITIZED_HEAD_BRANCH.api.im-feat.dhis2.org" >> $GITHUB_ENV
           else
-            echo "TARGET_URL=https://dev.$BASE_HOSTNAME" >> $GITHUB_ENV
+            # Dev environment
+            echo "TARGET_URL=https://api.im-dev.dhis2.org" >> $GITHUB_ENV
           fi
 
       # Don't set environment variable "API_URL" in this workflow with the action below.
       # See https://github.com/convictional/trigger-workflow-and-wait/issues/62#issuecomment-1843267732
       - name: Trigger E2E Playwright tests
+        id: trigger
         uses: convictional/trigger-workflow-and-wait@v1.6.5
         with:
           owner: dhis2-sre
@@ -61,7 +68,7 @@ jobs:
 
   send-slack-message:
     runs-on: ubuntu-latest
-    if: always() && contains(needs.*.result, 'failure') && github.ref == 'refs/heads/master'
+    if: always() && needs.e2e.result == 'failure' && needs.e2e.outputs.conclusion != 'cancelled' && github.ref == 'refs/heads/master'
     needs: [ e2e ]
     steps:
       - uses: rtCamp/action-slack-notify@v2

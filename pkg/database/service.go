@@ -1,6 +1,7 @@
 package database
 
 import (
+	"cmp"
 	"compress/gzip"
 	"context"
 	"fmt"
@@ -8,9 +9,10 @@ import (
 	"log/slog"
 	"net/url"
 	"os"
-	"path"
+	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"golang.org/x/exp/maps"
 
@@ -19,21 +21,29 @@ import (
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	"github.com/dhis2-sre/im-manager/pkg/storage"
 
-	"github.com/anthhub/forwarder"
-
 	pg "github.com/habx/pg-commands"
 
 	"github.com/google/uuid"
 )
 
+// Publisher publishes notifications for async database operations.
+// The implementation owns JSON marshaling and error handling — callers pass typed
+// payloads and never see failures.
+type Publisher interface {
+	Publish(ctx context.Context, userID uint, groupName, kind string, payload any)
+}
+
 //goland:noinspection GoExportedFuncWithUnexportedType
-func NewService(logger *slog.Logger, s3Bucket string, s3Client S3Client, groupService groupService, repository *repository) *service {
+func NewService(logger *slog.Logger, s3Bucket string, s3Client S3Client, groupService groupService, repository *repository, podExecutor podExecutorFunc, publisher Publisher, filestoreBackuper FilestoreBackuper) *service {
 	return &service{
-		logger:       logger,
-		s3Bucket:     s3Bucket,
-		s3Client:     s3Client,
-		groupService: groupService,
-		repository:   repository,
+		logger:            logger,
+		s3Bucket:          s3Bucket,
+		s3Client:          s3Client,
+		groupService:      groupService,
+		repository:        repository,
+		podExecutor:       podExecutor,
+		publisher:         publisher,
+		filestoreBackuper: filestoreBackuper,
 	}
 }
 
@@ -41,12 +51,27 @@ type groupService interface {
 	Find(ctx context.Context, name string) (*model.Group, error)
 }
 
+type PodExecutor interface {
+	Exec(ctx context.Context, namespace, podName, container string, command []string, stdout, stderr io.Writer) error
+}
+
+type podExecutorFunc func(cluster model.Cluster) (PodExecutor, error)
+
+// FilestoreBackuper backs up the file store associated with a database. Used after pg_dump
+// inside service.SaveAs's goroutine so the HTTP request returns quickly.
+type FilestoreBackuper interface {
+	FilestoreBackup(ctx context.Context, instance *model.DeploymentInstance, name string, database *model.Database) error
+}
+
 type service struct {
-	logger       *slog.Logger
-	s3Bucket     string
-	s3Client     S3Client
-	groupService groupService
-	repository   *repository
+	logger            *slog.Logger
+	s3Bucket          string
+	s3Client          S3Client
+	groupService      groupService
+	repository        *repository
+	podExecutor       podExecutorFunc
+	publisher         Publisher
+	filestoreBackuper FilestoreBackuper
 }
 
 type S3Client interface {
@@ -55,6 +80,7 @@ type S3Client interface {
 	Upload(ctx context.Context, bucket string, key string, body storage.ReadAtSeeker, size int64) error
 	Delete(bucket string, key string) error
 	Download(ctx context.Context, bucket string, key string, dst io.Writer, cb func(contentLength int64)) error
+	StreamUpload(ctx context.Context, bucket, key, contentType string, r io.Reader) (int64, error)
 }
 
 func (s service) FindByIdentifier(ctx context.Context, identifier string) (*model.Database, error) {
@@ -190,6 +216,7 @@ func (s service) Upload(ctx context.Context, d *model.Database, group *model.Gro
 	}
 
 	d.Url = fmt.Sprintf("s3://%s/%s", s.s3Bucket, key)
+	d.Size = size
 
 	err = s.repository.Save(ctx, d)
 	if err != nil {
@@ -308,7 +335,16 @@ func groupsWithDatabases(databases []model.Database) []GroupsWithDatabases {
 		groupsWithDatabases[i].Databases = filterDatabases(databases, func(database *model.Database) bool {
 			return database.GroupName == groupName
 		})
+
+		slices.SortFunc(groupsWithDatabases[i].Databases, func(a, b model.Database) int {
+			return cmp.Compare(a.Name, b.Name)
+		})
 	}
+
+	slices.SortFunc(groupsWithDatabases, func(a, b GroupsWithDatabases) int {
+		return cmp.Compare(a.Name, b.Name)
+	})
+
 	return groupsWithDatabases
 }
 
@@ -343,6 +379,11 @@ func (s service) Update(ctx context.Context, d *model.Database) error {
 		return err
 	}
 
+	// TODO: This shouldn't be necessary... But without it I get the following error: {"time":"2025-07-04T00:03:05.942946078Z","level":"ERROR","msg":"record not found","error":"record not found","query":"SELECT * FROM \"databases\" WHERE \"databases\".\"id\" = 0 ORDER BY \"databases\".\"id\" LIMIT 1","duration": 602547,"rows":0,"file":"/src/pkg/database/repository.go:63","correlationId":"4c39fa85-d8fb-4e75-a0cb-1ad4732b7f47","user":12}
+	if d.FilestoreID == 0 {
+		return nil
+	}
+
 	return s.updateFS(ctx, d)
 }
 
@@ -371,9 +412,7 @@ func (s service) updateFS(ctx context.Context, d *model.Database) error {
 		return err
 	}
 
-	d.Url = fmt.Sprintf("s3://%s/%s", s.s3Bucket, destination)
-
-	updateSlug(d)
+	fs.Url = fmt.Sprintf("s3://%s/%s", s.s3Bucket, destination)
 
 	return s.repository.Update(ctx, fs)
 }
@@ -395,7 +434,7 @@ func (s service) FindExternalDownload(ctx context.Context, uuid uuid.UUID) (*mod
 	return s.repository.FindExternalDownload(ctx, uuid)
 }
 
-func (s service) Save(ctx context.Context, userId uint, database *model.Database, instance *model.DeploymentInstance, stack *model.Stack) error {
+func (s service) Save(ctx context.Context, userId uint, database *model.Database, instance *model.DeploymentInstance, stack *model.Stack, coreInstance *model.DeploymentInstance) error {
 	lock := database.Lock
 	isLocked := lock != nil
 	if isLocked && (lock.InstanceID != instance.ID || lock.UserID != userId) {
@@ -417,10 +456,10 @@ func (s service) Save(ctx context.Context, userId uint, database *model.Database
 
 	tmpName := uuid.New().String()
 	format := getFormat(database)
-	_, err := s.SaveAs(ctx, database, instance, stack, tmpName, format, func(ctx context.Context, saved *model.Database) {
+	_, err := s.SaveAs(ctx, database.UserID, instance, stack, coreInstance, tmpName, format, func(ctx context.Context, saved *model.Database) {
 		defer func() {
 			if !isLocked {
-				err := s.Unlock(ctx, database.ID)
+				err := s.repository.Unlock(ctx, database.ID)
 				if err != nil {
 					s.logError(ctx, fmt.Errorf("unlock database failed: %v", err))
 				}
@@ -433,25 +472,33 @@ func (s service) Save(ctx context.Context, userId uint, database *model.Database
 			return
 		}
 
-		err = s.Delete(ctx, database.ID)
+		sourceKey := strings.TrimPrefix(u.Path, "/")
+		destinationKey := fmt.Sprintf("%s/%s", database.GroupName, database.Name)
+		err = s.s3Client.Move(s.s3Bucket, sourceKey, destinationKey)
 		if err != nil {
-			s.logError(ctx, err)
+			s.logError(ctx, fmt.Errorf("moving database failed: %v", err))
 			return
 		}
 
-		sourceKey := strings.TrimPrefix(u.Path, "/")
-		destinationKey := fmt.Sprintf("%s/%s", saved.GroupName, database.Name)
-		err = s.s3Client.Move(s.s3Bucket, sourceKey, destinationKey)
+		err = s.repository.Unlock(ctx, database.ID)
+		if err != nil {
+			s.logError(ctx, fmt.Errorf("unlock database failed: %v", err))
+		}
+
+		err = s.repository.Delete(ctx, database.ID)
 		if err != nil {
 			s.logError(ctx, err)
 			return
 		}
 
 		saved.Name = database.Name
+		saved.GroupName = database.GroupName
 		saved.Url = database.Url
 		saved.Slug = database.Slug
 		saved.CreatedAt = database.CreatedAt
-		err = s.Update(ctx, saved)
+
+		// Use the repository Update method, since the service Update method also performs an S3 move.
+		err = s.repository.Update(ctx, saved)
 		if err != nil {
 			s.logError(ctx, err)
 			return
@@ -462,6 +509,9 @@ func (s service) Save(ctx context.Context, userId uint, database *model.Database
 			s.logError(ctx, err)
 			return
 		}
+		// Align in-memory saved with the now-renamed/ID-swapped row so the SaveAs
+		// goroutine's downstream filestore-backup step refetches the correct row.
+		saved.ID = database.ID
 
 		if database.Lock != nil {
 			_, err := s.repository.Lock(ctx, database.ID, database.Lock.InstanceID, database.Lock.UserID)
@@ -482,10 +532,7 @@ func getFormat(database *model.Database) string {
 	return "plain"
 }
 
-func (s service) SaveAs(ctx context.Context, database *model.Database, instance *model.DeploymentInstance, stack *model.Stack, newName string, format string, done func(ctx context.Context, saved *model.Database)) (*model.Database, error) {
-	// TODO: Add to config
-	dumpPath := "/mnt/data/"
-
+func (s service) SaveAs(ctx context.Context, userId uint, instance *model.DeploymentInstance, stack *model.Stack, coreInstance *model.DeploymentInstance, newName string, format string, done func(ctx context.Context, saved *model.Database)) (*model.Database, error) {
 	group, err := s.groupService.Find(ctx, instance.GroupName)
 	if err != nil {
 		return nil, err
@@ -495,12 +542,15 @@ func (s service) SaveAs(ctx context.Context, database *model.Database, instance 
 	if err != nil {
 		return nil, err
 	}
+	dump.Host = "localhost"
+	command := buildPgDumpCommand(dump, format)
 
 	newDatabase := &model.Database{
 		Name: newName,
 		// TODO: For now, only saving to the same group is supported
 		GroupName: instance.GroupName,
 		Type:      "database",
+		UserID:    userId,
 	}
 
 	err = s.repository.Save(ctx, newDatabase)
@@ -508,101 +558,127 @@ func (s service) SaveAs(ctx context.Context, database *model.Database, instance 
 		return nil, err
 	}
 
-	// only use ctx for values (logging) and not cancellation signals since we create a go routine
-	// that outlives the HTTP request scope
 	ctx = context.WithoutCancel(ctx)
 	go func() {
-		var ret *forwarder.Result
-		if group.ClusterConfiguration != nil && len(group.ClusterConfiguration.KubernetesConfiguration) > 0 {
-			hostname := fmt.Sprintf(stack.HostnamePattern, instance.Name, instance.GroupName)
-			serviceName := strings.Split(hostname, ".")[0]
-			options := []*forwarder.Option{
-				{
-					RemotePort:  5432,
-					ServiceName: serviceName,
-					Namespace:   instance.GroupName,
-				},
-			}
-
-			kubeConfig, err := decryptYaml(group.ClusterConfiguration.KubernetesConfiguration)
-			if err != nil {
-				s.logError(ctx, err)
-				return
-			}
-
-			ret, err = forwarder.WithForwardersEmbedConfig(context.Background(), options, kubeConfig)
-			if err != nil {
-				s.logError(ctx, err)
-				return
-			}
-			defer ret.Close()
-
-			ports, err := ret.Ready()
-			if err != nil {
-				s.logError(ctx, err)
-				return
-			}
-
-			dump.Host = "localhost"
-			dump.Port = int(ports[0][0].Local)
+		publish := func(status, errMsg string, size int64) {
+			s.publisher.Publish(ctx, userId, newDatabase.GroupName, kindDatabaseSave, newDatabaseEvent(newDatabase, status, errMsg, size))
 		}
 
-		dump.SetPath(dumpPath)
-		fileId := uuid.New().String()
-		dump.SetFileName(fileId + ".dump")
-		dump.SetupFormat(format)
-
-		// TODO: Remove... Or at least make configurable
-		dump.EnableVerbose()
-
-		dumpExec := dump.Exec(pg.ExecOptions{StreamPrint: true, StreamDestination: os.Stdout})
-		if dumpExec.Error != nil {
-			s.logger.ErrorContext(ctx, "Failed to dump DB", "error", dumpExec.Error.Err, "dumpOutput", dumpExec.Output)
-			return
-		}
-
-		dumpFile := path.Join(dumpPath, dumpExec.File)
-		file, err := os.Open(dumpFile) // #nosec
+		podExecutor, err := s.podExecutor(group.Cluster)
 		if err != nil {
 			s.logError(ctx, err)
+			publish("error", err.Error(), 0)
 			return
 		}
-		defer s.removeTempFile(ctx, file)
 
-		if format == "plain" {
-			gzFileName := path.Join(dumpPath, fileId+".gz")
-			file, err = s.gz(ctx, gzFileName, database, file)
-			if err != nil {
-				s.logError(ctx, err)
-				return
-			}
-
-			defer s.removeTempFile(ctx, file)
-		}
-
-		stat, err := file.Stat()
+		hostname, err := stack.ParameterProviders["DATABASE_HOSTNAME"].Provide(*instance)
 		if err != nil {
 			s.logError(ctx, err)
+			publish("error", err.Error(), 0)
+			return
+		}
+		// TODO: get pod by label selector instead
+		podName := strings.Split(hostname, ".")[0] + "-0"
+		namespace := instance.Group.Namespace
+
+		pr, pw := io.Pipe()
+
+		key := fmt.Sprintf("%s/%s", group.Name, newDatabase.Name)
+
+		type uploadResult struct {
+			size int64
+			err  error
+		}
+		uploadDone := make(chan uploadResult, 1)
+		go func() {
+			defer pr.Close()
+			size, err := s.s3Client.StreamUpload(ctx, s.s3Bucket, key, "application/octet-stream", pr)
+			uploadDone <- uploadResult{size, err}
+		}()
+
+		s.logger.InfoContext(ctx, "starting pg_dump", "pod", podName, "namespace", namespace, "command", strings.Join(command, " "))
+		publish("started", "", 0)
+
+		if err := execPgDump(ctx, podExecutor, namespace, podName, command, pw, format, newDatabase.Name); err != nil {
+			s.logger.ErrorContext(ctx, "failed to exec pg_dump", "error", err)
+			<-uploadDone
+			publish("error", err.Error(), 0)
 			return
 		}
 
-		// This is added due to the following issue - https://github.com/aws/aws-sdk-go/issues/1962
-		_, err = file.Seek(0, 0)
+		result := <-uploadDone
+		if result.err != nil {
+			s.logError(ctx, result.err)
+			publish("error", result.err.Error(), 0)
+			return
+		}
+
+		saved, err := s.repository.FindById(ctx, newDatabase.ID)
 		if err != nil {
 			s.logError(ctx, err)
+			publish("error", err.Error(), 0)
 			return
 		}
-
-		_, err = s.Upload(ctx, newDatabase, group, file, stat.Size())
-		if err != nil {
+		saved.Url = fmt.Sprintf("s3://%s/%s", s.s3Bucket, key)
+		saved.Size = result.size
+		if err := s.repository.Save(ctx, saved); err != nil {
 			s.logError(ctx, err)
+			publish("error", err.Error(), 0)
 			return
 		}
 
-		done(ctx, newDatabase)
+		s.logger.InfoContext(ctx, "pg_dump completed successfully", "key", key, "size", result.size)
+		publish("success", "", result.size)
+
+		if done != nil {
+			done(ctx, saved)
+		}
+
+		if coreInstance == nil {
+			return
+		}
+
+		// Refetch in case done mutated row identity (Save renames + ID-swaps).
+		// This also ensures filestoreBackup writes back a struct with up-to-date fields.
+		fsTarget, err := s.repository.FindById(ctx, saved.ID)
+		if err != nil {
+			s.logger.ErrorContext(ctx, "failed to refetch database for filestore backup", "id", saved.ID, "error", err)
+			return
+		}
+		s.publisher.Publish(ctx, userId, fsTarget.GroupName, kindFilestoreBackup, newDatabaseEvent(fsTarget, "started", "", 0))
+		if err := s.filestoreBackuper.FilestoreBackup(ctx, coreInstance, fsTarget.Name, fsTarget); err != nil {
+			s.logger.ErrorContext(ctx, "filestore backup failed", "groupName", fsTarget.GroupName, "databaseName", fsTarget.Name, "error", err)
+			s.publisher.Publish(ctx, userId, fsTarget.GroupName, kindFilestoreBackup, newDatabaseEvent(fsTarget, "error", err.Error(), 0))
+			return
+		}
+		s.publisher.Publish(ctx, userId, fsTarget.GroupName, kindFilestoreBackup, newDatabaseEvent(fsTarget, "success", "", 0))
 	}()
 
 	return newDatabase, nil
+}
+
+func execPgDump(ctx context.Context, executor PodExecutor, namespace, podName string, command []string, pw *io.PipeWriter, format string, databaseName string) error {
+	var execWriter io.WriteCloser = pw
+	var gzWriter *gzip.Writer
+	if format == "plain" {
+		gzWriter = gzip.NewWriter(pw)
+		gzWriter.Name = strings.TrimSuffix(databaseName, ".gz")
+		execWriter = gzWriter
+	}
+
+	var stderrBuf strings.Builder
+	execErr := executor.Exec(ctx, namespace, podName, "postgresql", command, execWriter, &stderrBuf)
+
+	if gzWriter != nil {
+		gzWriter.Close()
+	}
+
+	if execErr != nil {
+		pw.CloseWithError(execErr)
+		return fmt.Errorf("%w: %s", execErr, stderrBuf.String())
+	}
+	pw.Close()
+	return nil
 }
 
 func (s service) logError(ctx context.Context, err error) {
@@ -639,13 +715,6 @@ func (s service) gz(ctx context.Context, gzFile string, database *model.Database
 		return nil, err
 	}
 
-	defer func(src *os.File) {
-		err := src.Close()
-		if err != nil {
-			s.logger.ErrorContext(ctx, "Failed to close file", "error", err)
-		}
-	}(src)
-
 	return outFile, nil
 }
 
@@ -668,7 +737,7 @@ func newPgDumpConfig(instance *model.DeploymentInstance, stack *model.Stack) (*p
 	}
 
 	dump, err := pg.NewDump(&pg.Postgres{
-		Host:     fmt.Sprintf(stack.HostnamePattern, instance.Name, instance.GroupName),
+		Host:     fmt.Sprintf(stack.HostnamePattern, instance.Name, instance.Group.Namespace),
 		Port:     5432,
 		DB:       databaseName.Value,
 		Username: databaseUsername.Value,
@@ -682,4 +751,37 @@ func newPgDumpConfig(instance *model.DeploymentInstance, stack *model.Stack) (*p
 	dump.IgnoreTableData = []string{"analytics*", "_*"}
 
 	return dump, nil
+}
+
+func buildPgDumpCommand(dump *pg.Dump, format string) []string {
+	options := dump.Options
+	options = append(options, dump.Postgres.Parse()...)
+	options = append(options, fmt.Sprintf("-F%s", format))
+	options = append(options, dump.IgnoreTableDataToString()...)
+
+	return append([]string{"env", "PGPASSWORD=" + dump.Password, "pg_dump"}, options...)
+}
+
+func (s service) StreamUpload(ctx context.Context, database model.Database, group *model.Group, body io.Reader, contentType string, contentLength int64) (model.Database, error) {
+	ctx = context.WithoutCancel(ctx)
+
+	key := fmt.Sprintf("%s/%s", group.Name, database.Name)
+	s.logger.InfoContext(ctx, "Uploading started", "database", database.Name, "group", group.Name)
+
+	start := time.Now()
+	size, err := s.s3Client.StreamUpload(ctx, s.s3Bucket, key, contentType, body)
+	if err != nil {
+		return model.Database{}, err
+	}
+
+	s.logger.InfoContext(ctx, "Upload completed", "contentLength", contentLength, "bytesProcessed", size, "duration", time.Since(start))
+
+	database.Url = fmt.Sprintf("s3://%s/%s", s.s3Bucket, key)
+	database.Size = size
+	err = s.repository.Save(ctx, &database)
+	if err != nil {
+		return model.Database{}, fmt.Errorf("failed to save database record: %w", err)
+	}
+
+	return database, nil
 }

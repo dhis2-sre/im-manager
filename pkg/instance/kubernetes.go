@@ -11,6 +11,11 @@ import (
 	"strings"
 	"time"
 
+	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+
+	metricsv1beta1 "k8s.io/metrics/pkg/client/clientset/versioned"
+
 	"github.com/dhis2-sre/im-manager/internal/errdef"
 
 	"k8s.io/apimachinery/pkg/types"
@@ -19,31 +24,40 @@ import (
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/tools/remotecommand"
 )
 
 type kubernetesService struct {
-	client *kubernetes.Clientset
+	client     kubernetes.Interface
+	restConfig *rest.Config
 }
 
 //goland:noinspection GoExportedFuncWithUnexportedType
-func NewKubernetesService(config *model.ClusterConfiguration) (*kubernetesService, error) {
-	client, err := newClient(config)
+func NewKubernetesService(config model.Cluster) (*kubernetesService, error) {
+	restConfig, err := newRestConfig(config)
+	if err != nil {
+		return nil, fmt.Errorf("error creating kube rest config: %v", err)
+	}
+
+	client, err := kubernetes.NewForConfig(restConfig)
 	if err != nil {
 		return nil, fmt.Errorf("error creating kube client: %v", err)
 	}
 
-	return &kubernetesService{client: client}, nil
+	return &kubernetesService{client: client, restConfig: restConfig}, nil
 }
 
-func commandExecutor(cmd *exec.Cmd, configuration *model.ClusterConfiguration) (stdout []byte, stderr []byte, err error) {
-	if configuration == nil {
+func commandExecutor(cmd *exec.Cmd, cluster model.Cluster) (stdout []byte, stderr []byte, err error) {
+	if cluster.Configuration == nil {
 		return runCommand(cmd)
 	}
 
-	kubeCfg, err := decryptYaml(configuration.KubernetesConfiguration)
+	kubeCfg, err := decryptYaml(cluster.Configuration)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to decrypt kubernetes config: %v", err)
 	}
@@ -96,10 +110,38 @@ func runCommand(cmd *exec.Cmd) ([]byte, []byte, error) {
 	return stdout.Bytes(), stderr.Bytes(), err
 }
 
-func newClient(configuration *model.ClusterConfiguration) (*kubernetes.Clientset, error) {
+func newMetricsClient(cluster model.Cluster) (*metricsv1beta1.Clientset, error) {
+	restClientConfig, err := newRestConfig(cluster)
+	if err != nil {
+		return nil, err
+	}
+
+	metricsClient, err := metricsv1beta1.NewForConfig(restClientConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	return metricsClient, nil
+}
+
+func newClient(configuration model.Cluster) (*kubernetes.Clientset, error) {
+	restClientConfig, err := newRestConfig(configuration)
+	if err != nil {
+		return nil, err
+	}
+
+	client, err := kubernetes.NewForConfig(restClientConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	return client, nil
+}
+
+func newRestConfig(cluster model.Cluster) (*rest.Config, error) {
 	var restClientConfig *rest.Config
-	if configuration != nil && len(configuration.KubernetesConfiguration) > 0 {
-		kubeCfg, err := decryptYaml(configuration.KubernetesConfiguration)
+	if cluster.Configuration != nil {
+		kubeCfg, err := decryptYaml(cluster.Configuration)
 		if err != nil {
 			return nil, err
 		}
@@ -121,12 +163,79 @@ func newClient(configuration *model.ClusterConfiguration) (*kubernetes.Clientset
 		}
 	}
 
-	client, err := kubernetes.NewForConfig(restClientConfig)
-	if err != nil {
-		return nil, err
-	}
+	return restClientConfig, nil
+}
 
-	return client, nil
+// discoverIngressClass returns the IngressClass name to use for this cluster.
+//
+// Selection rules (in priority order):
+//  1. If any IngressClass carries the annotation
+//     "ingressclass.kubernetes.io/is-default-class=true", that one is used.
+//     This is the standard Kubernetes convention for marking a cluster default.
+//  2. If exactly one IngressClass exists (with no default annotation), it is
+//     used - there is no ambiguity when only one option is present.
+//  3. If multiple IngressClasses exist but none is marked default, an error is
+//     returned. The operator must annotate one with
+//     ingressclass.kubernetes.io/is-default-class=true.
+//  4. If no IngressClasses exist at all, "" is returned silently.
+func discoverIngressClass(ctx context.Context, cluster model.Cluster) (string, error) {
+	client, err := newClient(cluster)
+	if err != nil {
+		return "", err
+	}
+	classes, err := client.NetworkingV1().IngressClasses().List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return "", fmt.Errorf("listing IngressClasses: %w", err)
+	}
+	for _, ic := range classes.Items {
+		if ic.Annotations["ingressclass.kubernetes.io/is-default-class"] == "true" {
+			return ic.Name, nil
+		}
+	}
+	switch len(classes.Items) {
+	case 0:
+		return "", nil
+	case 1:
+		return classes.Items[0].Name, nil
+	default:
+		return "", fmt.Errorf("found %d IngressClasses but none is annotated as default — annotate one with ingressclass.kubernetes.io/is-default-class=true", len(classes.Items))
+	}
+}
+
+// discoverCertIssuer returns the cert-manager ClusterIssuer name to use for
+// this cluster.
+//
+// Selection rules:
+//  1. If exactly one ClusterIssuer exists, it is used — unambiguous.
+//  2. If multiple ClusterIssuers exist we cannot choose safely (there is no
+//     "default issuer" concept in cert-manager), so an error is returned.
+//     The operator must configure the cert issuer explicitly.
+//  3. If no ClusterIssuers exist, "" is returned silently — the cluster may
+//     not use cert-manager at all, which is a valid setup.
+//  4. If the ClusterIssuer CRD itself is not installed (API error), "" is
+//     returned silently — cert-manager is not present on this cluster.
+func discoverCertIssuer(ctx context.Context, cluster model.Cluster) (string, error) {
+	restConfig, err := newRestConfig(cluster)
+	if err != nil {
+		return "", err
+	}
+	dynClient, err := dynamic.NewForConfig(restConfig)
+	if err != nil {
+		return "", err
+	}
+	gvr := schema.GroupVersionResource{Group: "cert-manager.io", Version: "v1", Resource: "clusterissuers"}
+	issuers, err := dynClient.Resource(gvr).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return "", nil // cert-manager CRD not installed - not an error
+	}
+	switch len(issuers.Items) {
+	case 0:
+		return "", nil
+	case 1:
+		return issuers.Items[0].GetName(), nil
+	default:
+		return "", fmt.Errorf("found %d ClusterIssuers — cannot auto-select, configure the cert issuer explicitly", len(issuers.Items))
+	}
 }
 
 func (ks kubernetesService) getLogs(instance *model.DeploymentInstance, typeSelector string) (io.ReadCloser, error) {
@@ -137,13 +246,49 @@ func (ks kubernetesService) getLogs(instance *model.DeploymentInstance, typeSele
 
 	podLogOptions := v1.PodLogOptions{
 		Follow: true,
+		// TODO: Just getting the first container isn't ideal. Ideally we would have an endpoint which returns all containers and allow the user to select one. However this is beyond the scope of the current changes and simply getting the first prevents a 500 error
+		Container: pod.Spec.Containers[0].Name,
 	}
 
-	return ks.client.
+	stream, err := ks.client.
 		CoreV1().
 		Pods(pod.Namespace).
 		GetLogs(pod.Name, &podLogOptions).
 		Stream(context.TODO())
+	if err != nil {
+		if strings.Contains(err.Error(), "ContainerCreating") || strings.Contains(err.Error(), "waiting to start") {
+			return nil, errdef.NewConflict("instance is still starting up, logs not available yet")
+		}
+		return nil, err
+	}
+	return stream, nil
+}
+
+func (ks kubernetesService) Exec(ctx context.Context, namespace, podName, container string, command []string, stdout, stderr io.Writer) error {
+	req := ks.client.CoreV1().RESTClient().Post().
+		Resource("pods").
+		Name(podName).
+		Namespace(namespace).
+		SubResource("exec")
+
+	req.VersionedParams(&v1.PodExecOptions{
+		Container: container,
+		Command:   command,
+		Stdin:     false,
+		Stdout:    true,
+		Stderr:    true,
+		TTY:       false,
+	}, scheme.ParameterCodec)
+
+	executor, err := remotecommand.NewSPDYExecutor(ks.restConfig, "POST", req.URL())
+	if err != nil {
+		return err
+	}
+
+	return executor.StreamWithContext(ctx, remotecommand.StreamOptions{
+		Stdout: stdout,
+		Stderr: stderr,
+	})
 }
 
 func (ks kubernetesService) getPod(instanceID uint, typeSelector string) (v1.Pod, error) {
@@ -209,7 +354,7 @@ func (ks kubernetesService) restart(instance *model.DeploymentInstance, typeSele
 	}
 
 	if instanceStack.KubernetesResource == model.StatefulSetResource {
-		statefulSets := ks.client.AppsV1().StatefulSets(instance.GroupName)
+		statefulSets := ks.client.AppsV1().StatefulSets(instance.Group.Namespace)
 		statefulSetsList, err := statefulSets.List(context.TODO(), listOptions)
 		if err != nil {
 			return err
@@ -234,7 +379,7 @@ func (ks kubernetesService) restart(instance *model.DeploymentInstance, typeSele
 	}
 
 	if instanceStack.KubernetesResource == model.DeploymentResource {
-		deployments := ks.client.AppsV1().Deployments(instance.GroupName)
+		deployments := ks.client.AppsV1().Deployments(instance.Group.Namespace)
 		deploymentList, err := deployments.List(context.TODO(), listOptions)
 		if err != nil {
 			return err
@@ -264,7 +409,7 @@ func (ks kubernetesService) restart(instance *model.DeploymentInstance, typeSele
 func (ks kubernetesService) pause(instance *model.DeploymentInstance) error {
 	err := ks.scale(instance, 0)
 	if err != nil {
-		return fmt.Errorf("failed to pause instance %q: %v", instance.ID, err)
+		return fmt.Errorf("failed to pause instance %d: %v", instance.ID, err)
 	}
 
 	return nil
@@ -273,7 +418,7 @@ func (ks kubernetesService) pause(instance *model.DeploymentInstance) error {
 func (ks kubernetesService) resume(instance *model.DeploymentInstance) error {
 	err := ks.scale(instance, 1)
 	if err != nil {
-		return fmt.Errorf("failed to resume instance %q: %v", instance.ID, err)
+		return fmt.Errorf("failed to resume instance %d: %v", instance.ID, err)
 	}
 
 	return nil
@@ -292,10 +437,10 @@ func (ks kubernetesService) deletePersistentVolumeClaim(instance *model.Deployme
 		return nil
 	}
 
-	pvcs := ks.client.CoreV1().PersistentVolumeClaims(instance.GroupName)
+	pvcs := ks.client.CoreV1().PersistentVolumeClaims(instance.Group.Namespace)
 
 	for _, pattern := range labelPatterns {
-		selector := fmt.Sprintf(pattern, instance.Name)
+		selector := fmt.Sprintf(pattern, fmt.Sprintf("%s-%d", instance.Name, instance.Group.ID))
 		listOptions := metav1.ListOptions{LabelSelector: selector}
 		list, err := pvcs.List(context.TODO(), listOptions)
 		if err != nil {
@@ -322,7 +467,7 @@ func (ks kubernetesService) scale(instance *model.DeploymentInstance, replicas u
 	labelSelector := fmt.Sprintf("im-id=%d", instance.ID)
 	listOptions := metav1.ListOptions{LabelSelector: labelSelector}
 
-	deployments := ks.client.AppsV1().Deployments(instance.GroupName)
+	deployments := ks.client.AppsV1().Deployments(instance.Group.Namespace)
 	deploymentList, err := deployments.List(context.TODO(), listOptions)
 	if err != nil {
 		return fmt.Errorf("error finding deployments using selector %q: %v", labelSelector, err)
@@ -335,7 +480,7 @@ func (ks kubernetesService) scale(instance *model.DeploymentInstance, replicas u
 		}
 	}
 
-	sets := ks.client.AppsV1().StatefulSets(instance.GroupName)
+	sets := ks.client.AppsV1().StatefulSets(instance.Group.Namespace)
 	setsList, err := sets.List(context.TODO(), listOptions)
 	if err != nil {
 		return fmt.Errorf("error finding StatefulSets using selector %q: %v", labelSelector, err)
@@ -349,6 +494,80 @@ func (ks kubernetesService) scale(instance *model.DeploymentInstance, replicas u
 	}
 
 	return nil
+}
+
+type ClusterResources struct {
+	CPU        string
+	Memory     string
+	Autoscaled bool
+	Nodes      int
+}
+
+func FindResources(cluster model.Cluster) (ClusterResources, error) {
+	client, err := newClient(cluster)
+	if err != nil {
+		return ClusterResources{}, err
+	}
+
+	metricsClient, err := newMetricsClient(cluster)
+	if err != nil {
+		return ClusterResources{}, err
+	}
+
+	nodes, err := client.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		return ClusterResources{}, err
+	}
+
+	nodeMetrics, err := metricsClient.MetricsV1beta1().NodeMetricses().List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		return ClusterResources{}, err
+	}
+
+	var totalCPUUsed, totalMemUsed, totalCPUAlloc, totalMemAlloc resource.Quantity
+
+	for _, node := range nodes.Items {
+		name := node.Name
+		allocCPU := node.Status.Allocatable["cpu"]
+		allocMem := node.Status.Allocatable["memory"]
+
+		var usedCPU, usedMem resource.Quantity
+		for _, metric := range nodeMetrics.Items {
+			if metric.Name == name {
+				usedCPU = metric.Usage["cpu"]
+				usedMem = metric.Usage["memory"]
+				break
+			}
+		}
+		/*
+			cpuPercent := percent(usedCPU.MilliValue(), allocCPU.MilliValue())
+			memPercent := percent(usedMem.Value(), allocMem.Value())
+
+			fmt.Printf("- %s\n", name)
+			fmt.Printf("  CPU: %s / %s (%.1f%%)\n", usedCPU.String(), allocCPU.String(), cpuPercent)
+			fmt.Printf("  MEM: %s / %s (%.1f%%)\n", usedMem.String(), allocMem.String(), memPercent)
+		*/
+		totalCPUUsed.Add(usedCPU)
+		totalMemUsed.Add(usedMem)
+		totalCPUAlloc.Add(allocCPU)
+		totalMemAlloc.Add(allocMem)
+	}
+
+	clusterCPUPercent := percent(totalCPUUsed.MilliValue(), totalCPUAlloc.MilliValue())
+	clusterMemPercent := percent(totalMemUsed.Value(), totalMemAlloc.Value())
+
+	return ClusterResources{
+		CPU:    fmt.Sprintf("%.1f%%", clusterCPUPercent),
+		Memory: fmt.Sprintf("%.1f%%", clusterMemPercent),
+		Nodes:  len(nodes.Items),
+	}, nil
+}
+
+func percent(used, total int64) float64 {
+	if total == 0 {
+		return 0.0
+	}
+	return (float64(used) / float64(total)) * 100
 }
 
 // scaler allows updating the desired scale of a resource as well as getting the current desired and

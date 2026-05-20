@@ -37,6 +37,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/dhis2-sre/im-manager/pkg/cluster"
+
+	"github.com/dhis2-sre/im-manager/pkg/inspector"
+
 	"go.opentelemetry.io/otel/sdk/resource"
 	semconv "go.opentelemetry.io/otel/semconv/v1.27.0"
 
@@ -49,6 +53,10 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/go-mail/mail"
 	"github.com/go-redis/redis"
+	"github.com/gorilla/sessions"
+	"github.com/markbates/goth"
+	"github.com/markbates/goth/gothic"
+	"github.com/markbates/goth/providers/google"
 	"github.com/rabbitmq/rabbitmq-stream-go-client/pkg/stream"
 	"gorm.io/gorm"
 
@@ -69,9 +77,9 @@ import (
 	"github.com/dhis2-sre/im-manager/internal/server"
 	"github.com/dhis2-sre/im-manager/pkg/instance"
 	"github.com/dhis2-sre/im-manager/pkg/integration"
+	"github.com/dhis2-sre/im-manager/pkg/notification"
 	"github.com/dhis2-sre/im-manager/pkg/stack"
 	"github.com/dhis2-sre/im-manager/pkg/storage"
-	"github.com/dhis2-sre/rabbitmq-client/pkg/rabbitmq"
 )
 
 func main() {
@@ -96,7 +104,12 @@ func run() (err error) {
 	}
 
 	ctx := context.Background()
-	logger := slog.New(log.New(slog.NewJSONHandler(os.Stdout, nil)))
+
+	prettyPrint, exists := os.LookupEnv("LOG_PRETTY_PRINT")
+	enablePrettyPrint := exists && prettyPrint == "true"
+
+	options := log.PrettyJSONHandlerOptions{PrettyPrint: enablePrettyPrint}
+	logger := slog.New(log.New(log.NewPrettyJSONHandler(os.Stdout, &options)))
 
 	db, err := newDB(logger)
 	if err != nil {
@@ -129,7 +142,7 @@ func run() (err error) {
 	if err != nil {
 		return err
 	}
-	tokenService, err := token.NewService(logger, tokenRepository, privateKey, authConfig.AccessTokenExpirationSeconds, authConfig.RefreshTokenSecretKey, authConfig.RefreshTokenExpirationSeconds, authConfig.RefreshTokenRememberMeExpirationSeconds)
+	tokenService, err := token.NewService(logger, tokenRepository, privateKey, authConfig.AccessTokenExpirationSeconds, authConfig.RefreshAccessTokenExpirationSeconds, authConfig.RefreshTokenSecretKey, authConfig.RefreshTokenExpirationSeconds, authConfig.RefreshTokenRememberMeExpirationSeconds)
 	if err != nil {
 		return err
 	}
@@ -139,11 +152,28 @@ func run() (err error) {
 	if err != nil {
 		return err
 	}
-	userHandler := user.NewHandler(logger, hostname, authConfig.SameSiteMode, authConfig.AccessTokenExpirationSeconds, authConfig.RefreshTokenExpirationSeconds, authConfig.RefreshTokenRememberMeExpirationSeconds, publicKey, userService, tokenService)
+	userHandler := user.NewHandler(logger, hostname, authConfig.SameSiteMode, authConfig.CookieSecure, authConfig.AccessTokenExpirationSeconds, authConfig.RefreshTokenExpirationSeconds, authConfig.RefreshTokenRememberMeExpirationSeconds, publicKey, userService, tokenService)
+
+	uiURL, err := requireEnv("UI_URL")
+	if err != nil {
+		return err
+	}
+	if err := setupGoogleOAuth(authConfig.SameSiteMode, authConfig.CookieSecure); err != nil {
+		return err
+	}
+	oauthHandler := user.NewOAuthHandler(logger, uiURL, authConfig.SameSiteMode, authConfig.CookieSecure, authConfig.AccessTokenExpirationSeconds, authConfig.RefreshTokenExpirationSeconds, userService, tokenService)
+
+	clusterRepository := cluster.NewRepository(db)
+	encryptor, err := newEncryptor(err)
+	if err != nil {
+		return err
+	}
+	clusterService := cluster.NewService(clusterRepository, encryptor)
+	clusterHandler := cluster.NewHandler(clusterService)
 
 	authentication := middleware.NewAuthentication(publicKey, userService)
 	groupRepository := group.NewRepository(db)
-	groupService := group.NewService(groupRepository, userService)
+	groupService := group.NewService(groupRepository, userService, clusterService)
 	groupHandler := group.NewHandler(groupService)
 
 	stackService, err := newStackService()
@@ -156,28 +186,7 @@ func run() (err error) {
 		return err
 	}
 
-	instanceService, err := newInstanceService(logger, db, stackService, groupService, awsS3Client)
-	if err != nil {
-		return err
-	}
-
-	rabbitmqConfig, err := newRabbitMQ()
-	if err != nil {
-		return err
-	}
-	consumer, err := rabbitmq.NewConsumer(
-		rabbitmqConfig.GetURI(),
-		rabbitmq.WithConnectionName(hostname),
-		rabbitmq.WithConsumerTagPrefix(hostname),
-		rabbitmq.WithLogger(logger.WithGroup("rabbitmq")),
-	)
-	if err != nil {
-		return fmt.Errorf("failed to setup RabbitMQ consumer: %v", err)
-	}
-	defer consumer.Close()
-
-	ttlDestroyConsumer := instance.NewTTLDestroyConsumer(logger, consumer, instanceService)
-	err = ttlDestroyConsumer.Consume()
+	instanceService, err := newInstanceService(logger, db, stackService, groupService, awsS3Client, tokenService)
 	if err != nil {
 		return err
 	}
@@ -189,7 +198,19 @@ func run() (err error) {
 		return err
 	}
 
-	databaseHandler, err := newDatabaseHandler(ctx, logger, db, groupService, instanceService, stackService)
+	rabbitmqConfig, err := newRabbitMQ()
+	if err != nil {
+		return err
+	}
+
+	streamEnv, streamName, err := newStreamEnvironment(ctx, logger, rabbitmqConfig)
+	if err != nil {
+		return err
+	}
+
+	notificationHandler := newNotificationHandler(logger, db)
+
+	databaseHandler, err := newDatabaseHandler(ctx, logger, db, groupService, instanceService, stackService, streamEnv, streamName)
 	if err != nil {
 		return err
 	}
@@ -204,12 +225,9 @@ func run() (err error) {
 		return err
 	}
 
-	eventHandler, err := newEventHandler(ctx, logger, rabbitmqConfig)
-	if err != nil {
-		return err
-	}
+	eventHandler := event.NewHandler(logger, streamEnv, streamName)
 
-	err = createGroups(ctx, logger, groupService)
+	_, err = createDefaultCluster(ctx, clusterService)
 	if err != nil {
 		return err
 	}
@@ -219,10 +237,19 @@ func run() (err error) {
 		return err
 	}
 
+	err = createGroups(ctx, logger, groupService)
+	if err != nil {
+		return err
+	}
+
 	err = createE2ETestUser(ctx, userService, groupService)
 	if err != nil {
 		return err
 	}
+
+	ins := inspector.NewInspector(logger, instanceService, inspector.NewTTLDestroyHandler(logger, instanceService))
+	// TODO: Graceful shutdown... ?
+	go ins.Inspect(ctx)
 
 	r, err := newGinEngine(logger)
 	if err != nil {
@@ -231,19 +258,74 @@ func run() (err error) {
 
 	r.Use(otelgin.Middleware("im")) // Attach OpenTelemetry middleware
 
+	cluster.Routes(r, authentication, authorization, clusterHandler)
 	group.Routes(r, authentication, authorization, groupHandler)
-	user.Routes(r, authentication, authorization, userHandler)
+	user.Routes(r, authentication, authorization, userHandler, oauthHandler)
 	stack.Routes(r, authentication.TokenAuthentication, stackHandler)
 	integration.Routes(r, authentication, integrationHandler)
 	database.Routes(r, authentication.TokenAuthentication, databaseHandler)
 	instance.Routes(r, authentication.TokenAuthentication, instanceHandler)
 	event.Routes(r, authentication.TokenAuthentication, eventHandler)
+	notification.Routes(r, authentication.TokenAuthentication, notificationHandler)
 
 	logger.InfoContext(ctx, "Listening and serving HTTP")
 	if err := r.Run(); err != nil {
 		return fmt.Errorf("failed to start the HTTP server: %v", err)
 	}
+	server := &http.Server{
+		Addr:         ":8080",
+		Handler:      r,
+		WriteTimeout: 240 * time.Second,
+		ReadTimeout:  240 * time.Second,
+	}
+	if err := server.ListenAndServe(); err != nil {
+		return fmt.Errorf("failed to start the HTTP server: %v", err)
+	}
+
 	return nil
+}
+
+// setupGoogleOAuth configures the shared gothic cookie store and registers the Google provider.
+// The OAuth state cookie is forced to SameSite=Lax (regardless of the app's SAME_SITE_MODE) so
+// that it survives the cross-site redirect from Google back to the callback URL. Strict would
+// drop the cookie and the callback would always fail with a state mismatch.
+func setupGoogleOAuth(_ http.SameSite, cookieSecure bool) error {
+	clientID, err := requireEnv("GOOGLE_CLIENT_ID")
+	if err != nil {
+		return err
+	}
+	clientSecret, err := requireEnv("GOOGLE_CLIENT_SECRET")
+	if err != nil {
+		return err
+	}
+	callbackURL, err := requireEnv("GOOGLE_CALLBACK_URL")
+	if err != nil {
+		return err
+	}
+	sessionSecret, err := requireEnv("SESSION_SECRET")
+	if err != nil {
+		return err
+	}
+
+	store := sessions.NewCookieStore([]byte(sessionSecret))
+	store.Options.Path = "/"
+	store.Options.HttpOnly = true
+	store.Options.Secure = cookieSecure
+	store.Options.SameSite = http.SameSiteLaxMode
+	store.MaxAge(600)
+	gothic.Store = store
+
+	goth.UseProviders(google.New(clientID, clientSecret, callbackURL, "email", "profile"))
+
+	return nil
+}
+
+func newEncryptor(err error) (cluster.Encryptor, error) {
+	encryptor, err := cluster.NewEncryptor(os.Getenv("SOPS_KMS_ARN"), os.Getenv("SOPS_AGE_KEY"))
+	if err != nil {
+		return cluster.Encryptor{}, err
+	}
+	return encryptor, nil
 }
 
 func newDB(logger *slog.Logger) (*gorm.DB, error) {
@@ -268,9 +350,11 @@ func newDB(logger *slog.Logger) (*gorm.DB, error) {
 		return nil, err
 	}
 
+	logQueries := os.Getenv("DATABASE_LOG_QUERIES") == "true"
+
 	db, err := storage.NewDatabase(
 		logger,
-		storage.PostgresqlConfig{Host: host, Port: port, Username: username, Password: password, DatabaseName: name},
+		storage.PostgresqlConfig{Host: host, Port: port, Username: username, Password: password, DatabaseName: name, LogQueries: logQueries},
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to setup DB: %v", err)
@@ -329,8 +413,10 @@ func newRedis() (*redis.Client, error) {
 
 type authenticationConfig struct {
 	SameSiteMode                            http.SameSite
+	CookieSecure                            bool
 	RefreshTokenSecretKey                   string
 	AccessTokenExpirationSeconds            int
+	RefreshAccessTokenExpirationSeconds     int
 	RefreshTokenExpirationSeconds           int
 	RefreshTokenRememberMeExpirationSeconds int
 }
@@ -348,6 +434,10 @@ func newAuthenticationConfig() (authenticationConfig, error) {
 	if err != nil {
 		return authenticationConfig{}, err
 	}
+	refreshAccessTokenExpirationSeconds, err := requireEnvAsInt("REFRESH_ACCESS_TOKEN_EXPIRATION_IN_SECONDS")
+	if err != nil {
+		return authenticationConfig{}, err
+	}
 	refreshTokenExpirationSeconds, err := requireEnvAsInt("REFRESH_TOKEN_EXPIRATION_IN_SECONDS")
 	if err != nil {
 		return authenticationConfig{}, err
@@ -357,10 +447,14 @@ func newAuthenticationConfig() (authenticationConfig, error) {
 		return authenticationConfig{}, err
 	}
 
+	cookieSecure := os.Getenv("COOKIE_SECURE") != "false"
+
 	return authenticationConfig{
 		SameSiteMode:                            mode,
+		CookieSecure:                            cookieSecure,
 		RefreshTokenSecretKey:                   refreshTokenSecretKey,
 		AccessTokenExpirationSeconds:            accessTokenExpirationSeconds,
+		RefreshAccessTokenExpirationSeconds:     refreshAccessTokenExpirationSeconds,
 		RefreshTokenExpirationSeconds:           refreshTokenExpirationSeconds,
 		RefreshTokenRememberMeExpirationSeconds: refreshTokenRememberMeExpirationSeconds,
 	}, nil
@@ -418,11 +512,16 @@ func getPrivateKey(ctx context.Context, logger *slog.Logger) (*rsa.PrivateKey, e
 func newStackService() (stack.Service, error) {
 	stacks, err := stack.New(
 		stack.DHIS2DB,
+		stack.MINIO,
 		stack.DHIS2Core,
 		stack.DHIS2,
 		stack.PgAdmin,
 		stack.WhoamiGo,
 		stack.IMJobRunner,
+		stack.ChapDB,
+		stack.ChapValkey,
+		stack.ChapWorker,
+		stack.ChapCore,
 	)
 	if err != nil {
 		return stack.Service{}, fmt.Errorf("error in stack config: %v", err)
@@ -431,24 +530,30 @@ func newStackService() (stack.Service, error) {
 	return stack.NewService(stacks), nil
 }
 
-func newInstanceService(logger *slog.Logger, db *gorm.DB, stackService stack.Service, groupService *group.Service, s3Client *s3.Client) (*instance.Service, error) {
+func newInstanceService(logger *slog.Logger, db *gorm.DB, stackService stack.Service, groupService *group.Service, s3Client *s3.Client, tokenService *token.TokenService) (*instance.Service, error) {
 	instanceParameterEncryptionKey, err := requireEnv("INSTANCE_PARAMETER_ENCRYPTION_KEY")
 	if err != nil {
 		return nil, err
 	}
-	instanceRepository := instance.NewRepository(db, instanceParameterEncryptionKey)
+	instanceRepository, err := instance.NewRepository(db, instanceParameterEncryptionKey)
+	if err != nil {
+		return nil, err
+	}
 	classification, err := requireEnv("CLASSIFICATION")
 	if err != nil {
 		return nil, err
 	}
-	helmfileService := instance.NewHelmfileService(logger, stackService, "./stacks", classification)
+	helmfileService, err := instance.NewHelmfileService(logger, stackService, "./stacks", classification)
+	if err != nil {
+		return nil, err
+	}
 
 	s3Bucket, err := requireEnv("S3_BUCKET")
 	if err != nil {
 		return nil, err
 	}
 
-	return instance.NewService(logger, instanceRepository, groupService, stackService, helmfileService, s3Client, s3Bucket), nil
+	return instance.NewService(logger, instanceRepository, groupService, stackService, helmfileService, s3Client, s3Bucket, tokenService), nil
 }
 
 type rabbitMQConfig struct {
@@ -504,7 +609,7 @@ func newInstanceHandler(stackService stack.Service, groupService *group.Service,
 	return instance.NewHandler(stackService, groupService, instanceService, defaultTTL), nil
 }
 
-func newDatabaseHandler(ctx context.Context, logger *slog.Logger, db *gorm.DB, groupService *group.Service, instanceService *instance.Service, stackService stack.Service) (database.Handler, error) {
+func newDatabaseHandler(ctx context.Context, logger *slog.Logger, db *gorm.DB, groupService *group.Service, instanceService *instance.Service, stackService stack.Service, env *stream.Environment, streamName string) (database.Handler, error) {
 	s3Bucket, err := requireEnv("S3_BUCKET")
 	if err != nil {
 		return database.Handler{}, err
@@ -514,7 +619,14 @@ func newDatabaseHandler(ctx context.Context, logger *slog.Logger, db *gorm.DB, g
 		return database.Handler{}, err
 	}
 	databaseRepository := database.NewRepository(db)
-	databaseService := database.NewService(logger, s3Bucket, s3Client, groupService, databaseRepository)
+	notificationRepository := notification.NewRepository(db)
+	publisher, err := notification.NewPublisher(logger, env, streamName, notificationRepository)
+	if err != nil {
+		return database.Handler{}, fmt.Errorf("failed to create database notification publisher: %w", err)
+	}
+	databaseService := database.NewService(logger, s3Bucket, s3Client, groupService, databaseRepository, func(c model.Cluster) (database.PodExecutor, error) {
+		return instance.NewKubernetesService(c)
+	}, publisher, instanceService)
 
 	return database.NewHandler(logger, databaseService, groupService, instanceService, stackService), nil
 }
@@ -554,6 +666,7 @@ func newAWSS3Client(ctx context.Context) (*s3.Client, error) {
 	s3AWSClient := s3.NewFromConfig(s3Config, func(o *s3.Options) {
 		o.UsePathStyle = true
 	})
+
 	return s3AWSClient, nil
 }
 
@@ -572,15 +685,17 @@ func newIntegrationHandler() (integration.Handler, error) {
 			Password: password,
 		})
 
+	ghcrClient := integration.NewGhcrClient()
+
 	instanceServiceHost, err := requireEnv("INSTANCE_SERVICE_HOST")
 	if err != nil {
 		return integration.Handler{}, err
 	}
 
-	return integration.NewHandler(dockerHubClient, instanceServiceHost), nil
+	return integration.NewHandler(dockerHubClient, ghcrClient, instanceServiceHost), nil
 }
 
-func newEventHandler(ctx context.Context, logger *slog.Logger, rabbitmqConfig rabbitMQConfig) (event.Handler, error) {
+func newStreamEnvironment(ctx context.Context, logger *slog.Logger, rabbitmqConfig rabbitMQConfig) (*stream.Environment, string, error) {
 	logger.InfoContext(ctx, "Connecting with RabbitMQ stream client", "host", rabbitmqConfig.Host, "port", rabbitmqConfig.StreamPort)
 	env, err := stream.NewEnvironment(
 		stream.NewEnvironmentOptions().
@@ -591,7 +706,7 @@ func newEventHandler(ctx context.Context, logger *slog.Logger, rabbitmqConfig ra
 			SetAddressResolver(stream.AddressResolver{Host: rabbitmqConfig.Host, Port: rabbitmqConfig.StreamPort}),
 	)
 	if err != nil {
-		return event.Handler{}, fmt.Errorf("failed to connect with RabbitMQ stream client: %v", err)
+		return nil, "", fmt.Errorf("failed to connect with RabbitMQ stream client: %v", err)
 	}
 	logger.InfoContext(ctx, "Connected with RabbitMQ stream client", "host", rabbitmqConfig.Host, "port", rabbitmqConfig.StreamPort)
 
@@ -601,18 +716,33 @@ func newEventHandler(ctx context.Context, logger *slog.Logger, rabbitmqConfig ra
 			SetMaxSegmentSizeBytes(stream.ByteCapacity{}.MB(1)).
 			SetMaxAge(1*time.Hour))
 	if err != nil {
-		return event.Handler{}, fmt.Errorf("failed to declare RabbitMQ stream %q: %v", streamName, err)
+		return nil, "", fmt.Errorf("failed to declare RabbitMQ stream %q: %v", streamName, err)
 	}
 
-	return event.NewHandler(logger, env, streamName), nil
+	return env, streamName, nil
+}
+
+func newNotificationHandler(logger *slog.Logger, db *gorm.DB) notification.Handler {
+	repo := notification.NewRepository(db)
+	svc := notification.NewService(repo)
+	return notification.NewHandler(logger, svc)
+}
+
+func createDefaultCluster(ctx context.Context, clusterService cluster.Service) (model.Cluster, error) {
+	return clusterService.FindOrCreate(ctx, "default", "The cluster where IM is hosted")
 }
 
 type groupService interface {
-	FindOrCreate(ctx context.Context, name string, hostname string, deployable bool) (*model.Group, error)
+	FindOrCreate(ctx context.Context, name string, namespace string, hostname string, deployable bool) (*model.Group, error)
 }
 
 func createGroups(ctx context.Context, logger *slog.Logger, groupService groupService) error {
 	groupNames, err := requireEnvAsArray("GROUP_NAMES")
+	if err != nil {
+		return err
+	}
+
+	groupNamespaces, err := requireEnvAsArray("GROUP_NAMESPACES")
 	if err != nil {
 		return err
 	}
@@ -624,15 +754,16 @@ func createGroups(ctx context.Context, logger *slog.Logger, groupService groupSe
 		return fmt.Errorf("want arrays to be of equal size, instead got \"GROUP_NAMES\"=%v \"GROUP_HOSTNAMES\"=%v", groupNames, groupHostnames)
 	}
 
-	groups := make([]struct{ Name, Hostname string }, len(groupNames))
+	groups := make([]struct{ Name, Namespaces, Hostname string }, len(groupNames))
 	for i := 0; i < len(groupNames); i++ {
 		groups[i].Name = groupNames[i]
+		groups[i].Namespaces = groupNamespaces[i]
 		groups[i].Hostname = groupHostnames[i]
 	}
 
 	logger.InfoContext(ctx, "Creating groups...")
 	for _, g := range groups {
-		newGroup, err := groupService.FindOrCreate(ctx, g.Name, g.Hostname, true)
+		newGroup, err := groupService.FindOrCreate(ctx, g.Name, g.Namespaces, g.Hostname, true)
 		if err != nil {
 			return fmt.Errorf("error creating group: %v", err)
 		}
@@ -654,7 +785,7 @@ func createAdminUser(ctx context.Context, userService *user.Service, groupServic
 		return err
 	}
 
-	return user.CreateUser(ctx, adminEmail, adminPassword, userService, groupService, model.AdministratorGroupName, "admin")
+	return user.CreateUser(ctx, adminEmail, adminPassword, userService, groupService, model.AdministratorGroupName, "", "admin")
 }
 
 func createE2ETestUser(ctx context.Context, userService *user.Service, groupService *group.Service) error {
@@ -667,7 +798,7 @@ func createE2ETestUser(ctx context.Context, userService *user.Service, groupServ
 		return err
 	}
 
-	return user.CreateUser(ctx, testEmail, testPassword, userService, groupService, model.DefaultGroupName, "e2e test")
+	return user.CreateUser(ctx, testEmail, testPassword, userService, groupService, model.DefaultGroupName, model.DefaultGroupName, "e2e test")
 }
 
 func newGinEngine(logger *slog.Logger) (*gin.Engine, error) {

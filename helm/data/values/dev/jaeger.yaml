@@ -2,6 +2,16 @@ provisionDataStore:
   cassandra: false
 allInOne:
   enabled: true
+  image:
+    repository: jaegertracing/all-in-one
+    tag: 1.76.0
+  tolerations:
+    - key: im-dedicated
+      operator: Equal
+      value: "true"
+      effect: NoSchedule
+  nodeSelector:
+    im-dedicated: "true"
 storage:
   type: memory
 agent:

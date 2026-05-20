@@ -2,7 +2,7 @@
   createNamespace: true
   remoteChart: im-group
   repo: https://dhis2-sre.github.io/im-group
-  version: 0.3.0
+  version: 0.4.0
 
 .im-group-prod-service-account-config: &im-group-prod-service-account-config
   setValues:
@@ -33,7 +33,7 @@ deploy:
         createNamespace: true
         remoteChart: jaeger
         repo: https://jaegertracing.github.io/helm-charts
-        version: 3.4.0
+        version: 3.4.1
         upgradeOnChange: true
         valuesFiles:
           - helm/data/values/{{ .CLASSIFICATION }}/jaeger.yaml
@@ -49,13 +49,19 @@ deploy:
         valuesFiles:
           - helm/data/secrets/{{ .CLASSIFICATION }}/rabbitmq.yaml
           - helm/data/values/{{ .CLASSIFICATION }}/rabbitmq.yaml
+        setValueTemplates:
+          global:
+            security:
+              allowInsecureImages: true
+          image:
+            repository: bitnamilegacy/rabbitmq
 
       - name: im-redis-{{ .ENVIRONMENT }}
         namespace: instance-manager-{{ .CLASSIFICATION }}
         createNamespace: true
-        remoteChart: redis
-        repo: https://charts.bitnami.com/bitnami
-        version: 18.2.2
+        remoteChart: valkey
+        repo: https://valkey.io/valkey-helm
+        version: 0.9.2
         upgradeOnChange: true
         valuesFiles:
           - helm/data/values/{{ .CLASSIFICATION }}/redis.yaml
@@ -71,6 +77,12 @@ deploy:
         valuesFiles:
           - helm/data/secrets/{{ .CLASSIFICATION }}/postgresql.yaml
           - helm/data/values/{{ .CLASSIFICATION }}/postgresql.yaml
+        setValueTemplates:
+          global:
+            security:
+              allowInsecureImages: true
+          image:
+            repository: bitnamilegacy/postgresql
 
       - name: im-manager-{{ .ENVIRONMENT }}
         namespace: instance-manager-{{ .CLASSIFICATION }}
@@ -90,7 +102,9 @@ deploy:
             hostname: "{{ .API_HOSTNAME }}"
             certIssuer: cert-issuer-prod
           redis:
-            host: im-redis-{{ .ENVIRONMENT }}-master.instance-manager-{{ .CLASSIFICATION }}.svc
+            host: im-redis-{{ .ENVIRONMENT }}-valkey.instance-manager-{{ .CLASSIFICATION }}.svc
+          google:
+            callbackUrl: "https://{{ .API_HOSTNAME }}/auth/google/callback"
           environment:
             ENVIRONMENT: "{{ .ENVIRONMENT }}"
             CLASSIFICATION: "{{ .CLASSIFICATION }}"
@@ -108,6 +122,8 @@ deploy:
             S3_REGION: eu-west-1
             DEFAULT_TTL: "172800" # 48 hours
             PASSWORD_TOKEN_TTL: "900" # 15 minutes
+            LOG_PRETTY_PRINT: "{{ .LOG_PRETTY_PRINT }}"
+            DATABASE_LOG_QUERIES: "{{ .DATABASE_LOG_QUERIES }}"
         useHelmSecrets: true
         valuesFiles:
           - helm/data/secrets/{{ .CLASSIFICATION }}/values.yaml
@@ -116,6 +132,16 @@ deploy:
 profiles:
   - name: dev
     patches:
+      - op: add
+        path: /deploy/helm/releases/-
+        value:
+          name: im-group-dev-dev
+          namespace: dev
+          <<: *im-group-chart-config
+          setValueTemplates:
+            serviceAccount:
+              name: im-manager-{{ .ENVIRONMENT }}
+              namespace: instance-manager-{{ .CLASSIFICATION }}
       - op: add
         path: /deploy/helm/releases/-
         value:
@@ -195,4 +221,11 @@ profiles:
         value:
           name: im-group-emis
           namespace: emis
+          <<: [ *im-group-chart-config, *im-group-prod-service-account-config ]
+
+      - op: add
+        path: /deploy/helm/releases/-
+        value:
+          name: im-group-prod
+          namespace: prod
           <<: [ *im-group-chart-config, *im-group-prod-service-account-config ]

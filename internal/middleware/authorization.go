@@ -32,6 +32,7 @@ type userService interface {
 func (m AuthorizationMiddleware) RequireAdministrator(c *gin.Context) {
 	u, err := handler.GetUserFromContext(c.Request.Context())
 	if err != nil {
+		_ = c.AbortWithError(http.StatusUnauthorized, err)
 		return
 	}
 

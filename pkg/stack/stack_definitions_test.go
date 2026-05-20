@@ -37,15 +37,20 @@ func TestStackDefinitionsAreInSyncWithHelmfile(t *testing.T) {
 	}
 
 	// helmfileParameters will not contain Go Validator or Provider functions. We therefore need to
-	// create map of stack name to parameters with parameters only containing. DefaultValue and
+	// create a map of stack name to parameters with parameters only containing. DefaultValue and
 	// Consumed as we cannot ignore fields in the assertions we use.
 	stacks := map[string]model.StackParameters{
 		"dhis2-db":      DHIS2DB.Parameters,
 		"dhis2-core":    DHIS2Core.Parameters,
 		"dhis2":         DHIS2.Parameters,
+		"minio":         MINIO.Parameters,
 		"pgadmin":       PgAdmin.Parameters,
 		"whoami-go":     WhoamiGo.Parameters,
 		"im-job-runner": IMJobRunner.Parameters,
+		"chap-db":       ChapDB.Parameters,
+		"chap-valkey":   ChapValkey.Parameters,
+		"chap-worker":   ChapWorker.Parameters,
+		"chap-core":     ChapCore.Parameters,
 	}
 	stackDefinitions := make(map[string]model.StackParameters)
 	for stackName, stackParameters := range stacks {
@@ -118,7 +123,7 @@ func parseStacks(dir string) (map[string]*stack, error) {
 }
 
 func parseStack(dir, name string) (*stack, error) {
-	path := fmt.Sprintf("%s/%s/helmfile.yaml", dir, name)
+	path := fmt.Sprintf("%s/%s/helmfile.yaml.gotmpl", dir, name)
 	file, err := os.ReadFile(path) // #nosec
 	if err != nil {
 		return nil, fmt.Errorf("error reading stack %q: %v", name, err)
@@ -200,7 +205,7 @@ func inSlice(str string, strings []string) bool {
 }
 
 func getSystemParameters() []string {
-	parameters := []string{"HOSTNAME", "DEPLOYMENT_ID", "INSTANCE_ID", "INSTANCE_TTL", "INSTANCE_NAME", "INSTANCE_HOSTNAME", "INSTANCE_NAMESPACE", "IM_ACCESS_TOKEN", "INSTANCE_CREATION_TIMESTAMP"}
+	parameters := []string{"HOSTNAME", "DEPLOYMENT_ID", "INSTANCE_ID", "INSTANCE_TTL", "INSTANCE_NAME", "INSTANCE_PATH_NAME", "INSTANCE_HOSTNAME", "INSTANCE_NAMESPACE", "IM_ACCESS_TOKEN", "INSTANCE_CREATION_TIMESTAMP"}
 	sort.Strings(parameters)
 	return parameters
 }
