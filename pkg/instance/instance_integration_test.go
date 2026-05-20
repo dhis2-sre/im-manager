@@ -32,10 +32,16 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func TestInstanceHandler(t *testing.T) {
 	k8sClient := inttest.SetupK8s(t)
+
+	err := createNamespace(t, k8sClient, "group-name")
+	require.NoError(t, err, "failed to create test namespace")
+
 	db := inttest.SetupDB(t)
 	redis := inttest.SetupRedis(t)
 
@@ -334,6 +340,16 @@ func TestInstanceHandler(t *testing.T) {
 		assert.Equal(t, "0.6.0", updatedInstance.Parameters["IMAGE_TAG"].Value,
 			"parameters should be preserved when the patch body only changes public")
 	})
+}
+
+func createNamespace(t *testing.T, k8sClient *inttest.K8sClient, namespace string) error {
+	t.Helper()
+	_, err := k8sClient.Client.CoreV1().Namespaces().Create(
+		t.Context(),
+		&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace}},
+		metav1.CreateOptions{},
+	)
+	return err
 }
 
 type groupService struct {
