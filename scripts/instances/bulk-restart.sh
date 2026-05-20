@@ -57,7 +57,8 @@ for ((i = START_NUM; i < END_NUM + 1; i++)); do
   fi
 
   if [ "$BROKEN_ONLY" = "true" ]; then
-    if curl -s -o /dev/null -w "%{http_code}" "https://$GROUP_HOST/$instance_name" | grep -q "503"; then
+    status_code=$($HTTP --headers get "https://$GROUP_HOST/$instance_name" 2>/dev/null | head -n1 | awk '{print $2}')
+    if [ "$status_code" = "503" ]; then
       echo "503 returned, running restart"
       ./restart.sh "$instance_id"
     else

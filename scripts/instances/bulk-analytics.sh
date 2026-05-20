@@ -55,19 +55,19 @@ for ((i = START_NUM; i < END_NUM + 1; i++)); do
   echo "Processing $NAME-$zi"
   if [ "$CONDITIONAL" = "true" ]; then
     echo "Conditional mode"
-    status_code=$(curl -s -o /dev/null -w "%{http_code}" \
-      --user "$USERNAME:$PASSWORD" \
-      "https://$GROUP_HOST/$NAME-$zi/api/analytics/dataValueSet.json?dimension=ou%3ATEQlaapDQoK%3BVth0fbpFcsO%3BbL4ooGhyHRQ%3BjmIPBj66vD6%3BqhqAxPSTUXp%3BLEVEL-wjP19dkFeIk&dimension=pe%3ALAST_12_MONTHS&dimension=dx%3AsB79w2hiLp8&showHierarchy=false&hierarchyMeta=false&includeMetadataDetails=true&includeNumDen=true&skipRounding=false&completedOnly=false")
+    status_code=$($HTTP --headers --auth "$USERNAME:$PASSWORD" get \
+      "https://$GROUP_HOST/$NAME-$zi/api/analytics/dataValueSet.json?dimension=ou%3ATEQlaapDQoK%3BVth0fbpFcsO%3BbL4ooGhyHRQ%3BjmIPBj66vD6%3BqhqAxPSTUXp%3BLEVEL-wjP19dkFeIk&dimension=pe%3ALAST_12_MONTHS&dimension=dx%3AsB79w2hiLp8&showHierarchy=false&hierarchyMeta=false&includeMetadataDetails=true&includeNumDen=true&skipRounding=false&completedOnly=false" \
+      2>/dev/null | head -n1 | awk '{print $2}')
 
     if [ "$status_code" = "409" ]; then
       echo "$NAME-$zi : Analytics returned 409, running"
-      curl -s -X POST --user "$USERNAME:$PASSWORD" \
+      $HTTP --auth "$USERNAME:$PASSWORD" post \
         "https://$GROUP_HOST/$NAME-$zi/api/resourceTables/analytics"
     else
       echo "$NAME-$zi : Analytics returned $status_code, skipping"
     fi
   else
-    curl -s -X POST --user "$USERNAME:$PASSWORD" \
+    $HTTP --auth "$USERNAME:$PASSWORD" post \
       "https://$GROUP_HOST/$NAME-$zi/api/resourceTables/analytics"
   fi
 done
