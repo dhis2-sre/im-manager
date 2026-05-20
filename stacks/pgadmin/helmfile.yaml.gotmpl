@@ -1,5 +1,8 @@
 # consumedParameters: DATABASE_USERNAME, DATABASE_NAME, DATABASE_HOSTNAME
 # hostnameVariable: DATABASE_HOSTNAME
+helmDefaults:
+  createNamespace: false
+
 releases:
   - name: {{ requiredEnv "INSTANCE_NAME" }}-pgadmin
     namespace: "{{ requiredEnv "INSTANCE_NAMESPACE" }}"

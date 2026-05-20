@@ -1,3 +1,6 @@
+helmDefaults:
+  createNamespace: false
+
 releases:
   - name: {{ requiredEnv "INSTANCE_NAME" }}-job
     namespace: "{{ requiredEnv "INSTANCE_NAMESPACE" }}"
