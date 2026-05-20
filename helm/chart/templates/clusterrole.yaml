@@ -45,6 +45,12 @@ rules:
       - networkpolicies
     verbs:
       - patch
+  - apiGroups:
+      - networking.k8s.io
+    resources:
+      - ingressclasses
+    verbs:
+      - list
 # KEDA
   - apiGroups:
       - http.keda.sh
