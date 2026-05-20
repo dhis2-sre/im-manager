@@ -39,14 +39,7 @@ import (
 func TestInstanceHandler(t *testing.T) {
 	k8sClient := inttest.SetupK8s(t)
 
-	// In production the group's namespace is created out-of-band by skaffold via
-	// the im-group chart before any instance deploys. Stack helmfiles no longer
-	// pass --create-namespace, so mirror that here.
-	_, err := k8sClient.Client.CoreV1().Namespaces().Create(
-		context.TODO(),
-		&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "group-name"}},
-		metav1.CreateOptions{},
-	)
+	err := createNamespace(t, k8sClient, "group-name")
 	require.NoError(t, err, "failed to create test namespace")
 
 	db := inttest.SetupDB(t)
@@ -347,6 +340,16 @@ func TestInstanceHandler(t *testing.T) {
 		assert.Equal(t, "0.6.0", updatedInstance.Parameters["IMAGE_TAG"].Value,
 			"parameters should be preserved when the patch body only changes public")
 	})
+}
+
+func createNamespace(t *testing.T, k8sClient *inttest.K8sClient, namespace string) error {
+	t.Helper()
+	_, err := k8sClient.Client.CoreV1().Namespaces().Create(
+		t.Context(),
+		&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace}},
+		metav1.CreateOptions{},
+	)
+	return err
 }
 
 type groupService struct {
