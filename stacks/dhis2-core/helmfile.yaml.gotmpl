@@ -2,6 +2,7 @@
 # hostnameVariable: DATABASE_HOSTNAME
 # stackParameters: DEPLOY_CHAP,GOOGLE_AUTH_PROJECT_ID,GOOGLE_AUTH_PRIVATE_KEY_ID,GOOGLE_AUTH_PRIVATE_KEY,GOOGLE_AUTH_CLIENT_EMAIL,GOOGLE_AUTH_CLIENT_ID
 helmDefaults:
+  createNamespace: false
   deleteWait: true
 
 releases:
