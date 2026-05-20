@@ -32,10 +32,23 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func TestInstanceHandler(t *testing.T) {
 	k8sClient := inttest.SetupK8s(t)
+
+	// In production the group's namespace is created out-of-band by skaffold via
+	// the im-group chart before any instance deploys. Stack helmfiles no longer
+	// pass --create-namespace, so mirror that here.
+	_, err := k8sClient.Client.CoreV1().Namespaces().Create(
+		context.TODO(),
+		&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "group-name"}},
+		metav1.CreateOptions{},
+	)
+	require.NoError(t, err, "failed to create test namespace")
+
 	db := inttest.SetupDB(t)
 	redis := inttest.SetupRedis(t)
 
