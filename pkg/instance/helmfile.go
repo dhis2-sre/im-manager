@@ -59,12 +59,12 @@ type stackService interface {
 	Find(name string) (*model.Stack, error)
 }
 
-func (h helmfileService) sync(ctx context.Context, token string, instance *model.DeploymentInstance, group *model.Group, ttl uint) (*exec.Cmd, error) {
-	return h.executeHelmfileCommand(ctx, token, instance, group, ttl, "sync")
+func (h helmfileService) sync(ctx context.Context, token string, instance *model.DeploymentInstance, group *model.Group, ttl uint, extraEnv map[string]string) (*exec.Cmd, error) {
+	return h.executeHelmfileCommand(ctx, token, instance, group, ttl, extraEnv, "sync")
 }
 
 func (h helmfileService) destroy(ctx context.Context, instance *model.DeploymentInstance, group *model.Group) (*exec.Cmd, error) {
-	return h.executeHelmfileCommand(ctx, "token", instance, group, 0, "destroy")
+	return h.executeHelmfileCommand(ctx, "token", instance, group, 0, nil, "destroy")
 }
 
 // **Security considerations**
@@ -73,7 +73,7 @@ func (h helmfileService) destroy(ctx context.Context, instance *model.Deployment
 // * stack.Name is populated by reading the name of a folder and even if that folder name could contain something malicious it won't be running in a shell anyway
 // * stackPath is concatenated using path.Join which also cleans the path and furthermore it's existence is validated
 // * Binaries are executed using an absolute path resolved once at startup (via exec.LookPath or an explicit env override); PATH is not consulted per request
-func (h helmfileService) executeHelmfileCommand(ctx context.Context, token string, instance *model.DeploymentInstance, group *model.Group, ttl uint, operation string) (*exec.Cmd, error) {
+func (h helmfileService) executeHelmfileCommand(ctx context.Context, token string, instance *model.DeploymentInstance, group *model.Group, ttl uint, extraEnv map[string]string, operation string) (*exec.Cmd, error) {
 	//goland:noinspection GoImportUsedAsName
 	stack, err := h.stackService.Find(instance.StackName)
 	if err != nil {
@@ -92,7 +92,7 @@ func (h helmfileService) executeHelmfileCommand(ctx context.Context, token strin
 
 	cmd := exec.Command(h.helmfileBinary, "--helm-binary", h.helmBinary, "-f", stackPath, operation) // #nosec
 	h.logger.InfoContext(ctx, "Executing helmfile command", "command", cmd.String())
-	h.configureInstanceEnvironment(ctx, token, instance, group, ttl, stackParameters, cmd)
+	h.configureInstanceEnvironment(ctx, token, instance, group, ttl, stackParameters, extraEnv, cmd)
 
 	return cmd, nil
 }
@@ -124,10 +124,9 @@ func (h helmfileService) loadStackParameters(stackName string) (stackParameters,
 	return params, nil
 }
 
-func (h helmfileService) configureInstanceEnvironment(ctx context.Context, accessToken string, instance *model.DeploymentInstance, group *model.Group, ttl uint, stackParameters stackParameters, cmd *exec.Cmd) {
-	// TODO: We should only inject what the stack require, currently we just blindly inject IM_ACCESS_TOKEN and others which may not be required by the stack
-	// We could probably list the required system parameters in the stacks helmfile and parse those as well as other parameters
+func (h helmfileService) configureInstanceEnvironment(ctx context.Context, accessToken string, instance *model.DeploymentInstance, group *model.Group, ttl uint, stackParameters stackParameters, extraEnv map[string]string, cmd *exec.Cmd) {
 	// INSTANCE_NAME: unique name for K8s/Helm (release names, services). INSTANCE_PATH_NAME: deployment name for URL path/context (group-based subdomain already makes URL unique).
+	// IM_ACCESS_TOKEN is kept for stacks that need IM API access (e.g. im-job-runner). Seed stacks use per-deployment signed URLs via extraEnv instead.
 	instanceNameEnv := fmt.Sprintf("%s=%s-%d", "INSTANCE_NAME", instance.Name, group.ID)
 	instancePathNameEnv := fmt.Sprintf("%s=%s", "INSTANCE_PATH_NAME", instance.Name)
 	instanceNamespaceEnv := fmt.Sprintf("%s=%s", "INSTANCE_NAMESPACE", group.Namespace)
@@ -173,6 +172,10 @@ func (h helmfileService) configureInstanceEnvironment(ctx context.Context, acces
 	for parameter, value := range stackParameters {
 		instanceEnv := fmt.Sprintf("%s=%s", parameter, value)
 		cmd.Env = append(cmd.Env, instanceEnv)
+	}
+
+	for key, value := range extraEnv {
+		cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", key, value))
 	}
 }
 

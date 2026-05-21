@@ -8,12 +8,11 @@ function exec_psql() {
   psql --username=postgres --no-align --tuples-only --dbname="$DATABASE_NAME" --command="$1"
 }
 
-if [[ -z $DATABASE_ID ]]; then
-  echo "Seeding aborted. No database id found!"
+if [[ -z "${DATABASE_DOWNLOAD_URL:-}" ]]; then
+  echo "Seeding aborted. No database download URL found!"
   exit 0
 fi
 
-DATABASE_DOWNLOAD_URL="$HOSTNAME/databases/$DATABASE_ID/download"
 echo "DATABASE_DOWNLOAD_URL: $DATABASE_DOWNLOAD_URL"
 
 exec_psql "create extension if not exists postgis"
@@ -21,20 +20,8 @@ exec_psql "create extension if not exists pg_trgm"
 exec_psql "create extension if not exists btree_gin"
 
 tmp_file=$(mktemp)
-curl --connect-timeout 10 --retry 5 --retry-delay 1 --fail -L "$DATABASE_DOWNLOAD_URL" --cookie "accessToken=$IM_ACCESS_TOKEN" >"$tmp_file" || {
+curl --connect-timeout 10 --retry 5 --retry-delay 1 --fail -L "$DATABASE_DOWNLOAD_URL" >"$tmp_file" || {
   echo "curl failed with exit code $?"
-  ( set +e
-    payload=$(echo "$IM_ACCESS_TOKEN" | cut -d. -f2 | base64 -d 2>/dev/null)
-    exp=$(echo "$payload" | grep -o '"exp":[0-9]*' | cut -d: -f2)
-    now=$(date +%s)
-    if [[ -n "$exp" && "$now" -gt "$exp" ]]; then
-      echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
-      echo "!!! TOKEN EXPIRED: exp=$exp now=$now ($(( now - exp ))s ago) !!!"
-      echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
-    else
-      echo "Token: exp=${exp:-unknown} now=$now remaining=${exp:+$((exp - now))}s"
-    fi
-  ) || true
   exit 1
 }
 
