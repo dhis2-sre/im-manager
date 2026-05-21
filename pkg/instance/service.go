@@ -84,7 +84,7 @@ func (s Service) buildSeedEnv(ctx context.Context, instance *model.DeploymentIns
 		return nil, nil
 	}
 
-	databaseID, err := strconv.ParseUint(param.Value, 10, 64)
+	databaseID, err := strconv.ParseUint(param.Value, 10, strconv.IntSize)
 	if err != nil || databaseID == 0 {
 		return nil, nil
 	}
