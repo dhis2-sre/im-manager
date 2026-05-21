@@ -8,6 +8,7 @@ import (
 	"io"
 	"log/slog"
 	"net/url"
+	"os"
 	"slices"
 	"strconv"
 	"strings"
@@ -33,8 +34,8 @@ type Publisher interface {
 }
 
 //goland:noinspection GoExportedFuncWithUnexportedType
-func NewService(logger *slog.Logger, s3Bucket string, s3Client S3Client, groupService groupService, repository *repository, podExecutor podExecutorFunc, publisher Publisher, filestoreBackuper FilestoreBackuper) *Service {
-	return &Service{
+func NewService(logger *slog.Logger, s3Bucket string, s3Client S3Client, groupService groupService, repository *repository, podExecutor podExecutorFunc, publisher Publisher, filestoreBackuper FilestoreBackuper) *service {
+	return &service{
 		logger:            logger,
 		s3Bucket:          s3Bucket,
 		s3Client:          s3Client,
@@ -62,7 +63,7 @@ type FilestoreBackuper interface {
 	FilestoreBackup(ctx context.Context, instance *model.DeploymentInstance, name string, database *model.Database) error
 }
 
-type Service struct {
+type service struct {
 	logger            *slog.Logger
 	s3Bucket          string
 	s3Client          S3Client
@@ -82,7 +83,7 @@ type S3Client interface {
 	StreamUpload(ctx context.Context, bucket, key, contentType string, r io.Reader) (int64, error)
 }
 
-func (s Service) FindByIdentifier(ctx context.Context, identifier string) (*model.Database, error) {
+func (s service) FindByIdentifier(ctx context.Context, identifier string) (*model.Database, error) {
 	id, err := strconv.ParseUint(identifier, 10, 32)
 	if err != nil {
 		database, err := s.FindBySlug(ctx, identifier)
@@ -99,7 +100,7 @@ func (s Service) FindByIdentifier(ctx context.Context, identifier string) (*mode
 	return database, nil
 }
 
-func (s Service) Copy(ctx context.Context, id uint, d *model.Database, group *model.Group) error {
+func (s service) Copy(ctx context.Context, id uint, d *model.Database, group *model.Group) error {
 	source, err := s.FindById(ctx, id)
 	if err != nil {
 		return err
@@ -136,7 +137,7 @@ func (s Service) Copy(ctx context.Context, id uint, d *model.Database, group *mo
 	return s.copyFS(ctx, d, group, source.FilestoreID)
 }
 
-func (s Service) copyFS(ctx context.Context, d *model.Database, group *model.Group, filestoreID uint) error {
+func (s service) copyFS(ctx context.Context, d *model.Database, group *model.Group, filestoreID uint) error {
 	fs, err := s.repository.FindById(ctx, filestoreID)
 	if err != nil {
 		if errdef.IsNotFound(err) {
@@ -186,19 +187,19 @@ func (s Service) copyFS(ctx context.Context, d *model.Database, group *model.Gro
 	return nil
 }
 
-func (s Service) FindById(ctx context.Context, id uint) (*model.Database, error) {
+func (s service) FindById(ctx context.Context, id uint) (*model.Database, error) {
 	return s.repository.FindById(ctx, id)
 }
 
-func (s Service) FindBySlug(ctx context.Context, slug string) (*model.Database, error) {
+func (s service) FindBySlug(ctx context.Context, slug string) (*model.Database, error) {
 	return s.repository.FindBySlug(ctx, slug)
 }
 
-func (s Service) Lock(ctx context.Context, databaseId uint, instanceId uint, userId uint) (*model.Lock, error) {
+func (s service) Lock(ctx context.Context, databaseId uint, instanceId uint, userId uint) (*model.Lock, error) {
 	return s.repository.Lock(ctx, databaseId, instanceId, userId)
 }
 
-func (s Service) Unlock(ctx context.Context, databaseId uint) error {
+func (s service) Unlock(ctx context.Context, databaseId uint) error {
 	return s.repository.Unlock(ctx, databaseId)
 }
 
@@ -207,7 +208,7 @@ type ReadAtSeeker interface {
 	io.ReadSeeker
 }
 
-func (s Service) Upload(ctx context.Context, d *model.Database, group *model.Group, reader ReadAtSeeker, size int64) (*model.Database, error) {
+func (s service) Upload(ctx context.Context, d *model.Database, group *model.Group, reader ReadAtSeeker, size int64) (*model.Database, error) {
 	key := fmt.Sprintf("%s/%s", group.Name, d.Name)
 	err := s.s3Client.Upload(ctx, s.s3Bucket, key, reader, size)
 	if err != nil {
@@ -225,7 +226,7 @@ func (s Service) Upload(ctx context.Context, d *model.Database, group *model.Gro
 	return d, nil
 }
 
-func (s Service) Download(ctx context.Context, id uint, dst io.Writer, cb func(contentLength int64)) error {
+func (s service) Download(ctx context.Context, id uint, dst io.Writer, cb func(contentLength int64)) error {
 	d, err := s.repository.FindById(ctx, id)
 	if err != nil {
 		return err
@@ -244,7 +245,7 @@ func (s Service) Download(ctx context.Context, id uint, dst io.Writer, cb func(c
 	return s.s3Client.Download(ctx, s.s3Bucket, key, dst, cb)
 }
 
-func (s Service) Delete(ctx context.Context, id uint) error {
+func (s service) Delete(ctx context.Context, id uint) error {
 	d, err := s.repository.FindById(ctx, id)
 	if err != nil {
 		return err
@@ -271,7 +272,7 @@ func (s Service) Delete(ctx context.Context, id uint) error {
 	return s.deleteFS(ctx, d)
 }
 
-func (s Service) deleteFS(ctx context.Context, d *model.Database) error {
+func (s service) deleteFS(ctx context.Context, d *model.Database) error {
 	fs, err := s.repository.FindById(ctx, d.FilestoreID)
 	if err != nil {
 		if errdef.IsNotFound(err) {
@@ -301,7 +302,7 @@ func (s Service) deleteFS(ctx context.Context, d *model.Database) error {
 	return nil
 }
 
-func (s Service) List(ctx context.Context, user *model.User) ([]GroupsWithDatabases, error) {
+func (s service) List(ctx context.Context, user *model.User) ([]GroupsWithDatabases, error) {
 	groups := append(user.Groups, user.AdminGroups...) //nolint:gocritic
 	groupsByName := make(map[string]model.Group)
 	for _, group := range groups {
@@ -356,7 +357,7 @@ func filterDatabases(databases []model.Database, test func(database *model.Datab
 	return
 }
 
-func (s Service) Update(ctx context.Context, d *model.Database) error {
+func (s service) Update(ctx context.Context, d *model.Database) error {
 	sourceUrl, err := url.Parse(d.Url)
 	if err != nil {
 		return err
@@ -386,7 +387,7 @@ func (s Service) Update(ctx context.Context, d *model.Database) error {
 	return s.updateFS(ctx, d)
 }
 
-func (s Service) updateFS(ctx context.Context, d *model.Database) error {
+func (s service) updateFS(ctx context.Context, d *model.Database) error {
 	fs, err := s.repository.FindById(ctx, d.FilestoreID)
 	if err != nil {
 		if errdef.IsNotFound(err) {
@@ -416,7 +417,7 @@ func (s Service) updateFS(ctx context.Context, d *model.Database) error {
 	return s.repository.Update(ctx, fs)
 }
 
-func (s Service) CreateExternalDownload(ctx context.Context, databaseID uint, expiration uint) (*model.ExternalDownload, error) {
+func (s service) CreateExternalDownload(ctx context.Context, databaseID uint, expiration uint) (*model.ExternalDownload, error) {
 	err := s.repository.PurgeExternalDownload(ctx)
 	if err != nil {
 		return nil, err
@@ -425,7 +426,7 @@ func (s Service) CreateExternalDownload(ctx context.Context, databaseID uint, ex
 	return s.repository.CreateExternalDownload(ctx, databaseID, expiration)
 }
 
-func (s Service) FindExternalDownload(ctx context.Context, uuid uuid.UUID) (*model.ExternalDownload, error) {
+func (s service) FindExternalDownload(ctx context.Context, uuid uuid.UUID) (*model.ExternalDownload, error) {
 	err := s.repository.PurgeExternalDownload(ctx)
 	if err != nil {
 		return nil, err
@@ -433,7 +434,7 @@ func (s Service) FindExternalDownload(ctx context.Context, uuid uuid.UUID) (*mod
 	return s.repository.FindExternalDownload(ctx, uuid)
 }
 
-func (s Service) Save(ctx context.Context, userId uint, database *model.Database, instance *model.DeploymentInstance, stack *model.Stack, coreInstance *model.DeploymentInstance) error {
+func (s service) Save(ctx context.Context, userId uint, database *model.Database, instance *model.DeploymentInstance, stack *model.Stack, coreInstance *model.DeploymentInstance) error {
 	lock := database.Lock
 	isLocked := lock != nil
 	if isLocked && (lock.InstanceID != instance.ID || lock.UserID != userId) {
@@ -531,7 +532,7 @@ func getFormat(database *model.Database) string {
 	return "plain"
 }
 
-func (s Service) SaveAs(ctx context.Context, userId uint, instance *model.DeploymentInstance, stack *model.Stack, coreInstance *model.DeploymentInstance, newName string, format string, done func(ctx context.Context, saved *model.Database)) (*model.Database, error) {
+func (s service) SaveAs(ctx context.Context, userId uint, instance *model.DeploymentInstance, stack *model.Stack, coreInstance *model.DeploymentInstance, newName string, format string, done func(ctx context.Context, saved *model.Database)) (*model.Database, error) {
 	group, err := s.groupService.Find(ctx, instance.GroupName)
 	if err != nil {
 		return nil, err
@@ -680,9 +681,41 @@ func execPgDump(ctx context.Context, executor PodExecutor, namespace, podName st
 	return nil
 }
 
-func (s Service) logError(ctx context.Context, err error) {
+func (s service) logError(ctx context.Context, err error) {
 	// TODO: Persist error message
 	s.logger.ErrorContext(ctx, "Failed to SaveAs DB", "error", err)
+}
+
+func (s service) removeTempFile(ctx context.Context, fd *os.File) {
+	for _, err := range [...]error{fd.Close(), os.Remove(fd.Name())} {
+		if err != nil {
+			s.logger.ErrorContext(ctx, "Failed to remove temp file", "error", err)
+		}
+	}
+}
+
+func (s service) gz(ctx context.Context, gzFile string, database *model.Database, src *os.File) (*os.File, error) {
+	outFile, err := os.Create(gzFile) // #nosec
+	if err != nil {
+		return nil, err
+	}
+
+	zw := gzip.NewWriter(outFile)
+	zw.Name = strings.TrimSuffix(database.Name, ".gz")
+
+	defer func(zw *gzip.Writer) {
+		err := zw.Close()
+		if err != nil {
+			s.logger.ErrorContext(ctx, "Failed to close gzip writer", "error", err)
+		}
+	}(zw)
+
+	_, err = io.Copy(zw, src)
+	if err != nil {
+		return nil, err
+	}
+
+	return outFile, nil
 }
 
 func newPgDumpConfig(instance *model.DeploymentInstance, stack *model.Stack) (*pg.Dump, error) {
@@ -729,7 +762,7 @@ func buildPgDumpCommand(dump *pg.Dump, format string) []string {
 	return append([]string{"env", "PGPASSWORD=" + dump.Password, "pg_dump"}, options...)
 }
 
-func (s Service) StreamUpload(ctx context.Context, database model.Database, group *model.Group, body io.Reader, contentType string, contentLength int64) (model.Database, error) {
+func (s service) StreamUpload(ctx context.Context, database model.Database, group *model.Group, body io.Reader, contentType string, contentLength int64) (model.Database, error) {
 	ctx = context.WithoutCancel(ctx)
 
 	key := fmt.Sprintf("%s/%s", group.Name, database.Name)
