@@ -1,5 +1,5 @@
 # hostnamePattern: %s-database-postgresql.%s.svc
-{{- $_ := requiredEnv "DATABASE_ID" -}}
+{{ $_ := requiredEnv "DATABASE_ID" }}
 helmDefaults:
   createNamespace: false
   deleteWait: true
