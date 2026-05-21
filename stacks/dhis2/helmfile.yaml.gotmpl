@@ -1,5 +1,6 @@
 # hostnamePattern: %s-database-postgresql.%s.svc
 # stackParameters: GOOGLE_AUTH_PROJECT_ID,GOOGLE_AUTH_PRIVATE_KEY_ID,GOOGLE_AUTH_PRIVATE_KEY,GOOGLE_AUTH_CLIENT_EMAIL,GOOGLE_AUTH_CLIENT_ID
+{{- $_ := requiredEnv "DATABASE_ID" -}}
 helmDefaults:
   createNamespace: false
 
