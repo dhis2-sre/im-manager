@@ -116,7 +116,6 @@ func TestInstanceHandler(t *testing.T) {
 	databaseService := database.NewService(logger, s3Bucket, s3Client, groupService, databaseRepository, func(c model.Cluster) (database.PodExecutor, error) {
 		return instance.NewKubernetesService(c)
 	}, noopPublisher{}, noopFilestoreBackuper{})
-	instanceService.SetExternalDownloads(databaseService)
 
 	authenticator := func(c *gin.Context) {
 		ctx := model.NewContextWithUser(c.Request.Context(), user)
