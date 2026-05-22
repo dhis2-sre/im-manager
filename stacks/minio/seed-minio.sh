@@ -57,6 +57,7 @@ else
     gunzip -c "$tmp_file" | tar xf - -C "$tmp_dir"
     chmod -R u+rwx,go+rx "$tmp_dir"
 
+    mc rm --recursive --force --quiet local/dhis2/apps/ || true
     mc mirror "$tmp_dir"/ local/dhis2/
 
     echo "Seeded from $FILESTORE_DOWNLOAD_URL" | mc pipe $seed_file
