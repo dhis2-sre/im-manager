@@ -880,7 +880,7 @@ func (s Service) FilestoreBackup(ctx context.Context, instance *model.Deployment
 		return fmt.Errorf("MinIO connection test failed: %v", err)
 	}
 
-	source := NewMinioBackupSource(s.logger, minioClient, "dhis2")
+	source := NewMinioBackupSource(s.logger, minioClient, "dhis2", "apps/")
 	backupService := NewBackupService(s.logger, source, s.s3Client)
 
 	baseName := name

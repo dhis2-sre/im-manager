@@ -80,8 +80,9 @@ func (s *BackupService) PerformBackup(ctx context.Context, s3Bucket, key string)
 	pr, pw := io.Pipe()
 
 	g.Go(func() error {
-		defer pw.Close()
-		return s.createTarGzStream(ctx, pw, stats)
+		err := s.createTarGzStream(ctx, pw, stats)
+		_ = pw.CloseWithError(err)
+		return err
 	})
 
 	g.Go(func() error {
@@ -147,7 +148,7 @@ func (s *BackupService) processSingleObject(ctx context.Context, tw *tar.Writer,
 	return nil
 }
 
-func (s *BackupService) streamToS3WithMultipart(ctx context.Context, bucket, key string, reader io.Reader) error {
+func (s *BackupService) streamToS3WithMultipart(ctx context.Context, bucket, key string, reader io.Reader) (err error) {
 	createResponse, err := s.s3Client.CreateMultipartUpload(ctx, &s3.CreateMultipartUploadInput{
 		Bucket:      &bucket,
 		Key:         &key,
@@ -165,17 +166,17 @@ func (s *BackupService) streamToS3WithMultipart(ctx context.Context, bucket, key
 	buffer := make([]byte, bufferSize)
 
 	for {
-		n, err := io.ReadFull(reader, buffer)
-		if err != nil && err != io.EOF && !errors.Is(err, io.ErrUnexpectedEOF) {
-			return fmt.Errorf("read from pipe: %v", err)
+		n, readErr := io.ReadFull(reader, buffer)
+		if readErr != nil && readErr != io.EOF && !errors.Is(readErr, io.ErrUnexpectedEOF) {
+			return fmt.Errorf("read from pipe: %v", readErr)
 		}
 		if n == 0 {
 			break
 		}
 
-		part, err := s.uploadPart(ctx, bucket, key, uploadID, partNumber, buffer[:n])
-		if err != nil {
-			return err
+		part, partErr := s.uploadPart(ctx, bucket, key, uploadID, partNumber, buffer[:n])
+		if partErr != nil {
+			return partErr
 		}
 
 		completedParts = append(completedParts, part)
