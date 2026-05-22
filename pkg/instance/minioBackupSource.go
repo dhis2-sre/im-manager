@@ -5,14 +5,13 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"strings"
 
 	"github.com/minio/minio-go/v7"
 	"golang.org/x/sync/errgroup"
 )
 
-func NewMinioBackupSource(logger *slog.Logger, client MinioClient, bucket string, excludePrefixes ...string) *MinioBackupSource {
-	return &MinioBackupSource{logger, client, bucket, excludePrefixes}
+func NewMinioBackupSource(logger *slog.Logger, client MinioClient, bucket string) *MinioBackupSource {
+	return &MinioBackupSource{logger, client, bucket}
 }
 
 // MinioClient defines the methods we need from MinIO client
@@ -23,10 +22,9 @@ type MinioClient interface {
 
 // MinioBackupSource implements BackupSource for MinIO
 type MinioBackupSource struct {
-	logger          *slog.Logger
-	client          MinioClient
-	bucket          string
-	excludePrefixes []string
+	logger *slog.Logger
+	client MinioClient
+	bucket string
 }
 
 // List implements BackupSource interface
@@ -42,17 +40,6 @@ func (m *MinioBackupSource) List(ctx context.Context) (<-chan BackupObject, erro
 		for obj := range objectCh {
 			if obj.Err != nil {
 				return fmt.Errorf("list objects: %v", obj.Err)
-			}
-
-			excluded := false
-			for _, prefix := range m.excludePrefixes {
-				if strings.HasPrefix(obj.Key, prefix) {
-					excluded = true
-					break
-				}
-			}
-			if excluded {
-				continue
 			}
 
 			select {
