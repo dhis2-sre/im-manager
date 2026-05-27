@@ -63,6 +63,53 @@ func (h Handler) Create(c *gin.Context) {
 	c.JSON(http.StatusCreated, group)
 }
 
+type UpdateGroupRequest struct {
+	Namespace   string `json:"namespace" binding:"required"`
+	Description string `json:"description" binding:"required"`
+	Hostname    string `json:"hostname" binding:"required"`
+	Deployable  bool   `json:"deployable"`
+	ClusterID   *uint  `json:"clusterId"`
+}
+
+// Update group
+func (h Handler) Update(c *gin.Context) {
+	// swagger:route PUT /groups/{name} groupUpdate
+	//
+	// Update group
+	//
+	// Update a group...
+	//
+	// security:
+	//   oauth2:
+	//
+	// responses:
+	//   200: Group
+	//   400: Error
+	//   401: Error
+	//   403: Error
+	//   404: Error
+	//   415: Error
+	name := c.Param("name")
+
+	var request UpdateGroupRequest
+	if err := handler.DataBinder(c, &request); err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	group, err := h.groupService.Update(c.Request.Context(), name, request.Namespace, request.Description, request.Hostname, request.Deployable, request.ClusterID)
+	if err != nil {
+		if errdef.IsNotFound(err) {
+			_ = c.AbortWithError(http.StatusNotFound, err)
+		} else {
+			_ = c.Error(err)
+		}
+		return
+	}
+
+	c.JSON(http.StatusOK, group)
+}
+
 // AddUserToGroup group
 func (h Handler) AddUserToGroup(c *gin.Context) {
 	// swagger:route POST /groups/{group}/users/{userId} addUserToGroup
