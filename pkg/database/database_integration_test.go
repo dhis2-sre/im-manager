@@ -128,9 +128,11 @@ func TestDatabaseHandler(t *testing.T) {
 			Name:      "path/ghost.sql.gz",
 			GroupName: "packages",
 			Url:       "s3://database-bucket/packages/path/ghost.sql.gz",
+			Slug:      "packages-path-ghost-sql-gz",
 			UserID:    userID,
 		}
 		require.NoError(t, db.Create(ghost).Error)
+		t.Cleanup(func() { db.Unscoped().Delete(ghost) })
 		ghostID := strconv.FormatUint(uint64(ghost.ID), 10)
 
 		client.Do(t, http.MethodGet, "/databases/"+ghostID+"/download", nil, http.StatusNotFound)
