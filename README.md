@@ -8,45 +8,29 @@ Instance Manager is a web application that manages the lifecycle of DHIS2 instan
 
 If you just want to see what the application looks like you can find some screenshots [here](./docs/screenshots).
 
-### Start local development environment with Docker
+## Quick start
 
-1. Start by copying the `.env.example` file into a new `.env` file:
+### Prerequisites
+
+We use [direnv](https://direnv.net/) to not just automatically load environment variables from `.env` into the current shell session but also to populate some based on others.
+
+Docker and Docker Compose are also required and so are several other tools which can be installed via `make init`.
+
+### Start local environment with k3s clusters
+
+Generate a `.env` with pre-filled secrets and export it
 
 ```shell
-cp .env.example .env
+scripts/generate-env.sh
 ```
 
-2. Create a private key:
+Make sure `CLASSIFICATION=local` is set
 
-```
-make keys
-```
-
-3. Copy the private key contents, with actual newlines replaced by "\n", into the `PRIVATE_KEY` environment variable
-   within the `.env` file:
-   *This should work on macOS to copy the key contents*
-
-```
-cat rsa_private.pem | awk '{printf "%s\\n", $0}' | pbcopy
+```shell
+direnv allow
 ```
 
-4. Initialize the environment and install dev dependencies:
-
-```
-make init
-```
-
-5. Start a development environment:
-
-```
-make dev
-```
-
-### Start local IM with k3s clusters
-
-Brings up IM together with three in-Docker k3s clusters (`dev`, `test`, `prod`) that IM can deploy DHIS2 instances into, fronted by Traefik.
-
-Set `CLASSIFICATION=local` in `.env`, then with `direnv` active:
+Start a local IM instance with k3s clusters (`dev`, `test`, `prod`)
 
 ```shell
 docker compose up

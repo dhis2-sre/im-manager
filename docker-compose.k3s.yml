@@ -26,7 +26,7 @@ x-register-env: &k3s-register-env
 
 services:
   im-web-client:
-    image: dhis2/im-web-client:local
+    image: dhis2/im-web-client:latest
     environment:
       API_URL: "http://api.im.127-0-0-1.nip.io"
     profiles: [k3s]
