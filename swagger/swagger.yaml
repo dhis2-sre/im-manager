@@ -297,9 +297,7 @@ definitions:
                 type: integer
                 x-go-name: Expiration
             uuid:
-                format: uuid
-                type: string
-                x-go-name: UUID
+                $ref: '#/definitions/UUID'
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/model
     FileHeader:
@@ -596,6 +594,15 @@ definitions:
                 x-go-name: Sensitive
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/stack
+    UUID:
+        description: |-
+            A UUID is a 128 bit (16 byte) Universal Unique IDentifier as defined in RFC
+            4122.
+        items:
+            format: uint8
+            type: integer
+        type: array
+        x-go-package: github.com/google/uuid
     UpdateClusterRequest:
         properties:
             KubernetesConfiguration:
