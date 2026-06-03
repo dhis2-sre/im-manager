@@ -16,11 +16,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/anthhub/forwarder"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/dhis2-sre/im-manager/pkg/token"
-	"github.com/minio/minio-go/v7"
-	"github.com/minio/minio-go/v7/pkg/credentials"
 
 	v1 "k8s.io/api/core/v1"
 
@@ -892,55 +889,16 @@ func (s Service) FilestoreBackup(ctx context.Context, instance *model.Deployment
 		return err
 	}
 
-	var minioClient *minio.Client
-	var minioEndpoint string
-
-	minioEndpoint = fmt.Sprintf("%s-%d-minio.%s.svc:9000", instance.Name, instance.Group.ID, instance.Group.Namespace)
-
-	if group.Cluster.Configuration != nil {
-		// TODO: Don't hard code the service name, use a provider as done for the database backup
-		hostname := fmt.Sprintf("%s-%d-minio.%s.svc", instance.Name, instance.Group.ID, instance.Group.Namespace)
-		serviceName := strings.Split(hostname, ".")[0]
-		options := []*forwarder.Option{
-			{
-				RemotePort:  9000,
-				ServiceName: serviceName,
-				Namespace:   instance.Group.Namespace,
-			},
-		}
-
-		kubeConfig, err := decryptYaml(group.Cluster.Configuration)
-		if err != nil {
-			return err
-		}
-
-		ret, err := forwarder.WithForwardersEmbedConfig(context.Background(), options, kubeConfig)
-		if err != nil {
-			return err
-		}
-		defer ret.Close()
-
-		ports, err := ret.Ready()
-		if err != nil {
-			return err
-		}
-
-		minioEndpoint = fmt.Sprintf("localhost:%d", ports[0][0].Local)
-	}
-
-	minioClient, err = newMinioClient("dhisdhis", "dhisdhis", minioEndpoint, false)
+	// Re-fetch decrypted so STORAGE_TYPE and any external S3 credentials are populated.
+	core, err := s.FindDecryptedDeploymentInstanceById(ctx, instance.ID)
 	if err != nil {
 		return err
 	}
 
-	// Test MinIO connection before proceeding
-	_, err = minioClient.ListBuckets(ctx)
+	streamer, err := s.filestoreStreamerFor(core, group.Cluster)
 	if err != nil {
-		return fmt.Errorf("MinIO connection test failed: %v", err)
+		return err
 	}
-
-	source := NewMinioBackupSource(s.logger, minioClient, "dhis2")
-	backupService := NewBackupService(s.logger, source, s.s3Client)
 
 	baseName := name
 	baseName = strings.TrimSuffix(baseName, ".sql.gz")
@@ -948,8 +906,8 @@ func (s Service) FilestoreBackup(ctx context.Context, instance *model.Deployment
 	baseName = strings.TrimSuffix(baseName, ".tar.gz")
 
 	key := fmt.Sprintf("%s/%s-%s.tar.gz", instance.GroupName, baseName, "fs")
-	err = backupService.PerformBackup(ctx, s.s3Bucket, key)
-	if err != nil {
+	backupService := NewBackupService(s.logger, s.s3Client)
+	if err := backupService.PerformBackup(ctx, streamer, s.s3Bucket, key); err != nil {
 		return err
 	}
 
@@ -962,12 +920,7 @@ func (s Service) FilestoreBackup(ctx context.Context, instance *model.Deployment
 
 	database.FilestoreID = filestore.ID
 
-	err = s.instanceRepository.SaveDatabase(ctx, database)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return s.instanceRepository.SaveDatabase(ctx, database)
 }
 
 func (s Service) recordBackup(ctx context.Context, groupName, s3uri, name string, userID uint) (*model.Database, error) {
@@ -988,17 +941,6 @@ func (s Service) recordBackup(ctx context.Context, groupName, s3uri, name string
 
 func (s Service) FindAllDeployments(ctx context.Context) ([]model.Deployment, error) {
 	return s.instanceRepository.FindAllDeployments(ctx)
-}
-
-func newMinioClient(accessKey, secretKey, endpoint string, useSSL bool) (*minio.Client, error) {
-	minioClient, err := minio.New(endpoint, &minio.Options{
-		Creds:  credentials.NewStaticV4(accessKey, secretKey, ""),
-		Secure: useSSL,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to create MinIO client: %v", err)
-	}
-	return minioClient, nil
 }
 
 func (s Service) UpdateInstance(ctx context.Context, token string, deploymentId, instanceId uint, parameters parameters, public *bool) (*model.DeploymentInstance, error) {

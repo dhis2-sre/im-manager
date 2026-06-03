@@ -1,15 +1,12 @@
 package instance
 
 import (
-	"archive/tar"
 	"bytes"
-	"compress/gzip"
 	"context"
 	"errors"
 	"fmt"
 	"io"
 	"log/slog"
-	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -39,14 +36,13 @@ const (
 )
 
 // NewBackupService creates a new backup service instance
-func NewBackupService(logger *slog.Logger, source BackupSource, s3Client S3BackupClient) *BackupService {
-	return &BackupService{logger, source, s3Client}
+func NewBackupService(logger *slog.Logger, s3Client S3BackupClient) *BackupService {
+	return &BackupService{logger, s3Client}
 }
 
-// BackupService handles the backup operation
+// BackupService streams a filestoreStreamer's output to S3 via multipart upload.
 type BackupService struct {
 	logger   *slog.Logger
-	source   BackupSource
 	s3Client S3BackupClient
 }
 
@@ -58,30 +54,16 @@ type S3BackupClient interface {
 	AbortMultipartUpload(ctx context.Context, params *s3.AbortMultipartUploadInput, optFns ...func(*s3.Options)) (*s3.AbortMultipartUploadOutput, error)
 }
 
-// BackupStats tracks backup operation statistics
-type BackupStats struct {
-	ObjectsProcessed int64
-	BytesProcessed   int64
-	StartTime        time.Time
-	mu               sync.Mutex
-}
-
-func (bs *BackupStats) increment(size int64) {
-	bs.mu.Lock()
-	defer bs.mu.Unlock()
-	bs.ObjectsProcessed++
-	bs.BytesProcessed += size
-}
-
-// PerformBackup executes the backup operation
-func (s *BackupService) PerformBackup(ctx context.Context, s3Bucket, key string) error {
+// PerformBackup runs streamer in a goroutine writing into a pipe whose reader is
+// streamed to S3 via multipart upload.
+func (s *BackupService) PerformBackup(ctx context.Context, streamer filestoreStreamer, s3Bucket, key string) error {
 	g, ctx := errgroup.WithContext(ctx)
-	stats := &BackupStats{StartTime: time.Now()}
+	start := time.Now()
 	pr, pw := io.Pipe()
 
 	g.Go(func() error {
 		defer pw.Close()
-		return s.createTarGzStream(ctx, pw, stats)
+		return streamer.stream(ctx, pw)
 	})
 
 	g.Go(func() error {
@@ -92,58 +74,7 @@ func (s *BackupService) PerformBackup(ctx context.Context, s3Bucket, key string)
 		return fmt.Errorf("backup failed: %v", err)
 	}
 
-	s.logBackupStats(ctx, stats)
-	return nil
-}
-
-func (s *BackupService) createTarGzStream(ctx context.Context, w io.Writer, stats *BackupStats) error {
-	gw := gzip.NewWriter(w)
-	defer gw.Close()
-
-	tw := tar.NewWriter(gw)
-	defer tw.Close()
-
-	objectCh, err := s.source.List(ctx)
-	if err != nil {
-		return fmt.Errorf("list objects: %v", err)
-	}
-
-	for object := range objectCh {
-		if object.Err != nil {
-			return object.Err
-		}
-
-		if err := s.processSingleObject(ctx, tw, object, stats); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func (s *BackupService) processSingleObject(ctx context.Context, tw *tar.Writer, object BackupObject, stats *BackupStats) error {
-	reader, err := s.source.Get(ctx, object.Path)
-	if err != nil {
-		return fmt.Errorf("failed to get object %s: %v", object.Path, err)
-	}
-	defer reader.Close()
-
-	header := &tar.Header{
-		Name:    object.Path,
-		Size:    object.Size,
-		Mode:    0644,
-		ModTime: object.LastModified,
-	}
-
-	if err := tw.WriteHeader(header); err != nil {
-		return fmt.Errorf("write tar header for %s: %v", object.Path, err)
-	}
-
-	if _, err := io.Copy(tw, reader); err != nil {
-		return fmt.Errorf("copy object %s to tar: %v", object.Path, err)
-	}
-
-	stats.increment(object.Size)
+	s.logger.InfoContext(ctx, "Filestore backup completed", "key", key, "duration", time.Since(start))
 	return nil
 }
 
@@ -235,12 +166,4 @@ func (s *BackupService) abortMultipartUpload(ctx context.Context, bucket, key, u
 		UploadId: &uploadID,
 	})
 	return err
-}
-
-func (s *BackupService) logBackupStats(ctx context.Context, stats *BackupStats) {
-	duration := time.Since(stats.StartTime)
-	s.logger.InfoContext(ctx, "Filestore backup completed",
-		"objects_processed", stats.ObjectsProcessed,
-		"bytes_processed", stats.BytesProcessed,
-		"duration", duration)
 }

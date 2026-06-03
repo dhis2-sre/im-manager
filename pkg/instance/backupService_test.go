@@ -50,10 +50,10 @@ func TestBackupServiceIntegration(t *testing.T) {
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	source := NewMinioBackupSource(logger, minioClient, minioBucket)
-	backupService := NewBackupService(logger, source, s3Test.Client)
+	backupService := NewBackupService(logger, s3Test.Client)
 
 	s3Key := "group/save-name-fs.tar.gz"
-	require.NoError(t, backupService.PerformBackup(ctx, s3Bucket, s3Key))
+	require.NoError(t, backupService.PerformBackup(ctx, s3APISource{source}, s3Bucket, s3Key))
 
 	tarContent := s3Test.GetObject(t, s3Bucket, s3Key)
 	entries := extractTarGz(t, tarContent)
