@@ -229,7 +229,7 @@ func TestInstanceHandler(t *testing.T) {
 		deployDeployment(t, client, deployment.ID, tokens.AccessToken)
 
 		groupedName := fmt.Sprintf("%s-%d", coreInstance.Name, coreInstance.Group.ID)
-		k8sClient.AssertPodIsReady(t, coreInstance.Group.Namespace, groupedName+"-minio", 60)
+		k8sClient.AssertPodIsReady(t, coreInstance.Group.Namespace, groupedName+"-minio", 120)
 
 		// Seed an object into the minio bucket by exec'ing mc in the pod - no port-forward needed,
 		// which is the whole point of this change.

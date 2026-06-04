@@ -101,27 +101,70 @@ func (e execStreamer) stream(ctx context.Context, w io.Writer) error {
 	return nil
 }
 
-// minioMirrorCommand mirrors the dhis2 bucket to a temp dir then tars it to
-// stdout. MinIO 2025.x stores xl.meta on disk, so the bucket must be read
-// through mc to get logical object keys. mc and tar ship in the minio image.
-func minioMirrorCommand() []string {
-	script := strings.Join([]string{
-		"set -e",
-		"D=$(mktemp -d)",
-		`trap 'rm -rf "$D"' EXIT`,
-		"mc alias set bk http://127.0.0.1:9000 dhisdhis dhisdhis >/dev/null 2>&1",
-		`mc mirror --quiet bk/dhis2 "$D" >/dev/null`,
-		`tar -C "$D" -czf - .`,
-	}, "; ")
-	return []string{"sh", "-c", script}
+// minioClientHostEnv defines a host alias named "backup" inline via mc's
+// MC_HOST_<alias> environment variable, so no `mc alias set` step is needed.
+// MC_HOST_ is mc's own convention (like postgres's PGPASSWORD); only the alias
+// name "backup" is ours. Credentials match the minio stack's defaults and
+// seed-minio.sh. Passed as an `env` argv entry, mirroring the
+// `env PGPASSWORD=... pg_dump` pattern used for the database backup.
+const minioClientHostEnv = "MC_HOST_backup=http://dhisdhis:dhisdhis@127.0.0.1:9000"
+
+// minioExecSource backs up an in-cluster MinIO bucket without a port-forward.
+// MinIO 2025.x stores xl.meta on disk, so the bucket must be read through mc to
+// recover logical object keys, and mc can only write to a filesystem - so this
+// mirrors into a temporary directory, streams a gzip'd tar of it to w, then
+// removes it. Every step is plain argv (no shell); cleanup is a best-effort
+// deferred exec.
+type minioExecSource struct {
+	executor  podExecutor
+	namespace string
+	podName   string
+	container string
+	tmpDir    string
 }
 
-// filesystemTarCommand tars DHIS2_HOME/files to stdout, emitting an empty
-// archive when no files exist yet so backup never fails on a clean instance.
+func (m minioExecSource) stream(ctx context.Context, w io.Writer) error {
+	defer func() {
+		// Best-effort: the directory lives in the pod's ephemeral /tmp regardless.
+		_ = m.exec(ctx, io.Discard, "rm", "-rf", m.tmpDir)
+	}()
+
+	if err := m.exec(ctx, io.Discard, "env", minioClientHostEnv, "mc", "mirror", "--quiet", "backup/dhis2", m.tmpDir); err != nil {
+		return err
+	}
+	return m.exec(ctx, w, "tar", "-C", m.tmpDir, "-czf", "-", ".")
+}
+
+func (m minioExecSource) exec(ctx context.Context, stdout io.Writer, command ...string) error {
+	var stderr strings.Builder
+	if err := m.executor.Exec(ctx, m.namespace, m.podName, m.container, command, stdout, &stderr); err != nil {
+		return fmt.Errorf("%w: %s", err, stderr.String())
+	}
+	return nil
+}
+
+// minioTempDir returns a per-backup directory path, derived from the backup
+// name so concurrent backups of the same pod don't collide, with non-path-safe
+// characters replaced.
+func minioTempDir(backupName string) string {
+	safe := strings.Map(func(r rune) rune {
+		switch {
+		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9', r == '-', r == '_':
+			return r
+		default:
+			return '-'
+		}
+	}, backupName)
+	return "/tmp/im-filestore-backup-" + safe
+}
+
+// filesystemTarCommand tars DHIS2_HOME/files to stdout as argv - no shell, so no
+// value is interpolated into a shell string (cf. buildPgDumpCommand). DHIS2
+// creates the files directory on startup, so it exists by backup time; an empty
+// directory tars fine.
 func filesystemTarCommand(dhis2Home string) []string {
 	files := strings.TrimRight(dhis2Home, "/") + "/files"
-	script := fmt.Sprintf(`if [ -d "%s" ]; then tar -C "%s" -czf - .; else tar -czf - -T /dev/null; fi`, files, files)
-	return []string{"sh", "-c", script}
+	return []string{"tar", "-C", files, "-czf", "-", "."}
 }
 
 func storageType(core *model.DeploymentInstance) string {
@@ -145,7 +188,8 @@ func newAWSS3Client(core *model.DeploymentInstance) (*minio.Client, error) {
 
 // filestoreStreamerFor selects the backend-specific streamer for an instance.
 // minio + filesystem stream via pod exec; s3 reads the external bucket directly.
-func (s Service) filestoreStreamerFor(core *model.DeploymentInstance, cluster model.Cluster) (filestoreStreamer, error) {
+// backupName is used to derive a unique temp dir for the minio backend.
+func (s Service) filestoreStreamerFor(core *model.DeploymentInstance, cluster model.Cluster, backupName string) (filestoreStreamer, error) {
 	switch storageType(core) {
 	case "filesystem":
 		ks, err := NewKubernetesService(cluster)
@@ -181,12 +225,12 @@ func (s Service) filestoreStreamerFor(core *model.DeploymentInstance, cluster mo
 		if err != nil {
 			return nil, err
 		}
-		return execStreamer{
+		return minioExecSource{
 			executor:  ks,
 			namespace: pod.Namespace,
 			podName:   pod.Name,
 			container: "minio",
-			command:   minioMirrorCommand(),
+			tmpDir:    minioTempDir(backupName),
 		}, nil
 	}
 }

@@ -895,15 +895,15 @@ func (s Service) FilestoreBackup(ctx context.Context, instance *model.Deployment
 		return err
 	}
 
-	streamer, err := s.filestoreStreamerFor(core, group.Cluster)
-	if err != nil {
-		return err
-	}
-
 	baseName := name
 	baseName = strings.TrimSuffix(baseName, ".sql.gz")
 	baseName = strings.TrimSuffix(baseName, ".pgc")
 	baseName = strings.TrimSuffix(baseName, ".tar.gz")
+
+	streamer, err := s.filestoreStreamerFor(core, group.Cluster, baseName)
+	if err != nil {
+		return err
+	}
 
 	key := fmt.Sprintf("%s/%s-%s.tar.gz", instance.GroupName, baseName, "fs")
 	backupService := NewBackupService(s.logger, s.s3Client)

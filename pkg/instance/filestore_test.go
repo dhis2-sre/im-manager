@@ -59,21 +59,66 @@ func TestExecStreamerWrapsStderrOnError(t *testing.T) {
 	assert.Contains(t, err.Error(), "mc: boom")
 }
 
-func TestMinioMirrorCommand(t *testing.T) {
-	cmd := minioMirrorCommand()
-	require.Len(t, cmd, 3)
-	assert.Equal(t, []string{"sh", "-c"}, cmd[:2])
-	assert.Contains(t, cmd[2], "mc mirror --quiet bk/dhis2")
-	assert.Contains(t, cmd[2], `tar -C "$D" -czf - .`)
-	assert.Contains(t, cmd[2], "mc alias set bk http://127.0.0.1:9000 dhisdhis dhisdhis")
+// recordingExecutor records every Exec call and can be scripted with per-call
+// stdout to write and errors to return, keyed by call index.
+type recordingExecutor struct {
+	calls   [][]string
+	stdouts map[int]string
+	stderrs map[int]string
+	errs    map[int]error
+}
+
+func (r *recordingExecutor) Exec(ctx context.Context, namespace, podName, container string, command []string, stdout, stderr io.Writer) error {
+	i := len(r.calls)
+	r.calls = append(r.calls, command)
+	if s := r.stdouts[i]; s != "" {
+		_, _ = io.WriteString(stdout, s)
+	}
+	if s := r.stderrs[i]; s != "" {
+		_, _ = io.WriteString(stderr, s)
+	}
+	return r.errs[i]
+}
+
+func TestMinioExecSourceMirrorsTarsAndCleansUp(t *testing.T) {
+	exec := &recordingExecutor{stdouts: map[int]string{1: "tar-bytes"}} // call 1 = tar
+	src := minioExecSource{executor: exec, namespace: "ns", podName: "pod", container: "minio", tmpDir: "/tmp/im-filestore-backup-x"}
+
+	var buf strings.Builder
+	require.NoError(t, src.stream(context.Background(), &buf))
+
+	assert.Equal(t, "tar-bytes", buf.String())
+	require.Len(t, exec.calls, 3)
+	assert.Equal(t, []string{"env", "MC_HOST_backup=http://dhisdhis:dhisdhis@127.0.0.1:9000", "mc", "mirror", "--quiet", "backup/dhis2", "/tmp/im-filestore-backup-x"}, exec.calls[0])
+	assert.Equal(t, []string{"tar", "-C", "/tmp/im-filestore-backup-x", "-czf", "-", "."}, exec.calls[1])
+	assert.Equal(t, []string{"rm", "-rf", "/tmp/im-filestore-backup-x"}, exec.calls[2])
+}
+
+func TestMinioExecSourceMirrorErrorSkipsTarButCleansUp(t *testing.T) {
+	exec := &recordingExecutor{
+		errs:    map[int]error{0: fmt.Errorf("exit 1")},
+		stderrs: map[int]string{0: "mc: mirror failed"},
+	}
+	src := minioExecSource{executor: exec, namespace: "ns", podName: "pod", container: "minio", tmpDir: "/tmp/im-filestore-backup-x"}
+
+	err := src.stream(context.Background(), io.Discard)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "exit 1")
+	assert.Contains(t, err.Error(), "mc: mirror failed")
+
+	require.Len(t, exec.calls, 2) // mirror (failed), then cleanup; no tar
+	assert.Equal(t, "mc", exec.calls[0][2])
+	assert.Equal(t, []string{"rm", "-rf", "/tmp/im-filestore-backup-x"}, exec.calls[1])
+}
+
+func TestMinioTempDir(t *testing.T) {
+	assert.Equal(t, "/tmp/im-filestore-backup-saved-copy", minioTempDir("saved-copy"))
+	assert.Equal(t, "/tmp/im-filestore-backup-a-b-c", minioTempDir("a/b c")) // non-path-safe chars replaced
 }
 
 func TestFilesystemTarCommand(t *testing.T) {
 	cmd := filesystemTarCommand("/opt/dhis2/")
-	require.Len(t, cmd, 3)
-	assert.Equal(t, []string{"sh", "-c"}, cmd[:2])
-	assert.Contains(t, cmd[2], `tar -C "/opt/dhis2/files" -czf - .`)
-	assert.Contains(t, cmd[2], "tar -czf - -T /dev/null")
+	assert.Equal(t, []string{"tar", "-C", "/opt/dhis2/files", "-czf", "-", "."}, cmd)
 }
 
 func TestGetPodByLabels(t *testing.T) {
