@@ -48,15 +48,15 @@ type _ struct {
 }
 
 // swagger:response InstanceLogsResponse
-type _ struct {
+type InstanceLogsBody struct {
 	// in: body
-	_ string
+	Body string
 }
 
 // swagger:response Status
-type _ struct {
+type StatusBody struct {
 	// in: body
-	_ InstanceStatus
+	Body InstanceStatus
 }
 
 // swagger:parameters instanceNameToId
@@ -71,22 +71,22 @@ type _ struct {
 }
 
 // swagger:response Error
-type _ struct {
+type ErrorBody struct {
 	// The error message
 	// in: body
 	Message string
 }
 
 // swagger:response GroupsWithDeployments
-type _ struct {
+type GroupsWithDeploymentsBody struct {
 	// in: body
-	_ []GroupWithDeployments
+	Body []GroupWithDeployments
 }
 
 // swagger:response GroupsWithPublicInstances
-type _ struct {
+type GroupsWithPublicInstancesBody struct {
 	// in: body
-	_ []GroupWithPublicInstances
+	Body []GroupWithPublicInstances
 }
 
 // swagger:parameters saveDeployment
@@ -106,9 +106,9 @@ type _ struct {
 }
 
 // swagger:response DeploymentInstance
-type _ struct {
+type DeploymentInstanceBody struct {
 	// in: body
-	_ model.DeploymentInstance
+	Body model.DeploymentInstance
 }
 
 // swagger:parameters updateInstance
