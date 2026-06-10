@@ -42,7 +42,7 @@ jobs:
           minor=$(echo "$version" | cut --delimiter='.' --fields=2)
           patch=$(echo "$version" | cut --delimiter='.' --fields=3)
           next_minor=$((minor + 1))
-          next_version="v${major}.${next_minor}.0"
+          next_version="${major}.${next_minor}.0"
           echo "::set-output name=next_version::$next_version"
 
       - name: Tag the latest commit with a signed tag
