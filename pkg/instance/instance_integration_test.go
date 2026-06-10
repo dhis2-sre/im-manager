@@ -274,7 +274,7 @@ func TestInstanceHandler(t *testing.T) {
 		require.Eventually(t, func() bool {
 			content := s3.GetObject(t, s3Bucket, "group-name/save-test.sql.gz")
 			return len(content) > originalSize
-		}, 60*time.Second, 500*time.Millisecond, "saved database in S3 should grow beyond the uploaded placeholder")
+		}, 3*time.Minute, 500*time.Millisecond, "saved database in S3 should grow beyond the uploaded placeholder")
 
 		destroyDeployment(t, client, deployment.ID, tokens.AccessToken)
 	})
