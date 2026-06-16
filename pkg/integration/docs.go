@@ -12,9 +12,9 @@ type _ struct {
 type Response struct{}
 
 // swagger:response Response
-type _ struct {
+type ResponseBody struct {
 	// in: body
-	_ Response
+	Body Response
 }
 
 // swagger:parameters imageExists
