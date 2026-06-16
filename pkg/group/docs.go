@@ -51,9 +51,9 @@ type _ struct {
 }
 
 // swagger:response ClusterResources
-type _ struct {
+type ClusterResourcesBody struct {
 	// in: body
-	_ instance.ClusterResources
+	Body instance.ClusterResources
 }
 
 // swagger:parameters addClusterToGroup removeClusterFromGroup
