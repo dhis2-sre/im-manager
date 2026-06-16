@@ -24,6 +24,7 @@ func Routes(r *gin.Engine, authenticationMiddleware AuthenticationMiddleware, au
 	administratorRestrictedRouter := tokenAuthenticationRouter.Group("")
 	administratorRestrictedRouter.Use(authorizationMiddleware.RequireAdministrator)
 	administratorRestrictedRouter.POST("/groups", handler.Create)
+	administratorRestrictedRouter.PUT("/groups/:name", handler.Update)
 	administratorRestrictedRouter.POST("/groups/:group/users/:userId", handler.AddUserToGroup)
 	administratorRestrictedRouter.DELETE("/groups/:group/users/:userId", handler.RemoveUserFromGroup)
 	administratorRestrictedRouter.POST("/groups/:group/admins/:userId", handler.AddAdminUserToGroup)

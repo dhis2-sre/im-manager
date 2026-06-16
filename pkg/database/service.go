@@ -747,6 +747,10 @@ func newPgDumpConfig(instance *model.DeploymentInstance, stack *model.Stack) (*p
 		return nil, err
 	}
 
+	// Restores target a freshly created, empty database, so replace the
+	// default arguments without the --clean option.
+	dump.Options = []string{"--no-owner", "--no-acl", "--blob"}
+
 	// TODO: This is very DHIS2 specific... More stack meta data?
 	dump.IgnoreTableData = []string{"analytics*", "_*"}
 

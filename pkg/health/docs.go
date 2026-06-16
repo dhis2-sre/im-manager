@@ -1,7 +1,7 @@
 package health
 
 // swagger:response Response
-type _ struct {
+type ResponseBody struct {
 	//in: body
-	_ Response
+	Body Response
 }
