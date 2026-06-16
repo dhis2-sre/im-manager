@@ -92,9 +92,9 @@ type _ struct {
 }
 
 // swagger:response DownloadDatabaseResponse
-type _ struct {
+type DownloadDatabaseBody struct {
 	//in: body
-	_ []byte
+	Body []byte
 }
 
 // swagger:parameters createExternalDownloadDatabase
@@ -106,25 +106,25 @@ type _ struct {
 }
 
 // swagger:response CreateExternalDownloadResponse
-type _ struct {
+type CreateExternalDownloadBody struct {
 	//in: body
-	_ model.ExternalDownload
+	Body model.ExternalDownload
 }
 
 // swagger:response Database
-type _ struct {
+type DatabaseBody struct {
 	//in: body
-	_ model.Database
+	Body model.Database
 }
 
 // swagger:response GroupsWithDatabases
-type _ struct {
+type GroupsWithDatabasesBody struct {
 	//in: body
-	_ GroupsWithDatabases
+	Body GroupsWithDatabases
 }
 
 // swagger:response Lock
-type _ struct {
+type LockBody struct {
 	//in: body
-	_ model.Lock
+	Body model.Lock
 }

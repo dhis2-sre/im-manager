@@ -181,27 +181,14 @@ func (h Handler) SaveAs(c *gin.Context) {
 		return
 	}
 
-	parameter := "DATABASE_ID"
-	databaseId, exists := instance.Parameters[parameter]
-	if !exists {
-		_ = c.Error(fmt.Errorf("parameter %q not found", parameter))
-	}
-
-	database, err := h.databaseService.FindByIdentifier(ctx, databaseId.Value)
-	if err != nil {
-		_ = c.Error(err)
-		return
-	}
-
-	err = h.canAccess(c, database)
-	if err != nil {
-		_ = c.Error(err)
-		return
-	}
-
 	user, err := handler.GetUserFromContext(ctx)
 	if err != nil {
 		_ = c.Error(err)
+		return
+	}
+
+	if !handler.CanAccessGroup(user, instance.GroupName) {
+		_ = c.Error(errdef.NewForbidden("access denied"))
 		return
 	}
 

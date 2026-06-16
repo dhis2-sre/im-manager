@@ -65,3 +65,17 @@ func (sc *S3Client) GetObject(t *testing.T, bucket, key string) []byte {
 	require.NoErrorf(t, err, errMsg+": failed to read body", bucket, key)
 	return body
 }
+
+// TryGetObject fetches an S3 object without failing the test, suitable for use inside
+// require.Eventually where a transient error (e.g. object not yet visible during upload) should
+// be treated as "not ready yet" rather than a hard failure.
+func (sc *S3Client) TryGetObject(bucket, key string) ([]byte, error) {
+	object, err := sc.Client.GetObject(context.TODO(), &s3.GetObjectInput{
+		Bucket: aws.String(bucket),
+		Key:    aws.String(key),
+	})
+	if err != nil {
+		return nil, err
+	}
+	return io.ReadAll(object.Body)
+}
