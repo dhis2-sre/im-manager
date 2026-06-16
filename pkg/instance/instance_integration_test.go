@@ -273,8 +273,8 @@ func TestInstanceHandler(t *testing.T) {
 		client.Do(t, http.MethodPost, "/databases/save/"+instanceIDStr, nil, http.StatusAccepted, inttest.WithAuthToken(tokens.AccessToken))
 
 		require.Eventually(t, func() bool {
-			content := s3.GetObject(t, s3Bucket, "group-name/save-test.sql.gz")
-			return len(content) > originalSize
+			content, err := s3.TryGetObject(s3Bucket, "group-name/save-test.sql.gz")
+			return err == nil && len(content) > originalSize
 		}, 60*time.Second, 500*time.Millisecond, "saved database in S3 should grow beyond the uploaded placeholder")
 
 		destroyDeployment(t, client, deployment.ID, tokens.AccessToken)

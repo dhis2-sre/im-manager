@@ -28,6 +28,18 @@ type _ struct {
 	Name string `json:"name"`
 }
 
+// swagger:parameters groupUpdate
+type _ struct {
+	// in: path
+	// required: true
+	Name string `json:"name"`
+
+	// Update group request body parameter
+	// in: body
+	// required: true
+	Body UpdateGroupRequest
+}
+
 // swagger:parameters findAllGroupsByUser
 type _ struct {
 	// deployable
@@ -39,9 +51,9 @@ type _ struct {
 }
 
 // swagger:response ClusterResources
-type _ struct {
+type ClusterResourcesBody struct {
 	// in: body
-	_ instance.ClusterResources
+	Body instance.ClusterResources
 }
 
 // swagger:parameters addClusterToGroup removeClusterFromGroup

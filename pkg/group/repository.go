@@ -179,6 +179,24 @@ func (r repository) findByGroupNames(ctx context.Context, groupNames []string) (
 	return databases, err
 }
 
+func (r repository) update(ctx context.Context, name, namespace, description, hostname string, deployable bool, clusterID *uint) error {
+	// only use ctx for values (logging) and not cancellation signals on cud operations for now. ctx
+	// cancellation can lead to rollbacks which we should decide individually.
+	ctx = context.WithoutCancel(ctx)
+
+	err := r.db.WithContext(ctx).Model(&model.Group{Name: name}).Updates(map[string]interface{}{
+		"namespace":   namespace,
+		"description": description,
+		"hostname":    hostname,
+		"deployable":  deployable,
+		"cluster_id":  clusterID,
+	}).Error
+	if errors.Is(err, gorm.ErrDuplicatedKey) {
+		return errdef.NewDuplicated("group hostname already exists: %s", err)
+	}
+	return err
+}
+
 // AddClusterToGroup adds a cluster to a group
 func (r repository) AddClusterToGroup(ctx context.Context, groupName string, clusterId uint) error {
 	group := &model.Group{}

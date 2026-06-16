@@ -133,6 +133,25 @@ func (s *Service) RemoveAdminUser(ctx context.Context, groupName string, userId 
 	return s.groupRepository.removeAdminUser(ctx, group, u)
 }
 
+func (s *Service) Update(ctx context.Context, name, namespace, description, hostname string, deployable bool, clusterID *uint) (*model.Group, error) {
+	_, err := s.groupRepository.find(ctx, name)
+	if err != nil {
+		return nil, err
+	}
+
+	if clusterID != nil {
+		if _, err = s.clusterService.Find(ctx, *clusterID); err != nil {
+			return nil, err
+		}
+	}
+
+	if err = s.groupRepository.update(ctx, name, namespace, description, hostname, deployable, clusterID); err != nil {
+		return nil, err
+	}
+
+	return s.groupRepository.find(ctx, name)
+}
+
 func (s *Service) FindAll(ctx context.Context, user *model.User, deployable bool) ([]model.Group, error) {
 	return s.groupRepository.findAll(ctx, user, deployable)
 }
