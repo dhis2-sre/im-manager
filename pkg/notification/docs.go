@@ -5,9 +5,9 @@ import (
 )
 
 // swagger:response Notification
-type _ struct {
+type NotificationBody struct {
 	// in: body
-	_ []model.Notification
+	Body []model.Notification
 }
 
 // swagger:parameters markNotificationRead

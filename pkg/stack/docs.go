@@ -8,13 +8,13 @@ type _ struct {
 }
 
 // swagger:response Stack
-type _ struct {
+type StackBody struct {
 	//in: body
-	_ Stack
+	Body Stack
 }
 
 // swagger:response Stacks
-type _ struct {
+type StacksBody struct {
 	//in: body
-	_ []Stack
+	Body []Stack
 }
