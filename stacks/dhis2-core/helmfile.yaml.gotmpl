@@ -2,6 +2,7 @@
 # hostnameVariable: DATABASE_HOSTNAME
 # stackParameters: DEPLOY_CHAP,GOOGLE_AUTH_PROJECT_ID,GOOGLE_AUTH_PRIVATE_KEY_ID,GOOGLE_AUTH_PRIVATE_KEY,GOOGLE_AUTH_CLIENT_EMAIL,GOOGLE_AUTH_CLIENT_ID
 helmDefaults:
+  createNamespace: false
   deleteWait: true
 
 releases:
@@ -65,10 +66,11 @@ releases:
       {{- if eq (requiredEnv "STORAGE_TYPE") "s3" }}
       - S3:
           provider: aws-s3
-          container: {{ requiredEnv "S3_BUCKET" }}
-          location: {{ requiredEnv "S3_REGION" }}
-          identity: {{ requiredEnv "S3_IDENTITY" }}
-          secret: {{ requiredEnv "S3_SECRET" }}
+          container: "{{ requiredEnv "S3_BUCKET" }}"
+          endpoint: ""
+          location: "{{ requiredEnv "S3_REGION" }}"
+          identity: "{{ requiredEnv "S3_IDENTITY" }}"
+          secret: "{{ requiredEnv "S3_SECRET" }}"
       {{- end }}
 
       - database:

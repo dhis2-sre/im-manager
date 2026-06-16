@@ -52,10 +52,10 @@ type _ struct {
 }
 
 // swagger:response UsersResponse
-type _ struct {
+type UsersResponseBody struct {
 	// Users list response
 	//in: body
-	_ *[]model.User
+	Body *[]model.User
 }
 
 // swagger:parameters updateUser

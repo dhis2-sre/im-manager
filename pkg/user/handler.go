@@ -314,7 +314,11 @@ func (h Handler) RefreshToken(c *gin.Context) {
 
 	tokens, err := h.tokenService.GetTokens(user, refreshToken.ID.String(), refreshToken.RememberMe)
 	if err != nil {
-		_ = c.Error(err)
+		if errdef.IsUnauthorized(err) {
+			_ = c.AbortWithError(http.StatusUnauthorized, err)
+		} else {
+			_ = c.Error(err)
+		}
 		return
 	}
 

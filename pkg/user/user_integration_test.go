@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/rsa"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"log/slog"
@@ -19,6 +20,7 @@ import (
 	"github.com/dhis2-sre/im-manager/pkg/cluster"
 
 	"github.com/google/uuid"
+	"golang.org/x/crypto/scrypt"
 
 	"github.com/go-mail/mail"
 
@@ -77,11 +79,11 @@ func TestUserHandler(t *testing.T) {
 
 		var user model.User
 		userCount.Increment()
+		defer userCount.Done()
 		client.PostJSON(t, "/users", jsonBody(`{
 			"email":    "user@dhis2.org",
 			"password": "oneoneoneoneoneoneone111"
 		}`), &user)
-		userCount.Done()
 
 		assert.Equal(t, "user@dhis2.org", user.Email)
 		assert.Empty(t, user.Password)
@@ -105,6 +107,30 @@ func TestUserHandler(t *testing.T) {
 		client.GetJSON(t, "/me", &me, inttest.WithAuthToken(accessToken.Value))
 		assert.Equal(t, "user@dhis2.org", me.Email)
 		assert.True(t, me.Validated)
+	})
+
+	t.Run("LegacyPasswordMigrationOnSignIn", func(t *testing.T) {
+		t.Parallel()
+
+		email := "legacy@dhis2.org"
+		password := "legacypasswordlegacypassword"
+
+		userCount.Increment()
+		u, err := userService.FindOrCreate(context.Background(), email, password)
+		require.NoError(t, err)
+		userCount.Done()
+
+		u.Password = legacyScryptHashFixture(t, password)
+		u.Validated = true
+		err = userService.Save(context.Background(), u)
+		require.NoError(t, err)
+
+		_, _ = client.SignIn(t, email, password)
+
+		migrated, err := userService.FindById(context.Background(), u.ID)
+		require.NoError(t, err)
+		assert.True(t, strings.HasPrefix(migrated.Password, "$argon2id$"),
+			"expected stored hash to be upgraded to argon2id, got %q", migrated.Password)
 	})
 
 	t.Run("SignOut", func(t *testing.T) {
@@ -441,11 +467,11 @@ func TestUserHandler(t *testing.T) {
 
 				var user model.User
 				userCount.Increment()
+				defer userCount.Done()
 				client.PostJSON(t, "/users", jsonBody(`{
 					"email":    "no-email-validation@dhis2.org",
 					"password": "oneoneoneoneoneoneone111"
 				}`), &user)
-				userCount.Done()
 
 				require.Equal(t, "no-email-validation@dhis2.org", user.Email)
 				require.Empty(t, user.Password)
@@ -602,13 +628,13 @@ func createUser(t *testing.T, client *inttest.HTTPClient, userService *user.Serv
 	t.Helper()
 
 	userCount.Increment()
+	defer userCount.Done()
 	email := fmt.Sprintf("user%d@dhis2.org", userCount.Value())
 	password := uuid.NewString()
 	requestBody := jsonBody(`{"email": "%s", "password": "%s"}`, email, password)
 
 	var user model.User
 	client.PostJSON(t, "/users", requestBody, &user)
-	userCount.Done()
 
 	require.Equal(t, email, user.Email)
 	require.Empty(t, user.Password)
@@ -643,4 +669,16 @@ func findCookieByName(name string, cookies []*http.Cookie) *http.Cookie {
 
 func jsonBody(format string, args ...any) io.Reader {
 	return strings.NewReader(fmt.Sprintf(format, args...))
+}
+
+// legacyScryptHashFixture produces a hash in the pre-Argon2id encoding so the
+// migration path can be exercised end-to-end.
+func legacyScryptHashFixture(t *testing.T, password string) string {
+	t.Helper()
+	salt := make([]byte, 32)
+	_, err := rand.Read(salt)
+	require.NoError(t, err)
+	hash, err := scrypt.Key([]byte(password), salt, 32768, 8, 1, 32)
+	require.NoError(t, err)
+	return fmt.Sprintf("%s.%s", hex.EncodeToString(hash), hex.EncodeToString(salt))
 }

@@ -22,6 +22,22 @@ make keys             # generate the RSA private key required by .env's PRIVATE_
 skaffold run -p dev   # run im-manager + deps via skaffold (dev profile)
 ```
 
+### Skaffold / kubeconfig
+
+`skaffold run -p dev` must target the EKS production cluster. The correct kubeconfig is set in `.env`:
+
+```
+KUBECONFIG=$HOME/.kube/kubeconfig_instance-cluster-production
+```
+
+Run from `../im-tooling/` (which composes im-manager + im-web-client). The im-tooling `.envrc` computes `API_URL`, `UI_HOSTNAME`, etc. from `ENVIRONMENT`/`CLASSIFICATION` in `.env`, and sets `KUBECONFIG` to the EKS production cluster:
+
+```bash
+cd ../im-tooling && skaffold run -p dev
+```
+
+Do **not** use `im-hetzner-cluster.yaml` for skaffold deploys — that cluster lacks capacity for the feature namespace workloads.
+
 `make test` runs everything together — `*_integration_test.go` files have **no build tag**. They use `pkg/inttest` which
 spins real Postgres/RabbitMQ/Redis/Minio/localstack containers via testcontainers, so Docker must be running.
 
