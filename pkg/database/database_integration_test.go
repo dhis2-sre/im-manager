@@ -123,6 +123,21 @@ func TestDatabaseHandler(t *testing.T) {
 		assert.Equal(t, "file contents", string(actualContent))
 	})
 
+	t.Run("DownloadNotFoundInS3", func(t *testing.T) {
+		ghost := &model.Database{
+			Name:      "path/ghost.sql.gz",
+			GroupName: "packages",
+			Url:       "s3://database-bucket/packages/path/ghost.sql.gz",
+			Slug:      "packages-path-ghost-sql-gz",
+			UserID:    userID,
+		}
+		require.NoError(t, db.Create(ghost).Error)
+		t.Cleanup(func() { db.Unscoped().Delete(ghost) })
+		ghostID := strconv.FormatUint(uint64(ghost.ID), 10)
+
+		client.Do(t, http.MethodGet, "/databases/"+ghostID+"/download", nil, http.StatusNotFound)
+	})
+
 	t.Run("Copy", func(t *testing.T) {
 		{
 			t.Log("Copy")
