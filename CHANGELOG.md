@@ -1,11 +1,32 @@
 
-<a name="0.70.0"></a>
-## [0.70.0](https://github.com/dhis2-sre/im-manager/compare/0.69.0...0.70.0)
+<a name="0.71.0"></a>
+## [0.71.0](https://github.com/dhis2-sre/im-manager/compare/0.70.0...0.71.0)
 
-> 2026-06-09
+> 2026-06-16
 
 ### Chore
 
+* disable Release workflow in favour of /release-im skill
+* drop v prefix from release tags
+
+### Docs
+
+* drop v prefix from release tag example ([#1566](https://github.com/dhis2-sre/im-manager/issues/1566))
+
+### Fix
+
+* replace GetObject with TryGetObject ([#1565](https://github.com/dhis2-sre/im-manager/issues/1565))
+* gate save-as on instance group instead of source database row ([#1568](https://github.com/dhis2-sre/im-manager/issues/1568))
+
+
+<a name="0.70.0"></a>
+## [0.70.0](https://github.com/dhis2-sre/im-manager/compare/0.69.0...0.70.0)
+
+> 2026-06-10
+
+### Chore
+
+* generate change log
 * bump default dhis2-core chart version to 0.34.11 ([#1549](https://github.com/dhis2-sre/im-manager/issues/1549))
 * hash passwords with Argon2id and migrate scrypt hashes on sign-in ([#1525](https://github.com/dhis2-sre/im-manager/issues/1525))
 * drop unused namespaces:create permission from ClusterRole ([#1526](https://github.com/dhis2-sre/im-manager/issues/1526))
@@ -116,7 +137,7 @@
 
 
 <a name="v0.67.0"></a>
-## [v0.67.0](https://github.com/dhis2-sre/im-manager/compare/v0.66.0...v0.67.0)
+## [v0.67.0](https://github.com/dhis2-sre/im-manager/compare/0.66.0...v0.67.0)
 
 > 2026-05-07
 
@@ -141,14 +162,14 @@
 * add SaveAs and BackupService integration tests ([#1375](https://github.com/dhis2-sre/im-manager/issues/1375))
 
 
-<a name="v0.66.0"></a>
-## [v0.66.0](https://github.com/dhis2-sre/im-manager/compare/0.66.0...v0.66.0)
+<a name="0.66.0"></a>
+## [0.66.0](https://github.com/dhis2-sre/im-manager/compare/v0.66.0...0.66.0)
 
 > 2026-04-22
 
 
-<a name="0.66.0"></a>
-## [0.66.0](https://github.com/dhis2-sre/im-manager/compare/0.65.3...0.66.0)
+<a name="v0.66.0"></a>
+## [v0.66.0](https://github.com/dhis2-sre/im-manager/compare/0.65.3...v0.66.0)
 
 > 2026-04-22
 
@@ -1978,17 +1999,18 @@
 
 
 <a name="v0.5.10"></a>
-## [v0.5.10](https://github.com/dhis2-sre/im-manager/compare/v0.5.9...v0.5.10)
+## [v0.5.10](https://github.com/dhis2-sre/im-manager/compare/v0.5.6...v0.5.10)
 
 > 2022-04-11
 
 ### Fix
 
 * Only change the ownership of generate_uid() func [DEVOPS-102]
+* Use func names with argument signatures to change ownership [DEVOPS-102]
 
 
-<a name="v0.5.9"></a>
-## [v0.5.9](https://github.com/dhis2-sre/im-manager/compare/v0.5.8...v0.5.9)
+<a name="v0.5.6"></a>
+## [v0.5.6](https://github.com/dhis2-sre/im-manager/compare/v0.5.9...v0.5.6)
 
 > 2022-04-11
 
@@ -1997,8 +2019,8 @@
 * Use func names with argument signatures to change ownership [DEVOPS-102]
 
 
-<a name="v0.5.8"></a>
-## [v0.5.8](https://github.com/dhis2-sre/im-manager/compare/v0.5.7...v0.5.8)
+<a name="v0.5.9"></a>
+## [v0.5.9](https://github.com/dhis2-sre/im-manager/compare/v0.5.7...v0.5.9)
 
 > 2022-04-11
 
@@ -2018,7 +2040,7 @@
 
 
 <a name="v0.5.5"></a>
-## [v0.5.5](https://github.com/dhis2-sre/im-manager/compare/v0.5.6...v0.5.5)
+## [v0.5.5](https://github.com/dhis2-sre/im-manager/compare/v0.5.8...v0.5.5)
 
 > 2022-04-11
 
@@ -2027,8 +2049,8 @@
 * Use func names with argument signatures to change ownership [DEVOPS-102]
 
 
-<a name="v0.5.6"></a>
-## [v0.5.6](https://github.com/dhis2-sre/im-manager/compare/v0.5.3...v0.5.6)
+<a name="v0.5.8"></a>
+## [v0.5.8](https://github.com/dhis2-sre/im-manager/compare/v0.5.3...v0.5.8)
 
 > 2022-04-11
 
