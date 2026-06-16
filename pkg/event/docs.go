@@ -3,7 +3,7 @@ package event
 import "github.com/gin-contrib/sse"
 
 // swagger:response Stream
-type _ struct {
+type StreamBody struct {
 	// in: body
-	_ sse.Event
+	Body sse.Event
 }
