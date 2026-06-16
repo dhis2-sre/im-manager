@@ -141,10 +141,11 @@ func (s S3Client) Download(ctx context.Context, bucket string, key string, dst i
 	if err != nil {
 		var noBucket *types.NoSuchBucket
 		var noKey *types.NoSuchKey
+		var apiErr smithy.APIError
 		if errors.As(err, &noBucket) {
 			return errdef.NewNotFound("bucket %q does not exist", bucket)
 		}
-		if errors.As(err, &noKey) {
+		if errors.As(err, &noKey) || (errors.As(err, &apiErr) && apiErr.ErrorCode() == "NoSuchKey") {
 			return errdef.NewNotFound("key %q not found in bucket %q", key, bucket)
 		}
 		if authErr := s3AuthErr(err); authErr != nil {
