@@ -1,4 +1,92 @@
 
+<a name="0.71.0"></a>
+## [0.71.0](https://github.com/dhis2-sre/im-manager/compare/0.70.0...0.71.0)
+
+> 2026-06-16
+
+### Chore
+
+* disable Release workflow in favour of /release-im skill
+* drop v prefix from release tags
+
+### Docs
+
+* drop v prefix from release tag example ([#1566](https://github.com/dhis2-sre/im-manager/issues/1566))
+
+### Fix
+
+* replace GetObject with TryGetObject ([#1565](https://github.com/dhis2-sre/im-manager/issues/1565))
+* gate save-as on instance group instead of source database row ([#1568](https://github.com/dhis2-sre/im-manager/issues/1568))
+
+
+<a name="0.70.0"></a>
+## [0.70.0](https://github.com/dhis2-sre/im-manager/compare/0.69.0...0.70.0)
+
+> 2026-06-10
+
+### Chore
+
+* generate change log
+* bump default dhis2-core chart version to 0.34.11 ([#1549](https://github.com/dhis2-sre/im-manager/issues/1549))
+* hash passwords with Argon2id and migrate scrypt hashes on sign-in ([#1525](https://github.com/dhis2-sre/im-manager/issues/1525))
+* drop unused namespaces:create permission from ClusterRole ([#1526](https://github.com/dhis2-sre/im-manager/issues/1526))
+* upgrade testcontainers-go to v0.42.0 and fix API breakage ([#1527](https://github.com/dhis2-sre/im-manager/issues/1527))
+* drop unused build dependencies ([#1499](https://github.com/dhis2-sre/im-manager/issues/1499))
+* bump core chart version to 0.34.9 ([#1497](https://github.com/dhis2-sre/im-manager/issues/1497))
+* generate change log
+
+### Ci
+
+* add workflow for generating sbom ([#1078](https://github.com/dhis2-sre/im-manager/issues/1078))
+
+### Docs
+
+* document skaffold kubeconfig and im-tooling deploy setup ([#1538](https://github.com/dhis2-sre/im-manager/issues/1538))
+
+### Feat
+
+* add PUT /groups/:name endpoint for updating groups ([#1537](https://github.com/dhis2-sre/im-manager/issues/1537))
+* add generate-env.sh and improve quick start docs ([#1546](https://github.com/dhis2-sre/im-manager/issues/1546))
+* grant ingressclasses:list and clusterissuers:list to im-manager ClusterRole ([#1530](https://github.com/dhis2-sre/im-manager/issues/1530))
+* per-environment CORS via skaffold profiles ([#1524](https://github.com/dhis2-sre/im-manager/issues/1524))
+* initial Google SSO ([#1517](https://github.com/dhis2-sre/im-manager/issues/1517))
+* initial working notifications ([#1516](https://github.com/dhis2-sre/im-manager/issues/1516))
+* optionally log SQL queries via DATABASE_LOG_QUERIES ([#1518](https://github.com/dhis2-sre/im-manager/issues/1518))
+* support setting cluster when creating a group ([#1492](https://github.com/dhis2-sre/im-manager/issues/1492))
+
+### Fix
+
+* dump DB without --clean [DEVOPS-713] ([#1559](https://github.com/dhis2-sre/im-manager/issues/1559))
+* use named struct fields in swagger:response to fix go-swagger v0.34.0 compat ([#1563](https://github.com/dhis2-sre/im-manager/issues/1563))
+* render dhis2-core S3 storage block as valid YAML ([#1535](https://github.com/dhis2-sre/im-manager/issues/1535))
+* exclude apps/ from filestore backup to prevent accumulation
+* replace IM_ACCESS_TOKEN pod env with signed download URLs for db/minio seed scripts
+* disable helmfile createNamespace default so deploys don't need namespaces:create ([#1531](https://github.com/dhis2-sre/im-manager/issues/1531))
+* skip e2e slack notification on cancelled downstream runs ([#1519](https://github.com/dhis2-sre/im-manager/issues/1519))
+* abort with 401 when user context is missing in RequireAdministrator ([#1502](https://github.com/dhis2-sre/im-manager/issues/1502))
+* cap external database download link expiration at 30 days ([#1513](https://github.com/dhis2-sre/im-manager/issues/1513))
+* remove reflex from Dockerfile and docker-compose ([#1514](https://github.com/dhis2-sre/im-manager/issues/1514))
+* replace AES-CFB with AES-GCM for instance parameter encryption ([#1515](https://github.com/dhis2-sre/im-manager/issues/1515))
+* drop refresh token from validation error log ([#1501](https://github.com/dhis2-sre/im-manager/issues/1501))
+* require group membership or admin for group/user enumeration endpoints ([#1511](https://github.com/dhis2-sre/im-manager/issues/1511))
+* encode rememberMe in refresh JWT instead of trusting client cookie ([#1509](https://github.com/dhis2-sre/im-manager/issues/1509))
+* use mime.FormatMediaType for Content-Disposition filename ([#1507](https://github.com/dhis2-sre/im-manager/issues/1507))
+* check CanWriteDeployment in SaveInstance to prevent cross-group access ([#1503](https://github.com/dhis2-sre/im-manager/issues/1503))
+* exec pg_dump directly to prevent command injection via instance parameters ([#1506](https://github.com/dhis2-sre/im-manager/issues/1506))
+* validate organization/repository/tag against safe charset in ImageExists ([#1508](https://github.com/dhis2-sre/im-manager/issues/1508))
+* align admin user update password minimum to 24 characters ([#1505](https://github.com/dhis2-sre/im-manager/issues/1505))
+* persist user before sending validation email to prevent mail-bomb ([#1504](https://github.com/dhis2-sre/im-manager/issues/1504))
+* correct swagger spec for /databases/external/{uuid} - remove auth, fix uuid type ([#1510](https://github.com/dhis2-sre/im-manager/issues/1510))
+* return 400 instead of 500 for password validation errors on reset ([#1498](https://github.com/dhis2-sre/im-manager/issues/1498))
+* backup filestore when saving database ([#1496](https://github.com/dhis2-sre/im-manager/issues/1496))
+* set proxy-busy-buffers-size alongside proxy-buffer-size ([#1494](https://github.com/dhis2-sre/im-manager/issues/1494))
+* default TARGETARCH to amd64 in Dockerfile ([#1493](https://github.com/dhis2-sre/im-manager/issues/1493))
+
+### Reverts
+
+* fix: exclude apps/ from filestore backup to prevent accumulation
+
+
 <a name="0.69.0"></a>
 ## [0.69.0](https://github.com/dhis2-sre/im-manager/compare/0.68.0...0.69.0)
 
@@ -49,7 +137,7 @@
 
 
 <a name="v0.67.0"></a>
-## [v0.67.0](https://github.com/dhis2-sre/im-manager/compare/v0.66.0...v0.67.0)
+## [v0.67.0](https://github.com/dhis2-sre/im-manager/compare/0.66.0...v0.67.0)
 
 > 2026-05-07
 
@@ -74,14 +162,14 @@
 * add SaveAs and BackupService integration tests ([#1375](https://github.com/dhis2-sre/im-manager/issues/1375))
 
 
-<a name="v0.66.0"></a>
-## [v0.66.0](https://github.com/dhis2-sre/im-manager/compare/0.66.0...v0.66.0)
+<a name="0.66.0"></a>
+## [0.66.0](https://github.com/dhis2-sre/im-manager/compare/v0.66.0...0.66.0)
 
 > 2026-04-22
 
 
-<a name="0.66.0"></a>
-## [0.66.0](https://github.com/dhis2-sre/im-manager/compare/0.65.3...0.66.0)
+<a name="v0.66.0"></a>
+## [v0.66.0](https://github.com/dhis2-sre/im-manager/compare/0.65.3...v0.66.0)
 
 > 2026-04-22
 
@@ -653,7 +741,7 @@
 
 
 <a name="v0.45.0"></a>
-## [v0.45.0](https://github.com/dhis2-sre/im-manager/compare/v0.44.0...v0.45.0)
+## [v0.45.0](https://github.com/dhis2-sre/im-manager/compare/v0.43.0...v0.45.0)
 
 > 2024-11-27
 
@@ -663,14 +751,14 @@
 * order public instances as stable, development and nightly
 
 
-<a name="v0.44.0"></a>
-## [v0.44.0](https://github.com/dhis2-sre/im-manager/compare/v0.43.0...v0.44.0)
+<a name="v0.43.0"></a>
+## [v0.43.0](https://github.com/dhis2-sre/im-manager/compare/v0.44.0...v0.43.0)
 
 > 2024-11-27
 
 
-<a name="v0.43.0"></a>
-## [v0.43.0](https://github.com/dhis2-sre/im-manager/compare/v0.42.0...v0.43.0)
+<a name="v0.44.0"></a>
+## [v0.44.0](https://github.com/dhis2-sre/im-manager/compare/v0.41.0...v0.44.0)
 
 > 2024-11-27
 
@@ -680,14 +768,14 @@
 * use PAT
 
 
-<a name="v0.42.0"></a>
-## [v0.42.0](https://github.com/dhis2-sre/im-manager/compare/v0.41.0...v0.42.0)
+<a name="v0.41.0"></a>
+## [v0.41.0](https://github.com/dhis2-sre/im-manager/compare/v0.42.0...v0.41.0)
 
 > 2024-11-20
 
 
-<a name="v0.41.0"></a>
-## [v0.41.0](https://github.com/dhis2-sre/im-manager/compare/v0.40.0...v0.41.0)
+<a name="v0.42.0"></a>
+## [v0.42.0](https://github.com/dhis2-sre/im-manager/compare/v0.40.0...v0.42.0)
 
 > 2024-11-20
 
@@ -1911,37 +1999,28 @@
 
 
 <a name="v0.5.10"></a>
-## [v0.5.10](https://github.com/dhis2-sre/im-manager/compare/v0.5.9...v0.5.10)
+## [v0.5.10](https://github.com/dhis2-sre/im-manager/compare/v0.5.6...v0.5.10)
 
 > 2022-04-11
 
 ### Fix
 
 * Only change the ownership of generate_uid() func [DEVOPS-102]
+* Use func names with argument signatures to change ownership [DEVOPS-102]
+
+
+<a name="v0.5.6"></a>
+## [v0.5.6](https://github.com/dhis2-sre/im-manager/compare/v0.5.9...v0.5.6)
+
+> 2022-04-11
+
+### Fix
+
+* Use func names with argument signatures to change ownership [DEVOPS-102]
 
 
 <a name="v0.5.9"></a>
-## [v0.5.9](https://github.com/dhis2-sre/im-manager/compare/v0.5.8...v0.5.9)
-
-> 2022-04-11
-
-### Fix
-
-* Use func names with argument signatures to change ownership [DEVOPS-102]
-
-
-<a name="v0.5.8"></a>
-## [v0.5.8](https://github.com/dhis2-sre/im-manager/compare/v0.5.5...v0.5.8)
-
-> 2022-04-11
-
-### Fix
-
-* Use func names with argument signatures to change ownership [DEVOPS-102]
-
-
-<a name="v0.5.5"></a>
-## [v0.5.5](https://github.com/dhis2-sre/im-manager/compare/v0.5.7...v0.5.5)
+## [v0.5.9](https://github.com/dhis2-sre/im-manager/compare/v0.5.7...v0.5.9)
 
 > 2022-04-11
 
@@ -1951,7 +2030,7 @@
 
 
 <a name="v0.5.7"></a>
-## [v0.5.7](https://github.com/dhis2-sre/im-manager/compare/v0.5.6...v0.5.7)
+## [v0.5.7](https://github.com/dhis2-sre/im-manager/compare/v0.5.5...v0.5.7)
 
 > 2022-04-11
 
@@ -1960,8 +2039,18 @@
 * Use func names with argument signatures to change ownership [DEVOPS-102]
 
 
-<a name="v0.5.6"></a>
-## [v0.5.6](https://github.com/dhis2-sre/im-manager/compare/v0.5.3...v0.5.6)
+<a name="v0.5.5"></a>
+## [v0.5.5](https://github.com/dhis2-sre/im-manager/compare/v0.5.8...v0.5.5)
+
+> 2022-04-11
+
+### Fix
+
+* Use func names with argument signatures to change ownership [DEVOPS-102]
+
+
+<a name="v0.5.8"></a>
+## [v0.5.8](https://github.com/dhis2-sre/im-manager/compare/v0.5.3...v0.5.8)
 
 > 2022-04-11
 
