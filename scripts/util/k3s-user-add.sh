@@ -6,14 +6,22 @@ USER_NAME=""
 NAMESPACE=""
 DURATION="8760h"
 CLUSTER_WIDE=""
+VIEW=""
 POSITIONAL_ARGS=()
 for arg in "$@"; do
     if [[ "$arg" == "--cluster-wide" ]]; then
         CLUSTER_WIDE="true"
+    elif [[ "$arg" == "--view" ]]; then
+        VIEW="true"
     else
         POSITIONAL_ARGS+=("$arg")
     fi
 done
+
+ROLE="edit"
+if [[ -n "$VIEW" ]]; then
+    ROLE="view"
+fi
 
 if [[ ${#POSITIONAL_ARGS[@]} -ge 1 ]]; then
     USER_NAME="${POSITIONAL_ARGS[0]}"
@@ -28,7 +36,7 @@ fi
 OUTPUT_FILE="${USER_NAME}-config.yaml"
 
 if [[ -z "$USER_NAME" ]]; then
-    echo "Usage: $0 <username> [namespace] [--cluster-wide] [duration]"
+    echo "Usage: $0 <username> [namespace] [--cluster-wide] [--view] [duration]"
     exit 1
 fi
 
@@ -37,7 +45,7 @@ if [[ -n "$CLUSTER_WIDE" && -z "$NAMESPACE" ]]; then
 fi
 
 if [[ -z "$NAMESPACE" ]]; then
-    echo "Usage: $0 <username> <namespace> [duration]"
+    echo "Usage: $0 <username> <namespace> [--view] [duration]"
     exit 1
 fi
 
@@ -79,7 +87,7 @@ subjects:
   namespace: ${NAMESPACE}
 roleRef:
   kind: ClusterRole
-  name: edit
+  name: ${ROLE}
   apiGroup: rbac.authorization.k8s.io
 EOF
 else
@@ -100,7 +108,7 @@ subjects:
   namespace: ${NAMESPACE}
 roleRef:
   kind: ClusterRole
-  name: edit
+  name: ${ROLE}
   apiGroup: rbac.authorization.k8s.io
 EOF
 fi
@@ -134,7 +142,7 @@ users:
 EOF
 
 if [[ -n "$CLUSTER_WIDE" ]]; then
-    echo "Success! Config saved to: $OUTPUT_FILE (cluster-wide access)"
+    echo "Success! Config saved to: $OUTPUT_FILE (cluster-wide access, role: ${ROLE})"
 else
-    echo "Success! Config saved to: $OUTPUT_FILE"
+    echo "Success! Config saved to: $OUTPUT_FILE (role: ${ROLE})"
 fi
