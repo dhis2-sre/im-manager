@@ -16,7 +16,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/dhis2-sre/im-manager/pkg/storage"
 	"github.com/dhis2-sre/im-manager/pkg/token"
 
 	v1 "k8s.io/api/core/v1"
@@ -29,7 +29,7 @@ import (
 	"github.com/dhis2-sre/im-manager/pkg/model"
 )
 
-func NewService(logger *slog.Logger, instanceRepository *repository, groupService groupService, stackService stack.Service, helmfileService helmfile, s3Client *s3.Client, s3Bucket string, tokenService *token.TokenService) *Service {
+func NewService(logger *slog.Logger, instanceRepository *repository, groupService groupService, stackService stack.Service, helmfileService helmfile, s3Client *storage.S3Client, s3Bucket string, tokenService *token.TokenService) *Service {
 	return &Service{
 		logger:             logger,
 		instanceRepository: instanceRepository,
@@ -63,7 +63,7 @@ type Service struct {
 	groupService       groupService
 	stackService       stack.Service
 	helmfileService    helmfile
-	s3Client           *s3.Client
+	s3Client           *storage.S3Client
 	s3Bucket           string
 	tokenService       *token.TokenService
 	externalDownloads  externalDownloadCreator

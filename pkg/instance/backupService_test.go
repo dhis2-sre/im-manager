@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/dhis2-sre/im-manager/pkg/inttest"
+	"github.com/dhis2-sre/im-manager/pkg/storage"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
 	"github.com/stretchr/testify/assert"
@@ -50,7 +51,8 @@ func TestBackupServiceIntegration(t *testing.T) {
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	source := NewMinioBackupSource(logger, minioClient, minioBucket)
-	backupService := NewBackupService(logger, s3Test.Client)
+	// nil uploader: PerformBackup uses StreamUpload, which only needs the multipart client methods.
+	backupService := NewBackupService(logger, storage.NewS3Client(logger, s3Test.Client, nil))
 
 	s3Key := "group/save-name-fs.tar.gz"
 	require.NoError(t, backupService.PerformBackup(ctx, s3APISource{source}, s3Bucket, s3Key))

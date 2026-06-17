@@ -245,7 +245,7 @@ func TestInstanceHandler(t *testing.T) {
 		require.NoError(t, db.Create(target).Error)
 
 		// The shared instanceService is wired with a nil S3 client; build one with the real client.
-		fsService := instance.NewService(logger, instanceRepo, groupService, stackService, helmfileService, s3.Client, s3Bucket, tokenService)
+		fsService := instance.NewService(logger, instanceRepo, groupService, stackService, helmfileService, s3Client, s3Bucket, tokenService)
 		require.NoError(t, fsService.FilestoreBackup(context.Background(), &coreInstance, target.Name, target))
 
 		// The exec-built tar.gz lands in S3 and preserves the seeded object under its logical key.
