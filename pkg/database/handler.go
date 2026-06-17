@@ -19,7 +19,7 @@ import (
 	"github.com/google/uuid"
 )
 
-func NewHandler(logger *slog.Logger, databaseService *service, groupService groupService, instanceService instanceService, stackService stackService) Handler {
+func NewHandler(logger *slog.Logger, databaseService *Service, groupService groupService, instanceService instanceService, stackService stackService) Handler {
 	return Handler{
 		logger:          logger,
 		databaseService: databaseService,
@@ -31,7 +31,7 @@ func NewHandler(logger *slog.Logger, databaseService *service, groupService grou
 
 type Handler struct {
 	logger          *slog.Logger
-	databaseService *service
+	databaseService *Service
 	groupService    groupService
 	instanceService instanceService
 	stackService    stackService
