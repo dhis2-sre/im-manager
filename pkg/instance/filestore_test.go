@@ -1,6 +1,7 @@
 package instance
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -14,6 +15,51 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
 )
+
+// fakeBackupSource serves a fixed set of objects from memory, for exercising
+// writeTarGz without a real bucket.
+type fakeBackupSource struct {
+	objects map[string][]byte
+}
+
+func (f fakeBackupSource) List(ctx context.Context) (<-chan BackupObject, error) {
+	ch := make(chan BackupObject)
+	go func() {
+		defer close(ch)
+		for path, data := range f.objects {
+			select {
+			case ch <- BackupObject{Path: path, Size: int64(len(data))}:
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+	return ch, nil
+}
+
+func (f fakeBackupSource) Get(ctx context.Context, path string) (io.ReadCloser, error) {
+	data, ok := f.objects[path]
+	if !ok {
+		return nil, fmt.Errorf("object not found: %s", path)
+	}
+	return io.NopCloser(bytes.NewReader(data)), nil
+}
+
+func TestWriteTarGzConcurrent(t *testing.T) {
+	objects := make(map[string][]byte)
+	for i := 0; i < 500; i++ { // more objects than filestoreReadWorkers, to exercise the pool
+		objects[fmt.Sprintf("apps/app-%03d/file.txt", i)] = []byte(fmt.Sprintf("content-%d", i))
+	}
+
+	var buf bytes.Buffer
+	require.NoError(t, writeTarGz(context.Background(), fakeBackupSource{objects: objects}, &buf))
+
+	entries := extractTarGz(t, buf.Bytes())
+	require.Len(t, entries, len(objects)) // no objects dropped despite concurrency
+	for path, data := range objects {
+		assert.Equal(t, data, entries[path], "content mismatch for %s", path)
+	}
+}
 
 type fakeExecutor struct {
 	gotNamespace string

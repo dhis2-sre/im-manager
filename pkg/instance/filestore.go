@@ -11,6 +11,19 @@ import (
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
+	"golang.org/x/sync/errgroup"
+	"golang.org/x/sync/semaphore"
+)
+
+const (
+	// filestoreReadWorkers caps how many objects are fetched from the source
+	// bucket concurrently. The s3 backend lists many small objects, so serial
+	// per-object GETs dominate wall-clock; fetching in parallel is the speedup.
+	filestoreReadWorkers = 16
+	// filestoreReadByteBudget caps the total bytes of fetched-but-not-yet-written
+	// objects held in memory at once. A few large objects throttle themselves
+	// against this budget instead of letting worker count alone bound memory.
+	filestoreReadByteBudget = 256 << 20 // 256 MiB
 )
 
 // filestoreStreamer writes a gzip'd tar of an instance's filestore to w.
@@ -22,6 +35,11 @@ type filestoreStreamer interface {
 
 // writeTarGz builds a gzip'd tar from a BackupSource (object lister) and writes
 // it to w. Entry names are object keys, matching what mc mirror restores.
+//
+// Objects are fetched concurrently by a bounded worker pool and handed to a
+// single goroutine that owns the tar.Writer. Tar entry order is irrelevant
+// because seed-minio.sh restores by object key, so the writer can emit objects
+// in whatever order they finish fetching.
 func writeTarGz(ctx context.Context, source BackupSource, w io.Writer) error {
 	gw := gzip.NewWriter(w)
 	defer gw.Close()
@@ -34,35 +52,102 @@ func writeTarGz(ctx context.Context, source BackupSource, w io.Writer) error {
 		return fmt.Errorf("list objects: %v", err)
 	}
 
-	for object := range objectCh {
-		if object.Err != nil {
-			return object.Err
-		}
-		if err := writeTarObject(ctx, tw, source, object); err != nil {
-			return err
-		}
+	type fetchedObject struct {
+		object BackupObject
+		data   []byte
 	}
-	return nil
+	results := make(chan fetchedObject)
+	budget := semaphore.NewWeighted(filestoreReadByteBudget)
+
+	g, ctx := errgroup.WithContext(ctx)
+
+	// Fetchers: read objects concurrently into memory, bounded by worker count
+	// and the in-flight byte budget, then hand each to the writer below.
+	g.Go(func() error {
+		defer close(results)
+
+		fetchers, ctx := errgroup.WithContext(ctx)
+		fetchers.SetLimit(filestoreReadWorkers)
+
+		for object := range objectCh {
+			if object.Err != nil {
+				return object.Err
+			}
+			object := object
+			fetchers.Go(func() error {
+				weight := objectWeight(object.Size)
+				if err := budget.Acquire(ctx, weight); err != nil {
+					return err
+				}
+				defer budget.Release(weight)
+
+				data, err := readObject(ctx, source, object.Path)
+				if err != nil {
+					return err
+				}
+				select {
+				case results <- fetchedObject{object: object, data: data}:
+					return nil
+				case <-ctx.Done():
+					return ctx.Err()
+				}
+			})
+		}
+		return fetchers.Wait()
+	})
+
+	// Writer: a single goroutine owns the non-concurrency-safe tar.Writer.
+	g.Go(func() error {
+		for f := range results {
+			if err := writeTarBytes(tw, f.object, f.data); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+
+	return g.Wait()
 }
 
-func writeTarObject(ctx context.Context, tw *tar.Writer, source BackupSource, object BackupObject) error {
-	reader, err := source.Get(ctx, object.Path)
+// objectWeight clamps an object's size into [1, budget] so the byte budget can
+// account for it without rejecting an object that is larger than the budget.
+func objectWeight(size int64) int64 {
+	switch {
+	case size <= 0:
+		return 1
+	case size > filestoreReadByteBudget:
+		return filestoreReadByteBudget
+	default:
+		return size
+	}
+}
+
+func readObject(ctx context.Context, source BackupSource, path string) ([]byte, error) {
+	reader, err := source.Get(ctx, path)
 	if err != nil {
-		return fmt.Errorf("failed to get object %s: %v", object.Path, err)
+		return nil, fmt.Errorf("failed to get object %s: %v", path, err)
 	}
 	defer reader.Close()
 
+	data, err := io.ReadAll(reader)
+	if err != nil {
+		return nil, fmt.Errorf("read object %s: %v", path, err)
+	}
+	return data, nil
+}
+
+func writeTarBytes(tw *tar.Writer, object BackupObject, data []byte) error {
 	header := &tar.Header{
 		Name:    object.Path,
-		Size:    object.Size,
+		Size:    int64(len(data)),
 		Mode:    0644,
 		ModTime: object.LastModified,
 	}
 	if err := tw.WriteHeader(header); err != nil {
 		return fmt.Errorf("write tar header for %s: %v", object.Path, err)
 	}
-	if _, err := io.Copy(tw, reader); err != nil {
-		return fmt.Errorf("copy object %s to tar: %v", object.Path, err)
+	if _, err := tw.Write(data); err != nil {
+		return fmt.Errorf("write object %s to tar: %v", object.Path, err)
 	}
 	return nil
 }
