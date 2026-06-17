@@ -9,7 +9,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/config v1.32.18
 	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.22.19
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.102.0
-	github.com/aws/smithy-go v1.26.0
+	github.com/aws/smithy-go v1.27.2
 	github.com/dominikbraun/graph v0.23.0
 	github.com/getsops/sops/v3 v3.13.1
 	github.com/gin-contrib/cors v1.7.7
@@ -31,7 +31,7 @@ require (
 	github.com/moby/moby/api v1.54.2
 	github.com/orandin/slog-gorm v1.4.0
 	github.com/orlangure/gnomock v0.0.0-00010101000000-000000000000
-	github.com/rabbitmq/amqp091-go v1.11.0
+	github.com/rabbitmq/amqp091-go v1.12.0
 	github.com/rabbitmq/rabbitmq-stream-go-client v1.8.1
 	github.com/stretchr/testify v1.11.1
 	github.com/testcontainers/testcontainers-go v0.42.0
