@@ -23,6 +23,7 @@ releases:
           className: "{{ env "INGRESS_CLASS" }}"
           annotations:
             nginx.ingress.kubernetes.io/proxy-body-size: 128m
+            nginx.ingress.kubernetes.io/proxy-read-timeout: "180"
       - dhis2Home: "{{ requiredEnv "DHIS2_HOME" }}"
       - catalinaOpts: "-Dcontext.path=/{{ requiredEnv "INSTANCE_PATH_NAME" }} -Dcontext.sameSiteCookies={{ requiredEnv "SAME_SITE_COOKIES" }}"
       - contextPath: /{{ requiredEnv "INSTANCE_PATH_NAME" }}
