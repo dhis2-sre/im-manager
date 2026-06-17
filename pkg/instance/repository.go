@@ -71,7 +71,7 @@ func (r repository) SaveDeployment(ctx context.Context, deployment *model.Deploy
 	err := r.db.WithContext(ctx).Save(&deployment).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrDuplicatedKey) {
-			return errdef.NewDuplicated("a deployment named %q already exists", deployment.Name)
+			return errdef.NewDuplicated("a deployment named %q already exists in group %q", deployment.Name, deployment.GroupName)
 		}
 		return fmt.Errorf("failed to save deployment: %v", err)
 	}
@@ -149,6 +149,9 @@ func (r repository) SaveInstance(ctx context.Context, instance *model.Deployment
 
 	err = r.db.WithContext(ctx).Session(&gorm.Session{FullSaveAssociations: true}).Save(instance).Error
 	if err != nil {
+		if errors.Is(err, gorm.ErrDuplicatedKey) {
+			return errdef.NewDuplicated("an instance for stack %q already exists in deployment %q in group %q", instance.StackName, instance.Name, instance.GroupName)
+		}
 		return fmt.Errorf("failed to save instance: %v", err)
 	}
 	return nil
