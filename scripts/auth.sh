@@ -2,6 +2,8 @@
 
 set -euo pipefail
 
+: "${HTTP:=http}"
+
 IM_USER_TYPE="${1:-}"
 
 TOKEN_CACHE_FILE=./.access_token_cache_$IM_USER_TYPE

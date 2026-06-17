@@ -45,6 +45,20 @@ type AWSS3Uploader interface {
 	Upload(ctx context.Context, input *s3.PutObjectInput, opts ...func(*manager.Uploader)) (*manager.UploadOutput, error)
 }
 
+// s3AuthErr returns a ServiceUnavailable error if err is an S3 authentication or authorization
+// failure, indicating misconfigured credentials or IAM permissions. Returns nil otherwise.
+func s3AuthErr(err error) error {
+	var apiErr smithy.APIError
+	if !errors.As(err, &apiErr) {
+		return nil
+	}
+	switch apiErr.ErrorCode() {
+	case "AuthorizationHeaderMalformed", "InvalidAccessKeyId", "SignatureDoesNotMatch", "AccessDenied", "RequestTimeTooSkewed":
+		return errdef.NewServiceUnavailable("S3 authentication failed: %s", apiErr.ErrorMessage())
+	}
+	return nil
+}
+
 func (s S3Client) Copy(bucket string, source string, destination string) error {
 	_, err := s.client.CopyObject(context.TODO(), &s3.CopyObjectInput{
 		Bucket:     aws.String(bucket),
@@ -53,6 +67,9 @@ func (s S3Client) Copy(bucket string, source string, destination string) error {
 		ACL:        types.ObjectCannedACLPrivate,
 	})
 	if err != nil {
+		if authErr := s3AuthErr(err); authErr != nil {
+			return authErr
+		}
 		return fmt.Errorf("error copying object from %q to %q: %s", source, destination, err)
 	}
 	return nil
@@ -94,6 +111,9 @@ func (s S3Client) Upload(ctx context.Context, bucket string, key string, body Re
 		ACL:    types.ObjectCannedACLPrivate,
 	})
 	if err != nil {
+		if authErr := s3AuthErr(err); authErr != nil {
+			return authErr
+		}
 		return fmt.Errorf("error uploading object to bucket %q using key %q: %s", bucket, key, err)
 	}
 	return nil
@@ -105,6 +125,9 @@ func (s S3Client) Delete(bucket string, key string) error {
 		Key:    aws.String(key),
 	})
 	if err != nil {
+		if authErr := s3AuthErr(err); authErr != nil {
+			return authErr
+		}
 		return fmt.Errorf("error deleting object from bucket %q using key %q: %s", bucket, key, err)
 	}
 	return nil
@@ -118,11 +141,15 @@ func (s S3Client) Download(ctx context.Context, bucket string, key string, dst i
 	if err != nil {
 		var noBucket *types.NoSuchBucket
 		var noKey *types.NoSuchKey
+		var apiErr smithy.APIError
 		if errors.As(err, &noBucket) {
 			return errdef.NewNotFound("bucket %q does not exist", bucket)
 		}
-		if errors.As(err, &noKey) {
+		if errors.As(err, &noKey) || (errors.As(err, &apiErr) && apiErr.ErrorCode() == "NoSuchKey") {
 			return errdef.NewNotFound("key %q not found in bucket %q", key, bucket)
+		}
+		if authErr := s3AuthErr(err); authErr != nil {
+			return authErr
 		}
 		return fmt.Errorf("error downloading object from bucket %q using key %q: %s", bucket, key, err)
 	}
@@ -179,9 +206,8 @@ func (s S3Client) InitiateMultipartUpload(ctx context.Context, bucket, key, cont
 	}
 	resp, err := s.client.CreateMultipartUpload(ctx, input)
 	if err != nil {
-		var apiErr smithy.APIError
-		if errors.As(err, &apiErr) && apiErr.ErrorCode() == "InvalidAccessKeyId" {
-			return "", errdef.NewServiceUnavailable("invalid AWS access key ID: %s", apiErr.ErrorMessage())
+		if authErr := s3AuthErr(err); authErr != nil {
+			return "", authErr
 		}
 		return "", err
 	}
