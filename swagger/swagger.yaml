@@ -404,9 +404,20 @@ definitions:
                 x-go-name: Name
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/database
+    HealthResponse:
+        properties:
+            status:
+                type: string
+                x-go-name: Status
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/health
     InstanceStatus:
         type: string
         x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
+    IntegrationResponse:
+        description: Response depends on the input and can be either a list or a map
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/integration
     Lock:
         properties:
             databaseId:
@@ -523,10 +534,6 @@ definitions:
                 x-go-name: Token
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/user
-    Response:
-        description: Response depends on the input and can be either a list or a map
-        type: object
-        x-go-package: github.com/dhis2-sre/im-manager/pkg/integration
     SaveDeploymentRequest:
         properties:
             description:
@@ -781,7 +788,7 @@ paths:
                     $ref: '#/definitions/CreateClusterRequest'
             responses:
                 "201":
-                    description: Cluster
+                    description: Cluster domain object defining a cluster
                     schema:
                         $ref: '#/definitions/Cluster'
                 "400":
@@ -834,7 +841,7 @@ paths:
                   x-go-name: ID
             responses:
                 "200":
-                    description: Cluster
+                    description: Cluster domain object defining a cluster
                     schema:
                         $ref: '#/definitions/Cluster'
                 "400":
@@ -867,7 +874,7 @@ paths:
                     $ref: '#/definitions/UpdateClusterRequest'
             responses:
                 "200":
-                    description: Cluster
+                    description: Cluster domain object defining a cluster
                     schema:
                         $ref: '#/definitions/Cluster'
                 "400":
@@ -1270,7 +1277,7 @@ paths:
                     $ref: '#/definitions/SaveDeploymentRequest'
             responses:
                 "200":
-                    description: Deployment
+                    description: OK
                     schema:
                         $ref: '#/definitions/Deployment'
                 "401":
@@ -1321,7 +1328,7 @@ paths:
                   x-go-name: ID
             responses:
                 "200":
-                    description: Deployment
+                    description: OK
                     schema:
                         $ref: '#/definitions/Deployment'
                 "401":
@@ -1353,7 +1360,7 @@ paths:
                     $ref: '#/definitions/UpdateDeploymentRequest'
             responses:
                 "200":
-                    description: Deployment
+                    description: OK
                     schema:
                         $ref: '#/definitions/Deployment'
                 "400":
@@ -1529,14 +1536,17 @@ paths:
             description: Find all groups by user
             operationId: findAllGroupsByUser
             parameters:
-                - description: deployable
+                - description: |-
+                    deployable
+                    type: string
+                    description: if true, only deployable groups are returned. Otherwise, all groups are returned
                   in: query
                   name: deployable
                   type: string
                   x-go-name: Deployable
             responses:
                 "200":
-                    description: Group
+                    description: Group domain object defining a group
                     schema:
                         items:
                             $ref: '#/definitions/Group'
@@ -1560,7 +1570,7 @@ paths:
                     $ref: '#/definitions/CreateGroupRequest'
             responses:
                 "201":
-                    description: Group
+                    description: Group domain object defining a group
                     schema:
                         $ref: '#/definitions/Group'
                 "400":
@@ -1737,7 +1747,7 @@ paths:
                   x-go-name: UserID
             responses:
                 "201":
-                    description: Group
+                    description: Group domain object defining a group
                     schema:
                         $ref: '#/definitions/Group'
                 "400":
@@ -1763,7 +1773,7 @@ paths:
                   x-go-name: Name
             responses:
                 "200":
-                    description: Group
+                    description: Group domain object defining a group
                     schema:
                         $ref: '#/definitions/Group'
                 "401":
@@ -1794,7 +1804,7 @@ paths:
                     $ref: '#/definitions/UpdateGroupRequest'
             responses:
                 "200":
-                    description: Group
+                    description: Group domain object defining a group
                     schema:
                         $ref: '#/definitions/Group'
                 "400":
@@ -1822,7 +1832,7 @@ paths:
                   x-go-name: Name
             responses:
                 "200":
-                    description: Group
+                    description: Group domain object defining a group
                     schema:
                         $ref: '#/definitions/Group'
                 "401":
@@ -1904,7 +1914,10 @@ paths:
                   required: true
                   type: integer
                   x-go-name: ID
-                - description: selector
+                - description: |-
+                    selector
+                    type: string
+                    description: stream logs of a specific pod labeled with im-type=<selector>
                   in: query
                   name: selector
                   type: string
@@ -1986,7 +1999,10 @@ paths:
                   required: true
                   type: integer
                   x-go-name: ID
-                - description: selector
+                - description: |-
+                    selector
+                    type: string
+                    description: restart a specific deployment labeled with im-type=<selector>
                   in: query
                   name: selector
                   type: string
@@ -2118,7 +2134,7 @@ paths:
             operationId: me
             responses:
                 "200":
-                    description: User
+                    description: User domain object defining a user
                     schema:
                         $ref: '#/definitions/User'
                 "401":
@@ -2304,7 +2320,7 @@ paths:
                     $ref: '#/definitions/signUpRequest'
             responses:
                 "201":
-                    description: User
+                    description: User domain object defining a user
                     schema:
                         $ref: '#/definitions/User'
                 "400":
@@ -2349,7 +2365,7 @@ paths:
                   x-go-name: ID
             responses:
                 "200":
-                    description: User
+                    description: User domain object defining a user
                     schema:
                         $ref: '#/definitions/User'
                 "401":
@@ -2381,7 +2397,7 @@ paths:
                     $ref: '#/definitions/updateUserRequest'
             responses:
                 "200":
-                    description: User
+                    description: User domain object defining a user
                     schema:
                         $ref: '#/definitions/User'
                 "401":
@@ -2490,6 +2506,8 @@ responses:
             type: array
     Error:
         description: ""
+        schema:
+            type: string
     GroupsWithDatabases:
         description: ""
         schema:
@@ -2508,6 +2526,8 @@ responses:
             type: array
     InstanceLogsResponse:
         description: ""
+        schema:
+            type: string
     Lock:
         description: ""
         schema:
@@ -2521,7 +2541,7 @@ responses:
     Response:
         description: ""
         schema:
-            $ref: '#/definitions/Response'
+            $ref: '#/definitions/IntegrationResponse'
     Stack:
         description: ""
         schema:
