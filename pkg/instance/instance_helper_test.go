@@ -139,8 +139,7 @@ func minioPodName(t *testing.T, k8sClient *inttest.K8sClient, namespace string, 
 }
 
 // waitForCorePodRunning polls until the core instance's default pod is Running, returning its name
-// and primary container. It waits for Running, not Ready, because the backup only execs into the
-// pod - the DHIS2 app can exceed the readiness timeout on a loaded runner.
+// and primary container.
 func waitForCorePodRunning(t *testing.T, k8sClient *inttest.K8sClient, namespace string, instanceID uint, timeout time.Duration) (string, string) {
 	t.Helper()
 	selector := fmt.Sprintf("im-id=%d,im-default=true", instanceID)
@@ -160,8 +159,7 @@ func waitForCorePodRunning(t *testing.T, k8sClient *inttest.K8sClient, namespace
 	}
 }
 
-// extractTarGzEntries unpacks a gzip'd tar into a map of file path -> contents, stripping any
-// leading "./".
+// extractTarGzEntries unpacks a gzip'd tar into a map of file path -> contents, stripping any leading "./".
 func extractTarGzEntries(t *testing.T, data []byte) map[string][]byte {
 	t.Helper()
 	gr, err := gzip.NewReader(bytes.NewReader(data))

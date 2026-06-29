@@ -900,7 +900,7 @@ func (s Service) FilestoreBackup(ctx context.Context, instance *model.Deployment
 	baseName = strings.TrimSuffix(baseName, ".pgc")
 	baseName = strings.TrimSuffix(baseName, ".tar.gz")
 
-	streamer, err := s.filestoreStreamerFor(core, group.Cluster, baseName)
+	streamer, err := s.filestoreStreamerFor(core, group.Cluster)
 	if err != nil {
 		return err
 	}

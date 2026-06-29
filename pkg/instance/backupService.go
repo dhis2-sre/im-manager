@@ -31,7 +31,6 @@ type s3StreamUploader interface {
 	StreamUpload(ctx context.Context, bucket, key, contentType string, r io.Reader) (int64, error)
 }
 
-// NewBackupService creates a new backup service instance
 func NewBackupService(logger *slog.Logger, uploader s3StreamUploader) *BackupService {
 	return &BackupService{logger: logger, uploader: uploader}
 }
@@ -42,8 +41,7 @@ type BackupService struct {
 	uploader s3StreamUploader
 }
 
-// PerformBackup runs streamer in a goroutine writing into a pipe whose reader is
-// streamed to S3.
+// PerformBackup runs streamer in a goroutine writing into a pipe whose reader is streamed to S3.
 func (s *BackupService) PerformBackup(ctx context.Context, streamer filestoreStreamer, s3Bucket, key string) error {
 	start := time.Now()
 	pr, pw := io.Pipe()
@@ -54,8 +52,10 @@ func (s *BackupService) PerformBackup(ctx context.Context, streamer filestoreStr
 		pw.CloseWithError(err)
 		return err
 	})
+	var uploaded int64
 	g.Go(func() error {
-		_, err := s.uploader.StreamUpload(ctx, s3Bucket, key, "application/x-gzip", pr)
+		n, err := s.uploader.StreamUpload(ctx, s3Bucket, key, "application/x-gzip", pr)
+		uploaded = n
 		pr.CloseWithError(err)
 		return err
 	})
@@ -65,5 +65,6 @@ func (s *BackupService) PerformBackup(ctx context.Context, streamer filestoreStr
 	}
 
 	s.logger.InfoContext(ctx, "Filestore backup completed", "key", key, "duration", time.Since(start))
+	s.logger.DebugContext(ctx, "Filestore backup stats", "key", key, "bytesUploaded", uploaded)
 	return nil
 }

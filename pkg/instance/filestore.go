@@ -2,36 +2,38 @@ package instance
 
 import (
 	"archive/tar"
+	"bytes"
 	"compress/gzip"
 	"context"
 	"fmt"
 	"io"
 	"strings"
+	"time"
 
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"
+	v1 "k8s.io/api/core/v1"
 )
 
 const (
-	// filestoreReadWorkers caps how many objects are fetched from the source
-	// bucket concurrently.
-	filestoreReadWorkers = 16
-	// filestoreReadByteBudget caps the total bytes of fetched-but-not-yet-written
-	// objects held in memory at once.
+	filestoreReadWorkers    = 16
 	filestoreReadByteBudget = 256 << 20 // 256 MiB
 )
 
-// filestoreStreamer writes a gzip'd tar of an instance's filestore to w.
+// Objects larger than this stream straight into the tar instead of being buffered,
+// so a single object can't exceed filestoreReadByteBudget.
+var filestoreMaxBufferedObject int64 = 32 << 20 // 32 MiB
+
 type filestoreStreamer interface {
 	stream(ctx context.Context, w io.Writer) error
 }
 
-// writeTarGz builds a gzip'd tar from a BackupSource and writes it to w. Objects
-// are fetched concurrently; tar entry order does not matter because the archive
-// is restored by object key.
+// writeTarGz builds a gzip'd tar from source. Objects up to filestoreMaxBufferedObject
+// are fetched concurrently (bounded by filestoreReadWorkers and filestoreReadByteBudget);
+// larger ones are streamed directly. A single goroutine owns the non-thread-safe tar.Writer.
 func writeTarGz(ctx context.Context, source BackupSource, w io.Writer) error {
 	gw := gzip.NewWriter(w)
 	defer gw.Close()
@@ -53,7 +55,6 @@ func writeTarGz(ctx context.Context, source BackupSource, w io.Writer) error {
 
 	g, ctx := errgroup.WithContext(ctx)
 
-	// fetch objects concurrently, bounded by worker count and the byte budget
 	g.Go(func() error {
 		defer close(results)
 
@@ -64,7 +65,14 @@ func writeTarGz(ctx context.Context, source BackupSource, w io.Writer) error {
 			if object.Err != nil {
 				return object.Err
 			}
-			object := object
+			if object.Size > filestoreMaxBufferedObject {
+				select {
+				case results <- fetchedObject{object: object}:
+				case <-ctx.Done():
+					return ctx.Err()
+				}
+				continue
+			}
 			fetchers.Go(func() error {
 				weight := objectWeight(object.Size)
 				if err := budget.Acquire(ctx, weight); err != nil {
@@ -87,10 +95,15 @@ func writeTarGz(ctx context.Context, source BackupSource, w io.Writer) error {
 		return fetchers.Wait()
 	})
 
-	// one goroutine owns the tar.Writer, which is not concurrency-safe
 	g.Go(func() error {
 		for f := range results {
-			if err := writeTarBytes(tw, f.object, f.data); err != nil {
+			if f.data == nil {
+				if err := streamTarObject(ctx, tw, source, f.object); err != nil {
+					return err
+				}
+				continue
+			}
+			if err := writeTarEntry(tw, f.object, int64(len(f.data)), bytes.NewReader(f.data)); err != nil {
 				return err
 			}
 		}
@@ -100,8 +113,8 @@ func writeTarGz(ctx context.Context, source BackupSource, w io.Writer) error {
 	return g.Wait()
 }
 
-// objectWeight clamps size into [1, budget] so a single oversized object cannot
-// exceed the semaphore's limit.
+// objectWeight is how many bytes an object reserves while it is fetched, capped at the
+// total budget so one oversized object can still be fetched instead of waiting forever.
 func objectWeight(size int64) int64 {
 	switch {
 	case size <= 0:
@@ -127,24 +140,33 @@ func readObject(ctx context.Context, source BackupSource, path string) ([]byte, 
 	return data, nil
 }
 
-func writeTarBytes(tw *tar.Writer, object BackupObject, data []byte) error {
+func streamTarObject(ctx context.Context, tw *tar.Writer, source BackupSource, object BackupObject) error {
+	reader, err := source.Get(ctx, object.Path)
+	if err != nil {
+		return fmt.Errorf("failed to get object %s: %v", object.Path, err)
+	}
+	defer reader.Close()
+
+	return writeTarEntry(tw, object, object.Size, reader)
+}
+
+func writeTarEntry(tw *tar.Writer, object BackupObject, size int64, r io.Reader) error {
 	header := &tar.Header{
 		Name:    object.Path,
-		Size:    int64(len(data)),
+		Size:    size,
 		Mode:    0644,
 		ModTime: object.LastModified,
 	}
 	if err := tw.WriteHeader(header); err != nil {
 		return fmt.Errorf("write tar header for %s: %v", object.Path, err)
 	}
-	if _, err := tw.Write(data); err != nil {
+	if _, err := io.Copy(tw, r); err != nil {
 		return fmt.Errorf("write object %s to tar: %v", object.Path, err)
 	}
 	return nil
 }
 
-// s3APISource streams a tar.gz of objects listed over the S3 API, for the
-// external S3 backend.
+// s3APISource streams a tar.gz of objects listed over the S3 API, for the external S3 backend.
 type s3APISource struct {
 	source BackupSource
 }
@@ -153,78 +175,70 @@ func (s s3APISource) stream(ctx context.Context, w io.Writer) error {
 	return writeTarGz(ctx, s.source, w)
 }
 
-// podExecutor runs a command in a pod container, streaming stdout/stderr.
 type podExecutor interface {
 	Exec(ctx context.Context, namespace, podName, container string, command []string, stdout, stderr io.Writer) error
 }
 
-// execStreamer streams a command's stdout (a gzip'd tar) out of a pod.
-type execStreamer struct {
+// podExec runs commands in one pod container and wraps a failed command with its stderr.
+type podExec struct {
 	executor  podExecutor
 	namespace string
 	podName   string
 	container string
-	command   []string
+}
+
+func (p podExec) run(ctx context.Context, stdout io.Writer, command ...string) error {
+	var stderr strings.Builder
+	if err := p.executor.Exec(ctx, p.namespace, p.podName, p.container, command, stdout, &stderr); err != nil {
+		return fmt.Errorf("%w: %s", err, stderr.String())
+	}
+	return nil
+}
+
+// execStreamer streams a command's stdout (a gzip'd tar) out of a pod.
+type execStreamer struct {
+	podExec
+	command []string
 }
 
 func (e execStreamer) stream(ctx context.Context, w io.Writer) error {
-	var stderr strings.Builder
-	if err := e.executor.Exec(ctx, e.namespace, e.podName, e.container, e.command, w, &stderr); err != nil {
-		return fmt.Errorf("%w: %s", err, stderr.String())
-	}
-	return nil
+	return e.run(ctx, w, e.command...)
 }
 
-// minioClientHostEnv registers the mc host alias "backup" inline via mc's
-// MC_HOST_<alias> convention, with the minio stack's default credentials.
+// mc reads MC_HOST_<alias> to define a host alias inline; "backup" uses the minio stack defaults.
 const minioClientHostEnv = "MC_HOST_backup=http://dhisdhis:dhisdhis@127.0.0.1:9000"
 
-// minioExecSource backs up an in-cluster MinIO bucket by mirroring it to a temp
-// dir with mc, then tarring that to w. Reading via mc is required because MinIO
-// does not store the raw objects on disk.
+// minioExecSource backs up an in-cluster MinIO bucket by mirroring it to a pod temp dir
+// with mc, then tarring that to w (mc can't tar to stdout and MinIO doesn't keep raw
+// objects on disk). The staging copy needs ~filestore-size free ephemeral storage on the
+// pod or it risks eviction.
 type minioExecSource struct {
-	executor  podExecutor
-	namespace string
-	podName   string
-	container string
-	tmpDir    string
+	podExec
 }
 
 func (m minioExecSource) stream(ctx context.Context, w io.Writer) error {
-	defer func() {
-		// best-effort cleanup
-		_ = m.exec(ctx, io.Discard, "rm", "-rf", m.tmpDir)
-	}()
-
-	if err := m.exec(ctx, io.Discard, "env", minioClientHostEnv, "mc", "mirror", "--quiet", "backup/dhis2", m.tmpDir); err != nil {
+	var out strings.Builder
+	if err := m.run(ctx, &out, "mktemp", "-d", "/tmp/im-filestore-backup-XXXXXXXX"); err != nil {
 		return err
 	}
-	return m.exec(ctx, w, "tar", "-C", m.tmpDir, "-czf", "-", ".")
-}
-
-func (m minioExecSource) exec(ctx context.Context, stdout io.Writer, command ...string) error {
-	var stderr strings.Builder
-	if err := m.executor.Exec(ctx, m.namespace, m.podName, m.container, command, stdout, &stderr); err != nil {
-		return fmt.Errorf("%w: %s", err, stderr.String())
+	tmpDir := strings.TrimSpace(out.String())
+	if tmpDir == "" {
+		return fmt.Errorf("mktemp returned an empty path")
 	}
-	return nil
+
+	defer func() {
+		// Detached from ctx so a cancelled or failed backup still removes the staging dir.
+		cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 30*time.Second)
+		defer cancel()
+		_ = m.run(cleanupCtx, io.Discard, "rm", "-rf", tmpDir)
+	}()
+
+	if err := m.run(ctx, io.Discard, "env", minioClientHostEnv, "mc", "mirror", "--quiet", "backup/dhis2", tmpDir); err != nil {
+		return err
+	}
+	return m.run(ctx, w, "tar", "-C", tmpDir, "-czf", "-", ".")
 }
 
-// minioTempDir returns a per-backup temp dir derived from the backup name so
-// concurrent backups of the same pod don't collide.
-func minioTempDir(backupName string) string {
-	safe := strings.Map(func(r rune) rune {
-		switch {
-		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9', r == '-', r == '_':
-			return r
-		default:
-			return '-'
-		}
-	}, backupName)
-	return "/tmp/im-filestore-backup-" + safe
-}
-
-// filesystemTarCommand tars DHIS2_HOME/files to stdout as argv (no shell).
 func filesystemTarCommand(dhis2Home string) []string {
 	files := strings.TrimRight(dhis2Home, "/") + "/files"
 	return []string{"tar", "-C", files, "-czf", "-", "."}
@@ -237,21 +251,31 @@ func storageType(core *model.DeploymentInstance) string {
 	return "minio"
 }
 
-// newAWSS3Client builds a minio-go client for the instance's external AWS bucket.
-func newAWSS3Client(core *model.DeploymentInstance) (*minio.Client, error) {
+func newExternalS3Client(core *model.DeploymentInstance) (*minio.Client, error) {
+	endpoint := core.Parameters["S3_ENDPOINT"].Value
+	if endpoint == "" {
+		endpoint = "s3.amazonaws.com"
+	}
+	// minio.New wants a bare host; take TLS from the scheme, defaulting to HTTPS.
+	secure := true
+	if rest, ok := strings.CutPrefix(endpoint, "https://"); ok {
+		endpoint = rest
+	} else if rest, ok := strings.CutPrefix(endpoint, "http://"); ok {
+		endpoint, secure = rest, false
+	}
 	region := core.Parameters["S3_REGION"].Value
 	identity := core.Parameters["S3_IDENTITY"].Value
 	secret := core.Parameters["S3_SECRET"].Value
-	return minio.New("s3.amazonaws.com", &minio.Options{
+	return minio.New(endpoint, &minio.Options{
 		Creds:  credentials.NewStaticV4(identity, secret, ""),
-		Secure: true,
+		Secure: secure,
 		Region: region,
 	})
 }
 
-// filestoreStreamerFor selects the backend-specific streamer: minio and
-// filesystem stream via pod exec, s3 reads the external bucket directly.
-func (s Service) filestoreStreamerFor(core *model.DeploymentInstance, cluster model.Cluster, backupName string) (filestoreStreamer, error) {
+// filestoreStreamerFor selects the backend-specific streamer: minio and filesystem
+// stream via pod exec, s3 reads the external bucket directly.
+func (s Service) filestoreStreamerFor(core *model.DeploymentInstance, cluster model.Cluster) (filestoreStreamer, error) {
 	switch storageType(core) {
 	case "filesystem":
 		ks, err := NewKubernetesService(cluster)
@@ -263,14 +287,16 @@ func (s Service) filestoreStreamerFor(core *model.DeploymentInstance, cluster mo
 			return nil, err
 		}
 		return execStreamer{
-			executor:  ks,
-			namespace: pod.Namespace,
-			podName:   pod.Name,
-			container: pod.Spec.Containers[0].Name,
-			command:   filesystemTarCommand(core.Parameters["DHIS2_HOME"].Value),
+			podExec: podExec{
+				executor:  ks,
+				namespace: pod.Namespace,
+				podName:   pod.Name,
+				container: coreContainerName(pod, core.Name),
+			},
+			command: filesystemTarCommand(core.Parameters["DHIS2_HOME"].Value),
 		}, nil
 	case "s3":
-		client, err := newAWSS3Client(core)
+		client, err := newExternalS3Client(core)
 		if err != nil {
 			return nil, err
 		}
@@ -288,11 +314,23 @@ func (s Service) filestoreStreamerFor(core *model.DeploymentInstance, cluster mo
 			return nil, err
 		}
 		return minioExecSource{
-			executor:  ks,
-			namespace: pod.Namespace,
-			podName:   pod.Name,
-			container: "minio",
-			tmpDir:    minioTempDir(backupName),
+			podExec{
+				executor:  ks,
+				namespace: pod.Namespace,
+				podName:   pod.Name,
+				container: "minio",
+			},
 		}, nil
 	}
+}
+
+// coreContainerName returns the container named after the release (the DHIS2 container),
+// falling back to the first so a sidecar injected ahead of it isn't picked by mistake.
+func coreContainerName(pod v1.Pod, instanceName string) string {
+	for _, container := range pod.Spec.Containers {
+		if container.Name == instanceName {
+			return container.Name
+		}
+	}
+	return pod.Spec.Containers[0].Name
 }

@@ -7,7 +7,6 @@ import (
 	"log/slog"
 
 	"github.com/minio/minio-go/v7"
-	"golang.org/x/sync/errgroup"
 )
 
 func NewMinioBackupSource(logger *slog.Logger, client MinioClient, bucket string) *MinioBackupSource {
@@ -27,30 +26,28 @@ type MinioBackupSource struct {
 	bucket string
 }
 
-// List implements BackupSource interface
+// List delivers a listing error as a BackupObject with Err set (the goroutine's
+// error isn't awaited), so consumers must check BackupObject.Err.
 func (m *MinioBackupSource) List(ctx context.Context) (<-chan BackupObject, error) {
 	ch := make(chan BackupObject)
-	g, ctx := errgroup.WithContext(ctx)
 
-	g.Go(func() error {
+	go func() {
 		defer close(ch)
 
 		objectCh := m.client.ListObjects(ctx, m.bucket, minio.ListObjectsOptions{Recursive: true})
 
 		for obj := range objectCh {
+			object := BackupObject{Path: obj.Key, Size: obj.Size, LastModified: obj.LastModified}
 			if obj.Err != nil {
-				return fmt.Errorf("list objects: %v", obj.Err)
+				object = BackupObject{Err: fmt.Errorf("list objects: %v", obj.Err)}
 			}
-
 			select {
 			case <-ctx.Done():
-				return ctx.Err()
-			case ch <- BackupObject{Path: obj.Key, Size: obj.Size, LastModified: obj.LastModified}:
+				return
+			case ch <- object:
 			}
 		}
-
-		return nil
-	})
+	}()
 
 	return ch, nil
 }

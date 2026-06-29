@@ -110,6 +110,27 @@ func TestWriteTarGzPropagatesGetError(t *testing.T) {
 	}
 }
 
+func TestWriteTarGzStreamsLargeObjects(t *testing.T) {
+	// lower the buffering threshold so small test objects exercise both the buffered and the direct-stream paths
+	orig := filestoreMaxBufferedObject
+	filestoreMaxBufferedObject = 4
+	defer func() { filestoreMaxBufferedObject = orig }()
+
+	objects := map[string][]byte{
+		"small/a.txt": []byte("hi"),                    // <= threshold: buffered
+		"large/b.bin": bytes.Repeat([]byte("x"), 1024), // > threshold: streamed directly
+	}
+
+	var buf bytes.Buffer
+	require.NoError(t, writeTarGz(context.Background(), fakeBackupSource{objects: objects}, &buf))
+
+	entries := extractTarGz(t, buf.Bytes())
+	require.Len(t, entries, len(objects))
+	for path, data := range objects {
+		assert.Equal(t, data, entries[path], "content mismatch for %s", path)
+	}
+}
+
 func TestFilestoreStreamerForS3(t *testing.T) {
 	s := Service{logger: slog.New(slog.NewTextHandler(io.Discard, nil))}
 	core := &model.DeploymentInstance{Parameters: model.DeploymentInstanceParameters{
@@ -121,7 +142,7 @@ func TestFilestoreStreamerForS3(t *testing.T) {
 	}}
 
 	// only s3 is unit-testable here; minio/filesystem resolve a pod and are covered by integration tests
-	streamer, err := s.filestoreStreamerFor(core, model.Cluster{}, "backup-name")
+	streamer, err := s.filestoreStreamerFor(core, model.Cluster{})
 	require.NoError(t, err)
 	assert.IsType(t, s3APISource{}, streamer)
 }
@@ -149,7 +170,7 @@ func (f *fakeExecutor) Exec(ctx context.Context, namespace, podName, container s
 
 func TestExecStreamerCopiesStdout(t *testing.T) {
 	exec := &fakeExecutor{stdout: "tar-bytes"}
-	s := execStreamer{executor: exec, namespace: "ns", podName: "pod", container: "minio", command: []string{"sh", "-c", "x"}}
+	s := execStreamer{podExec: podExec{executor: exec, namespace: "ns", podName: "pod", container: "minio"}, command: []string{"sh", "-c", "x"}}
 
 	var buf strings.Builder
 	require.NoError(t, s.stream(context.Background(), &buf))
@@ -162,7 +183,7 @@ func TestExecStreamerCopiesStdout(t *testing.T) {
 
 func TestExecStreamerWrapsStderrOnError(t *testing.T) {
 	exec := &fakeExecutor{stderr: "mc: boom", err: fmt.Errorf("exit 1")}
-	s := execStreamer{executor: exec, namespace: "ns", podName: "pod", container: "minio", command: []string{"sh"}}
+	s := execStreamer{podExec: podExec{executor: exec, namespace: "ns", podName: "pod", container: "minio"}, command: []string{"sh"}}
 
 	err := s.stream(context.Background(), io.Discard)
 	require.Error(t, err)
@@ -191,39 +212,64 @@ func (r *recordingExecutor) Exec(ctx context.Context, namespace, podName, contai
 }
 
 func TestMinioExecSourceMirrorsTarsAndCleansUp(t *testing.T) {
-	exec := &recordingExecutor{stdouts: map[int]string{1: "tar-bytes"}} // call 1 = tar
-	src := minioExecSource{executor: exec, namespace: "ns", podName: "pod", container: "minio", tmpDir: "/tmp/im-filestore-backup-x"}
+	exec := &recordingExecutor{stdouts: map[int]string{
+		0: "/tmp/im-filestore-backup-abc123\n", // call 0 = mktemp (trailing newline must be trimmed)
+		2: "tar-bytes",                         // call 2 = tar
+	}}
+	src := minioExecSource{podExec{executor: exec, namespace: "ns", podName: "pod", container: "minio"}}
 
 	var buf strings.Builder
 	require.NoError(t, src.stream(context.Background(), &buf))
 
 	assert.Equal(t, "tar-bytes", buf.String())
-	require.Len(t, exec.calls, 3)
-	assert.Equal(t, []string{"env", "MC_HOST_backup=http://dhisdhis:dhisdhis@127.0.0.1:9000", "mc", "mirror", "--quiet", "backup/dhis2", "/tmp/im-filestore-backup-x"}, exec.calls[0])
-	assert.Equal(t, []string{"tar", "-C", "/tmp/im-filestore-backup-x", "-czf", "-", "."}, exec.calls[1])
-	assert.Equal(t, []string{"rm", "-rf", "/tmp/im-filestore-backup-x"}, exec.calls[2])
+	require.Len(t, exec.calls, 4)
+	assert.Equal(t, []string{"mktemp", "-d", "/tmp/im-filestore-backup-XXXXXXXX"}, exec.calls[0])
+	assert.Equal(t, []string{"env", "MC_HOST_backup=http://dhisdhis:dhisdhis@127.0.0.1:9000", "mc", "mirror", "--quiet", "backup/dhis2", "/tmp/im-filestore-backup-abc123"}, exec.calls[1])
+	assert.Equal(t, []string{"tar", "-C", "/tmp/im-filestore-backup-abc123", "-czf", "-", "."}, exec.calls[2])
+	assert.Equal(t, []string{"rm", "-rf", "/tmp/im-filestore-backup-abc123"}, exec.calls[3])
 }
 
 func TestMinioExecSourceMirrorErrorSkipsTarButCleansUp(t *testing.T) {
 	exec := &recordingExecutor{
-		errs:    map[int]error{0: fmt.Errorf("exit 1")},
-		stderrs: map[int]string{0: "mc: mirror failed"},
+		stdouts: map[int]string{0: "/tmp/im-filestore-backup-abc123"}, // call 0 = mktemp
+		errs:    map[int]error{1: fmt.Errorf("exit 1")},               // call 1 = mirror
+		stderrs: map[int]string{1: "mc: mirror failed"},
 	}
-	src := minioExecSource{executor: exec, namespace: "ns", podName: "pod", container: "minio", tmpDir: "/tmp/im-filestore-backup-x"}
+	src := minioExecSource{podExec{executor: exec, namespace: "ns", podName: "pod", container: "minio"}}
 
 	err := src.stream(context.Background(), io.Discard)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "exit 1")
 	assert.Contains(t, err.Error(), "mc: mirror failed")
 
-	require.Len(t, exec.calls, 2) // mirror (failed), then cleanup; no tar
-	assert.Equal(t, "mc", exec.calls[0][2])
-	assert.Equal(t, []string{"rm", "-rf", "/tmp/im-filestore-backup-x"}, exec.calls[1])
+	require.Len(t, exec.calls, 3) // mktemp, mirror (failed), then cleanup; no tar
+	assert.Equal(t, "mc", exec.calls[1][2])
+	assert.Equal(t, []string{"rm", "-rf", "/tmp/im-filestore-backup-abc123"}, exec.calls[2])
 }
 
-func TestMinioTempDir(t *testing.T) {
-	assert.Equal(t, "/tmp/im-filestore-backup-saved-copy", minioTempDir("saved-copy"))
-	assert.Equal(t, "/tmp/im-filestore-backup-a-b-c", minioTempDir("a/b c")) // non-path-safe chars replaced
+func TestMinioExecSourceMktempErrorSkipsCleanup(t *testing.T) {
+	exec := &recordingExecutor{
+		errs:    map[int]error{0: fmt.Errorf("exit 1")}, // call 0 = mktemp
+		stderrs: map[int]string{0: "mktemp: no space"},
+	}
+	src := minioExecSource{podExec{executor: exec, namespace: "ns", podName: "pod", container: "minio"}}
+
+	err := src.stream(context.Background(), io.Discard)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "mktemp: no space")
+
+	require.Len(t, exec.calls, 1) // mktemp failed; nothing to mirror, tar, or clean up
+}
+
+func TestMinioExecSourceEmptyMktempPathErrors(t *testing.T) {
+	exec := &recordingExecutor{stdouts: map[int]string{0: "  \n"}} // mktemp produced no path
+	src := minioExecSource{podExec{executor: exec, namespace: "ns", podName: "pod", container: "minio"}}
+
+	err := src.stream(context.Background(), io.Discard)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "empty path")
+
+	require.Len(t, exec.calls, 1) // no rm -rf with an empty path
 }
 
 func TestFilesystemTarCommand(t *testing.T) {
