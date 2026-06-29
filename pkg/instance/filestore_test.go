@@ -18,8 +18,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 )
 
-// fakeBackupSource serves a fixed set of objects from memory, for exercising
-// writeTarGz without a real bucket.
+// fakeBackupSource serves a fixed set of objects from memory.
 type fakeBackupSource struct {
 	objects map[string][]byte
 }
@@ -63,8 +62,7 @@ func TestWriteTarGzConcurrent(t *testing.T) {
 	}
 }
 
-// failingBackupSource lists objects but fails Get for one path, to exercise error propagation
-// through the concurrent fetch pool.
+// failingBackupSource lists objects but fails Get for one path.
 type failingBackupSource struct {
 	objects  map[string][]byte
 	failPath string
@@ -99,7 +97,7 @@ func TestWriteTarGzPropagatesGetError(t *testing.T) {
 	}
 	src := failingBackupSource{objects: objects, failPath: "apps/app-100/file.txt"}
 
-	// Run in a goroutine: a regression that swallows the error would deadlock rather than fail.
+	// in a goroutine so a deadlock regression fails the test instead of hanging it
 	done := make(chan error, 1)
 	go func() { done <- writeTarGz(context.Background(), src, io.Discard) }()
 
@@ -122,9 +120,7 @@ func TestFilestoreStreamerForS3(t *testing.T) {
 		"S3_SECRET":    {Value: "secret"},
 	}}
 
-	// s3 reads the external bucket over the API - no cluster, no pod - so selection is unit-testable
-	// here. The minio/filesystem branches resolve a pod and are covered end-to-end by the
-	// integration tests instead.
+	// only s3 is unit-testable here; minio/filesystem resolve a pod and are covered by integration tests
 	streamer, err := s.filestoreStreamerFor(core, model.Cluster{}, "backup-name")
 	require.NoError(t, err)
 	assert.IsType(t, s3APISource{}, streamer)
@@ -174,8 +170,7 @@ func TestExecStreamerWrapsStderrOnError(t *testing.T) {
 	assert.Contains(t, err.Error(), "mc: boom")
 }
 
-// recordingExecutor records every Exec call and can be scripted with per-call
-// stdout to write and errors to return, keyed by call index.
+// recordingExecutor records every Exec call; per-call stdout and errors are keyed by call index.
 type recordingExecutor struct {
 	calls   [][]string
 	stdouts map[int]string

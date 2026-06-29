@@ -26,9 +26,7 @@ type BackupObject struct {
 	Err          error
 }
 
-// s3StreamUploader streams a reader to an object in S3. It is implemented by
-// pkg/storage.S3Client, the same uploader IM uses for database uploads and
-// pg_dump, so the backup does not reimplement multipart upload.
+// s3StreamUploader streams a reader to an object in S3.
 type s3StreamUploader interface {
 	StreamUpload(ctx context.Context, bucket, key, contentType string, r io.Reader) (int64, error)
 }
@@ -45,8 +43,7 @@ type BackupService struct {
 }
 
 // PerformBackup runs streamer in a goroutine writing into a pipe whose reader is
-// streamed to S3. Whichever side fails closes the pipe with that error, which
-// unblocks the other side instead of deadlocking on the pipe.
+// streamed to S3.
 func (s *BackupService) PerformBackup(ctx context.Context, streamer filestoreStreamer, s3Bucket, key string) error {
 	start := time.Now()
 	pr, pw := io.Pipe()

@@ -17,29 +17,21 @@ import (
 
 const (
 	// filestoreReadWorkers caps how many objects are fetched from the source
-	// bucket concurrently. The s3 backend lists many small objects, so serial
-	// per-object GETs dominate wall-clock; fetching in parallel is the speedup.
+	// bucket concurrently.
 	filestoreReadWorkers = 16
 	// filestoreReadByteBudget caps the total bytes of fetched-but-not-yet-written
-	// objects held in memory at once. A few large objects throttle themselves
-	// against this budget instead of letting worker count alone bound memory.
+	// objects held in memory at once.
 	filestoreReadByteBudget = 256 << 20 // 256 MiB
 )
 
 // filestoreStreamer writes a gzip'd tar of an instance's filestore to w.
-// Tar entry names are logical object keys (relative paths), which makes the
-// archive restore-compatible with stacks/minio/seed-minio.sh for every backend.
 type filestoreStreamer interface {
 	stream(ctx context.Context, w io.Writer) error
 }
 
-// writeTarGz builds a gzip'd tar from a BackupSource (object lister) and writes
-// it to w. Entry names are object keys, matching what mc mirror restores.
-//
-// Objects are fetched concurrently by a bounded worker pool and handed to a
-// single goroutine that owns the tar.Writer. Tar entry order is irrelevant
-// because seed-minio.sh restores by object key, so the writer can emit objects
-// in whatever order they finish fetching.
+// writeTarGz builds a gzip'd tar from a BackupSource and writes it to w. Objects
+// are fetched concurrently; tar entry order does not matter because the archive
+// is restored by object key.
 func writeTarGz(ctx context.Context, source BackupSource, w io.Writer) error {
 	gw := gzip.NewWriter(w)
 	defer gw.Close()
@@ -61,8 +53,7 @@ func writeTarGz(ctx context.Context, source BackupSource, w io.Writer) error {
 
 	g, ctx := errgroup.WithContext(ctx)
 
-	// Fetchers: read objects concurrently into memory, bounded by worker count
-	// and the in-flight byte budget, then hand each to the writer below.
+	// fetch objects concurrently, bounded by worker count and the byte budget
 	g.Go(func() error {
 		defer close(results)
 
@@ -96,7 +87,7 @@ func writeTarGz(ctx context.Context, source BackupSource, w io.Writer) error {
 		return fetchers.Wait()
 	})
 
-	// Writer: a single goroutine owns the non-concurrency-safe tar.Writer.
+	// one goroutine owns the tar.Writer, which is not concurrency-safe
 	g.Go(func() error {
 		for f := range results {
 			if err := writeTarBytes(tw, f.object, f.data); err != nil {
@@ -109,8 +100,8 @@ func writeTarGz(ctx context.Context, source BackupSource, w io.Writer) error {
 	return g.Wait()
 }
 
-// objectWeight clamps an object's size into [1, budget] so the byte budget can
-// account for it without rejecting an object that is larger than the budget.
+// objectWeight clamps size into [1, budget] so a single oversized object cannot
+// exceed the semaphore's limit.
 func objectWeight(size int64) int64 {
 	switch {
 	case size <= 0:
@@ -152,8 +143,8 @@ func writeTarBytes(tw *tar.Writer, object BackupObject, data []byte) error {
 	return nil
 }
 
-// s3APISource streams a tar.gz built from objects listed over the S3 API.
-// Used for the external-AWS-S3 storage backend (no pod, no port-forward).
+// s3APISource streams a tar.gz of objects listed over the S3 API, for the
+// external S3 backend.
 type s3APISource struct {
 	source BackupSource
 }
@@ -163,13 +154,11 @@ func (s s3APISource) stream(ctx context.Context, w io.Writer) error {
 }
 
 // podExecutor runs a command in a pod container, streaming stdout/stderr.
-// Implemented by kubernetesService.
 type podExecutor interface {
 	Exec(ctx context.Context, namespace, podName, container string, command []string, stdout, stderr io.Writer) error
 }
 
-// execStreamer streams a command's stdout (a gzip'd tar) out of a pod, the same
-// way the database backup streams pg_dump. stderr is captured for errors.
+// execStreamer streams a command's stdout (a gzip'd tar) out of a pod.
 type execStreamer struct {
 	executor  podExecutor
 	namespace string
@@ -186,20 +175,13 @@ func (e execStreamer) stream(ctx context.Context, w io.Writer) error {
 	return nil
 }
 
-// minioClientHostEnv defines a host alias named "backup" inline via mc's
-// MC_HOST_<alias> environment variable, so no `mc alias set` step is needed.
-// MC_HOST_ is mc's own convention (like postgres's PGPASSWORD); only the alias
-// name "backup" is ours. Credentials match the minio stack's defaults and
-// seed-minio.sh. Passed as an `env` argv entry, mirroring the
-// `env PGPASSWORD=... pg_dump` pattern used for the database backup.
+// minioClientHostEnv registers the mc host alias "backup" inline via mc's
+// MC_HOST_<alias> convention, with the minio stack's default credentials.
 const minioClientHostEnv = "MC_HOST_backup=http://dhisdhis:dhisdhis@127.0.0.1:9000"
 
-// minioExecSource backs up an in-cluster MinIO bucket without a port-forward.
-// MinIO 2025.x stores xl.meta on disk, so the bucket must be read through mc to
-// recover logical object keys, and mc can only write to a filesystem - so this
-// mirrors into a temporary directory, streams a gzip'd tar of it to w, then
-// removes it. Every step is plain argv (no shell); cleanup is a best-effort
-// deferred exec.
+// minioExecSource backs up an in-cluster MinIO bucket by mirroring it to a temp
+// dir with mc, then tarring that to w. Reading via mc is required because MinIO
+// does not store the raw objects on disk.
 type minioExecSource struct {
 	executor  podExecutor
 	namespace string
@@ -210,7 +192,7 @@ type minioExecSource struct {
 
 func (m minioExecSource) stream(ctx context.Context, w io.Writer) error {
 	defer func() {
-		// Best-effort: the directory lives in the pod's ephemeral /tmp regardless.
+		// best-effort cleanup
 		_ = m.exec(ctx, io.Discard, "rm", "-rf", m.tmpDir)
 	}()
 
@@ -228,9 +210,8 @@ func (m minioExecSource) exec(ctx context.Context, stdout io.Writer, command ...
 	return nil
 }
 
-// minioTempDir returns a per-backup directory path, derived from the backup
-// name so concurrent backups of the same pod don't collide, with non-path-safe
-// characters replaced.
+// minioTempDir returns a per-backup temp dir derived from the backup name so
+// concurrent backups of the same pod don't collide.
 func minioTempDir(backupName string) string {
 	safe := strings.Map(func(r rune) rune {
 		switch {
@@ -243,10 +224,7 @@ func minioTempDir(backupName string) string {
 	return "/tmp/im-filestore-backup-" + safe
 }
 
-// filesystemTarCommand tars DHIS2_HOME/files to stdout as argv - no shell, so no
-// value is interpolated into a shell string (cf. buildPgDumpCommand). DHIS2
-// creates the files directory on startup, so it exists by backup time; an empty
-// directory tars fine.
+// filesystemTarCommand tars DHIS2_HOME/files to stdout as argv (no shell).
 func filesystemTarCommand(dhis2Home string) []string {
 	files := strings.TrimRight(dhis2Home, "/") + "/files"
 	return []string{"tar", "-C", files, "-czf", "-", "."}
@@ -271,9 +249,8 @@ func newAWSS3Client(core *model.DeploymentInstance) (*minio.Client, error) {
 	})
 }
 
-// filestoreStreamerFor selects the backend-specific streamer for an instance.
-// minio + filesystem stream via pod exec; s3 reads the external bucket directly.
-// backupName is used to derive a unique temp dir for the minio backend.
+// filestoreStreamerFor selects the backend-specific streamer: minio and
+// filesystem stream via pod exec, s3 reads the external bucket directly.
 func (s Service) filestoreStreamerFor(core *model.DeploymentInstance, cluster model.Cluster, backupName string) (filestoreStreamer, error) {
 	switch storageType(core) {
 	case "filesystem":

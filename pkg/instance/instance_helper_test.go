@@ -11,11 +11,13 @@ import (
 	"io"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/dhis2-sre/im-manager/pkg/inttest"
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -126,8 +128,7 @@ func createDHIS2CoreInstance(t *testing.T, client *inttest.HTTPClient, deploymen
 	return createInstance(t, client, deploymentID, "dhis2-core", authToken, opts...)
 }
 
-// minioPodName returns the name of the single minio pod belonging to the given deployment,
-// disambiguated by im-deployment-id so it is safe under parallel subtests sharing a namespace.
+// minioPodName returns the name of the deployment's single minio pod.
 func minioPodName(t *testing.T, k8sClient *inttest.K8sClient, namespace string, deploymentID uint) string {
 	t.Helper()
 	selector := fmt.Sprintf("im-type=minio,im-deployment-id=%d", deploymentID)
@@ -137,22 +138,30 @@ func minioPodName(t *testing.T, k8sClient *inttest.K8sClient, namespace string, 
 	return pods.Items[0].Name
 }
 
-// corePodNameAndContainer returns the name and primary container of the single default
-// ("im-default=true") pod for the given core instance, so a test can exec into it. Disambiguated
-// by im-id so it is safe under parallel subtests sharing a namespace.
-func corePodNameAndContainer(t *testing.T, k8sClient *inttest.K8sClient, namespace string, instanceID uint) (string, string) {
+// waitForCorePodRunning polls until the core instance's default pod is Running, returning its name
+// and primary container. It waits for Running, not Ready, because the backup only execs into the
+// pod - the DHIS2 app can exceed the readiness timeout on a loaded runner.
+func waitForCorePodRunning(t *testing.T, k8sClient *inttest.K8sClient, namespace string, instanceID uint, timeout time.Duration) (string, string) {
 	t.Helper()
 	selector := fmt.Sprintf("im-id=%d,im-default=true", instanceID)
-	pods, err := k8sClient.Client.CoreV1().Pods(namespace).List(context.Background(), metav1.ListOptions{LabelSelector: selector})
-	require.NoError(t, err)
-	require.Len(t, pods.Items, 1, "expected exactly one core pod for selector %q", selector)
-	pod := pods.Items[0]
-	require.NotEmpty(t, pod.Spec.Containers, "core pod %q has no containers", pod.Name)
-	return pod.Name, pod.Spec.Containers[0].Name
+	deadline := time.Now().Add(timeout)
+	for {
+		pods, err := k8sClient.Client.CoreV1().Pods(namespace).List(context.Background(), metav1.ListOptions{LabelSelector: selector})
+		require.NoError(t, err)
+		for _, pod := range pods.Items {
+			if pod.Status.Phase == corev1.PodRunning && len(pod.Spec.Containers) > 0 {
+				return pod.Name, pod.Spec.Containers[0].Name
+			}
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("timed out after %s waiting for a Running core pod for selector %q", timeout, selector)
+		}
+		time.Sleep(2 * time.Second)
+	}
 }
 
-// extractTarGzEntries unpacks a gzip'd tar into a map of regular-file path -> contents, stripping
-// any leading "./" so callers can assert on logical object keys.
+// extractTarGzEntries unpacks a gzip'd tar into a map of file path -> contents, stripping any
+// leading "./".
 func extractTarGzEntries(t *testing.T, data []byte) map[string][]byte {
 	t.Helper()
 	gr, err := gzip.NewReader(bytes.NewReader(data))

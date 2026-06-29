@@ -911,7 +911,6 @@ func (s Service) FilestoreBackup(ctx context.Context, instance *model.Deployment
 		return err
 	}
 
-	// Record backup in database
 	s3Uri := fmt.Sprintf("s3://%s/%s", s.s3Bucket, key)
 	filestore, err := s.recordBackup(ctx, instance.GroupName, s3Uri, baseName+"-fs.tar.gz", database.UserID)
 	if err != nil {

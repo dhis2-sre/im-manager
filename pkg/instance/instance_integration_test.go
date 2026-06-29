@@ -231,12 +231,12 @@ func TestInstanceHandler(t *testing.T) {
 		groupedName := fmt.Sprintf("%s-%d", coreInstance.Name, coreInstance.Group.ID)
 		k8sClient.AssertPodIsReady(t, coreInstance.Group.Namespace, groupedName+"-minio", 120)
 
-		// Seed an object into the minio bucket by exec'ing mc in the pod - no port-forward needed,
-		// which is the whole point of this change.
+		// seed an object into the minio bucket via exec
 		ks, err := instance.NewKubernetesService(group.Cluster)
 		require.NoError(t, err)
 		minioPod := minioPodName(t, k8sClient, coreInstance.Group.Namespace, deployment.ID)
-		seedScript := `mc alias set local http://127.0.0.1:9000 dhisdhis dhisdhis >/dev/null 2>&1; printf 'hello-filestore' > /tmp/marker.txt; mc cp --quiet /tmp/marker.txt local/dhis2/seeded/marker.txt`
+		// create the bucket; the stack creates it asynchronously and we'd otherwise race it
+		seedScript := `mc alias set local http://127.0.0.1:9000 dhisdhis dhisdhis >/dev/null 2>&1; mc mb --ignore-existing local/dhis2 >/dev/null 2>&1; printf 'hello-filestore' > /tmp/marker.txt; mc cp --quiet /tmp/marker.txt local/dhis2/seeded/marker.txt`
 		var seedOut, seedErr strings.Builder
 		require.NoError(t, ks.Exec(context.Background(), coreInstance.Group.Namespace, minioPod, "minio", []string{"sh", "-c", seedScript}, &seedOut, &seedErr), "seed failed: %s", seedErr.String())
 
@@ -248,13 +248,11 @@ func TestInstanceHandler(t *testing.T) {
 		fsService := instance.NewService(logger, instanceRepo, groupService, stackService, helmfileService, s3Client, s3Bucket, tokenService)
 		require.NoError(t, fsService.FilestoreBackup(context.Background(), &coreInstance, target.Name, target))
 
-		// The exec-built tar.gz lands in S3 and preserves the seeded object under its logical key.
 		content := s3.GetObject(t, s3Bucket, "group-name/fs-backup-target-fs.tar.gz")
 		require.NotEmpty(t, content)
 		entries := extractTarGzEntries(t, content)
 		assert.Equal(t, "hello-filestore", string(entries["seeded/marker.txt"]))
 
-		// The target row is linked to the recorded filestore backup.
 		var saved model.Database
 		require.NoError(t, db.First(&saved, target.ID).Error)
 		assert.NotZero(t, saved.FilestoreID)
@@ -263,11 +261,9 @@ func TestInstanceHandler(t *testing.T) {
 	})
 
 	t.Run("FilestoreBackupFilesystemViaExec", func(t *testing.T) {
-		t.Parallel()
+		// not parallel: a full dhis2-core deploy is heavy; running it outside the parallel batch avoids starving the runner
 
-		// STORAGE_TYPE=filesystem deploys no minio stack; the filestore lives on a PVC in the
-		// core pod and the backup execs `tar` against DHIS2_HOME/files - the same transport as
-		// minio, no port-forward.
+		// STORAGE_TYPE=filesystem: no minio stack; the filestore lives on a PVC in the core pod
 		deployment := createDeployment(t, client, "fsstore-backup-deployment", tokens.AccessToken)
 		createDHIS2DBInstance(t, client, deployment.ID, databaseID, tokens.AccessToken)
 		coreInstance := createDHIS2CoreInstance(t, client, deployment.ID, tokens.AccessToken,
@@ -276,13 +272,10 @@ func TestInstanceHandler(t *testing.T) {
 
 		deployDeployment(t, client, deployment.ID, tokens.AccessToken)
 
-		// The backup execs into the core pod, so it must be running.
-		k8sClient.AssertPodIsReady(t, coreInstance.Group.Namespace, coreInstance.Name, 120, coreInstance.Group.ID)
-
-		// Seed a file into DHIS2_HOME/files (default /opt/dhis2) by exec'ing in the core pod.
+		// the backup execs into the core pod, so wait for Running, not Ready
 		ks, err := instance.NewKubernetesService(group.Cluster)
 		require.NoError(t, err)
-		corePod, coreContainer := corePodNameAndContainer(t, k8sClient, coreInstance.Group.Namespace, coreInstance.ID)
+		corePod, coreContainer := waitForCorePodRunning(t, k8sClient, coreInstance.Group.Namespace, coreInstance.ID, 120*time.Second)
 		seedScript := `mkdir -p /opt/dhis2/files/seeded && printf 'hello-filestore' > /opt/dhis2/files/seeded/marker.txt`
 		var seedOut, seedErr strings.Builder
 		require.NoError(t, ks.Exec(context.Background(), coreInstance.Group.Namespace, corePod, coreContainer, []string{"sh", "-c", seedScript}, &seedOut, &seedErr), "seed failed: %s", seedErr.String())
@@ -295,13 +288,11 @@ func TestInstanceHandler(t *testing.T) {
 		fsService := instance.NewService(logger, instanceRepo, groupService, stackService, helmfileService, s3Client, s3Bucket, tokenService)
 		require.NoError(t, fsService.FilestoreBackup(context.Background(), &coreInstance, target.Name, target))
 
-		// The exec-built tar.gz lands in S3 and preserves the seeded file under its logical key.
 		content := s3.GetObject(t, s3Bucket, "group-name/fsstore-backup-target-fs.tar.gz")
 		require.NotEmpty(t, content)
 		entries := extractTarGzEntries(t, content)
 		assert.Equal(t, "hello-filestore", string(entries["seeded/marker.txt"]))
 
-		// The target row is linked to the recorded filestore backup.
 		var saved model.Database
 		require.NoError(t, db.First(&saved, target.ID).Error)
 		assert.NotZero(t, saved.FilestoreID)
