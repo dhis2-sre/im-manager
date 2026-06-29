@@ -262,6 +262,53 @@ func TestInstanceHandler(t *testing.T) {
 		destroyDeployment(t, client, deployment.ID, tokens.AccessToken)
 	})
 
+	t.Run("FilestoreBackupFilesystemViaExec", func(t *testing.T) {
+		t.Parallel()
+
+		// STORAGE_TYPE=filesystem deploys no minio stack; the filestore lives on a PVC in the
+		// core pod and the backup execs `tar` against DHIS2_HOME/files - the same transport as
+		// minio, no port-forward.
+		deployment := createDeployment(t, client, "fsstore-backup-deployment", tokens.AccessToken)
+		createDHIS2DBInstance(t, client, deployment.ID, databaseID, tokens.AccessToken)
+		coreInstance := createDHIS2CoreInstance(t, client, deployment.ID, tokens.AccessToken,
+			WithParameter("STORAGE_TYPE", "filesystem"),
+			WithParameter("ALLOW_SUSPEND", "false"))
+
+		deployDeployment(t, client, deployment.ID, tokens.AccessToken)
+
+		// The backup execs into the core pod, so it must be running.
+		k8sClient.AssertPodIsReady(t, coreInstance.Group.Namespace, coreInstance.Name, 120, coreInstance.Group.ID)
+
+		// Seed a file into DHIS2_HOME/files (default /opt/dhis2) by exec'ing in the core pod.
+		ks, err := instance.NewKubernetesService(group.Cluster)
+		require.NoError(t, err)
+		corePod, coreContainer := corePodNameAndContainer(t, k8sClient, coreInstance.Group.Namespace, coreInstance.ID)
+		seedScript := `mkdir -p /opt/dhis2/files/seeded && printf 'hello-filestore' > /opt/dhis2/files/seeded/marker.txt`
+		var seedOut, seedErr strings.Builder
+		require.NoError(t, ks.Exec(context.Background(), coreInstance.Group.Namespace, corePod, coreContainer, []string{"sh", "-c", seedScript}, &seedOut, &seedErr), "seed failed: %s", seedErr.String())
+
+		// FilestoreBackup links the filestore to an existing (SaveAs target) database row.
+		target := &model.Database{Name: "fsstore-backup-target.sql.gz", GroupName: "group-name", Type: "database", Slug: "group-name/fsstore-backup-target", UserID: user.ID}
+		require.NoError(t, db.Create(target).Error)
+
+		// The shared instanceService is wired with a nil S3 client; build one with the real client.
+		fsService := instance.NewService(logger, instanceRepo, groupService, stackService, helmfileService, s3Client, s3Bucket, tokenService)
+		require.NoError(t, fsService.FilestoreBackup(context.Background(), &coreInstance, target.Name, target))
+
+		// The exec-built tar.gz lands in S3 and preserves the seeded file under its logical key.
+		content := s3.GetObject(t, s3Bucket, "group-name/fsstore-backup-target-fs.tar.gz")
+		require.NotEmpty(t, content)
+		entries := extractTarGzEntries(t, content)
+		assert.Equal(t, "hello-filestore", string(entries["seeded/marker.txt"]))
+
+		// The target row is linked to the recorded filestore backup.
+		var saved model.Database
+		require.NoError(t, db.First(&saved, target.ID).Error)
+		assert.NotZero(t, saved.FilestoreID)
+
+		destroyDeployment(t, client, deployment.ID, tokens.AccessToken)
+	})
+
 	t.Run("SaveAsDatabase", func(t *testing.T) {
 		t.Parallel()
 		deployment := createDeployment(t, client, "save-as-deployment", tokens.AccessToken)

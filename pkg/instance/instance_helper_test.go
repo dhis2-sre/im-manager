@@ -137,6 +137,20 @@ func minioPodName(t *testing.T, k8sClient *inttest.K8sClient, namespace string, 
 	return pods.Items[0].Name
 }
 
+// corePodNameAndContainer returns the name and primary container of the single default
+// ("im-default=true") pod for the given core instance, so a test can exec into it. Disambiguated
+// by im-id so it is safe under parallel subtests sharing a namespace.
+func corePodNameAndContainer(t *testing.T, k8sClient *inttest.K8sClient, namespace string, instanceID uint) (string, string) {
+	t.Helper()
+	selector := fmt.Sprintf("im-id=%d,im-default=true", instanceID)
+	pods, err := k8sClient.Client.CoreV1().Pods(namespace).List(context.Background(), metav1.ListOptions{LabelSelector: selector})
+	require.NoError(t, err)
+	require.Len(t, pods.Items, 1, "expected exactly one core pod for selector %q", selector)
+	pod := pods.Items[0]
+	require.NotEmpty(t, pod.Spec.Containers, "core pod %q has no containers", pod.Name)
+	return pod.Name, pod.Spec.Containers[0].Name
+}
+
 // extractTarGzEntries unpacks a gzip'd tar into a map of regular-file path -> contents, stripping
 // any leading "./" so callers can assert on logical object keys.
 func extractTarGzEntries(t *testing.T, data []byte) map[string][]byte {

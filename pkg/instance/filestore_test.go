@@ -5,8 +5,10 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	"github.com/stretchr/testify/assert"
@@ -59,6 +61,73 @@ func TestWriteTarGzConcurrent(t *testing.T) {
 	for path, data := range objects {
 		assert.Equal(t, data, entries[path], "content mismatch for %s", path)
 	}
+}
+
+// failingBackupSource lists objects but fails Get for one path, to exercise error propagation
+// through the concurrent fetch pool.
+type failingBackupSource struct {
+	objects  map[string][]byte
+	failPath string
+}
+
+func (f failingBackupSource) List(ctx context.Context) (<-chan BackupObject, error) {
+	ch := make(chan BackupObject)
+	go func() {
+		defer close(ch)
+		for path, data := range f.objects {
+			select {
+			case ch <- BackupObject{Path: path, Size: int64(len(data))}:
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+	return ch, nil
+}
+
+func (f failingBackupSource) Get(ctx context.Context, path string) (io.ReadCloser, error) {
+	if path == f.failPath {
+		return nil, fmt.Errorf("boom fetching %s", path)
+	}
+	return io.NopCloser(bytes.NewReader(f.objects[path])), nil
+}
+
+func TestWriteTarGzPropagatesGetError(t *testing.T) {
+	objects := make(map[string][]byte)
+	for i := 0; i < 200; i++ { // more objects than filestoreReadWorkers, so a failure races other fetches
+		objects[fmt.Sprintf("apps/app-%03d/file.txt", i)] = []byte("x")
+	}
+	src := failingBackupSource{objects: objects, failPath: "apps/app-100/file.txt"}
+
+	// Run in a goroutine: a regression that swallows the error would deadlock rather than fail.
+	done := make(chan error, 1)
+	go func() { done <- writeTarGz(context.Background(), src, io.Discard) }()
+
+	select {
+	case err := <-done:
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "boom")
+	case <-time.After(15 * time.Second):
+		t.Fatal("writeTarGz did not return - the concurrent fetch likely deadlocked on a Get error")
+	}
+}
+
+func TestFilestoreStreamerForS3(t *testing.T) {
+	s := Service{logger: slog.New(slog.NewTextHandler(io.Discard, nil))}
+	core := &model.DeploymentInstance{Parameters: model.DeploymentInstanceParameters{
+		"STORAGE_TYPE": {Value: "s3"},
+		"S3_BUCKET":    {Value: "my-bucket"},
+		"S3_REGION":    {Value: "eu-west-1"},
+		"S3_IDENTITY":  {Value: "identity"},
+		"S3_SECRET":    {Value: "secret"},
+	}}
+
+	// s3 reads the external bucket over the API - no cluster, no pod - so selection is unit-testable
+	// here. The minio/filesystem branches resolve a pod and are covered end-to-end by the
+	// integration tests instead.
+	streamer, err := s.filestoreStreamerFor(core, model.Cluster{}, "backup-name")
+	require.NoError(t, err)
+	assert.IsType(t, s3APISource{}, streamer)
 }
 
 type fakeExecutor struct {
