@@ -52,6 +52,25 @@ releases:
       {{- if eq (requiredEnv "STORAGE_TYPE") "filesystem" }}
       - storage:
           volumeSize: {{ requiredEnv "FILESYSTEM_VOLUME_SIZE" }}
+      # Restore the filestore into dhis-home before core starts, ahead of the chart's
+      # dhis2-home-permissions init container so it fixes ownership of the extracted files.
+      - initContainers:
+          - name: "{{ requiredEnv "INSTANCE_NAME" }}-init-fs"
+            image: alpine:3.18
+            imagePullPolicy: {{ requiredEnv "IMAGE_PULL_POLICY" }}
+            env:
+              - name: DHIS2_HOME
+                value: "{{ requiredEnv "DHIS2_HOME" }}"
+              - name: FILESTORE_DOWNLOAD_URL
+                value: {{ env "FILESTORE_DOWNLOAD_URL" | default "" }}
+            command:
+              - "/bin/sh"
+              - "-c"
+              - |
+                {{- readFile "./seed-filesystem.sh" | nindent 16 }}
+            volumeMounts:
+              - name: dhis-home
+                mountPath: "{{ requiredEnv "DHIS2_HOME" }}"
       {{- end }}
 
       {{- if eq (requiredEnv "STORAGE_TYPE") "minio" }}
