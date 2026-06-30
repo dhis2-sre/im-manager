@@ -252,6 +252,8 @@ func TestInstanceHandler(t *testing.T) {
 		require.NotEmpty(t, content)
 		entries := extractTarGzEntries(t, content)
 		assert.Equal(t, "hello-filestore", string(entries["seeded/marker.txt"]))
+		assert.Contains(t, rawTarGzNames(t, content), "./seeded/marker.txt",
+			"backup must tar with ./-relative keys so restore reproduces the original object key")
 
 		var saved model.Database
 		require.NoError(t, db.First(&saved, target.ID).Error)
@@ -292,6 +294,8 @@ func TestInstanceHandler(t *testing.T) {
 		require.NotEmpty(t, content)
 		entries := extractTarGzEntries(t, content)
 		assert.Equal(t, "hello-filestore", string(entries["seeded/marker.txt"]))
+		assert.Contains(t, rawTarGzNames(t, content), "./seeded/marker.txt",
+			"backup must tar with ./-relative keys so restore reproduces the original object key")
 
 		var saved model.Database
 		require.NoError(t, db.First(&saved, target.ID).Error)
