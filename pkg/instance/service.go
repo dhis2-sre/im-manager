@@ -884,6 +884,9 @@ func (s Service) Reset(ctx context.Context, token string, instance *model.Deploy
 }
 
 func (s Service) FilestoreBackup(ctx context.Context, instance *model.DeploymentInstance, name string, database *model.Database) error {
+	// Detach from the request context so the backup isn't cancelled if the client disconnects.
+	ctx = context.WithoutCancel(ctx)
+
 	group, err := s.groupService.Find(ctx, instance.GroupName)
 	if err != nil {
 		return err
