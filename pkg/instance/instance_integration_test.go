@@ -82,6 +82,12 @@ func TestInstanceHandler(t *testing.T) {
 	err = db.Create(user).Error
 	require.NoError(t, err, "failed to save user")
 
+	nonMember := &model.User{
+		Email: "user2@dhis2.org",
+	}
+	err = db.Create(nonMember).Error
+	require.NoError(t, err, "failed to save non-member user")
+
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	encryptionKey := strings.Repeat("a", 32)
 	instanceRepo, err := instance.NewRepository(db, encryptionKey)
@@ -118,8 +124,13 @@ func TestInstanceHandler(t *testing.T) {
 	}, noopPublisher{}, noopFilestoreBackuper{})
 	instanceService.SetExternalDownloads(databaseService)
 
+	// this is only to allow testing using multiple users without bringing in all our auth stack
 	authenticator := func(c *gin.Context) {
-		ctx := model.NewContextWithUser(c.Request.Context(), user)
+		authenticatedUser := user
+		if c.Query("user") == "non-member" {
+			authenticatedUser = nonMember
+		}
+		ctx := model.NewContextWithUser(c.Request.Context(), authenticatedUser)
 		c.Request = c.Request.WithContext(ctx)
 	}
 	client := inttest.SetupHTTPServer(t, func(engine *gin.Engine) {
@@ -177,6 +188,17 @@ func TestInstanceHandler(t *testing.T) {
 
 		destroyDeployment(t, client, deployment.ID, tokens.AccessToken)
 		k8sClient.AssertPodIsNotRunning(t, deploymentInstance.Group.Namespace, deploymentInstance.Name, 10, deploymentInstance.Group.ID)
+	})
+
+	t.Run("InstanceWithDetailsDeniedForNonMember", func(t *testing.T) {
+		t.Parallel()
+		deployment := createDeployment(t, client, "details-auth-deployment", tokens.AccessToken)
+		deploymentInstance := createWhoamiInstance(t, client, deployment.ID, tokens.AccessToken)
+
+		path := fmt.Sprintf("/instances/%d/details?user=non-member", deploymentInstance.ID)
+		response := client.Do(t, http.MethodGet, path, nil, http.StatusUnauthorized, inttest.WithAuthToken(tokens.AccessToken))
+
+		assert.Contains(t, string(response), "read access denied")
 	})
 
 	t.Run("GetPublicDeployments", func(t *testing.T) {

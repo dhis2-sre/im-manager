@@ -432,10 +432,28 @@ func (h Handler) InstanceWithDetails(c *gin.Context) {
 	}
 
 	ctx := c.Request.Context()
+	user, err := handler.GetUserFromContext(ctx)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
 
 	instance, err := h.instanceService.FindDeploymentInstanceById(ctx, id)
 	if err != nil {
 		_ = c.Error(err)
+		return
+	}
+
+	deployment, err := h.instanceService.FindDeploymentById(ctx, instance.DeploymentID)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	canRead := handler.CanReadDeployment(user, deployment)
+	if !canRead {
+		unauthorized := errdef.NewUnauthorized("read access denied")
+		_ = c.Error(unauthorized)
 		return
 	}
 
