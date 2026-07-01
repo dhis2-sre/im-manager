@@ -414,6 +414,60 @@ func (f fakeMinioClient) GetObject(ctx context.Context, bucket, object string, o
 	return nil, fmt.Errorf("not used")
 }
 
+// fakeExternalDownloads resolves database records by id for the backup-key lookup.
+type fakeExternalDownloads struct {
+	byID map[uint]*model.Database
+}
+
+func (f fakeExternalDownloads) FindById(ctx context.Context, id uint) (*model.Database, error) {
+	db, ok := f.byID[id]
+	if !ok {
+		return nil, fmt.Errorf("database %d not found", id)
+	}
+	return db, nil
+}
+
+func (f fakeExternalDownloads) CreateExternalDownload(ctx context.Context, databaseID uint, expiration uint) (*model.ExternalDownload, error) {
+	return nil, fmt.Errorf("not used")
+}
+
+func TestFilestoreBackupKey(t *testing.T) {
+	s := Service{
+		s3Bucket: "im-bucket",
+		externalDownloads: fakeExternalDownloads{byID: map[uint]*model.Database{
+			10: {ID: 10, FilestoreID: 20},
+			20: {ID: 20, Url: "s3://im-bucket/group/save-fs.tar.gz"},
+		}},
+	}
+	core := &model.DeploymentInstance{Parameters: model.DeploymentInstanceParameters{
+		"DATABASE_ID": {Value: "10"},
+	}}
+
+	key, ok, err := s.filestoreBackupKey(context.Background(), core)
+	require.NoError(t, err)
+	require.True(t, ok)
+	assert.Equal(t, "group/save-fs.tar.gz", key)
+}
+
+func TestFilestoreBackupKeyNoFilestore(t *testing.T) {
+	s := Service{externalDownloads: fakeExternalDownloads{byID: map[uint]*model.Database{
+		10: {ID: 10, FilestoreID: 0}, // database restored without a filestore backup
+	}}}
+	core := &model.DeploymentInstance{Parameters: model.DeploymentInstanceParameters{
+		"DATABASE_ID": {Value: "10"},
+	}}
+
+	_, ok, err := s.filestoreBackupKey(context.Background(), core)
+	require.NoError(t, err)
+	assert.False(t, ok, "no filestore backup means nothing to restore")
+}
+
+func TestFilestoreBackupKeyNoDatabaseID(t *testing.T) {
+	_, ok, err := Service{}.filestoreBackupKey(context.Background(), &model.DeploymentInstance{})
+	require.NoError(t, err)
+	assert.False(t, ok, "a fresh instance with no DATABASE_ID has nothing to restore")
+}
+
 func TestMinioBackupSourceListPropagatesError(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	client := fakeMinioClient{objects: []minio.ObjectInfo{
