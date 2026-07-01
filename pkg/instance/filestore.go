@@ -166,6 +166,52 @@ func writeTarEntry(tw *tar.Writer, object BackupObject, size int64, r io.Reader)
 	return nil
 }
 
+// restoreTarGzToBucket uploads each file in a gzip'd tar to bucket under its key,
+// stripping the filesystem backend's leading "./" so keys match across backends.
+func restoreTarGzToBucket(ctx context.Context, client *minio.Client, bucket string, r io.Reader) error {
+	gr, err := gzip.NewReader(r)
+	if err != nil {
+		return fmt.Errorf("open gzip stream: %v", err)
+	}
+	defer gr.Close()
+
+	tr := tar.NewReader(gr)
+	for {
+		header, err := tr.Next()
+		if err == io.EOF {
+			return nil
+		}
+		if err != nil {
+			return fmt.Errorf("read tar entry: %v", err)
+		}
+		if header.Typeflag != tar.TypeReg {
+			continue
+		}
+		key := strings.TrimPrefix(header.Name, "./")
+		if key == "" {
+			continue
+		}
+		if _, err := client.PutObject(ctx, bucket, key, tr, header.Size, minio.PutObjectOptions{}); err != nil {
+			return fmt.Errorf("put object %s: %v", key, err)
+		}
+	}
+}
+
+// ensureBucket creates bucket if absent so a restore can populate a fresh one.
+func ensureBucket(ctx context.Context, client *minio.Client, bucket, region string) error {
+	exists, err := client.BucketExists(ctx, bucket)
+	if err != nil {
+		return fmt.Errorf("check bucket %q: %v", bucket, err)
+	}
+	if exists {
+		return nil
+	}
+	if err := client.MakeBucket(ctx, bucket, minio.MakeBucketOptions{Region: region}); err != nil {
+		return fmt.Errorf("create bucket %q: %v", bucket, err)
+	}
+	return nil
+}
+
 // s3APISource streams a tar.gz of objects listed over the S3 API, for the external S3 backend.
 type s3APISource struct {
 	source BackupSource
