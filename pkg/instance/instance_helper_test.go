@@ -1,15 +1,24 @@
 package instance_test
 
 import (
+	"archive/tar"
+	"bytes"
+	"compress/gzip"
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/dhis2-sre/im-manager/pkg/inttest"
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type instanceBuilder struct {
@@ -117,4 +126,87 @@ func createMinioInstance(t *testing.T, client *inttest.HTTPClient, deploymentID 
 
 func createDHIS2CoreInstance(t *testing.T, client *inttest.HTTPClient, deploymentID uint, authToken string, opts ...InstanceOption) model.DeploymentInstance {
 	return createInstance(t, client, deploymentID, "dhis2-core", authToken, opts...)
+}
+
+// minioPodName returns the name of the deployment's single minio pod.
+func minioPodName(t *testing.T, k8sClient *inttest.K8sClient, namespace string, deploymentID uint) string {
+	t.Helper()
+	selector := fmt.Sprintf("im-type=minio,im-deployment-id=%d", deploymentID)
+	pods, err := k8sClient.Client.CoreV1().Pods(namespace).List(context.Background(), metav1.ListOptions{LabelSelector: selector})
+	require.NoError(t, err)
+	require.Len(t, pods.Items, 1, "expected exactly one minio pod for selector %q", selector)
+	return pods.Items[0].Name
+}
+
+// waitForCorePodRunning polls until the core instance's default pod is Running, returning its name
+// and primary container.
+func waitForCorePodRunning(t *testing.T, k8sClient *inttest.K8sClient, namespace string, instanceID uint, timeout time.Duration) (string, string) {
+	t.Helper()
+	selector := fmt.Sprintf("im-id=%d,im-default=true", instanceID)
+	deadline := time.Now().Add(timeout)
+	for {
+		pods, err := k8sClient.Client.CoreV1().Pods(namespace).List(context.Background(), metav1.ListOptions{LabelSelector: selector})
+		require.NoError(t, err)
+		for _, pod := range pods.Items {
+			if pod.Status.Phase == corev1.PodRunning && len(pod.Spec.Containers) > 0 {
+				return pod.Name, pod.Spec.Containers[0].Name
+			}
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("timed out after %s waiting for a Running core pod for selector %q", timeout, selector)
+		}
+		time.Sleep(2 * time.Second)
+	}
+}
+
+// extractTarGzEntries unpacks a gzip'd tar into a map of file path -> contents, stripping any leading "./".
+func extractTarGzEntries(t *testing.T, data []byte) map[string][]byte {
+	t.Helper()
+	gr, err := gzip.NewReader(bytes.NewReader(data))
+	require.NoError(t, err)
+	defer gr.Close()
+
+	tr := tar.NewReader(gr)
+	entries := make(map[string][]byte)
+	for {
+		header, err := tr.Next()
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		require.NoError(t, err)
+		if header.Typeflag != tar.TypeReg {
+			continue
+		}
+		var buf bytes.Buffer
+		_, err = io.Copy(&buf, tr) //nolint:gosec // test data, trusted archive
+		require.NoError(t, err)
+		entries[strings.TrimPrefix(header.Name, "./")] = buf.Bytes()
+	}
+	return entries
+}
+
+// rawTarGzNames returns the raw tar entry names for regular files, without stripping
+// the leading "./". Restore (seed-minio.sh: tar x + mc mirror) reproduces the original
+// object key only if the exec backends tar with "./"-relative names, so asserting the raw
+// name guards that format.
+func rawTarGzNames(t *testing.T, data []byte) []string {
+	t.Helper()
+	gr, err := gzip.NewReader(bytes.NewReader(data))
+	require.NoError(t, err)
+	defer gr.Close()
+
+	tr := tar.NewReader(gr)
+	var names []string
+	for {
+		header, err := tr.Next()
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		require.NoError(t, err)
+		if header.Typeflag != tar.TypeReg {
+			continue
+		}
+		names = append(names, header.Name)
+	}
+	return names
 }
