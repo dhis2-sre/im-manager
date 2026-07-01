@@ -43,7 +43,7 @@ func (r redisTokenRepository) DeleteRefreshToken(userId uint, previousTokenId st
 }
 
 func (r redisTokenRepository) DeleteRefreshTokens(userId uint) error {
-	pattern := fmt.Sprintf("%d*", userId)
+	pattern := fmt.Sprintf("%d:*", userId)
 
 	iterator := r.redis.Scan(0, pattern, 5).Iterator()
 	failCount := 0
@@ -55,11 +55,11 @@ func (r redisTokenRepository) DeleteRefreshTokens(userId uint) error {
 	}
 
 	if err := iterator.Err(); err != nil {
-		return fmt.Errorf("failed to delete refresh token: %s", iterator.Val())
+		return fmt.Errorf("failed to scan refresh tokens for userId %d: %s", userId, err)
 	}
 
 	if failCount > 0 {
-		return fmt.Errorf("failed to delete refresh token: %s", iterator.Val())
+		return fmt.Errorf("failed to delete %d refresh tokens for userId %d", failCount, userId)
 	}
 
 	return nil
