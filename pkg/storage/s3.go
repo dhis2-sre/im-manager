@@ -153,6 +153,7 @@ func (s S3Client) Download(ctx context.Context, bucket string, key string, dst i
 		}
 		return fmt.Errorf("error downloading object from bucket %q using key %q: %s", bucket, key, err)
 	}
+	defer object.Body.Close()
 
 	cb(*object.ContentLength)
 
