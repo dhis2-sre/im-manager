@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/dhis2-sre/im-manager/pkg/storage"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -26,22 +27,17 @@ type BackupObject struct {
 	Err          error
 }
 
-// s3StreamUploader streams a reader to an object in S3.
-type s3StreamUploader interface {
-	StreamUpload(ctx context.Context, bucket, key, contentType string, r io.Reader) (int64, error)
-}
-
-func NewBackupService(logger *slog.Logger, uploader s3StreamUploader) *BackupService {
+func NewBackupService(logger *slog.Logger, uploader *storage.S3Client) *BackupService {
 	return &BackupService{logger: logger, uploader: uploader}
 }
 
 // BackupService streams a filestoreStreamer's gzip'd tar to S3.
 type BackupService struct {
 	logger   *slog.Logger
-	uploader s3StreamUploader
+	uploader *storage.S3Client
 }
 
-// PerformBackup runs streamer in a goroutine writing into a pipe whose reader is streamed to S3.
+// PerformBackup uploads the streamer's output to key in s3Bucket.
 func (s *BackupService) PerformBackup(ctx context.Context, streamer filestoreStreamer, s3Bucket, key string) error {
 	start := time.Now()
 	pr, pw := io.Pipe()

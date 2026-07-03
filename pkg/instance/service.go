@@ -167,6 +167,15 @@ func (s Service) restoreFilestoreToS3(ctx context.Context, core *model.Deploymen
 		return err
 	}
 
+	restored, err := filestoreRestored(ctx, client, bucket)
+	if err != nil {
+		return err
+	}
+	if restored {
+		s.logger.InfoContext(ctx, "Filestore already restored to external S3, skipping", "bucket", bucket)
+		return nil
+	}
+
 	pr, pw := io.Pipe()
 	g, ctx := errgroup.WithContext(ctx)
 	g.Go(func() error {
@@ -181,6 +190,10 @@ func (s Service) restoreFilestoreToS3(ctx context.Context, core *model.Deploymen
 	})
 	if err := g.Wait(); err != nil {
 		return fmt.Errorf("filestore restore failed: %v", err)
+	}
+
+	if err := markFilestoreRestored(ctx, client, bucket); err != nil {
+		return err
 	}
 
 	s.logger.InfoContext(ctx, "Filestore restored to external S3", "bucket", bucket, "key", key)

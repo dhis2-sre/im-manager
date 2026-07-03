@@ -313,41 +313,6 @@ func TestStorageTypeDefaultsToMinio(t *testing.T) {
 	assert.Equal(t, "filesystem", storageType(withType))
 }
 
-func TestObjectWeight(t *testing.T) {
-	assert.Equal(t, int64(1), objectWeight(0), "zero-size must reserve at least 1 so Acquire never blocks on 0")
-	assert.Equal(t, int64(1), objectWeight(-5))
-	assert.Equal(t, int64(100), objectWeight(100))
-	assert.Equal(t, int64(filestoreReadByteBudget), objectWeight(filestoreReadByteBudget+1), "an oversized object is capped at the total budget so it can still be fetched")
-}
-
-func TestNewExternalS3Client(t *testing.T) {
-	tests := []struct {
-		name       string
-		endpoint   string
-		wantHost   string
-		wantScheme string
-	}{
-		{"empty defaults to aws over https", "", "s3.amazonaws.com", "https"},
-		{"http endpoint disables tls and strips scheme", "http://minio.local:9000", "minio.local:9000", "http"},
-		{"https endpoint keeps tls and strips scheme", "https://minio.local:9000", "minio.local:9000", "https"},
-		{"scheme-less endpoint defaults to https", "minio.local:9000", "minio.local:9000", "https"},
-	}
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			core := &model.DeploymentInstance{Parameters: model.DeploymentInstanceParameters{
-				"S3_ENDPOINT": {Value: tc.endpoint},
-				"S3_REGION":   {Value: "eu-west-1"},
-				"S3_IDENTITY": {Value: "id"},
-				"S3_SECRET":   {Value: "secret"},
-			}}
-			client, err := newExternalS3Client(core)
-			require.NoError(t, err)
-			assert.Equal(t, tc.wantHost, client.EndpointURL().Host)
-			assert.Equal(t, tc.wantScheme, client.EndpointURL().Scheme)
-		})
-	}
-}
-
 func TestCoreContainerName(t *testing.T) {
 	pod := func(names ...string) v1.Pod {
 		var containers []v1.Container
@@ -357,11 +322,11 @@ func TestCoreContainerName(t *testing.T) {
 		return v1.Pod{Spec: v1.PodSpec{Containers: containers}}
 	}
 
-	assert.Equal(t, "my-release", coreContainerName(pod("istio-proxy", "my-release"), "my-release"),
-		"the container named after the release is picked even when a sidecar comes first")
-	assert.Equal(t, "sidecar", coreContainerName(pod("sidecar", "core"), "no-match"),
-		"with no name match it falls back to the first container")
-	assert.Equal(t, "only", coreContainerName(pod("only"), "whatever"))
+	assert.Equal(t, "core", coreContainerName(pod("istio-proxy", "core")),
+		"the DHIS2 container (named 'core') is picked even when a sidecar comes first")
+	assert.Equal(t, "sidecar", coreContainerName(pod("sidecar", "other")),
+		"with no 'core' container it falls back to the first")
+	assert.Equal(t, "only", coreContainerName(pod("only")))
 }
 
 func TestWriteTarGzEmptySource(t *testing.T) {
@@ -487,4 +452,25 @@ func TestMinioBackupSourceListPropagatesError(t *testing.T) {
 	}
 	require.Error(t, listErr, "a listing error must be delivered as BackupObject.Err, not swallowed")
 	assert.Contains(t, listErr.Error(), "boom listing")
+}
+
+func TestMinioBackupSourceListSkipsRestoreMarker(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	client := fakeMinioClient{objects: []minio.ObjectInfo{
+		{Key: "apps/a.txt", Size: 3},
+		{Key: filestoreRestoreMarker, Size: 10},
+		{Key: "userAvatar/uid1", Size: 5},
+	}}
+	src := NewMinioBackupSource(logger, client, "dhis2")
+
+	ch, err := src.List(context.Background())
+	require.NoError(t, err)
+
+	var keys []string
+	for object := range ch {
+		require.NoError(t, object.Err)
+		keys = append(keys, object.Path)
+	}
+	assert.NotContains(t, keys, filestoreRestoreMarker, "the restore marker must not be swept into a backup")
+	assert.ElementsMatch(t, []string{"apps/a.txt", "userAvatar/uid1"}, keys)
 }
