@@ -16,6 +16,8 @@ import (
 	awss3 "github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/dhis2-sre/im-manager/pkg/database"
+	"github.com/dhis2-sre/im-manager/pkg/deployment"
+	"github.com/dhis2-sre/im-manager/pkg/instance"
 	"github.com/dhis2-sre/im-manager/pkg/inttest"
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	"github.com/dhis2-sre/im-manager/pkg/storage"
@@ -40,10 +42,11 @@ func TestDatabaseHandler(t *testing.T) {
 	s3Client := storage.NewS3Client(logger, s3.Client, uploader)
 
 	databaseRepository := database.NewRepository(db)
-	databaseService := database.NewService(logger, s3Bucket, s3Client, groupService{}, databaseRepository, nil, noopPublisher{}, noopFilestoreBackuper{})
+	databaseService := database.NewService(logger, s3Bucket, s3Client, groupService{}, databaseRepository, nil, noopPublisher{})
+	deploymentService := deployment.NewService(logger, instanceService{}, databaseService, nil, noopPublisher{})
 
 	client := inttest.SetupHTTPServer(t, func(engine *gin.Engine) {
-		databaseHandler := database.NewHandler(logger, databaseService, groupService{groupName: "packages"}, instanceService{}, stackService{})
+		databaseHandler := database.NewHandler(logger, databaseService, groupService{groupName: "packages"}, instanceService{}, stackService{}, deploymentService)
 		authenticator := func(c *gin.Context) {
 			ctx := model.NewContextWithUser(c.Request.Context(), &model.User{
 				ID:    1,
@@ -336,6 +339,30 @@ func (is instanceService) FindDecryptedDeploymentInstanceById(ctx context.Contex
 	panic("implement me")
 }
 
+func (is instanceService) FindDecryptedDeploymentById(ctx context.Context, id uint) (*model.Deployment, error) {
+	panic("implement me")
+}
+
+func (is instanceService) DeploymentOrder(deployment *model.Deployment) ([]*model.DeploymentInstance, error) {
+	panic("implement me")
+}
+
+func (is instanceService) DeployInstance(ctx context.Context, token string, instance *model.DeploymentInstance, ttl uint, extraEnv map[string]string, filestoreBackup *model.Database) error {
+	panic("implement me")
+}
+
+func (is instanceService) DestroyInstance(ctx context.Context, instance *model.DeploymentInstance) error {
+	panic("implement me")
+}
+
+func (is instanceService) SaveDeployment(ctx context.Context, deployment *model.Deployment) error {
+	panic("implement me")
+}
+
+func (is instanceService) UpdateInstanceParameters(ctx context.Context, deploymentId, instanceId uint, parameters instance.Parameters, public *bool) (*model.DeploymentInstance, error) {
+	panic("implement me")
+}
+
 type stackService struct{}
 
 func (ss stackService) Find(name string) (*model.Stack, error) {
@@ -345,9 +372,3 @@ func (ss stackService) Find(name string) (*model.Stack, error) {
 type noopPublisher struct{}
 
 func (noopPublisher) Publish(context.Context, uint, string, string, any) {}
-
-type noopFilestoreBackuper struct{}
-
-func (noopFilestoreBackuper) FilestoreBackup(context.Context, *model.DeploymentInstance, string, *model.Database) error {
-	return nil
-}

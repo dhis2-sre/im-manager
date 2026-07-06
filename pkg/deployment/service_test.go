@@ -29,6 +29,22 @@ func (f fakeDatabaseService) CreateExternalDownload(ctx context.Context, databas
 	return &model.ExternalDownload{UUID: uuid.NewSHA1(uuid.NameSpaceOID, []byte(fmt.Sprint(databaseID))), DatabaseID: databaseID}, nil
 }
 
+func (f fakeDatabaseService) CreateDatabase(ctx context.Context, userId uint, groupName, name string) (*model.Database, error) {
+	panic("not used")
+}
+
+func (f fakeDatabaseService) Dump(ctx context.Context, userId uint, database *model.Database, instance *model.DeploymentInstance, stack *model.Stack, format string) (*model.Database, error) {
+	panic("not used")
+}
+
+func (f fakeDatabaseService) EnsureLocked(ctx context.Context, database *model.Database, instanceId, userId uint) (*model.Database, bool, error) {
+	panic("not used")
+}
+
+func (f fakeDatabaseService) SaveLocked(ctx context.Context, database *model.Database, instance *model.DeploymentInstance, stack *model.Stack, wasLocked bool) (*model.Database, error) {
+	panic("not used")
+}
+
 func TestBuildSeed(t *testing.T) {
 	t.Setenv("HOSTNAME", "http://im")
 	s := Service{databaseService: fakeDatabaseService{byID: map[uint]*model.Database{

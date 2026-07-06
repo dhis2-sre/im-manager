@@ -206,12 +206,14 @@ func run() (err error) {
 
 	notificationHandler := newNotificationHandler(logger, db)
 
-	databaseHandler, databaseService, err := newDatabaseHandler(ctx, logger, db, groupService, instanceService, stackService, streamEnv, streamName)
+	databaseService, publisher, err := newDatabaseService(ctx, logger, db, groupService, streamEnv, streamName)
 	if err != nil {
 		return err
 	}
 
-	deploymentService := deployment.NewService(logger, instanceService, databaseService, tokenService)
+	deploymentService := deployment.NewService(logger, instanceService, databaseService, tokenService, publisher)
+
+	databaseHandler := database.NewHandler(logger, databaseService, groupService, instanceService, stackService, deploymentService)
 
 	instanceHandler, err := newInstanceHandler(stackService, groupService, instanceService, deploymentService)
 	if err != nil {
@@ -612,26 +614,26 @@ func newInstanceHandler(stackService stack.Service, groupService *group.Service,
 	return instance.NewHandler(stackService, groupService, instanceService, deploymentService, defaultTTL), nil
 }
 
-func newDatabaseHandler(ctx context.Context, logger *slog.Logger, db *gorm.DB, groupService *group.Service, instanceService *instance.Service, stackService stack.Service, env *stream.Environment, streamName string) (database.Handler, *database.Service, error) {
+func newDatabaseService(ctx context.Context, logger *slog.Logger, db *gorm.DB, groupService *group.Service, env *stream.Environment, streamName string) (*database.Service, *notification.Publisher, error) {
 	s3Bucket, err := requireEnv("S3_BUCKET")
 	if err != nil {
-		return database.Handler{}, nil, err
+		return nil, nil, err
 	}
 	s3Client, err := newS3Client(ctx, logger)
 	if err != nil {
-		return database.Handler{}, nil, err
+		return nil, nil, err
 	}
 	databaseRepository := database.NewRepository(db)
 	notificationRepository := notification.NewRepository(db)
 	publisher, err := notification.NewPublisher(logger, env, streamName, notificationRepository)
 	if err != nil {
-		return database.Handler{}, nil, fmt.Errorf("failed to create database notification publisher: %w", err)
+		return nil, nil, fmt.Errorf("failed to create database notification publisher: %w", err)
 	}
 	databaseService := database.NewService(logger, s3Bucket, s3Client, groupService, databaseRepository, func(c model.Cluster) (database.PodExecutor, error) {
 		return instance.NewKubernetesService(c)
-	}, publisher, instanceService)
+	}, publisher)
 
-	return database.NewHandler(logger, databaseService, groupService, instanceService, stackService), databaseService, nil
+	return databaseService, publisher, nil
 }
 
 func newS3Client(ctx context.Context, logger *slog.Logger) (*storage.S3Client, error) {

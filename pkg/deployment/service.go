@@ -12,12 +12,13 @@ import (
 	"github.com/dhis2-sre/im-manager/pkg/token"
 )
 
-func NewService(logger *slog.Logger, instanceService instanceService, databaseService databaseService, tokenService *token.TokenService) *Service {
+func NewService(logger *slog.Logger, instanceService instanceService, databaseService databaseService, tokenService *token.TokenService, publisher Publisher) *Service {
 	return &Service{
 		logger:          logger,
 		instanceService: instanceService,
 		databaseService: databaseService,
 		tokenService:    tokenService,
+		publisher:       publisher,
 	}
 }
 
@@ -30,11 +31,21 @@ type instanceService interface {
 	FindDecryptedDeploymentInstanceById(ctx context.Context, id uint) (*model.DeploymentInstance, error)
 	SaveDeployment(ctx context.Context, deployment *model.Deployment) error
 	UpdateInstanceParameters(ctx context.Context, deploymentId, instanceId uint, parameters instance.Parameters, public *bool) (*model.DeploymentInstance, error)
+	FilestoreBackup(ctx context.Context, instance *model.DeploymentInstance, name string, database *model.Database) error
 }
 
 type databaseService interface {
 	FindById(ctx context.Context, id uint) (*model.Database, error)
 	CreateExternalDownload(ctx context.Context, databaseID uint, expiration uint) (*model.ExternalDownload, error)
+	CreateDatabase(ctx context.Context, userId uint, groupName, name string) (*model.Database, error)
+	Dump(ctx context.Context, userId uint, database *model.Database, instance *model.DeploymentInstance, stack *model.Stack, format string) (*model.Database, error)
+	EnsureLocked(ctx context.Context, database *model.Database, instanceId, userId uint) (*model.Database, bool, error)
+	SaveLocked(ctx context.Context, database *model.Database, instance *model.DeploymentInstance, stack *model.Stack, wasLocked bool) (*model.Database, error)
+}
+
+// Publisher publishes notifications for async cross-service operations.
+type Publisher interface {
+	Publish(ctx context.Context, userID uint, groupName, kind string, payload any)
 }
 
 type Service struct {
@@ -42,6 +53,7 @@ type Service struct {
 	instanceService instanceService
 	databaseService databaseService
 	tokenService    *token.TokenService
+	publisher       Publisher
 }
 
 func (s Service) DeployDeployment(ctx context.Context, token string, deployment *model.Deployment) error {
@@ -129,6 +141,65 @@ func (s Service) UpdateInstance(ctx context.Context, token string, deploymentId,
 	}
 
 	return updated, nil
+}
+
+// SaveAs dumps the instance's database into a new record. The record is returned right away
+// while the dump and the filestore backup of the dhis2-core sibling run in the background.
+func (s Service) SaveAs(ctx context.Context, userId uint, instance *model.DeploymentInstance, stack *model.Stack, coreInstance *model.DeploymentInstance, name string, format string) (*model.Database, error) {
+	created, err := s.databaseService.CreateDatabase(ctx, userId, instance.GroupName, name)
+	if err != nil {
+		return nil, err
+	}
+
+	// Detach from the request context so the dump and backup aren't cancelled when the
+	// HTTP response is sent.
+	ctx = context.WithoutCancel(ctx)
+	go func() {
+		dumped, err := s.databaseService.Dump(ctx, userId, created, instance, stack, format)
+		if err != nil {
+			return
+		}
+		s.saveFilestore(ctx, userId, coreInstance, dumped)
+	}()
+
+	return created, nil
+}
+
+// Save overwrites the instance's source database with a fresh dump. The lock check runs before
+// returning; the dump, finalization and filestore backup run in the background.
+func (s Service) Save(ctx context.Context, userId uint, database *model.Database, instance *model.DeploymentInstance, stack *model.Stack, coreInstance *model.DeploymentInstance) error {
+	locked, wasLocked, err := s.databaseService.EnsureLocked(ctx, database, instance.ID, userId)
+	if err != nil {
+		return err
+	}
+
+	// Detach from the request context so the dump and backup aren't cancelled when the
+	// HTTP response is sent.
+	ctx = context.WithoutCancel(ctx)
+	go func() {
+		saved, err := s.databaseService.SaveLocked(ctx, locked, instance, stack, wasLocked)
+		if err != nil {
+			s.logger.ErrorContext(ctx, "save database failed", "databaseName", locked.Name, "error", err)
+			return
+		}
+		s.saveFilestore(ctx, locked.UserID, coreInstance, saved)
+	}()
+
+	return nil
+}
+
+func (s Service) saveFilestore(ctx context.Context, userId uint, coreInstance *model.DeploymentInstance, database *model.Database) {
+	if coreInstance == nil {
+		return
+	}
+
+	s.publisher.Publish(ctx, userId, database.GroupName, kindFilestoreBackup, newFilestoreEvent(database, "started", ""))
+	if err := s.instanceService.FilestoreBackup(ctx, coreInstance, database.Name, database); err != nil {
+		s.logger.ErrorContext(ctx, "filestore backup failed", "groupName", database.GroupName, "databaseName", database.Name, "error", err)
+		s.publisher.Publish(ctx, userId, database.GroupName, kindFilestoreBackup, newFilestoreEvent(database, "error", err.Error()))
+		return
+	}
+	s.publisher.Publish(ctx, userId, database.GroupName, kindFilestoreBackup, newFilestoreEvent(database, "success", ""))
 }
 
 func (s Service) deployInstance(ctx context.Context, token string, instance *model.DeploymentInstance, ttl uint) error {
