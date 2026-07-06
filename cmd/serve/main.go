@@ -66,6 +66,7 @@ import (
 	"github.com/dhis2-sre/im-manager/internal/log"
 	"github.com/dhis2-sre/im-manager/internal/middleware"
 	"github.com/dhis2-sre/im-manager/pkg/database"
+	"github.com/dhis2-sre/im-manager/pkg/deployment"
 	"github.com/dhis2-sre/im-manager/pkg/event"
 	"github.com/dhis2-sre/im-manager/pkg/group"
 	"github.com/dhis2-sre/im-manager/pkg/model"
@@ -186,17 +187,12 @@ func run() (err error) {
 		return err
 	}
 
-	instanceService, err := newInstanceService(logger, db, stackService, groupService, s3Client, tokenService)
+	instanceService, err := newInstanceService(logger, db, stackService, groupService, s3Client)
 	if err != nil {
 		return err
 	}
 
 	stackHandler := stack.NewHandler(stackService)
-
-	instanceHandler, err := newInstanceHandler(stackService, groupService, instanceService)
-	if err != nil {
-		return err
-	}
 
 	rabbitmqConfig, err := newRabbitMQ()
 	if err != nil {
@@ -214,7 +210,13 @@ func run() (err error) {
 	if err != nil {
 		return err
 	}
-	instanceService.SetExternalDownloads(databaseService)
+
+	deploymentService := deployment.NewService(logger, instanceService, databaseService, tokenService)
+
+	instanceHandler, err := newInstanceHandler(stackService, groupService, instanceService, deploymentService)
+	if err != nil {
+		return err
+	}
 
 	err = handler.RegisterValidation()
 	if err != nil {
@@ -531,7 +533,7 @@ func newStackService() (stack.Service, error) {
 	return stack.NewService(stacks), nil
 }
 
-func newInstanceService(logger *slog.Logger, db *gorm.DB, stackService stack.Service, groupService *group.Service, s3Client *storage.S3Client, tokenService *token.TokenService) (*instance.Service, error) {
+func newInstanceService(logger *slog.Logger, db *gorm.DB, stackService stack.Service, groupService *group.Service, s3Client *storage.S3Client) (*instance.Service, error) {
 	instanceParameterEncryptionKey, err := requireEnv("INSTANCE_PARAMETER_ENCRYPTION_KEY")
 	if err != nil {
 		return nil, err
@@ -554,7 +556,7 @@ func newInstanceService(logger *slog.Logger, db *gorm.DB, stackService stack.Ser
 		return nil, err
 	}
 
-	return instance.NewService(logger, instanceRepository, groupService, stackService, helmfileService, s3Client, s3Bucket, tokenService), nil
+	return instance.NewService(logger, instanceRepository, groupService, stackService, helmfileService, s3Client, s3Bucket), nil
 }
 
 type rabbitMQConfig struct {
@@ -601,13 +603,13 @@ func newRabbitMQ() (rabbitMQConfig, error) {
 	}, nil
 }
 
-func newInstanceHandler(stackService stack.Service, groupService *group.Service, instanceService *instance.Service) (instance.Handler, error) {
+func newInstanceHandler(stackService stack.Service, groupService *group.Service, instanceService *instance.Service, deploymentService *deployment.Service) (instance.Handler, error) {
 	defaultTTL, err := requireEnvAsUint("DEFAULT_TTL")
 	if err != nil {
 		return instance.Handler{}, err
 	}
 
-	return instance.NewHandler(stackService, groupService, instanceService, defaultTTL), nil
+	return instance.NewHandler(stackService, groupService, instanceService, deploymentService, defaultTTL), nil
 }
 
 func newDatabaseHandler(ctx context.Context, logger *slog.Logger, db *gorm.DB, groupService *group.Service, instanceService *instance.Service, stackService stack.Service, env *stream.Environment, streamName string) (database.Handler, *database.Service, error) {

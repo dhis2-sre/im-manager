@@ -19,6 +19,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
 	"github.com/dhis2-sre/im-manager/pkg/cluster"
 	"github.com/dhis2-sre/im-manager/pkg/database"
+	"github.com/dhis2-sre/im-manager/pkg/deployment"
 	"github.com/dhis2-sre/im-manager/pkg/storage"
 
 	"filippo.io/age"
@@ -103,7 +104,7 @@ func TestInstanceHandler(t *testing.T) {
 	require.NoError(t, err, "failed to generate RSA private key")
 	tokenService, err := token.NewService(logger, tokenRepository, privateKey, 100, 60, "secret", 100, 100)
 	require.NoError(t, err, "failed to create token service")
-	instanceService := instance.NewService(logger, instanceRepo, groupService, stackService, helmfileService, nil, "", tokenService)
+	instanceService := instance.NewService(logger, instanceRepo, groupService, stackService, helmfileService, nil, "")
 
 	s3Dir := t.TempDir()
 	s3Bucket := "database-bucket"
@@ -116,7 +117,7 @@ func TestInstanceHandler(t *testing.T) {
 	databaseService := database.NewService(logger, s3Bucket, s3Client, groupService, databaseRepository, func(c model.Cluster) (database.PodExecutor, error) {
 		return instance.NewKubernetesService(c)
 	}, noopPublisher{}, noopFilestoreBackuper{})
-	instanceService.SetExternalDownloads(databaseService)
+	deploymentService := deployment.NewService(logger, instanceService, databaseService, tokenService)
 
 	authenticator := func(c *gin.Context) {
 		ctx := model.NewContextWithUser(c.Request.Context(), user)
@@ -124,7 +125,7 @@ func TestInstanceHandler(t *testing.T) {
 	}
 	client := inttest.SetupHTTPServer(t, func(engine *gin.Engine) {
 		var twoDayTTL uint = 172800
-		instanceHandler := instance.NewHandler(stackService, groupService, instanceService, twoDayTTL)
+		instanceHandler := instance.NewHandler(stackService, groupService, instanceService, deploymentService, twoDayTTL)
 		instance.Routes(engine, authenticator, instanceHandler)
 
 		databaseHandler := database.NewHandler(logger, databaseService, groupService, instanceService, stackService)
@@ -245,7 +246,7 @@ func TestInstanceHandler(t *testing.T) {
 		require.NoError(t, db.Create(target).Error)
 
 		// The shared instanceService is wired with a nil S3 client; build one with the real client.
-		fsService := instance.NewService(logger, instanceRepo, groupService, stackService, helmfileService, s3Client, s3Bucket, tokenService)
+		fsService := instance.NewService(logger, instanceRepo, groupService, stackService, helmfileService, s3Client, s3Bucket)
 		require.NoError(t, fsService.FilestoreBackup(context.Background(), &coreInstance, target.Name, target))
 
 		content := s3.GetObject(t, s3Bucket, "group-name/fs-backup-target-fs.tar.gz")
@@ -287,7 +288,7 @@ func TestInstanceHandler(t *testing.T) {
 		require.NoError(t, db.Create(target).Error)
 
 		// The shared instanceService is wired with a nil S3 client; build one with the real client.
-		fsService := instance.NewService(logger, instanceRepo, groupService, stackService, helmfileService, s3Client, s3Bucket, tokenService)
+		fsService := instance.NewService(logger, instanceRepo, groupService, stackService, helmfileService, s3Client, s3Bucket)
 		require.NoError(t, fsService.FilestoreBackup(context.Background(), &coreInstance, target.Name, target))
 
 		content := s3.GetObject(t, s3Bucket, "group-name/fsstore-backup-target-fs.tar.gz")
