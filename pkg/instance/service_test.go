@@ -132,6 +132,40 @@ func TestResolveParameters(t *testing.T) {
 		assert.ElementsMatch(t, want, deployment.Instances)
 	})
 
+	t.Run("RequiredInstanceNotInDeployment", func(t *testing.T) {
+		stackA := model.Stack{
+			Name: "stack-a",
+		}
+		stackB := model.Stack{
+			Name: "stack-b",
+			Parameters: map[string]model.StackParameter{
+				"parameter": {
+					Consumed: true,
+				},
+			},
+			Requires: []model.Stack{stackA},
+		}
+		stacks := stack.Stacks{
+			"stack-a": stackA,
+			"stack-b": stackB,
+		}
+		stackService := stack.NewService(stacks)
+		service := NewService(nil, nil, nil, stackService, nil, nil, "", nil)
+		deployment := &model.Deployment{
+			Instances: []*model.DeploymentInstance{
+				{
+					Name:       "name-b",
+					StackName:  "stack-b",
+					Parameters: map[string]model.DeploymentInstanceParameter{},
+				},
+			},
+		}
+
+		err := service.resolveParameters(deployment)
+
+		require.ErrorContains(t, err, `failed to find required instance "stack-a" of instance "name-b"`)
+	})
+
 	t.Run("ResolveParameterUsingProvider", func(t *testing.T) {
 		stackA := model.Stack{
 			Name: "stack-a",
