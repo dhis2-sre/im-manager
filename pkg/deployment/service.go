@@ -26,9 +26,7 @@ type instanceService interface {
 	DeploymentOrder(deployment *model.Deployment) ([]*model.DeploymentInstance, error)
 	DeployInstance(ctx context.Context, token string, instance *model.DeploymentInstance, ttl uint, extraEnv map[string]string, filestoreBackup *model.Database) error
 	DestroyInstance(ctx context.Context, instance *model.DeploymentInstance) error
-	FindDeploymentById(ctx context.Context, id uint) (*model.Deployment, error)
 	FindDecryptedDeploymentById(ctx context.Context, id uint) (*model.Deployment, error)
-	FindDecryptedDeploymentInstanceById(ctx context.Context, id uint) (*model.DeploymentInstance, error)
 	SaveDeployment(ctx context.Context, deployment *model.Deployment) error
 	UpdateInstanceParameters(ctx context.Context, deploymentId, instanceId uint, parameters instance.Parameters, public *bool) (*model.DeploymentInstance, error)
 	FilestoreBackup(ctx context.Context, instance *model.DeploymentInstance, name string, database *model.Database) error
@@ -70,7 +68,7 @@ func (s Service) DeployDeployment(ctx context.Context, token string, deployment 
 		if err != nil {
 			return err
 		}
-		err = s.deployInstance(ctx, token, instance, deployment.TTL)
+		err = s.deployInstance(ctx, token, instance, deployment.TTL, deployment.Instances)
 		if err != nil {
 			return fmt.Errorf("failed to deploy instance(%s) %q: %w", instance.StackName, instance.Name, err)
 		}
@@ -111,7 +109,12 @@ func (s Service) Reset(ctx context.Context, token string, instance *model.Deploy
 		return err
 	}
 
-	return s.deployInstance(ctx, token, instance, ttl)
+	deployment, err := s.instanceService.FindDecryptedDeploymentById(ctx, instance.DeploymentID)
+	if err != nil {
+		return err
+	}
+
+	return s.deployInstance(ctx, token, instance, ttl, deployment.Instances)
 }
 
 func (s Service) UpdateInstance(ctx context.Context, token string, deploymentId, instanceId uint, parameters instance.Parameters, public *bool) (*model.DeploymentInstance, error) {
@@ -120,12 +123,12 @@ func (s Service) UpdateInstance(ctx context.Context, token string, deploymentId,
 		return nil, err
 	}
 
-	deployment, err := s.instanceService.FindDeploymentById(ctx, deploymentId)
+	deployment, err := s.instanceService.FindDecryptedDeploymentById(ctx, deploymentId)
 	if err != nil {
 		return nil, err
 	}
 
-	decryptedInstance, err := s.instanceService.FindDecryptedDeploymentInstanceById(ctx, instanceId)
+	decryptedInstance, err := findInstanceById(deployment.Instances, instanceId)
 	if err != nil {
 		return nil, err
 	}
@@ -135,12 +138,21 @@ func (s Service) UpdateInstance(ctx context.Context, token string, deploymentId,
 		return nil, err
 	}
 
-	err = s.deployInstance(ctx, refreshedToken, decryptedInstance, deployment.TTL)
+	err = s.deployInstance(ctx, refreshedToken, decryptedInstance, deployment.TTL, deployment.Instances)
 	if err != nil {
 		return nil, fmt.Errorf("failed to deploy updated instance: %v", err)
 	}
 
 	return updated, nil
+}
+
+func findInstanceById(instances []*model.DeploymentInstance, id uint) (*model.DeploymentInstance, error) {
+	for _, instance := range instances {
+		if instance.ID == id {
+			return instance, nil
+		}
+	}
+	return nil, fmt.Errorf("instance %d not found in deployment", id)
 }
 
 // SaveAs dumps the instance's database into a new record. The record is returned right away
@@ -202,8 +214,8 @@ func (s Service) saveFilestore(ctx context.Context, userId uint, coreInstance *m
 	s.publisher.Publish(ctx, userId, database.GroupName, kindFilestoreBackup, newFilestoreEvent(database, "success", ""))
 }
 
-func (s Service) deployInstance(ctx context.Context, token string, instance *model.DeploymentInstance, ttl uint) error {
-	extraEnv, filestoreBackup, err := s.buildSeed(ctx, instance)
+func (s Service) deployInstance(ctx context.Context, token string, instance *model.DeploymentInstance, ttl uint, instances []*model.DeploymentInstance) error {
+	extraEnv, filestoreBackup, err := s.buildSeed(ctx, instances)
 	if err != nil {
 		return fmt.Errorf("failed to build seed environment: %w", err)
 	}
@@ -213,23 +225,38 @@ func (s Service) deployInstance(ctx context.Context, token string, instance *mod
 
 const seedDownloadTTLSeconds uint = 1800
 
-// buildSeed resolves the database referenced by the instance's DATABASE_ID parameter into the
-// environment variables and filestore backup record needed to seed the instance at deploy time.
-func (s Service) buildSeed(ctx context.Context, instance *model.DeploymentInstance) (map[string]string, *model.Database, error) {
-	param, ok := instance.Parameters["DATABASE_ID"]
-	if !ok {
-		return nil, nil, nil
-	}
+// databaseIDFromInstances resolves the DATABASE_ID parameter from whichever instance in the
+// deployment carries it. DATABASE_ID lives on the db instance, while storage parameters live on
+// the core instance, so callers operating on the core must look across siblings to find it.
+func databaseIDFromInstances(instances []*model.DeploymentInstance) (uint, bool) {
+	for _, instance := range instances {
+		param, ok := instance.Parameters["DATABASE_ID"]
+		if !ok {
+			continue
+		}
 
-	databaseID, err := strconv.ParseUint(param.Value, 10, strconv.IntSize)
-	if err != nil || databaseID == 0 {
+		databaseID, err := strconv.ParseUint(param.Value, 10, strconv.IntSize)
+		if err != nil || databaseID == 0 {
+			continue
+		}
+
+		return uint(databaseID), true
+	}
+	return 0, false
+}
+
+// buildSeed resolves the database referenced by the deployment's DATABASE_ID parameter into the
+// environment variables and filestore backup record needed to seed an instance at deploy time.
+func (s Service) buildSeed(ctx context.Context, instances []*model.DeploymentInstance) (map[string]string, *model.Database, error) {
+	databaseID, ok := databaseIDFromInstances(instances)
+	if !ok {
 		return nil, nil, nil
 	}
 
 	hostname := os.Getenv("HOSTNAME")
 	extraEnv := make(map[string]string)
 
-	db, err := s.databaseService.FindById(ctx, uint(databaseID))
+	db, err := s.databaseService.FindById(ctx, databaseID)
 	if err != nil {
 		return nil, nil, fmt.Errorf("database %d not found: %w", databaseID, err)
 	}

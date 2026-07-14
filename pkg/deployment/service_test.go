@@ -55,12 +55,35 @@ func TestBuildSeed(t *testing.T) {
 		"DATABASE_ID": {Value: "10"},
 	}}
 
-	extraEnv, filestore, err := s.buildSeed(context.Background(), instance)
+	extraEnv, filestore, err := s.buildSeed(context.Background(), []*model.DeploymentInstance{instance})
 	require.NoError(t, err)
 	dbUUID := uuid.NewSHA1(uuid.NameSpaceOID, []byte("10")).String()
 	fsUUID := uuid.NewSHA1(uuid.NameSpaceOID, []byte("20")).String()
 	assert.Equal(t, "http://im/databases/external/"+dbUUID, extraEnv["DATABASE_DOWNLOAD_URL"])
 	assert.Equal(t, "http://im/databases/external/"+fsUUID, extraEnv["FILESTORE_DOWNLOAD_URL"])
+	require.NotNil(t, filestore)
+	assert.Equal(t, "s3://im-bucket/group/save-fs.tar.gz", filestore.Url)
+}
+
+func TestBuildSeedResolvesDatabaseIDFromSibling(t *testing.T) {
+	t.Setenv("HOSTNAME", "http://im")
+	s := Service{databaseService: fakeDatabaseService{byID: map[uint]*model.Database{
+		10: {ID: 10, FilestoreID: 20},
+		20: {ID: 20, Url: "s3://im-bucket/group/save-fs.tar.gz"},
+	}}}
+	// The s3 core instance carries the storage parameters but no DATABASE_ID; the
+	// db instance carries DATABASE_ID. Seeding must resolve it across siblings.
+	core := &model.DeploymentInstance{Parameters: model.DeploymentInstanceParameters{
+		"STORAGE_TYPE": {Value: "s3"},
+		"S3_BUCKET":    {Value: "external-bucket"},
+	}}
+	db := &model.DeploymentInstance{Parameters: model.DeploymentInstanceParameters{
+		"DATABASE_ID": {Value: "10"},
+	}}
+
+	extraEnv, filestore, err := s.buildSeed(context.Background(), []*model.DeploymentInstance{core, db})
+	require.NoError(t, err)
+	assert.Contains(t, extraEnv, "DATABASE_DOWNLOAD_URL")
 	require.NotNil(t, filestore)
 	assert.Equal(t, "s3://im-bucket/group/save-fs.tar.gz", filestore.Url)
 }
@@ -74,7 +97,7 @@ func TestBuildSeedNoFilestore(t *testing.T) {
 		"DATABASE_ID": {Value: "10"},
 	}}
 
-	extraEnv, filestore, err := s.buildSeed(context.Background(), instance)
+	extraEnv, filestore, err := s.buildSeed(context.Background(), []*model.DeploymentInstance{instance})
 	require.NoError(t, err)
 	assert.Contains(t, extraEnv, "DATABASE_DOWNLOAD_URL")
 	assert.NotContains(t, extraEnv, "FILESTORE_DOWNLOAD_URL")
@@ -82,7 +105,7 @@ func TestBuildSeedNoFilestore(t *testing.T) {
 }
 
 func TestBuildSeedNoDatabaseID(t *testing.T) {
-	extraEnv, filestore, err := Service{}.buildSeed(context.Background(), &model.DeploymentInstance{})
+	extraEnv, filestore, err := Service{}.buildSeed(context.Background(), []*model.DeploymentInstance{{}})
 	require.NoError(t, err)
 	assert.Nil(t, extraEnv, "a fresh instance with no DATABASE_ID has nothing to seed")
 	assert.Nil(t, filestore)
