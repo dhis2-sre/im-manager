@@ -160,6 +160,10 @@ func (s Service) filestoreBackupKey(ctx context.Context, instances []*model.Depl
 // restoreFilestoreToS3 restores the instance's filestore backup into its external
 // S3 bucket, since external S3 has no pod to seed the way minio/filesystem do.
 func (s Service) restoreFilestoreToS3(ctx context.Context, core *model.DeploymentInstance, instances []*model.DeploymentInstance) error {
+	// Detach from the request context so a large restore isn't cancelled if the
+	// client disconnects; it runs to completion and writes the idempotency marker.
+	ctx = context.WithoutCancel(ctx)
+
 	key, ok, err := s.filestoreBackupKey(ctx, instances)
 	if err != nil {
 		return err
