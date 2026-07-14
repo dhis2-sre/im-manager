@@ -192,14 +192,16 @@ func (s Service) restoreFilestoreToS3(ctx context.Context, core *model.Deploymen
 	}
 
 	pr, pw := io.Pipe()
-	g, ctx := errgroup.WithContext(ctx)
+	// Use a dedicated context for the streaming errgroup; it is cancelled once
+	// g.Wait returns, so the marker write below must use the outer detached ctx.
+	g, streamCtx := errgroup.WithContext(ctx)
 	g.Go(func() error {
-		err := s.s3Client.Download(ctx, s.s3Bucket, key, pw, func(int64) {})
+		err := s.s3Client.Download(streamCtx, s.s3Bucket, key, pw, func(int64) {})
 		pw.CloseWithError(err)
 		return err
 	})
 	g.Go(func() error {
-		err := restoreTarGzToBucket(ctx, client, bucket, pr)
+		err := restoreTarGzToBucket(streamCtx, client, bucket, pr)
 		pr.CloseWithError(err)
 		return err
 	})
