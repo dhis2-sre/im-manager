@@ -296,13 +296,25 @@ func (ks kubernetesService) getPod(instanceID uint, typeSelector string) (v1.Pod
 	if err != nil {
 		return v1.Pod{}, err
 	}
+	return ks.getPodBySelector(selector)
+}
+
+func (ks kubernetesService) getPodByLabels(labels map[string]string) (v1.Pod, error) {
+	selector, err := metav1.LabelSelectorAsSelector(&metav1.LabelSelector{MatchLabels: labels})
+	if err != nil {
+		return v1.Pod{}, fmt.Errorf("error creating label selector: %v", err)
+	}
+	return ks.getPodBySelector(selector.String())
+}
+
+func (ks kubernetesService) getPodBySelector(selector string) (v1.Pod, error) {
 	listOptions := metav1.ListOptions{
 		LabelSelector: selector,
 	}
 
 	pods, err := ks.client.CoreV1().Pods("").List(context.TODO(), listOptions)
 	if err != nil {
-		return v1.Pod{}, fmt.Errorf("error getting pod for instance %d and selector %q: %v", instanceID, selector, err)
+		return v1.Pod{}, fmt.Errorf("error getting pod for selector %q: %v", selector, err)
 	}
 
 	// 'Evicted' pods are safe to filter out, as for each pod
