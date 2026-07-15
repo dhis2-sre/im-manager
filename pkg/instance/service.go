@@ -18,6 +18,7 @@ import (
 
 	"github.com/dhis2-sre/im-manager/pkg/storage"
 	"github.com/dhis2-sre/im-manager/pkg/token"
+	"golang.org/x/sync/errgroup"
 
 	v1 "k8s.io/api/core/v1"
 
@@ -113,6 +114,90 @@ func (s Service) buildSeedEnv(ctx context.Context, instance *model.DeploymentIns
 	}
 
 	return extraEnv, nil
+}
+
+// filestoreBackupKey returns the S3 key of the filestore backup attached to the
+// instance's database, or ok=false when there is none to restore.
+func (s Service) filestoreBackupKey(ctx context.Context, instance *model.DeploymentInstance) (string, bool, error) {
+	param, ok := instance.Parameters["DATABASE_ID"]
+	if !ok {
+		return "", false, nil
+	}
+
+	databaseID, err := strconv.ParseUint(param.Value, 10, strconv.IntSize)
+	if err != nil || databaseID == 0 {
+		return "", false, nil
+	}
+
+	db, err := s.externalDownloads.FindById(ctx, uint(databaseID))
+	if err != nil {
+		return "", false, fmt.Errorf("database %d not found: %w", databaseID, err)
+	}
+	if db.FilestoreID == 0 {
+		return "", false, nil
+	}
+
+	filestore, err := s.externalDownloads.FindById(ctx, db.FilestoreID)
+	if err != nil {
+		return "", false, fmt.Errorf("filestore %d not found: %w", db.FilestoreID, err)
+	}
+
+	key := strings.TrimPrefix(filestore.Url, fmt.Sprintf("s3://%s/", s.s3Bucket))
+	return key, true, nil
+}
+
+// restoreFilestoreToS3 restores the instance's filestore backup into its external
+// S3 bucket, since external S3 has no pod to seed the way minio/filesystem do.
+func (s Service) restoreFilestoreToS3(ctx context.Context, core *model.DeploymentInstance) error {
+	key, ok, err := s.filestoreBackupKey(ctx, core)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return nil
+	}
+
+	client, err := newExternalS3Client(core)
+	if err != nil {
+		return err
+	}
+
+	bucket := core.Parameters["S3_BUCKET"].Value
+	if err := ensureBucket(ctx, client, bucket, core.Parameters["S3_REGION"].Value); err != nil {
+		return err
+	}
+
+	restored, err := filestoreRestored(ctx, client, bucket)
+	if err != nil {
+		return err
+	}
+	if restored {
+		s.logger.InfoContext(ctx, "Filestore already restored to external S3, skipping", "bucket", bucket)
+		return nil
+	}
+
+	pr, pw := io.Pipe()
+	g, ctx := errgroup.WithContext(ctx)
+	g.Go(func() error {
+		err := s.s3Client.Download(ctx, s.s3Bucket, key, pw, func(int64) {})
+		pw.CloseWithError(err)
+		return err
+	})
+	g.Go(func() error {
+		err := restoreTarGzToBucket(ctx, client, bucket, pr)
+		pr.CloseWithError(err)
+		return err
+	})
+	if err := g.Wait(); err != nil {
+		return fmt.Errorf("filestore restore failed: %v", err)
+	}
+
+	if err := markFilestoreRestored(ctx, client, bucket); err != nil {
+		return err
+	}
+
+	s.logger.InfoContext(ctx, "Filestore restored to external S3", "bucket", bucket, "key", key)
+	return nil
 }
 
 func (s Service) SaveDeployment(ctx context.Context, deployment *model.Deployment) error {
@@ -457,6 +542,12 @@ func (s Service) deployDeploymentInstance(ctx context.Context, token string, ins
 	extraEnv, err := s.buildSeedEnv(ctx, instance)
 	if err != nil {
 		return fmt.Errorf("failed to build seed environment: %w", err)
+	}
+
+	if storageType(instance) == "s3" {
+		if err := s.restoreFilestoreToS3(ctx, instance); err != nil {
+			return err
+		}
 	}
 
 	syncCmd, err := s.helmfileService.sync(ctx, token, instance, group, ttl, extraEnv)

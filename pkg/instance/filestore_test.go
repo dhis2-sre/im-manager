@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/dhis2-sre/im-manager/pkg/model"
+	"github.com/minio/minio-go/v7"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
@@ -194,6 +195,7 @@ func TestExecStreamerWrapsStderrOnError(t *testing.T) {
 // recordingExecutor records every Exec call; per-call stdout and errors are keyed by call index.
 type recordingExecutor struct {
 	calls   [][]string
+	ctxErrs []error
 	stdouts map[int]string
 	stderrs map[int]string
 	errs    map[int]error
@@ -202,6 +204,7 @@ type recordingExecutor struct {
 func (r *recordingExecutor) Exec(ctx context.Context, namespace, podName, container string, command []string, stdout, stderr io.Writer) error {
 	i := len(r.calls)
 	r.calls = append(r.calls, command)
+	r.ctxErrs = append(r.ctxErrs, ctx.Err())
 	if s := r.stdouts[i]; s != "" {
 		_, _ = io.WriteString(stdout, s)
 	}
@@ -308,4 +311,166 @@ func TestStorageTypeDefaultsToMinio(t *testing.T) {
 		"STORAGE_TYPE": {Value: "filesystem"},
 	}}
 	assert.Equal(t, "filesystem", storageType(withType))
+}
+
+func TestCoreContainerName(t *testing.T) {
+	pod := func(names ...string) v1.Pod {
+		var containers []v1.Container
+		for _, name := range names {
+			containers = append(containers, v1.Container{Name: name})
+		}
+		return v1.Pod{Spec: v1.PodSpec{Containers: containers}}
+	}
+
+	assert.Equal(t, "core", coreContainerName(pod("istio-proxy", "core")),
+		"the DHIS2 container (named 'core') is picked even when a sidecar comes first")
+	assert.Equal(t, "sidecar", coreContainerName(pod("sidecar", "other")),
+		"with no 'core' container it falls back to the first")
+	assert.Equal(t, "only", coreContainerName(pod("only")))
+}
+
+func TestWriteTarGzEmptySource(t *testing.T) {
+	var buf bytes.Buffer
+	require.NoError(t, writeTarGz(context.Background(), fakeBackupSource{objects: map[string][]byte{}}, &buf))
+
+	assert.Empty(t, extractTarGz(t, buf.Bytes()))
+	assert.NotZero(t, buf.Len(), "an empty filestore still produces a valid gzip stream, so the multipart upload gets a part")
+}
+
+func TestMinioExecSourceCleanupDetachedFromCanceledContext(t *testing.T) {
+	exec := &recordingExecutor{stdouts: map[int]string{
+		0: "/tmp/im-filestore-backup-abc123",
+		2: "tar-bytes",
+	}}
+	src := minioExecSource{podExec{executor: exec, namespace: "ns", podName: "pod", container: "minio"}}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	_ = src.stream(ctx, io.Discard)
+
+	require.Len(t, exec.calls, 4)
+	require.Len(t, exec.ctxErrs, 4)
+	assert.Equal(t, []string{"rm", "-rf", "/tmp/im-filestore-backup-abc123"}, exec.calls[3])
+	assert.Error(t, exec.ctxErrs[0], "sanity: the streaming calls run on the canceled request context")
+	assert.NoError(t, exec.ctxErrs[3], "cleanup must run on a context detached from the canceled request context")
+}
+
+// fakeMinioClient serves a fixed list of ObjectInfos, including ones carrying an Err.
+type fakeMinioClient struct {
+	objects []minio.ObjectInfo
+}
+
+func (f fakeMinioClient) ListObjects(ctx context.Context, bucket string, opts minio.ListObjectsOptions) <-chan minio.ObjectInfo {
+	ch := make(chan minio.ObjectInfo)
+	go func() {
+		defer close(ch)
+		for _, o := range f.objects {
+			select {
+			case ch <- o:
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+	return ch
+}
+
+func (f fakeMinioClient) GetObject(ctx context.Context, bucket, object string, opts minio.GetObjectOptions) (*minio.Object, error) {
+	return nil, fmt.Errorf("not used")
+}
+
+// fakeExternalDownloads resolves database records by id for the backup-key lookup.
+type fakeExternalDownloads struct {
+	byID map[uint]*model.Database
+}
+
+func (f fakeExternalDownloads) FindById(ctx context.Context, id uint) (*model.Database, error) {
+	db, ok := f.byID[id]
+	if !ok {
+		return nil, fmt.Errorf("database %d not found", id)
+	}
+	return db, nil
+}
+
+func (f fakeExternalDownloads) CreateExternalDownload(ctx context.Context, databaseID uint, expiration uint) (*model.ExternalDownload, error) {
+	return nil, fmt.Errorf("not used")
+}
+
+func TestFilestoreBackupKey(t *testing.T) {
+	s := Service{
+		s3Bucket: "im-bucket",
+		externalDownloads: fakeExternalDownloads{byID: map[uint]*model.Database{
+			10: {ID: 10, FilestoreID: 20},
+			20: {ID: 20, Url: "s3://im-bucket/group/save-fs.tar.gz"},
+		}},
+	}
+	core := &model.DeploymentInstance{Parameters: model.DeploymentInstanceParameters{
+		"DATABASE_ID": {Value: "10"},
+	}}
+
+	key, ok, err := s.filestoreBackupKey(context.Background(), core)
+	require.NoError(t, err)
+	require.True(t, ok)
+	assert.Equal(t, "group/save-fs.tar.gz", key)
+}
+
+func TestFilestoreBackupKeyNoFilestore(t *testing.T) {
+	s := Service{externalDownloads: fakeExternalDownloads{byID: map[uint]*model.Database{
+		10: {ID: 10, FilestoreID: 0}, // database restored without a filestore backup
+	}}}
+	core := &model.DeploymentInstance{Parameters: model.DeploymentInstanceParameters{
+		"DATABASE_ID": {Value: "10"},
+	}}
+
+	_, ok, err := s.filestoreBackupKey(context.Background(), core)
+	require.NoError(t, err)
+	assert.False(t, ok, "no filestore backup means nothing to restore")
+}
+
+func TestFilestoreBackupKeyNoDatabaseID(t *testing.T) {
+	_, ok, err := Service{}.filestoreBackupKey(context.Background(), &model.DeploymentInstance{})
+	require.NoError(t, err)
+	assert.False(t, ok, "a fresh instance with no DATABASE_ID has nothing to restore")
+}
+
+func TestMinioBackupSourceListPropagatesError(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	client := fakeMinioClient{objects: []minio.ObjectInfo{
+		{Key: "apps/a.txt", Size: 3},
+		{Err: fmt.Errorf("boom listing")},
+	}}
+	src := NewMinioBackupSource(logger, client, "dhis2")
+
+	ch, err := src.List(context.Background())
+	require.NoError(t, err)
+
+	var listErr error
+	for object := range ch {
+		if object.Err != nil {
+			listErr = object.Err
+		}
+	}
+	require.Error(t, listErr, "a listing error must be delivered as BackupObject.Err, not swallowed")
+	assert.Contains(t, listErr.Error(), "boom listing")
+}
+
+func TestMinioBackupSourceListSkipsRestoreMarker(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	client := fakeMinioClient{objects: []minio.ObjectInfo{
+		{Key: "apps/a.txt", Size: 3},
+		{Key: filestoreRestoreMarker, Size: 10},
+		{Key: "userAvatar/uid1", Size: 5},
+	}}
+	src := NewMinioBackupSource(logger, client, "dhis2")
+
+	ch, err := src.List(context.Background())
+	require.NoError(t, err)
+
+	var keys []string
+	for object := range ch {
+		require.NoError(t, object.Err)
+		keys = append(keys, object.Path)
+	}
+	assert.NotContains(t, keys, filestoreRestoreMarker, "the restore marker must not be swept into a backup")
+	assert.ElementsMatch(t, []string{"apps/a.txt", "userAvatar/uid1"}, keys)
 }

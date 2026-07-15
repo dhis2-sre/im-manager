@@ -37,6 +37,10 @@ func (m *MinioBackupSource) List(ctx context.Context) (<-chan BackupObject, erro
 		objectCh := m.client.ListObjects(ctx, m.bucket, minio.ListObjectsOptions{Recursive: true})
 
 		for obj := range objectCh {
+			// Skip IM's own restore marker so it isn't swept into the backup.
+			if obj.Err == nil && obj.Key == filestoreRestoreMarker {
+				continue
+			}
 			object := BackupObject{Path: obj.Key, Size: obj.Size, LastModified: obj.LastModified}
 			if obj.Err != nil {
 				object = BackupObject{Err: fmt.Errorf("list objects: %v", obj.Err)}

@@ -184,3 +184,29 @@ func extractTarGzEntries(t *testing.T, data []byte) map[string][]byte {
 	}
 	return entries
 }
+
+// rawTarGzNames returns the raw tar entry names for regular files, without stripping
+// the leading "./". Restore (seed-minio.sh: tar x + mc mirror) reproduces the original
+// object key only if the exec backends tar with "./"-relative names, so asserting the raw
+// name guards that format.
+func rawTarGzNames(t *testing.T, data []byte) []string {
+	t.Helper()
+	gr, err := gzip.NewReader(bytes.NewReader(data))
+	require.NoError(t, err)
+	defer gr.Close()
+
+	tr := tar.NewReader(gr)
+	var names []string
+	for {
+		header, err := tr.Next()
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		require.NoError(t, err)
+		if header.Typeflag != tar.TypeReg {
+			continue
+		}
+		names = append(names, header.Name)
+	}
+	return names
+}

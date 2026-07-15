@@ -14,26 +14,20 @@ import (
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
 	"golang.org/x/sync/errgroup"
-	"golang.org/x/sync/semaphore"
 	v1 "k8s.io/api/core/v1"
 )
 
-const (
-	filestoreReadWorkers    = 16
-	filestoreReadByteBudget = 256 << 20 // 256 MiB
-)
+const filestoreReadWorkers = 16
 
-// Objects larger than this stream straight into the tar instead of being buffered,
-// so a single object can't exceed filestoreReadByteBudget.
+// Objects larger than this stream straight into the tar instead of being buffered, so
+// worst-case memory stays bounded by filestoreReadWorkers * filestoreMaxBufferedObject.
 var filestoreMaxBufferedObject int64 = 32 << 20 // 32 MiB
 
 type filestoreStreamer interface {
 	stream(ctx context.Context, w io.Writer) error
 }
 
-// writeTarGz builds a gzip'd tar from source. Objects up to filestoreMaxBufferedObject
-// are fetched concurrently (bounded by filestoreReadWorkers and filestoreReadByteBudget);
-// larger ones are streamed directly. A single goroutine owns the non-thread-safe tar.Writer.
+// writeTarGz builds a gzip'd tar of source's objects into w.
 func writeTarGz(ctx context.Context, source BackupSource, w io.Writer) error {
 	gw := gzip.NewWriter(w)
 	defer gw.Close()
@@ -51,7 +45,6 @@ func writeTarGz(ctx context.Context, source BackupSource, w io.Writer) error {
 		data   []byte
 	}
 	results := make(chan fetchedObject)
-	budget := semaphore.NewWeighted(filestoreReadByteBudget)
 
 	g, ctx := errgroup.WithContext(ctx)
 
@@ -74,12 +67,6 @@ func writeTarGz(ctx context.Context, source BackupSource, w io.Writer) error {
 				continue
 			}
 			fetchers.Go(func() error {
-				weight := objectWeight(object.Size)
-				if err := budget.Acquire(ctx, weight); err != nil {
-					return err
-				}
-				defer budget.Release(weight)
-
 				data, err := readObject(ctx, source, object.Path)
 				if err != nil {
 					return err
@@ -111,19 +98,6 @@ func writeTarGz(ctx context.Context, source BackupSource, w io.Writer) error {
 	})
 
 	return g.Wait()
-}
-
-// objectWeight is how many bytes an object reserves while it is fetched, capped at the
-// total budget so one oversized object can still be fetched instead of waiting forever.
-func objectWeight(size int64) int64 {
-	switch {
-	case size <= 0:
-		return 1
-	case size > filestoreReadByteBudget:
-		return filestoreReadByteBudget
-	default:
-		return size
-	}
 }
 
 func readObject(ctx context.Context, source BackupSource, path string) ([]byte, error) {
@@ -166,7 +140,79 @@ func writeTarEntry(tw *tar.Writer, object BackupObject, size int64, r io.Reader)
 	return nil
 }
 
-// s3APISource streams a tar.gz of objects listed over the S3 API, for the external S3 backend.
+// restoreTarGzToBucket uploads each file in a gzip'd tar to bucket under its key,
+// stripping the filesystem backend's leading "./" so keys match across backends.
+func restoreTarGzToBucket(ctx context.Context, client *minio.Client, bucket string, r io.Reader) error {
+	gr, err := gzip.NewReader(r)
+	if err != nil {
+		return fmt.Errorf("open gzip stream: %v", err)
+	}
+	defer gr.Close()
+
+	tr := tar.NewReader(gr)
+	for {
+		header, err := tr.Next()
+		if err == io.EOF {
+			return nil
+		}
+		if err != nil {
+			return fmt.Errorf("read tar entry: %v", err)
+		}
+		if header.Typeflag != tar.TypeReg {
+			continue
+		}
+		key := strings.TrimPrefix(header.Name, "./")
+		if key == "" {
+			continue
+		}
+		if _, err := client.PutObject(ctx, bucket, key, tr, header.Size, minio.PutObjectOptions{}); err != nil {
+			return fmt.Errorf("put object %s: %v", key, err)
+		}
+	}
+}
+
+// filestoreRestoreMarker is written into the external bucket after a successful one-time
+// restore, so a redeploy or update does not re-restore over live filestore data. It
+// mirrors the .im-filestore-seeded marker the filesystem/minio seed scripts use.
+const filestoreRestoreMarker = ".im-filestore-restored"
+
+// filestoreRestored reports whether the restore marker is already present in bucket.
+func filestoreRestored(ctx context.Context, client *minio.Client, bucket string) (bool, error) {
+	_, err := client.StatObject(ctx, bucket, filestoreRestoreMarker, minio.StatObjectOptions{})
+	if err == nil {
+		return true, nil
+	}
+	if minio.ToErrorResponse(err).Code == "NoSuchKey" {
+		return false, nil
+	}
+	return false, fmt.Errorf("check restore marker in %q: %v", bucket, err)
+}
+
+// markFilestoreRestored writes the restore marker so subsequent deploys skip the restore.
+func markFilestoreRestored(ctx context.Context, client *minio.Client, bucket string) error {
+	marker := strings.NewReader("restored by instance manager")
+	if _, err := client.PutObject(ctx, bucket, filestoreRestoreMarker, marker, marker.Size(), minio.PutObjectOptions{}); err != nil {
+		return fmt.Errorf("write restore marker to %q: %v", bucket, err)
+	}
+	return nil
+}
+
+// ensureBucket creates bucket if absent so a restore can populate a fresh one.
+func ensureBucket(ctx context.Context, client *minio.Client, bucket, region string) error {
+	exists, err := client.BucketExists(ctx, bucket)
+	if err != nil {
+		return fmt.Errorf("check bucket %q: %v", bucket, err)
+	}
+	if exists {
+		return nil
+	}
+	if err := client.MakeBucket(ctx, bucket, minio.MakeBucketOptions{Region: region}); err != nil {
+		return fmt.Errorf("create bucket %q: %v", bucket, err)
+	}
+	return nil
+}
+
+// s3APISource is the filestore streamer for the external S3 backend.
 type s3APISource struct {
 	source BackupSource
 }
@@ -252,23 +298,12 @@ func storageType(core *model.DeploymentInstance) string {
 }
 
 func newExternalS3Client(core *model.DeploymentInstance) (*minio.Client, error) {
-	endpoint := core.Parameters["S3_ENDPOINT"].Value
-	if endpoint == "" {
-		endpoint = "s3.amazonaws.com"
-	}
-	// minio.New wants a bare host; take TLS from the scheme, defaulting to HTTPS.
-	secure := true
-	if rest, ok := strings.CutPrefix(endpoint, "https://"); ok {
-		endpoint = rest
-	} else if rest, ok := strings.CutPrefix(endpoint, "http://"); ok {
-		endpoint, secure = rest, false
-	}
 	region := core.Parameters["S3_REGION"].Value
 	identity := core.Parameters["S3_IDENTITY"].Value
 	secret := core.Parameters["S3_SECRET"].Value
-	return minio.New(endpoint, &minio.Options{
+	return minio.New("s3.amazonaws.com", &minio.Options{
 		Creds:  credentials.NewStaticV4(identity, secret, ""),
-		Secure: secure,
+		Secure: true,
 		Region: region,
 	})
 }
@@ -291,7 +326,7 @@ func (s Service) filestoreStreamerFor(core *model.DeploymentInstance, cluster mo
 				executor:  ks,
 				namespace: pod.Namespace,
 				podName:   pod.Name,
-				container: coreContainerName(pod, core.Name),
+				container: coreContainerName(pod),
 			},
 			command: filesystemTarCommand(core.Parameters["DHIS2_HOME"].Value),
 		}, nil
@@ -324,11 +359,14 @@ func (s Service) filestoreStreamerFor(core *model.DeploymentInstance, cluster mo
 	}
 }
 
-// coreContainerName returns the container named after the release (the DHIS2 container),
-// falling back to the first so a sidecar injected ahead of it isn't picked by mistake.
-func coreContainerName(pod v1.Pod, instanceName string) string {
+// dhis2CoreContainer is the DHIS2 container's name in the dhis2/core chart (its .Chart.Name).
+const dhis2CoreContainer = "core"
+
+// coreContainerName returns the DHIS2 container, falling back to the first so a sidecar
+// injected ahead of it isn't picked by mistake.
+func coreContainerName(pod v1.Pod) string {
 	for _, container := range pod.Spec.Containers {
-		if container.Name == instanceName {
+		if container.Name == dhis2CoreContainer {
 			return container.Name
 		}
 	}
