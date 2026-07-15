@@ -181,12 +181,12 @@ func run() (err error) {
 		return err
 	}
 
-	awsS3Client, err := newAWSS3Client(ctx)
+	s3Client, err := newS3Client(ctx, logger)
 	if err != nil {
 		return err
 	}
 
-	instanceService, err := newInstanceService(logger, db, stackService, groupService, awsS3Client, tokenService)
+	instanceService, err := newInstanceService(logger, db, stackService, groupService, s3Client, tokenService)
 	if err != nil {
 		return err
 	}
@@ -531,7 +531,7 @@ func newStackService() (stack.Service, error) {
 	return stack.NewService(stacks), nil
 }
 
-func newInstanceService(logger *slog.Logger, db *gorm.DB, stackService stack.Service, groupService *group.Service, s3Client *s3.Client, tokenService *token.TokenService) (*instance.Service, error) {
+func newInstanceService(logger *slog.Logger, db *gorm.DB, stackService stack.Service, groupService *group.Service, s3Client *storage.S3Client, tokenService *token.TokenService) (*instance.Service, error) {
 	instanceParameterEncryptionKey, err := requireEnv("INSTANCE_PARAMETER_ENCRYPTION_KEY")
 	if err != nil {
 		return nil, err

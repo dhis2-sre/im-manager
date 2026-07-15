@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/dhis2-sre/im-manager/pkg/inttest"
+	"github.com/dhis2-sre/im-manager/pkg/storage"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
 	"github.com/stretchr/testify/assert"
@@ -50,10 +51,11 @@ func TestBackupServiceIntegration(t *testing.T) {
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	source := NewMinioBackupSource(logger, minioClient, minioBucket)
-	backupService := NewBackupService(logger, source, s3Test.Client)
+	// nil uploader: PerformBackup uses StreamUpload, which only needs the multipart client methods.
+	backupService := NewBackupService(logger, storage.NewS3Client(logger, s3Test.Client, nil))
 
 	s3Key := "group/save-name-fs.tar.gz"
-	require.NoError(t, backupService.PerformBackup(ctx, s3Bucket, s3Key))
+	require.NoError(t, backupService.PerformBackup(ctx, s3APISource{source}, s3Bucket, s3Key))
 
 	tarContent := s3Test.GetObject(t, s3Bucket, s3Key)
 	entries := extractTarGz(t, tarContent)
@@ -76,8 +78,36 @@ func TestBackupServiceIntegration(t *testing.T) {
 	}
 }
 
+// TestFilestoreRestoreMarker checks the guard that makes the external-S3 restore a
+// one-time operation: the marker is absent on a fresh bucket and present once written,
+// so a redeploy skips the restore instead of re-clobbering live filestore data.
+func TestFilestoreRestoreMarker(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test")
+	}
+
+	ctx := context.Background()
+	container, minioClient := setupMinio(t, ctx)
+	defer func() {
+		require.NoError(t, testcontainers.TerminateContainer(container))
+	}()
+
+	bucket := "restore-marker"
+	require.NoError(t, minioClient.MakeBucket(ctx, bucket, minio.MakeBucketOptions{}))
+
+	restored, err := filestoreRestored(ctx, minioClient, bucket)
+	require.NoError(t, err)
+	assert.False(t, restored, "a fresh bucket has not been restored")
+
+	require.NoError(t, markFilestoreRestored(ctx, minioClient, bucket))
+
+	restored, err = filestoreRestored(ctx, minioClient, bucket)
+	require.NoError(t, err)
+	assert.True(t, restored, "the marker makes a subsequent restore a no-op")
+}
+
 func setupMinio(t *testing.T, ctx context.Context) (*minioContainer.MinioContainer, *minio.Client) {
-	container, err := minioContainer.Run(ctx, "minio/minio:latest")
+	container, err := minioContainer.Run(ctx, "minio/minio:RELEASE.2025-01-20T14-49-07Z")
 	require.NoError(t, err)
 
 	endpoint, err := container.Endpoint(ctx, "")
