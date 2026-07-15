@@ -454,6 +454,15 @@ func (s Service) EnsureLocked(ctx context.Context, database *model.Database, ins
 // into a temporary record, moves the dump over the original in S3 and re-points the record to the
 // original name and id. It blocks until done and returns the finalized record.
 func (s Service) SaveLocked(ctx context.Context, database *model.Database, instance *model.DeploymentInstance, stack *model.Stack, wasLocked bool) (*model.Database, error) {
+	if !wasLocked {
+		defer func() {
+			err := s.repository.Unlock(ctx, database.ID)
+			if err != nil {
+				s.logError(ctx, fmt.Errorf("unlock database failed: %v", err))
+			}
+		}()
+	}
+
 	tmpName := uuid.New().String()
 	format := getFormat(database)
 
@@ -467,21 +476,12 @@ func (s Service) SaveLocked(ctx context.Context, database *model.Database, insta
 		return nil, err
 	}
 
-	return s.finalizeSave(ctx, database, saved, wasLocked)
+	return s.finalizeSave(ctx, database, saved)
 }
 
 // finalizeSave moves the freshly dumped temporary record over the original database: S3 move,
 // delete the original row, rename the new row and swap its id back to the original's.
-func (s Service) finalizeSave(ctx context.Context, database *model.Database, saved *model.Database, wasLocked bool) (*model.Database, error) {
-	defer func() {
-		if !wasLocked {
-			err := s.repository.Unlock(ctx, database.ID)
-			if err != nil {
-				s.logError(ctx, fmt.Errorf("unlock database failed: %v", err))
-			}
-		}
-	}()
-
+func (s Service) finalizeSave(ctx context.Context, database *model.Database, saved *model.Database) (*model.Database, error) {
 	u, err := url.Parse(saved.Url)
 	if err != nil {
 		return nil, err

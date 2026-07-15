@@ -314,6 +314,48 @@ func TestDatabaseHandler(t *testing.T) {
 
 }
 
+func TestSaveLockedUnlocksOnDumpFailure(t *testing.T) {
+	t.Parallel()
+
+	db := inttest.SetupDB(t)
+	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
+	databaseRepository := database.NewRepository(db)
+	databaseService := database.NewService(logger, "database-bucket", nil, groupService{groupName: "packages"}, databaseRepository, nil, noopPublisher{})
+
+	user, _ := userpkg.CreateUserWithGroup(t, db, "group-name", "some", "", "user1@dhis2.org")
+
+	deployment := &model.Deployment{
+		UserID:    user.ID,
+		Name:      "name",
+		GroupName: "group-name",
+	}
+	db.Create(deployment)
+
+	instance := &model.DeploymentInstance{
+		Name:         "name",
+		GroupName:    "group-name",
+		StackName:    "dhis2",
+		DeploymentID: deployment.ID,
+	}
+	db.Create(instance)
+
+	ctx := context.Background()
+	original, err := databaseService.CreateDatabase(ctx, user.ID, "packages", "original.sql.gz")
+	require.NoError(t, err)
+
+	locked, wasLocked, err := databaseService.EnsureLocked(ctx, original, instance.ID, user.ID)
+	require.NoError(t, err)
+	require.False(t, wasLocked)
+
+	// The instance has no database parameters, so the dump fails before touching pods or S3.
+	_, err = databaseService.SaveLocked(ctx, locked, instance, &model.Stack{}, wasLocked)
+	require.Error(t, err)
+
+	reloaded, err := databaseService.FindById(ctx, locked.ID)
+	require.NoError(t, err)
+	require.Nil(t, reloaded.Lock, "a failed save must release the lock it acquired")
+}
+
 type groupService struct {
 	groupName string
 }
