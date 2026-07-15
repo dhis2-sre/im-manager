@@ -408,7 +408,31 @@ func TestFilestoreBackupKey(t *testing.T) {
 		"DATABASE_ID": {Value: "10"},
 	}}
 
-	key, ok, err := s.filestoreBackupKey(context.Background(), core)
+	key, ok, err := s.filestoreBackupKey(context.Background(), []*model.DeploymentInstance{core})
+	require.NoError(t, err)
+	require.True(t, ok)
+	assert.Equal(t, "group/save-fs.tar.gz", key)
+}
+
+func TestFilestoreBackupKeyResolvesDatabaseIDFromSibling(t *testing.T) {
+	s := Service{
+		s3Bucket: "im-bucket",
+		externalDownloads: fakeExternalDownloads{byID: map[uint]*model.Database{
+			10: {ID: 10, FilestoreID: 20},
+			20: {ID: 20, Url: "s3://im-bucket/group/save-fs.tar.gz"},
+		}},
+	}
+	// The s3 core instance carries the storage parameters but no DATABASE_ID; the
+	// db instance carries DATABASE_ID. Restore must resolve it across siblings.
+	core := &model.DeploymentInstance{Parameters: model.DeploymentInstanceParameters{
+		"STORAGE_TYPE": {Value: "s3"},
+		"S3_BUCKET":    {Value: "external-bucket"},
+	}}
+	db := &model.DeploymentInstance{Parameters: model.DeploymentInstanceParameters{
+		"DATABASE_ID": {Value: "10"},
+	}}
+
+	key, ok, err := s.filestoreBackupKey(context.Background(), []*model.DeploymentInstance{core, db})
 	require.NoError(t, err)
 	require.True(t, ok)
 	assert.Equal(t, "group/save-fs.tar.gz", key)
@@ -422,13 +446,13 @@ func TestFilestoreBackupKeyNoFilestore(t *testing.T) {
 		"DATABASE_ID": {Value: "10"},
 	}}
 
-	_, ok, err := s.filestoreBackupKey(context.Background(), core)
+	_, ok, err := s.filestoreBackupKey(context.Background(), []*model.DeploymentInstance{core})
 	require.NoError(t, err)
 	assert.False(t, ok, "no filestore backup means nothing to restore")
 }
 
 func TestFilestoreBackupKeyNoDatabaseID(t *testing.T) {
-	_, ok, err := Service{}.filestoreBackupKey(context.Background(), &model.DeploymentInstance{})
+	_, ok, err := Service{}.filestoreBackupKey(context.Background(), []*model.DeploymentInstance{{}})
 	require.NoError(t, err)
 	assert.False(t, ok, "a fresh instance with no DATABASE_ID has nothing to restore")
 }

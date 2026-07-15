@@ -76,25 +76,41 @@ func (s *Service) SetExternalDownloads(creator externalDownloadCreator) {
 
 const seedDownloadTTLSeconds uint = 1800
 
-func (s Service) buildSeedEnv(ctx context.Context, instance *model.DeploymentInstance) (map[string]string, error) {
-	param, ok := instance.Parameters["DATABASE_ID"]
+// databaseIDFromInstances resolves the DATABASE_ID parameter from whichever
+// instance in the deployment carries it. DATABASE_ID lives on the db instance,
+// while storage parameters live on the core instance, so callers operating on the
+// core must look across siblings to find it.
+func databaseIDFromInstances(instances []*model.DeploymentInstance) (uint, bool) {
+	for _, instance := range instances {
+		param, ok := instance.Parameters["DATABASE_ID"]
+		if !ok {
+			continue
+		}
+
+		databaseID, err := strconv.ParseUint(param.Value, 10, strconv.IntSize)
+		if err != nil || databaseID == 0 {
+			continue
+		}
+
+		return uint(databaseID), true
+	}
+	return 0, false
+}
+
+func (s Service) buildSeedEnv(ctx context.Context, instances []*model.DeploymentInstance) (map[string]string, error) {
+	databaseID, ok := databaseIDFromInstances(instances)
 	if !ok {
 		return nil, nil
 	}
 
-	databaseID, err := strconv.ParseUint(param.Value, 10, strconv.IntSize)
-	if err != nil || databaseID == 0 {
-		return nil, nil
-	}
-
 	if s.externalDownloads == nil {
-		return nil, fmt.Errorf("external download service not configured; cannot create seed URLs for DATABASE_ID=%s", param.Value)
+		return nil, fmt.Errorf("external download service not configured; cannot create seed URLs for DATABASE_ID=%d", databaseID)
 	}
 
 	hostname := os.Getenv("HOSTNAME")
 	extraEnv := make(map[string]string)
 
-	db, err := s.externalDownloads.FindById(ctx, uint(databaseID))
+	db, err := s.externalDownloads.FindById(ctx, databaseID)
 	if err != nil {
 		return nil, fmt.Errorf("database %d not found: %w", databaseID, err)
 	}
@@ -117,19 +133,14 @@ func (s Service) buildSeedEnv(ctx context.Context, instance *model.DeploymentIns
 }
 
 // filestoreBackupKey returns the S3 key of the filestore backup attached to the
-// instance's database, or ok=false when there is none to restore.
-func (s Service) filestoreBackupKey(ctx context.Context, instance *model.DeploymentInstance) (string, bool, error) {
-	param, ok := instance.Parameters["DATABASE_ID"]
+// deployment's database, or ok=false when there is none to restore.
+func (s Service) filestoreBackupKey(ctx context.Context, instances []*model.DeploymentInstance) (string, bool, error) {
+	databaseID, ok := databaseIDFromInstances(instances)
 	if !ok {
 		return "", false, nil
 	}
 
-	databaseID, err := strconv.ParseUint(param.Value, 10, strconv.IntSize)
-	if err != nil || databaseID == 0 {
-		return "", false, nil
-	}
-
-	db, err := s.externalDownloads.FindById(ctx, uint(databaseID))
+	db, err := s.externalDownloads.FindById(ctx, databaseID)
 	if err != nil {
 		return "", false, fmt.Errorf("database %d not found: %w", databaseID, err)
 	}
@@ -148,8 +159,8 @@ func (s Service) filestoreBackupKey(ctx context.Context, instance *model.Deploym
 
 // restoreFilestoreToS3 restores the instance's filestore backup into its external
 // S3 bucket, since external S3 has no pod to seed the way minio/filesystem do.
-func (s Service) restoreFilestoreToS3(ctx context.Context, core *model.DeploymentInstance) error {
-	key, ok, err := s.filestoreBackupKey(ctx, core)
+func (s Service) restoreFilestoreToS3(ctx context.Context, core *model.DeploymentInstance, instances []*model.DeploymentInstance) error {
+	key, ok, err := s.filestoreBackupKey(ctx, instances)
 	if err != nil {
 		return err
 	}
@@ -177,14 +188,16 @@ func (s Service) restoreFilestoreToS3(ctx context.Context, core *model.Deploymen
 	}
 
 	pr, pw := io.Pipe()
-	g, ctx := errgroup.WithContext(ctx)
+	// Use a dedicated context for the streaming errgroup; it is cancelled once
+	// g.Wait returns, so the marker write below must use the outer detached ctx.
+	g, streamCtx := errgroup.WithContext(ctx)
 	g.Go(func() error {
-		err := s.s3Client.Download(ctx, s.s3Bucket, key, pw, func(int64) {})
+		err := s.s3Client.Download(streamCtx, s.s3Bucket, key, pw, func(int64) {})
 		pw.CloseWithError(err)
 		return err
 	})
 	g.Go(func() error {
-		err := restoreTarGzToBucket(ctx, client, bucket, pr)
+		err := restoreTarGzToBucket(streamCtx, client, bucket, pr)
 		pr.CloseWithError(err)
 		return err
 	})
@@ -539,13 +552,25 @@ func (s Service) deployDeploymentInstance(ctx context.Context, token string, ins
 		return err
 	}
 
-	extraEnv, err := s.buildSeedEnv(ctx, instance)
+	deployment, err := s.FindDecryptedDeploymentById(ctx, instance.DeploymentID)
+	if err != nil {
+		return err
+	}
+
+	extraEnv, err := s.buildSeedEnv(ctx, deployment.Instances)
 	if err != nil {
 		return fmt.Errorf("failed to build seed environment: %w", err)
 	}
 
 	if storageType(instance) == "s3" {
-		if err := s.restoreFilestoreToS3(ctx, instance); err != nil {
+		// A filestore restore can push the deploy past the client/load-balancer
+		// timeout. Detach from the request context so the restore and the
+		// subsequent ingress-class/cert-issuer discovery still run instead of
+		// failing on a cancelled context, which would drop TLS from the ingress.
+		// Only the s3 path needs this; other storage types deploy well within the
+		// timeout and keep the request context so client cancellation still works.
+		ctx = context.WithoutCancel(ctx)
+		if err := s.restoreFilestoreToS3(ctx, instance, deployment.Instances); err != nil {
 			return err
 		}
 	}
