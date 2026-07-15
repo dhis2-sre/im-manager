@@ -84,14 +84,16 @@ func (s Service) restoreFilestoreToS3(ctx context.Context, core *model.Deploymen
 	}
 
 	pr, pw := io.Pipe()
-	g, ctx := errgroup.WithContext(ctx)
+	// Use a dedicated context for the streaming errgroup; it is cancelled once
+	// g.Wait returns, so the marker write below must use the outer detached ctx.
+	g, streamCtx := errgroup.WithContext(ctx)
 	g.Go(func() error {
-		err := s.s3Client.Download(ctx, s.s3Bucket, key, pw, func(int64) {})
+		err := s.s3Client.Download(streamCtx, s.s3Bucket, key, pw, func(int64) {})
 		pw.CloseWithError(err)
 		return err
 	})
 	g.Go(func() error {
-		err := restoreTarGzToBucket(ctx, client, bucket, pr)
+		err := restoreTarGzToBucket(streamCtx, client, bucket, pr)
 		pr.CloseWithError(err)
 		return err
 	})
@@ -430,6 +432,13 @@ func (s Service) DeployInstance(ctx context.Context, token string, instance *mod
 	}
 
 	if storageType(instance) == "s3" && filestoreBackup != nil {
+		// A filestore restore can push the deploy past the client/load-balancer
+		// timeout. Detach from the request context so the restore and the
+		// subsequent ingress-class/cert-issuer discovery still run instead of
+		// failing on a cancelled context, which would drop TLS from the ingress.
+		// Only the s3 path needs this; other storage types deploy well within the
+		// timeout and keep the request context so client cancellation still works.
+		ctx = context.WithoutCancel(ctx)
 		if err := s.restoreFilestoreToS3(ctx, instance, filestoreBackup); err != nil {
 			return err
 		}
