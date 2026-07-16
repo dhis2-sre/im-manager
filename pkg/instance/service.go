@@ -356,7 +356,7 @@ func resolveConsumedParameters(deployment *model.Deployment, instance *model.Dep
 			// consume from instance parameters
 			sourceInstance := findInstanceByStackName(requiredStack.Name, deployment)
 			if sourceInstance == nil {
-				return errdef.NewNotFound("failed to find required instance %q of instance %q", sourceInstance.Name, instance.Name)
+				return errdef.NewNotFound("failed to find required instance %q of instance %q", requiredStack.Name, instance.Name)
 			}
 
 			if sourceInstanceParameter, ok := sourceInstance.Parameters[name]; ok {
