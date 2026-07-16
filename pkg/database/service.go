@@ -612,7 +612,7 @@ func (s Service) Dump(ctx context.Context, userId uint, database *model.Database
 		uploadDone <- uploadResult{size, err}
 	}()
 
-	s.logger.InfoContext(ctx, "starting pg_dump", "pod", podName, "namespace", namespace, "command", strings.Join(command, " "))
+	s.logger.InfoContext(ctx, "starting pg_dump", "pod", podName, "namespace", namespace, "command", strings.Join(redactPgPassword(command), " "))
 	publish("started", "", 0)
 
 	if err := execPgDump(ctx, podExecutor, namespace, podName, command, pw, format, database.Name); err != nil {
@@ -709,6 +709,16 @@ func newPgDumpConfig(instance *model.DeploymentInstance, stack *model.Stack) (*p
 	dump.IgnoreTableData = []string{"analytics*", "_*"}
 
 	return dump, nil
+}
+
+func redactPgPassword(command []string) []string {
+	redacted := slices.Clone(command)
+	for i, arg := range redacted {
+		if strings.HasPrefix(arg, "PGPASSWORD=") {
+			redacted[i] = "PGPASSWORD=*****"
+		}
+	}
+	return redacted
 }
 
 func buildPgDumpCommand(dump *pg.Dump, format string) []string {
