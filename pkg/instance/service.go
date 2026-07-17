@@ -16,11 +16,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/anthhub/forwarder"
-	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/dhis2-sre/im-manager/pkg/storage"
 	"github.com/dhis2-sre/im-manager/pkg/token"
-	"github.com/minio/minio-go/v7"
-	"github.com/minio/minio-go/v7/pkg/credentials"
+	"golang.org/x/sync/errgroup"
 
 	v1 "k8s.io/api/core/v1"
 
@@ -32,7 +30,7 @@ import (
 	"github.com/dhis2-sre/im-manager/pkg/model"
 )
 
-func NewService(logger *slog.Logger, instanceRepository *repository, groupService groupService, stackService stack.Service, helmfileService helmfile, s3Client *s3.Client, s3Bucket string, tokenService *token.TokenService) *Service {
+func NewService(logger *slog.Logger, instanceRepository *repository, groupService groupService, stackService stack.Service, helmfileService helmfile, s3Client *storage.S3Client, s3Bucket string, tokenService *token.TokenService) *Service {
 	return &Service{
 		logger:             logger,
 		instanceRepository: instanceRepository,
@@ -66,7 +64,7 @@ type Service struct {
 	groupService       groupService
 	stackService       stack.Service
 	helmfileService    helmfile
-	s3Client           *s3.Client
+	s3Client           *storage.S3Client
 	s3Bucket           string
 	tokenService       *token.TokenService
 	externalDownloads  externalDownloadCreator
@@ -78,25 +76,41 @@ func (s *Service) SetExternalDownloads(creator externalDownloadCreator) {
 
 const seedDownloadTTLSeconds uint = 1800
 
-func (s Service) buildSeedEnv(ctx context.Context, instance *model.DeploymentInstance) (map[string]string, error) {
-	param, ok := instance.Parameters["DATABASE_ID"]
+// databaseIDFromInstances resolves the DATABASE_ID parameter from whichever
+// instance in the deployment carries it. DATABASE_ID lives on the db instance,
+// while storage parameters live on the core instance, so callers operating on the
+// core must look across siblings to find it.
+func databaseIDFromInstances(instances []*model.DeploymentInstance) (uint, bool) {
+	for _, instance := range instances {
+		param, ok := instance.Parameters["DATABASE_ID"]
+		if !ok {
+			continue
+		}
+
+		databaseID, err := strconv.ParseUint(param.Value, 10, strconv.IntSize)
+		if err != nil || databaseID == 0 {
+			continue
+		}
+
+		return uint(databaseID), true
+	}
+	return 0, false
+}
+
+func (s Service) buildSeedEnv(ctx context.Context, instances []*model.DeploymentInstance) (map[string]string, error) {
+	databaseID, ok := databaseIDFromInstances(instances)
 	if !ok {
 		return nil, nil
 	}
 
-	databaseID, err := strconv.ParseUint(param.Value, 10, strconv.IntSize)
-	if err != nil || databaseID == 0 {
-		return nil, nil
-	}
-
 	if s.externalDownloads == nil {
-		return nil, fmt.Errorf("external download service not configured; cannot create seed URLs for DATABASE_ID=%s", param.Value)
+		return nil, fmt.Errorf("external download service not configured; cannot create seed URLs for DATABASE_ID=%d", databaseID)
 	}
 
 	hostname := os.Getenv("HOSTNAME")
 	extraEnv := make(map[string]string)
 
-	db, err := s.externalDownloads.FindById(ctx, uint(databaseID))
+	db, err := s.externalDownloads.FindById(ctx, databaseID)
 	if err != nil {
 		return nil, fmt.Errorf("database %d not found: %w", databaseID, err)
 	}
@@ -116,6 +130,87 @@ func (s Service) buildSeedEnv(ctx context.Context, instance *model.DeploymentIns
 	}
 
 	return extraEnv, nil
+}
+
+// filestoreBackupKey returns the S3 key of the filestore backup attached to the
+// deployment's database, or ok=false when there is none to restore.
+func (s Service) filestoreBackupKey(ctx context.Context, instances []*model.DeploymentInstance) (string, bool, error) {
+	databaseID, ok := databaseIDFromInstances(instances)
+	if !ok {
+		return "", false, nil
+	}
+
+	db, err := s.externalDownloads.FindById(ctx, databaseID)
+	if err != nil {
+		return "", false, fmt.Errorf("database %d not found: %w", databaseID, err)
+	}
+	if db.FilestoreID == 0 {
+		return "", false, nil
+	}
+
+	filestore, err := s.externalDownloads.FindById(ctx, db.FilestoreID)
+	if err != nil {
+		return "", false, fmt.Errorf("filestore %d not found: %w", db.FilestoreID, err)
+	}
+
+	key := strings.TrimPrefix(filestore.Url, fmt.Sprintf("s3://%s/", s.s3Bucket))
+	return key, true, nil
+}
+
+// restoreFilestoreToS3 restores the instance's filestore backup into its external
+// S3 bucket, since external S3 has no pod to seed the way minio/filesystem do.
+func (s Service) restoreFilestoreToS3(ctx context.Context, core *model.DeploymentInstance, instances []*model.DeploymentInstance) error {
+	key, ok, err := s.filestoreBackupKey(ctx, instances)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return nil
+	}
+
+	client, err := newExternalS3Client(core)
+	if err != nil {
+		return err
+	}
+
+	bucket := core.Parameters["S3_BUCKET"].Value
+	if err := ensureBucket(ctx, client, bucket, core.Parameters["S3_REGION"].Value); err != nil {
+		return err
+	}
+
+	restored, err := filestoreRestored(ctx, client, bucket)
+	if err != nil {
+		return err
+	}
+	if restored {
+		s.logger.InfoContext(ctx, "Filestore already restored to external S3, skipping", "bucket", bucket)
+		return nil
+	}
+
+	pr, pw := io.Pipe()
+	// Use a dedicated context for the streaming errgroup; it is cancelled once
+	// g.Wait returns, so the marker write below must use the outer detached ctx.
+	g, streamCtx := errgroup.WithContext(ctx)
+	g.Go(func() error {
+		err := s.s3Client.Download(streamCtx, s.s3Bucket, key, pw, func(int64) {})
+		pw.CloseWithError(err)
+		return err
+	})
+	g.Go(func() error {
+		err := restoreTarGzToBucket(streamCtx, client, bucket, pr)
+		pr.CloseWithError(err)
+		return err
+	})
+	if err := g.Wait(); err != nil {
+		return fmt.Errorf("filestore restore failed: %v", err)
+	}
+
+	if err := markFilestoreRestored(ctx, client, bucket); err != nil {
+		return err
+	}
+
+	s.logger.InfoContext(ctx, "Filestore restored to external S3", "bucket", bucket, "key", key)
+	return nil
 }
 
 func (s Service) SaveDeployment(ctx context.Context, deployment *model.Deployment) error {
@@ -457,9 +552,27 @@ func (s Service) deployDeploymentInstance(ctx context.Context, token string, ins
 		return err
 	}
 
-	extraEnv, err := s.buildSeedEnv(ctx, instance)
+	deployment, err := s.FindDecryptedDeploymentById(ctx, instance.DeploymentID)
+	if err != nil {
+		return err
+	}
+
+	extraEnv, err := s.buildSeedEnv(ctx, deployment.Instances)
 	if err != nil {
 		return fmt.Errorf("failed to build seed environment: %w", err)
+	}
+
+	if storageType(instance) == "s3" {
+		// A filestore restore can push the deploy past the client/load-balancer
+		// timeout. Detach from the request context so the restore and the
+		// subsequent ingress-class/cert-issuer discovery still run instead of
+		// failing on a cancelled context, which would drop TLS from the ingress.
+		// Only the s3 path needs this; other storage types deploy well within the
+		// timeout and keep the request context so client cancellation still works.
+		ctx = context.WithoutCancel(ctx)
+		if err := s.restoreFilestoreToS3(ctx, instance, deployment.Instances); err != nil {
+			return err
+		}
 	}
 
 	syncCmd, err := s.helmfileService.sync(ctx, token, instance, group, ttl, extraEnv)
@@ -887,73 +1000,36 @@ func (s Service) Reset(ctx context.Context, token string, instance *model.Deploy
 }
 
 func (s Service) FilestoreBackup(ctx context.Context, instance *model.DeploymentInstance, name string, database *model.Database) error {
+	// Detach from the request context so the backup isn't cancelled if the client disconnects.
+	ctx = context.WithoutCancel(ctx)
+
 	group, err := s.groupService.Find(ctx, instance.GroupName)
 	if err != nil {
 		return err
 	}
 
-	var minioClient *minio.Client
-	var minioEndpoint string
-
-	minioEndpoint = fmt.Sprintf("%s-%d-minio.%s.svc:9000", instance.Name, instance.Group.ID, instance.Group.Namespace)
-
-	if group.Cluster.Configuration != nil {
-		// TODO: Don't hard code the service name, use a provider as done for the database backup
-		hostname := fmt.Sprintf("%s-%d-minio.%s.svc", instance.Name, instance.Group.ID, instance.Group.Namespace)
-		serviceName := strings.Split(hostname, ".")[0]
-		options := []*forwarder.Option{
-			{
-				RemotePort:  9000,
-				ServiceName: serviceName,
-				Namespace:   instance.Group.Namespace,
-			},
-		}
-
-		kubeConfig, err := decryptYaml(group.Cluster.Configuration)
-		if err != nil {
-			return err
-		}
-
-		ret, err := forwarder.WithForwardersEmbedConfig(context.Background(), options, kubeConfig)
-		if err != nil {
-			return err
-		}
-		defer ret.Close()
-
-		ports, err := ret.Ready()
-		if err != nil {
-			return err
-		}
-
-		minioEndpoint = fmt.Sprintf("localhost:%d", ports[0][0].Local)
-	}
-
-	minioClient, err = newMinioClient("dhisdhis", "dhisdhis", minioEndpoint, false)
+	// Re-fetch decrypted so STORAGE_TYPE and any external S3 credentials are populated.
+	core, err := s.FindDecryptedDeploymentInstanceById(ctx, instance.ID)
 	if err != nil {
 		return err
 	}
-
-	// Test MinIO connection before proceeding
-	_, err = minioClient.ListBuckets(ctx)
-	if err != nil {
-		return fmt.Errorf("MinIO connection test failed: %v", err)
-	}
-
-	source := NewMinioBackupSource(s.logger, minioClient, "dhis2")
-	backupService := NewBackupService(s.logger, source, s.s3Client)
 
 	baseName := name
 	baseName = strings.TrimSuffix(baseName, ".sql.gz")
 	baseName = strings.TrimSuffix(baseName, ".pgc")
 	baseName = strings.TrimSuffix(baseName, ".tar.gz")
 
-	key := fmt.Sprintf("%s/%s-%s.tar.gz", instance.GroupName, baseName, "fs")
-	err = backupService.PerformBackup(ctx, s.s3Bucket, key)
+	streamer, err := s.filestoreStreamerFor(core, group.Cluster)
 	if err != nil {
 		return err
 	}
 
-	// Record backup in database
+	key := fmt.Sprintf("%s/%s-%s.tar.gz", instance.GroupName, baseName, "fs")
+	backupService := NewBackupService(s.logger, s.s3Client)
+	if err := backupService.PerformBackup(ctx, streamer, s.s3Bucket, key); err != nil {
+		return err
+	}
+
 	s3Uri := fmt.Sprintf("s3://%s/%s", s.s3Bucket, key)
 	filestore, err := s.recordBackup(ctx, instance.GroupName, s3Uri, baseName+"-fs.tar.gz", database.UserID)
 	if err != nil {
@@ -962,12 +1038,7 @@ func (s Service) FilestoreBackup(ctx context.Context, instance *model.Deployment
 
 	database.FilestoreID = filestore.ID
 
-	err = s.instanceRepository.SaveDatabase(ctx, database)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return s.instanceRepository.SaveDatabase(ctx, database)
 }
 
 func (s Service) recordBackup(ctx context.Context, groupName, s3uri, name string, userID uint) (*model.Database, error) {
@@ -988,17 +1059,6 @@ func (s Service) recordBackup(ctx context.Context, groupName, s3uri, name string
 
 func (s Service) FindAllDeployments(ctx context.Context) ([]model.Deployment, error) {
 	return s.instanceRepository.FindAllDeployments(ctx)
-}
-
-func newMinioClient(accessKey, secretKey, endpoint string, useSSL bool) (*minio.Client, error) {
-	minioClient, err := minio.New(endpoint, &minio.Options{
-		Creds:  credentials.NewStaticV4(accessKey, secretKey, ""),
-		Secure: useSSL,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to create MinIO client: %v", err)
-	}
-	return minioClient, nil
 }
 
 func (s Service) UpdateInstance(ctx context.Context, token string, deploymentId, instanceId uint, parameters parameters, public *bool) (*model.DeploymentInstance, error) {
