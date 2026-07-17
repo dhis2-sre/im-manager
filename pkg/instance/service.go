@@ -650,6 +650,7 @@ func (s Service) DeleteDeployment(ctx context.Context, deployment *model.Deploym
 		err := s.destroyDeploymentInstance(ctx, instance)
 		if err != nil {
 			errs = errors.Join(errs, fmt.Errorf("failed to destroy instance(%s) %q: %v", instance.StackName, instance.Name, err))
+			continue
 		}
 
 		err = s.instanceRepository.DeleteDeploymentInstance(ctx, instance)
