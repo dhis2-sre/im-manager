@@ -53,6 +53,13 @@ func TestDeletePersistentVolumeClaim(t *testing.T) {
 			wantDeleted: 2,
 		},
 		{
+			stack: "minio",
+			pvcs: []*v1.PersistentVolumeClaim{
+				labeledPVC(namespace, "data-minio-0", uniqueName+"-minio"),
+			},
+			wantDeleted: 1,
+		},
+		{
 			stack:       "whoami-go",
 			pvcs:        nil,
 			wantDeleted: 0,
