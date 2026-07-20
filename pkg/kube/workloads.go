@@ -29,10 +29,10 @@ func (c *Client) RestartStatefulSet(instance *model.DeploymentInstance, componen
 
 	statefulSetsItems := statefulSetsList.Items
 	if len(statefulSetsItems) == 0 {
-		return fmt.Errorf("no deployment found using the selector: %q", selector)
+		return fmt.Errorf("no stateful set found using the selector: %q", selector)
 	}
 	if len(statefulSetsItems) > 1 {
-		return fmt.Errorf("multiple deployments found using the selector: %q", selector)
+		return fmt.Errorf("multiple stateful sets found using the selector: %q", selector)
 	}
 
 	statefulSet := statefulSetsItems[0]
