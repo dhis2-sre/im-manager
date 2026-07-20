@@ -11,7 +11,7 @@ type _ struct {
 // Response depends on the input and can be either a list or a map
 type Response struct{}
 
-// swagger:response Response
+// swagger:response IntegrationResponse
 type ResponseBody struct {
 	// in: body
 	Body Response

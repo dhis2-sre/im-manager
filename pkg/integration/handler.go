@@ -96,7 +96,7 @@ func (h Handler) Integrations(c *gin.Context) {
 	//  oauth2:
 	//
 	// responses:
-	//   200: Response
+	//   200: IntegrationResponse
 	//   401: Error
 	//   403: Error
 	//   415: Error

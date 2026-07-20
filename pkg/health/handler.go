@@ -19,6 +19,6 @@ func Health(c *gin.Context) {
 	// Show service health status
 	//
 	// Responses:
-	//   200: Response
+	//   200: HealthResponse
 	c.JSON(http.StatusOK, Response{"UP"})
 }
