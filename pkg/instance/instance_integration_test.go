@@ -237,9 +237,17 @@ func TestInstanceHandler(t *testing.T) {
 		require.NoError(t, err)
 		minioPod := minioPodName(t, k8sClient, coreInstance.Group.Namespace, deployment.ID)
 		// create the bucket; the stack creates it asynchronously and we'd otherwise race it
-		seedScript := `mc alias set local http://127.0.0.1:9000 dhisdhis dhisdhis >/dev/null 2>&1; mc mb --ignore-existing local/dhis2 >/dev/null 2>&1; printf 'hello-filestore' > /tmp/marker.txt; mc cp --quiet /tmp/marker.txt local/dhis2/seeded/marker.txt`
-		var seedOut, seedErr strings.Builder
-		require.NoError(t, ks.Exec(context.Background(), coreInstance.Group.Namespace, minioPod, "minio", []string{"sh", "-c", seedScript}, &seedOut, &seedErr), "seed failed: %s", seedErr.String())
+		seedScript := `mc alias set local http://127.0.0.1:9000 dhisdhis dhisdhis; mc mb --ignore-existing local/dhis2; printf 'hello-filestore' > /tmp/marker.txt; mc cp --quiet /tmp/marker.txt local/dhis2/seeded/marker.txt`
+		// minio's PodReady condition does not guarantee its S3 API is already accepting
+		// connections, so retry the idempotent seed until it succeeds
+		require.Eventually(t, func() bool {
+			var seedOut, seedErr strings.Builder
+			err := ks.Exec(context.Background(), coreInstance.Group.Namespace, minioPod, "minio", []string{"sh", "-c", seedScript}, &seedOut, &seedErr)
+			if err != nil {
+				t.Logf("seed attempt failed: %v: %s", err, seedErr.String())
+			}
+			return err == nil
+		}, 60*time.Second, 2*time.Second, "seeding the minio bucket via exec should eventually succeed")
 
 		// FilestoreBackup links the filestore to an existing (SaveAs target) database row.
 		target := &model.Database{Name: "fs-backup-target.sql.gz", GroupName: "group-name", Type: "database", Slug: "group-name/fs-backup-target", UserID: user.ID}
