@@ -19,22 +19,24 @@ import (
 	"github.com/google/uuid"
 )
 
-func NewHandler(logger *slog.Logger, databaseService *Service, groupService groupService, instanceService instanceService, stackService stackService) Handler {
+func NewHandler(logger *slog.Logger, databaseService *Service, groupService groupService, instanceService instanceService, stackService stackService, deploymentService deploymentService) Handler {
 	return Handler{
-		logger:          logger,
-		databaseService: databaseService,
-		groupService:    groupService,
-		instanceService: instanceService,
-		stackService:    stackService,
+		logger:            logger,
+		databaseService:   databaseService,
+		groupService:      groupService,
+		instanceService:   instanceService,
+		stackService:      stackService,
+		deploymentService: deploymentService,
 	}
 }
 
 type Handler struct {
-	logger          *slog.Logger
-	databaseService *Service
-	groupService    groupService
-	instanceService instanceService
-	stackService    stackService
+	logger            *slog.Logger
+	databaseService   *Service
+	groupService      groupService
+	instanceService   instanceService
+	stackService      stackService
+	deploymentService deploymentService
 }
 
 type instanceService interface {
@@ -44,6 +46,11 @@ type instanceService interface {
 
 type stackService interface {
 	Find(name string) (*model.Stack, error)
+}
+
+type deploymentService interface {
+	SaveAs(ctx context.Context, userId uint, instance *model.DeploymentInstance, stack *model.Stack, coreInstance *model.DeploymentInstance, name string, format string) (*model.Database, error)
+	Save(ctx context.Context, userId uint, database *model.Database, instance *model.DeploymentInstance, stack *model.Stack, coreInstance *model.DeploymentInstance) error
 }
 
 // Upload database
@@ -204,7 +211,7 @@ func (h Handler) SaveAs(c *gin.Context) {
 		return
 	}
 
-	savedDatabase, err := h.databaseService.SaveAs(ctx, user.ID, instance, stack, coreInstance, request.Name, request.Format, nil)
+	savedDatabase, err := h.deploymentService.SaveAs(ctx, user.ID, instance, stack, coreInstance, request.Name, request.Format)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -295,7 +302,7 @@ func (h Handler) Save(c *gin.Context) {
 		return
 	}
 
-	if err := h.databaseService.Save(ctx, user.ID, database, instance, stack, coreInstance); err != nil {
+	if err := h.deploymentService.Save(ctx, user.ID, database, instance, stack, coreInstance); err != nil {
 		_ = c.Error(err)
 		return
 	}

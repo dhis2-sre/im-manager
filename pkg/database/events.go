@@ -2,13 +2,9 @@ package database
 
 import "github.com/dhis2-sre/im-manager/pkg/model"
 
-const (
-	kindDatabaseSave    = "database-save"
-	kindFilestoreBackup = "filestore-backup"
-)
+const kindDatabaseSave = "database-save"
 
-// databaseEvent is the JSON payload published for database-save and filestore-backup events.
-// Size is omitted (omitempty) for filestore-backup, which doesn't produce one.
+// databaseEvent is the JSON payload published for database-save events.
 type databaseEvent struct {
 	Status       string `json:"status"`
 	DatabaseID   uint   `json:"databaseId"`

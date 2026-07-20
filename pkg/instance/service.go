@@ -9,15 +9,12 @@ import (
 	"iter"
 	"log/slog"
 	"maps"
-	"os"
 	"os/exec"
 	"slices"
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/dhis2-sre/im-manager/pkg/storage"
-	"github.com/dhis2-sre/im-manager/pkg/token"
 	"golang.org/x/sync/errgroup"
 
 	v1 "k8s.io/api/core/v1"
@@ -30,7 +27,7 @@ import (
 	"github.com/dhis2-sre/im-manager/pkg/model"
 )
 
-func NewService(logger *slog.Logger, instanceRepository *repository, groupService groupService, stackService stack.Service, helmfileService helmfile, s3Client *storage.S3Client, s3Bucket string, tokenService *token.TokenService) *Service {
+func NewService(logger *slog.Logger, instanceRepository *repository, groupService groupService, stackService stack.Service, helmfileService helmfile, s3Client *storage.S3Client, s3Bucket string) *Service {
 	return &Service{
 		logger:             logger,
 		instanceRepository: instanceRepository,
@@ -39,7 +36,6 @@ func NewService(logger *slog.Logger, instanceRepository *repository, groupServic
 		helmfileService:    helmfileService,
 		s3Client:           s3Client,
 		s3Bucket:           s3Bucket,
-		tokenService:       tokenService,
 	}
 }
 
@@ -53,11 +49,6 @@ type helmfile interface {
 	destroy(ctx context.Context, instance *model.DeploymentInstance, group *model.Group) (*exec.Cmd, error)
 }
 
-type externalDownloadCreator interface {
-	FindById(ctx context.Context, id uint) (*model.Database, error)
-	CreateExternalDownload(ctx context.Context, databaseID uint, expiration uint) (*model.ExternalDownload, error)
-}
-
 type Service struct {
 	logger             *slog.Logger
 	instanceRepository *repository
@@ -66,107 +57,12 @@ type Service struct {
 	helmfileService    helmfile
 	s3Client           *storage.S3Client
 	s3Bucket           string
-	tokenService       *token.TokenService
-	externalDownloads  externalDownloadCreator
 }
 
-func (s *Service) SetExternalDownloads(creator externalDownloadCreator) {
-	s.externalDownloads = creator
-}
-
-const seedDownloadTTLSeconds uint = 1800
-
-// databaseIDFromInstances resolves the DATABASE_ID parameter from whichever
-// instance in the deployment carries it. DATABASE_ID lives on the db instance,
-// while storage parameters live on the core instance, so callers operating on the
-// core must look across siblings to find it.
-func databaseIDFromInstances(instances []*model.DeploymentInstance) (uint, bool) {
-	for _, instance := range instances {
-		param, ok := instance.Parameters["DATABASE_ID"]
-		if !ok {
-			continue
-		}
-
-		databaseID, err := strconv.ParseUint(param.Value, 10, strconv.IntSize)
-		if err != nil || databaseID == 0 {
-			continue
-		}
-
-		return uint(databaseID), true
-	}
-	return 0, false
-}
-
-func (s Service) buildSeedEnv(ctx context.Context, instances []*model.DeploymentInstance) (map[string]string, error) {
-	databaseID, ok := databaseIDFromInstances(instances)
-	if !ok {
-		return nil, nil
-	}
-
-	if s.externalDownloads == nil {
-		return nil, fmt.Errorf("external download service not configured; cannot create seed URLs for DATABASE_ID=%d", databaseID)
-	}
-
-	hostname := os.Getenv("HOSTNAME")
-	extraEnv := make(map[string]string)
-
-	db, err := s.externalDownloads.FindById(ctx, databaseID)
-	if err != nil {
-		return nil, fmt.Errorf("database %d not found: %w", databaseID, err)
-	}
-
-	dbDownload, err := s.externalDownloads.CreateExternalDownload(ctx, db.ID, seedDownloadTTLSeconds)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create seed download link for database %d: %w", db.ID, err)
-	}
-	extraEnv["DATABASE_DOWNLOAD_URL"] = hostname + "/databases/external/" + dbDownload.UUID.String()
-
-	if db.FilestoreID != 0 {
-		fsDownload, err := s.externalDownloads.CreateExternalDownload(ctx, db.FilestoreID, seedDownloadTTLSeconds)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create seed download link for filestore %d: %w", db.FilestoreID, err)
-		}
-		extraEnv["FILESTORE_DOWNLOAD_URL"] = hostname + "/databases/external/" + fsDownload.UUID.String()
-	}
-
-	return extraEnv, nil
-}
-
-// filestoreBackupKey returns the S3 key of the filestore backup attached to the
-// deployment's database, or ok=false when there is none to restore.
-func (s Service) filestoreBackupKey(ctx context.Context, instances []*model.DeploymentInstance) (string, bool, error) {
-	databaseID, ok := databaseIDFromInstances(instances)
-	if !ok {
-		return "", false, nil
-	}
-
-	db, err := s.externalDownloads.FindById(ctx, databaseID)
-	if err != nil {
-		return "", false, fmt.Errorf("database %d not found: %w", databaseID, err)
-	}
-	if db.FilestoreID == 0 {
-		return "", false, nil
-	}
-
-	filestore, err := s.externalDownloads.FindById(ctx, db.FilestoreID)
-	if err != nil {
-		return "", false, fmt.Errorf("filestore %d not found: %w", db.FilestoreID, err)
-	}
-
-	key := strings.TrimPrefix(filestore.Url, fmt.Sprintf("s3://%s/", s.s3Bucket))
-	return key, true, nil
-}
-
-// restoreFilestoreToS3 restores the instance's filestore backup into its external
+// restoreFilestoreToS3 restores the given filestore backup into the instance's external
 // S3 bucket, since external S3 has no pod to seed the way minio/filesystem do.
-func (s Service) restoreFilestoreToS3(ctx context.Context, core *model.DeploymentInstance, instances []*model.DeploymentInstance) error {
-	key, ok, err := s.filestoreBackupKey(ctx, instances)
-	if err != nil {
-		return err
-	}
-	if !ok {
-		return nil
-	}
+func (s Service) restoreFilestoreToS3(ctx context.Context, core *model.DeploymentInstance, filestore *model.Database) error {
+	key := strings.TrimPrefix(filestore.Url, fmt.Sprintf("s3://%s/", s.s3Bucket))
 
 	client, err := newExternalS3Client(core)
 	if err != nil {
@@ -333,7 +229,7 @@ func (s Service) DeleteInstance(ctx context.Context, deploymentId, instanceId ui
 		return errdef.NewBadRequest("failed to delete instance: %v", err)
 	}
 
-	err = s.destroyDeploymentInstance(ctx, instance)
+	err = s.DestroyInstance(ctx, instance)
 	if err != nil {
 		return fmt.Errorf("failed to destroy instance %d in deployment %d: %v", instanceId, deployment.ID, err)
 	}
@@ -518,51 +414,24 @@ func addDefaultParameterValues(instanceParameters model.DeploymentInstanceParame
 	}
 }
 
-func (s Service) DeployDeployment(ctx context.Context, token string, deployment *model.Deployment) error {
+// DeploymentOrder validates the deployment's instance graph and returns its instances in
+// topological deploy order.
+func (s Service) DeploymentOrder(deployment *model.Deployment) ([]*model.DeploymentInstance, error) {
 	deploymentGraph, err := s.validateNoCycles(deployment.Instances)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	instances, err := deploymentOrder(deployment, deploymentGraph)
-	if err != nil {
-		return err
-	}
-
-	deployment.Instances = instances
-
-	for _, instance := range instances {
-		var err error
-		token, err = s.tokenService.RefreshAccessToken(token)
-		if err != nil {
-			return err
-		}
-		err = s.deployDeploymentInstance(ctx, token, instance, deployment.TTL)
-		if err != nil {
-			return fmt.Errorf("failed to deploy instance(%s) %q: %w", instance.StackName, instance.Name, err)
-		}
-	}
-
-	return nil
+	return deploymentOrder(deployment, deploymentGraph)
 }
 
-func (s Service) deployDeploymentInstance(ctx context.Context, token string, instance *model.DeploymentInstance, ttl uint) error {
+func (s Service) DeployInstance(ctx context.Context, token string, instance *model.DeploymentInstance, ttl uint, extraEnv map[string]string, filestoreBackup *model.Database) error {
 	group, err := s.groupService.Find(ctx, instance.GroupName)
 	if err != nil {
 		return err
 	}
 
-	deployment, err := s.FindDecryptedDeploymentById(ctx, instance.DeploymentID)
-	if err != nil {
-		return err
-	}
-
-	extraEnv, err := s.buildSeedEnv(ctx, deployment.Instances)
-	if err != nil {
-		return fmt.Errorf("failed to build seed environment: %w", err)
-	}
-
-	if storageType(instance) == "s3" {
+	if storageType(instance) == "s3" && filestoreBackup != nil {
 		// A filestore restore can push the deploy past the client/load-balancer
 		// timeout. Detach from the request context so the restore and the
 		// subsequent ingress-class/cert-issuer discovery still run instead of
@@ -570,7 +439,7 @@ func (s Service) deployDeploymentInstance(ctx context.Context, token string, ins
 		// Only the s3 path needs this; other storage types deploy well within the
 		// timeout and keep the request context so client cancellation still works.
 		ctx = context.WithoutCancel(ctx)
-		if err := s.restoreFilestoreToS3(ctx, instance, deployment.Instances); err != nil {
+		if err := s.restoreFilestoreToS3(ctx, instance, filestoreBackup); err != nil {
 			return err
 		}
 	}
@@ -634,12 +503,7 @@ func (s Service) Delete(ctx context.Context, deploymentInstanceId uint) error {
 }
 
 func (s Service) DeleteDeployment(ctx context.Context, deployment *model.Deployment) error {
-	deploymentGraph, err := s.validateNoCycles(deployment.Instances)
-	if err != nil {
-		return err
-	}
-
-	instances, err := deploymentOrder(deployment, deploymentGraph)
+	instances, err := s.DeploymentOrder(deployment)
 	if err != nil {
 		return err
 	}
@@ -647,7 +511,7 @@ func (s Service) DeleteDeployment(ctx context.Context, deployment *model.Deploym
 
 	var errs error
 	for _, instance := range instances {
-		err := s.destroyDeploymentInstance(ctx, instance)
+		err := s.DestroyInstance(ctx, instance)
 		if err != nil {
 			errs = errors.Join(errs, fmt.Errorf("failed to destroy instance(%s) %q: %v", instance.StackName, instance.Name, err))
 			continue
@@ -665,7 +529,7 @@ func (s Service) DeleteDeployment(ctx context.Context, deployment *model.Deploym
 	return s.instanceRepository.DeleteDeployment(ctx, deployment)
 }
 
-func (s Service) destroyDeploymentInstance(ctx context.Context, instance *model.DeploymentInstance) error {
+func (s Service) DestroyInstance(ctx context.Context, instance *model.DeploymentInstance) error {
 	if _, err := s.FindDeploymentInstanceById(ctx, instance.ID); err != nil {
 		return err
 	}
@@ -991,15 +855,6 @@ func (s Service) GetStatus(instance *model.DeploymentInstance) (InstanceStatus, 
 	return "", fmt.Errorf("failed to get instance status")
 }
 
-func (s Service) Reset(ctx context.Context, token string, instance *model.DeploymentInstance, ttl uint) error {
-	err := s.destroyDeploymentInstance(ctx, instance)
-	if err != nil {
-		return err
-	}
-
-	return s.deployDeploymentInstance(ctx, token, instance, ttl)
-}
-
 func (s Service) FilestoreBackup(ctx context.Context, instance *model.DeploymentInstance, name string, database *model.Database) error {
 	// Detach from the request context so the backup isn't cancelled if the client disconnects.
 	ctx = context.WithoutCancel(ctx)
@@ -1062,7 +917,7 @@ func (s Service) FindAllDeployments(ctx context.Context) ([]model.Deployment, er
 	return s.instanceRepository.FindAllDeployments(ctx)
 }
 
-func (s Service) UpdateInstance(ctx context.Context, token string, deploymentId, instanceId uint, parameters parameters, public *bool) (*model.DeploymentInstance, error) {
+func (s Service) UpdateInstanceParameters(ctx context.Context, deploymentId, instanceId uint, parameters Parameters, public *bool) (*model.DeploymentInstance, error) {
 	instance, err := s.FindDecryptedDeploymentInstanceById(ctx, instanceId)
 	if err != nil {
 		return nil, err
@@ -1124,46 +979,5 @@ func (s Service) UpdateInstance(ctx context.Context, token string, deploymentId,
 		return nil, err
 	}
 
-	decryptedInstance, err := s.FindDecryptedDeploymentInstanceById(ctx, instanceId)
-	if err != nil {
-		return nil, err
-	}
-
-	refreshedToken, err := s.tokenService.RefreshAccessToken(token)
-	if err != nil {
-		return nil, err
-	}
-
-	err = s.deployDeploymentInstance(ctx, refreshedToken, decryptedInstance, deployment.TTL)
-	if err != nil {
-		return nil, fmt.Errorf("failed to deploy updated instance: %v", err)
-	}
-
 	return instance, nil
-}
-
-func (s Service) UpdateDeployment(ctx context.Context, token string, deploymentId uint, ttl uint, description string) (*model.Deployment, error) {
-	deployment, err := s.FindDecryptedDeploymentById(ctx, deploymentId)
-	if err != nil {
-		return nil, err
-	}
-
-	ttlChanged := deployment.TTL != ttl
-
-	deployment.TTL = ttl
-	deployment.Description = description
-
-	err = s.instanceRepository.SaveDeployment(ctx, deployment)
-	if err != nil {
-		return nil, err
-	}
-
-	if ttlChanged {
-		err = s.DeployDeployment(ctx, token, deployment)
-		if err != nil {
-			return nil, fmt.Errorf("failed to redeploy instances: %v", err)
-		}
-	}
-
-	return deployment, nil
 }

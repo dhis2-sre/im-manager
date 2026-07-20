@@ -484,6 +484,18 @@ definitions:
                 x-go-name: UserID
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/model
+    Parameter:
+        properties:
+            value:
+                type: string
+                x-go-name: Value
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
+    Parameters:
+        additionalProperties:
+            $ref: '#/definitions/Parameter'
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
     PublicInstance:
         properties:
             description:
@@ -554,7 +566,7 @@ definitions:
     SaveInstanceRequest:
         properties:
             parameters:
-                $ref: '#/definitions/parameters'
+                $ref: '#/definitions/Parameters'
             public:
                 type: boolean
                 x-go-name: Public
@@ -659,7 +671,7 @@ definitions:
     UpdateInstanceRequest:
         properties:
             parameters:
-                $ref: '#/definitions/parameters'
+                $ref: '#/definitions/Parameters'
             public:
                 type: boolean
                 x-go-name: Public
@@ -703,18 +715,6 @@ definitions:
                 x-go-name: Validated
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/model
-    parameter:
-        properties:
-            value:
-                type: string
-                x-go-name: Value
-        type: object
-        x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
-    parameters:
-        additionalProperties:
-            $ref: '#/definitions/parameter'
-        type: object
-        x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
     saveAsRequest:
         properties:
             format:
@@ -1876,7 +1876,7 @@ paths:
             operationId: health
             responses:
                 "200":
-                    $ref: '#/responses/Response'
+                    $ref: '#/responses/HealthResponse'
             summary: Health status
     /instances/{id}/details:
         put:
@@ -2088,7 +2088,7 @@ paths:
                     $ref: '#/definitions/Request'
             responses:
                 "200":
-                    $ref: '#/responses/Response'
+                    $ref: '#/responses/IntegrationResponse'
                 "401":
                     $ref: '#/responses/Error'
                 "403":
@@ -2524,10 +2524,18 @@ responses:
             items:
                 $ref: '#/definitions/GroupWithPublicInstances'
             type: array
+    HealthResponse:
+        description: ""
+        schema:
+            $ref: '#/definitions/HealthResponse'
     InstanceLogsResponse:
         description: ""
         schema:
             type: string
+    IntegrationResponse:
+        description: ""
+        schema:
+            $ref: '#/definitions/IntegrationResponse'
     Lock:
         description: ""
         schema:
@@ -2538,10 +2546,6 @@ responses:
             items:
                 $ref: '#/definitions/Notification'
             type: array
-    Response:
-        description: ""
-        schema:
-            $ref: '#/definitions/IntegrationResponse'
     Stack:
         description: ""
         schema:

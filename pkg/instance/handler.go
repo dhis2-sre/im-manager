@@ -16,24 +16,33 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func NewHandler(stackService stack.Service, groupService groupServiceHandler, instanceService *Service, defaultTTL uint) Handler {
+func NewHandler(stackService stack.Service, groupService groupServiceHandler, instanceService *Service, deploymentService deploymentService, defaultTTL uint) Handler {
 	return Handler{
-		stackService:    stackService,
-		groupService:    groupService,
-		instanceService: instanceService,
-		defaultTTL:      defaultTTL,
+		stackService:      stackService,
+		groupService:      groupService,
+		instanceService:   instanceService,
+		deploymentService: deploymentService,
+		defaultTTL:        defaultTTL,
 	}
 }
 
 type Handler struct {
-	stackService    stack.Service
-	groupService    groupServiceHandler
-	instanceService *Service
-	defaultTTL      uint
+	stackService      stack.Service
+	groupService      groupServiceHandler
+	instanceService   *Service
+	deploymentService deploymentService
+	defaultTTL        uint
 }
 
 type groupServiceHandler interface {
 	Find(ctx context.Context, name string) (*model.Group, error)
+}
+
+type deploymentService interface {
+	DeployDeployment(ctx context.Context, token string, deployment *model.Deployment) error
+	UpdateDeployment(ctx context.Context, token string, deploymentId uint, ttl uint, description string) (*model.Deployment, error)
+	UpdateInstance(ctx context.Context, token string, deploymentId, instanceId uint, parameters Parameters, public *bool) (*model.DeploymentInstance, error)
+	Reset(ctx context.Context, token string, instance *model.DeploymentInstance, ttl uint) error
 }
 
 func (h Handler) DeployDeployment(c *gin.Context) {
@@ -89,7 +98,7 @@ func (h Handler) DeployDeployment(c *gin.Context) {
 		return
 	}
 
-	err = h.instanceService.DeployDeployment(ctx, token, deployment)
+	err = h.deploymentService.DeployDeployment(ctx, token, deployment)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -262,15 +271,15 @@ func (h Handler) FindDeploymentById(c *gin.Context) {
 	c.JSON(http.StatusOK, deployment)
 }
 
-type parameter struct {
+type Parameter struct {
 	Value string `json:"value"`
 }
 
-type parameters map[string]parameter
+type Parameters map[string]Parameter
 
 type SaveInstanceRequest struct {
 	StackName  string     `json:"stackName"`
-	Parameters parameters `json:"parameters"`
+	Parameters Parameters `json:"parameters"`
 	Public     bool       `json:"public"`
 }
 
@@ -501,7 +510,7 @@ func (h Handler) Reset(c *gin.Context) {
 		return
 	}
 
-	err = h.instanceService.Reset(ctx, token, instance, deployment.TTL)
+	err = h.deploymentService.Reset(ctx, token, instance, deployment.TTL)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -938,7 +947,7 @@ func (h Handler) Status(c *gin.Context) {
 }
 
 type UpdateInstanceRequest struct {
-	Parameters parameters `json:"parameters"`
+	Parameters Parameters `json:"parameters"`
 	Public     *bool      `json:"public"`
 }
 
@@ -1003,7 +1012,7 @@ func (h Handler) UpdateInstance(c *gin.Context) {
 		return
 	}
 
-	instance, err := h.instanceService.UpdateInstance(ctx, token, deploymentId, instanceId, request.Parameters, request.Public)
+	instance, err := h.deploymentService.UpdateInstance(ctx, token, deploymentId, instanceId, request.Parameters, request.Public)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -1072,7 +1081,7 @@ func (h Handler) UpdateDeployment(c *gin.Context) {
 		return
 	}
 
-	updatedDeployment, err := h.instanceService.UpdateDeployment(ctx, token, id, request.TTL, request.Description)
+	updatedDeployment, err := h.deploymentService.UpdateDeployment(ctx, token, id, request.TTL, request.Description)
 	if err != nil {
 		_ = c.Error(err)
 		return
