@@ -8,9 +8,6 @@ import (
 	"fmt"
 	"io"
 	"strings"
-
-	"github.com/getsops/sops/v3/cmd/sops/formats"
-	"github.com/getsops/sops/v3/decrypt"
 )
 
 const gcmPrefix = "v2:"
@@ -91,8 +88,4 @@ func decryptCFB(key string, encoded string) (string, error) {
 	cfb.XORKeyStream(plainText, cipherText)
 
 	return string(plainText), nil
-}
-
-func decryptYaml(data []byte) ([]byte, error) {
-	return decrypt.DataWithFormat(data, formats.FormatFromString("yaml"))
 }

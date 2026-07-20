@@ -556,7 +556,7 @@ func (s Service) DestroyInstance(ctx context.Context, instance *model.Deployment
 		return err
 	}
 
-	return ks.deletePersistentVolumeClaim(instance)
+	return ks.DeletePersistentVolumeClaim(instance)
 }
 
 func deploymentOrder(deployment *model.Deployment, g graph.Graph[string, *model.DeploymentInstance]) ([]*model.DeploymentInstance, error) {
@@ -586,7 +586,7 @@ func (s Service) Pause(ctx context.Context, instance *model.DeploymentInstance) 
 		return err
 	}
 
-	return ks.pause(instance)
+	return ks.Pause(instance)
 }
 
 func (s Service) Resume(ctx context.Context, instance *model.DeploymentInstance) error {
@@ -600,7 +600,7 @@ func (s Service) Resume(ctx context.Context, instance *model.DeploymentInstance)
 		return err
 	}
 
-	return ks.resume(instance)
+	return ks.Resume(instance)
 }
 
 func (s Service) Restart(ctx context.Context, instance *model.DeploymentInstance, typeSelector string) error {
@@ -619,7 +619,14 @@ func (s Service) Restart(ctx context.Context, instance *model.DeploymentInstance
 		return err
 	}
 
-	return ks.restart(instance, typeSelector, stack)
+	switch stack.KubernetesResource {
+	case model.StatefulSetResource:
+		return ks.RestartStatefulSet(instance, typeSelector)
+	case model.DeploymentResource:
+		return ks.RestartDeployment(instance, typeSelector)
+	default:
+		return fmt.Errorf("kubernetes resource not supported: %s", stack.KubernetesResource)
+	}
 }
 
 func (s Service) Logs(instance *model.DeploymentInstance, group *model.Group, typeSelector string) (io.ReadCloser, error) {
@@ -628,7 +635,7 @@ func (s Service) Logs(instance *model.DeploymentInstance, group *model.Group, ty
 		return nil, err
 	}
 
-	return ks.getLogs(instance, typeSelector)
+	return ks.Logs(instance, typeSelector)
 }
 
 type GroupWithDeployments struct {
@@ -795,7 +802,7 @@ func (s Service) GetStatus(instance *model.DeploymentInstance) (InstanceStatus, 
 		return "", err
 	}
 
-	pod, err := ks.getPod(instance.ID, "")
+	pod, err := ks.GetPod(instance.ID, "")
 	if err != nil {
 		if errdef.IsNotFound(err) {
 			s.logger.Info("Pod not found, assuming not deployed", "instance", instance.ID, "group", instance.GroupName, "error", err)

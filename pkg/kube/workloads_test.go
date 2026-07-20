@@ -1,4 +1,4 @@
-package instance
+package kube
 
 import (
 	"context"
@@ -74,14 +74,14 @@ func TestDeletePersistentVolumeClaim(t *testing.T) {
 			}
 			fakeClient := fake.NewSimpleClientset(objs...)
 
-			ks := &kubernetesService{client: fakeClient}
+			c := &Client{Clientset: fakeClient}
 			inst := &model.DeploymentInstance{
 				Name:      instanceName,
 				StackName: tc.stack,
 				Group:     group,
 			}
 
-			err := ks.deletePersistentVolumeClaim(inst)
+			err := c.DeletePersistentVolumeClaim(inst)
 			require.NoError(t, err)
 
 			remaining, err := fakeClient.CoreV1().PersistentVolumeClaims(namespace).List(context.TODO(), metav1.ListOptions{})
@@ -89,7 +89,7 @@ func TestDeletePersistentVolumeClaim(t *testing.T) {
 
 			wantRemaining := len(tc.pvcs) - tc.wantDeleted
 			assert.Lenf(t, remaining.Items, wantRemaining,
-				"stack %q: expected %d PVC(s) remaining after deletePersistentVolumeClaim", tc.stack, wantRemaining)
+				"stack %q: expected %d PVC(s) remaining after DeletePersistentVolumeClaim", tc.stack, wantRemaining)
 		})
 	}
 }

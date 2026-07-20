@@ -317,7 +317,7 @@ func (s Service) filestoreStreamerFor(core *model.DeploymentInstance, cluster mo
 		if err != nil {
 			return nil, err
 		}
-		pod, err := ks.getPod(core.ID, "")
+		pod, err := ks.GetPod(core.ID, "")
 		if err != nil {
 			return nil, err
 		}
@@ -341,7 +341,7 @@ func (s Service) filestoreStreamerFor(core *model.DeploymentInstance, cluster mo
 		if err != nil {
 			return nil, err
 		}
-		pod, err := ks.getPodByLabels(map[string]string{
+		pod, err := ks.GetPodByLabels(map[string]string{
 			"im-type":          "minio",
 			"im-deployment-id": fmt.Sprint(core.DeploymentID),
 		})
