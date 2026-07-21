@@ -247,7 +247,12 @@ func TestInstanceHandler(t *testing.T) {
 
 		// The shared instanceService is wired with a nil S3 client; build one with the real client.
 		fsService := instance.NewService(logger, instanceRepo, groupService, stackService, helmfileService, s3Client, s3Bucket)
-		require.NoError(t, fsService.FilestoreBackup(context.Background(), &coreInstance, target.Name, target))
+		// minio can briefly refuse connections right after its pod reports ready (the server
+		// restarts during first-run setup), so retry until it is serving. FilestoreBackup returns
+		// before recording anything when the mirror fails, so retries are side-effect free.
+		require.EventuallyWithT(t, func(c *assert.CollectT) {
+			assert.NoError(c, fsService.FilestoreBackup(context.Background(), &coreInstance, target.Name, target))
+		}, 90*time.Second, 3*time.Second, "filestore backup should succeed once minio is serving")
 
 		content := s3.GetObject(t, s3Bucket, "group-name/fs-backup-target-fs.tar.gz")
 		require.NotEmpty(t, content)

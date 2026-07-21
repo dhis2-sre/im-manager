@@ -63,7 +63,7 @@ definitions:
                 format: int64
                 type: integer
         type: object
-        x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/kube
     CopyDatabaseRequest:
         properties:
             group:
