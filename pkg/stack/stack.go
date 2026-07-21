@@ -154,7 +154,6 @@ var DHIS2DB = model.Stack{
 	ParameterProviders: model.ParameterProviders{
 		"DATABASE_HOSTNAME": postgresHostnameProvider,
 	},
-	KubernetesResource: model.StatefulSetResource,
 }
 
 // Provides the PostgreSQL hostname of an instance.
@@ -195,8 +194,7 @@ var MINIO = model.Stack{
 	ParameterProviders: model.ParameterProviders{
 		"MINIO_HOSTNAME": minioHostnameProvider,
 	},
-	Requires:           []model.Stack{DHIS2DB},
-	KubernetesResource: model.DeploymentResource,
+	Requires: []model.Stack{DHIS2DB},
 }
 
 // Provides the Minio hostname of an instance.
@@ -269,7 +267,6 @@ var DHIS2Core = model.Stack{
 		MINIO,
 		ChapCore,
 	},
-	KubernetesResource: model.DeploymentResource,
 }
 
 var dhis2CoreDefaults = struct {
@@ -402,7 +399,6 @@ var PgAdmin = model.Stack{
 	Requires: []model.Stack{
 		DHIS2DB,
 	},
-	KubernetesResource: model.StatefulSetResource,
 }
 
 var pgAdminDefaults = struct {
@@ -421,7 +417,6 @@ var WhoamiGo = model.Stack{
 		"REPLICA_COUNT":     {Priority: 4, DisplayName: "Replica Count", DefaultValue: &whoamiGoDefaults.replicaCount},
 		"CHART_VERSION":     {Priority: 5, DisplayName: "Chart Version", DefaultValue: &whoamiGoDefaults.chartVersion},
 	},
-	KubernetesResource: model.DeploymentResource,
 }
 
 var whoamiGoDefaults = struct {

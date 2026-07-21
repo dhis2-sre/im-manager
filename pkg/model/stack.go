@@ -1,12 +1,5 @@
 package model
 
-type KubernetesResource string
-
-const (
-	DeploymentResource  = KubernetesResource("deployment")
-	StatefulSetResource = KubernetesResource("statefulSet")
-)
-
 // swagger:model StackDetail
 type Stack struct {
 	Name             string          `json:"name"`
@@ -18,8 +11,7 @@ type Stack struct {
 	// Requires these stacks to deploy an instance of this stack.
 	Requires []Stack `json:"requires"`
 	// Companions are optional stacks that can be deployed alongside this stack. Certain parameters can require a companion stack.
-	Companions         []Stack `json:"companions"`
-	KubernetesResource KubernetesResource
+	Companions []Stack `json:"companions"`
 }
 
 // swagger:model StackDetailParameters

@@ -20,7 +20,6 @@ var ChapDB = model.Stack{
 		"DATABASE_HOSTNAME": chapDBHostnameProvider,
 		"DATABASE_SECRET":   chapDBSecretProvider,
 	},
-	KubernetesResource: model.StatefulSetResource,
 }
 
 var chapDBHostnameProvider = model.ParameterProviderFunc(func(instance model.DeploymentInstance) (string, error) {
@@ -57,7 +56,6 @@ var ChapValkey = model.Stack{
 		"REDIS_HOST":   chapValkeyHostnameProvider,
 		"REDIS_SECRET": chapValkeySecretProvider,
 	},
-	KubernetesResource: model.StatefulSetResource,
 }
 
 var chapValkeyHostnameProvider = model.ParameterProviderFunc(func(instance model.DeploymentInstance) (string, error) {
@@ -91,8 +89,7 @@ var ChapWorker = model.Stack{
 		"REDIS_HOST":        {Priority: 0, DisplayName: "Redis Host", Consumed: true},
 		"REDIS_SECRET":      {Priority: 0, DisplayName: "Redis Secret", Consumed: true},
 	},
-	Requires:           []model.Stack{ChapDB, ChapValkey},
-	KubernetesResource: model.DeploymentResource,
+	Requires: []model.Stack{ChapDB, ChapValkey},
 }
 
 var chapWorkerDefaults = struct {
@@ -122,9 +119,8 @@ var ChapCore = model.Stack{
 		"REDIS_HOST":                         {Priority: 0, DisplayName: "Redis Host", Consumed: true},
 		"REDIS_SECRET":                       {Priority: 0, DisplayName: "Redis Secret", Consumed: true},
 	},
-	Requires:           []model.Stack{ChapDB, ChapValkey},
-	Companions:         []model.Stack{ChapWorker},
-	KubernetesResource: model.DeploymentResource,
+	Requires:   []model.Stack{ChapDB, ChapValkey},
+	Companions: []model.Stack{ChapWorker},
 }
 
 var chapCoreDefaults = struct {

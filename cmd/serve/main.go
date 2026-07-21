@@ -78,6 +78,7 @@ import (
 	"github.com/dhis2-sre/im-manager/internal/server"
 	"github.com/dhis2-sre/im-manager/pkg/instance"
 	"github.com/dhis2-sre/im-manager/pkg/integration"
+	"github.com/dhis2-sre/im-manager/pkg/kube"
 	"github.com/dhis2-sre/im-manager/pkg/notification"
 	"github.com/dhis2-sre/im-manager/pkg/stack"
 	"github.com/dhis2-sre/im-manager/pkg/storage"
@@ -630,7 +631,7 @@ func newDatabaseService(ctx context.Context, logger *slog.Logger, db *gorm.DB, g
 		return nil, nil, fmt.Errorf("failed to create database notification publisher: %w", err)
 	}
 	databaseService := database.NewService(logger, s3Bucket, s3Client, groupService, databaseRepository, func(c model.Cluster) (database.PodExecutor, error) {
-		return instance.NewKubernetesService(c)
+		return kube.NewClient(c)
 	}, publisher)
 
 	return databaseService, publisher, nil

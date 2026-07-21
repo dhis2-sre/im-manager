@@ -2,10 +2,8 @@ package kube
 
 import (
 	"context"
-	"fmt"
 	"testing"
 
-	"github.com/dhis2-sre/im-manager/pkg/model"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
@@ -14,82 +12,75 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 )
 
-func TestDeletePersistentVolumeClaim(t *testing.T) {
-	const (
-		namespace    = "test-ns"
-		instanceName = "mydb"
-		groupID      = uint(7)
-	)
-
-	group := &model.Group{ID: groupID, Namespace: namespace}
-	uniqueName := fmt.Sprintf("%s-%d", instanceName, groupID)
+func TestDeletePVCs(t *testing.T) {
+	const namespace = "test-ns"
 
 	tests := []struct {
-		stack       string
-		pvcs        []*v1.PersistentVolumeClaim
-		wantDeleted int
+		name          string
+		pvcs          []*v1.PersistentVolumeClaim
+		selectors     []string
+		wantErr       bool
+		wantRemaining int
 	}{
 		{
-			stack: "dhis2-db",
-			pvcs: []*v1.PersistentVolumeClaim{
-				labeledPVC(namespace, "data-db-0", uniqueName+"-database"),
-			},
-			wantDeleted: 1,
+			name:          "deletes the single match",
+			pvcs:          []*v1.PersistentVolumeClaim{labeledPVC(namespace, "data-db-0", "mydb-7-database")},
+			selectors:     []string{"app.kubernetes.io/instance=mydb-7-database"},
+			wantRemaining: 0,
 		},
 		{
-			stack: "dhis2",
+			name: "deletes across multiple selectors",
 			pvcs: []*v1.PersistentVolumeClaim{
-				labeledPVC(namespace, "data-db-0", uniqueName+"-database"),
-				labeledPVC(namespace, "data-redis-0", uniqueName+"-redis"),
+				labeledPVC(namespace, "data-db-0", "mydb-7-database"),
+				labeledPVC(namespace, "data-redis-0", "mydb-7-redis"),
 			},
-			wantDeleted: 2,
+			selectors: []string{
+				"app.kubernetes.io/instance=mydb-7-database",
+				"app.kubernetes.io/instance=mydb-7-redis",
+			},
+			wantRemaining: 0,
 		},
 		{
-			stack: "dhis2-core",
-			pvcs: []*v1.PersistentVolumeClaim{
-				labeledPVC(namespace, "data-core-0", uniqueName),
-				labeledPVC(namespace, "data-minio-0", uniqueName+"-minio"),
-			},
-			wantDeleted: 2,
+			name:          "no matching pvc is a no-op",
+			pvcs:          []*v1.PersistentVolumeClaim{labeledPVC(namespace, "data-db-0", "other")},
+			selectors:     []string{"app.kubernetes.io/instance=mydb-7-database"},
+			wantRemaining: 1,
 		},
 		{
-			stack: "minio",
-			pvcs: []*v1.PersistentVolumeClaim{
-				labeledPVC(namespace, "data-minio-0", uniqueName+"-minio"),
-			},
-			wantDeleted: 1,
+			name:          "empty selectors deletes nothing",
+			pvcs:          []*v1.PersistentVolumeClaim{labeledPVC(namespace, "data-db-0", "mydb-7-database")},
+			selectors:     nil,
+			wantRemaining: 1,
 		},
 		{
-			stack:       "whoami-go",
-			pvcs:        nil,
-			wantDeleted: 0,
+			name: "more than one match errors",
+			pvcs: []*v1.PersistentVolumeClaim{
+				labeledPVC(namespace, "data-db-0", "mydb-7-database"),
+				labeledPVC(namespace, "data-db-1", "mydb-7-database"),
+			},
+			selectors: []string{"app.kubernetes.io/instance=mydb-7-database"},
+			wantErr:   true,
 		},
 	}
 
 	for _, tc := range tests {
-		t.Run(tc.stack, func(t *testing.T) {
+		t.Run(tc.name, func(t *testing.T) {
 			objs := make([]runtime.Object, len(tc.pvcs))
 			for i, p := range tc.pvcs {
 				objs[i] = p
 			}
-			fakeClient := fake.NewSimpleClientset(objs...)
+			c := &Client{Clientset: fake.NewSimpleClientset(objs...)}
 
-			c := &Client{Clientset: fakeClient}
-			inst := &model.DeploymentInstance{
-				Name:      instanceName,
-				StackName: tc.stack,
-				Group:     group,
+			err := c.DeletePVCs(context.Background(), namespace, tc.selectors)
+			if tc.wantErr {
+				require.Error(t, err)
+				return
 			}
-
-			err := c.DeletePersistentVolumeClaim(inst)
 			require.NoError(t, err)
 
-			remaining, err := fakeClient.CoreV1().PersistentVolumeClaims(namespace).List(context.TODO(), metav1.ListOptions{})
+			remaining, err := c.Clientset.CoreV1().PersistentVolumeClaims(namespace).List(context.TODO(), metav1.ListOptions{})
 			require.NoError(t, err)
-
-			wantRemaining := len(tc.pvcs) - tc.wantDeleted
-			assert.Lenf(t, remaining.Items, wantRemaining,
-				"stack %q: expected %d PVC(s) remaining after DeletePersistentVolumeClaim", tc.stack, wantRemaining)
+			assert.Len(t, remaining.Items, tc.wantRemaining)
 		})
 	}
 }
