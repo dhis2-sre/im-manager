@@ -18,6 +18,7 @@ import (
 	"github.com/dhis2-sre/im-manager/internal/errdef"
 
 	"github.com/dhis2-sre/im-manager/pkg/model"
+	"github.com/dhis2-sre/im-manager/pkg/stack"
 	"github.com/dhis2-sre/im-manager/pkg/storage"
 
 	pg "github.com/habx/pg-commands"
@@ -453,7 +454,7 @@ func (s Service) EnsureLocked(ctx context.Context, database *model.Database, ins
 // SaveLocked overwrites the given locked database with a fresh dump from the instance: it dumps
 // into a temporary record, moves the dump over the original in S3 and re-points the record to the
 // original name and id. It blocks until done and returns the finalized record.
-func (s Service) SaveLocked(ctx context.Context, database *model.Database, instance *model.DeploymentInstance, stack *model.Stack, wasLocked bool) (*model.Database, error) {
+func (s Service) SaveLocked(ctx context.Context, database *model.Database, instance *model.DeploymentInstance, stack *stack.Stack, wasLocked bool) (*model.Database, error) {
 	if !wasLocked {
 		defer func() {
 			err := s.repository.Unlock(ctx, database.ID)
@@ -562,7 +563,7 @@ func (s Service) CreateDatabase(ctx context.Context, userId uint, groupName, nam
 // Dump streams a pg_dump of the instance's database into S3 and updates the given record with the
 // resulting url and size. It blocks until the dump completes and publishes database-save events
 // along the way.
-func (s Service) Dump(ctx context.Context, userId uint, database *model.Database, instance *model.DeploymentInstance, stack *model.Stack, format string) (*model.Database, error) {
+func (s Service) Dump(ctx context.Context, userId uint, database *model.Database, instance *model.DeploymentInstance, stack *stack.Stack, format string) (*model.Database, error) {
 	publish := func(status, errMsg string, size int64) {
 		s.publisher.Publish(ctx, userId, database.GroupName, kindDatabaseSave, newDatabaseEvent(database, status, errMsg, size))
 	}
@@ -672,7 +673,7 @@ func (s Service) logError(ctx context.Context, err error) {
 	s.logger.ErrorContext(ctx, "Failed to SaveAs DB", "error", err)
 }
 
-func newPgDumpConfig(instance *model.DeploymentInstance, stack *model.Stack) (*pg.Dump, error) {
+func newPgDumpConfig(instance *model.DeploymentInstance, stack *stack.Stack) (*pg.Dump, error) {
 	errorMessage := "can't find parameter: %s"
 
 	databaseName, exists := instance.Parameters["DATABASE_NAME"]

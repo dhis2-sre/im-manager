@@ -127,7 +127,7 @@ func (s Service) FindDecryptedDeploymentById(ctx context.Context, id uint) (*mod
 }
 
 func (s Service) decryptDeployment(deployment *model.Deployment) (*model.Deployment, error) {
-	var stacksByName = map[string]*model.Stack{}
+	var stacksByName = map[string]*stack.Stack{}
 	for _, instance := range deployment.Instances {
 		stack, err := s.stackService.Find(instance.StackName)
 		if err != nil {
@@ -331,7 +331,7 @@ func (s Service) resolveParameters(deployment *model.Deployment) error {
 	return nil
 }
 
-func validateParameters(instanceParameters model.DeploymentInstanceParameters, stack *model.Stack) error {
+func validateParameters(instanceParameters model.DeploymentInstanceParameters, stack *stack.Stack) error {
 	var errs []error
 	for name, parameter := range instanceParameters {
 		stackParameter := stack.Parameters[name]
@@ -345,7 +345,7 @@ func validateParameters(instanceParameters model.DeploymentInstanceParameters, s
 	return errors.Join(errs...)
 }
 
-func resolveConsumedParameters(deployment *model.Deployment, instance *model.DeploymentInstance, stack *model.Stack) error {
+func resolveConsumedParameters(deployment *model.Deployment, instance *model.DeploymentInstance, stack *stack.Stack) error {
 	for name, parameter := range instance.Parameters {
 		stackParameter := stack.Parameters[name]
 		if !stackParameter.Consumed {
@@ -388,7 +388,7 @@ func findInstanceByStackName(name string, deployment *model.Deployment) *model.D
 	return nil
 }
 
-func rejectNonExistingParameters(instanceParameters model.DeploymentInstanceParameters, stack *model.Stack) error {
+func rejectNonExistingParameters(instanceParameters model.DeploymentInstanceParameters, stack *stack.Stack) error {
 	var errs []error
 	for name := range instanceParameters {
 		if _, ok := stack.Parameters[name]; !ok {
@@ -398,7 +398,7 @@ func rejectNonExistingParameters(instanceParameters model.DeploymentInstancePara
 	return errors.Join(errs...)
 }
 
-func addDefaultParameterValues(instanceParameters model.DeploymentInstanceParameters, stack *model.Stack) {
+func addDefaultParameterValues(instanceParameters model.DeploymentInstanceParameters, stack *stack.Stack) {
 	for name, stackParameter := range stack.Parameters {
 		if _, ok := instanceParameters[name]; !ok {
 			instanceParameter := model.DeploymentInstanceParameter{
@@ -614,18 +614,18 @@ func (s Service) Restart(ctx context.Context, instance *model.DeploymentInstance
 		return err
 	}
 
-	stack, err := s.stackService.Find(instance.StackName)
+	instanceStack, err := s.stackService.Find(instance.StackName)
 	if err != nil {
 		return err
 	}
 
-	switch stack.KubernetesResource {
-	case model.StatefulSetResource:
+	switch instanceStack.KubernetesResource {
+	case stack.StatefulSetResource:
 		return ks.RestartStatefulSet(instance, typeSelector)
-	case model.DeploymentResource:
+	case stack.DeploymentResource:
 		return ks.RestartDeployment(instance, typeSelector)
 	default:
-		return fmt.Errorf("kubernetes resource not supported: %s", stack.KubernetesResource)
+		return fmt.Errorf("kubernetes resource not supported: %s", instanceStack.KubernetesResource)
 	}
 }
 

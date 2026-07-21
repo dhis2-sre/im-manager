@@ -13,9 +13,9 @@ import (
 
 func TestResolveParameters(t *testing.T) {
 	t.Run("PreventUserFromOverwritingConsumedParameters", func(t *testing.T) {
-		s := model.Stack{
+		s := stack.Stack{
 			Name: "stack",
-			Parameters: map[string]model.StackParameter{
+			Parameters: map[string]stack.StackParameter{
 				"parameter": {
 					Consumed: true,
 				},
@@ -42,9 +42,9 @@ func TestResolveParameters(t *testing.T) {
 	})
 
 	t.Run("RejectNonExistingParameter", func(t *testing.T) {
-		s := model.Stack{
+		s := stack.Stack{
 			Name:       "name-a",
-			Parameters: map[string]model.StackParameter{},
+			Parameters: map[string]stack.StackParameter{},
 		}
 		stacks := stack.Stacks{
 			"name-a": s,
@@ -72,9 +72,9 @@ func TestResolveParameters(t *testing.T) {
 	t.Run("ResolveParameters", func(t *testing.T) {
 		defaultValue1 := "default value used"
 		defaultValue2 := "default value not user"
-		stackA := model.Stack{
+		stackA := stack.Stack{
 			Name: "stack-a",
-			Parameters: map[string]model.StackParameter{
+			Parameters: map[string]stack.StackParameter{
 				"parameter-a": {
 					DefaultValue: &defaultValue1,
 				},
@@ -133,17 +133,17 @@ func TestResolveParameters(t *testing.T) {
 	})
 
 	t.Run("RequiredInstanceNotInDeployment", func(t *testing.T) {
-		stackA := model.Stack{
+		stackA := stack.Stack{
 			Name: "stack-a",
 		}
-		stackB := model.Stack{
+		stackB := stack.Stack{
 			Name: "stack-b",
-			Parameters: map[string]model.StackParameter{
+			Parameters: map[string]stack.StackParameter{
 				"parameter": {
 					Consumed: true,
 				},
 			},
-			Requires: []model.Stack{stackA},
+			Requires: []stack.Stack{stackA},
 		}
 		stacks := stack.Stacks{
 			"stack-a": stackA,
@@ -167,22 +167,22 @@ func TestResolveParameters(t *testing.T) {
 	})
 
 	t.Run("ResolveParameterUsingProvider", func(t *testing.T) {
-		stackA := model.Stack{
+		stackA := stack.Stack{
 			Name: "stack-a",
-			ParameterProviders: model.ParameterProviders{
-				"provider-parameter": model.ParameterProviderFunc(func(instance model.DeploymentInstance) (string, error) {
+			ParameterProviders: stack.ParameterProviders{
+				"provider-parameter": stack.ParameterProviderFunc(func(instance model.DeploymentInstance) (string, error) {
 					return fmt.Sprintf("%s-%s", instance.Name, instance.GroupName), nil
 				}),
 			},
 		}
-		stackB := model.Stack{
+		stackB := stack.Stack{
 			Name: "stack-b",
-			Parameters: map[string]model.StackParameter{
+			Parameters: map[string]stack.StackParameter{
 				"provider-parameter": {
 					Consumed: true,
 				},
 			},
-			Requires: []model.Stack{stackA},
+			Requires: []stack.Stack{stackA},
 		}
 		stacks := stack.Stacks{
 			"stack-a": stackA,

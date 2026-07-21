@@ -20,6 +20,7 @@ import (
 	"github.com/dhis2-sre/im-manager/pkg/instance"
 	"github.com/dhis2-sre/im-manager/pkg/inttest"
 	"github.com/dhis2-sre/im-manager/pkg/model"
+	"github.com/dhis2-sre/im-manager/pkg/stack"
 	"github.com/dhis2-sre/im-manager/pkg/storage"
 	userpkg "github.com/dhis2-sre/im-manager/pkg/user"
 	"github.com/gin-gonic/gin"
@@ -348,7 +349,7 @@ func TestSaveLockedUnlocksOnDumpFailure(t *testing.T) {
 	require.False(t, wasLocked)
 
 	// The instance has no database parameters, so the dump fails before touching pods or S3.
-	_, err = databaseService.SaveLocked(ctx, locked, instance, &model.Stack{}, wasLocked)
+	_, err = databaseService.SaveLocked(ctx, locked, instance, &stack.Stack{}, wasLocked)
 	require.Error(t, err)
 
 	reloaded, err := databaseService.FindById(ctx, locked.ID)
@@ -407,7 +408,7 @@ func (is instanceService) UpdateInstanceParameters(ctx context.Context, deployme
 
 type stackService struct{}
 
-func (ss stackService) Find(name string) (*model.Stack, error) {
+func (ss stackService) Find(name string) (*stack.Stack, error) {
 	return nil, nil
 }
 

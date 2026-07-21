@@ -14,6 +14,7 @@ import (
 
 	"github.com/dhis2-sre/im-manager/internal/handler"
 	"github.com/dhis2-sre/im-manager/pkg/model"
+	"github.com/dhis2-sre/im-manager/pkg/stack"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -45,12 +46,12 @@ type instanceService interface {
 }
 
 type stackService interface {
-	Find(name string) (*model.Stack, error)
+	Find(name string) (*stack.Stack, error)
 }
 
 type deploymentService interface {
-	SaveAs(ctx context.Context, userId uint, instance *model.DeploymentInstance, stack *model.Stack, coreInstance *model.DeploymentInstance, name string, format string) (*model.Database, error)
-	Save(ctx context.Context, userId uint, database *model.Database, instance *model.DeploymentInstance, stack *model.Stack, coreInstance *model.DeploymentInstance) error
+	SaveAs(ctx context.Context, userId uint, instance *model.DeploymentInstance, stack *stack.Stack, coreInstance *model.DeploymentInstance, name string, format string) (*model.Database, error)
+	Save(ctx context.Context, userId uint, database *model.Database, instance *model.DeploymentInstance, stack *stack.Stack, coreInstance *model.DeploymentInstance) error
 }
 
 // Upload database
