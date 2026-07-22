@@ -23,7 +23,7 @@ require (
 	github.com/gorilla/sessions v1.4.0
 	github.com/gosimple/slug v1.15.0
 	github.com/habx/pg-commands v0.6.1
-	github.com/lestrrat-go/jwx/v2 v2.1.6
+	github.com/lestrrat-go/jwx/v2 v2.1.7
 	github.com/lib/pq v1.12.3
 	github.com/markbates/goth v1.82.0
 	github.com/minio/minio-go/v7 v7.2.0
@@ -111,7 +111,7 @@ require (
 	github.com/cpuguy83/dockercfg v0.3.2 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.7 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
-	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.0 // indirect
+	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.1 // indirect
 	github.com/distribution/reference v0.6.0 // indirect
 	github.com/docker/docker v28.5.2+incompatible // indirect
 	github.com/docker/go-connections v0.7.0 // indirect
@@ -195,7 +195,7 @@ require (
 	github.com/klauspost/crc32 v1.3.0 // indirect
 	github.com/kylelemons/godebug v1.1.0 // indirect
 	github.com/leodido/go-urn v1.4.0 // indirect
-	github.com/lestrrat-go/blackmagic v1.0.3 // indirect
+	github.com/lestrrat-go/blackmagic v1.0.4 // indirect
 	github.com/lestrrat-go/httpcc v1.0.1 // indirect
 	github.com/lestrrat-go/httprc v1.0.6 // indirect
 	github.com/lestrrat-go/iter v1.0.2 // indirect
@@ -239,7 +239,7 @@ require (
 	github.com/rs/xid v1.6.0 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/ryanuber/go-glob v1.0.0 // indirect
-	github.com/segmentio/asm v1.2.0 // indirect
+	github.com/segmentio/asm v1.2.1 // indirect
 	github.com/shirou/gopsutil/v4 v4.26.3 // indirect
 	github.com/sirupsen/logrus v1.9.4 // indirect
 	github.com/spaolacci/murmur3 v1.1.0 // indirect
