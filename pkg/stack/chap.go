@@ -7,27 +7,27 @@ import (
 )
 
 // Stack representing ../../stacks/chap-db/helmfile.yaml.gotmpl
-var ChapDB = model.Stack{
+var ChapDB = Stack{
 	Name: "chap-db",
-	Parameters: model.StackParameters{
+	Parameters: StackParameters{
 		"DATABASE_SIZE":     {Priority: 1, DisplayName: "Database Size", DefaultValue: &chapDBDefaults.dbSize},
 		"DATABASE_NAME":     {Priority: 2, DisplayName: "Database Name", DefaultValue: &chapDBDefaults.dbName},
 		"DATABASE_PASSWORD": {Priority: 3, DisplayName: "Database Password", DefaultValue: &chapDBDefaults.dbPassword, Sensitive: true},
 		"DATABASE_VERSION":  {Priority: 4, DisplayName: "Database Version", DefaultValue: &chapDBDefaults.dbVersion},
 		"CHART_VERSION":     {Priority: 5, DisplayName: "Chart Version", DefaultValue: &chapDBDefaults.chartVersion},
 	},
-	ParameterProviders: model.ParameterProviders{
+	ParameterProviders: ParameterProviders{
 		"DATABASE_HOSTNAME": chapDBHostnameProvider,
 		"DATABASE_SECRET":   chapDBSecretProvider,
 	},
-	KubernetesResource: model.StatefulSetResource,
+	KubernetesResource: StatefulSetResource,
 }
 
-var chapDBHostnameProvider = model.ParameterProviderFunc(func(instance model.DeploymentInstance) (string, error) {
+var chapDBHostnameProvider = ParameterProviderFunc(func(instance model.DeploymentInstance) (string, error) {
 	return fmt.Sprintf("%s-%d-chap-db-postgres-rw.%s.svc", instance.Name, instance.Group.ID, instance.Group.Namespace), nil
 })
 
-var chapDBSecretProvider = model.ParameterProviderFunc(func(instance model.DeploymentInstance) (string, error) {
+var chapDBSecretProvider = ParameterProviderFunc(func(instance model.DeploymentInstance) (string, error) {
 	return fmt.Sprintf("%s-%d-chap-db-postgres", instance.Name, instance.Group.ID), nil
 })
 
@@ -46,25 +46,25 @@ var chapDBDefaults = struct {
 }
 
 // Stack representing ../../stacks/chap-valkey/helmfile.yaml.gotmpl
-var ChapValkey = model.Stack{
+var ChapValkey = Stack{
 	Name: "chap-valkey",
-	Parameters: model.StackParameters{
+	Parameters: StackParameters{
 		"REDIS_STORAGE_SIZE": {Priority: 1, DisplayName: "Redis Storage Size", DefaultValue: &chapValkeyDefaults.storageSize},
 		"REDIS_PASSWORD":     {Priority: 2, DisplayName: "Redis Password", DefaultValue: &chapValkeyDefaults.password, Sensitive: true},
 		"CHART_VERSION":      {Priority: 3, DisplayName: "Chart Version", DefaultValue: &chapValkeyDefaults.chartVersion},
 	},
-	ParameterProviders: model.ParameterProviders{
+	ParameterProviders: ParameterProviders{
 		"REDIS_HOST":   chapValkeyHostnameProvider,
 		"REDIS_SECRET": chapValkeySecretProvider,
 	},
-	KubernetesResource: model.StatefulSetResource,
+	KubernetesResource: StatefulSetResource,
 }
 
-var chapValkeyHostnameProvider = model.ParameterProviderFunc(func(instance model.DeploymentInstance) (string, error) {
+var chapValkeyHostnameProvider = ParameterProviderFunc(func(instance model.DeploymentInstance) (string, error) {
 	return fmt.Sprintf("%s-%d-chap-valkey.%s.svc", instance.Name, instance.Group.ID, instance.Group.Namespace), nil
 })
 
-var chapValkeySecretProvider = model.ParameterProviderFunc(func(instance model.DeploymentInstance) (string, error) {
+var chapValkeySecretProvider = ParameterProviderFunc(func(instance model.DeploymentInstance) (string, error) {
 	return fmt.Sprintf("%s-%d-chap-valkey-auth", instance.Name, instance.Group.ID), nil
 })
 
@@ -79,9 +79,9 @@ var chapValkeyDefaults = struct {
 }
 
 // Stack representing ../../stacks/chap-worker/helmfile.yaml.gotmpl
-var ChapWorker = model.Stack{
+var ChapWorker = Stack{
 	Name: "chap-worker",
-	Parameters: model.StackParameters{
+	Parameters: StackParameters{
 		"IMAGE_TAG":         {Priority: 1, DisplayName: "Image Tag", DefaultValue: &chapWorkerDefaults.imageTag},
 		"IMAGE_PULL_POLICY": {Priority: 2, DisplayName: "Image Pull Policy", DefaultValue: &chapWorkerDefaults.imagePullPolicy, Validator: imagePullPolicy},
 		"CHART_VERSION":     {Priority: 3, DisplayName: "Chart Version", DefaultValue: &chapWorkerDefaults.chartVersion},
@@ -91,8 +91,8 @@ var ChapWorker = model.Stack{
 		"REDIS_HOST":        {Priority: 0, DisplayName: "Redis Host", Consumed: true},
 		"REDIS_SECRET":      {Priority: 0, DisplayName: "Redis Secret", Consumed: true},
 	},
-	Requires:           []model.Stack{ChapDB, ChapValkey},
-	KubernetesResource: model.DeploymentResource,
+	Requires:           []Stack{ChapDB, ChapValkey},
+	KubernetesResource: DeploymentResource,
 }
 
 var chapWorkerDefaults = struct {
@@ -106,9 +106,9 @@ var chapWorkerDefaults = struct {
 }
 
 // Stack representing ../../stacks/chap-core/helmfile.yaml.gotmpl
-var ChapCore = model.Stack{
+var ChapCore = Stack{
 	Name: "chap-core",
-	Parameters: model.StackParameters{
+	Parameters: StackParameters{
 		"IMAGE_TAG":                          {Priority: 1, DisplayName: "Image Tag", DefaultValue: &chapCoreDefaults.imageTag},
 		"IMAGE_PULL_POLICY":                  {Priority: 2, DisplayName: "Image Pull Policy", DefaultValue: &chapCoreDefaults.imagePullPolicy, Validator: imagePullPolicy},
 		"CHART_VERSION":                      {Priority: 3, DisplayName: "Chart Version", DefaultValue: &chapCoreDefaults.chartVersion},
@@ -122,9 +122,9 @@ var ChapCore = model.Stack{
 		"REDIS_HOST":                         {Priority: 0, DisplayName: "Redis Host", Consumed: true},
 		"REDIS_SECRET":                       {Priority: 0, DisplayName: "Redis Secret", Consumed: true},
 	},
-	Requires:           []model.Stack{ChapDB, ChapValkey},
-	Companions:         []model.Stack{ChapWorker},
-	KubernetesResource: model.DeploymentResource,
+	Requires:           []Stack{ChapDB, ChapValkey},
+	Companions:         []Stack{ChapWorker},
+	KubernetesResource: DeploymentResource,
 }
 
 var chapCoreDefaults = struct {
