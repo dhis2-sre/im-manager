@@ -487,10 +487,8 @@ var IMJobRunner = Stack{
 		"DHIS2_HOSTNAME":          {Priority: 0, DisplayName: "DHIS2 Hostname", DefaultValue: &imJobRunnerDefaults.dhis2Hostname},
 		"CHART_VERSION":           {Priority: 0, DisplayName: "Chart Version", DefaultValue: &imJobRunnerDefaults.chartVersion},
 	},
-	Components: []kube.Component{
-		// The chart labels only pods, so restart is a pod delete.
-		kube.PodComponent{BaseComponent: kube.BaseComponent{Name: "job"}},
-	},
+	// No components: the job-runner is an old jobs experiment that only labels pods, so no
+	// workload is addressable. Jobs get their own design in a separate task.
 }
 
 var imJobRunnerDefaults = struct {

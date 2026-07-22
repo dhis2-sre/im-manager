@@ -9,7 +9,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
-	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
 )
@@ -50,29 +49,6 @@ func TestStatefulSetComponentRestartPatchesStatefulSet(t *testing.T) {
 	got, err := c.Clientset.AppsV1().StatefulSets("ns").Get(context.TODO(), "db", metav1.GetOptions{})
 	require.NoError(t, err)
 	assert.NotEmpty(t, got.Spec.Template.Annotations["kubectl.kubernetes.io/restartedAt"])
-}
-
-func TestPodComponentRestartDeletesMatchingPods(t *testing.T) {
-	instance := componentTestInstance()
-	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "job-abc", Namespace: "ns", Labels: componentLabels("job")}}
-	other := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "unrelated", Namespace: "ns", Labels: map[string]string{"im-id": "1", "im-type": "other"}}}
-	c := &Client{Clientset: fake.NewSimpleClientset(pod, other)}
-
-	component := PodComponent{BaseComponent{Name: "job"}}
-	require.NoError(t, component.Restart(context.Background(), c, instance))
-
-	remaining, err := c.Clientset.CoreV1().Pods("ns").List(context.TODO(), metav1.ListOptions{})
-	require.NoError(t, err)
-	require.Len(t, remaining.Items, 1)
-	assert.Equal(t, "unrelated", remaining.Items[0].Name)
-}
-
-func TestPodComponentRestartNoMatchIsNoOp(t *testing.T) {
-	instance := componentTestInstance()
-	c := &Client{Clientset: fake.NewSimpleClientset()}
-
-	component := PodComponent{BaseComponent{Name: "job"}}
-	require.NoError(t, component.Restart(context.Background(), c, instance))
 }
 
 func TestPVCSelectors(t *testing.T) {

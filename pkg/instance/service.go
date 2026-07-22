@@ -629,6 +629,9 @@ func (s Service) Restart(ctx context.Context, instance *model.DeploymentInstance
 	if err != nil {
 		return err
 	}
+	if len(components) == 0 {
+		return fmt.Errorf("stack %q has no components to restart", instance.StackName)
+	}
 
 	if componentName == "" {
 		var errs error

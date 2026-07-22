@@ -2,7 +2,6 @@ package kube
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"slices"
@@ -84,29 +83,6 @@ func (c *Client) GetPodByLabels(labels map[string]string) (v1.Pod, error) {
 		return v1.Pod{}, fmt.Errorf("error creating label selector: %v", err)
 	}
 	return c.podBySelector(selector.String())
-}
-
-// DeletePods deletes all pods matching the component's selector in the instance's namespace.
-// A chart's controller recreates them; zero matches is a no-op.
-func (c *Client) DeletePods(ctx context.Context, instance *model.DeploymentInstance, componentName string) error {
-	selector, err := labelSelector(instance.ID, componentName)
-	if err != nil {
-		return err
-	}
-
-	pods := c.Clientset.CoreV1().Pods(instance.Group.Namespace)
-	list, err := pods.List(ctx, metav1.ListOptions{LabelSelector: selector})
-	if err != nil {
-		return fmt.Errorf("error finding pods using selector %q: %v", selector, err)
-	}
-
-	var errs error
-	for _, pod := range list.Items {
-		if err := pods.Delete(ctx, pod.Name, metav1.DeleteOptions{}); err != nil {
-			errs = errors.Join(errs, fmt.Errorf("failed to delete pod %q: %v", pod.Name, err))
-		}
-	}
-	return errs
 }
 
 func (c *Client) podBySelector(selector string) (v1.Pod, error) {

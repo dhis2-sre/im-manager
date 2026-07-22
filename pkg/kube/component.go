@@ -56,16 +56,6 @@ func (c StatefulSetComponent) Restart(_ context.Context, client *Client, instanc
 	return client.RestartStatefulSet(instance, c.Name)
 }
 
-// PodComponent restarts charts that label only pods (no workload controller carrying the im
-// labels) by deleting the matching pods; the chart's controller recreates them.
-type PodComponent struct {
-	BaseComponent
-}
-
-func (c PodComponent) Restart(ctx context.Context, client *Client, instance *model.DeploymentInstance) error {
-	return client.DeletePods(ctx, instance, c.Name)
-}
-
 // FindComponent returns the component with the given name, or a not-found error.
 func FindComponent(components []Component, name string) (Component, error) {
 	for _, component := range components {

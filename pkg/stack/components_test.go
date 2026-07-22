@@ -11,9 +11,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// allStacks are the deployable stack definitions; every one must declare its components.
+// allStacks are the deployable stack definitions; every one must declare its components. The
+// job-runner is exempt: it is an old jobs experiment that only labels pods, and jobs get their
+// own design in a separate task.
 var allStacks = []Stack{
-	DHIS2DB, MINIO, DHIS2Core, DHIS2, PgAdmin, WhoamiGo, IMJobRunner,
+	DHIS2DB, MINIO, DHIS2Core, DHIS2, PgAdmin, WhoamiGo,
 	ChapDB, ChapValkey, ChapWorker, ChapCore,
 }
 
@@ -27,6 +29,8 @@ func TestEveryStackHasUniqueNamedComponents(t *testing.T) {
 			seen[c.ComponentName()] = true
 		}
 	}
+
+	assert.Empty(t, IMJobRunner.Components, "im-job-runner deliberately has no components until jobs are redesigned")
 }
 
 // TestComponentNamesMatchHelmfileImType asserts every declared component name is an im-type label
