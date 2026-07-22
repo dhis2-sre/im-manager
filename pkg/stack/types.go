@@ -1,4 +1,6 @@
-package model
+package stack
+
+import "github.com/dhis2-sre/im-manager/pkg/model"
 
 // swagger:model StackDetail
 type Stack struct {
@@ -36,17 +38,17 @@ type ParameterProviders map[string]ParameterProvider
 
 // ParameterProvider provides a value that can be consumed by a stack as a stack parameter.
 type ParameterProvider interface {
-	Provide(instance DeploymentInstance) (value string, err error)
+	Provide(instance model.DeploymentInstance) (value string, err error)
 }
 
-type ParameterProviderFunc func(instance DeploymentInstance) (string, error)
+type ParameterProviderFunc func(instance model.DeploymentInstance) (string, error)
 
-func (p ParameterProviderFunc) Provide(instance DeploymentInstance) (string, error) {
+func (p ParameterProviderFunc) Provide(instance model.DeploymentInstance) (string, error) {
 	return p(instance)
 }
 
-type RequireCompanionFunc func(instance DeploymentInstanceParameter) (*Stack, error)
+type RequireCompanionFunc func(instance model.DeploymentInstanceParameter) (*Stack, error)
 
-func (r RequireCompanionFunc) Require(parameter DeploymentInstanceParameter) (*Stack, error) {
+func (r RequireCompanionFunc) Require(parameter model.DeploymentInstanceParameter) (*Stack, error) {
 	return r(parameter)
 }

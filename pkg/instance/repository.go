@@ -10,6 +10,7 @@ import (
 
 	"github.com/dhis2-sre/im-manager/internal/errdef"
 	"github.com/dhis2-sre/im-manager/pkg/model"
+	"github.com/dhis2-sre/im-manager/pkg/stack"
 	"gorm.io/gorm"
 )
 
@@ -115,7 +116,7 @@ func (r repository) FindDeploymentInstanceById(ctx context.Context, id uint) (*m
 	return instance, nil
 }
 
-func (r repository) DecryptDeploymentInstance(deploymentInstance *model.DeploymentInstance, stack *model.Stack) (*model.DeploymentInstance, error) {
+func (r repository) DecryptDeploymentInstance(deploymentInstance *model.DeploymentInstance, stack *stack.Stack) (*model.DeploymentInstance, error) {
 	err := decryptParameters(r.instanceParameterEncryptionKey, deploymentInstance, stack)
 	if err != nil {
 		return nil, err
@@ -124,7 +125,7 @@ func (r repository) DecryptDeploymentInstance(deploymentInstance *model.Deployme
 	return deploymentInstance, nil
 }
 
-func (r repository) DecryptDeployment(deployment *model.Deployment, stacksByName map[string]*model.Stack) (*model.Deployment, error) {
+func (r repository) DecryptDeployment(deployment *model.Deployment, stacksByName map[string]*stack.Stack) (*model.Deployment, error) {
 	for _, instance := range deployment.Instances {
 		err := decryptParameters(r.instanceParameterEncryptionKey, instance, stacksByName[instance.StackName])
 		if err != nil {
@@ -135,7 +136,7 @@ func (r repository) DecryptDeployment(deployment *model.Deployment, stacksByName
 	return deployment, nil
 }
 
-func (r repository) SaveInstance(ctx context.Context, instance *model.DeploymentInstance, stack *model.Stack) error {
+func (r repository) SaveInstance(ctx context.Context, instance *model.DeploymentInstance, stack *stack.Stack) error {
 	// only use ctx for values (logging) and not cancellation signals on cud operations for now. ctx
 	// cancellation can lead to rollbacks which we should decide individually.
 	ctx = context.WithoutCancel(ctx)
@@ -243,7 +244,7 @@ func (r repository) FindAllDeployments(ctx context.Context) ([]model.Deployment,
 	return deployments, err
 }
 
-func encryptParameters(key string, instance *model.DeploymentInstance, stack *model.Stack) error {
+func encryptParameters(key string, instance *model.DeploymentInstance, stack *stack.Stack) error {
 	for i, parameter := range instance.Parameters {
 		if !stack.Parameters[parameter.ParameterName].Sensitive {
 			continue
@@ -259,7 +260,7 @@ func encryptParameters(key string, instance *model.DeploymentInstance, stack *mo
 	return nil
 }
 
-func decryptParameters(key string, instance *model.DeploymentInstance, stack *model.Stack) error {
+func decryptParameters(key string, instance *model.DeploymentInstance, stack *stack.Stack) error {
 	for i, parameter := range instance.Parameters {
 		if !stack.Parameters[parameter.ParameterName].Sensitive {
 			continue

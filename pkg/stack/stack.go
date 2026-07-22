@@ -19,10 +19,10 @@ import (
 )
 
 // Stacks represents all deployable stacks.
-type Stacks map[string]model.Stack
+type Stacks map[string]Stack
 
 // New creates stacks ensuring consumed parameters are provided by required stacks.
-func New(stacks ...model.Stack) (Stacks, error) {
+func New(stacks ...Stack) (Stacks, error) {
 	_, err := ValidateNoCycles(stacks)
 	if err != nil {
 		return nil, err
@@ -44,8 +44,8 @@ func New(stacks ...model.Stack) (Stacks, error) {
 // graph via the required stacks forming a directed edge from the stack to the required stack.
 // Stacks with cycles would lead to undeployable instances. There would not be an order (no solution
 // to topological sort) in which we could deploy instances in.
-func ValidateNoCycles(stacks []model.Stack) (graph.Graph[string, model.Stack], error) {
-	g := graph.New(func(stack model.Stack) string {
+func ValidateNoCycles(stacks []Stack) (graph.Graph[string, Stack], error) {
+	g := graph.New(func(stack Stack) string {
 		return stack.Name
 	}, graph.Directed(), graph.PreventCycles())
 
@@ -75,7 +75,7 @@ func ValidateNoCycles(stacks []model.Stack) (graph.Graph[string, model.Stack], e
 
 // ValidateConsumedParameters validates all consumed parameters are provided by exactly one of the
 // required stacks. Required stacks need to provide at least one consumed parameter.
-func ValidateConsumedParameters(stacks []model.Stack) error {
+func ValidateConsumedParameters(stacks []Stack) error {
 	var errs []error
 	for _, stack := range stacks { // validate each stacks consumed parameters are provided by its required stacks
 		requiredStacks := make(map[string]int)
@@ -136,11 +136,11 @@ const ifNotPresent = "IfNotPresent"
 const always = "Always"
 
 // Stack representing ../../stacks/dhis2-db/helmfile.yaml.gotmpl
-var DHIS2DB = model.Stack{
+var DHIS2DB = Stack{
 	// TODO: Remove HostnamePattern once stacks 2.0 are the default
 	HostnamePattern: "%s-database-postgresql.%s.svc",
 	Name:            "dhis2-db",
-	Parameters: model.StackParameters{
+	Parameters: StackParameters{
 		"DATABASE_ID":               {Priority: 1, DisplayName: "Database"},
 		"DATABASE_SIZE":             {Priority: 2, DisplayName: "Database Size", DefaultValue: &dhis2DBDefaults.dbSize},
 		"DATABASE_NAME":             {Priority: 3, DisplayName: "Database Name", DefaultValue: &dhis2DBDefaults.dbName},
@@ -151,13 +151,13 @@ var DHIS2DB = model.Stack{
 		"RESOURCES_REQUESTS_MEMORY": {Priority: 8, DisplayName: "Resources Requests Memory", DefaultValue: &dhis2DBDefaults.resourcesRequestsMemory},
 		"CHART_VERSION":             {Priority: 9, DisplayName: "Chart Version", DefaultValue: &dhis2DBDefaults.chartVersion},
 	},
-	ParameterProviders: model.ParameterProviders{
+	ParameterProviders: ParameterProviders{
 		"DATABASE_HOSTNAME": postgresHostnameProvider,
 	},
 }
 
 // Provides the PostgreSQL hostname of an instance.
-var postgresHostnameProvider = model.ParameterProviderFunc(func(instance model.DeploymentInstance) (string, error) {
+var postgresHostnameProvider = ParameterProviderFunc(func(instance model.DeploymentInstance) (string, error) {
 	return fmt.Sprintf("%s-%d-database-postgresql.%s.svc", instance.Name, instance.Group.ID, instance.Group.Namespace), nil
 })
 
@@ -183,26 +183,26 @@ var dhis2DBDefaults = struct {
 }
 
 // Stack representing ../../stacks/minio/helmfile.yaml.gotmpl
-var MINIO = model.Stack{
+var MINIO = Stack{
 	Name: "minio",
-	Parameters: model.StackParameters{
+	Parameters: StackParameters{
 		"MINIO_STORAGE_SIZE":  {Priority: 1, DisplayName: "Storage Size", DefaultValue: &minIODefaults.storageSize},
 		"MINIO_CHART_VERSION": {Priority: 2, DisplayName: "Chart Version", DefaultValue: &minIODefaults.chartVersion},
 		"IMAGE_PULL_POLICY":   {Priority: 3, DisplayName: "Image Pull Policy", DefaultValue: &minIODefaults.imagePullPolicy, Validator: imagePullPolicy},
 		"DATABASE_ID":         {Priority: 0, DisplayName: "Database", Consumed: true},
 	},
-	ParameterProviders: model.ParameterProviders{
+	ParameterProviders: ParameterProviders{
 		"MINIO_HOSTNAME": minioHostnameProvider,
 	},
-	Requires: []model.Stack{DHIS2DB},
+	Requires: []Stack{DHIS2DB},
 }
 
 // Provides the Minio hostname of an instance.
-var minioHostnameProvider = model.ParameterProviderFunc(func(instance model.DeploymentInstance) (string, error) {
+var minioHostnameProvider = ParameterProviderFunc(func(instance model.DeploymentInstance) (string, error) {
 	return fmt.Sprintf("%s-minio.%s.svc", instance.Name, instance.Group.Namespace), nil
 })
 
-var storageCompanionProvider = model.RequireCompanionFunc(func(parameter model.DeploymentInstanceParameter) (*model.Stack, error) {
+var storageCompanionProvider = RequireCompanionFunc(func(parameter model.DeploymentInstanceParameter) (*Stack, error) {
 	if parameter.Value == minIOStorage {
 		return &MINIO, nil
 	}
@@ -220,9 +220,9 @@ var minIODefaults = struct {
 }
 
 // Stack representing ../../stacks/dhis2-core/helmfile.yaml.gotmpl
-var DHIS2Core = model.Stack{
+var DHIS2Core = Stack{
 	Name: "dhis2-core",
-	Parameters: model.StackParameters{
+	Parameters: StackParameters{
 		"IMAGE_TAG":                       {Priority: 1, DisplayName: "Image Tag", DefaultValue: &dhis2CoreDefaults.imageTag},
 		"IMAGE_REPOSITORY":                {Priority: 2, DisplayName: "Image Repository", DefaultValue: &dhis2CoreDefaults.imageRepository},
 		"IMAGE_PULL_POLICY":               {Priority: 3, DisplayName: "Image Pull Policy", DefaultValue: &dhis2CoreDefaults.imagePullPolicy, Validator: imagePullPolicy},
@@ -260,10 +260,10 @@ var DHIS2Core = model.Stack{
 		"DATABASE_PASSWORD":               {Priority: 0, DisplayName: "Database Password", Consumed: true, Sensitive: true},
 		"DATABASE_USERNAME":               {Priority: 0, DisplayName: "Database Username", Consumed: true, Sensitive: true},
 	},
-	Requires: []model.Stack{
+	Requires: []Stack{
 		DHIS2DB,
 	},
-	Companions: []model.Stack{
+	Companions: []Stack{
 		MINIO,
 		ChapCore,
 	},
@@ -338,11 +338,11 @@ var dhis2CoreDefaults = struct {
 }
 
 // Stack representing ../../stacks/dhis2/helmfile.yaml.gotmpl
-var DHIS2 = model.Stack{
+var DHIS2 = Stack{
 	// TODO: Remove HostnamePattern once stacks 2.0 are the default
 	HostnamePattern: "%s-database-postgresql.%s.svc",
 	Name:            "dhis2",
-	Parameters: model.StackParameters{
+	Parameters: StackParameters{
 		"IMAGE_TAG":                       {Priority: 1, DisplayName: "Image Tag", DefaultValue: &dhis2CoreDefaults.imageTag},
 		"IMAGE_REPOSITORY":                {Priority: 2, DisplayName: "Image Repository", DefaultValue: &dhis2CoreDefaults.imageRepository},
 		"IMAGE_PULL_POLICY":               {Priority: 3, DisplayName: "Image Pull Policy", DefaultValue: &dhis2CoreDefaults.imagePullPolicy, Validator: imagePullPolicy},
@@ -374,7 +374,7 @@ var DHIS2 = model.Stack{
 		"GOOGLE_AUTH_CLIENT_EMAIL":        {Priority: 0, DisplayName: "Google auth client email", DefaultValue: &dhis2CoreDefaults.googleAuthClientEmail, Sensitive: true},
 		"GOOGLE_AUTH_CLIENT_ID":           {Priority: 0, DisplayName: "Google auth client id", DefaultValue: &dhis2CoreDefaults.googleAuthClientId, Sensitive: true},
 	},
-	ParameterProviders: model.ParameterProviders{
+	ParameterProviders: ParameterProviders{
 		"DATABASE_HOSTNAME": postgresHostnameProvider,
 	},
 }
@@ -386,9 +386,9 @@ var dhis2Defaults = struct {
 }
 
 // Stack representing ../../stacks/pgadmin/helmfile.yaml.gotmpl
-var PgAdmin = model.Stack{
+var PgAdmin = Stack{
 	Name: "pgadmin",
-	Parameters: model.StackParameters{
+	Parameters: StackParameters{
 		"PGADMIN_USERNAME":  {Priority: 1, DisplayName: "pgAdmin Username", Sensitive: true},
 		"PGADMIN_PASSWORD":  {Priority: 2, DisplayName: "pgAdmin Password", Sensitive: true},
 		"CHART_VERSION":     {Priority: 3, DisplayName: "Chart Version", DefaultValue: &pgAdminDefaults.chartVersion},
@@ -396,7 +396,7 @@ var PgAdmin = model.Stack{
 		"DATABASE_NAME":     {Priority: 0, DisplayName: "Database Name", Consumed: true},
 		"DATABASE_USERNAME": {Priority: 0, DisplayName: "Database Username", Consumed: true, Sensitive: true},
 	},
-	Requires: []model.Stack{
+	Requires: []Stack{
 		DHIS2DB,
 	},
 }
@@ -408,9 +408,9 @@ var pgAdminDefaults = struct {
 }
 
 // Stack representing ../../stacks/whoami-go/helmfile.yaml.gotmpl
-var WhoamiGo = model.Stack{
+var WhoamiGo = Stack{
 	Name: "whoami-go",
-	Parameters: model.StackParameters{
+	Parameters: StackParameters{
 		"IMAGE_TAG":         {Priority: 1, DisplayName: "Image Tag", DefaultValue: &whoamiGoDefaults.imageTag},
 		"IMAGE_REPOSITORY":  {Priority: 2, DisplayName: "Image Repository", DefaultValue: &whoamiGoDefaults.imageRepository},
 		"IMAGE_PULL_POLICY": {Priority: 3, DisplayName: "Image Pull Policy", DefaultValue: &whoamiGoDefaults.imagePullPolicy, Validator: imagePullPolicy},
@@ -434,9 +434,9 @@ var whoamiGoDefaults = struct {
 }
 
 // Stack representing ../../stacks/im-job-runner/helmfile.yaml.gotmpl
-var IMJobRunner = model.Stack{
+var IMJobRunner = Stack{
 	Name: "im-job-runner",
-	Parameters: model.StackParameters{
+	Parameters: StackParameters{
 		"COMMAND":                 {Priority: 0, DisplayName: "Command"},
 		"PAYLOAD":                 {Priority: 0, DisplayName: "Payload", DefaultValue: &imJobRunnerDefaults.payload},
 		"DHIS2_DATABASE_DATABASE": {Priority: 0, DisplayName: "DHIS2 Database Name", DefaultValue: &dhis2DBDefaults.dbName},

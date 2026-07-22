@@ -19,7 +19,7 @@ import (
 func reencryptCFBToGCM() *gormigrate.Migration {
 	const gcmPrefix = "v2:"
 
-	allStacks := []model.Stack{
+	allStacks := []stack.Stack{
 		stack.DHIS2DB,
 		stack.MINIO,
 		stack.DHIS2Core,

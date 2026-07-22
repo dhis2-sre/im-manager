@@ -14,6 +14,7 @@ import (
 
 	"github.com/dhis2-sre/im-manager/pkg/kube"
 	"github.com/dhis2-sre/im-manager/pkg/model"
+	"github.com/dhis2-sre/im-manager/pkg/stack"
 )
 
 //goland:noinspection GoExportedFuncWithUnexportedType
@@ -57,7 +58,7 @@ type helmfileService struct {
 }
 
 type stackService interface {
-	Find(name string) (*model.Stack, error)
+	Find(name string) (*stack.Stack, error)
 }
 
 func (h helmfileService) sync(ctx context.Context, token string, instance *model.DeploymentInstance, group *model.Group, ttl uint, extraEnv map[string]string) (*exec.Cmd, error) {

@@ -591,6 +591,7 @@ definitions:
                 type: array
                 x-go-name: Requires
         type: object
+        x-go-name: StackResponse
         x-go-package: github.com/dhis2-sre/im-manager/pkg/stack
     StackParameter:
         properties:
@@ -614,6 +615,7 @@ definitions:
                 type: boolean
                 x-go-name: Sensitive
         type: object
+        x-go-name: StackParameterResponse
         x-go-package: github.com/dhis2-sre/im-manager/pkg/stack
     UpdateClusterRequest:
         properties:
