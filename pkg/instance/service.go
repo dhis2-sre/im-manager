@@ -22,6 +22,7 @@ import (
 	"github.com/dhis2-sre/im-manager/internal/errdef"
 	"github.com/dominikbraun/graph"
 
+	"github.com/dhis2-sre/im-manager/pkg/kube"
 	"github.com/dhis2-sre/im-manager/pkg/stack"
 
 	"github.com/dhis2-sre/im-manager/pkg/model"
@@ -551,12 +552,22 @@ func (s Service) DestroyInstance(ctx context.Context, instance *model.Deployment
 		return err
 	}
 
-	ks, err := NewKubernetesService(group.Cluster)
+	client, err := kube.NewClient(group.Cluster)
 	if err != nil {
 		return err
 	}
 
-	return ks.DeletePersistentVolumeClaim(instance)
+	components, err := s.stackService.Components(instance.StackName)
+	if err != nil {
+		return err
+	}
+
+	var selectors []string
+	for _, component := range components {
+		selectors = append(selectors, component.PVCSelectors(instance)...)
+	}
+
+	return client.DeletePVCs(ctx, instance.Group.Namespace, selectors)
 }
 
 func deploymentOrder(deployment *model.Deployment, g graph.Graph[string, *model.DeploymentInstance]) ([]*model.DeploymentInstance, error) {
@@ -581,7 +592,7 @@ func (s Service) Pause(ctx context.Context, instance *model.DeploymentInstance) 
 		return err
 	}
 
-	ks, err := NewKubernetesService(group.Cluster)
+	ks, err := kube.NewClient(group.Cluster)
 	if err != nil {
 		return err
 	}
@@ -595,7 +606,7 @@ func (s Service) Resume(ctx context.Context, instance *model.DeploymentInstance)
 		return err
 	}
 
-	ks, err := NewKubernetesService(group.Cluster)
+	ks, err := kube.NewClient(group.Cluster)
 	if err != nil {
 		return err
 	}
@@ -603,34 +614,42 @@ func (s Service) Resume(ctx context.Context, instance *model.DeploymentInstance)
 	return ks.Resume(instance)
 }
 
-func (s Service) Restart(ctx context.Context, instance *model.DeploymentInstance, typeSelector string) error {
+func (s Service) Restart(ctx context.Context, instance *model.DeploymentInstance, componentName string) error {
 	group, err := s.groupService.Find(ctx, instance.GroupName)
 	if err != nil {
 		return err
 	}
 
-	ks, err := NewKubernetesService(group.Cluster)
+	client, err := kube.NewClient(group.Cluster)
 	if err != nil {
 		return err
 	}
 
-	instanceStack, err := s.stackService.Find(instance.StackName)
+	components, err := s.stackService.Components(instance.StackName)
 	if err != nil {
 		return err
 	}
-
-	switch instanceStack.KubernetesResource {
-	case stack.StatefulSetResource:
-		return ks.RestartStatefulSet(instance, typeSelector)
-	case stack.DeploymentResource:
-		return ks.RestartDeployment(instance, typeSelector)
-	default:
-		return fmt.Errorf("kubernetes resource not supported: %s", instanceStack.KubernetesResource)
+	if len(components) == 0 {
+		return fmt.Errorf("stack %q has no components to restart", instance.StackName)
 	}
+
+	if componentName == "" {
+		var errs error
+		for _, component := range components {
+			errs = errors.Join(errs, component.Restart(ctx, client, instance))
+		}
+		return errs
+	}
+
+	component, err := kube.FindComponent(components, componentName)
+	if err != nil {
+		return err
+	}
+	return component.Restart(ctx, client, instance)
 }
 
 func (s Service) Logs(instance *model.DeploymentInstance, group *model.Group, typeSelector string) (io.ReadCloser, error) {
-	ks, err := NewKubernetesService(group.Cluster)
+	ks, err := kube.NewClient(group.Cluster)
 	if err != nil {
 		return nil, err
 	}
@@ -797,7 +816,7 @@ const (
 )
 
 func (s Service) GetStatus(instance *model.DeploymentInstance) (InstanceStatus, error) {
-	ks, err := NewKubernetesService(instance.Group.Cluster)
+	ks, err := kube.NewClient(instance.Group.Cluster)
 	if err != nil {
 		return "", err
 	}
