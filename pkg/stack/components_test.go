@@ -11,36 +11,32 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// expectedStacks is the set of stacks that must have components declared.
-var expectedStacks = []string{
-	"dhis2-db", "minio", "dhis2-core", "dhis2", "pgadmin", "whoami-go",
-	"im-job-runner", "chap-db", "chap-valkey", "chap-worker", "chap-core",
+// allStacks are the deployable stack definitions; every one must declare its components.
+var allStacks = []Stack{
+	DHIS2DB, MINIO, DHIS2Core, DHIS2, PgAdmin, WhoamiGo, IMJobRunner,
+	ChapDB, ChapValkey, ChapWorker, ChapCore,
 }
 
 func TestEveryStackHasUniqueNamedComponents(t *testing.T) {
-	for _, name := range expectedStacks {
-		comps, ok := components[name]
-		require.Truef(t, ok, "stack %q has no components", name)
-		require.NotEmptyf(t, comps, "stack %q has no components", name)
+	for _, s := range allStacks {
+		require.NotEmptyf(t, s.Components, "stack %q has no components", s.Name)
 
 		seen := map[string]bool{}
-		for _, c := range comps {
-			require.Falsef(t, seen[c.ComponentName()], "stack %q has duplicate component %q", name, c.ComponentName())
+		for _, c := range s.Components {
+			require.Falsef(t, seen[c.ComponentName()], "stack %q has duplicate component %q", s.Name, c.ComponentName())
 			seen[c.ComponentName()] = true
 		}
 	}
-
-	assert.Len(t, components, len(expectedStacks), "components registry has an unexpected number of stacks")
 }
 
 // TestComponentNamesMatchHelmfileImType asserts every declared component name is an im-type label
 // applied by the stack's helmfile, so operations never target a label no workload carries.
 func TestComponentNamesMatchHelmfileImType(t *testing.T) {
-	for _, name := range expectedStacks {
-		imTypes := helmfileImTypes(t, name)
-		for _, c := range components[name] {
+	for _, s := range allStacks {
+		imTypes := helmfileImTypes(t, s.Name)
+		for _, c := range s.Components {
 			assert.Containsf(t, imTypes, c.ComponentName(),
-				"stack %q component %q is not an im-type in its helmfile", name, c.ComponentName())
+				"stack %q component %q is not an im-type in its helmfile", s.Name, c.ComponentName())
 		}
 	}
 }
@@ -57,18 +53,18 @@ func TestComponentPVCSelectorParity(t *testing.T) {
 
 	instance := &model.DeploymentInstance{Name: "mydb", Group: &model.Group{ID: 7}}
 
-	for _, name := range expectedStacks {
+	for _, s := range allStacks {
 		var want []string
-		for _, pattern := range oldMap[name] {
+		for _, pattern := range oldMap[s.Name] {
 			want = append(want, replacePlaceholder(pattern, "mydb-7"))
 		}
 
 		var got []string
-		for _, c := range components[name] {
+		for _, c := range s.Components {
 			got = append(got, c.PVCSelectors(instance)...)
 		}
 
-		assert.Equalf(t, want, got, "PVC selector parity mismatch for stack %q", name)
+		assert.Equalf(t, want, got, "PVC selector parity mismatch for stack %q", s.Name)
 	}
 }
 

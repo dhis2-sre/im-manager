@@ -1,6 +1,9 @@
 package stack
 
-import "github.com/dhis2-sre/im-manager/pkg/model"
+import (
+	"github.com/dhis2-sre/im-manager/pkg/kube"
+	"github.com/dhis2-sre/im-manager/pkg/model"
+)
 
 // swagger:model StackDetail
 type Stack struct {
@@ -14,6 +17,9 @@ type Stack struct {
 	Requires []Stack `json:"requires"`
 	// Companions are optional stacks that can be deployed alongside this stack. Certain parameters can require a companion stack.
 	Companions []Stack `json:"companions"`
+	// Components are the addressable parts a deployed instance of this stack consists of. Their
+	// names equal the im-type label values the stack's helmfile applies.
+	Components []kube.Component `json:"-"`
 }
 
 // swagger:model StackDetailParameters

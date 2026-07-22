@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/dhis2-sre/im-manager/pkg/kube"
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	"github.com/dominikbraun/graph"
 	"golang.org/x/exp/slices"
@@ -154,6 +155,12 @@ var DHIS2DB = Stack{
 	ParameterProviders: ParameterProviders{
 		"DATABASE_HOSTNAME": postgresHostnameProvider,
 	},
+	Components: []kube.Component{
+		kube.StatefulSetComponent{BaseComponent: kube.BaseComponent{
+			Name:        "db",
+			PVCPatterns: []string{"app.kubernetes.io/instance=%s-database"},
+		}},
+	},
 }
 
 // Provides the PostgreSQL hostname of an instance.
@@ -195,6 +202,12 @@ var MINIO = Stack{
 		"MINIO_HOSTNAME": minioHostnameProvider,
 	},
 	Requires: []Stack{DHIS2DB},
+	Components: []kube.Component{
+		kube.DeploymentComponent{BaseComponent: kube.BaseComponent{
+			Name:        "minio",
+			PVCPatterns: []string{"app.kubernetes.io/instance=%s-minio"},
+		}},
+	},
 }
 
 // Provides the Minio hostname of an instance.
@@ -266,6 +279,15 @@ var DHIS2Core = Stack{
 	Companions: []Stack{
 		MINIO,
 		ChapCore,
+	},
+	Components: []kube.Component{
+		kube.DeploymentComponent{BaseComponent: kube.BaseComponent{
+			Name: "dhis2",
+			PVCPatterns: []string{
+				"app.kubernetes.io/instance=%s",
+				"app.kubernetes.io/instance=%s-minio",
+			},
+		}},
 	},
 }
 
@@ -377,6 +399,18 @@ var DHIS2 = Stack{
 	ParameterProviders: ParameterProviders{
 		"DATABASE_HOSTNAME": postgresHostnameProvider,
 	},
+	Components: []kube.Component{
+		kube.DeploymentComponent{BaseComponent: kube.BaseComponent{Name: "dhis2"}},
+		kube.StatefulSetComponent{BaseComponent: kube.BaseComponent{
+			Name: "db",
+			PVCPatterns: []string{
+				"app.kubernetes.io/instance=%s-database",
+				// The redis release carries no im labels yet, so it has no component; its PVC
+				// still rides here until redis labels land (roadmap step 4).
+				"app.kubernetes.io/instance=%s-redis",
+			},
+		}},
+	},
 }
 
 var dhis2Defaults = struct {
@@ -399,6 +433,9 @@ var PgAdmin = Stack{
 	Requires: []Stack{
 		DHIS2DB,
 	},
+	Components: []kube.Component{
+		kube.StatefulSetComponent{BaseComponent: kube.BaseComponent{Name: "pgadmin"}},
+	},
 }
 
 var pgAdminDefaults = struct {
@@ -416,6 +453,9 @@ var WhoamiGo = Stack{
 		"IMAGE_PULL_POLICY": {Priority: 3, DisplayName: "Image Pull Policy", DefaultValue: &whoamiGoDefaults.imagePullPolicy, Validator: imagePullPolicy},
 		"REPLICA_COUNT":     {Priority: 4, DisplayName: "Replica Count", DefaultValue: &whoamiGoDefaults.replicaCount},
 		"CHART_VERSION":     {Priority: 5, DisplayName: "Chart Version", DefaultValue: &whoamiGoDefaults.chartVersion},
+	},
+	Components: []kube.Component{
+		kube.DeploymentComponent{BaseComponent: kube.BaseComponent{Name: "whoami"}},
 	},
 }
 
@@ -446,6 +486,10 @@ var IMJobRunner = Stack{
 		"DHIS2_DATABASE_USERNAME": {Priority: 0, DisplayName: "DHIS2 Database Username", DefaultValue: &dhis2DBDefaults.dbUsername, Sensitive: true},
 		"DHIS2_HOSTNAME":          {Priority: 0, DisplayName: "DHIS2 Hostname", DefaultValue: &imJobRunnerDefaults.dhis2Hostname},
 		"CHART_VERSION":           {Priority: 0, DisplayName: "Chart Version", DefaultValue: &imJobRunnerDefaults.chartVersion},
+	},
+	Components: []kube.Component{
+		// The chart labels only pods, so restart is a pod delete.
+		kube.PodComponent{BaseComponent: kube.BaseComponent{Name: "job"}},
 	},
 }
 
