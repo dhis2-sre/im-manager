@@ -30,6 +30,7 @@ import (
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	"github.com/dhis2-sre/im-manager/pkg/stack"
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
@@ -74,7 +75,8 @@ func TestInstanceHandler(t *testing.T) {
 		},
 	}
 	user := &model.User{
-		Email: "user1@dhis2.org",
+		Email:      "user1@dhis2.org",
+		EmailToken: uuid.New(),
 		Groups: []model.Group{
 			*group,
 		},
@@ -83,7 +85,8 @@ func TestInstanceHandler(t *testing.T) {
 	require.NoError(t, err, "failed to save user")
 
 	nonMember := &model.User{
-		Email: "user2@dhis2.org",
+		Email:      "user2@dhis2.org",
+		EmailToken: uuid.New(),
 	}
 	err = db.Create(nonMember).Error
 	require.NoError(t, err, "failed to save non-member user")
