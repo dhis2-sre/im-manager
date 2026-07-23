@@ -19,6 +19,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
 	"github.com/dhis2-sre/im-manager/pkg/cluster"
 	"github.com/dhis2-sre/im-manager/pkg/database"
+	"github.com/dhis2-sre/im-manager/pkg/deployment"
 	"github.com/dhis2-sre/im-manager/pkg/storage"
 
 	"filippo.io/age"
@@ -112,7 +113,7 @@ func TestInstanceHandler(t *testing.T) {
 	require.NoError(t, err, "failed to generate RSA private key")
 	tokenService, err := token.NewService(logger, tokenRepository, privateKey, 100, 60, "secret", 100, 100)
 	require.NoError(t, err, "failed to create token service")
-	instanceService := instance.NewService(logger, instanceRepo, groupService, stackService, helmfileService, nil, "", tokenService)
+	instanceService := instance.NewService(logger, instanceRepo, groupService, stackService, helmfileService, nil, "")
 
 	s3Dir := t.TempDir()
 	s3Bucket := "database-bucket"
@@ -124,8 +125,8 @@ func TestInstanceHandler(t *testing.T) {
 	databaseRepository := database.NewRepository(db)
 	databaseService := database.NewService(logger, s3Bucket, s3Client, groupService, databaseRepository, func(c model.Cluster) (database.PodExecutor, error) {
 		return instance.NewKubernetesService(c)
-	}, noopPublisher{}, noopFilestoreBackuper{})
-	instanceService.SetExternalDownloads(databaseService)
+	}, noopPublisher{})
+	deploymentService := deployment.NewService(logger, instanceService, databaseService, tokenService, noopPublisher{})
 
 	// this is only to allow testing using multiple users without bringing in all our auth stack
 	authenticator := func(c *gin.Context) {
@@ -138,10 +139,10 @@ func TestInstanceHandler(t *testing.T) {
 	}
 	client := inttest.SetupHTTPServer(t, func(engine *gin.Engine) {
 		var twoDayTTL uint = 172800
-		instanceHandler := instance.NewHandler(stackService, groupService, instanceService, twoDayTTL)
+		instanceHandler := instance.NewHandler(stackService, groupService, instanceService, deploymentService, twoDayTTL)
 		instance.Routes(engine, authenticator, instanceHandler)
 
-		databaseHandler := database.NewHandler(logger, databaseService, groupService, instanceService, stackService)
+		databaseHandler := database.NewHandler(logger, databaseService, groupService, instanceService, stackService, deploymentService)
 		database.Routes(engine, authenticator, databaseHandler)
 	})
 
@@ -270,7 +271,7 @@ func TestInstanceHandler(t *testing.T) {
 		require.NoError(t, db.Create(target).Error)
 
 		// The shared instanceService is wired with a nil S3 client; build one with the real client.
-		fsService := instance.NewService(logger, instanceRepo, groupService, stackService, helmfileService, s3Client, s3Bucket, tokenService)
+		fsService := instance.NewService(logger, instanceRepo, groupService, stackService, helmfileService, s3Client, s3Bucket)
 		require.NoError(t, fsService.FilestoreBackup(context.Background(), &coreInstance, target.Name, target))
 
 		content := s3.GetObject(t, s3Bucket, "group-name/fs-backup-target-fs.tar.gz")
@@ -312,7 +313,7 @@ func TestInstanceHandler(t *testing.T) {
 		require.NoError(t, db.Create(target).Error)
 
 		// The shared instanceService is wired with a nil S3 client; build one with the real client.
-		fsService := instance.NewService(logger, instanceRepo, groupService, stackService, helmfileService, s3Client, s3Bucket, tokenService)
+		fsService := instance.NewService(logger, instanceRepo, groupService, stackService, helmfileService, s3Client, s3Bucket)
 		require.NoError(t, fsService.FilestoreBackup(context.Background(), &coreInstance, target.Name, target))
 
 		content := s3.GetObject(t, s3Bucket, "group-name/fsstore-backup-target-fs.tar.gz")
@@ -479,9 +480,3 @@ func (gs groupService) Find(ctx context.Context, name string) (*model.Group, err
 type noopPublisher struct{}
 
 func (noopPublisher) Publish(context.Context, uint, string, string, any) {}
-
-type noopFilestoreBackuper struct{}
-
-func (noopFilestoreBackuper) FilestoreBackup(context.Context, *model.DeploymentInstance, string, *model.Database) error {
-	return nil
-}
