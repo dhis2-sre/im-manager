@@ -74,3 +74,43 @@ func TestDeleteDeploymentPreservesInstanceRecordWhenDestroyFails(t *testing.T) {
 	_, err = instanceRepo.FindDeploymentInstanceById(context.Background(), deployment.Instances[0].ID)
 	require.NoError(t, err, "instance whose destroy failed should keep its DB record")
 }
+
+// An instance that has locked a database must still be deletable: deleting it releases the
+// lock. Otherwise the locks.instance_id FK blocks the delete and the deployment is stuck.
+func TestDeleteDeploymentInstanceReleasesDatabaseLock(t *testing.T) {
+	db := inttest.SetupDB(t)
+
+	group := model.Group{Name: "group-name", Namespace: "group-name", Hostname: "some-host"}
+	user := &model.User{Email: "user@dhis2.org", Groups: []model.Group{group}}
+	require.NoError(t, db.Create(user).Error)
+	group = user.Groups[0]
+
+	instanceRepo, err := NewRepository(db, "01234567890123456789012345678901")
+	require.NoError(t, err)
+
+	deployment := &model.Deployment{
+		Name:      "dep",
+		GroupName: group.Name,
+		UserID:    user.ID,
+		Instances: []*model.DeploymentInstance{
+			{Name: "instance-a", GroupName: group.Name, StackName: "whoami-go"},
+		},
+	}
+	require.NoError(t, instanceRepo.SaveDeployment(context.Background(), deployment))
+	instance := deployment.Instances[0]
+
+	database := &model.Database{Name: "db", GroupName: group.Name, Slug: "db", UserID: user.ID}
+	require.NoError(t, db.Create(database).Error)
+	require.NoError(t, db.Create(&model.Lock{DatabaseID: database.ID, InstanceID: instance.ID, UserID: user.ID}).Error)
+
+	err = instanceRepo.DeleteDeploymentInstance(context.Background(), instance)
+	require.NoError(t, err)
+
+	var locks int64
+	require.NoError(t, db.Model(&model.Lock{}).Where("instance_id = ?", instance.ID).Count(&locks).Error)
+	require.Zero(t, locks, "lock held by the deleted instance should be released")
+
+	var remaining int64
+	require.NoError(t, db.Model(&model.Database{}).Where("id = ?", database.ID).Count(&remaining).Error)
+	require.EqualValues(t, 1, remaining, "releasing the lock must not delete the database itself")
+}
