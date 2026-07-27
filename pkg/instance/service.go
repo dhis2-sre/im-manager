@@ -630,13 +630,15 @@ func (s Service) Restart(ctx context.Context, instance *model.DeploymentInstance
 		return err
 	}
 	if len(components) == 0 {
-		return fmt.Errorf("stack %q has no components to restart", instance.StackName)
+		return errdef.NewBadRequest("stack %q has no components to restart", instance.StackName)
 	}
 
 	if componentName == "" {
 		var errs error
 		for _, component := range components {
-			errs = errors.Join(errs, component.Restart(ctx, client, instance))
+			if err := component.Restart(ctx, client, instance); err != nil {
+				errs = errors.Join(errs, fmt.Errorf("restarting component %q: %w", component.ComponentName(), err))
+			}
 		}
 		return errs
 	}
