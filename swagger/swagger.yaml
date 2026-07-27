@@ -64,6 +64,23 @@ definitions:
                 type: integer
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/kube
+    ComponentStatus:
+        properties:
+            name:
+                type: string
+                x-go-name: Name
+            replicas:
+                items:
+                    $ref: '#/definitions/Replica'
+                type: array
+                x-go-name: Replicas
+            supportedOperations:
+                items:
+                    $ref: '#/definitions/Operation'
+                type: array
+                x-go-name: SupportedOperations
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
     CopyDatabaseRequest:
         properties:
             group:
@@ -484,6 +501,10 @@ definitions:
                 x-go-name: UserID
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/model
+    Operation:
+        title: Operation is the name of an action a component supports, as exposed to API clients.
+        type: string
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/kube
     Parameter:
         properties:
             value:
@@ -520,6 +541,30 @@ definitions:
                 x-go-name: RefreshToken
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/user
+    Replica:
+        description: |-
+            Replica is a live pod backing a component. Replicas are discovered from the cluster on demand
+            and never persisted.
+        properties:
+            createdAt:
+                format: date-time
+                type: string
+                x-go-name: CreatedAt
+            name:
+                type: string
+                x-go-name: Name
+            phase:
+                type: string
+                x-go-name: Phase
+            ready:
+                type: boolean
+                x-go-name: Ready
+            restarts:
+                format: int32
+                type: integer
+                x-go-name: Restarts
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/kube
     Request:
         properties:
             key:
@@ -1880,6 +1925,31 @@ paths:
                 "200":
                     $ref: '#/responses/HealthResponse'
             summary: Health status
+    /instances/{id}/components:
+        get:
+            description: List the components of an instance along with their supported operations and live replicas
+            operationId: instanceComponents
+            parameters:
+                - format: uint64
+                  in: path
+                  name: id
+                  required: true
+                  type: integer
+                  x-go-name: ID
+            responses:
+                "200":
+                    $ref: '#/responses/Components'
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Instance components
     /instances/{id}/details:
         put:
             description: Returns the details of an instance including parameters
@@ -2004,11 +2074,19 @@ paths:
                 - description: |-
                     selector
                     type: string
-                    description: restart a specific deployment labeled with im-type=<selector>
+                    description: restart a specific component labeled with im-type=<selector>
                   in: query
                   name: selector
                   type: string
                   x-go-name: Selector
+                - description: |-
+                    replica
+                    type: string
+                    description: restart a single replica (pod) of the component given by selector
+                  in: query
+                  name: replica
+                  type: string
+                  x-go-name: Replica
             responses:
                 "202":
                     description: ""
@@ -2486,6 +2564,12 @@ responses:
         schema:
             items:
                 $ref: '#/definitions/Cluster'
+            type: array
+    Components:
+        description: ""
+        schema:
+            items:
+                $ref: '#/definitions/ComponentStatus'
             type: array
     CreateExternalDownloadResponse:
         description: ""

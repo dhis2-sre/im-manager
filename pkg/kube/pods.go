@@ -85,6 +85,20 @@ func (c *Client) GetPodByLabels(labels map[string]string) (v1.Pod, error) {
 	return c.podBySelector(selector.String())
 }
 
+// ListPods returns the non-evicted pods matching the selector in the given namespace.
+func (c *Client) ListPods(ctx context.Context, namespace, selector string) ([]v1.Pod, error) {
+	pods, err := c.Clientset.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{LabelSelector: selector})
+	if err != nil {
+		return nil, fmt.Errorf("error listing pods for selector %q: %v", selector, err)
+	}
+
+	pods.Items = slices.DeleteFunc(pods.Items, func(pod v1.Pod) bool {
+		return pod.Status.Phase == v1.PodFailed && pod.Status.Reason == "Evicted"
+	})
+
+	return pods.Items, nil
+}
+
 func (c *Client) podBySelector(selector string) (v1.Pod, error) {
 	listOptions := metav1.ListOptions{
 		LabelSelector: selector,

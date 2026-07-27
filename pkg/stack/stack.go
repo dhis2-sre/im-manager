@@ -287,6 +287,11 @@ var DHIS2Core = Stack{
 				"app.kubernetes.io/instance=%s",
 				"app.kubernetes.io/instance=%s-minio",
 			},
+			// All STORAGE_TYPE backends (minio, filesystem, s3) support filestore backup, so no
+			// predicate; the first parameter-gated capability arrives with CNPG-backed stacks.
+			Capabilities: []kube.Capability{
+				{Operation: kube.OperationFilestoreBackup},
+			},
 		}},
 	},
 }

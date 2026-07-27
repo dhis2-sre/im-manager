@@ -36,6 +36,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -196,6 +197,45 @@ func TestInstanceHandler(t *testing.T) {
 
 		destroyDeployment(t, client, deployment.ID, tokens.AccessToken)
 		k8sClient.AssertPodIsNotRunning(t, deploymentInstance.Group.Namespace, deploymentInstance.Name, 10, deploymentInstance.Group.ID)
+	})
+
+	t.Run("ComponentsAndReplicaRestart", func(t *testing.T) {
+		t.Parallel()
+		deployment := createDeployment(t, client, "components-deployment", tokens.AccessToken)
+		deploymentInstance := createWhoamiInstance(t, client, deployment.ID, tokens.AccessToken)
+
+		deployDeployment(t, client, deployment.ID, tokens.AccessToken)
+		k8sClient.AssertPodIsReady(t, deploymentInstance.Group.Namespace, deploymentInstance.Name, 60, deploymentInstance.Group.ID)
+
+		path := fmt.Sprintf("/instances/%d/components", deploymentInstance.ID)
+		var components []instance.ComponentStatus
+		client.GetJSON(t, path, &components, inttest.WithAuthToken(tokens.AccessToken))
+
+		require.Len(t, components, 1)
+		assert.Equal(t, "whoami", components[0].Name)
+		assert.Equal(t, []kube.Operation{kube.OperationRestart, kube.OperationRestartReplica}, components[0].SupportedOperations)
+		require.Len(t, components[0].Replicas, 1)
+		replica := components[0].Replicas[0]
+		assert.Equal(t, "Running", replica.Phase)
+		assert.True(t, replica.Ready)
+
+		path = fmt.Sprintf("/instances/%d/restart?replica=%s", deploymentInstance.ID, replica.Name)
+		response := client.Do(t, http.MethodPut, path, nil, http.StatusBadRequest, inttest.WithAuthToken(tokens.AccessToken))
+		assert.Contains(t, string(response), "replica requires a component selector")
+
+		path = fmt.Sprintf("/instances/%d/restart?selector=whoami&replica=no-such-pod", deploymentInstance.ID)
+		client.Do(t, http.MethodPut, path, nil, http.StatusNotFound, inttest.WithAuthToken(tokens.AccessToken))
+
+		path = fmt.Sprintf("/instances/%d/restart?selector=whoami&replica=%s", deploymentInstance.ID, replica.Name)
+		client.Do(t, http.MethodPut, path, nil, http.StatusAccepted, inttest.WithAuthToken(tokens.AccessToken))
+
+		require.EventuallyWithT(t, func(c *assert.CollectT) {
+			_, err := k8sClient.Client.CoreV1().Pods(deploymentInstance.Group.Namespace).Get(context.Background(), replica.Name, metav1.GetOptions{})
+			assert.Truef(c, k8serrors.IsNotFound(err), "pod %q should be replaced after replica restart, err: %v", replica.Name, err)
+		}, 60*time.Second, 2*time.Second)
+		k8sClient.AssertPodIsReady(t, deploymentInstance.Group.Namespace, deploymentInstance.Name, 60, deploymentInstance.Group.ID)
+
+		destroyDeployment(t, client, deployment.ID, tokens.AccessToken)
 	})
 
 	t.Run("InstanceWithDetailsDeniedForNonMember", func(t *testing.T) {

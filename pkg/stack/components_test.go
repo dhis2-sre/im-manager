@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"testing"
 
+	"github.com/dhis2-sre/im-manager/pkg/kube"
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -31,6 +32,19 @@ func TestEveryStackHasUniqueNamedComponents(t *testing.T) {
 	}
 
 	assert.Empty(t, IMJobRunner.Components, "im-job-runner deliberately has no components until jobs are redesigned")
+}
+
+// TestDHIS2CoreAdvertisesFilestoreBackup asserts the capability listing: the dhis2-core component
+// supports filestore backup for every storage backend, while other stacks only expose the base
+// operations.
+func TestDHIS2CoreAdvertisesFilestoreBackup(t *testing.T) {
+	core, err := kube.FindComponent(DHIS2Core.Components, "dhis2")
+	require.NoError(t, err)
+	assert.Contains(t, core.SupportedOperations(nil), kube.OperationFilestoreBackup)
+
+	whoami, err := kube.FindComponent(WhoamiGo.Components, "whoami")
+	require.NoError(t, err)
+	assert.Equal(t, []kube.Operation{kube.OperationRestart, kube.OperationRestartReplica}, whoami.SupportedOperations(nil))
 }
 
 // TestComponentNamesMatchHelmfileImType asserts every declared component name is an im-type label

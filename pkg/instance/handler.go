@@ -642,13 +642,75 @@ func (h Handler) Restart(c *gin.Context) {
 	}
 
 	selector := c.Query("selector")
-	err = h.instanceService.Restart(ctx, instance, selector)
+	replica := c.Query("replica")
+	if replica != "" && selector == "" {
+		_ = c.Error(errdef.NewBadRequest("replica requires a component selector"))
+		return
+	}
+
+	err = h.instanceService.Restart(ctx, instance, selector, replica)
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
 
 	c.Status(http.StatusAccepted)
+}
+
+// Components instance components
+func (h Handler) Components(c *gin.Context) {
+	// swagger:route GET /instances/{id}/components instanceComponents
+	//
+	// Instance components
+	//
+	// List the components of an instance along with their supported operations and live replicas
+	//
+	// Security:
+	//	oauth2:
+	//
+	// responses:
+	//	200: Components
+	//	401: Error
+	//	403: Error
+	//	404: Error
+	//	415: Error
+	id, ok := handler.GetPathParameter(c, "id")
+	if !ok {
+		return
+	}
+
+	ctx := c.Request.Context()
+	user, err := handler.GetUserFromContext(ctx)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	instance, err := h.instanceService.FindDecryptedDeploymentInstanceById(ctx, id)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	deployment, err := h.instanceService.FindDeploymentById(ctx, instance.DeploymentID)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	canRead := handler.CanReadDeployment(user, deployment)
+	if !canRead {
+		_ = c.Error(errdef.NewUnauthorized("read access denied"))
+		return
+	}
+
+	components, err := h.instanceService.Components(ctx, instance)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	c.JSON(http.StatusOK, components)
 }
 
 // DeleteDeploymentInstance delete deployment instance by id
