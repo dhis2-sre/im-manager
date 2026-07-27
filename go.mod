@@ -8,7 +8,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/config v1.32.31
 	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.22.35
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.106.0
-	github.com/aws/smithy-go v1.27.4
+	github.com/aws/smithy-go v1.27.5
 	github.com/dominikbraun/graph v0.23.0
 	github.com/getsops/sops/v3 v3.13.3
 	github.com/gin-contrib/cors v1.7.7
@@ -16,7 +16,7 @@ require (
 	github.com/gin-gonic/gin v1.12.0
 	github.com/go-gormigrate/gormigrate/v2 v2.1.6
 	github.com/go-mail/mail v2.3.1+incompatible
-	github.com/go-openapi/runtime v0.32.6
+	github.com/go-openapi/runtime v0.33.0
 	github.com/go-playground/validator/v10 v10.30.3
 	github.com/go-redis/redis v6.15.9+incompatible
 	github.com/google/uuid v1.6.0
