@@ -9,7 +9,6 @@ import (
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
@@ -27,30 +26,13 @@ func componentLabels(componentName string) map[string]string {
 	return map[string]string{"im-id": "1", "im-type": componentName}
 }
 
-func TestDeploymentComponentRestartPatchesDeployment(t *testing.T) {
-	instance := componentTestInstance()
-	dep := &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: "core", Namespace: "ns", Labels: componentLabels("dhis2")}}
-	c := &Client{Clientset: fake.NewSimpleClientset(dep)}
-
-	component := DeploymentComponent{BaseComponent{Name: "dhis2"}}
-	require.NoError(t, component.Restart(context.Background(), c, instance))
-
-	got, err := c.Clientset.AppsV1().Deployments("ns").Get(context.TODO(), "core", metav1.GetOptions{})
-	require.NoError(t, err)
-	assert.NotEmpty(t, got.Spec.Template.Annotations["kubectl.kubernetes.io/restartedAt"])
+// testComponent is a minimal concrete Component; the real technology-named types live in pkg/stack.
+type testComponent struct {
+	BaseComponent
 }
 
-func TestStatefulSetComponentRestartPatchesStatefulSet(t *testing.T) {
-	instance := componentTestInstance()
-	set := &appsv1.StatefulSet{ObjectMeta: metav1.ObjectMeta{Name: "db", Namespace: "ns", Labels: componentLabels("db")}}
-	c := &Client{Clientset: fake.NewSimpleClientset(set)}
-
-	component := StatefulSetComponent{BaseComponent{Name: "db"}}
-	require.NoError(t, component.Restart(context.Background(), c, instance))
-
-	got, err := c.Clientset.AppsV1().StatefulSets("ns").Get(context.TODO(), "db", metav1.GetOptions{})
-	require.NoError(t, err)
-	assert.NotEmpty(t, got.Spec.Template.Annotations["kubectl.kubernetes.io/restartedAt"])
+func (c testComponent) Restart(context.Context, *Client, *model.DeploymentInstance) error {
+	return nil
 }
 
 func TestPVCSelectors(t *testing.T) {
@@ -160,8 +142,8 @@ func TestRestartReplicaMissingPod(t *testing.T) {
 
 func TestFindComponent(t *testing.T) {
 	components := []Component{
-		DeploymentComponent{BaseComponent{Name: "dhis2"}},
-		StatefulSetComponent{BaseComponent{Name: "db"}},
+		testComponent{BaseComponent{Name: "dhis2"}},
+		testComponent{BaseComponent{Name: "db"}},
 	}
 
 	found, err := FindComponent(components, "db")

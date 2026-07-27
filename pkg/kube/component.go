@@ -43,8 +43,8 @@ type Replica struct {
 }
 
 // Component is a single addressable part of a deployed stack (e.g. dhis2 core, its database).
-// Components are static stack metadata; pkg/stack owns the registry mapping each stack to its
-// components. Each concrete type knows how to restart its own underlying Kubernetes resource.
+// Components are static stack metadata; pkg/stack defines the concrete types, each named for the
+// chart/technology it operates on and implementing Restart against its own Kubernetes resource.
 type Component interface {
 	ComponentName() string
 	Restart(ctx context.Context, client *Client, instance *model.DeploymentInstance) error
@@ -150,24 +150,6 @@ func (b BaseComponent) PVCSelectors(instance *model.DeploymentInstance) []string
 		selectors[i] = fmt.Sprintf(pattern, uniqueName)
 	}
 	return selectors
-}
-
-// DeploymentComponent restarts a workload backed by a Deployment.
-type DeploymentComponent struct {
-	BaseComponent
-}
-
-func (c DeploymentComponent) Restart(_ context.Context, client *Client, instance *model.DeploymentInstance) error {
-	return client.RestartDeployment(instance, c.Name)
-}
-
-// StatefulSetComponent restarts a workload backed by a StatefulSet.
-type StatefulSetComponent struct {
-	BaseComponent
-}
-
-func (c StatefulSetComponent) Restart(_ context.Context, client *Client, instance *model.DeploymentInstance) error {
-	return client.RestartStatefulSet(instance, c.Name)
 }
 
 // FindComponent returns the component with the given name, or a not-found error.

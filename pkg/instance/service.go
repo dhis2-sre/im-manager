@@ -597,7 +597,7 @@ func (s Service) Pause(ctx context.Context, instance *model.DeploymentInstance) 
 		return err
 	}
 
-	return ks.Pause(instance)
+	return ks.Pause(ctx, instance)
 }
 
 func (s Service) Resume(ctx context.Context, instance *model.DeploymentInstance) error {
@@ -611,7 +611,7 @@ func (s Service) Resume(ctx context.Context, instance *model.DeploymentInstance)
 		return err
 	}
 
-	return ks.Resume(instance)
+	return ks.Resume(ctx, instance)
 }
 
 func (s Service) Restart(ctx context.Context, instance *model.DeploymentInstance, componentName, podName string) error {

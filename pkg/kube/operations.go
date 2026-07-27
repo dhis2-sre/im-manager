@@ -12,7 +12,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
-func (c *Client) RestartStatefulSet(instance *model.DeploymentInstance, componentName string) error {
+func (c *Client) RestartStatefulSet(ctx context.Context, instance *model.DeploymentInstance, componentName string) error {
 	selector, err := labelSelector(instance.ID, componentName)
 	if err != nil {
 		return err
@@ -22,7 +22,7 @@ func (c *Client) RestartStatefulSet(instance *model.DeploymentInstance, componen
 	}
 
 	statefulSets := c.Clientset.AppsV1().StatefulSets(instance.Group.Namespace)
-	statefulSetsList, err := statefulSets.List(context.TODO(), listOptions)
+	statefulSetsList, err := statefulSets.List(ctx, listOptions)
 	if err != nil {
 		return err
 	}
@@ -37,7 +37,7 @@ func (c *Client) RestartStatefulSet(instance *model.DeploymentInstance, componen
 
 	statefulSet := statefulSetsItems[0]
 	data := fmt.Sprintf(`{"spec": {"template": {"metadata": {"annotations": {"kubectl.kubernetes.io/restartedAt": "%s"}}}}}`, time.Now().Format(time.RFC3339))
-	_, err = statefulSets.Patch(context.TODO(), statefulSet.Name, types.StrategicMergePatchType, []byte(data), metav1.PatchOptions{})
+	_, err = statefulSets.Patch(ctx, statefulSet.Name, types.StrategicMergePatchType, []byte(data), metav1.PatchOptions{})
 	if err != nil {
 		return fmt.Errorf("error restarting %q: %v", statefulSet.Name, err)
 	}
@@ -45,7 +45,7 @@ func (c *Client) RestartStatefulSet(instance *model.DeploymentInstance, componen
 	return nil
 }
 
-func (c *Client) RestartDeployment(instance *model.DeploymentInstance, componentName string) error {
+func (c *Client) RestartDeployment(ctx context.Context, instance *model.DeploymentInstance, componentName string) error {
 	selector, err := labelSelector(instance.ID, componentName)
 	if err != nil {
 		return err
@@ -55,7 +55,7 @@ func (c *Client) RestartDeployment(instance *model.DeploymentInstance, component
 	}
 
 	deployments := c.Clientset.AppsV1().Deployments(instance.Group.Namespace)
-	deploymentList, err := deployments.List(context.TODO(), listOptions)
+	deploymentList, err := deployments.List(ctx, listOptions)
 	if err != nil {
 		return err
 	}
@@ -70,7 +70,7 @@ func (c *Client) RestartDeployment(instance *model.DeploymentInstance, component
 
 	deployment := deploymentItems[0]
 	data := fmt.Sprintf(`{"spec": {"template": {"metadata": {"annotations": {"kubectl.kubernetes.io/restartedAt": "%s"}}}}}`, time.Now().Format(time.RFC3339))
-	_, err = deployments.Patch(context.TODO(), deployment.Name, types.StrategicMergePatchType, []byte(data), metav1.PatchOptions{})
+	_, err = deployments.Patch(ctx, deployment.Name, types.StrategicMergePatchType, []byte(data), metav1.PatchOptions{})
 	if err != nil {
 		return fmt.Errorf("error restarting %q: %v", deployment.Name, err)
 	}
@@ -78,8 +78,8 @@ func (c *Client) RestartDeployment(instance *model.DeploymentInstance, component
 	return nil
 }
 
-func (c *Client) Pause(instance *model.DeploymentInstance) error {
-	err := c.scale(instance, 0)
+func (c *Client) Pause(ctx context.Context, instance *model.DeploymentInstance) error {
+	err := c.scale(ctx, instance, 0)
 	if err != nil {
 		return fmt.Errorf("failed to pause instance %d: %v", instance.ID, err)
 	}
@@ -87,8 +87,8 @@ func (c *Client) Pause(instance *model.DeploymentInstance) error {
 	return nil
 }
 
-func (c *Client) Resume(instance *model.DeploymentInstance) error {
-	err := c.scale(instance, 1)
+func (c *Client) Resume(ctx context.Context, instance *model.DeploymentInstance) error {
+	err := c.scale(ctx, instance, 1)
 	if err != nil {
 		return fmt.Errorf("failed to resume instance %d: %v", instance.ID, err)
 	}
@@ -124,31 +124,31 @@ func (c *Client) DeletePVCs(ctx context.Context, namespace string, selectors []s
 	return nil
 }
 
-func (c *Client) scale(instance *model.DeploymentInstance, replicas int32) error {
+func (c *Client) scale(ctx context.Context, instance *model.DeploymentInstance, replicas int32) error {
 	labelSelector := fmt.Sprintf("im-id=%d", instance.ID)
 	listOptions := metav1.ListOptions{LabelSelector: labelSelector}
 
 	deployments := c.Clientset.AppsV1().Deployments(instance.Group.Namespace)
-	deploymentList, err := deployments.List(context.TODO(), listOptions)
+	deploymentList, err := deployments.List(ctx, listOptions)
 	if err != nil {
 		return fmt.Errorf("error finding deployments using selector %q: %v", labelSelector, err)
 	}
 
 	for _, d := range deploymentList.Items {
-		_, err = scale(deployments, d.Name, replicas)
+		_, err = scale(ctx, deployments, d.Name, replicas)
 		if err != nil {
 			return err
 		}
 	}
 
 	sets := c.Clientset.AppsV1().StatefulSets(instance.Group.Namespace)
-	setsList, err := sets.List(context.TODO(), listOptions)
+	setsList, err := sets.List(ctx, listOptions)
 	if err != nil {
 		return fmt.Errorf("error finding StatefulSets using selector %q: %v", labelSelector, err)
 	}
 
 	for _, s := range setsList.Items {
-		_, err = scale(sets, s.Name, replicas)
+		_, err = scale(ctx, sets, s.Name, replicas)
 		if err != nil {
 			return err
 		}
@@ -166,8 +166,8 @@ type scaler interface {
 
 // scale updates the number of replicas on a scaler. The desired number of replicas before scaling
 // was updated is returned.
-func scale(sc scaler, name string, replicas int32) (int32, error) {
-	scale, err := sc.GetScale(context.TODO(), name, metav1.GetOptions{})
+func scale(ctx context.Context, sc scaler, name string, replicas int32) (int32, error) {
+	scale, err := sc.GetScale(ctx, name, metav1.GetOptions{})
 	if err != nil {
 		return 0, fmt.Errorf("failed to get scale of %q: %v", name, err)
 	}
@@ -175,7 +175,7 @@ func scale(sc scaler, name string, replicas int32) (int32, error) {
 	prevReplicas := scale.Spec.Replicas
 	scale.Spec.Replicas = replicas
 
-	_, err = sc.UpdateScale(context.TODO(), name, scale, metav1.UpdateOptions{})
+	_, err = sc.UpdateScale(ctx, name, scale, metav1.UpdateOptions{})
 	if err != nil {
 		return 0, fmt.Errorf("failed to update scale of %q to %d: %v", name, replicas, err)
 	}

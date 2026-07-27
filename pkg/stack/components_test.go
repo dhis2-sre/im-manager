@@ -1,6 +1,8 @@
 package stack
 
 import (
+	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -10,6 +12,9 @@ import (
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	appsv1 "k8s.io/api/apps/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes/fake"
 )
 
 // allStacks are the deployable stack definitions; every one must declare its components. The
@@ -32,6 +37,56 @@ func TestEveryStackHasUniqueNamedComponents(t *testing.T) {
 	}
 
 	assert.Empty(t, IMJobRunner.Components, "im-job-runner deliberately has no components until jobs are redesigned")
+}
+
+// TestComponentRestartTargetsExpectedWorkload asserts each technology component patches the
+// Kubernetes workload kind its chart actually deploys.
+func TestComponentRestartTargetsExpectedWorkload(t *testing.T) {
+	instance := &model.DeploymentInstance{ID: 1, Name: "myinstance", Group: &model.Group{ID: 7, Namespace: "ns"}}
+
+	tests := []struct {
+		component   kube.Component
+		statefulSet bool
+	}{
+		{DHIS2CoreComponent{kube.BaseComponent{Name: "dhis2"}}, false},
+		{BitnamiPostgresComponent{kube.BaseComponent{Name: "db"}}, true},
+		{CNPGPostgresComponent{kube.BaseComponent{Name: "chap-db"}}, true},
+		{MinioComponent{kube.BaseComponent{Name: "minio"}}, false},
+		{PgAdminComponent{kube.BaseComponent{Name: "pgadmin"}}, true},
+		{WhoamiComponent{kube.BaseComponent{Name: "whoami"}}, false},
+		{ValkeyComponent{kube.BaseComponent{Name: "chap-valkey"}}, true},
+		{ChapWorkerComponent{kube.BaseComponent{Name: "chap-worker"}}, false},
+		{ChapCoreComponent{kube.BaseComponent{Name: "chap-core"}}, false},
+	}
+
+	for _, test := range tests {
+		name := test.component.ComponentName()
+		t.Run(fmt.Sprintf("%T", test.component), func(t *testing.T) {
+			labels := map[string]string{"im-id": "1", "im-type": name}
+			meta := metav1.ObjectMeta{Name: name, Namespace: "ns", Labels: labels}
+
+			var client *kube.Client
+			if test.statefulSet {
+				client = &kube.Client{Clientset: fake.NewSimpleClientset(&appsv1.StatefulSet{ObjectMeta: meta})}
+			} else {
+				client = &kube.Client{Clientset: fake.NewSimpleClientset(&appsv1.Deployment{ObjectMeta: meta})}
+			}
+
+			require.NoError(t, test.component.Restart(context.Background(), client, instance))
+
+			var annotations map[string]string
+			if test.statefulSet {
+				got, err := client.Clientset.AppsV1().StatefulSets("ns").Get(context.TODO(), name, metav1.GetOptions{})
+				require.NoError(t, err)
+				annotations = got.Spec.Template.Annotations
+			} else {
+				got, err := client.Clientset.AppsV1().Deployments("ns").Get(context.TODO(), name, metav1.GetOptions{})
+				require.NoError(t, err)
+				annotations = got.Spec.Template.Annotations
+			}
+			assert.NotEmpty(t, annotations["kubectl.kubernetes.io/restartedAt"])
+		})
+	}
 }
 
 // TestDHIS2CoreAdvertisesFilestoreBackup asserts the capability listing: the dhis2-core component

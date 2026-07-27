@@ -22,7 +22,7 @@ var ChapDB = Stack{
 		"DATABASE_SECRET":   chapDBSecretProvider,
 	},
 	Components: []kube.Component{
-		kube.StatefulSetComponent{BaseComponent: kube.BaseComponent{Name: "chap-db"}},
+		CNPGPostgresComponent{BaseComponent: kube.BaseComponent{Name: "chap-db"}},
 	},
 }
 
@@ -61,7 +61,7 @@ var ChapValkey = Stack{
 		"REDIS_SECRET": chapValkeySecretProvider,
 	},
 	Components: []kube.Component{
-		kube.StatefulSetComponent{BaseComponent: kube.BaseComponent{Name: "chap-valkey"}},
+		ValkeyComponent{BaseComponent: kube.BaseComponent{Name: "chap-valkey"}},
 	},
 }
 
@@ -98,7 +98,7 @@ var ChapWorker = Stack{
 	},
 	Requires: []Stack{ChapDB, ChapValkey},
 	Components: []kube.Component{
-		kube.DeploymentComponent{BaseComponent: kube.BaseComponent{Name: "chap-worker"}},
+		ChapWorkerComponent{BaseComponent: kube.BaseComponent{Name: "chap-worker"}},
 	},
 }
 
@@ -132,7 +132,7 @@ var ChapCore = Stack{
 	Requires:   []Stack{ChapDB, ChapValkey},
 	Companions: []Stack{ChapWorker},
 	Components: []kube.Component{
-		kube.DeploymentComponent{BaseComponent: kube.BaseComponent{Name: "chap-core"}},
+		ChapCoreComponent{BaseComponent: kube.BaseComponent{Name: "chap-core"}},
 	},
 }
 
