@@ -3,6 +3,7 @@ package stack
 import (
 	"fmt"
 
+	"github.com/dhis2-sre/im-manager/pkg/kube"
 	"github.com/dhis2-sre/im-manager/pkg/model"
 )
 
@@ -20,7 +21,9 @@ var ChapDB = Stack{
 		"DATABASE_HOSTNAME": chapDBHostnameProvider,
 		"DATABASE_SECRET":   chapDBSecretProvider,
 	},
-	KubernetesResource: StatefulSetResource,
+	Components: []kube.Component{
+		kube.StatefulSetComponent{BaseComponent: kube.BaseComponent{Name: "chap-db"}},
+	},
 }
 
 var chapDBHostnameProvider = ParameterProviderFunc(func(instance model.DeploymentInstance) (string, error) {
@@ -57,7 +60,9 @@ var ChapValkey = Stack{
 		"REDIS_HOST":   chapValkeyHostnameProvider,
 		"REDIS_SECRET": chapValkeySecretProvider,
 	},
-	KubernetesResource: StatefulSetResource,
+	Components: []kube.Component{
+		kube.StatefulSetComponent{BaseComponent: kube.BaseComponent{Name: "chap-valkey"}},
+	},
 }
 
 var chapValkeyHostnameProvider = ParameterProviderFunc(func(instance model.DeploymentInstance) (string, error) {
@@ -91,8 +96,10 @@ var ChapWorker = Stack{
 		"REDIS_HOST":        {Priority: 0, DisplayName: "Redis Host", Consumed: true},
 		"REDIS_SECRET":      {Priority: 0, DisplayName: "Redis Secret", Consumed: true},
 	},
-	Requires:           []Stack{ChapDB, ChapValkey},
-	KubernetesResource: DeploymentResource,
+	Requires: []Stack{ChapDB, ChapValkey},
+	Components: []kube.Component{
+		kube.DeploymentComponent{BaseComponent: kube.BaseComponent{Name: "chap-worker"}},
+	},
 }
 
 var chapWorkerDefaults = struct {
@@ -122,9 +129,11 @@ var ChapCore = Stack{
 		"REDIS_HOST":                         {Priority: 0, DisplayName: "Redis Host", Consumed: true},
 		"REDIS_SECRET":                       {Priority: 0, DisplayName: "Redis Secret", Consumed: true},
 	},
-	Requires:           []Stack{ChapDB, ChapValkey},
-	Companions:         []Stack{ChapWorker},
-	KubernetesResource: DeploymentResource,
+	Requires:   []Stack{ChapDB, ChapValkey},
+	Companions: []Stack{ChapWorker},
+	Components: []kube.Component{
+		kube.DeploymentComponent{BaseComponent: kube.BaseComponent{Name: "chap-core"}},
+	},
 }
 
 var chapCoreDefaults = struct {

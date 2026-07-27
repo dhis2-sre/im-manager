@@ -28,6 +28,7 @@ import (
 
 	"github.com/dhis2-sre/im-manager/pkg/instance"
 	"github.com/dhis2-sre/im-manager/pkg/inttest"
+	"github.com/dhis2-sre/im-manager/pkg/kube"
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	"github.com/dhis2-sre/im-manager/pkg/stack"
 	"github.com/gin-gonic/gin"
@@ -111,7 +112,10 @@ func TestInstanceHandler(t *testing.T) {
 	tokenRepository := token.NewRepository(redis)
 	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	require.NoError(t, err, "failed to generate RSA private key")
-	tokenService, err := token.NewService(logger, tokenRepository, privateKey, 100, 60, "secret", 100, 100)
+	// The access token must outlive the whole suite: it is minted once up front and the deploy
+	// paths refresh it, which fails with "exp" not satisfied once it expires. Slow CI runners
+	// blew through the previous 100 seconds.
+	tokenService, err := token.NewService(logger, tokenRepository, privateKey, 3600, 60, "secret", 3600, 3600)
 	require.NoError(t, err, "failed to create token service")
 	instanceService := instance.NewService(logger, instanceRepo, groupService, stackService, helmfileService, nil, "")
 
@@ -124,7 +128,7 @@ func TestInstanceHandler(t *testing.T) {
 	s3Client := storage.NewS3Client(logger, s3.Client, uploader)
 	databaseRepository := database.NewRepository(db)
 	databaseService := database.NewService(logger, s3Bucket, s3Client, groupService, databaseRepository, func(c model.Cluster) (database.PodExecutor, error) {
-		return instance.NewKubernetesService(c)
+		return kube.NewClient(c)
 	}, noopPublisher{})
 	deploymentService := deployment.NewService(logger, instanceService, databaseService, tokenService, noopPublisher{})
 
@@ -258,7 +262,7 @@ func TestInstanceHandler(t *testing.T) {
 		k8sClient.AssertPodIsReady(t, coreInstance.Group.Namespace, groupedName+"-minio", 120)
 
 		// seed an object into the minio bucket via exec
-		ks, err := instance.NewKubernetesService(group.Cluster)
+		ks, err := kube.NewClient(group.Cluster)
 		require.NoError(t, err)
 		minioPod := minioPodName(t, k8sClient, coreInstance.Group.Namespace, deployment.ID)
 		// create the bucket; the stack creates it asynchronously and we'd otherwise race it
@@ -306,7 +310,7 @@ func TestInstanceHandler(t *testing.T) {
 		deployDeployment(t, client, deployment.ID, tokens.AccessToken)
 
 		// the backup execs into the core pod, so wait for Running, not Ready
-		ks, err := instance.NewKubernetesService(group.Cluster)
+		ks, err := kube.NewClient(group.Cluster)
 		require.NoError(t, err)
 		corePod, coreContainer := waitForCorePodRunning(t, k8sClient, coreInstance.Group.Namespace, coreInstance.ID, 120*time.Second)
 		seedScript := `mkdir -p /opt/dhis2/files/seeded && printf 'hello-filestore' > /opt/dhis2/files/seeded/marker.txt`

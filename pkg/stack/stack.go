@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/dhis2-sre/im-manager/pkg/kube"
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	"github.com/dominikbraun/graph"
 	"golang.org/x/exp/slices"
@@ -154,7 +155,12 @@ var DHIS2DB = Stack{
 	ParameterProviders: ParameterProviders{
 		"DATABASE_HOSTNAME": postgresHostnameProvider,
 	},
-	KubernetesResource: StatefulSetResource,
+	Components: []kube.Component{
+		kube.StatefulSetComponent{BaseComponent: kube.BaseComponent{
+			Name:        "db",
+			PVCPatterns: []string{"app.kubernetes.io/instance=%s-database"},
+		}},
+	},
 }
 
 // Provides the PostgreSQL hostname of an instance.
@@ -195,8 +201,13 @@ var MINIO = Stack{
 	ParameterProviders: ParameterProviders{
 		"MINIO_HOSTNAME": minioHostnameProvider,
 	},
-	Requires:           []Stack{DHIS2DB},
-	KubernetesResource: DeploymentResource,
+	Requires: []Stack{DHIS2DB},
+	Components: []kube.Component{
+		kube.DeploymentComponent{BaseComponent: kube.BaseComponent{
+			Name:        "minio",
+			PVCPatterns: []string{"app.kubernetes.io/instance=%s-minio"},
+		}},
+	},
 }
 
 // Provides the Minio hostname of an instance.
@@ -269,7 +280,15 @@ var DHIS2Core = Stack{
 		MINIO,
 		ChapCore,
 	},
-	KubernetesResource: DeploymentResource,
+	Components: []kube.Component{
+		kube.DeploymentComponent{BaseComponent: kube.BaseComponent{
+			Name: "dhis2",
+			PVCPatterns: []string{
+				"app.kubernetes.io/instance=%s",
+				"app.kubernetes.io/instance=%s-minio",
+			},
+		}},
+	},
 }
 
 var dhis2CoreDefaults = struct {
@@ -380,6 +399,18 @@ var DHIS2 = Stack{
 	ParameterProviders: ParameterProviders{
 		"DATABASE_HOSTNAME": postgresHostnameProvider,
 	},
+	Components: []kube.Component{
+		kube.DeploymentComponent{BaseComponent: kube.BaseComponent{Name: "dhis2"}},
+		kube.StatefulSetComponent{BaseComponent: kube.BaseComponent{
+			Name: "db",
+			PVCPatterns: []string{
+				"app.kubernetes.io/instance=%s-database",
+				// The redis release carries no im labels yet, so it has no component; its PVC
+				// still rides here until redis labels land (roadmap step 4).
+				"app.kubernetes.io/instance=%s-redis",
+			},
+		}},
+	},
 }
 
 var dhis2Defaults = struct {
@@ -402,7 +433,9 @@ var PgAdmin = Stack{
 	Requires: []Stack{
 		DHIS2DB,
 	},
-	KubernetesResource: StatefulSetResource,
+	Components: []kube.Component{
+		kube.StatefulSetComponent{BaseComponent: kube.BaseComponent{Name: "pgadmin"}},
+	},
 }
 
 var pgAdminDefaults = struct {
@@ -421,7 +454,9 @@ var WhoamiGo = Stack{
 		"REPLICA_COUNT":     {Priority: 4, DisplayName: "Replica Count", DefaultValue: &whoamiGoDefaults.replicaCount},
 		"CHART_VERSION":     {Priority: 5, DisplayName: "Chart Version", DefaultValue: &whoamiGoDefaults.chartVersion},
 	},
-	KubernetesResource: DeploymentResource,
+	Components: []kube.Component{
+		kube.DeploymentComponent{BaseComponent: kube.BaseComponent{Name: "whoami"}},
+	},
 }
 
 var whoamiGoDefaults = struct {
@@ -452,6 +487,8 @@ var IMJobRunner = Stack{
 		"DHIS2_HOSTNAME":          {Priority: 0, DisplayName: "DHIS2 Hostname", DefaultValue: &imJobRunnerDefaults.dhis2Hostname},
 		"CHART_VERSION":           {Priority: 0, DisplayName: "Chart Version", DefaultValue: &imJobRunnerDefaults.chartVersion},
 	},
+	// No components: the job-runner is an old jobs experiment that only labels pods, so no
+	// workload is addressable. Jobs get their own design in a separate task.
 }
 
 var imJobRunnerDefaults = struct {

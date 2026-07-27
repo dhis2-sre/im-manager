@@ -96,26 +96,14 @@ func (c *Client) Resume(instance *model.DeploymentInstance) error {
 	return nil
 }
 
-func (c *Client) DeletePersistentVolumeClaim(instance *model.DeploymentInstance) error {
-	// TODO: This should be stack metadata
-	labelMap := map[string][]string{
-		"dhis2":      {"app.kubernetes.io/instance=%s-database", "app.kubernetes.io/instance=%s-redis"},
-		"dhis2-core": {"app.kubernetes.io/instance=%s", "app.kubernetes.io/instance=%s-minio"},
-		"dhis2-db":   {"app.kubernetes.io/instance=%s-database"},
-		"minio":      {"app.kubernetes.io/instance=%s-minio"},
-	}
+// DeletePVCs deletes the persistent volume claims matching each label selector in the given
+// namespace. Selectors are pre-formatted by the caller (a component's PVCSelectors).
+func (c *Client) DeletePVCs(ctx context.Context, namespace string, selectors []string) error {
+	pvcs := c.Clientset.CoreV1().PersistentVolumeClaims(namespace)
 
-	labelPatterns := labelMap[instance.StackName]
-	if labelPatterns == nil {
-		return nil
-	}
-
-	pvcs := c.Clientset.CoreV1().PersistentVolumeClaims(instance.Group.Namespace)
-
-	for _, pattern := range labelPatterns {
-		selector := fmt.Sprintf(pattern, fmt.Sprintf("%s-%d", instance.Name, instance.Group.ID))
+	for _, selector := range selectors {
 		listOptions := metav1.ListOptions{LabelSelector: selector}
-		list, err := pvcs.List(context.TODO(), listOptions)
+		list, err := pvcs.List(ctx, listOptions)
 		if err != nil {
 			return fmt.Errorf("error finding pvcs using selector %q: %v", selector, err)
 		}
@@ -126,7 +114,7 @@ func (c *Client) DeletePersistentVolumeClaim(instance *model.DeploymentInstance)
 
 		if len(list.Items) == 1 {
 			name := list.Items[0].Name
-			err := pvcs.Delete(context.TODO(), name, metav1.DeleteOptions{})
+			err := pvcs.Delete(ctx, name, metav1.DeleteOptions{})
 			if err != nil {
 				return fmt.Errorf("failed to delete pvc: %v", err)
 			}
