@@ -643,11 +643,6 @@ func (h Handler) Restart(c *gin.Context) {
 
 	selector := c.Query("selector")
 	replica := c.Query("replica")
-	if replica != "" && selector == "" {
-		_ = c.Error(errdef.NewBadRequest("replica requires a component selector"))
-		return
-	}
-
 	err = h.instanceService.Restart(ctx, instance, selector, replica)
 	if err != nil {
 		_ = c.Error(err)
@@ -686,7 +681,7 @@ func (h Handler) Components(c *gin.Context) {
 		return
 	}
 
-	instance, err := h.instanceService.FindDecryptedDeploymentInstanceById(ctx, id)
+	instance, err := h.instanceService.FindDeploymentInstanceById(ctx, id)
 	if err != nil {
 		_ = c.Error(err)
 		return

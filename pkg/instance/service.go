@@ -615,6 +615,10 @@ func (s Service) Resume(ctx context.Context, instance *model.DeploymentInstance)
 }
 
 func (s Service) Restart(ctx context.Context, instance *model.DeploymentInstance, componentName, podName string) error {
+	if podName != "" && componentName == "" {
+		return errdef.NewBadRequest("restarting a replica requires a component selector")
+	}
+
 	group, err := s.groupService.Find(ctx, instance.GroupName)
 	if err != nil {
 		return err
@@ -634,9 +638,6 @@ func (s Service) Restart(ctx context.Context, instance *model.DeploymentInstance
 	}
 
 	if componentName == "" {
-		if podName != "" {
-			return errdef.NewBadRequest("restarting a replica requires a component selector")
-		}
 		var errs error
 		for _, component := range components {
 			if err := component.Restart(ctx, client, instance); err != nil {
@@ -663,7 +664,8 @@ type ComponentStatus struct {
 }
 
 // Components lists the instance's components with their supported operations and live replicas.
-// The instance must be decrypted since capability predicates evaluate real parameter values.
+// Parameters are decrypted here since capability predicates evaluate real parameter values, so
+// callers pass the instance as stored.
 func (s Service) Components(ctx context.Context, instance *model.DeploymentInstance) ([]ComponentStatus, error) {
 	group, err := s.groupService.Find(ctx, instance.GroupName)
 	if err != nil {
@@ -675,11 +677,17 @@ func (s Service) Components(ctx context.Context, instance *model.DeploymentInsta
 		return nil, err
 	}
 
-	components, err := s.stackService.Components(instance.StackName)
+	stack, err := s.stackService.Find(instance.StackName)
 	if err != nil {
 		return nil, err
 	}
 
+	instance, err = s.instanceRepository.DecryptDeploymentInstance(instance, stack)
+	if err != nil {
+		return nil, err
+	}
+
+	components := stack.Components
 	statuses := make([]ComponentStatus, len(components))
 	for i, component := range components {
 		replicas, err := component.Replicas(ctx, client, instance)
