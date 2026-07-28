@@ -156,7 +156,7 @@ var DHIS2DB = Stack{
 		"DATABASE_HOSTNAME": postgresHostnameProvider,
 	},
 	Components: []kube.Component{
-		kube.StatefulSetComponent{BaseComponent: kube.BaseComponent{
+		BitnamiPostgresComponent{BaseComponent: kube.BaseComponent{
 			Name:        "db",
 			PVCPatterns: []string{"app.kubernetes.io/instance=%s-database"},
 		}},
@@ -203,7 +203,7 @@ var MINIO = Stack{
 	},
 	Requires: []Stack{DHIS2DB},
 	Components: []kube.Component{
-		kube.DeploymentComponent{BaseComponent: kube.BaseComponent{
+		MinioComponent{BaseComponent: kube.BaseComponent{
 			Name:        "minio",
 			PVCPatterns: []string{"app.kubernetes.io/instance=%s-minio"},
 		}},
@@ -281,11 +281,16 @@ var DHIS2Core = Stack{
 		ChapCore,
 	},
 	Components: []kube.Component{
-		kube.DeploymentComponent{BaseComponent: kube.BaseComponent{
+		DHIS2CoreComponent{BaseComponent: kube.BaseComponent{
 			Name: "dhis2",
 			PVCPatterns: []string{
 				"app.kubernetes.io/instance=%s",
 				"app.kubernetes.io/instance=%s-minio",
+			},
+			// All STORAGE_TYPE backends (minio, filesystem, s3) support filestore backup, so no
+			// predicate; the first parameter-gated capability arrives with CNPG-backed stacks.
+			Capabilities: []kube.Capability{
+				{Operation: kube.OperationFilestoreBackup},
 			},
 		}},
 	},
@@ -400,8 +405,8 @@ var DHIS2 = Stack{
 		"DATABASE_HOSTNAME": postgresHostnameProvider,
 	},
 	Components: []kube.Component{
-		kube.DeploymentComponent{BaseComponent: kube.BaseComponent{Name: "dhis2"}},
-		kube.StatefulSetComponent{BaseComponent: kube.BaseComponent{
+		DHIS2CoreComponent{BaseComponent: kube.BaseComponent{Name: "dhis2"}},
+		BitnamiPostgresComponent{BaseComponent: kube.BaseComponent{
 			Name: "db",
 			PVCPatterns: []string{
 				"app.kubernetes.io/instance=%s-database",
@@ -434,7 +439,7 @@ var PgAdmin = Stack{
 		DHIS2DB,
 	},
 	Components: []kube.Component{
-		kube.StatefulSetComponent{BaseComponent: kube.BaseComponent{Name: "pgadmin"}},
+		PgAdminComponent{BaseComponent: kube.BaseComponent{Name: "pgadmin"}},
 	},
 }
 
@@ -455,7 +460,7 @@ var WhoamiGo = Stack{
 		"CHART_VERSION":     {Priority: 5, DisplayName: "Chart Version", DefaultValue: &whoamiGoDefaults.chartVersion},
 	},
 	Components: []kube.Component{
-		kube.DeploymentComponent{BaseComponent: kube.BaseComponent{Name: "whoami"}},
+		WhoamiComponent{BaseComponent: kube.BaseComponent{Name: "whoami"}},
 	},
 }
 

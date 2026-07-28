@@ -597,7 +597,7 @@ func (s Service) Pause(ctx context.Context, instance *model.DeploymentInstance) 
 		return err
 	}
 
-	return ks.Pause(instance)
+	return ks.Pause(ctx, instance)
 }
 
 func (s Service) Resume(ctx context.Context, instance *model.DeploymentInstance) error {
@@ -611,10 +611,14 @@ func (s Service) Resume(ctx context.Context, instance *model.DeploymentInstance)
 		return err
 	}
 
-	return ks.Resume(instance)
+	return ks.Resume(ctx, instance)
 }
 
-func (s Service) Restart(ctx context.Context, instance *model.DeploymentInstance, componentName string) error {
+func (s Service) Restart(ctx context.Context, instance *model.DeploymentInstance, componentName, podName string) error {
+	if podName != "" && componentName == "" {
+		return errdef.NewBadRequest("restarting a replica requires a component selector")
+	}
+
 	group, err := s.groupService.Find(ctx, instance.GroupName)
 	if err != nil {
 		return err
@@ -647,7 +651,56 @@ func (s Service) Restart(ctx context.Context, instance *model.DeploymentInstance
 	if err != nil {
 		return err
 	}
+	if podName != "" {
+		return component.RestartReplica(ctx, client, instance, podName)
+	}
 	return component.Restart(ctx, client, instance)
+}
+
+type ComponentStatus struct {
+	Name                string           `json:"name"`
+	SupportedOperations []kube.Operation `json:"supportedOperations"`
+	Replicas            []kube.Replica   `json:"replicas"`
+}
+
+// Components lists the instance's components with their supported operations and live replicas.
+// Parameters are decrypted here since capability predicates evaluate real parameter values, so
+// callers pass the instance as stored.
+func (s Service) Components(ctx context.Context, instance *model.DeploymentInstance) ([]ComponentStatus, error) {
+	group, err := s.groupService.Find(ctx, instance.GroupName)
+	if err != nil {
+		return nil, err
+	}
+
+	client, err := kube.NewClient(group.Cluster)
+	if err != nil {
+		return nil, err
+	}
+
+	stack, err := s.stackService.Find(instance.StackName)
+	if err != nil {
+		return nil, err
+	}
+
+	instance, err = s.instanceRepository.DecryptDeploymentInstance(instance, stack)
+	if err != nil {
+		return nil, err
+	}
+
+	components := stack.Components
+	statuses := make([]ComponentStatus, len(components))
+	for i, component := range components {
+		replicas, err := component.Replicas(ctx, client, instance)
+		if err != nil {
+			return nil, fmt.Errorf("listing replicas of component %q: %w", component.ComponentName(), err)
+		}
+		statuses[i] = ComponentStatus{
+			Name:                component.ComponentName(),
+			SupportedOperations: component.SupportedOperations(instance.Parameters),
+			Replicas:            replicas,
+		}
+	}
+	return statuses, nil
 }
 
 func (s Service) Logs(instance *model.DeploymentInstance, group *model.Group, typeSelector string) (io.ReadCloser, error) {
