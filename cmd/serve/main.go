@@ -521,6 +521,7 @@ func newStackService() (stack.Service, error) {
 		stack.MINIO,
 		stack.DHIS2Core,
 		stack.DHIS2,
+		stack.DHIS2V2,
 		stack.PgAdmin,
 		stack.WhoamiGo,
 		stack.IMJobRunner,

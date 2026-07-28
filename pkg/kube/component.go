@@ -47,6 +47,7 @@ type Replica struct {
 // chart/technology it operates on and implementing Restart against its own Kubernetes resource.
 type Component interface {
 	ComponentName() string
+	Present(params model.DeploymentInstanceParameters) bool
 	Restart(ctx context.Context, client *Client, instance *model.DeploymentInstance) error
 	RestartReplica(ctx context.Context, client *Client, instance *model.DeploymentInstance, podName string) error
 	Replicas(ctx context.Context, client *Client, instance *model.DeploymentInstance) ([]Replica, error)
@@ -60,10 +61,30 @@ type BaseComponent struct {
 	Name         string
 	PVCPatterns  []string
 	Capabilities []Capability
+	// When gates the component's presence on the instance's decrypted parameters; nil means the
+	// component is always present (e.g. a minio component only exists when STORAGE_TYPE is minio,
+	// mirroring the chart's own enable condition).
+	When CapabilityPredicate
 }
 
 func (b BaseComponent) ComponentName() string {
 	return b.Name
+}
+
+// Present reports whether this component exists for an instance with the given decrypted parameters.
+func (b BaseComponent) Present(params model.DeploymentInstanceParameters) bool {
+	return b.When == nil || b.When(params)
+}
+
+// PresentComponents returns the components present for an instance with the given decrypted parameters.
+func PresentComponents(components []Component, params model.DeploymentInstanceParameters) []Component {
+	present := make([]Component, 0, len(components))
+	for _, component := range components {
+		if component.Present(params) {
+			present = append(present, component)
+		}
+	}
+	return present
 }
 
 // SupportedOperations returns the base operations every component supports plus the capabilities

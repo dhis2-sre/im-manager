@@ -87,6 +87,24 @@ func TestSupportedOperations(t *testing.T) {
 		component.SupportedOperations(minioParams))
 }
 
+func TestPresentComponents(t *testing.T) {
+	always := testComponent{BaseComponent{Name: "always"}}
+	whenMinio := testComponent{BaseComponent{Name: "minio", When: func(params model.DeploymentInstanceParameters) bool {
+		return params["STORAGE_TYPE"].Value == "minio"
+	}}}
+	components := []Component{always, whenMinio}
+
+	assert.True(t, always.Present(nil))
+
+	minioParams := model.DeploymentInstanceParameters{"STORAGE_TYPE": {Value: "minio"}}
+	assert.Len(t, PresentComponents(components, minioParams), 2)
+
+	s3Params := model.DeploymentInstanceParameters{"STORAGE_TYPE": {Value: "s3"}}
+	present := PresentComponents(components, s3Params)
+	require.Len(t, present, 1)
+	assert.Equal(t, "always", present[0].ComponentName())
+}
+
 func TestReplicas(t *testing.T) {
 	instance := componentTestInstance()
 	pod := componentTestPod("core-1", "dhis2")

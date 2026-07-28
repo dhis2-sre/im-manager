@@ -41,6 +41,7 @@ func TestStackDefinitionsAreInSyncWithHelmfile(t *testing.T) {
 		"dhis2-db":      DHIS2DB.Parameters,
 		"dhis2-core":    DHIS2Core.Parameters,
 		"dhis2":         DHIS2.Parameters,
+		"dhis2-v2":      DHIS2V2.Parameters,
 		"minio":         MINIO.Parameters,
 		"pgadmin":       PgAdmin.Parameters,
 		"whoami-go":     WhoamiGo.Parameters,
