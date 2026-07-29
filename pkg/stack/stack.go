@@ -505,7 +505,7 @@ var DHIS2V2 = Stack{
 var dhis2V2Defaults = struct {
 	chartVersion string
 }{
-	chartVersion: "0.1.0",
+	chartVersion: "1.0.0",
 }
 
 // The minio component only exists when the file store lives in the bundled MinIO, mirroring the
