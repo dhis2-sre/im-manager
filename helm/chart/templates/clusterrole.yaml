@@ -67,3 +67,17 @@ rules:
       - create
       - delete
       - patch
+# CloudNativePG clusters deployed by the dhis2-v2 stack. Custom resources are not covered by the
+# namespace-scoped admin grants that handle native resources in group namespaces.
+  - apiGroups:
+      - postgresql.cnpg.io
+    resources:
+      - clusters
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+      - update
+      - patch
+      - delete
