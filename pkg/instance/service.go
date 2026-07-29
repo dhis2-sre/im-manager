@@ -562,6 +562,8 @@ func (s Service) DestroyInstance(ctx context.Context, instance *model.Deployment
 		return err
 	}
 
+	// Deliberately not filtered by presence: PVC deletion skips selectors matching nothing, and a
+	// storage type changed between deploys must not leave the previous component's volumes behind.
 	var selectors []string
 	for _, component := range components {
 		selectors = append(selectors, component.PVCSelectors(instance)...)
@@ -629,10 +631,17 @@ func (s Service) Restart(ctx context.Context, instance *model.DeploymentInstance
 		return err
 	}
 
-	components, err := s.stackService.Components(instance.StackName)
+	stack, err := s.stackService.Find(instance.StackName)
 	if err != nil {
 		return err
 	}
+
+	instance, err = s.instanceRepository.DecryptDeploymentInstance(instance, stack)
+	if err != nil {
+		return err
+	}
+
+	components := kube.PresentComponents(stack.Components, instance.Parameters)
 	if len(components) == 0 {
 		return errdef.NewBadRequest("stack %q has no components to restart", instance.StackName)
 	}
@@ -687,7 +696,7 @@ func (s Service) Components(ctx context.Context, instance *model.DeploymentInsta
 		return nil, err
 	}
 
-	components := stack.Components
+	components := kube.PresentComponents(stack.Components, instance.Parameters)
 	statuses := make([]ComponentStatus, len(components))
 	for i, component := range components {
 		replicas, err := component.Replicas(ctx, client, instance)

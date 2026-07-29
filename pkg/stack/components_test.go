@@ -20,10 +20,16 @@ import (
 // allStacks are the deployable stack definitions; every one must declare its components. The
 // job-runner is exempt: it is an old jobs experiment that only labels pods, and jobs get their
 // own design in a separate task.
-var allStacks = []Stack{
-	DHIS2DB, MINIO, DHIS2Core, DHIS2, PgAdmin, WhoamiGo,
-	ChapDB, ChapValkey, ChapWorker, ChapCore,
-}
+var allStacks = func() []Stack {
+	var stacks []Stack
+	for _, s := range All {
+		if s.Name == IMJobRunner.Name {
+			continue
+		}
+		stacks = append(stacks, s)
+	}
+	return stacks
+}()
 
 func TestEveryStackHasUniqueNamedComponents(t *testing.T) {
 	for _, s := range allStacks {
@@ -89,6 +95,27 @@ func TestComponentRestartTargetsExpectedWorkload(t *testing.T) {
 	}
 }
 
+// TestDHIS2V2MinioComponentPresence asserts the minio component only exists when the file store
+// lives in the bundled MinIO, mirroring the chart's minio.enabled condition.
+func TestDHIS2V2MinioComponentPresence(t *testing.T) {
+	names := func(params model.DeploymentInstanceParameters) []string {
+		var names []string
+		for _, c := range kube.PresentComponents(DHIS2V2.Components, params) {
+			names = append(names, c.ComponentName())
+		}
+		return names
+	}
+
+	minioParams := model.DeploymentInstanceParameters{"STORAGE_TYPE": {Value: "minio"}}
+	assert.Equal(t, []string{"dhis2", "db", "minio"}, names(minioParams))
+
+	filesystemParams := model.DeploymentInstanceParameters{"STORAGE_TYPE": {Value: "filesystem"}}
+	assert.Equal(t, []string{"dhis2", "db"}, names(filesystemParams))
+
+	s3Params := model.DeploymentInstanceParameters{"STORAGE_TYPE": {Value: "s3"}}
+	assert.Equal(t, []string{"dhis2", "db"}, names(s3Params))
+}
+
 // TestDHIS2CoreAdvertisesFilestoreBackup asserts the capability listing: the dhis2-core component
 // supports filestore backup for every storage backend, while other stacks only expose the base
 // operations.
@@ -122,6 +149,13 @@ func TestComponentPVCSelectorParity(t *testing.T) {
 		"dhis2-core": {"app.kubernetes.io/instance=%s", "app.kubernetes.io/instance=%s-minio"},
 		"dhis2-db":   {"app.kubernetes.io/instance=%s-database"},
 		"minio":      {"app.kubernetes.io/instance=%s-minio"},
+		// dhis2-v2 postdates the hardcoded map; the release's own PVCs share its instance label so
+		// selectors are qualified by chart name, and the CNPG cluster labels its volumes itself.
+		"dhis2-v2": {
+			"app.kubernetes.io/instance=%s,app.kubernetes.io/name=dhis2",
+			"cnpg.io/cluster=%s-dhis2-postgresql",
+			"app.kubernetes.io/instance=%s,app.kubernetes.io/name=minio",
+		},
 	}
 
 	instance := &model.DeploymentInstance{Name: "mydb", Group: &model.Group{ID: 7}}
