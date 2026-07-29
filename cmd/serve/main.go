@@ -516,20 +516,7 @@ func getPrivateKey(ctx context.Context, logger *slog.Logger) (*rsa.PrivateKey, e
 }
 
 func newStackService() (stack.Service, error) {
-	stacks, err := stack.New(
-		stack.DHIS2DB,
-		stack.MINIO,
-		stack.DHIS2Core,
-		stack.DHIS2,
-		stack.DHIS2V2,
-		stack.PgAdmin,
-		stack.WhoamiGo,
-		stack.IMJobRunner,
-		stack.ChapDB,
-		stack.ChapValkey,
-		stack.ChapWorker,
-		stack.ChapCore,
-	)
+	stacks, err := stack.New(stack.All...)
 	if err != nil {
 		return stack.Service{}, fmt.Errorf("error in stack config: %v", err)
 	}

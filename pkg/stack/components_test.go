@@ -20,10 +20,16 @@ import (
 // allStacks are the deployable stack definitions; every one must declare its components. The
 // job-runner is exempt: it is an old jobs experiment that only labels pods, and jobs get their
 // own design in a separate task.
-var allStacks = []Stack{
-	DHIS2DB, MINIO, DHIS2Core, DHIS2, DHIS2V2, PgAdmin, WhoamiGo,
-	ChapDB, ChapValkey, ChapWorker, ChapCore,
-}
+var allStacks = func() []Stack {
+	var stacks []Stack
+	for _, s := range All {
+		if s.Name == IMJobRunner.Name {
+			continue
+		}
+		stacks = append(stacks, s)
+	}
+	return stacks
+}()
 
 func TestEveryStackHasUniqueNamedComponents(t *testing.T) {
 	for _, s := range allStacks {

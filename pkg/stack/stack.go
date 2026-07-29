@@ -22,6 +22,23 @@ import (
 // Stacks represents all deployable stacks.
 type Stacks map[string]Stack
 
+// All lists every stack the service serves. main.go registers exactly this list and the tests
+// derive their expectations from it, so a new stack is added here and nowhere else.
+var All = []Stack{
+	DHIS2DB,
+	MINIO,
+	DHIS2Core,
+	DHIS2,
+	DHIS2V2,
+	PgAdmin,
+	WhoamiGo,
+	IMJobRunner,
+	ChapDB,
+	ChapValkey,
+	ChapWorker,
+	ChapCore,
+}
+
 // New creates stacks ensuring consumed parameters are provided by required stacks.
 func New(stacks ...Stack) (Stacks, error) {
 	_, err := ValidateNoCycles(stacks)
