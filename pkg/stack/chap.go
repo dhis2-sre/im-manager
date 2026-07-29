@@ -22,7 +22,7 @@ var ChapDB = Stack{
 		"DATABASE_SECRET":   chapDBSecretProvider,
 	},
 	Components: []kube.Component{
-		CNPGPostgresComponent{BaseComponent: kube.BaseComponent{Name: "chap-db"}},
+		CNPGPostgresComponent{BaseComponent: kube.BaseComponent{Name: "chap-db"}, ClusterPattern: "%s-chap-db-postgres"},
 	},
 }
 

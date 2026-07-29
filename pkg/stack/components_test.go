@@ -14,6 +14,10 @@ import (
 	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	dynamicfake "k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/kubernetes/fake"
 )
 
@@ -56,7 +60,8 @@ func TestComponentRestartTargetsExpectedWorkload(t *testing.T) {
 	}{
 		{DHIS2CoreComponent{kube.BaseComponent{Name: "dhis2"}}, false},
 		{BitnamiPostgresComponent{kube.BaseComponent{Name: "db"}}, true},
-		{CNPGPostgresComponent{kube.BaseComponent{Name: "chap-db"}}, true},
+		// CNPGPostgresComponent is absent: its restart patches the Cluster custom resource, covered
+		// by TestCNPGComponentRestartPatchesCluster.
 		{MinioComponent{kube.BaseComponent{Name: "minio"}}, false},
 		{PgAdminComponent{kube.BaseComponent{Name: "pgadmin"}}, true},
 		{WhoamiComponent{kube.BaseComponent{Name: "whoami"}}, false},
@@ -93,6 +98,28 @@ func TestComponentRestartTargetsExpectedWorkload(t *testing.T) {
 			assert.NotEmpty(t, annotations["kubectl.kubernetes.io/restartedAt"])
 		})
 	}
+}
+
+// TestCNPGComponentRestartPatchesCluster asserts the CNPG component restarts through the Cluster
+// custom resource, named by the cluster pattern, rather than touching the operator's pods.
+func TestCNPGComponentRestartPatchesCluster(t *testing.T) {
+	instance := &model.DeploymentInstance{ID: 1, Name: "myinstance", Group: &model.Group{ID: 7, Namespace: "ns"}}
+	gvr := schema.GroupVersionResource{Group: "postgresql.cnpg.io", Version: "v1", Resource: "clusters"}
+	cluster := &unstructured.Unstructured{Object: map[string]any{
+		"apiVersion": "postgresql.cnpg.io/v1",
+		"kind":       "Cluster",
+		"metadata":   map[string]any{"name": "myinstance-7-dhis2-postgresql", "namespace": "ns"},
+	}}
+	scheme := runtime.NewScheme()
+	client := &kube.Client{Dynamic: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(scheme, map[schema.GroupVersionResource]string{gvr: "ClusterList"}, cluster)}
+
+	component := CNPGPostgresComponent{BaseComponent: kube.BaseComponent{Name: "db"}, ClusterPattern: "%s-dhis2-postgresql"}
+	require.NoError(t, component.Restart(context.Background(), client, instance))
+
+	got, err := client.Dynamic.Resource(gvr).Namespace("ns").Get(context.Background(), "myinstance-7-dhis2-postgresql", metav1.GetOptions{})
+	require.NoError(t, err)
+	annotations := got.GetAnnotations()
+	assert.NotEmpty(t, annotations["kubectl.kubernetes.io/restartedAt"])
 }
 
 // TestDHIS2V2MinioComponentPresence asserts the minio component only exists when the file store
