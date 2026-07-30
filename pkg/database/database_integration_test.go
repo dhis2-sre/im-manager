@@ -294,6 +294,12 @@ func TestDatabaseHandler(t *testing.T) {
 		client.PostJSON(t, "/databases/"+databaseID+"/lock", body, &model.Lock{})
 		// Attempt delete but expect a bad request response
 		client.Do(t, http.MethodDelete, "/databases/"+databaseID, nil, http.StatusBadRequest, inttest.WithAuthToken("sometoken"))
+		// The rejected delete must not have removed the underlying S3 object
+		_, err = s3.Client.GetObject(context.TODO(), &awss3.GetObjectInput{
+			Bucket: aws.String(s3Bucket),
+			Key:    aws.String("packages/path/rename.extension"),
+		})
+		require.NoErrorf(t, err, "delete of a locked database must not delete its S3 object")
 		// Unlock database
 		client.Delete(t, "/databases/"+databaseID+"/lock")
 
@@ -306,7 +312,7 @@ func TestDatabaseHandler(t *testing.T) {
 
 		_, err = s3.Client.GetObject(context.TODO(), &awss3.GetObjectInput{
 			Bucket: aws.String(s3Bucket),
-			Key:    aws.String("packages/path/name.extension"),
+			Key:    aws.String("packages/path/rename.extension"),
 		})
 		var e *types.NoSuchKey
 		require.ErrorAsf(t, err, &e, "DELETE \"/databases/%s\" failed: DB should be deleted from S3", databaseID)

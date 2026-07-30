@@ -242,6 +242,10 @@ func (s Service) Delete(ctx context.Context, id uint) error {
 		return err
 	}
 
+	if d.Lock != nil {
+		return errdef.NewBadRequest("database is locked")
+	}
+
 	u, err := url.Parse(d.Url)
 	if err != nil {
 		return err

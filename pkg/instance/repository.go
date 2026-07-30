@@ -36,7 +36,12 @@ func (r repository) DeleteDeploymentInstance(ctx context.Context, instance *mode
 	// cancellation can lead to rollbacks which we should decide individually.
 	ctx = context.WithoutCancel(ctx)
 
-	err := r.db.WithContext(ctx).Unscoped().Delete(&model.DeploymentInstance{}, instance.ID).Error
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Unscoped().Delete(&model.Lock{}, "instance_id = ?", instance.ID).Error; err != nil {
+			return fmt.Errorf("failed to release database lock held by instance %q: %v", instance.Name, err)
+		}
+		return tx.Unscoped().Delete(&model.DeploymentInstance{}, instance.ID).Error
+	})
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return errdef.NewNotFound("instance not found by id: %d", instance.ID)
