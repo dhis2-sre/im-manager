@@ -20,9 +20,10 @@ import (
 )
 
 // Client talks to a single cluster's Kubernetes API. Construct it with NewClient so RestConfig is
-// populated; the fields are exported so tests can inject a fake Clientset.
+// populated; the fields are exported so tests can inject a fake Clientset and a fake Dynamic client.
 type Client struct {
 	Clientset  kubernetes.Interface
+	Dynamic    dynamic.Interface
 	RestConfig *rest.Config
 }
 
@@ -37,7 +38,12 @@ func NewClient(config model.Cluster) (*Client, error) {
 		return nil, fmt.Errorf("error creating kube client: %v", err)
 	}
 
-	return &Client{Clientset: client, RestConfig: restConfig}, nil
+	dynamicClient, err := dynamic.NewForConfig(restConfig)
+	if err != nil {
+		return nil, fmt.Errorf("error creating dynamic kube client: %v", err)
+	}
+
+	return &Client{Clientset: client, Dynamic: dynamicClient, RestConfig: restConfig}, nil
 }
 
 func newMetricsClient(cluster model.Cluster) (*metricsv1beta1.Clientset, error) {

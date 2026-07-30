@@ -9,6 +9,7 @@ import (
 
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 )
 
@@ -93,6 +94,20 @@ func (c *Client) Resume(ctx context.Context, instance *model.DeploymentInstance)
 		return fmt.Errorf("failed to resume instance %d: %v", instance.ID, err)
 	}
 
+	return nil
+}
+
+var cnpgClusterResource = schema.GroupVersionResource{Group: "postgresql.cnpg.io", Version: "v1", Resource: "clusters"}
+
+// RestartCNPGCluster triggers a rolling restart of a CloudNativePG cluster by stamping the
+// standard restartedAt annotation on the Cluster resource, the same mechanism as the cnpg kubectl
+// plugin's restart command. Patching the operator-managed pods directly would fight the operator.
+func (c *Client) RestartCNPGCluster(ctx context.Context, namespace, name string) error {
+	data := fmt.Sprintf(`{"metadata": {"annotations": {"kubectl.kubernetes.io/restartedAt": "%s"}}}`, time.Now().Format(time.RFC3339))
+	_, err := c.Dynamic.Resource(cnpgClusterResource).Namespace(namespace).Patch(ctx, name, types.MergePatchType, []byte(data), metav1.PatchOptions{})
+	if err != nil {
+		return fmt.Errorf("error restarting %q: %v", name, err)
+	}
 	return nil
 }
 

@@ -2,6 +2,7 @@ package stack
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/dhis2-sre/im-manager/pkg/kube"
 	"github.com/dhis2-sre/im-manager/pkg/model"
@@ -40,16 +41,19 @@ func (c BitnamiPostgresComponent) Restart(ctx context.Context, client *kube.Clie
 	return client.RestartStatefulSet(ctx, instance, c.Name)
 }
 
-// CNPGPostgresComponent operates on a CloudNativePG-managed PostgreSQL cluster. Restart currently
-// applies the generic StatefulSet patch, which finds nothing against CNPG's bare pods (unchanged
-// from before components existed); roadmap step 5 reimplements it via the Cluster custom resource's
-// restart annotation.
+// CNPGPostgresComponent operates on a CloudNativePG-managed PostgreSQL cluster. Restart goes
+// through the Cluster custom resource so the operator performs the rollout; patching the bare pods
+// it manages would fight it.
 type CNPGPostgresComponent struct {
 	kube.BaseComponent
+	// ClusterPattern names the Cluster resource, formatted with the instance's "<name>-<groupID>"
+	// unique name, e.g. "%s-dhis2-postgresql".
+	ClusterPattern string
 }
 
 func (c CNPGPostgresComponent) Restart(ctx context.Context, client *kube.Client, instance *model.DeploymentInstance) error {
-	return client.RestartStatefulSet(ctx, instance, c.Name)
+	clusterName := fmt.Sprintf(c.ClusterPattern, fmt.Sprintf("%s-%d", instance.Name, instance.Group.ID))
+	return client.RestartCNPGCluster(ctx, instance.Group.Namespace, clusterName)
 }
 
 // MinioComponent operates on the Bitnami MinIO chart's Deployment.

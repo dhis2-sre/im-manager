@@ -493,7 +493,7 @@ var DHIS2V2 = Stack{
 		CNPGPostgresComponent{BaseComponent: kube.BaseComponent{
 			Name:        "db",
 			PVCPatterns: []string{"cnpg.io/cluster=%s-dhis2-postgresql"},
-		}},
+		}, ClusterPattern: "%s-dhis2-postgresql"},
 		MinioComponent{BaseComponent: kube.BaseComponent{
 			Name:        "minio",
 			PVCPatterns: []string{"app.kubernetes.io/instance=%s,app.kubernetes.io/name=minio"},
