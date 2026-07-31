@@ -1,0 +1,152 @@
+# Local development on top of docker-compose.yml: images built from source, published ports, and
+# stand-ins for what a server provides from outside the project. .envrc puts this in COMPOSE_FILE;
+# servers pass explicit -f flags and never see it.
+
+# These variables come from .envrc rather than .env, so they have to be passed explicitly.
+x-envrc-vars: &envrc-vars
+  environment:
+    HOSTNAME: ${HOSTNAME}
+    UI_URL: ${UI_URL}
+    API_HOSTNAME: ${API_HOSTNAME}
+
+x-service: &common-dev-test
+  build:
+    context: .
+    target: build
+  env_file:
+    - .env
+  volumes:
+    - .:/src
+  working_dir: /src
+  <<: *envrc-vars
+
+services:
+  # Profiled here so `make dev` runs the source variant instead. The base file has no profile, so a
+  # server starts this unconditionally.
+  prod:
+    build: .
+    profiles:
+      - prod
+    ports:
+      - "8080:8080"
+    <<: *envrc-vars
+    depends_on:
+      minio:
+        condition: service_healthy
+      jaeger:
+        condition: service_healthy
+
+  dev:
+    <<: *common-dev-test
+    ports:
+      - "8080:8080"
+    command: go run ./cmd/serve
+    depends_on:
+      database:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      jaeger:
+        condition: service_healthy
+    profiles:
+      - dev
+
+  test:
+    <<: *common-dev-test
+    command: /bin/sh -c 'go test ./...'
+    profiles:
+      - test
+
+  test-coverage:
+    <<: *common-dev-test
+    command: /bin/sh -c 'go test -coverprofile=./coverage.out ./... && go tool cover -html=./coverage.out -o ./coverage.html'
+    profiles:
+      - test-coverage
+
+  database:
+    profiles:
+      - dev
+      - prod
+    ports:
+      - "5432:5432"
+    volumes:
+      # IM creates the extension itself at boot; this covers a database used outside it.
+      - ./init-scripts:/docker-entrypoint-initdb.d:ro
+
+  rabbitmq:
+    profiles:
+      - dev
+      - prod
+    ports:
+      - "127.0.0.1:5552:5552" # stream
+      - "127.0.0.1:5672:5672" # AMQP
+      - "127.0.0.1:15672:15672" # management UI
+
+  redis:
+    profiles:
+      - dev
+      - prod
+    ports:
+      - "6379:6379"
+
+  # Servers run one shared collector per host instead.
+  jaeger:
+    profiles:
+      - dev
+      - prod
+    image: jaegertracing/all-in-one:1.76.0
+    ports:
+      - "14268:14268"
+      - "14269:14269"
+      - "16686:16686"
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "--quiet", "http://localhost:14269"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # Stands in for S3. Deployments talk to the real thing, with S3_ENDPOINT left unset.
+  minio:
+    profiles:
+      - dev
+      - prod
+    image: quay.io/minio/minio:RELEASE.2023-07-21T21-12-44Z
+    command: server --console-address ":9001" /data
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    volumes:
+      - minio:/data
+
+  minio-bucket:
+    profiles:
+      - dev
+      - prod
+    image: minio/mc:RELEASE.2023-07-21T20-44-27Z
+    depends_on:
+      minio:
+        condition: service_healthy
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    entrypoint: >
+      /bin/sh -c "
+        mc alias set dev http://minio:9000 ${MINIO_ROOT_USER} ${MINIO_ROOT_PASSWORD}
+        mc admin user add dev ${MINIO_USER} ${MINIO_PASSWORD}
+        mc admin policy attach dev readwrite --user ${MINIO_USER}
+        mc mb dev/${S3_BUCKET}"
+
+volumes:
+  minio:
