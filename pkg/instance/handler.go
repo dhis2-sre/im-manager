@@ -652,6 +652,56 @@ func (h Handler) Restart(c *gin.Context) {
 	c.Status(http.StatusAccepted)
 }
 
+// DeploymentComponents deployment components
+func (h Handler) DeploymentComponents(c *gin.Context) {
+	// swagger:route GET /deployments/{id}/components deploymentComponents
+	//
+	// Deployment components
+	//
+	// List the components of every instance in a deployment along with their supported operations and live replicas
+	//
+	// Security:
+	//	oauth2:
+	//
+	// responses:
+	//	200: DeploymentComponents
+	//	401: Error
+	//	403: Error
+	//	404: Error
+	//	415: Error
+	id, ok := handler.GetPathParameter(c, "id")
+	if !ok {
+		return
+	}
+
+	ctx := c.Request.Context()
+	user, err := handler.GetUserFromContext(ctx)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	deployment, err := h.instanceService.FindDeploymentById(ctx, id)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	canRead := handler.CanReadDeployment(user, deployment)
+	if !canRead {
+		_ = c.Error(errdef.NewUnauthorized("read access denied"))
+		return
+	}
+
+	components, err := h.instanceService.DeploymentComponents(ctx, deployment)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	c.JSON(http.StatusOK, components)
+}
+
 // Components instance components
 func (h Handler) Components(c *gin.Context) {
 	// swagger:route GET /instances/{id}/components instanceComponents

@@ -712,6 +712,40 @@ func (s Service) Components(ctx context.Context, instance *model.DeploymentInsta
 	return statuses, nil
 }
 
+type InstanceComponents struct {
+	InstanceID   uint              `json:"instanceId"`
+	InstanceName string            `json:"instanceName"`
+	StackName    string            `json:"stackName"`
+	Components   []ComponentStatus `json:"components"`
+}
+
+// DeploymentComponents lists every instance's components with live replicas for a whole
+// deployment. Each instance costs cluster round trips, so instances are queried concurrently; the
+// cluster watch cache planned in the roadmap later swaps the implementation under this shape.
+func (s Service) DeploymentComponents(ctx context.Context, deployment *model.Deployment) ([]InstanceComponents, error) {
+	result := make([]InstanceComponents, len(deployment.Instances))
+	group, groupCtx := errgroup.WithContext(ctx)
+	for i, instance := range deployment.Instances {
+		group.Go(func() error {
+			components, err := s.Components(groupCtx, instance)
+			if err != nil {
+				return fmt.Errorf("listing components of instance %q: %w", instance.Name, err)
+			}
+			result[i] = InstanceComponents{
+				InstanceID:   instance.ID,
+				InstanceName: instance.Name,
+				StackName:    instance.StackName,
+				Components:   components,
+			}
+			return nil
+		})
+	}
+	if err := group.Wait(); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
 func (s Service) Logs(instance *model.DeploymentInstance, group *model.Group, typeSelector string) (io.ReadCloser, error) {
 	ks, err := kube.NewClient(group.Cluster)
 	if err != nil {

@@ -428,6 +428,25 @@ definitions:
                 x-go-name: Status
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/health
+    InstanceComponents:
+        properties:
+            components:
+                items:
+                    $ref: '#/definitions/ComponentStatus'
+                type: array
+                x-go-name: Components
+            instanceId:
+                format: uint64
+                type: integer
+                x-go-name: InstanceID
+            instanceName:
+                type: string
+                x-go-name: InstanceName
+            stackName:
+                type: string
+                x-go-name: StackName
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
     InstanceStatus:
         type: string
         x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
@@ -1423,6 +1442,31 @@ paths:
             security:
                 - oauth2: []
             summary: Update a Deployment
+    /deployments/{id}/components:
+        get:
+            description: List the components of every instance in a deployment along with their supported operations and live replicas
+            operationId: deploymentComponents
+            parameters:
+                - format: uint64
+                  in: path
+                  name: id
+                  required: true
+                  type: integer
+                  x-go-name: ID
+            responses:
+                "200":
+                    $ref: '#/responses/DeploymentComponents'
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Deployment components
     /deployments/{id}/deploy:
         post:
             description: Deploy a deployment...
@@ -2579,6 +2623,12 @@ responses:
         description: ""
         schema:
             $ref: '#/definitions/Database'
+    DeploymentComponents:
+        description: ""
+        schema:
+            items:
+                $ref: '#/definitions/InstanceComponents'
+            type: array
     DeploymentInstance:
         description: ""
         schema:

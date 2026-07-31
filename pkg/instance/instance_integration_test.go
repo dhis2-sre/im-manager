@@ -219,6 +219,17 @@ func TestInstanceHandler(t *testing.T) {
 		assert.Equal(t, "Running", replica.Phase)
 		assert.True(t, replica.Ready)
 
+		path = fmt.Sprintf("/deployments/%d/components", deployment.ID)
+		var deploymentComponents []instance.InstanceComponents
+		client.GetJSON(t, path, &deploymentComponents, inttest.WithAuthToken(tokens.AccessToken))
+
+		require.Len(t, deploymentComponents, 1)
+		assert.Equal(t, deploymentInstance.ID, deploymentComponents[0].InstanceID)
+		assert.Equal(t, "whoami-go", deploymentComponents[0].StackName)
+		require.Len(t, deploymentComponents[0].Components, 1)
+		assert.Equal(t, "whoami", deploymentComponents[0].Components[0].Name)
+		require.Len(t, deploymentComponents[0].Components[0].Replicas, 1)
+
 		path = fmt.Sprintf("/instances/%d/restart?replica=%s", deploymentInstance.ID, replica.Name)
 		response := client.Do(t, http.MethodPut, path, nil, http.StatusBadRequest, inttest.WithAuthToken(tokens.AccessToken))
 		assert.Contains(t, string(response), "replica requires a component selector")
