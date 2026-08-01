@@ -7,10 +7,14 @@ import (
 
 // swagger:model StackDetail
 type Stack struct {
-	Name             string          `json:"name"`
-	Parameters       StackParameters `json:"parameters"`
-	HostnamePattern  string          `json:"hostnamePattern"`
-	HostnameVariable string          `json:"hostnameVariable"`
+	Name       string          `json:"name"`
+	Parameters StackParameters `json:"parameters"`
+	// ParameterGroups are the sections a client renders the parameters in, in order. A group's
+	// condition decides its visibility as the user edits the enabling parameter; component
+	// presence predicates reference the same conditions so form and backend cannot disagree.
+	ParameterGroups  []ParameterGroup `json:"parameterGroups,omitempty"`
+	HostnamePattern  string           `json:"hostnamePattern"`
+	HostnameVariable string           `json:"hostnameVariable"`
 	// ParameterProviders provide parameters to other stacks.
 	ParameterProviders ParameterProviders `json:"-"`
 	// Requires these stacks to deploy an instance of this stack.
@@ -20,6 +24,17 @@ type Stack struct {
 	// Components are the addressable parts a deployed instance of this stack consists of. Their
 	// names equal the im-type label values the stack's helmfile applies.
 	Components []kube.Component `json:"-"`
+}
+
+// ParameterGroup is a named section of a stack's parameters, naturally the component the
+// parameters belong to, with a human-readable title.
+// swagger:model StackParameterGroup
+type ParameterGroup struct {
+	Name  string `json:"name"`
+	Title string `json:"title"`
+	// When gates the group's visibility on the value of another parameter; nil means the group is
+	// always shown.
+	When *kube.Condition `json:"when,omitempty"`
 }
 
 // swagger:model StackDetailParameters
@@ -35,8 +50,11 @@ type StackParameter struct {
 	// Validator ensures that the actual stack parameters are valid according to its rules.
 	Validator func(value string) error `json:"-"`
 	// Priority determines the order in which the parameter is shown.
-	Priority         uint                 `json:"priority"`
-	Sensitive        bool                 `json:"sensitive"`
+	Priority  uint `json:"priority"`
+	Sensitive bool `json:"sensitive"`
+	// Group names the ParameterGroup this parameter belongs to; empty means ungrouped, which
+	// clients render in a single flat section.
+	Group            string               `json:"group,omitempty"`
 	RequireCompanion RequireCompanionFunc `json:"-"`
 }
 

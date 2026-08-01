@@ -63,8 +63,9 @@ type BaseComponent struct {
 	Capabilities []Capability
 	// When gates the component's presence on the instance's decrypted parameters; nil means the
 	// component is always present (e.g. a minio component only exists when STORAGE_TYPE is minio,
-	// mirroring the chart's own enable condition).
-	When CapabilityPredicate
+	// mirroring the chart's own enable condition). Declarative so the stacks API can serve the
+	// same condition to clients.
+	When *Condition
 }
 
 func (b BaseComponent) ComponentName() string {
@@ -73,7 +74,7 @@ func (b BaseComponent) ComponentName() string {
 
 // Present reports whether this component exists for an instance with the given decrypted parameters.
 func (b BaseComponent) Present(params model.DeploymentInstanceParameters) bool {
-	return b.When == nil || b.When(params)
+	return b.When.Matches(params)
 }
 
 // PresentComponents returns the components present for an instance with the given decrypted parameters.

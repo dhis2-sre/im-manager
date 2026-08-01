@@ -198,3 +198,34 @@ func getSystemParameters() []string {
 	sort.Strings(parameters)
 	return parameters
 }
+
+// assert group declarations are consistent: unique group names with titles, every parameter's
+// group referencing a declared group, and every group condition referencing a stack parameter.
+func TestParameterGroupsAreConsistent(t *testing.T) {
+	for _, s := range All {
+		groups := make(map[string]bool, len(s.ParameterGroups))
+		for _, group := range s.ParameterGroups {
+			assert.NotEmptyf(t, group.Name, "stack %q declares a group without a name", s.Name)
+			assert.NotEmptyf(t, group.Title, "stack %q group %q has no title", s.Name, group.Name)
+			assert.Falsef(t, groups[group.Name], "stack %q declares group %q twice", s.Name, group.Name)
+			groups[group.Name] = true
+
+			if group.When != nil {
+				_, ok := s.Parameters[group.When.Parameter]
+				assert.Truef(t, ok, "stack %q group %q condition references unknown parameter %q", s.Name, group.Name, group.When.Parameter)
+			}
+		}
+
+		for name, parameter := range s.Parameters {
+			if parameter.Group != "" {
+				assert.Truef(t, groups[parameter.Group], "stack %q parameter %q references undeclared group %q", s.Name, name, parameter.Group)
+			}
+		}
+
+		if len(s.ParameterGroups) > 0 {
+			for name, parameter := range s.Parameters {
+				assert.NotEmptyf(t, parameter.Group, "stack %q parameter %q has no group but the stack declares groups", s.Name, name)
+			}
+		}
+	}
+}

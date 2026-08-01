@@ -81,6 +81,21 @@ definitions:
                 x-go-name: SupportedOperations
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
+    Condition:
+        description: |-
+            Condition is a declarative predicate over an instance's parameters: it holds when the named
+            parameter has the given value. Being data rather than code, the same condition both gates a
+            component's presence on the backend and is served to clients, so forms can react to parameter
+            edits without a round trip and cannot disagree with the backend about when something exists.
+        properties:
+            equals:
+                type: string
+                x-go-name: Equals
+            parameter:
+                type: string
+                x-go-name: Parameter
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/kube
     CopyDatabaseRequest:
         properties:
             group:
@@ -644,6 +659,11 @@ definitions:
             name:
                 type: string
                 x-go-name: Name
+            parameterGroups:
+                items:
+                    $ref: '#/definitions/StackParameterGroup'
+                type: array
+                x-go-name: ParameterGroups
             parameters:
                 items:
                     $ref: '#/definitions/StackParameter'
@@ -668,6 +688,9 @@ definitions:
             displayName:
                 type: string
                 x-go-name: DisplayName
+            group:
+                type: string
+                x-go-name: Group
             parameterName:
                 type: string
                 x-go-name: ParameterName
@@ -680,6 +703,22 @@ definitions:
                 x-go-name: Sensitive
         type: object
         x-go-name: StackParameterResponse
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/stack
+    StackParameterGroup:
+        description: |-
+            ParameterGroup is a named section of a stack's parameters, naturally the component the
+            parameters belong to, with a human-readable title.
+        properties:
+            name:
+                type: string
+                x-go-name: Name
+            title:
+                type: string
+                x-go-name: Title
+            when:
+                $ref: '#/definitions/Condition'
+        type: object
+        x-go-name: ParameterGroup
         x-go-package: github.com/dhis2-sre/im-manager/pkg/stack
     UpdateClusterRequest:
         properties:
