@@ -89,9 +89,7 @@ func TestSupportedOperations(t *testing.T) {
 
 func TestPresentComponents(t *testing.T) {
 	always := testComponent{BaseComponent{Name: "always"}}
-	whenMinio := testComponent{BaseComponent{Name: "minio", When: func(params model.DeploymentInstanceParameters) bool {
-		return params["STORAGE_TYPE"].Value == "minio"
-	}}}
+	whenMinio := testComponent{BaseComponent{Name: "minio", When: &Condition{Parameter: "STORAGE_TYPE", Equals: "minio"}}}
 	components := []Component{always, whenMinio}
 
 	assert.True(t, always.Present(nil))

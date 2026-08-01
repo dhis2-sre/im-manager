@@ -60,6 +60,8 @@ func toResponseStack(stack Stack) StackResponse {
 		s.Requires[i] = StackResponse{Name: require.Name}
 	}
 
+	s.ParameterGroups = stack.ParameterGroups
+
 	for parameterName, parameter := range stack.Parameters {
 		s.Parameters = append(s.Parameters, StackParameterResponse{
 			ParameterName: parameterName,
@@ -68,6 +70,7 @@ func toResponseStack(stack Stack) StackResponse {
 			Consumed:      parameter.Consumed,
 			Priority:      parameter.Priority,
 			Sensitive:     parameter.Sensitive,
+			Group:         parameter.Group,
 		})
 	}
 
@@ -82,13 +85,15 @@ type StackParameterResponse struct {
 	Consumed      bool    `json:"consumed"`
 	Priority      uint    `json:"priority"`
 	Sensitive     bool    `json:"sensitive"`
+	Group         string  `json:"group,omitempty"`
 }
 
 // swagger:model Stack
 type StackResponse struct {
-	Name       string                   `json:"name"`
-	Parameters []StackParameterResponse `json:"parameters,omitempty"`
-	Requires   []StackResponse          `json:"requires,omitempty"`
+	Name            string                   `json:"name"`
+	Parameters      []StackParameterResponse `json:"parameters,omitempty"`
+	ParameterGroups []ParameterGroup         `json:"parameterGroups,omitempty"`
+	Requires        []StackResponse          `json:"requires,omitempty"`
 }
 
 // FindAll stack
