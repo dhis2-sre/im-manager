@@ -35,6 +35,10 @@ type ParameterGroup struct {
 	// When gates the group's visibility on the value of another parameter; nil means the group is
 	// always shown.
 	When *kube.Condition `json:"when,omitempty"`
+	// Parameters declared inside the group. withGroupedParameters flattens them into the stack's
+	// parameter map, stamping each parameter's Group, so membership follows from where a parameter
+	// is declared. Not serialized: the API serves the flat list where each parameter names its group.
+	Parameters StackParameters `json:"-"`
 }
 
 // swagger:model StackDetailParameters
@@ -53,7 +57,8 @@ type StackParameter struct {
 	Priority  uint `json:"priority"`
 	Sensitive bool `json:"sensitive"`
 	// Group names the ParameterGroup this parameter belongs to; empty means ungrouped, which
-	// clients render in a single flat section.
+	// clients render in a single flat section. Populated by withGroupedParameters from the
+	// declaring group, never set by hand.
 	Group            string               `json:"group,omitempty"`
 	RequireCompanion RequireCompanionFunc `json:"-"`
 }
