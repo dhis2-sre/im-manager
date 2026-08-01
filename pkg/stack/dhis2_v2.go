@@ -17,6 +17,7 @@ var DHIS2V2 = withGroupedParameters(Stack{
 			"IMAGE_TAG":                       {Priority: 1, DisplayName: "Image Tag", DefaultValue: &dhis2CoreDefaults.imageTag},
 			"IMAGE_REPOSITORY":                {Priority: 2, DisplayName: "Image Repository", DefaultValue: &dhis2CoreDefaults.imageRepository},
 			"IMAGE_PULL_POLICY":               {Priority: 3, DisplayName: "Image Pull Policy", DefaultValue: &dhis2CoreDefaults.imagePullPolicy, Validator: imagePullPolicy},
+			"STORAGE_TYPE":                    {Priority: 10, DisplayName: "Storage type", DefaultValue: &dhis2CoreDefaults.storageType, Validator: storage},
 			"DHIS2_HOME":                      {Priority: 17, DisplayName: "DHIS2 Home Directory", DefaultValue: &dhis2CoreDefaults.dhis2Home},
 			"FLYWAY_MIGRATE_OUT_OF_ORDER":     {Priority: 18, DisplayName: "Flyway Migrate Out Of Order", DefaultValue: &dhis2CoreDefaults.flywayMigrateOutOfOrder},
 			"FLYWAY_REPAIR_BEFORE_MIGRATION":  {Priority: 19, DisplayName: "Flyway Repair Before Migration", DefaultValue: &dhis2CoreDefaults.flywayRepairBeforeMigration},
@@ -46,9 +47,6 @@ var DHIS2V2 = withGroupedParameters(Stack{
 			"DATABASE_USERNAME":            {Priority: 8, DisplayName: "Database Username", DefaultValue: &dhis2DBDefaults.dbUsername, Sensitive: true},
 			"DB_RESOURCES_REQUESTS_CPU":    {Priority: 22, DisplayName: "Resources Requests CPU", DefaultValue: &dhis2DBDefaults.resourcesRequestsCPU},
 			"DB_RESOURCES_REQUESTS_MEMORY": {Priority: 23, DisplayName: "Resources Requests Memory", DefaultValue: &dhis2DBDefaults.resourcesRequestsMemory},
-		}},
-		{Name: "storage", Title: "Storage", Parameters: StackParameters{
-			"STORAGE_TYPE": {Priority: 10, DisplayName: "Storage type", DefaultValue: &dhis2CoreDefaults.storageType, Validator: storage},
 		}},
 		{Name: "minio", Title: "MinIO", When: whenStorageIsMinio, Parameters: StackParameters{
 			"MINIO_STORAGE_SIZE": {Priority: 11, DisplayName: "Storage size", DefaultValue: &minIODefaults.storageSize},
