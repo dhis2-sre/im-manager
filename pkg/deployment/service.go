@@ -157,8 +157,9 @@ func findInstanceById(instances []*model.DeploymentInstance, id uint) (*model.De
 }
 
 // SaveAs dumps the instance's database into a new record. The record is returned right away
-// while the dump and the filestore backup of the dhis2-core sibling run in the background.
-func (s Service) SaveAs(ctx context.Context, userId uint, instance *model.DeploymentInstance, stack *stack.Stack, coreInstance *model.DeploymentInstance, name string, format string) (*model.Database, error) {
+// while the dump and the filestore backup run in the background against whichever instance
+// advertises the filestoreBackup capability.
+func (s Service) SaveAs(ctx context.Context, userId uint, instance *model.DeploymentInstance, stack *stack.Stack, filestoreInstance *model.DeploymentInstance, name string, format string) (*model.Database, error) {
 	created, err := s.databaseService.CreateDatabase(ctx, userId, instance.GroupName, name)
 	if err != nil {
 		return nil, err
@@ -172,7 +173,7 @@ func (s Service) SaveAs(ctx context.Context, userId uint, instance *model.Deploy
 		if err != nil {
 			return
 		}
-		s.saveFilestore(ctx, userId, coreInstance, dumped)
+		s.saveFilestore(ctx, userId, filestoreInstance, dumped)
 	}()
 
 	return created, nil
@@ -180,7 +181,7 @@ func (s Service) SaveAs(ctx context.Context, userId uint, instance *model.Deploy
 
 // Save overwrites the instance's source database with a fresh dump. The lock check runs before
 // returning; the dump, finalization and filestore backup run in the background.
-func (s Service) Save(ctx context.Context, userId uint, database *model.Database, instance *model.DeploymentInstance, stack *stack.Stack, coreInstance *model.DeploymentInstance) error {
+func (s Service) Save(ctx context.Context, userId uint, database *model.Database, instance *model.DeploymentInstance, stack *stack.Stack, filestoreInstance *model.DeploymentInstance) error {
 	locked, wasLocked, err := s.databaseService.EnsureLocked(ctx, database, instance.ID, userId)
 	if err != nil {
 		return err
@@ -195,19 +196,19 @@ func (s Service) Save(ctx context.Context, userId uint, database *model.Database
 			s.logger.ErrorContext(ctx, "save database failed", "databaseName", locked.Name, "error", err)
 			return
 		}
-		s.saveFilestore(ctx, locked.UserID, coreInstance, saved)
+		s.saveFilestore(ctx, locked.UserID, filestoreInstance, saved)
 	}()
 
 	return nil
 }
 
-func (s Service) saveFilestore(ctx context.Context, userId uint, coreInstance *model.DeploymentInstance, database *model.Database) {
-	if coreInstance == nil {
+func (s Service) saveFilestore(ctx context.Context, userId uint, filestoreInstance *model.DeploymentInstance, database *model.Database) {
+	if filestoreInstance == nil {
 		return
 	}
 
 	s.publisher.Publish(ctx, userId, database.GroupName, kindFilestoreBackup, newFilestoreEvent(database, "started", ""))
-	if err := s.instanceService.FilestoreBackup(ctx, coreInstance, database.Name, database); err != nil {
+	if err := s.instanceService.FilestoreBackup(ctx, filestoreInstance, database.Name, database); err != nil {
 		s.logger.ErrorContext(ctx, "filestore backup failed", "groupName", database.GroupName, "databaseName", database.Name, "error", err)
 		s.publisher.Publish(ctx, userId, database.GroupName, kindFilestoreBackup, newFilestoreEvent(database, "error", err.Error()))
 		return

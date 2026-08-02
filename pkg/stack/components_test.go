@@ -288,3 +288,20 @@ func TestFindPostgresAccess(t *testing.T) {
 	_, err := kube.FindPostgresAccess(WhoamiGo.Components)
 	require.ErrorContains(t, err, "no postgres component found")
 }
+
+func TestDatabaseSaveCapability(t *testing.T) {
+	params := model.DeploymentInstanceParameters{}
+	for _, s := range []Stack{DHIS2DB, DHIS2, DHIS2V2} {
+		access, err := kube.FindPostgresAccess(s.Components)
+		require.NoErrorf(t, err, "stack %q", s.Name)
+		component := access.(kube.Component)
+		assert.Containsf(t, component.SupportedOperations(params), kube.OperationDatabaseSave, "stack %q should advertise databaseSave", s.Name)
+	}
+
+	// chap-db does not advertise databaseSave yet: saving CHAP is planned, but needs its
+	// parameter names mapped in the dump config and a seed/restore path first. Enabling it then
+	// is just adding the capability to its component.
+	chapAccess, err := kube.FindPostgresAccess(ChapDB.Components)
+	require.NoError(t, err)
+	assert.NotContains(t, chapAccess.(kube.Component).SupportedOperations(params), kube.OperationDatabaseSave)
+}

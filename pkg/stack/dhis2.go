@@ -46,6 +46,9 @@ var DHIS2 = Stack{
 		DHIS2CoreComponent{BaseComponent: kube.BaseComponent{Name: "dhis2"}},
 		BitnamiPostgresComponent{BaseComponent: kube.BaseComponent{
 			Name: "db",
+			Capabilities: []kube.Capability{
+				{Operation: kube.OperationDatabaseSave},
+			},
 			PVCPatterns: []string{
 				"app.kubernetes.io/instance=%s-database",
 				// The redis release carries no im labels yet, so it has no component; its PVC

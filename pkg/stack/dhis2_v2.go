@@ -75,6 +75,9 @@ var DHIS2V2 = withGroupedParameters(Stack{
 		CNPGPostgresComponent{BaseComponent: kube.BaseComponent{
 			Name:        "db",
 			PVCPatterns: []string{"cnpg.io/cluster=%s-dhis2-postgresql"},
+			Capabilities: []kube.Capability{
+				{Operation: kube.OperationDatabaseSave},
+			},
 		}, ClusterPattern: "%s-dhis2-postgresql"},
 		MinioComponent{BaseComponent: kube.BaseComponent{
 			Name:        "minio",

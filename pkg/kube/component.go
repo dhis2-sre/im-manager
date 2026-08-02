@@ -20,6 +20,7 @@ const (
 	OperationRestart         Operation = "restart"
 	OperationRestartReplica  Operation = "restartReplica"
 	OperationFilestoreBackup Operation = "filestoreBackup"
+	OperationDatabaseSave    Operation = "databaseSave"
 )
 
 // CapabilityPredicate decides whether a capability applies given the instance's decrypted parameters.
