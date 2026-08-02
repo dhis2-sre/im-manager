@@ -28,7 +28,7 @@ import (
 	"github.com/dhis2-sre/im-manager/pkg/model"
 )
 
-func NewService(logger *slog.Logger, instanceRepository *repository, groupService groupService, stackService stack.Service, helmfileService helmfile, s3Client *storage.S3Client, s3Bucket string) *Service {
+func NewService(logger *slog.Logger, instanceRepository *repository, groupService groupService, stackService stack.Service, helmfileService helmfile, s3Client *storage.S3Client, s3Bucket string, kubeClients *kube.Clients) *Service {
 	return &Service{
 		logger:             logger,
 		instanceRepository: instanceRepository,
@@ -37,6 +37,7 @@ func NewService(logger *slog.Logger, instanceRepository *repository, groupServic
 		helmfileService:    helmfileService,
 		s3Client:           s3Client,
 		s3Bucket:           s3Bucket,
+		kubeClients:        kubeClients,
 	}
 }
 
@@ -58,6 +59,7 @@ type Service struct {
 	helmfileService    helmfile
 	s3Client           *storage.S3Client
 	s3Bucket           string
+	kubeClients        *kube.Clients
 }
 
 // restoreFilestoreToS3 restores the given filestore backup into the instance's external
@@ -584,7 +586,7 @@ func (s Service) DestroyInstance(ctx context.Context, instance *model.Deployment
 		return err
 	}
 
-	client, err := kube.NewClient(group.Cluster)
+	client, err := s.kubeClients.For(group.Cluster)
 	if err != nil {
 		return err
 	}
@@ -626,7 +628,7 @@ func (s Service) Pause(ctx context.Context, instance *model.DeploymentInstance) 
 		return err
 	}
 
-	ks, err := kube.NewClient(group.Cluster)
+	ks, err := s.kubeClients.For(group.Cluster)
 	if err != nil {
 		return err
 	}
@@ -640,7 +642,7 @@ func (s Service) Resume(ctx context.Context, instance *model.DeploymentInstance)
 		return err
 	}
 
-	ks, err := kube.NewClient(group.Cluster)
+	ks, err := s.kubeClients.For(group.Cluster)
 	if err != nil {
 		return err
 	}
@@ -658,7 +660,7 @@ func (s Service) Restart(ctx context.Context, instance *model.DeploymentInstance
 		return err
 	}
 
-	client, err := kube.NewClient(group.Cluster)
+	client, err := s.kubeClients.For(group.Cluster)
 	if err != nil {
 		return err
 	}
@@ -713,7 +715,7 @@ func (s Service) Components(ctx context.Context, instance *model.DeploymentInsta
 		return nil, err
 	}
 
-	client, err := kube.NewClient(group.Cluster)
+	client, err := s.kubeClients.For(group.Cluster)
 	if err != nil {
 		return nil, err
 	}
@@ -779,7 +781,7 @@ func (s Service) DeploymentComponents(ctx context.Context, deployment *model.Dep
 }
 
 func (s Service) Logs(instance *model.DeploymentInstance, group *model.Group, typeSelector string) (io.ReadCloser, error) {
-	ks, err := kube.NewClient(group.Cluster)
+	ks, err := s.kubeClients.For(group.Cluster)
 	if err != nil {
 		return nil, err
 	}
@@ -946,7 +948,7 @@ const (
 )
 
 func (s Service) GetStatus(instance *model.DeploymentInstance) (InstanceStatus, error) {
-	ks, err := kube.NewClient(instance.Group.Cluster)
+	ks, err := s.kubeClients.For(instance.Group.Cluster)
 	if err != nil {
 		return "", err
 	}

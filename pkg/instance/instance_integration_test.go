@@ -118,7 +118,7 @@ func TestInstanceHandler(t *testing.T) {
 	// blew through the previous 100 seconds.
 	tokenService, err := token.NewService(logger, tokenRepository, privateKey, 3600, 60, "secret", 3600, 3600)
 	require.NoError(t, err, "failed to create token service")
-	instanceService := instance.NewService(logger, instanceRepo, groupService, stackService, helmfileService, nil, "")
+	instanceService := instance.NewService(logger, instanceRepo, groupService, stackService, helmfileService, nil, "", kube.NewClients())
 
 	s3Dir := t.TempDir()
 	s3Bucket := "database-bucket"
@@ -324,7 +324,7 @@ func TestInstanceHandler(t *testing.T) {
 		require.NoError(t, db.Create(target).Error)
 
 		// The shared instanceService is wired with a nil S3 client; build one with the real client.
-		fsService := instance.NewService(logger, instanceRepo, groupService, stackService, helmfileService, s3Client, s3Bucket)
+		fsService := instance.NewService(logger, instanceRepo, groupService, stackService, helmfileService, s3Client, s3Bucket, kube.NewClients())
 		// minio can briefly refuse connections right after its pod reports ready (the server
 		// restarts during first-run setup), so retry until it is serving. FilestoreBackup returns
 		// before recording anything when the mirror fails, so retries are side-effect free.
@@ -371,7 +371,7 @@ func TestInstanceHandler(t *testing.T) {
 		require.NoError(t, db.Create(target).Error)
 
 		// The shared instanceService is wired with a nil S3 client; build one with the real client.
-		fsService := instance.NewService(logger, instanceRepo, groupService, stackService, helmfileService, s3Client, s3Bucket)
+		fsService := instance.NewService(logger, instanceRepo, groupService, stackService, helmfileService, s3Client, s3Bucket, kube.NewClients())
 		require.NoError(t, fsService.FilestoreBackup(context.Background(), &coreInstance, target.Name, target))
 
 		content := s3.GetObject(t, s3Bucket, "group-name/fsstore-backup-target-fs.tar.gz")
