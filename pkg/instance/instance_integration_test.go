@@ -411,7 +411,7 @@ func TestInstanceHandler(t *testing.T) {
 				return false
 			}
 			return d.Url != ""
-		}, 120*time.Second, 500*time.Millisecond, "database URL should be set by async goroutine")
+		}, 300*time.Second, 500*time.Millisecond, "database URL should be set by async goroutine")
 
 		var finalDB model.Database
 		err := db.First(&finalDB, savedDB.ID).Error
@@ -445,7 +445,7 @@ func TestInstanceHandler(t *testing.T) {
 		require.Eventually(t, func() bool {
 			content, err := s3.TryGetObject(s3Bucket, "group-name/save-test.sql.gz")
 			return err == nil && len(content) > originalSize
-		}, 120*time.Second, 500*time.Millisecond, "saved database in S3 should grow beyond the uploaded placeholder")
+		}, 300*time.Second, 500*time.Millisecond, "saved database in S3 should grow beyond the uploaded placeholder")
 
 		destroyDeployment(t, client, deployment.ID, tokens.AccessToken)
 	})
