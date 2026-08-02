@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"github.com/dhis2-sre/im-manager/pkg/kube"
@@ -12,6 +13,21 @@ import (
 )
 
 func commandExecutor(cmd *exec.Cmd, cluster model.Cluster) (stdout []byte, stderr []byte, err error) {
+	// Give the helm invocation its own repository config file. Concurrent helmfile syncs otherwise
+	// race on the shared repositories.yaml: one process's repo add is clobbered by another's write
+	// between the add and the upgrade, failing with "repo not found". The chart cache stays shared
+	// so indexes and charts are not re-downloaded per deploy.
+	repoConfigDir, err := os.MkdirTemp("", "helm-repo-config")
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to create helm repository config dir: %v", err)
+	}
+	defer func() {
+		if errR := os.RemoveAll(repoConfigDir); errR != nil && err == nil {
+			err = fmt.Errorf("failed to clean up helm repository config dir: %v", errR)
+		}
+	}()
+	cmd.Env = append(cmd.Env, fmt.Sprintf("HELM_REPOSITORY_CONFIG=%s", filepath.Join(repoConfigDir, "repositories.yaml")))
+
 	if cluster.Configuration == nil {
 		return runCommand(cmd)
 	}
