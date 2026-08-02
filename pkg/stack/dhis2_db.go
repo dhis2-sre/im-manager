@@ -30,6 +30,9 @@ var DHIS2DB = Stack{
 		BitnamiPostgresComponent{BaseComponent: kube.BaseComponent{
 			Name:        "db",
 			PVCPatterns: []string{"app.kubernetes.io/instance=%s-database"},
+			Capabilities: []kube.Capability{
+				{Operation: kube.OperationDatabaseSave},
+			},
 		}},
 	},
 }

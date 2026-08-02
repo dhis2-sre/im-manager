@@ -288,3 +288,19 @@ func TestFindPostgresAccess(t *testing.T) {
 	_, err := kube.FindPostgresAccess(WhoamiGo.Components)
 	require.ErrorContains(t, err, "no postgres component found")
 }
+
+func TestDatabaseSaveCapability(t *testing.T) {
+	params := model.DeploymentInstanceParameters{}
+	for _, s := range []Stack{DHIS2DB, DHIS2, DHIS2V2} {
+		access, err := kube.FindPostgresAccess(s.Components)
+		require.NoErrorf(t, err, "stack %q", s.Name)
+		component := access.(kube.Component)
+		assert.Containsf(t, component.SupportedOperations(params), kube.OperationDatabaseSave, "stack %q should advertise databaseSave", s.Name)
+	}
+
+	// chap-db deliberately does not advertise databaseSave: its database is not part of the
+	// DATABASE_ID catalog flow.
+	chapAccess, err := kube.FindPostgresAccess(ChapDB.Components)
+	require.NoError(t, err)
+	assert.NotContains(t, chapAccess.(kube.Component).SupportedOperations(params), kube.OperationDatabaseSave)
+}
