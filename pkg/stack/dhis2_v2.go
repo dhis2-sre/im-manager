@@ -48,16 +48,16 @@ var DHIS2V2 = withGroupedParameters(Stack{
 			"DB_RESOURCES_REQUESTS_CPU":    {Priority: 22, DisplayName: "Resources Requests CPU", DefaultValue: &dhis2DBDefaults.resourcesRequestsCPU},
 			"DB_RESOURCES_REQUESTS_MEMORY": {Priority: 23, DisplayName: "Resources Requests Memory", DefaultValue: &dhis2DBDefaults.resourcesRequestsMemory},
 		}},
-		{Name: "minio", Title: "MinIO", When: whenStorageIsMinio, Parameters: StackParameters{
+		{Name: "minio", Title: "Storage: MinIO", When: whenStorageIsMinio, Parameters: StackParameters{
 			"MINIO_STORAGE_SIZE": {Priority: 11, DisplayName: "Storage size", DefaultValue: &minIODefaults.storageSize},
 		}},
-		{Name: "s3", Title: "S3", When: whenStorageIsS3, Parameters: StackParameters{
+		{Name: "s3", Title: "Storage: S3", When: whenStorageIsS3, Parameters: StackParameters{
 			"S3_BUCKET":   {Priority: 13, DisplayName: "Bucket", DefaultValue: &dhis2CoreDefaults.s3Bucket},
 			"S3_REGION":   {Priority: 14, DisplayName: "Region", DefaultValue: &dhis2CoreDefaults.s3Region, Sensitive: true},
 			"S3_IDENTITY": {Priority: 15, DisplayName: "Identity", DefaultValue: &dhis2CoreDefaults.s3Identity, Sensitive: true},
 			"S3_SECRET":   {Priority: 16, DisplayName: "Secret", DefaultValue: &dhis2CoreDefaults.s3Secret, Sensitive: true},
 		}},
-		{Name: "filesystem", Title: "Filesystem", When: whenStorageIsFilesystem, Parameters: StackParameters{
+		{Name: "filesystem", Title: "Storage: Filesystem", When: whenStorageIsFilesystem, Parameters: StackParameters{
 			"FILESYSTEM_VOLUME_SIZE": {Priority: 12, DisplayName: "Volume size", DefaultValue: &dhis2CoreDefaults.filesystemVolumeSize, Sensitive: true},
 		}},
 	},
