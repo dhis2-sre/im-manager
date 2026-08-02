@@ -4,7 +4,6 @@ import (
 	"cmp"
 	"fmt"
 	"slices"
-	"time"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -15,11 +14,11 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
-// cacheResyncPeriod is not a freshness interval: the watch keeps the store current in real time,
-// and client-go relists by itself when a watch breaks. Resync only replays the in-memory store to
-// registered event handlers (an in-memory iteration, no API calls) as a safety net against handler
-// bugs, which is why it can be generous.
-const cacheResyncPeriod = 10 * time.Minute
+// Resync is disabled: it is not a freshness mechanism (the watch keeps the store current in real
+// time, and client-go relists by itself when a watch breaks), it only replays the in-memory store
+// to registered event handlers, of which this cache has none. When event handlers arrive with the
+// status push, a deliberate resync period can come with them.
+const cacheResyncPeriod = 0
 
 // podCache is a shared informer over the pods IM manages, those carrying the im-id label, serving
 // pod reads from memory once synced. Until the initial sync completes, and if the watch ever
