@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/dhis2-sre/im-manager/internal/errdef"
 	"github.com/dhis2-sre/im-manager/pkg/kube"
 	"github.com/dhis2-sre/im-manager/pkg/model"
 )
@@ -41,6 +42,20 @@ func (c BitnamiPostgresComponent) Restart(ctx context.Context, client *kube.Clie
 	return client.RestartStatefulSet(ctx, instance, c.Name)
 }
 
+const bitnamiPostgresContainer = "postgresql"
+
+// PostgresPod returns the component's single pod, located by the im labels its chart applies.
+func (c BitnamiPostgresComponent) PostgresPod(ctx context.Context, client *kube.Client, instance *model.DeploymentInstance) (string, string, error) {
+	replicas, err := c.Replicas(ctx, client, instance)
+	if err != nil {
+		return "", "", err
+	}
+	if len(replicas) == 0 {
+		return "", "", errdef.NewNotFound("no postgres pod found for component %q", c.Name)
+	}
+	return replicas[0].Name, bitnamiPostgresContainer, nil
+}
+
 // CNPGPostgresComponent operates on a CloudNativePG-managed PostgreSQL cluster. Restart goes
 // through the Cluster custom resource so the operator performs the rollout; patching the bare pods
 // it manages would fight it.
@@ -54,6 +69,22 @@ type CNPGPostgresComponent struct {
 func (c CNPGPostgresComponent) Restart(ctx context.Context, client *kube.Client, instance *model.DeploymentInstance) error {
 	clusterName := fmt.Sprintf(c.ClusterPattern, fmt.Sprintf("%s-%d", instance.Name, instance.Group.ID))
 	return client.RestartCNPGCluster(ctx, instance.Group.Namespace, clusterName)
+}
+
+const cnpgPostgresContainer = "postgres"
+
+// PostgresPod returns the CNPG cluster's current primary, located by the operator's role label.
+func (c CNPGPostgresComponent) PostgresPod(ctx context.Context, client *kube.Client, instance *model.DeploymentInstance) (string, string, error) {
+	clusterName := fmt.Sprintf(c.ClusterPattern, fmt.Sprintf("%s-%d", instance.Name, instance.Group.ID))
+	selector := fmt.Sprintf("cnpg.io/cluster=%s,cnpg.io/instanceRole=primary", clusterName)
+	pods, err := client.ListPods(ctx, instance.Group.Namespace, selector)
+	if err != nil {
+		return "", "", err
+	}
+	if len(pods) != 1 {
+		return "", "", errdef.NewNotFound("expected one primary pod for cluster %q, found %d", clusterName, len(pods))
+	}
+	return pods[0].Name, cnpgPostgresContainer, nil
 }
 
 // MinioComponent operates on the Bitnami MinIO chart's Deployment.

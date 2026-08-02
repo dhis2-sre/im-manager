@@ -618,9 +618,7 @@ func newDatabaseService(ctx context.Context, logger *slog.Logger, db *gorm.DB, g
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to create database notification publisher: %w", err)
 	}
-	databaseService := database.NewService(logger, s3Bucket, s3Client, groupService, databaseRepository, func(c model.Cluster) (database.PodExecutor, error) {
-		return kube.NewClient(c)
-	}, publisher)
+	databaseService := database.NewService(logger, s3Bucket, s3Client, groupService, databaseRepository, kube.NewClient, publisher)
 
 	return databaseService, publisher, nil
 }

@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -217,4 +218,73 @@ func helmfileImTypes(t *testing.T, stackDir string) []string {
 		imTypes = append(imTypes, match[1])
 	}
 	return imTypes
+}
+
+func TestPostgresPod(t *testing.T) {
+	instance := &model.DeploymentInstance{ID: 1, Name: "myinstance", Group: &model.Group{ID: 7, Namespace: "ns"}}
+
+	t.Run("BitnamiViaImLabels", func(t *testing.T) {
+		component := BitnamiPostgresComponent{BaseComponent: kube.BaseComponent{Name: "db"}}
+		pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{
+			Name:      "myinstance-database-0",
+			Namespace: "ns",
+			Labels:    map[string]string{"im-id": "1", "im-type": "db"},
+		}}
+		client := &kube.Client{Clientset: fake.NewSimpleClientset(pod)}
+
+		name, container, err := component.PostgresPod(context.Background(), client, instance)
+
+		require.NoError(t, err)
+		assert.Equal(t, "myinstance-database-0", name)
+		assert.Equal(t, "postgresql", container)
+	})
+
+	t.Run("BitnamiNoPod", func(t *testing.T) {
+		component := BitnamiPostgresComponent{BaseComponent: kube.BaseComponent{Name: "db"}}
+		client := &kube.Client{Clientset: fake.NewSimpleClientset()}
+
+		_, _, err := component.PostgresPod(context.Background(), client, instance)
+
+		require.ErrorContains(t, err, "no postgres pod found")
+	})
+
+	t.Run("CNPGViaPrimaryRoleLabel", func(t *testing.T) {
+		component := CNPGPostgresComponent{BaseComponent: kube.BaseComponent{Name: "db"}, ClusterPattern: "%s-dhis2-postgresql"}
+		primary := &v1.Pod{ObjectMeta: metav1.ObjectMeta{
+			Name:      "myinstance-7-dhis2-postgresql-1",
+			Namespace: "ns",
+			Labels:    map[string]string{"cnpg.io/cluster": "myinstance-7-dhis2-postgresql", "cnpg.io/instanceRole": "primary"},
+		}}
+		replica := &v1.Pod{ObjectMeta: metav1.ObjectMeta{
+			Name:      "myinstance-7-dhis2-postgresql-2",
+			Namespace: "ns",
+			Labels:    map[string]string{"cnpg.io/cluster": "myinstance-7-dhis2-postgresql", "cnpg.io/instanceRole": "replica"},
+		}}
+		client := &kube.Client{Clientset: fake.NewSimpleClientset(primary, replica)}
+
+		name, container, err := component.PostgresPod(context.Background(), client, instance)
+
+		require.NoError(t, err)
+		assert.Equal(t, "myinstance-7-dhis2-postgresql-1", name)
+		assert.Equal(t, "postgres", container)
+	})
+
+	t.Run("CNPGNoPrimary", func(t *testing.T) {
+		component := CNPGPostgresComponent{BaseComponent: kube.BaseComponent{Name: "db"}, ClusterPattern: "%s-dhis2-postgresql"}
+		client := &kube.Client{Clientset: fake.NewSimpleClientset()}
+
+		_, _, err := component.PostgresPod(context.Background(), client, instance)
+
+		require.ErrorContains(t, err, "expected one primary pod")
+	})
+}
+
+func TestFindPostgresAccess(t *testing.T) {
+	for _, s := range []Stack{DHIS2DB, DHIS2, DHIS2V2, ChapDB} {
+		_, err := kube.FindPostgresAccess(s.Components)
+		assert.NoErrorf(t, err, "stack %q should have a postgres component", s.Name)
+	}
+
+	_, err := kube.FindPostgresAccess(WhoamiGo.Components)
+	require.ErrorContains(t, err, "no postgres component found")
 }
