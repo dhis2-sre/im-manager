@@ -10,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dhis2-sre/im-manager/pkg/kube"
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
@@ -314,7 +313,7 @@ func newExternalS3Client(core *model.DeploymentInstance) (*minio.Client, error) 
 func (s Service) filestoreStreamerFor(core *model.DeploymentInstance, cluster model.Cluster) (filestoreStreamer, error) {
 	switch storageType(core) {
 	case "filesystem":
-		ks, err := kube.NewClient(cluster)
+		ks, err := s.kubeClients.For(cluster)
 		if err != nil {
 			return nil, err
 		}
@@ -338,7 +337,7 @@ func (s Service) filestoreStreamerFor(core *model.DeploymentInstance, cluster mo
 		}
 		return s3APISource{source: NewMinioBackupSource(s.logger, client, core.Parameters["S3_BUCKET"].Value)}, nil
 	default: // minio
-		ks, err := kube.NewClient(cluster)
+		ks, err := s.kubeClients.For(cluster)
 		if err != nil {
 			return nil, err
 		}
