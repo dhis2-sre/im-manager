@@ -284,23 +284,57 @@ func (s Service) validateNoCycles(instances []*model.DeploymentInstance) (graph.
 			}
 		}
 
-		for _, requiredStack := range stack.Requires {
-			requiredStackName := requiredStack.Name
-			err := g.AddEdge(src.StackName, requiredStackName)
+		for name, stackParameter := range stack.Parameters {
+			if !stackParameter.Consumed {
+				continue
+			}
+			provider, _, err := s.findParameterProvider(instances, src, name)
+			if err != nil {
+				return nil, err
+			}
+			err = g.AddEdge(src.StackName, provider.StackName)
 			if err != nil {
 				if errors.Is(err, graph.ErrEdgeAlreadyExists) {
-					return nil, fmt.Errorf("instance %q requires %q more than once", src.Name, requiredStackName)
+					continue
 				} else if errors.Is(err, graph.ErrEdgeCreatesCycle) {
-					return nil, fmt.Errorf("link from instance %q to stack %q creates a cycle", src.Name, requiredStackName)
-				} else if errors.Is(err, graph.ErrVertexNotFound) {
-					return nil, fmt.Errorf("%q is required by %q", requiredStackName, src.StackName)
+					return nil, fmt.Errorf("link from instance %q to stack %q creates a cycle", src.Name, provider.StackName)
 				}
-				return nil, fmt.Errorf("failed linking instance %q with instance %q: %v", src.Name, requiredStackName, err)
+				return nil, fmt.Errorf("failed linking instance %q with instance %q: %v", src.Name, provider.Name, err)
 			}
 		}
 	}
 
 	return g, nil
+}
+
+// findParameterProvider returns the instance providing the named parameter: the one whose stack
+// declares it as a non-consumed parameter or serves it through a parameter provider. A requirement
+// is therefore satisfied by whichever stack actually provides the parameter, so e.g. pgadmin
+// composes with dhis2-db and dhis2-v2 alike.
+func (s Service) findParameterProvider(instances []*model.DeploymentInstance, consumer *model.DeploymentInstance, parameterName string) (*model.DeploymentInstance, *stack.Stack, error) {
+	var providerInstance *model.DeploymentInstance
+	var providerStack *stack.Stack
+	for _, candidate := range instances {
+		if candidate.StackName == consumer.StackName {
+			continue
+		}
+		candidateStack, err := s.stackService.Find(candidate.StackName)
+		if err != nil {
+			return nil, nil, err
+		}
+		candidateParameter, hasParameter := candidateStack.Parameters[parameterName]
+		_, hasProvider := candidateStack.ParameterProviders[parameterName]
+		if (hasParameter && !candidateParameter.Consumed) || hasProvider {
+			if providerInstance != nil {
+				return nil, nil, errdef.NewBadRequest("parameter %q consumed by %q is provided by both %q and %q", parameterName, consumer.StackName, providerInstance.StackName, candidate.StackName)
+			}
+			providerInstance, providerStack = candidate, candidateStack
+		}
+	}
+	if providerInstance == nil {
+		return nil, nil, errdef.NewBadRequest("no instance provides parameter %q consumed by %q", parameterName, consumer.StackName)
+	}
+	return providerInstance, providerStack, nil
 }
 
 func (s Service) resolveParameters(deployment *model.Deployment) error {
@@ -323,7 +357,7 @@ func (s Service) resolveParameters(deployment *model.Deployment) error {
 			return err
 		}
 
-		err = resolveConsumedParameters(deployment, instance, stack)
+		err = s.resolveConsumedParameters(deployment, instance, stack)
 		if err != nil {
 			return err
 		}
@@ -346,36 +380,34 @@ func validateParameters(instanceParameters model.DeploymentInstanceParameters, s
 	return errors.Join(errs...)
 }
 
-func resolveConsumedParameters(deployment *model.Deployment, instance *model.DeploymentInstance, stack *stack.Stack) error {
+func (s Service) resolveConsumedParameters(deployment *model.Deployment, instance *model.DeploymentInstance, stack *stack.Stack) error {
 	for name, parameter := range instance.Parameters {
 		stackParameter := stack.Parameters[name]
 		if !stackParameter.Consumed {
 			continue
 		}
 
-		for _, requiredStack := range stack.Requires {
-			// consume from instance parameters
-			sourceInstance := findInstanceByStackName(requiredStack.Name, deployment)
-			if sourceInstance == nil {
-				return errdef.NewNotFound("failed to find required instance %q of instance %q", requiredStack.Name, instance.Name)
-			}
-
-			if sourceInstanceParameter, ok := sourceInstance.Parameters[name]; ok {
-				parameter.Value = sourceInstanceParameter.Value
-			}
-
-			// consume from provider
-			if provider, ok := requiredStack.ParameterProviders[name]; ok {
-				sourceInstance.Group = instance.Group
-				value, err := provider.Provide(*sourceInstance)
-				if err != nil {
-					return fmt.Errorf("failed to provide value for instance %q parameter %q: %v", instance.Name, name, err)
-				}
-				parameter.Value = value
-			}
-
-			instance.Parameters[name] = parameter
+		sourceInstance, sourceStack, err := s.findParameterProvider(deployment.Instances, instance, name)
+		if err != nil {
+			return err
 		}
+
+		// consume from instance parameters
+		if sourceInstanceParameter, ok := sourceInstance.Parameters[name]; ok {
+			parameter.Value = sourceInstanceParameter.Value
+		}
+
+		// consume from provider
+		if provider, ok := sourceStack.ParameterProviders[name]; ok {
+			sourceInstance.Group = instance.Group
+			value, err := provider.Provide(*sourceInstance)
+			if err != nil {
+				return fmt.Errorf("failed to provide value for instance %q parameter %q: %v", instance.Name, name, err)
+			}
+			parameter.Value = value
+		}
+
+		instance.Parameters[name] = parameter
 	}
 	return nil
 }

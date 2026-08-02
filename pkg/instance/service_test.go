@@ -132,7 +132,7 @@ func TestResolveParameters(t *testing.T) {
 		assert.ElementsMatch(t, want, deployment.Instances)
 	})
 
-	t.Run("RequiredInstanceNotInDeployment", func(t *testing.T) {
+	t.Run("ParameterProviderNotInDeployment", func(t *testing.T) {
 		stackA := stack.Stack{
 			Name: "stack-a",
 		}
@@ -163,7 +163,7 @@ func TestResolveParameters(t *testing.T) {
 
 		err := service.resolveParameters(deployment)
 
-		require.ErrorContains(t, err, `failed to find required instance "stack-a" of instance "name-b"`)
+		require.ErrorContains(t, err, `no instance provides parameter "parameter" consumed by "stack-b"`)
 	})
 
 	t.Run("ResolveParameterUsingProvider", func(t *testing.T) {
@@ -226,5 +226,113 @@ func TestResolveParameters(t *testing.T) {
 			},
 		}
 		assert.ElementsMatch(t, want, deployment.Instances)
+	})
+}
+
+func TestProviderBasedRequirements(t *testing.T) {
+	consumer := stack.Stack{
+		Name: "consumer",
+		Parameters: map[string]stack.StackParameter{
+			"HOST": {Consumed: true},
+		},
+	}
+	provider := stack.Stack{
+		Name: "provider",
+		Parameters: map[string]stack.StackParameter{
+			"HOST": {},
+		},
+	}
+	otherProvider := stack.Stack{
+		Name: "other-provider",
+		Parameters: map[string]stack.StackParameter{
+			"HOST": {},
+		},
+	}
+
+	t.Run("ResolvedFromAnyProvidingStack", func(t *testing.T) {
+		stackService := stack.NewService(stack.Stacks{"consumer": consumer, "provider": provider})
+		service := NewService(nil, nil, nil, stackService, nil, nil, "")
+		deployment := &model.Deployment{
+			Instances: []*model.DeploymentInstance{
+				{StackName: "provider", Parameters: map[string]model.DeploymentInstanceParameter{"HOST": {ParameterName: "HOST", Value: "db.svc"}}},
+				{StackName: "consumer", Parameters: map[string]model.DeploymentInstanceParameter{}},
+			},
+		}
+
+		_, err := service.validateNoCycles(deployment.Instances)
+		require.NoError(t, err)
+		err = service.resolveParameters(deployment)
+		require.NoError(t, err)
+		assert.Equal(t, "db.svc", deployment.Instances[1].Parameters["HOST"].Value)
+	})
+
+	t.Run("MissingProvider", func(t *testing.T) {
+		stackService := stack.NewService(stack.Stacks{"consumer": consumer})
+		service := NewService(nil, nil, nil, stackService, nil, nil, "")
+		instances := []*model.DeploymentInstance{
+			{StackName: "consumer", Parameters: map[string]model.DeploymentInstanceParameter{}},
+		}
+
+		_, err := service.validateNoCycles(instances)
+
+		require.ErrorContains(t, err, `no instance provides parameter "HOST" consumed by "consumer"`)
+	})
+
+	t.Run("AmbiguousProviders", func(t *testing.T) {
+		stackService := stack.NewService(stack.Stacks{"consumer": consumer, "provider": provider, "other-provider": otherProvider})
+		service := NewService(nil, nil, nil, stackService, nil, nil, "")
+		instances := []*model.DeploymentInstance{
+			{StackName: "provider", Parameters: map[string]model.DeploymentInstanceParameter{}},
+			{StackName: "other-provider", Parameters: map[string]model.DeploymentInstanceParameter{}},
+			{StackName: "consumer", Parameters: map[string]model.DeploymentInstanceParameter{}},
+		}
+
+		_, err := service.validateNoCycles(instances)
+
+		require.ErrorContains(t, err, `provided by both`)
+	})
+
+	t.Run("PgAdminComposesWithDhis2V2", func(t *testing.T) {
+		stacks, err := stack.New(stack.All...)
+		require.NoError(t, err)
+		service := NewService(nil, nil, nil, stack.NewService(stacks), nil, nil, "")
+		group := &model.Group{Name: "group", Namespace: "namespace"}
+		deployment := &model.Deployment{
+			Instances: []*model.DeploymentInstance{
+				{Name: "core", StackName: "dhis2-v2", GroupName: "group", Group: group, Parameters: map[string]model.DeploymentInstanceParameter{}},
+				{Name: "admin", StackName: "pgadmin", GroupName: "group", Group: group, Parameters: map[string]model.DeploymentInstanceParameter{}},
+			},
+		}
+
+		_, err = service.validateNoCycles(deployment.Instances)
+		require.NoError(t, err)
+		err = service.resolveParameters(deployment)
+		require.NoError(t, err)
+
+		pgadmin := deployment.Instances[1]
+		assert.Contains(t, pgadmin.Parameters["DATABASE_HOSTNAME"].Value, "-dhis2-postgresql-rw.namespace.svc")
+		assert.NotEmpty(t, pgadmin.Parameters["DATABASE_NAME"].Value)
+		assert.NotEmpty(t, pgadmin.Parameters["DATABASE_USERNAME"].Value)
+	})
+
+	t.Run("PgAdminComposesWithDhis2DB", func(t *testing.T) {
+		stacks, err := stack.New(stack.All...)
+		require.NoError(t, err)
+		service := NewService(nil, nil, nil, stack.NewService(stacks), nil, nil, "")
+		group := &model.Group{Name: "group", Namespace: "namespace"}
+		deployment := &model.Deployment{
+			Instances: []*model.DeploymentInstance{
+				{Name: "db", StackName: "dhis2-db", GroupName: "group", Group: group, Parameters: map[string]model.DeploymentInstanceParameter{}},
+				{Name: "admin", StackName: "pgadmin", GroupName: "group", Group: group, Parameters: map[string]model.DeploymentInstanceParameter{}},
+			},
+		}
+
+		_, err = service.validateNoCycles(deployment.Instances)
+		require.NoError(t, err)
+		err = service.resolveParameters(deployment)
+		require.NoError(t, err)
+
+		pgadmin := deployment.Instances[1]
+		assert.NotEmpty(t, pgadmin.Parameters["DATABASE_HOSTNAME"].Value)
 	})
 }
