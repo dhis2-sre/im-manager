@@ -710,8 +710,10 @@ func newPgDumpConfig(instance *model.DeploymentInstance, stack *stack.Stack) (*p
 	}
 
 	// Restores target a freshly created, empty database, so replace the
-	// default arguments without the --clean option.
-	dump.Options = []string{"--no-owner", "--no-acl", "--blob"}
+	// default arguments without the --clean option. The dhis2 chart's seed marker table is chart
+	// bookkeeping owned by the superuser: excluding it keeps it out of the catalog artifact and
+	// keeps pg_dump from failing to lock it when running as the app user.
+	dump.Options = []string{"--no-owner", "--no-acl", "--blob", "--exclude-table=dhis2_chart_seed_complete"}
 
 	// TODO: This is very DHIS2 specific... More stack meta data?
 	dump.IgnoreTableData = []string{"analytics*", "_*"}
