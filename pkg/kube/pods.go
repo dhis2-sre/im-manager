@@ -16,8 +16,8 @@ import (
 	"k8s.io/client-go/tools/remotecommand"
 )
 
-func (c *Client) Logs(instance *model.DeploymentInstance, typeSelector string) (io.ReadCloser, error) {
-	pod, err := c.GetPod(instance.ID, typeSelector)
+func (c *Client) Logs(ctx context.Context, instance *model.DeploymentInstance, typeSelector string) (io.ReadCloser, error) {
+	pod, err := c.GetPod(ctx, instance.ID, typeSelector)
 	if err != nil {
 		return nil, err
 	}
@@ -69,61 +69,63 @@ func (c *Client) Exec(ctx context.Context, namespace, podName, container string,
 	})
 }
 
-func (c *Client) GetPod(instanceID uint, typeSelector string) (v1.Pod, error) {
+func (c *Client) GetPod(ctx context.Context, instanceID uint, typeSelector string) (v1.Pod, error) {
 	selector, err := labelSelector(instanceID, typeSelector)
 	if err != nil {
 		return v1.Pod{}, err
 	}
-	return c.podBySelector(selector)
+	return c.podBySelector(ctx, selector)
 }
 
-func (c *Client) GetPodByLabels(labels map[string]string) (v1.Pod, error) {
+func (c *Client) GetPodByLabels(ctx context.Context, labels map[string]string) (v1.Pod, error) {
 	selector, err := metav1.LabelSelectorAsSelector(&metav1.LabelSelector{MatchLabels: labels})
 	if err != nil {
 		return v1.Pod{}, fmt.Errorf("error creating label selector: %v", err)
 	}
-	return c.podBySelector(selector.String())
+	return c.podBySelector(ctx, selector.String())
 }
 
-// ListPods returns the non-evicted pods matching the selector in the given namespace.
+// ListPods returns the non-evicted pods matching the selector in the given namespace, served
+// from the informer cache when it is synced and live from the API server otherwise.
 func (c *Client) ListPods(ctx context.Context, namespace, selector string) ([]v1.Pod, error) {
+	if c.pods.ready() {
+		pods, err := c.pods.list(namespace, selector)
+		if err == nil {
+			return dropEvicted(pods), nil
+		}
+	}
+
 	pods, err := c.Clientset.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{LabelSelector: selector})
 	if err != nil {
 		return nil, fmt.Errorf("error listing pods for selector %q: %v", selector, err)
 	}
 
-	pods.Items = slices.DeleteFunc(pods.Items, func(pod v1.Pod) bool {
-		return pod.Status.Phase == v1.PodFailed && pod.Status.Reason == "Evicted"
-	})
-
-	return pods.Items, nil
+	return dropEvicted(pods.Items), nil
 }
 
-func (c *Client) podBySelector(selector string) (v1.Pod, error) {
-	listOptions := metav1.ListOptions{
-		LabelSelector: selector,
-	}
+// 'Evicted' pods are safe to filter out, as for each pod there will be another pod created in a
+// different state in place of it.
+func dropEvicted(pods []v1.Pod) []v1.Pod {
+	return slices.DeleteFunc(pods, func(pod v1.Pod) bool {
+		return pod.Status.Phase == v1.PodFailed && pod.Status.Reason == "Evicted"
+	})
+}
 
-	pods, err := c.Clientset.CoreV1().Pods("").List(context.TODO(), listOptions)
+func (c *Client) podBySelector(ctx context.Context, selector string) (v1.Pod, error) {
+	pods, err := c.ListPods(ctx, "", selector)
 	if err != nil {
 		return v1.Pod{}, fmt.Errorf("error getting pod for selector %q: %v", selector, err)
 	}
 
-	// 'Evicted' pods are safe to filter out, as for each pod
-	// there will be another pod created in a different state inplace of it.
-	pods.Items = slices.DeleteFunc(pods.Items, func(pod v1.Pod) bool {
-		return pod.Status.Phase == v1.PodFailed && pod.Status.Reason == "Evicted"
-	})
-
-	if len(pods.Items) == 0 {
+	if len(pods) == 0 {
 		return v1.Pod{}, errdef.NewNotFound("failed to find pod using the selector: %q", selector)
 	}
 
-	if len(pods.Items) > 1 {
+	if len(pods) > 1 {
 		return v1.Pod{}, errdef.NewConflict("multiple pods found using the selector: %q", selector)
 	}
 
-	return pods.Items[0], nil
+	return pods[0], nil
 }
 
 // labelSelector returns a selector with requirements for im-id=instanceId and either the im-default

@@ -144,7 +144,7 @@ func TestFilestoreStreamerForS3(t *testing.T) {
 	}}
 
 	// only s3 is unit-testable here; minio/filesystem resolve a pod and are covered by integration tests
-	streamer, err := s.filestoreStreamerFor(core, model.Cluster{})
+	streamer, err := s.filestoreStreamerFor(context.Background(), core, model.Cluster{})
 	require.NoError(t, err)
 	assert.IsType(t, s3APISource{}, streamer)
 }
@@ -294,7 +294,7 @@ func TestGetPodByLabels(t *testing.T) {
 	}}
 	ks := kube.Client{Clientset: fake.NewSimpleClientset(minioPod, otherPod)}
 
-	pod, err := ks.GetPodByLabels(map[string]string{"im-type": "minio", "im-deployment-id": "7"})
+	pod, err := ks.GetPodByLabels(context.Background(), map[string]string{"im-type": "minio", "im-deployment-id": "7"})
 	require.NoError(t, err)
 	assert.Equal(t, "test-1-minio-abc", pod.Name)
 	assert.Equal(t, "grp", pod.Namespace)
@@ -302,7 +302,7 @@ func TestGetPodByLabels(t *testing.T) {
 
 func TestGetPodByLabelsNotFound(t *testing.T) {
 	ks := kube.Client{Clientset: fake.NewSimpleClientset()}
-	_, err := ks.GetPodByLabels(map[string]string{"im-type": "minio", "im-deployment-id": "7"})
+	_, err := ks.GetPodByLabels(context.Background(), map[string]string{"im-type": "minio", "im-deployment-id": "7"})
 	require.Error(t, err)
 }
 

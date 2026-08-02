@@ -7,6 +7,7 @@ import (
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"k8s.io/client-go/kubernetes/fake"
 )
 
 func TestClientsCachePerCluster(t *testing.T) {
@@ -14,7 +15,7 @@ func TestClientsCachePerCluster(t *testing.T) {
 	clients := NewClients()
 	clients.build = func(cluster model.Cluster) (*Client, error) {
 		builds++
-		return &Client{}, nil
+		return &Client{Clientset: fake.NewSimpleClientset()}, nil
 	}
 
 	updated := time.Now()
@@ -39,4 +40,10 @@ func TestClientsCachePerCluster(t *testing.T) {
 	assert.NotSame(t, first, third)
 	assert.Equal(t, 3, builds)
 	assert.Len(t, clients.byCluster, 2, "the stale entry for the updated cluster is dropped")
+
+	select {
+	case <-first.pods.stop:
+	default:
+		t.Fatal("the stale client's informer should be stopped")
+	}
 }

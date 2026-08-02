@@ -36,12 +36,18 @@ func (c *Clients) For(cluster model.Cluster) (*Client, error) {
 	if err != nil {
 		return nil, err
 	}
+	if client.Clientset != nil {
+		client.pods = newPodCache(client.Clientset)
+	}
 
 	// Drop any stale entry for the same cluster under an older UpdatedAt.
 	for existing := range c.byCluster {
 		var id uint
 		var updated int64
 		if _, err := fmt.Sscanf(existing, "%d-%d", &id, &updated); err == nil && id == cluster.ID && existing != key {
+			if stale := c.byCluster[existing]; stale.pods != nil {
+				stale.pods.close()
+			}
 			delete(c.byCluster, existing)
 		}
 	}
