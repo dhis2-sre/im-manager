@@ -298,8 +298,9 @@ func TestDatabaseSaveCapability(t *testing.T) {
 		assert.Containsf(t, component.SupportedOperations(params), kube.OperationDatabaseSave, "stack %q should advertise databaseSave", s.Name)
 	}
 
-	// chap-db deliberately does not advertise databaseSave: its database is not part of the
-	// DATABASE_ID catalog flow.
+	// chap-db does not advertise databaseSave yet: saving CHAP is planned, but needs its
+	// parameter names mapped in the dump config and a seed/restore path first. Enabling it then
+	// is just adding the capability to its component.
 	chapAccess, err := kube.FindPostgresAccess(ChapDB.Components)
 	require.NoError(t, err)
 	assert.NotContains(t, chapAccess.(kube.Component).SupportedOperations(params), kube.OperationDatabaseSave)
