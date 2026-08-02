@@ -780,13 +780,13 @@ func (s Service) DeploymentComponents(ctx context.Context, deployment *model.Dep
 	return result, nil
 }
 
-func (s Service) Logs(instance *model.DeploymentInstance, group *model.Group, typeSelector string) (io.ReadCloser, error) {
+func (s Service) Logs(ctx context.Context, instance *model.DeploymentInstance, group *model.Group, typeSelector string) (io.ReadCloser, error) {
 	ks, err := s.kubeClients.For(group.Cluster)
 	if err != nil {
 		return nil, err
 	}
 
-	return ks.Logs(instance, typeSelector)
+	return ks.Logs(ctx, instance, typeSelector)
 }
 
 type GroupWithDeployments struct {
@@ -947,13 +947,13 @@ const (
 	Error              InstanceStatus = "Error"
 )
 
-func (s Service) GetStatus(instance *model.DeploymentInstance) (InstanceStatus, error) {
+func (s Service) GetStatus(ctx context.Context, instance *model.DeploymentInstance) (InstanceStatus, error) {
 	ks, err := s.kubeClients.For(instance.Group.Cluster)
 	if err != nil {
 		return "", err
 	}
 
-	pod, err := ks.GetPod(instance.ID, "")
+	pod, err := ks.GetPod(ctx, instance.ID, "")
 	if err != nil {
 		if errdef.IsNotFound(err) {
 			s.logger.Info("Pod not found, assuming not deployed", "instance", instance.ID, "group", instance.GroupName, "error", err)
@@ -1033,7 +1033,7 @@ func (s Service) FilestoreBackup(ctx context.Context, instance *model.Deployment
 	baseName = strings.TrimSuffix(baseName, ".pgc")
 	baseName = strings.TrimSuffix(baseName, ".tar.gz")
 
-	streamer, err := s.filestoreStreamerFor(core, group.Cluster)
+	streamer, err := s.filestoreStreamerFor(ctx, core, group.Cluster)
 	if err != nil {
 		return err
 	}

@@ -310,14 +310,14 @@ func newExternalS3Client(core *model.DeploymentInstance) (*minio.Client, error) 
 
 // filestoreStreamerFor selects the backend-specific streamer: minio and filesystem
 // stream via pod exec, s3 reads the external bucket directly.
-func (s Service) filestoreStreamerFor(core *model.DeploymentInstance, cluster model.Cluster) (filestoreStreamer, error) {
+func (s Service) filestoreStreamerFor(ctx context.Context, core *model.DeploymentInstance, cluster model.Cluster) (filestoreStreamer, error) {
 	switch storageType(core) {
 	case "filesystem":
 		ks, err := s.kubeClients.For(cluster)
 		if err != nil {
 			return nil, err
 		}
-		pod, err := ks.GetPod(core.ID, "")
+		pod, err := ks.GetPod(ctx, core.ID, "")
 		if err != nil {
 			return nil, err
 		}
@@ -341,7 +341,7 @@ func (s Service) filestoreStreamerFor(core *model.DeploymentInstance, cluster mo
 		if err != nil {
 			return nil, err
 		}
-		pod, err := ks.GetPodByLabels(map[string]string{
+		pod, err := ks.GetPodByLabels(ctx, map[string]string{
 			"im-type":          "minio",
 			"im-deployment-id": fmt.Sprint(core.DeploymentID),
 		})

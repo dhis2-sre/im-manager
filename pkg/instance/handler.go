@@ -869,7 +869,7 @@ func (h Handler) Logs(c *gin.Context) {
 	}
 
 	selector := c.Query("selector")
-	r, err := h.instanceService.Logs(instance, group, selector)
+	r, err := h.instanceService.Logs(ctx, instance, group, selector)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -1062,7 +1062,7 @@ func (h Handler) Status(c *gin.Context) {
 		return
 	}
 
-	status, err := h.instanceService.GetStatus(instance)
+	status, err := h.instanceService.GetStatus(ctx, instance)
 	if err != nil {
 		_ = c.Error(err)
 		return

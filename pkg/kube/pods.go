@@ -16,8 +16,8 @@ import (
 	"k8s.io/client-go/tools/remotecommand"
 )
 
-func (c *Client) Logs(instance *model.DeploymentInstance, typeSelector string) (io.ReadCloser, error) {
-	pod, err := c.GetPod(instance.ID, typeSelector)
+func (c *Client) Logs(ctx context.Context, instance *model.DeploymentInstance, typeSelector string) (io.ReadCloser, error) {
+	pod, err := c.GetPod(ctx, instance.ID, typeSelector)
 	if err != nil {
 		return nil, err
 	}
@@ -69,20 +69,20 @@ func (c *Client) Exec(ctx context.Context, namespace, podName, container string,
 	})
 }
 
-func (c *Client) GetPod(instanceID uint, typeSelector string) (v1.Pod, error) {
+func (c *Client) GetPod(ctx context.Context, instanceID uint, typeSelector string) (v1.Pod, error) {
 	selector, err := labelSelector(instanceID, typeSelector)
 	if err != nil {
 		return v1.Pod{}, err
 	}
-	return c.podBySelector(selector)
+	return c.podBySelector(ctx, selector)
 }
 
-func (c *Client) GetPodByLabels(labels map[string]string) (v1.Pod, error) {
+func (c *Client) GetPodByLabels(ctx context.Context, labels map[string]string) (v1.Pod, error) {
 	selector, err := metav1.LabelSelectorAsSelector(&metav1.LabelSelector{MatchLabels: labels})
 	if err != nil {
 		return v1.Pod{}, fmt.Errorf("error creating label selector: %v", err)
 	}
-	return c.podBySelector(selector.String())
+	return c.podBySelector(ctx, selector.String())
 }
 
 // ListPods returns the non-evicted pods matching the selector in the given namespace, served
@@ -111,8 +111,8 @@ func dropEvicted(pods []v1.Pod) []v1.Pod {
 	})
 }
 
-func (c *Client) podBySelector(selector string) (v1.Pod, error) {
-	pods, err := c.ListPods(context.TODO(), "", selector)
+func (c *Client) podBySelector(ctx context.Context, selector string) (v1.Pod, error) {
+	pods, err := c.ListPods(ctx, "", selector)
 	if err != nil {
 		return v1.Pod{}, fmt.Errorf("error getting pod for selector %q: %v", selector, err)
 	}
