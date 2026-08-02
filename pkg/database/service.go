@@ -16,6 +16,7 @@ import (
 	"golang.org/x/exp/maps"
 
 	"github.com/dhis2-sre/im-manager/internal/errdef"
+	"github.com/dhis2-sre/im-manager/pkg/kube"
 
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	"github.com/dhis2-sre/im-manager/pkg/stack"
@@ -54,7 +55,7 @@ type PodExecutor interface {
 	Exec(ctx context.Context, namespace, podName, container string, command []string, stdout, stderr io.Writer) error
 }
 
-type podExecutorFunc func(cluster model.Cluster) (PodExecutor, error)
+type podExecutorFunc func(cluster model.Cluster) (*kube.Client, error)
 
 type Service struct {
 	logger       *slog.Logger
@@ -589,17 +590,19 @@ func (s Service) Dump(ctx context.Context, userId uint, database *model.Database
 	dump.Host = "localhost"
 	command := buildPgDumpCommand(dump, format)
 
-	podExecutor, err := s.podExecutor(group.Cluster)
+	client, err := s.podExecutor(group.Cluster)
 	if err != nil {
 		return fail(err)
 	}
 
-	hostname, err := stack.ParameterProviders["DATABASE_HOSTNAME"].Provide(*instance)
+	access, err := kube.FindPostgresAccess(stack.Components)
+	if err != nil {
+		return fail(errdef.NewBadRequest("stack %q does not support database save", stack.Name))
+	}
+	podName, container, err := access.PostgresPod(ctx, client, instance)
 	if err != nil {
 		return fail(err)
 	}
-	// TODO: get pod by label selector instead
-	podName := strings.Split(hostname, ".")[0] + "-0"
 	namespace := instance.Group.Namespace
 
 	pr, pw := io.Pipe()
@@ -617,10 +620,10 @@ func (s Service) Dump(ctx context.Context, userId uint, database *model.Database
 		uploadDone <- uploadResult{size, err}
 	}()
 
-	s.logger.InfoContext(ctx, "starting pg_dump", "pod", podName, "namespace", namespace, "command", strings.Join(redactPgPassword(command), " "))
+	s.logger.InfoContext(ctx, "starting pg_dump", "pod", podName, "container", container, "namespace", namespace, "command", strings.Join(redactPgPassword(command), " "))
 	publish("started", "", 0)
 
-	if err := execPgDump(ctx, podExecutor, namespace, podName, command, pw, format, database.Name); err != nil {
+	if err := execPgDump(ctx, client, namespace, podName, container, command, pw, format, database.Name); err != nil {
 		s.logger.ErrorContext(ctx, "failed to exec pg_dump", "error", err)
 		<-uploadDone
 		publish("error", err.Error(), 0)
@@ -648,7 +651,7 @@ func (s Service) Dump(ctx context.Context, userId uint, database *model.Database
 	return saved, nil
 }
 
-func execPgDump(ctx context.Context, executor PodExecutor, namespace, podName string, command []string, pw *io.PipeWriter, format string, databaseName string) error {
+func execPgDump(ctx context.Context, executor PodExecutor, namespace, podName, container string, command []string, pw *io.PipeWriter, format string, databaseName string) error {
 	var execWriter io.WriteCloser = pw
 	var gzWriter *gzip.Writer
 	if format == "plain" {
@@ -658,7 +661,7 @@ func execPgDump(ctx context.Context, executor PodExecutor, namespace, podName st
 	}
 
 	var stderrBuf strings.Builder
-	execErr := executor.Exec(ctx, namespace, podName, "postgresql", command, execWriter, &stderrBuf)
+	execErr := executor.Exec(ctx, namespace, podName, container, command, execWriter, &stderrBuf)
 
 	if gzWriter != nil {
 		gzWriter.Close()

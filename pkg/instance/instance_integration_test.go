@@ -128,9 +128,7 @@ func TestInstanceHandler(t *testing.T) {
 	uploader := manager.NewUploader(s3.Client)
 	s3Client := storage.NewS3Client(logger, s3.Client, uploader)
 	databaseRepository := database.NewRepository(db)
-	databaseService := database.NewService(logger, s3Bucket, s3Client, groupService, databaseRepository, func(c model.Cluster) (database.PodExecutor, error) {
-		return kube.NewClient(c)
-	}, noopPublisher{})
+	databaseService := database.NewService(logger, s3Bucket, s3Client, groupService, databaseRepository, kube.NewClient, noopPublisher{})
 	deploymentService := deployment.NewService(logger, instanceService, databaseService, tokenService, noopPublisher{})
 
 	// this is only to allow testing using multiple users without bringing in all our auth stack
