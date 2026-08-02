@@ -25,9 +25,10 @@ const cacheResyncPeriod = 0
 // breaks, readers fall back to live LISTs, so the cache degrades to the uncached behavior instead
 // of becoming an outage.
 type podCache struct {
-	lister corelisters.PodLister
-	synced cache.InformerSynced
-	stop   chan struct{}
+	informer cache.SharedIndexInformer
+	lister   corelisters.PodLister
+	synced   cache.InformerSynced
+	stop     chan struct{}
 }
 
 func newPodCache(clientset kubernetes.Interface) *podCache {
@@ -37,7 +38,7 @@ func newPodCache(clientset kubernetes.Interface) *podCache {
 		}))
 	informer := factory.Core().V1().Pods()
 	stop := make(chan struct{})
-	c := &podCache{lister: informer.Lister(), synced: informer.Informer().HasSynced, stop: stop}
+	c := &podCache{informer: informer.Informer(), lister: informer.Lister(), synced: informer.Informer().HasSynced, stop: stop}
 	factory.Start(stop)
 	return c
 }
@@ -70,6 +71,11 @@ func (p *podCache) list(namespace, selector string) ([]v1.Pod, error) {
 	}
 	slices.SortFunc(result, func(a, b v1.Pod) int { return cmp.Compare(a.Name, b.Name) })
 	return result, nil
+}
+
+func (p *podCache) addHandler(handler cache.ResourceEventHandler) error {
+	_, err := p.informer.AddEventHandler(handler)
+	return err
 }
 
 func (p *podCache) close() {

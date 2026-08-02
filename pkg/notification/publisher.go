@@ -85,3 +85,25 @@ func (p *Publisher) Publish(ctx context.Context, userID uint, groupName, kind st
 		p.logger.ErrorContext(ctx, "Failed to send notification to RabbitMQ", "kind", kind, "error", err)
 	}
 }
+
+// PublishTransient streams an event to the group without persisting a notification and without an
+// owner, so every group member's live connection receives it and it never appears in the
+// notification bell. Meant for high-frequency ephemeral state like component status.
+func (p *Publisher) PublishTransient(ctx context.Context, groupName, kind string, payload any) {
+	data, err := json.Marshal(payload)
+	if err != nil {
+		p.logger.ErrorContext(ctx, "Failed to marshal transient event payload", "kind", kind, "error", err)
+		return
+	}
+
+	msg := amqp.NewMessage(data)
+	msg.SetPublishingId(p.counter.Add(1))
+	msg.ApplicationProperties = map[string]any{
+		"group": groupName,
+		"kind":  kind,
+	}
+
+	if err := p.producer.Send(msg); err != nil {
+		p.logger.ErrorContext(ctx, "Failed to send transient event to RabbitMQ", "kind", kind, "error", err)
+	}
+}
