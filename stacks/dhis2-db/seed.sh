@@ -25,11 +25,29 @@ curl --connect-timeout 10 --retry 5 --retry-delay 1 --fail -L "$DATABASE_DOWNLOA
   exit 1
 }
 
-# Try pg_restore... Or gzipped sql
-# pg_restore often returns a non zero return code due to benign errors resulting in executing of gunzip despite the restore being successful
-# gunzip will fail because the input isn't gzipped causing the whole seed script to fail... Which is why there's a "|| true" at the end
-(pg_restore --verbose -U postgres -d "$DATABASE_NAME" -j 4 "$tmp_file") ||
-  (gunzip -v -c "$tmp_file" | psql -U postgres -d "$DATABASE_NAME") || true
+# Detect the dump format up front rather than trying both, so a failure in the restore that actually
+# ran cannot be masked by falling through to the other one.
+if gunzip --test "$tmp_file" 2>/dev/null; then
+  # A truncated dump still decompresses cleanly, so pg_dump's end marker is the only proof it is
+  # whole. Read the tail into a variable instead of piping into grep, which exits on the first match
+  # and SIGPIPEs tail, tripping pipefail on a good dump.
+  dump_tail=$(gunzip -c "$tmp_file" | tail -c 512)
+  if [[ "$dump_tail" != *"PostgreSQL database dump complete"* ]]; then
+    echo "Refusing to restore: dump is truncated, it does not end with pg_dump's completion marker"
+    exit 1
+  fi
+
+  echo "Restoring gzipped plain SQL dump"
+  gunzip -c "$tmp_file" | psql --username=postgres --dbname="$DATABASE_NAME" --set ON_ERROR_STOP=on
+elif pg_restore --list "$tmp_file" >/dev/null 2>&1; then
+  echo "Restoring pg_dump archive"
+  # --list already rejected a corrupt archive, and pg_restore exits non zero on benign errors such
+  # as a missing role, so its exit code is logged rather than treated as fatal.
+  pg_restore --verbose -U postgres -d "$DATABASE_NAME" -j 4 "$tmp_file" || echo "pg_restore exited with $?, continuing"
+else
+  echo "Refusing to restore: dump is neither valid gzip nor a valid pg_dump archive"
+  exit 1
+fi
 rm "$tmp_file"
 
 ## Change ownership to $DATABASE_USERNAME
