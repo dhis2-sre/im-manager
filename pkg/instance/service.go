@@ -1040,12 +1040,13 @@ func (s Service) FilestoreBackup(ctx context.Context, instance *model.Deployment
 
 	key := fmt.Sprintf("%s/%s-%s.tar.gz", instance.GroupName, baseName, "fs")
 	backupService := NewBackupService(s.logger, s.s3Client)
-	if err := backupService.PerformBackup(ctx, streamer, s.s3Bucket, key); err != nil {
+	size, err := backupService.PerformBackup(ctx, streamer, s.s3Bucket, key)
+	if err != nil {
 		return err
 	}
 
 	s3Uri := fmt.Sprintf("s3://%s/%s", s.s3Bucket, key)
-	filestore, err := s.recordBackup(ctx, instance.GroupName, s3Uri, baseName+"-fs.tar.gz", database.UserID)
+	filestore, err := s.recordBackup(ctx, instance.GroupName, s3Uri, baseName+"-fs.tar.gz", database.UserID, size)
 	if err != nil {
 		return err
 	}
@@ -1055,13 +1056,14 @@ func (s Service) FilestoreBackup(ctx context.Context, instance *model.Deployment
 	return s.instanceRepository.SaveDatabase(ctx, database)
 }
 
-func (s Service) recordBackup(ctx context.Context, groupName, s3uri, name string, userID uint) (*model.Database, error) {
+func (s Service) recordBackup(ctx context.Context, groupName, s3uri, name string, userID uint, size int64) (*model.Database, error) {
 	database := &model.Database{
 		Name:      name,
 		GroupName: groupName,
 		Url:       s3uri,
 		Type:      "fs",
 		UserID:    userID,
+		Size:      size,
 	}
 	err := s.instanceRepository.RecordBackup(ctx, database)
 	if err != nil {

@@ -421,3 +421,32 @@ func (ss stackService) Find(name string) (*stack.Stack, error) {
 type noopPublisher struct{}
 
 func (noopPublisher) Publish(context.Context, uint, string, string, any) {}
+
+// TestFilestoreAssociationResolvesThroughFilestoreID guards the self-referential association: the
+// foreign key has to be FilestoreID, since resolving it through ID silently returns the database
+// itself as its own file store.
+func TestFilestoreAssociationResolvesThroughFilestoreID(t *testing.T) {
+	t.Parallel()
+
+	db := inttest.SetupDB(t)
+	repository := database.NewRepository(db)
+	ctx := context.Background()
+	user, _ := userpkg.CreateUserWithGroup(t, db, "packages", "some", "", "filestore-user@dhis2.org")
+
+	filestore := &model.Database{Name: "saved-fs.tar.gz", GroupName: "packages", Slug: "packages/saved-fs", Type: "fs", Size: 4096, UserID: user.ID}
+	require.NoError(t, db.Create(filestore).Error)
+
+	saved := &model.Database{Name: "saved.pgc", GroupName: "packages", Slug: "packages/saved", Type: "database", FilestoreID: filestore.ID, UserID: user.ID}
+	require.NoError(t, db.Create(saved).Error)
+
+	found, err := repository.FindById(ctx, saved.ID)
+	require.NoError(t, err)
+	require.NotNil(t, found.Filestore, "the file store should be loaded, not left nil")
+	assert.Equal(t, filestore.ID, found.Filestore.ID)
+	assert.Equal(t, "saved-fs.tar.gz", found.Filestore.Name, "resolving through ID would return the database itself")
+	assert.Equal(t, int64(4096), found.Filestore.Size)
+
+	withoutFilestore, err := repository.FindById(ctx, filestore.ID)
+	require.NoError(t, err)
+	assert.Nil(t, withoutFilestore.Filestore, "a file store row has no file store of its own")
+}
