@@ -23,6 +23,9 @@ jobs:
   delete-im-vm-environment:
     name: Delete the im-vm feature environment
     runs-on: ubuntu-24.04
+    # A closed pull request has no environment either way, but unlabeled fires for every label, and
+    # only this one created anything.
+    if: github.event.action == 'closed' || github.event.label.name == 'deploy'
     steps:
       - name: Destroy
         env:

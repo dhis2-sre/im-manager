@@ -3,7 +3,8 @@ name: Deploy to im-vm
 # The Hetzner control plane in dhis2-sre/dhis2-infrastructure services/im-vm, which replaces the EKS
 # instance-cluster. Runs after Build, test and deploy has pushed the image, because it deploys a tag
 # that has to exist, and works out that tag exactly as the build does: the sanitized head branch for
-# a pull request, latest for master, the tag itself for a release.
+# a pull request, latest for master, the tag itself for a release. A pull request gets an
+# environment only while it carries the deploy label, which is the label the EKS deploy uses too.
 #
 # The whole interface is a forced command over SSH. A deploy key can start an environment and, for
 # feature environments only, destroy one. It cannot open a shell, and it cannot stop or destroy a
@@ -36,12 +37,26 @@ jobs:
           EVENT: ${{ github.event.workflow_run.event }}
           HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
           PULL_REQUESTS: ${{ toJSON(github.event.workflow_run.pull_requests) }}
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
         run: |
           set -o errexit -o nounset -o pipefail
 
           pull_request=$(printf '%s' "$PULL_REQUESTS" | jq -r '.[0].number // empty')
 
           if [ -n "$pull_request" ]; then
+            # Opt in per pull request, on the same label the EKS deploy in gha-workflows uses, so
+            # one label drives both and removing it tears both down. An environment costs a
+            # database, a Redis and a RabbitMQ on a box shared with dev, and the build runs on
+            # every pull request event, so without this every open pull request would claim one.
+            labelled=$(gh pr view "$pull_request" --repo "$REPOSITORY" --json labels \
+              --jq 'any(.labels[].name; . == "deploy")')
+            if [ "$labelled" != true ]; then
+              echo "pull request $pull_request is not labelled deploy, nothing to deploy"
+              echo "server=none" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+
             # The same sanitisation the build uses for the image tag: lowercase, non-alphanumerics
             # to hyphens, 25 characters, no trailing hyphen.
             lowercase=$(printf '%s' "$HEAD_BRANCH" | tr '[:upper:]' '[:lower:]')
