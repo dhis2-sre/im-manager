@@ -2,6 +2,7 @@ package instance
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"strconv"
 
@@ -47,37 +48,52 @@ func NewComponentStatusWatcher(logger *slog.Logger, instances instanceLookup, pu
 
 var _ cache.ResourceEventHandler = &ComponentStatusWatcher{}
 
-func (w *ComponentStatusWatcher) OnAdd(obj interface{}, isInInitialList bool) {
+func (w *ComponentStatusWatcher) OnAdd(obj any, isInInitialList bool) {
 	// The initial list is the informer syncing what already runs; clients load that state through
 	// the components endpoint, so only genuine additions are pushed.
 	if isInInitialList {
 		return
 	}
-	w.publish(obj, false)
-}
-
-func (w *ComponentStatusWatcher) OnUpdate(oldObj, newObj interface{}) {
-	oldPod, okOld := oldObj.(*v1.Pod)
-	newPod, okNew := newObj.(*v1.Pod)
-	if okOld && okNew && kube.NewReplica(*oldPod) == kube.NewReplica(*newPod) {
-		return
+	if pod, ok := w.podFrom(obj); ok {
+		w.publish(pod, false)
 	}
-	w.publish(newObj, false)
 }
 
-func (w *ComponentStatusWatcher) OnDelete(obj interface{}) {
-	if unknown, ok := obj.(cache.DeletedFinalStateUnknown); ok {
-		obj = unknown.Obj
-	}
-	w.publish(obj, true)
-}
-
-func (w *ComponentStatusWatcher) publish(obj interface{}, deleted bool) {
-	pod, ok := obj.(*v1.Pod)
+func (w *ComponentStatusWatcher) OnUpdate(oldObj, newObj any) {
+	newPod, ok := w.podFrom(newObj)
 	if !ok {
 		return
 	}
+	// Writes that leave the replica view untouched, e.g. an unrelated annotation, are not worth an
+	// event. Without the previous pod there is nothing to compare, so the event goes out.
+	if oldPod, ok := w.podFrom(oldObj); ok && kube.NewReplica(*oldPod) == kube.NewReplica(*newPod) {
+		return
+	}
+	w.publish(newPod, false)
+}
 
+func (w *ComponentStatusWatcher) OnDelete(obj any) {
+	if pod, ok := w.podFrom(obj); ok {
+		w.publish(pod, true)
+	}
+}
+
+// podFrom recovers the pod from an informer event payload, unwrapping the tombstone the informer
+// delivers when a delete went unobserved. Anything else is logged rather than dropped in silence,
+// since that would leave clients stale with nothing pointing at why.
+func (w *ComponentStatusWatcher) podFrom(obj any) (*v1.Pod, bool) {
+	if tombstone, ok := obj.(cache.DeletedFinalStateUnknown); ok {
+		obj = tombstone.Obj
+	}
+	pod, ok := obj.(*v1.Pod)
+	if !ok {
+		w.logger.Warn("Ignoring pod informer event of unexpected type", "type", fmt.Sprintf("%T", obj))
+		return nil, false
+	}
+	return pod, true
+}
+
+func (w *ComponentStatusWatcher) publish(pod *v1.Pod, deleted bool) {
 	component := pod.Labels["im-type"]
 	instanceID, err := strconv.ParseUint(pod.Labels["im-id"], 10, 64)
 	if component == "" || err != nil {

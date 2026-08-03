@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/tools/cache"
 )
 
 type recordedEvent struct {
@@ -119,4 +120,25 @@ func TestComponentStatusWatcher(t *testing.T) {
 
 		assert.Empty(t, publisher.events)
 	})
+}
+
+func TestComponentStatusWatcherIgnoresUnexpectedTypes(t *testing.T) {
+	publisher := &recordingPublisher{}
+	instance := &model.DeploymentInstance{ID: 42, DeploymentID: 7, GroupName: "whoami"}
+	watcher := NewComponentStatusWatcher(slog.Default(), stubLookup{instance: instance}, publisher)
+
+	// Nothing here is a pod, so none of it may panic or publish.
+	watcher.OnAdd("not a pod", false)
+	watcher.OnUpdate(42, "still not a pod")
+	watcher.OnDelete(nil)
+	assert.Empty(t, publisher.events)
+
+	// A tombstone wrapping a real pod is a genuine delete.
+	watcher.OnDelete(cache.DeletedFinalStateUnknown{Key: "ns/db-0", Obj: watcherPod(v1.PodRunning, true)})
+	require.Len(t, publisher.events, 1)
+	assert.True(t, publisher.events[0].payload.(componentStatusEvent).Deleted)
+
+	// An update whose previous object is not a pod still publishes, there is nothing to compare to.
+	watcher.OnUpdate("not a pod", watcherPod(v1.PodRunning, true))
+	assert.Len(t, publisher.events, 2)
 }
