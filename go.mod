@@ -44,7 +44,7 @@ require (
 	golang.org/x/exp v0.0.0-20250128182459-e0ece0dbea4c
 	golang.org/x/sync v0.22.0
 	gopkg.in/yaml.v3 v3.0.1
-	gorm.io/driver/postgres v1.6.1
+	gorm.io/driver/postgres v1.6.2
 	gorm.io/gorm v1.31.2
 	k8s.io/api v0.36.3
 	k8s.io/apimachinery v0.36.3
