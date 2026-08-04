@@ -26,27 +26,35 @@ curl --connect-timeout 10 --retry 5 --retry-delay 1 --fail -L "$DATABASE_DOWNLOA
 }
 
 # Detect the dump format up front rather than trying both, so a failure in the restore that actually
-# ran cannot be masked by falling through to the other one.
-if gunzip --test "$tmp_file" 2>/dev/null; then
-  # A truncated dump still decompresses cleanly, so pg_dump's end marker is the only proof it is
-  # whole. Read the tail into a variable instead of piping into grep, which exits on the first match
-  # and SIGPIPEs tail, tripping pipefail on a good dump.
-  dump_tail=$(gunzip -c "$tmp_file" | tail -c 512)
-  if [[ "$dump_tail" != *"PostgreSQL database dump complete"* ]]; then
-    echo "Refusing to restore: dump is truncated, it does not end with pg_dump's completion marker"
-    exit 1
-  fi
-
-  echo "Restoring gzipped plain SQL dump"
-  gunzip -c "$tmp_file" | psql --username=postgres --dbname="$DATABASE_NAME" --set ON_ERROR_STOP=on
-elif pg_restore --list "$tmp_file" >/dev/null 2>&1; then
+# ran cannot be masked by falling through to the other one. Uploads are not necessarily pg_dump
+# output, so anything that reads as SQL is still accepted.
+if pg_restore --list "$tmp_file" >/dev/null 2>&1; then
   echo "Restoring pg_dump archive"
   # --list already rejected a corrupt archive, and pg_restore exits non zero on benign errors such
   # as a missing role, so its exit code is logged rather than treated as fatal.
   pg_restore --verbose -U postgres -d "$DATABASE_NAME" -j 4 "$tmp_file" || echo "pg_restore exited with $?, continuing"
 else
-  echo "Refusing to restore: dump is neither valid gzip nor a valid pg_dump archive"
-  exit 1
+  if gunzip --test "$tmp_file" 2>/dev/null; then
+    kind="gzipped SQL"
+    reader=(gunzip -c "$tmp_file")
+  else
+    kind="plain SQL"
+    reader=(cat "$tmp_file")
+  fi
+
+  # Only pg_dump writes the completion marker, so the check applies solely to its own output. head
+  # and tail exit before the reader finishes, so pipefail is disabled for these two subshells.
+  dump_head=$(set +o pipefail; "${reader[@]}" 2>/dev/null | head -c 4096)
+  if [[ "$dump_head" == *"PostgreSQL database dump"* ]]; then
+    dump_tail=$(set +o pipefail; "${reader[@]}" 2>/dev/null | tail -c 512)
+    if [[ "$dump_tail" != *"PostgreSQL database dump complete"* ]]; then
+      echo "Refusing to restore: pg_dump output is truncated, it does not end with the completion marker"
+      exit 1
+    fi
+  fi
+
+  echo "Restoring $kind"
+  "${reader[@]}" | psql --username=postgres --dbname="$DATABASE_NAME" --set ON_ERROR_STOP=on
 fi
 rm "$tmp_file"
 
