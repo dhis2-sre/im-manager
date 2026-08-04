@@ -607,9 +607,12 @@ type userCounter struct {
 	count atomic.Uint32
 }
 
-func (uc *userCounter) Increment() {
+// Increment reserves the next user number and returns it. The number has to come out of the same
+// atomic operation that produced it, because parallel subtests otherwise increment and then read
+// separately, and two of them can read the same count and derive the same email address.
+func (uc *userCounter) Increment() int {
 	uc.wg.Add(1)
-	uc.count.Add(1)
+	return int(uc.count.Add(1))
 }
 
 func (uc *userCounter) Done() {
@@ -627,9 +630,9 @@ func (uc *userCounter) Value() int {
 func createUser(t *testing.T, client *inttest.HTTPClient, userService *user.Service) (uint, string, string) {
 	t.Helper()
 
-	userCount.Increment()
+	number := userCount.Increment()
 	defer userCount.Done()
-	email := fmt.Sprintf("user%d@dhis2.org", userCount.Value())
+	email := fmt.Sprintf("user%d@dhis2.org", number)
 	password := uuid.NewString()
 	requestBody := jsonBody(`{"email": "%s", "password": "%s"}`, email, password)
 
