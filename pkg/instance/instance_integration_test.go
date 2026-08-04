@@ -260,6 +260,7 @@ func TestInstanceHandler(t *testing.T) {
 
 	t.Run("GetPublicDeployments", func(t *testing.T) {
 		t.Parallel()
+		acquireHeavyDeploy(t)
 		privateDeployment := createDeployment(t, client, "private-deployment", tokens.AccessToken)
 		createDHIS2DBInstance(t, client, privateDeployment.ID, databaseID, tokens.AccessToken)
 		createDHIS2CoreInstance(t, client, privateDeployment.ID, tokens.AccessToken)
@@ -280,6 +281,7 @@ func TestInstanceHandler(t *testing.T) {
 
 	t.Run("DeploymentWithCompanionStack", func(t *testing.T) {
 		t.Parallel()
+		acquireHeavyDeploy(t)
 		deployment := createDeployment(t, client, "companion-deployment", tokens.AccessToken, WithDescription("some description"))
 		deploymentInstance := createDHIS2DBInstance(t, client, deployment.ID, databaseID, tokens.AccessToken)
 		deploymentInstance = createMinioInstance(t, client, deployment.ID, tokens.AccessToken)
@@ -299,6 +301,7 @@ func TestInstanceHandler(t *testing.T) {
 
 	t.Run("FilestoreBackupMinioViaExec", func(t *testing.T) {
 		t.Parallel()
+		acquireHeavyDeploy(t)
 
 		deployment := createDeployment(t, client, "fs-backup-deployment", tokens.AccessToken)
 		createDHIS2DBInstance(t, client, deployment.ID, databaseID, tokens.AccessToken)
@@ -390,6 +393,7 @@ func TestInstanceHandler(t *testing.T) {
 
 	t.Run("SaveAsDatabase", func(t *testing.T) {
 		t.Parallel()
+		acquireHeavyDeploy(t)
 		deployment := createDeployment(t, client, "save-as-deployment", tokens.AccessToken)
 		dbInstance := createDHIS2DBInstance(t, client, deployment.ID, databaseID, tokens.AccessToken)
 
@@ -427,6 +431,7 @@ func TestInstanceHandler(t *testing.T) {
 
 	t.Run("SaveDatabase", func(t *testing.T) {
 		t.Parallel()
+		acquireHeavyDeploy(t)
 
 		dbID := database.UploadTestDatabase(t, client, "save-test.sql.gz", "select now();", "group-name", inttest.WithAuthToken(tokens.AccessToken))
 
@@ -462,6 +467,7 @@ func TestInstanceHandler(t *testing.T) {
 
 	t.Run("UpdateDeploymentInstance", func(t *testing.T) {
 		t.Parallel()
+		acquireHeavyDeploy(t)
 		deployment := createDeployment(t, client, "test-deployment-instance-update", tokens.AccessToken, WithDescription("some description"))
 
 		createDHIS2DBInstance(t, client, deployment.ID, databaseID, tokens.AccessToken)
