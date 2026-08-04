@@ -1,0 +1,71 @@
+name: Find Expiring Certificates
+
+on:
+  schedule:
+    - cron: '30 8 * * *'
+  workflow_dispatch:
+    inputs:
+      days:
+        description: 'Expiry threshold in days'
+        required: false
+        default: '14'
+
+jobs:
+  find-expiring-certificates:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install kubectl
+        uses: alexellis/arkade-get@master
+        with:
+          kubectl: v1.31.4
+
+      - name: Install Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.x'
+
+      - name: Create kubeconfig files
+        run: |
+          echo "${{ secrets.KUBECONFIG }}" > /tmp/eks-kubeconfig
+          echo "${{ secrets.HETZNER_KUBECONFIG }}" > /tmp/hetzner-kubeconfig
+
+      - name: Find expiring certificates
+        id: find-expiring-certificates
+        run: |
+          set -o pipefail
+          python scripts/util/find-expiring-certificates.py \
+            --days ${{ github.event.inputs.days || '14' }} \
+            --kubeconfig /tmp/eks-kubeconfig \
+            --kubeconfig /tmp/hetzner-kubeconfig |
+            tee /tmp/find-expiring-certificates-output
+
+          UNHEALTHY_COUNT=$(grep 'Unhealthy certificates' /tmp/find-expiring-certificates-output | grep --only-matching --regexp='([0-9]\+):$' | tr --delete '():')
+          echo "unhealthy_count=$UNHEALTHY_COUNT" >> $GITHUB_OUTPUT
+
+          {
+            echo "unhealthy_list<<CERTS_EOF"
+            sed -n '/^Unhealthy certificates/,/^$/p' /tmp/find-expiring-certificates-output | sed '$d'
+            echo "CERTS_EOF"
+          } >> $GITHUB_OUTPUT
+
+      - name: Send Slack notification
+        if: steps.find-expiring-certificates.outputs.unhealthy_count > '0'
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+          SLACK_CHANNEL: 'team-devops-internal'
+          SLACK_MESSAGE: |
+            :lock: Expiring TLS Certificates Found
+
+            ${{ steps.find-expiring-certificates.outputs.unhealthy_count }} certificate(s) need attention.
+
+            ```
+            ${{ steps.find-expiring-certificates.outputs.unhealthy_list }}
+            ```
+
+            View remediation commands in the GitHub Actions logs (step: "Find expiring certificates"):
+            https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          SLACK_COLOR: 'failure'
