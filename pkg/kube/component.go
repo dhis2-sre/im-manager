@@ -142,6 +142,11 @@ func (b BaseComponent) pods(ctx context.Context, client *Client, instance *model
 	return client.ListPods(ctx, instance.Group.Namespace, selector)
 }
 
+// NewReplica derives the replica view of a pod, shared by the cache event handlers.
+func NewReplica(pod v1.Pod) Replica {
+	return newReplica(pod)
+}
+
 func newReplica(pod v1.Pod) Replica {
 	var restarts int32
 	for _, status := range pod.Status.ContainerStatuses {

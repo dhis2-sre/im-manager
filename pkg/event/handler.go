@@ -8,6 +8,7 @@ import (
 	"math/rand/v2"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/dhis2-sre/im-manager/internal/errdef"
 	"github.com/dhis2-sre/im-manager/internal/handler"
@@ -102,11 +103,21 @@ func (h Handler) StreamEvents(c *gin.Context) {
 	c.Writer.Flush()
 	logger.InfoContext(ctx, "Connection established for sending SSE events")
 
+	heartbeat := time.NewTicker(30 * time.Second)
+	defer heartbeat.Stop()
+
 	for {
 		select {
 		case <-ctx.Done():
 			logger.InfoContext(ctx, "Request canceled, returning from /events handler")
 			return
+		case <-heartbeat.C:
+			// A comment frame keeps idle connections alive through proxies; browsers ignore it.
+			if _, err := c.Writer.WriteString(": heartbeat\n\n"); err != nil {
+				logger.InfoContext(ctx, "Failed to write SSE heartbeat, client likely gone", "error", err)
+				return
+			}
+			c.Writer.Flush()
 		case sseEvent := <-sseEvents:
 			c.Render(-1, sseEvent)
 			c.Writer.Flush()
