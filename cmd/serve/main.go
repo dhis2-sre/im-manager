@@ -215,6 +215,8 @@ func run() (err error) {
 
 	deploymentService := deployment.NewService(logger, instanceService, databaseService, tokenService, publisher)
 
+	kubeClients.RegisterPodHandler(instance.NewComponentStatusWatcher(logger, instanceService, publisher))
+
 	databaseHandler := database.NewHandler(logger, databaseService, groupService, instanceService, stackService, deploymentService)
 
 	instanceHandler, err := newInstanceHandler(stackService, groupService, instanceService, deploymentService)
