@@ -95,7 +95,7 @@ func (w *ComponentStatusWatcher) podFrom(obj any) (*v1.Pod, bool) {
 
 func (w *ComponentStatusWatcher) publish(pod *v1.Pod, deleted bool) {
 	component := pod.Labels["im-type"]
-	instanceID, err := strconv.ParseUint(pod.Labels["im-id"], 10, 64)
+	instanceID, err := strconv.ParseUint(pod.Labels["im-id"], 10, strconv.IntSize)
 	if component == "" || err != nil {
 		return
 	}
