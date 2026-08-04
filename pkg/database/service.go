@@ -605,35 +605,44 @@ func (s Service) Dump(ctx context.Context, userId uint, database *model.Database
 	}
 	namespace := instance.Group.Namespace
 
-	pr, pw := io.Pipe()
-
 	key := fmt.Sprintf("%s/%s", group.Name, database.Name)
-
-	type uploadResult struct {
-		size int64
-		err  error
-	}
-	uploadDone := make(chan uploadResult, 1)
-	go func() {
-		defer pr.Close()
-		size, err := s.s3Client.StreamUpload(ctx, s.s3Bucket, key, "application/octet-stream", pr)
-		uploadDone <- uploadResult{size, err}
-	}()
 
 	s.logger.InfoContext(ctx, "starting pg_dump", "pod", podName, "container", container, "namespace", namespace, "command", strings.Join(redactPgPassword(command), " "))
 	publish("started", "", 0)
 
-	if err := execPgDump(ctx, client, namespace, podName, container, command, pw, format, database.Name); err != nil {
+	// One attempt of the whole pipeline: pg_dump in the pod writing into a pipe that is streamed to
+	// S3. Retried as a unit, since a failed attempt leaves a partial object behind that the next
+	// upload to the same key replaces.
+	attempt := func() (int64, error) {
+		pr, pw := io.Pipe()
+
+		type uploadResult struct {
+			size int64
+			err  error
+		}
+		uploadDone := make(chan uploadResult, 1)
+		go func() {
+			defer pr.Close()
+			size, err := s.s3Client.StreamUpload(ctx, s.s3Bucket, key, "application/octet-stream", pr)
+			uploadDone <- uploadResult{size, err}
+		}()
+
+		if err := execPgDump(ctx, client, namespace, podName, container, command, pw, format, database.Name); err != nil {
+			<-uploadDone
+			return 0, err
+		}
+
+		upload := <-uploadDone
+		return upload.size, upload.err
+	}
+
+	size, err := s.dumpWithRetries(ctx, attempt)
+	if err != nil {
 		s.logger.ErrorContext(ctx, "failed to exec pg_dump", "error", err)
-		<-uploadDone
 		publish("error", err.Error(), 0)
 		return nil, err
 	}
-
-	result := <-uploadDone
-	if result.err != nil {
-		return fail(result.err)
-	}
+	result := uploadOutcome{size: size}
 
 	saved, err := s.repository.FindById(ctx, database.ID)
 	if err != nil {
@@ -673,6 +682,58 @@ func execPgDump(ctx context.Context, executor PodExecutor, namespace, podName, c
 	}
 	pw.Close()
 	return nil
+}
+
+type uploadOutcome struct {
+	size int64
+}
+
+// transientPostgresStates are the messages postgres returns while it is not accepting connections
+// yet or no longer is. Bitnami's chart runs a temporary server to execute the initdb scripts, which
+// seeding uses, and stops it once they finish; a dump that lands in that transition sees one of
+// these. They say nothing about the database being unusable, only that it is mid-transition, so a
+// backup should wait rather than fail.
+var transientPostgresStates = []string{
+	"the database system is shutting down",
+	"the database system is starting up",
+	"the database system is in recovery mode",
+	"connection refused",
+}
+
+func isTransientPostgresState(err error) bool {
+	message := strings.ToLower(err.Error())
+	return slices.ContainsFunc(transientPostgresStates, func(state string) bool {
+		return strings.Contains(message, state)
+	})
+}
+
+const (
+	dumpRetryBudget   = 2 * time.Minute
+	dumpRetryInterval = 5 * time.Second
+)
+
+// dumpWithRetries retries the dump while postgres reports a transient state, so a save issued
+// moments after a deploy waits for seeding to finish instead of failing with the server's
+// mid-restart message. Any other error fails immediately: retrying a genuine dump error would only
+// delay the report.
+func (s Service) dumpWithRetries(ctx context.Context, attempt func() (int64, error)) (int64, error) {
+	deadline := time.Now().Add(dumpRetryBudget)
+	for {
+		size, err := attempt()
+		if err == nil {
+			return size, nil
+		}
+		if !isTransientPostgresState(err) || time.Now().After(deadline) {
+			return 0, err
+		}
+
+		s.logger.InfoContext(ctx, "postgres is mid-transition, retrying the dump", "error", err, "retryIn", dumpRetryInterval)
+		select {
+		case <-ctx.Done():
+			return 0, ctx.Err()
+		case <-time.After(dumpRetryInterval):
+		}
+	}
 }
 
 func (s Service) logError(ctx context.Context, err error) {
