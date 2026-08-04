@@ -2,7 +2,7 @@ name: Delete deployed environment
 
 on:
   pull_request:
-    types: [closed]
+    types: [closed, unlabeled]
 
 # Cancel previous runs of the same workflow and PR number or branch/tag
 concurrency:
@@ -16,3 +16,29 @@ jobs:
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       KUBECONFIG: ${{ secrets.KUBECONFIG }}
+
+  # The same teardown on the Hetzner control plane. Separate from the EKS one above because it is a
+  # different system with a different credential, and it runs whether or not that one did: a feature
+  # environment left behind holds a database, a Redis and a RabbitMQ on a shared box.
+  delete-im-vm-environment:
+    name: Delete the im-vm feature environment
+    runs-on: ubuntu-24.04
+    # A closed pull request has no environment either way, but unlabeled fires for every label, and
+    # only this one created anything.
+    if: github.event.action == 'closed' || github.event.label.name == 'deploy'
+    steps:
+      - name: Destroy
+        env:
+          DEPLOY_KEY: ${{ secrets.IM_VM_DEV_DEPLOY_KEY }}
+          HOST: ${{ secrets.IM_VM_DEV_HOST }}
+          PULL_REQUEST: ${{ github.event.pull_request.number }}
+        run: |
+          set -o errexit -o nounset -o pipefail
+          install --mode=600 /dev/null deploy-key
+          printf '%s\n' "$DEPLOY_KEY" > deploy-key
+          ssh -i deploy-key -o StrictHostKeyChecking=accept-new -o BatchMode=yes \
+            im@"$HOST" "down feat-manager-$PULL_REQUEST"
+
+      - name: Forget the key
+        if: always()
+        run: rm --force deploy-key
