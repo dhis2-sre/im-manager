@@ -10,29 +10,29 @@ import (
 )
 
 func TestNew(t *testing.T) {
-	provider := model.ParameterProviderFunc(func(instance model.DeploymentInstance) (string, error) {
+	provider := stack.ParameterProviderFunc(func(instance model.DeploymentInstance) (string, error) {
 		return "1", nil
 	})
 
 	t.Run("Success", func(t *testing.T) {
-		a := model.Stack{
+		a := stack.Stack{
 			Name: "a",
-			Parameters: model.StackParameters{
+			Parameters: stack.StackParameters{
 				"a_param": {},
 			},
 		}
-		b := model.Stack{
+		b := stack.Stack{
 			Name: "b",
-			Parameters: model.StackParameters{
+			Parameters: stack.StackParameters{
 				"b_param": {},
 			},
-			ParameterProviders: model.ParameterProviders{
+			ParameterProviders: stack.ParameterProviders{
 				"b_param_provided": provider,
 			},
 		}
-		c := model.Stack{
+		c := stack.Stack{
 			Name: "c",
-			Parameters: model.StackParameters{
+			Parameters: stack.StackParameters{
 				"a_param": {
 					Consumed: true,
 				},
@@ -40,7 +40,7 @@ func TestNew(t *testing.T) {
 					Consumed: true,
 				},
 			},
-			Requires: []model.Stack{a, b},
+			Requires: []stack.Stack{a, b},
 		}
 
 		stacks, err := stack.New(a, b, c)
@@ -52,26 +52,26 @@ func TestNew(t *testing.T) {
 	})
 
 	t.Run("FailGivenStacksIfTheyHaveACycle", func(t *testing.T) {
-		a := model.Stack{
+		a := stack.Stack{
 			Name: "a",
-			Parameters: model.StackParameters{
+			Parameters: stack.StackParameters{
 				"a_param": {},
 				"b_param": {
 					Consumed: true,
 				},
 			},
 		}
-		b := model.Stack{
+		b := stack.Stack{
 			Name: "b",
-			Parameters: model.StackParameters{
+			Parameters: stack.StackParameters{
 				"b_param": {},
 				"a_param": {
 					Consumed: true,
 				},
 			},
-			Requires: []model.Stack{a},
+			Requires: []stack.Stack{a},
 		}
-		a.Requires = []model.Stack{b}
+		a.Requires = []stack.Stack{b}
 
 		_, err := stack.New(a, b)
 
@@ -79,13 +79,13 @@ func TestNew(t *testing.T) {
 	})
 
 	t.Run("FailGivenStacksIfAStackHasASelfReferenceCycle", func(t *testing.T) {
-		a := model.Stack{
+		a := stack.Stack{
 			Name: "a",
-			Parameters: model.StackParameters{
+			Parameters: stack.StackParameters{
 				"a_param": {},
 			},
 		}
-		a.Requires = []model.Stack{a}
+		a.Requires = []stack.Stack{a}
 
 		_, err := stack.New(a)
 
@@ -93,15 +93,15 @@ func TestNew(t *testing.T) {
 	})
 
 	t.Run("FailGivenStackIfConsumedParameterIsNotProvidedByRequiredStack", func(t *testing.T) {
-		a := model.Stack{
+		a := stack.Stack{
 			Name: "a",
-			ParameterProviders: model.ParameterProviders{
+			ParameterProviders: stack.ParameterProviders{
 				"a_param_provided": provider,
 			},
 		}
-		b := model.Stack{
+		b := stack.Stack{
 			Name: "b",
-			Parameters: model.StackParameters{
+			Parameters: stack.StackParameters{
 				"a_param": {
 					Consumed: true,
 				},
@@ -109,7 +109,7 @@ func TestNew(t *testing.T) {
 					Consumed: true,
 				},
 			},
-			Requires: []model.Stack{a},
+			Requires: []stack.Stack{a},
 		}
 
 		_, err := stack.New(a, b)
@@ -118,15 +118,15 @@ func TestNew(t *testing.T) {
 	})
 
 	t.Run("FailGivenStackIfConsumedParameterIsNotProvidedByProvider", func(t *testing.T) {
-		a := model.Stack{
+		a := stack.Stack{
 			Name: "a",
-			Parameters: model.StackParameters{
+			Parameters: stack.StackParameters{
 				"a_param": {},
 			},
 		}
-		b := model.Stack{
+		b := stack.Stack{
 			Name: "b",
-			Parameters: model.StackParameters{
+			Parameters: stack.StackParameters{
 				"a_param": {
 					Consumed: true,
 				},
@@ -134,7 +134,7 @@ func TestNew(t *testing.T) {
 					Consumed: true,
 				},
 			},
-			Requires: []model.Stack{a},
+			Requires: []stack.Stack{a},
 		}
 
 		_, err := stack.New(a, b)
@@ -143,25 +143,25 @@ func TestNew(t *testing.T) {
 	})
 
 	t.Run("FailGivenStackIfConsumedParameterIsPointingToAnAlreadyConsumedParameter", func(t *testing.T) {
-		a := model.Stack{
+		a := stack.Stack{
 			Name: "a",
-			Parameters: model.StackParameters{
+			Parameters: stack.StackParameters{
 				"a_param": {},
 			},
 		}
-		b := model.Stack{
+		b := stack.Stack{
 			Name: "b",
-			Parameters: model.StackParameters{
+			Parameters: stack.StackParameters{
 				"a_param": {Consumed: true},
 			},
-			Requires: []model.Stack{a},
+			Requires: []stack.Stack{a},
 		}
-		c := model.Stack{
+		c := stack.Stack{
 			Name: "c",
-			Parameters: model.StackParameters{
+			Parameters: stack.StackParameters{
 				"a_param": {Consumed: true},
 			},
-			Requires: []model.Stack{b},
+			Requires: []stack.Stack{b},
 		}
 
 		_, err := stack.New(a, c, b)
@@ -170,26 +170,26 @@ func TestNew(t *testing.T) {
 	})
 
 	t.Run("FailGivenStackIfThereAreMultipleStacksProvidingTheSameConsumedParameter", func(t *testing.T) {
-		a := model.Stack{
+		a := stack.Stack{
 			Name: "a",
-			ParameterProviders: model.ParameterProviders{
+			ParameterProviders: stack.ParameterProviders{
 				"a_param_provided": provider,
 			},
 		}
-		b := model.Stack{
+		b := stack.Stack{
 			Name: "b",
-			ParameterProviders: model.ParameterProviders{
+			ParameterProviders: stack.ParameterProviders{
 				"a_param_provided": provider,
 			},
 		}
-		c := model.Stack{
+		c := stack.Stack{
 			Name: "c",
-			Parameters: model.StackParameters{
+			Parameters: stack.StackParameters{
 				"a_param_provided": {
 					Consumed: true,
 				},
 			},
-			Requires: []model.Stack{a, b},
+			Requires: []stack.Stack{a, b},
 		}
 
 		_, err := stack.New(a, b, c)
@@ -198,26 +198,26 @@ func TestNew(t *testing.T) {
 	})
 
 	t.Run("FailGivenStackIfThereAreMultipleProvidersForOneConsumedParameter", func(t *testing.T) {
-		a := model.Stack{
+		a := stack.Stack{
 			Name: "a",
-			Parameters: model.StackParameters{
+			Parameters: stack.StackParameters{
 				"a_param": {},
 			},
 		}
-		b := model.Stack{
+		b := stack.Stack{
 			Name: "b",
-			Parameters: model.StackParameters{
+			Parameters: stack.StackParameters{
 				"a_param": {},
 			},
 		}
-		c := model.Stack{
+		c := stack.Stack{
 			Name: "c",
-			Parameters: model.StackParameters{
+			Parameters: stack.StackParameters{
 				"a_param": {
 					Consumed: true,
 				},
 			},
-			Requires: []model.Stack{a, b},
+			Requires: []stack.Stack{a, b},
 		}
 
 		_, err := stack.New(a, b, c)
@@ -226,23 +226,23 @@ func TestNew(t *testing.T) {
 	})
 
 	t.Run("FailGivenStackIfARequiredStackProvidesTheSameConsumedParameterTwice", func(t *testing.T) {
-		a := model.Stack{
+		a := stack.Stack{
 			Name: "a",
-			Parameters: model.StackParameters{
+			Parameters: stack.StackParameters{
 				"a_param": {},
 			},
-			ParameterProviders: model.ParameterProviders{
+			ParameterProviders: stack.ParameterProviders{
 				"a_param": provider,
 			},
 		}
-		b := model.Stack{
+		b := stack.Stack{
 			Name: "b",
-			Parameters: model.StackParameters{
+			Parameters: stack.StackParameters{
 				"a_param": {
 					Consumed: true,
 				},
 			},
-			Requires: []model.Stack{a},
+			Requires: []stack.Stack{a},
 		}
 
 		_, err := stack.New(a, b)
@@ -251,20 +251,20 @@ func TestNew(t *testing.T) {
 	})
 
 	t.Run("FailGivenStackIfItContainsDuplicateRequiredStacks", func(t *testing.T) {
-		a := model.Stack{
+		a := stack.Stack{
 			Name: "a",
-			Parameters: model.StackParameters{
+			Parameters: stack.StackParameters{
 				"a_param": {},
 			},
 		}
-		b := model.Stack{
+		b := stack.Stack{
 			Name: "b",
-			Parameters: model.StackParameters{
+			Parameters: stack.StackParameters{
 				"a_param": {
 					Consumed: true,
 				},
 			},
-			Requires: []model.Stack{a, a},
+			Requires: []stack.Stack{a, a},
 		}
 
 		_, err := stack.New(a, b)
@@ -273,19 +273,19 @@ func TestNew(t *testing.T) {
 	})
 
 	t.Run("FailGivenStackIfARequiredStackDoesNotProvideAnyOfItsConsumedParameters", func(t *testing.T) {
-		a := model.Stack{
+		a := stack.Stack{
 			Name: "a",
-			Parameters: model.StackParameters{
+			Parameters: stack.StackParameters{
 				"a_param": {},
 			},
 		}
-		b := model.Stack{
+		b := stack.Stack{
 			Name: "b",
-			Parameters: model.StackParameters{
+			Parameters: stack.StackParameters{
 				"b_param_1": {},
 				"b_param_2": {},
 			},
-			Requires: []model.Stack{a},
+			Requires: []stack.Stack{a},
 		}
 
 		_, err := stack.New(a, b)

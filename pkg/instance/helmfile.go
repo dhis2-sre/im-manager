@@ -12,7 +12,9 @@ import (
 
 	"gopkg.in/yaml.v3"
 
+	"github.com/dhis2-sre/im-manager/pkg/kube"
 	"github.com/dhis2-sre/im-manager/pkg/model"
+	"github.com/dhis2-sre/im-manager/pkg/stack"
 )
 
 //goland:noinspection GoExportedFuncWithUnexportedType
@@ -56,7 +58,7 @@ type helmfileService struct {
 }
 
 type stackService interface {
-	Find(name string) (*model.Stack, error)
+	Find(name string) (*stack.Stack, error)
 }
 
 func (h helmfileService) sync(ctx context.Context, token string, instance *model.DeploymentInstance, group *model.Group, ttl uint, extraEnv map[string]string) (*exec.Cmd, error) {
@@ -110,7 +112,7 @@ func (h helmfileService) loadStackParameters(stackName string) (stackParameters,
 		return nil, err
 	}
 
-	b, err := decryptYaml(data)
+	b, err := kube.DecryptYaml(data)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decrypt stack parameters: %v", err)
 	}
@@ -152,13 +154,13 @@ func (h helmfileService) configureInstanceEnvironment(ctx context.Context, acces
 	cmd.Env = h.injectEnv(ctx, cmd.Env, "KUBERNETES_SERVICE_PORT_HTTPS")
 	cmd.Env = h.injectEnv(ctx, cmd.Env, "KUBERNETES_SERVICE_HOST")
 
-	ingressClass, err := discoverIngressClass(ctx, group.Cluster)
+	ingressClass, err := kube.DiscoverIngressClass(ctx, group.Cluster)
 	if err != nil {
 		h.logger.WarnContext(ctx, "Failed to discover ingress class", "error", err)
 	}
 	cmd.Env = append(cmd.Env, fmt.Sprintf("INGRESS_CLASS=%s", ingressClass))
 
-	certIssuer, err := discoverCertIssuer(ctx, group.Cluster)
+	certIssuer, err := kube.DiscoverCertIssuer(ctx, group.Cluster)
 	if err != nil {
 		h.logger.WarnContext(ctx, "Failed to discover cert issuer", "error", err)
 	}

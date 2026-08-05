@@ -5,7 +5,6 @@ import (
 	"net/http"
 
 	"github.com/dhis2-sre/im-manager/internal/errdef"
-	"github.com/dhis2-sre/im-manager/pkg/model"
 
 	"github.com/gin-gonic/gin"
 )
@@ -53,22 +52,25 @@ func (h Handler) Find(c *gin.Context) {
 	c.JSON(http.StatusOK, toResponseStack(*stack))
 }
 
-func toResponseStack(stack model.Stack) Stack {
-	s := Stack{Name: stack.Name}
+func toResponseStack(stack Stack) StackResponse {
+	s := StackResponse{Name: stack.Name}
 
-	s.Requires = make([]Stack, len(stack.Requires))
+	s.Requires = make([]StackResponse, len(stack.Requires))
 	for i, require := range stack.Requires {
-		s.Requires[i] = Stack{Name: require.Name}
+		s.Requires[i] = StackResponse{Name: require.Name}
 	}
 
+	s.ParameterGroups = stack.ParameterGroups
+
 	for parameterName, parameter := range stack.Parameters {
-		s.Parameters = append(s.Parameters, StackParameter{
+		s.Parameters = append(s.Parameters, StackParameterResponse{
 			ParameterName: parameterName,
 			DisplayName:   parameter.DisplayName,
 			DefaultValue:  parameter.DefaultValue,
 			Consumed:      parameter.Consumed,
 			Priority:      parameter.Priority,
 			Sensitive:     parameter.Sensitive,
+			Group:         parameter.Group,
 		})
 	}
 
@@ -76,20 +78,22 @@ func toResponseStack(stack model.Stack) Stack {
 }
 
 // swagger:model StackParameter
-type StackParameter struct {
+type StackParameterResponse struct {
 	ParameterName string  `json:"parameterName"`
 	DisplayName   string  `json:"displayName"`
 	DefaultValue  *string `json:"defaultValue,omitempty"`
 	Consumed      bool    `json:"consumed"`
 	Priority      uint    `json:"priority"`
 	Sensitive     bool    `json:"sensitive"`
+	Group         string  `json:"group,omitempty"`
 }
 
 // swagger:model Stack
-type Stack struct {
-	Name       string           `json:"name"`
-	Parameters []StackParameter `json:"parameters,omitempty"`
-	Requires   []Stack          `json:"requires,omitempty"`
+type StackResponse struct {
+	Name            string                   `json:"name"`
+	Parameters      []StackParameterResponse `json:"parameters,omitempty"`
+	ParameterGroups []ParameterGroup         `json:"parameterGroups,omitempty"`
+	Requires        []StackResponse          `json:"requires,omitempty"`
 }
 
 // FindAll stack
@@ -115,7 +119,7 @@ func (h Handler) FindAll(c *gin.Context) {
 		return
 	}
 
-	response := make([]Stack, len(stacks))
+	response := make([]StackResponse, len(stacks))
 	for i, stack := range stacks {
 		response[i] = toResponseStack(stack)
 	}

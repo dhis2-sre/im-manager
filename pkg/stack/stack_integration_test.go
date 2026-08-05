@@ -34,7 +34,7 @@ func TestStackHandler(t *testing.T) {
 	t.Run("GetStack", func(t *testing.T) {
 		t.Parallel()
 
-		var dhis2 stack.Stack
+		var dhis2 stack.StackResponse
 		client.GetJSON(t, "/stacks/dhis2", &dhis2)
 
 		assert.Equal(t, "dhis2", dhis2.Name)
@@ -44,7 +44,7 @@ func TestStackHandler(t *testing.T) {
 	t.Run("GetAllStacks", func(t *testing.T) {
 		t.Parallel()
 
-		var stacks []stack.Stack
+		var stacks []stack.StackResponse
 		client.GetJSON(t, "/stacks", &stacks)
 
 		assert.NotEmpty(t, stacks)

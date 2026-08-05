@@ -55,9 +55,11 @@ func TestBackupServiceIntegration(t *testing.T) {
 	backupService := NewBackupService(logger, storage.NewS3Client(logger, s3Test.Client, nil))
 
 	s3Key := "group/save-name-fs.tar.gz"
-	require.NoError(t, backupService.PerformBackup(ctx, s3APISource{source}, s3Bucket, s3Key))
+	uploaded, err := backupService.PerformBackup(ctx, s3APISource{source}, s3Bucket, s3Key)
+	require.NoError(t, err)
 
 	tarContent := s3Test.GetObject(t, s3Bucket, s3Key)
+	assert.Equal(t, int64(len(tarContent)), uploaded, "the reported size is what landed in S3, so it can be recorded on the file store")
 	entries := extractTarGz(t, tarContent)
 
 	var paths []string

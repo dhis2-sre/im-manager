@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/dhis2-sre/im-manager/pkg/kube"
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	"github.com/dhis2-sre/im-manager/pkg/stack"
 	"github.com/stretchr/testify/assert"
@@ -13,9 +14,9 @@ import (
 
 func TestResolveParameters(t *testing.T) {
 	t.Run("PreventUserFromOverwritingConsumedParameters", func(t *testing.T) {
-		s := model.Stack{
+		s := stack.Stack{
 			Name: "stack",
-			Parameters: map[string]model.StackParameter{
+			Parameters: map[string]stack.StackParameter{
 				"parameter": {
 					Consumed: true,
 				},
@@ -25,7 +26,7 @@ func TestResolveParameters(t *testing.T) {
 			"stack": s,
 		}
 		stackService := stack.NewService(stacks)
-		service := NewService(nil, nil, nil, stackService, nil, nil, "")
+		service := NewService(nil, nil, nil, stackService, nil, nil, "", kube.NewClients())
 		instance := &model.DeploymentInstance{
 			StackName: "stack",
 			Parameters: map[string]model.DeploymentInstanceParameter{
@@ -42,15 +43,15 @@ func TestResolveParameters(t *testing.T) {
 	})
 
 	t.Run("RejectNonExistingParameter", func(t *testing.T) {
-		s := model.Stack{
+		s := stack.Stack{
 			Name:       "name-a",
-			Parameters: map[string]model.StackParameter{},
+			Parameters: map[string]stack.StackParameter{},
 		}
 		stacks := stack.Stacks{
 			"name-a": s,
 		}
 		stackService := stack.NewService(stacks)
-		service := NewService(nil, nil, nil, stackService, nil, nil, "")
+		service := NewService(nil, nil, nil, stackService, nil, nil, "", kube.NewClients())
 		deployment := &model.Deployment{
 			Instances: []*model.DeploymentInstance{
 				{
@@ -72,9 +73,9 @@ func TestResolveParameters(t *testing.T) {
 	t.Run("ResolveParameters", func(t *testing.T) {
 		defaultValue1 := "default value used"
 		defaultValue2 := "default value not user"
-		stackA := model.Stack{
+		stackA := stack.Stack{
 			Name: "stack-a",
-			Parameters: map[string]model.StackParameter{
+			Parameters: map[string]stack.StackParameter{
 				"parameter-a": {
 					DefaultValue: &defaultValue1,
 				},
@@ -88,7 +89,7 @@ func TestResolveParameters(t *testing.T) {
 			"stack-a": stackA,
 		}
 		stackService := stack.NewService(stacks)
-		service := NewService(nil, nil, nil, stackService, nil, nil, "")
+		service := NewService(nil, nil, nil, stackService, nil, nil, "", kube.NewClients())
 		deployment := &model.Deployment{
 			Instances: []*model.DeploymentInstance{
 				{
@@ -132,25 +133,25 @@ func TestResolveParameters(t *testing.T) {
 		assert.ElementsMatch(t, want, deployment.Instances)
 	})
 
-	t.Run("RequiredInstanceNotInDeployment", func(t *testing.T) {
-		stackA := model.Stack{
+	t.Run("ParameterProviderNotInDeployment", func(t *testing.T) {
+		stackA := stack.Stack{
 			Name: "stack-a",
 		}
-		stackB := model.Stack{
+		stackB := stack.Stack{
 			Name: "stack-b",
-			Parameters: map[string]model.StackParameter{
+			Parameters: map[string]stack.StackParameter{
 				"parameter": {
 					Consumed: true,
 				},
 			},
-			Requires: []model.Stack{stackA},
+			Requires: []stack.Stack{stackA},
 		}
 		stacks := stack.Stacks{
 			"stack-a": stackA,
 			"stack-b": stackB,
 		}
 		stackService := stack.NewService(stacks)
-		service := NewService(nil, nil, nil, stackService, nil, nil, "")
+		service := NewService(nil, nil, nil, stackService, nil, nil, "", kube.NewClients())
 		deployment := &model.Deployment{
 			Instances: []*model.DeploymentInstance{
 				{
@@ -163,33 +164,33 @@ func TestResolveParameters(t *testing.T) {
 
 		err := service.resolveParameters(deployment)
 
-		require.ErrorContains(t, err, `failed to find required instance "stack-a" of instance "name-b"`)
+		require.ErrorContains(t, err, `no instance provides parameter "parameter" consumed by "stack-b"`)
 	})
 
 	t.Run("ResolveParameterUsingProvider", func(t *testing.T) {
-		stackA := model.Stack{
+		stackA := stack.Stack{
 			Name: "stack-a",
-			ParameterProviders: model.ParameterProviders{
-				"provider-parameter": model.ParameterProviderFunc(func(instance model.DeploymentInstance) (string, error) {
+			ParameterProviders: stack.ParameterProviders{
+				"provider-parameter": stack.ParameterProviderFunc(func(instance model.DeploymentInstance) (string, error) {
 					return fmt.Sprintf("%s-%s", instance.Name, instance.GroupName), nil
 				}),
 			},
 		}
-		stackB := model.Stack{
+		stackB := stack.Stack{
 			Name: "stack-b",
-			Parameters: map[string]model.StackParameter{
+			Parameters: map[string]stack.StackParameter{
 				"provider-parameter": {
 					Consumed: true,
 				},
 			},
-			Requires: []model.Stack{stackA},
+			Requires: []stack.Stack{stackA},
 		}
 		stacks := stack.Stacks{
 			"stack-a": stackA,
 			"stack-b": stackB,
 		}
 		stackService := stack.NewService(stacks)
-		service := NewService(nil, nil, nil, stackService, nil, nil, "")
+		service := NewService(nil, nil, nil, stackService, nil, nil, "", kube.NewClients())
 		deployment := &model.Deployment{
 			Instances: []*model.DeploymentInstance{
 				{
@@ -226,5 +227,113 @@ func TestResolveParameters(t *testing.T) {
 			},
 		}
 		assert.ElementsMatch(t, want, deployment.Instances)
+	})
+}
+
+func TestProviderBasedRequirements(t *testing.T) {
+	consumer := stack.Stack{
+		Name: "consumer",
+		Parameters: map[string]stack.StackParameter{
+			"HOST": {Consumed: true},
+		},
+	}
+	provider := stack.Stack{
+		Name: "provider",
+		Parameters: map[string]stack.StackParameter{
+			"HOST": {},
+		},
+	}
+	otherProvider := stack.Stack{
+		Name: "other-provider",
+		Parameters: map[string]stack.StackParameter{
+			"HOST": {},
+		},
+	}
+
+	t.Run("ResolvedFromAnyProvidingStack", func(t *testing.T) {
+		stackService := stack.NewService(stack.Stacks{"consumer": consumer, "provider": provider})
+		service := NewService(nil, nil, nil, stackService, nil, nil, "", kube.NewClients())
+		deployment := &model.Deployment{
+			Instances: []*model.DeploymentInstance{
+				{StackName: "provider", Parameters: map[string]model.DeploymentInstanceParameter{"HOST": {ParameterName: "HOST", Value: "db.svc"}}},
+				{StackName: "consumer", Parameters: map[string]model.DeploymentInstanceParameter{}},
+			},
+		}
+
+		_, err := service.validateNoCycles(deployment.Instances)
+		require.NoError(t, err)
+		err = service.resolveParameters(deployment)
+		require.NoError(t, err)
+		assert.Equal(t, "db.svc", deployment.Instances[1].Parameters["HOST"].Value)
+	})
+
+	t.Run("MissingProvider", func(t *testing.T) {
+		stackService := stack.NewService(stack.Stacks{"consumer": consumer})
+		service := NewService(nil, nil, nil, stackService, nil, nil, "", kube.NewClients())
+		instances := []*model.DeploymentInstance{
+			{StackName: "consumer", Parameters: map[string]model.DeploymentInstanceParameter{}},
+		}
+
+		_, err := service.validateNoCycles(instances)
+
+		require.ErrorContains(t, err, `no instance provides parameter "HOST" consumed by "consumer"`)
+	})
+
+	t.Run("AmbiguousProviders", func(t *testing.T) {
+		stackService := stack.NewService(stack.Stacks{"consumer": consumer, "provider": provider, "other-provider": otherProvider})
+		service := NewService(nil, nil, nil, stackService, nil, nil, "", kube.NewClients())
+		instances := []*model.DeploymentInstance{
+			{StackName: "provider", Parameters: map[string]model.DeploymentInstanceParameter{}},
+			{StackName: "other-provider", Parameters: map[string]model.DeploymentInstanceParameter{}},
+			{StackName: "consumer", Parameters: map[string]model.DeploymentInstanceParameter{}},
+		}
+
+		_, err := service.validateNoCycles(instances)
+
+		require.ErrorContains(t, err, `provided by both`)
+	})
+
+	t.Run("PgAdminComposesWithDhis2V2", func(t *testing.T) {
+		stacks, err := stack.New(stack.All...)
+		require.NoError(t, err)
+		service := NewService(nil, nil, nil, stack.NewService(stacks), nil, nil, "", kube.NewClients())
+		group := &model.Group{Name: "group", Namespace: "namespace"}
+		deployment := &model.Deployment{
+			Instances: []*model.DeploymentInstance{
+				{Name: "core", StackName: "dhis2-v2", GroupName: "group", Group: group, Parameters: map[string]model.DeploymentInstanceParameter{}},
+				{Name: "admin", StackName: "pgadmin", GroupName: "group", Group: group, Parameters: map[string]model.DeploymentInstanceParameter{}},
+			},
+		}
+
+		_, err = service.validateNoCycles(deployment.Instances)
+		require.NoError(t, err)
+		err = service.resolveParameters(deployment)
+		require.NoError(t, err)
+
+		pgadmin := deployment.Instances[1]
+		assert.Contains(t, pgadmin.Parameters["DATABASE_HOSTNAME"].Value, "-dhis2-postgresql-rw.namespace.svc")
+		assert.NotEmpty(t, pgadmin.Parameters["DATABASE_NAME"].Value)
+		assert.NotEmpty(t, pgadmin.Parameters["DATABASE_USERNAME"].Value)
+	})
+
+	t.Run("PgAdminComposesWithDhis2DB", func(t *testing.T) {
+		stacks, err := stack.New(stack.All...)
+		require.NoError(t, err)
+		service := NewService(nil, nil, nil, stack.NewService(stacks), nil, nil, "", kube.NewClients())
+		group := &model.Group{Name: "group", Namespace: "namespace"}
+		deployment := &model.Deployment{
+			Instances: []*model.DeploymentInstance{
+				{Name: "db", StackName: "dhis2-db", GroupName: "group", Group: group, Parameters: map[string]model.DeploymentInstanceParameter{}},
+				{Name: "admin", StackName: "pgadmin", GroupName: "group", Group: group, Parameters: map[string]model.DeploymentInstanceParameter{}},
+			},
+		}
+
+		_, err = service.validateNoCycles(deployment.Instances)
+		require.NoError(t, err)
+		err = service.resolveParameters(deployment)
+		require.NoError(t, err)
+
+		pgadmin := deployment.Instances[1]
+		assert.NotEmpty(t, pgadmin.Parameters["DATABASE_HOSTNAME"].Value)
 	})
 }

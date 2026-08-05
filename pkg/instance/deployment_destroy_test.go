@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/dhis2-sre/im-manager/pkg/inttest"
+	"github.com/dhis2-sre/im-manager/pkg/kube"
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	"github.com/dhis2-sre/im-manager/pkg/stack"
 	"github.com/stretchr/testify/require"
@@ -66,7 +67,7 @@ func TestDeleteDeploymentPreservesInstanceRecordWhenDestroyFails(t *testing.T) {
 	require.NoError(t, instanceRepo.SaveDeployment(context.Background(), deployment))
 
 	stackService := stack.NewService(stack.Stacks{"whoami-go": stack.WhoamiGo})
-	service := NewService(logger, instanceRepo, stubGroupService{group: &group}, stackService, failingDestroyHelmfile{failStack: "whoami-go"}, nil, "")
+	service := NewService(logger, instanceRepo, stubGroupService{group: &group}, stackService, failingDestroyHelmfile{failStack: "whoami-go"}, nil, "", kube.NewClients())
 
 	err = service.DeleteDeployment(context.Background(), deployment)
 	require.Error(t, err)
