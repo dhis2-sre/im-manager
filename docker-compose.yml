@@ -42,7 +42,11 @@ services:
     volumes:
       # Naming this file replaces the image's default plugin set, so the management plugins are
       # listed alongside the stream one IM needs.
-      - ./rabbitmq/enabled_plugins:/etc/rabbitmq/enabled_plugins:ro
+      #
+      # Kept out of a root directory named after a chart: helm prefers a local directory of that
+      # name over the repository, and skaffold installs rabbitmq, jaeger, valkey and postgresql
+      # from repositories.
+      - ./compose/rabbitmq/enabled_plugins:/etc/rabbitmq/enabled_plugins:ro
       - rabbitmq:/var/lib/rabbitmq
     healthcheck:
       test: rabbitmq-diagnostics -q check_running
