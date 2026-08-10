@@ -234,7 +234,7 @@ func run() (err error) {
 		return err
 	}
 
-	eventHandler := event.NewHandler(logger, streamEnv, streamName)
+	eventHandler := event.NewHandler(logger, streamEnv, streamName, groupService)
 
 	_, err = createDefaultCluster(ctx, clusterService)
 	if err != nil {
