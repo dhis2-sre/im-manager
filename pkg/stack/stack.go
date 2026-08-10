@@ -31,10 +31,6 @@ var All = []Stack{
 	PgAdmin,
 	WhoamiGo,
 	IMJobRunner,
-	ChapDB,
-	ChapValkey,
-	ChapWorker,
-	ChapCore,
 	Chap,
 }
 

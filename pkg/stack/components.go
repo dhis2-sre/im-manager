@@ -133,20 +133,11 @@ func (c ChapAPIComponent) Restart(ctx context.Context, client *kube.Client, inst
 	return client.RestartDeployment(ctx, instance, c.Name)
 }
 
-// ChapWorkerComponent operates on the chap-worker chart's Deployment.
+// ChapWorkerComponent operates on the chap chart's worker Deployment.
 type ChapWorkerComponent struct {
 	kube.BaseComponent
 }
 
 func (c ChapWorkerComponent) Restart(ctx context.Context, client *kube.Client, instance *model.DeploymentInstance) error {
-	return client.RestartDeployment(ctx, instance, c.Name)
-}
-
-// ChapCoreComponent operates on the chap-core chart's Deployment.
-type ChapCoreComponent struct {
-	kube.BaseComponent
-}
-
-func (c ChapCoreComponent) Restart(ctx context.Context, client *kube.Client, instance *model.DeploymentInstance) error {
 	return client.RestartDeployment(ctx, instance, c.Name)
 }

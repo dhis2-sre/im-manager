@@ -48,7 +48,7 @@ var DHIS2Core = Stack{
 	},
 	Companions: []Stack{
 		MINIO,
-		ChapCore,
+		Chap,
 	},
 	Components: []kube.Component{
 		DHIS2CoreComponent{BaseComponent: kube.BaseComponent{
