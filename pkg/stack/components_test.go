@@ -66,7 +66,8 @@ func TestComponentRestartTargetsExpectedWorkload(t *testing.T) {
 		{MinioComponent{kube.BaseComponent{Name: "minio"}}, false},
 		{PgAdminComponent{kube.BaseComponent{Name: "pgadmin"}}, true},
 		{WhoamiComponent{kube.BaseComponent{Name: "whoami"}}, false},
-		{ValkeyComponent{kube.BaseComponent{Name: "chap-valkey"}}, true},
+		{ValkeyComponent{kube.BaseComponent{Name: "chap-valkey"}}, false},
+		{ChapAPIComponent{kube.BaseComponent{Name: "api"}}, false},
 		{ChapWorkerComponent{kube.BaseComponent{Name: "chap-worker"}}, false},
 		{ChapCoreComponent{kube.BaseComponent{Name: "chap-core"}}, false},
 	}
@@ -183,6 +184,12 @@ func TestComponentPVCSelectorParity(t *testing.T) {
 			"app.kubernetes.io/instance=%s,app.kubernetes.io/name=dhis2",
 			"cnpg.io/cluster=%s-dhis2-postgresql",
 			"app.kubernetes.io/instance=%s,app.kubernetes.io/name=minio",
+		},
+		// chap postdates the map too; the CNPG cluster labels its own volumes and the valkey
+		// subchart's PVC is qualified by chart name since it shares the release's instance label.
+		"chap": {
+			"cnpg.io/cluster=%s-chap-db",
+			"app.kubernetes.io/instance=%s-chap,app.kubernetes.io/name=valkey",
 		},
 	}
 

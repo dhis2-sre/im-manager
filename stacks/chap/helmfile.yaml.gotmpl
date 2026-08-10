@@ -1,0 +1,76 @@
+helmDefaults:
+  createNamespace: false
+  deleteWait: true
+
+releases:
+  # The release name ends in "chap" so the chart's fullname is the release name itself rather than
+  # release + chart name, making every derived resource name predictable for the Go stack definition.
+  - name: "{{ requiredEnv "INSTANCE_NAME" }}-chap"
+    namespace: "{{ requiredEnv "INSTANCE_NAMESPACE" }}"
+    chart: chap/chap
+    version: "{{ requiredEnv "CHART_VERSION" }}"
+    values:
+      - global:
+          commonLabels:
+            im: "true"
+            im-deployment-id: "{{ requiredEnv "DEPLOYMENT_ID" }}"
+            im-instance-id: "{{ requiredEnv "INSTANCE_ID" }}"
+            im-id: "{{ requiredEnv "INSTANCE_ID" }}"
+            im-creation-timestamp: "{{ requiredEnv "INSTANCE_CREATION_TIMESTAMP" }}"
+            im-ttl: "{{ requiredEnv "INSTANCE_TTL" }}"
+
+      - api:
+          image:
+            tag: "{{ requiredEnv "IMAGE_TAG" }}"
+            pullPolicy: {{ requiredEnv "IMAGE_PULL_POLICY" }}
+          labels:
+            im-default: "true"
+            im-type: "api"
+
+      - worker:
+          image:
+            tag: "{{ requiredEnv "IMAGE_TAG" }}"
+            pullPolicy: {{ requiredEnv "IMAGE_PULL_POLICY" }}
+          labels:
+            im-type: "worker"
+
+      - db:
+          database: {{ requiredEnv "DATABASE_NAME" }}
+          password: "{{ requiredEnv "DATABASE_PASSWORD" }}"
+          storageSize: {{ requiredEnv "DATABASE_SIZE" }}
+          version: "{{ requiredEnv "DATABASE_VERSION" }}"
+          labels:
+            im-type: "db"
+
+      # The valkey subchart reads neither global values nor the per-component labels, so it gets
+      # the full label set of its own.
+      - valkey:
+          auth:
+            enabled: true
+            aclUsers:
+              default:
+                password: "{{ requiredEnv "REDIS_PASSWORD" }}"
+                permissions: "~* &* +@all"
+          dataStorage:
+            enabled: true
+            requestedSize: {{ requiredEnv "REDIS_STORAGE_SIZE" }}
+          commonLabels:
+            im: "true"
+            im-deployment-id: "{{ requiredEnv "DEPLOYMENT_ID" }}"
+            im-instance-id: "{{ requiredEnv "INSTANCE_ID" }}"
+            im-id: "{{ requiredEnv "INSTANCE_ID" }}"
+            im-type: "valkey"
+            im-creation-timestamp: "{{ requiredEnv "INSTANCE_CREATION_TIMESTAMP" }}"
+            im-ttl: "{{ requiredEnv "INSTANCE_TTL" }}"
+
+      # Registers CHAP as a route in the DHIS 2 instance of the same deployment, which requires
+      # that instance to allow remote routes (route.remote_servers_allowed).
+      - dhis2:
+          enabled: {{ requiredEnv "DHIS2_REGISTER" }}
+          hostname: "{{ requiredEnv "INSTANCE_HOSTNAME" }}/{{ requiredEnv "INSTANCE_PATH_NAME" }}"
+          username: "{{ requiredEnv "DHIS2_USERNAME" }}"
+          password: "{{ requiredEnv "DHIS2_PASSWORD" }}"
+
+repositories:
+  - name: chap
+    url: https://dhis2-chap.github.io/chap-core/
