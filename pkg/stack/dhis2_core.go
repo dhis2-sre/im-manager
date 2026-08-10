@@ -46,9 +46,9 @@ var DHIS2Core = Stack{
 	Requires: []Stack{
 		DHIS2DB,
 	},
-	Companions: []Stack{
-		MINIO,
-		Chap,
+	Companions: []Companion{
+		{Stack: MINIO, When: whenStorageIsMinio},
+		{Stack: Chap, When: whenChapIsDeployed},
 	},
 	Components: []kube.Component{
 		DHIS2CoreComponent{BaseComponent: kube.BaseComponent{

@@ -65,8 +65,8 @@ var DHIS2V2 = withGroupedParameters(Stack{
 	ParameterProviders: ParameterProviders{
 		"DATABASE_HOSTNAME": dhis2V2PostgresHostnameProvider,
 	},
-	Companions: []Stack{
-		Chap,
+	Companions: []Companion{
+		{Stack: Chap, When: whenChapIsDeployed},
 	},
 	Components: []kube.Component{
 		DHIS2CoreComponent{BaseComponent: kube.BaseComponent{

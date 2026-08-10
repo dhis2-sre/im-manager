@@ -3,6 +3,7 @@ package stack_test
 import (
 	"testing"
 
+	"github.com/dhis2-sre/im-manager/pkg/kube"
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	"github.com/dhis2-sre/im-manager/pkg/stack"
 	"github.com/stretchr/testify/assert"
@@ -300,4 +301,60 @@ func TestValidatorOneOf(t *testing.T) {
 	assert.NoError(t, validator("ok"))
 	assert.NoError(t, validator("not_ok"))
 	assert.ErrorContains(t, validator("maybe"), `"maybe" is not valid, only "ok", "not_ok" are allowed`)
+}
+
+func TestValidateCompanionConditions(t *testing.T) {
+	t.Run("ConditionOnAnExistingParameter", func(t *testing.T) {
+		offered := stack.Stack{Name: "offered"}
+		offering := stack.Stack{
+			Name:       "offering",
+			Parameters: stack.StackParameters{"DEPLOY_IT": {}},
+			Companions: []stack.Companion{{Stack: offered, When: &kube.Condition{Parameter: "DEPLOY_IT", Equals: "true"}}},
+		}
+
+		err := stack.ValidateCompanionConditions([]stack.Stack{offering, offered})
+
+		require.NoError(t, err)
+	})
+
+	t.Run("UnconditionalCompanion", func(t *testing.T) {
+		offered := stack.Stack{Name: "offered"}
+		offering := stack.Stack{Name: "offering", Companions: []stack.Companion{{Stack: offered}}}
+
+		err := stack.ValidateCompanionConditions([]stack.Stack{offering, offered})
+
+		require.NoError(t, err)
+	})
+
+	// A condition naming a parameter the stack does not have never holds, so the companion would
+	// silently never be offered instead of failing loudly at startup.
+	t.Run("ConditionOnAMissingParameter", func(t *testing.T) {
+		offered := stack.Stack{Name: "offered"}
+		offering := stack.Stack{
+			Name:       "offering",
+			Companions: []stack.Companion{{Stack: offered, When: &kube.Condition{Parameter: "TYPO", Equals: "true"}}},
+		}
+
+		err := stack.ValidateCompanionConditions([]stack.Stack{offering, offered})
+
+		require.ErrorContains(t, err, `stack "offering" offers companion "offered" conditional on parameter "TYPO" which it does not have`)
+	})
+}
+
+// The deploy form decides whether to offer CHAP from this declaration, so it has to survive a
+// rename of the parameter that gates it.
+func TestChapIsOfferedOnDeployChap(t *testing.T) {
+	for _, s := range []stack.Stack{stack.DHIS2Core, stack.DHIS2V2} {
+		var found bool
+		for _, companion := range s.Companions {
+			if companion.Stack.Name != stack.Chap.Name {
+				continue
+			}
+			found = true
+			require.NotNilf(t, companion.When, "stack %q offers chap unconditionally", s.Name)
+			assert.Equalf(t, "DEPLOY_CHAP", companion.When.Parameter, "stack %q", s.Name)
+			assert.Equalf(t, "true", companion.When.Equals, "stack %q", s.Name)
+		}
+		assert.Truef(t, found, "stack %q does not offer chap as a companion", s.Name)
+	}
 }
