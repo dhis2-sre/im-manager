@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/dhis2-sre/im-manager/internal/errdef"
+	"github.com/dhis2-sre/im-manager/pkg/kube"
 
 	"github.com/gin-gonic/gin"
 )
@@ -60,6 +61,11 @@ func toResponseStack(stack Stack) StackResponse {
 		s.Requires[i] = StackResponse{Name: require.Name}
 	}
 
+	s.Companions = make([]StackCompanionResponse, len(stack.Companions))
+	for i, companion := range stack.Companions {
+		s.Companions[i] = StackCompanionResponse{Name: companion.Stack.Name, When: companion.When}
+	}
+
 	s.ParameterGroups = stack.ParameterGroups
 
 	for parameterName, parameter := range stack.Parameters {
@@ -94,6 +100,16 @@ type StackResponse struct {
 	Parameters      []StackParameterResponse `json:"parameters,omitempty"`
 	ParameterGroups []ParameterGroup         `json:"parameterGroups,omitempty"`
 	Requires        []StackResponse          `json:"requires,omitempty"`
+	Companions      []StackCompanionResponse `json:"companions,omitempty"`
+}
+
+// StackCompanionResponse names a stack that can be deployed alongside this one. Like Requires it
+// carries only the name, so a client fetches that stack to learn its parameters. When it has a
+// condition, the companion applies only while that condition holds over this stack's parameters.
+// swagger:model StackCompanion
+type StackCompanionResponse struct {
+	Name string          `json:"name"`
+	When *kube.Condition `json:"when,omitempty"`
 }
 
 // FindAll stack

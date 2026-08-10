@@ -656,6 +656,11 @@ definitions:
         x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
     Stack:
         properties:
+            companions:
+                items:
+                    $ref: '#/definitions/StackCompanion'
+                type: array
+                x-go-name: Companions
             name:
                 type: string
                 x-go-name: Name
@@ -676,6 +681,20 @@ definitions:
                 x-go-name: Requires
         type: object
         x-go-name: StackResponse
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/stack
+    StackCompanion:
+        description: |-
+            StackCompanionResponse names a stack that can be deployed alongside this one. Like Requires it
+            carries only the name, so a client fetches that stack to learn its parameters. When it has a
+            condition, the companion applies only while that condition holds over this stack's parameters.
+        properties:
+            name:
+                type: string
+                x-go-name: Name
+            when:
+                $ref: '#/definitions/Condition'
+        type: object
+        x-go-name: StackCompanionResponse
         x-go-package: github.com/dhis2-sre/im-manager/pkg/stack
     StackParameter:
         properties:

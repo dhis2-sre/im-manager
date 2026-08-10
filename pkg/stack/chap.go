@@ -49,6 +49,10 @@ var Chap = withGroupedParameters(Stack{
 // chart's own gating of the register job on dhis2.enabled.
 var whenDhis2RegisterIsEnabled = &kube.Condition{Parameter: "DHIS2_REGISTER", Equals: "true"}
 
+// Gates chap as a companion on the DEPLOY_CHAP parameter of the DHIS 2 stack offering it, which is
+// the same parameter that opens DHIS 2 up to the route chap registers.
+var whenChapIsDeployed = &kube.Condition{Parameter: "DEPLOY_CHAP", Equals: "true"}
+
 var chapDefaults = struct {
 	chartVersion     string
 	imageTag         string

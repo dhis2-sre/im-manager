@@ -46,6 +46,11 @@ func New(stacks ...Stack) (Stacks, error) {
 		return nil, err
 	}
 
+	err = ValidateCompanionConditions(stacks)
+	if err != nil {
+		return nil, err
+	}
+
 	result := make(Stacks, len(stacks))
 	for _, s := range stacks {
 		result[s.Name] = s
@@ -138,6 +143,25 @@ func ValidateConsumedParameters(stacks []Stack) error {
 		for requiredStackName, providedCount := range requiredStacks {
 			if providedCount == 0 {
 				errs = append(errs, fmt.Errorf("stack %q requires %q but does not consume from %q", stack.Name, requiredStackName, requiredStackName))
+			}
+		}
+	}
+
+	return errors.Join(errs...)
+}
+
+// ValidateCompanionConditions validates that every companion condition names a parameter the
+// declaring stack actually has. A condition over a parameter that does not exist never holds, so a
+// deploy form would silently never offer the companion.
+func ValidateCompanionConditions(stacks []Stack) error {
+	var errs []error
+	for _, stack := range stacks {
+		for _, companion := range stack.Companions {
+			if companion.When == nil {
+				continue
+			}
+			if _, ok := stack.Parameters[companion.When.Parameter]; !ok {
+				errs = append(errs, fmt.Errorf("stack %q offers companion %q conditional on parameter %q which it does not have", stack.Name, companion.Stack.Name, companion.When.Parameter))
 			}
 		}
 	}
