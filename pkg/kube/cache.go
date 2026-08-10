@@ -2,7 +2,9 @@ package kube
 
 import (
 	"cmp"
+	"context"
 	"fmt"
+	"log/slog"
 	"slices"
 
 	v1 "k8s.io/api/core/v1"
@@ -29,22 +31,52 @@ type podCache struct {
 	lister   corelisters.PodLister
 	synced   cache.InformerSynced
 	stop     chan struct{}
+	logger   *slog.Logger
 }
 
-func newPodCache(clientset kubernetes.Interface) *podCache {
+func newPodCache(logger *slog.Logger, clientset kubernetes.Interface) *podCache {
 	factory := informers.NewSharedInformerFactoryWithOptions(clientset, cacheResyncPeriod,
 		informers.WithTweakListOptions(func(options *metav1.ListOptions) {
 			options.LabelSelector = "im-id"
 		}))
 	informer := factory.Core().V1().Pods()
 	stop := make(chan struct{})
-	c := &podCache{informer: informer.Informer(), lister: informer.Lister(), synced: informer.Informer().HasSynced, stop: stop}
+	c := &podCache{informer: informer.Informer(), lister: informer.Lister(), synced: informer.Informer().HasSynced, stop: stop, logger: logger}
+
+	// Has to be installed before the informer runs. Without it a rejected or broken watch is only
+	// reported through klog, which this service does not wire into slog, so the cache would go
+	// quiet and readers would silently fall back to listing the API server.
+	if err := c.informer.SetWatchErrorHandler(func(_ *cache.Reflector, err error) {
+		logger.Error("Pod informer watch failed, component status pushes stop until it recovers", "error", err)
+	}); err != nil {
+		logger.Error("Failed to install the pod informer watch error handler", "error", err)
+	}
+
+	logger.Info("Starting pod informer cache")
 	factory.Start(stop)
+
+	go func() {
+		if !cache.WaitForCacheSync(stop, c.synced) {
+			logger.Warn("Pod informer cache stopped before it finished syncing")
+			return
+		}
+		logger.Info("Pod informer cache synced", "pods", len(c.informer.GetStore().List()))
+	}()
+
 	return c
 }
 
 func (p *podCache) ready() bool {
 	return p != nil && p.synced()
+}
+
+// logNotReady records that a read is going to the API server rather than the cache. A nil cache is
+// a client that was not built through Clients, which is the normal case in tests.
+func (p *podCache) logNotReady(ctx context.Context) {
+	if p == nil {
+		return
+	}
+	p.logger.DebugContext(ctx, "Pod cache is not synced, listing from the API server instead")
 }
 
 // list returns the cached pods matching the selector, sorted by name to mirror the API server's

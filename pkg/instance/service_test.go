@@ -3,6 +3,7 @@ package instance
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"testing"
 
 	"github.com/dhis2-sre/im-manager/pkg/kube"
@@ -26,7 +27,7 @@ func TestResolveParameters(t *testing.T) {
 			"stack": s,
 		}
 		stackService := stack.NewService(stacks)
-		service := NewService(nil, nil, nil, stackService, nil, nil, "", kube.NewClients())
+		service := NewService(nil, nil, nil, stackService, nil, nil, "", kube.NewClients(slog.Default()))
 		instance := &model.DeploymentInstance{
 			StackName: "stack",
 			Parameters: map[string]model.DeploymentInstanceParameter{
@@ -51,7 +52,7 @@ func TestResolveParameters(t *testing.T) {
 			"name-a": s,
 		}
 		stackService := stack.NewService(stacks)
-		service := NewService(nil, nil, nil, stackService, nil, nil, "", kube.NewClients())
+		service := NewService(nil, nil, nil, stackService, nil, nil, "", kube.NewClients(slog.Default()))
 		deployment := &model.Deployment{
 			Instances: []*model.DeploymentInstance{
 				{
@@ -89,7 +90,7 @@ func TestResolveParameters(t *testing.T) {
 			"stack-a": stackA,
 		}
 		stackService := stack.NewService(stacks)
-		service := NewService(nil, nil, nil, stackService, nil, nil, "", kube.NewClients())
+		service := NewService(nil, nil, nil, stackService, nil, nil, "", kube.NewClients(slog.Default()))
 		deployment := &model.Deployment{
 			Instances: []*model.DeploymentInstance{
 				{
@@ -151,7 +152,7 @@ func TestResolveParameters(t *testing.T) {
 			"stack-b": stackB,
 		}
 		stackService := stack.NewService(stacks)
-		service := NewService(nil, nil, nil, stackService, nil, nil, "", kube.NewClients())
+		service := NewService(nil, nil, nil, stackService, nil, nil, "", kube.NewClients(slog.Default()))
 		deployment := &model.Deployment{
 			Instances: []*model.DeploymentInstance{
 				{
@@ -190,7 +191,7 @@ func TestResolveParameters(t *testing.T) {
 			"stack-b": stackB,
 		}
 		stackService := stack.NewService(stacks)
-		service := NewService(nil, nil, nil, stackService, nil, nil, "", kube.NewClients())
+		service := NewService(nil, nil, nil, stackService, nil, nil, "", kube.NewClients(slog.Default()))
 		deployment := &model.Deployment{
 			Instances: []*model.DeploymentInstance{
 				{
@@ -252,7 +253,7 @@ func TestProviderBasedRequirements(t *testing.T) {
 
 	t.Run("ResolvedFromAnyProvidingStack", func(t *testing.T) {
 		stackService := stack.NewService(stack.Stacks{"consumer": consumer, "provider": provider})
-		service := NewService(nil, nil, nil, stackService, nil, nil, "", kube.NewClients())
+		service := NewService(nil, nil, nil, stackService, nil, nil, "", kube.NewClients(slog.Default()))
 		deployment := &model.Deployment{
 			Instances: []*model.DeploymentInstance{
 				{StackName: "provider", Parameters: map[string]model.DeploymentInstanceParameter{"HOST": {ParameterName: "HOST", Value: "db.svc"}}},
@@ -269,7 +270,7 @@ func TestProviderBasedRequirements(t *testing.T) {
 
 	t.Run("MissingProvider", func(t *testing.T) {
 		stackService := stack.NewService(stack.Stacks{"consumer": consumer})
-		service := NewService(nil, nil, nil, stackService, nil, nil, "", kube.NewClients())
+		service := NewService(nil, nil, nil, stackService, nil, nil, "", kube.NewClients(slog.Default()))
 		instances := []*model.DeploymentInstance{
 			{StackName: "consumer", Parameters: map[string]model.DeploymentInstanceParameter{}},
 		}
@@ -281,7 +282,7 @@ func TestProviderBasedRequirements(t *testing.T) {
 
 	t.Run("AmbiguousProviders", func(t *testing.T) {
 		stackService := stack.NewService(stack.Stacks{"consumer": consumer, "provider": provider, "other-provider": otherProvider})
-		service := NewService(nil, nil, nil, stackService, nil, nil, "", kube.NewClients())
+		service := NewService(nil, nil, nil, stackService, nil, nil, "", kube.NewClients(slog.Default()))
 		instances := []*model.DeploymentInstance{
 			{StackName: "provider", Parameters: map[string]model.DeploymentInstanceParameter{}},
 			{StackName: "other-provider", Parameters: map[string]model.DeploymentInstanceParameter{}},
@@ -296,7 +297,7 @@ func TestProviderBasedRequirements(t *testing.T) {
 	t.Run("PgAdminComposesWithDhis2V2", func(t *testing.T) {
 		stacks, err := stack.New(stack.All...)
 		require.NoError(t, err)
-		service := NewService(nil, nil, nil, stack.NewService(stacks), nil, nil, "", kube.NewClients())
+		service := NewService(nil, nil, nil, stack.NewService(stacks), nil, nil, "", kube.NewClients(slog.Default()))
 		group := &model.Group{Name: "group", Namespace: "namespace"}
 		deployment := &model.Deployment{
 			Instances: []*model.DeploymentInstance{
@@ -319,7 +320,7 @@ func TestProviderBasedRequirements(t *testing.T) {
 	t.Run("PgAdminComposesWithDhis2DB", func(t *testing.T) {
 		stacks, err := stack.New(stack.All...)
 		require.NoError(t, err)
-		service := NewService(nil, nil, nil, stack.NewService(stacks), nil, nil, "", kube.NewClients())
+		service := NewService(nil, nil, nil, stack.NewService(stacks), nil, nil, "", kube.NewClients(slog.Default()))
 		group := &model.Group{Name: "group", Namespace: "namespace"}
 		deployment := &model.Deployment{
 			Instances: []*model.DeploymentInstance{

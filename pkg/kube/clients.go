@@ -2,6 +2,7 @@ package kube
 
 import (
 	"fmt"
+	"log/slog"
 	"sync"
 
 	"github.com/dhis2-sre/im-manager/pkg/model"
@@ -14,6 +15,7 @@ import (
 // cached client without any explicit hook.
 type Clients struct {
 	mu          sync.Mutex
+	logger      *slog.Logger
 	byCluster   map[string]*Client
 	build       func(model.Cluster) (*Client, error)
 	podHandlers []cache.ResourceEventHandler
@@ -35,8 +37,8 @@ func (c *Clients) RegisterPodHandler(handler cache.ResourceEventHandler) {
 	}
 }
 
-func NewClients() *Clients {
-	return &Clients{byCluster: map[string]*Client{}, build: NewClient}
+func NewClients(logger *slog.Logger) *Clients {
+	return &Clients{logger: logger, byCluster: map[string]*Client{}, build: NewClient}
 }
 
 // For returns the cached client for the cluster, building it on first use.
@@ -55,7 +57,7 @@ func (c *Clients) For(cluster model.Cluster) (*Client, error) {
 		return nil, err
 	}
 	if client.Clientset != nil {
-		client.pods = newPodCache(client.Clientset)
+		client.pods = newPodCache(c.logger.With("clusterId", cluster.ID, "clusterName", cluster.Name, "clusterHost", restHost(client)), client.Clientset)
 		for _, handler := range c.podHandlers {
 			if err := client.pods.addHandler(handler); err != nil {
 				return nil, fmt.Errorf("failed to register pod event handler: %v", err)
@@ -76,5 +78,15 @@ func (c *Clients) For(cluster model.Cluster) (*Client, error) {
 	}
 
 	c.byCluster[key] = client
+	c.logger.Info("Built kube client", "clusterId", cluster.ID, "clusterName", cluster.Name, "clusterHost", restHost(client), "podHandlers", len(c.podHandlers))
 	return client, nil
+}
+
+// restHost identifies which API server a client and its cache belong to. A group can carry a
+// zero-value cluster, and then the id and name say nothing about where pods are really watched.
+func restHost(client *Client) string {
+	if client.RestConfig == nil {
+		return ""
+	}
+	return client.RestConfig.Host
 }
