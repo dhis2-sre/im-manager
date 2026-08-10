@@ -93,6 +93,9 @@ func (c *Client) ListPods(ctx context.Context, namespace, selector string) ([]v1
 		if err == nil {
 			return dropEvicted(pods), nil
 		}
+		c.pods.logger.WarnContext(ctx, "Pod cache list failed, listing from the API server instead", "selector", selector, "error", err)
+	} else {
+		c.pods.logNotReady(ctx)
 	}
 
 	pods, err := c.Clientset.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{LabelSelector: selector})

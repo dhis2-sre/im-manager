@@ -1,6 +1,7 @@
 package kube
 
 import (
+	"log/slog"
 	"testing"
 	"time"
 
@@ -12,7 +13,7 @@ import (
 
 func TestClientsCachePerCluster(t *testing.T) {
 	builds := 0
-	clients := NewClients()
+	clients := NewClients(slog.Default())
 	clients.build = func(cluster model.Cluster) (*Client, error) {
 		builds++
 		return &Client{Clientset: fake.NewSimpleClientset()}, nil

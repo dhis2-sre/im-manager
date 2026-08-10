@@ -67,7 +67,7 @@ func TestDeleteDeploymentPreservesInstanceRecordWhenDestroyFails(t *testing.T) {
 	require.NoError(t, instanceRepo.SaveDeployment(context.Background(), deployment))
 
 	stackService := stack.NewService(stack.Stacks{"whoami-go": stack.WhoamiGo})
-	service := NewService(logger, instanceRepo, stubGroupService{group: &group}, stackService, failingDestroyHelmfile{failStack: "whoami-go"}, nil, "", kube.NewClients())
+	service := NewService(logger, instanceRepo, stubGroupService{group: &group}, stackService, failingDestroyHelmfile{failStack: "whoami-go"}, nil, "", kube.NewClients(slog.Default()))
 
 	err = service.DeleteDeployment(context.Background(), deployment)
 	require.Error(t, err)

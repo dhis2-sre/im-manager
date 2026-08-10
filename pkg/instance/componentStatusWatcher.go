@@ -97,6 +97,7 @@ func (w *ComponentStatusWatcher) publish(pod *v1.Pod, deleted bool) {
 	component := pod.Labels["im-type"]
 	instanceID, err := strconv.ParseUint(pod.Labels["im-id"], 10, strconv.IntSize)
 	if component == "" || err != nil {
+		w.logger.Debug("Skipping component status for pod without usable im labels", "pod", pod.Name, "imType", component, "imId", pod.Labels["im-id"])
 		return
 	}
 
@@ -115,4 +116,5 @@ func (w *ComponentStatusWatcher) publish(pod *v1.Pod, deleted bool) {
 		Replica:      kube.NewReplica(*pod),
 		Deleted:      deleted,
 	})
+	w.logger.DebugContext(ctx, "Published component status", "group", instance.GroupName, "deploymentId", instance.DeploymentID, "instanceId", instance.ID, "component", component, "pod", pod.Name, "deleted", deleted)
 }

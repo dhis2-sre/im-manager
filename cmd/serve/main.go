@@ -111,6 +111,13 @@ func run() (err error) {
 	enablePrettyPrint := exists && prettyPrint == "true"
 
 	options := log.PrettyJSONHandlerOptions{PrettyPrint: enablePrettyPrint}
+	if level, exists := os.LookupEnv("LOG_LEVEL"); exists {
+		var parsed slog.Level
+		if err := parsed.UnmarshalText([]byte(level)); err != nil {
+			return fmt.Errorf("invalid LOG_LEVEL %q: %v", level, err)
+		}
+		options.Level = parsed
+	}
 	logger := slog.New(log.New(log.NewPrettyJSONHandler(os.Stdout, &options)))
 
 	db, err := newDB(logger)
@@ -188,7 +195,7 @@ func run() (err error) {
 		return err
 	}
 
-	kubeClients := kube.NewClients()
+	kubeClients := kube.NewClients(logger)
 	instanceService, err := newInstanceService(logger, db, stackService, groupService, s3Client, kubeClients)
 	if err != nil {
 		return err

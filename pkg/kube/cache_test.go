@@ -2,6 +2,7 @@ package kube
 
 import (
 	"context"
+	"log/slog"
 	"testing"
 	"time"
 
@@ -27,7 +28,7 @@ func TestPodCacheServesListPods(t *testing.T) {
 		imPod("db-b", "ns2", map[string]string{"im-type": "db"}),
 		imPod("web-a", "ns1", map[string]string{"im-type": "web"}),
 	)
-	cache := newPodCache(clientset)
+	cache := newPodCache(slog.Default(), clientset)
 	defer cache.close()
 	waitSynced(t, cache)
 
@@ -47,7 +48,7 @@ func TestPodCacheServesListPods(t *testing.T) {
 
 func TestPodCacheSeesUpdates(t *testing.T) {
 	clientset := fake.NewSimpleClientset()
-	cache := newPodCache(clientset)
+	cache := newPodCache(slog.Default(), clientset)
 	defer cache.close()
 	waitSynced(t, cache)
 
