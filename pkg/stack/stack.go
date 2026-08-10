@@ -31,10 +31,7 @@ var All = []Stack{
 	PgAdmin,
 	WhoamiGo,
 	IMJobRunner,
-	ChapDB,
-	ChapValkey,
-	ChapWorker,
-	ChapCore,
+	Chap,
 }
 
 // New creates stacks ensuring consumed parameters are provided by required stacks.

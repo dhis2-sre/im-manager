@@ -66,9 +66,9 @@ func TestComponentRestartTargetsExpectedWorkload(t *testing.T) {
 		{MinioComponent{kube.BaseComponent{Name: "minio"}}, false},
 		{PgAdminComponent{kube.BaseComponent{Name: "pgadmin"}}, true},
 		{WhoamiComponent{kube.BaseComponent{Name: "whoami"}}, false},
-		{ValkeyComponent{kube.BaseComponent{Name: "chap-valkey"}}, true},
-		{ChapWorkerComponent{kube.BaseComponent{Name: "chap-worker"}}, false},
-		{ChapCoreComponent{kube.BaseComponent{Name: "chap-core"}}, false},
+		{ValkeyComponent{kube.BaseComponent{Name: "valkey"}}, false},
+		{ChapAPIComponent{kube.BaseComponent{Name: "api"}}, false},
+		{ChapWorkerComponent{kube.BaseComponent{Name: "worker"}}, false},
 	}
 
 	for _, test := range tests {
@@ -184,6 +184,12 @@ func TestComponentPVCSelectorParity(t *testing.T) {
 			"cnpg.io/cluster=%s-dhis2-postgresql",
 			"app.kubernetes.io/instance=%s,app.kubernetes.io/name=minio",
 		},
+		// chap postdates the map too; the CNPG cluster labels its own volumes and the valkey
+		// subchart's PVC is qualified by chart name since it shares the release's instance label.
+		"chap": {
+			"cnpg.io/cluster=%s-chap-db",
+			"app.kubernetes.io/instance=%s-chap,app.kubernetes.io/name=valkey",
+		},
 	}
 
 	instance := &model.DeploymentInstance{Name: "mydb", Group: &model.Group{ID: 7}}
@@ -280,7 +286,7 @@ func TestPostgresPod(t *testing.T) {
 }
 
 func TestFindPostgresAccess(t *testing.T) {
-	for _, s := range []Stack{DHIS2DB, DHIS2, DHIS2V2, ChapDB} {
+	for _, s := range []Stack{DHIS2DB, DHIS2, DHIS2V2, Chap} {
 		_, err := kube.FindPostgresAccess(s.Components)
 		assert.NoErrorf(t, err, "stack %q should have a postgres component", s.Name)
 	}
@@ -298,10 +304,10 @@ func TestDatabaseSaveCapability(t *testing.T) {
 		assert.Containsf(t, component.SupportedOperations(params), kube.OperationDatabaseSave, "stack %q should advertise databaseSave", s.Name)
 	}
 
-	// chap-db does not advertise databaseSave yet: saving CHAP is planned, but needs its
+	// chap's db does not advertise databaseSave yet: saving CHAP is planned, but needs its
 	// parameter names mapped in the dump config and a seed/restore path first. Enabling it then
 	// is just adding the capability to its component.
-	chapAccess, err := kube.FindPostgresAccess(ChapDB.Components)
+	chapAccess, err := kube.FindPostgresAccess(Chap.Components)
 	require.NoError(t, err)
 	assert.NotContains(t, chapAccess.(kube.Component).SupportedOperations(params), kube.OperationDatabaseSave)
 }

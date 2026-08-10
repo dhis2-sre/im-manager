@@ -38,6 +38,7 @@ var DHIS2V2 = withGroupedParameters(Stack{
 			"GOOGLE_AUTH_PRIVATE_KEY_ID":      {Priority: 36, DisplayName: "Google auth private key id", DefaultValue: &dhis2CoreDefaults.googleAuthPrivateKeyId, Sensitive: true},
 			"GOOGLE_AUTH_CLIENT_EMAIL":        {Priority: 37, DisplayName: "Google auth client email", DefaultValue: &dhis2CoreDefaults.googleAuthClientEmail, Sensitive: true},
 			"GOOGLE_AUTH_CLIENT_ID":           {Priority: 38, DisplayName: "Google auth client id", DefaultValue: &dhis2CoreDefaults.googleAuthClientId, Sensitive: true},
+			"DEPLOY_CHAP":                     {Priority: 39, DisplayName: "Deploy CHAP", DefaultValue: &dhis2CoreDefaults.deployChap},
 		}},
 		{Name: "db", Title: "PostgreSQL", Parameters: StackParameters{
 			"DATABASE_ID":                  {Priority: 4, DisplayName: "Database"},
@@ -63,6 +64,9 @@ var DHIS2V2 = withGroupedParameters(Stack{
 	},
 	ParameterProviders: ParameterProviders{
 		"DATABASE_HOSTNAME": dhis2V2PostgresHostnameProvider,
+	},
+	Companions: []Stack{
+		Chap,
 	},
 	Components: []kube.Component{
 		DHIS2CoreComponent{BaseComponent: kube.BaseComponent{

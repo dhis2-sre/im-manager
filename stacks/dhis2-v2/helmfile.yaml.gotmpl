@@ -85,9 +85,23 @@ releases:
           secret: "{{ requiredEnv "S3_SECRET" }}"
       {{- end }}
 
-      {{- if ne (requiredEnv "CUSTOM_DHIS2_CONFIG") "" }}
-      - customConfigSnippet:
-          {{- requiredEnv "CUSTOM_DHIS2_CONFIG" | nindent 10 }}
+      # DEPLOY_CHAP allows DHIS 2 to proxy the route the chap companion registers, and installs the
+      # Modeling app that drives it. The custom config comes last so it can override the route rule.
+      - customConfigSnippet: |
+          {{- if eq (requiredEnv "DEPLOY_CHAP") "true" }}
+          route.remote_servers_allowed = http://*
+          {{- end }}
+          {{- with (requiredEnv "CUSTOM_DHIS2_CONFIG" | trim) }}
+          {{- . | nindent 10 }}
+          {{- end }}
+
+      {{- if eq (requiredEnv "DEPLOY_CHAP") "true" }}
+      - jobs:
+          installApps:
+            enabled: true
+            apps:
+              - name: Modeling
+                version: latest
       {{- end }}
 
       - sessionCookieSameSite: {{ requiredEnv "SAME_SITE_COOKIES" }}
