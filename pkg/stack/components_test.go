@@ -22,19 +22,8 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 )
 
-// allStacks are the deployable stack definitions; every one must declare its components. The
-// job-runner is exempt: it is an old jobs experiment that only labels pods, and jobs get their
-// own design in a separate task.
-var allStacks = func() []Stack {
-	var stacks []Stack
-	for _, s := range All {
-		if s.Name == IMJobRunner.Name {
-			continue
-		}
-		stacks = append(stacks, s)
-	}
-	return stacks
-}()
+// allStacks are the deployable stack definitions; every one must declare its components.
+var allStacks = All
 
 func TestEveryStackHasUniqueNamedComponents(t *testing.T) {
 	for _, s := range allStacks {
@@ -46,8 +35,6 @@ func TestEveryStackHasUniqueNamedComponents(t *testing.T) {
 			seen[c.ComponentName()] = true
 		}
 	}
-
-	assert.Empty(t, IMJobRunner.Components, "im-job-runner deliberately has no components until jobs are redesigned")
 }
 
 // TestComponentRestartTargetsExpectedWorkload asserts each technology component patches the

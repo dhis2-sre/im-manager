@@ -26,13 +26,16 @@ func reencryptCFBToGCM() *gormigrate.Migration {
 		stack.DHIS2,
 		stack.PgAdmin,
 		stack.WhoamiGo,
-		stack.IMJobRunner,
 	}
 
-	// The chap-db, chap-valkey, chap-worker and chap-core stacks were replaced by the chap
-	// umbrella stack after this migration shipped. Their sensitive parameters are frozen here so
-	// rows of instances deployed from them are still re-encrypted.
+	// Stacks removed after this migration shipped: the chap-* ones replaced by the chap umbrella
+	// stack, and im-job-runner retired outright. Their sensitive parameters are frozen here so rows
+	// of instances deployed from them are still re-encrypted.
 	sensitive := map[string]map[string]bool{
+		"im-job-runner": {
+			"DHIS2_DATABASE_PASSWORD": true,
+			"DHIS2_DATABASE_USERNAME": true,
+		},
 		"chap-db":     {"DATABASE_PASSWORD": true},
 		"chap-valkey": {"REDIS_PASSWORD": true},
 		"chap-worker": {},
