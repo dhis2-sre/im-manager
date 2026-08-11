@@ -29,8 +29,8 @@ releases:
 
       - worker:
           image:
-            tag: "{{ requiredEnv "IMAGE_TAG" }}"
-            pullPolicy: {{ requiredEnv "IMAGE_PULL_POLICY" }}
+            tag: "{{ requiredEnv "WORKER_IMAGE_TAG" }}"
+            pullPolicy: {{ requiredEnv "WORKER_IMAGE_PULL_POLICY" }}
           labels:
             im-type: "worker"
 

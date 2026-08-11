@@ -7,14 +7,23 @@ import (
 // Chap deploys the chap umbrella chart: one release bundling the CHAP api, its Celery worker,
 // a CloudNativePG PostgreSQL cluster and Valkey, replacing the deployment-level composition of
 // chap-db, chap-valkey, chap-worker and chap-core.
+//
+// Every group is named after a component, which is what lets the instance details page show each
+// component's parameters under it. A group that matches no component ends up in a list dangling
+// below the components instead, so release-wide settings live with the api, the component a CHAP
+// deployment is built around, rather than in a group of their own.
 var Chap = withGroupedParameters(Stack{
 	Name: "chap",
 	ParameterGroups: []ParameterGroup{
-		{Name: "chap", Title: "CHAP", Parameters: StackParameters{
+		{Name: "api", Title: "CHAP API", Parameters: StackParameters{
 			"IMAGE_TAG":         {Priority: 1, DisplayName: "Image Tag", DefaultValue: &chapDefaults.imageTag},
 			"IMAGE_PULL_POLICY": {Priority: 2, DisplayName: "Image Pull Policy", DefaultValue: &chapDefaults.imagePullPolicy, Validator: imagePullPolicy},
 			"CHART_VERSION":     {Priority: 3, DisplayName: "Chart Version", DefaultValue: &chapDefaults.chartVersion},
 			"DHIS2_REGISTER":    {Priority: 4, DisplayName: "Register as a route in DHIS 2", DefaultValue: &chapDefaults.dhis2Register},
+		}},
+		{Name: "worker", Title: "CHAP Worker", Parameters: StackParameters{
+			"WORKER_IMAGE_TAG":         {Priority: 13, DisplayName: "Image Tag", DefaultValue: &chapDefaults.imageTag},
+			"WORKER_IMAGE_PULL_POLICY": {Priority: 14, DisplayName: "Image Pull Policy", DefaultValue: &chapDefaults.imagePullPolicy, Validator: imagePullPolicy},
 		}},
 		{Name: "dhis2", Title: "DHIS 2 registration", When: whenDhis2RegisterIsEnabled, Parameters: StackParameters{
 			"DHIS2_USERNAME": {Priority: 5, DisplayName: "DHIS2 Username", DefaultValue: &chapDefaults.dhis2Username},

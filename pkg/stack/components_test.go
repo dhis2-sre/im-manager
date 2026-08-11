@@ -311,3 +311,26 @@ func TestDatabaseSaveCapability(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotContains(t, chapAccess.(kube.Component).SupportedOperations(params), kube.OperationDatabaseSave)
 }
+
+// TestParameterGroupsBelongToComponents asserts every parameter group can be attributed to a
+// component, either by naming one or, when it is conditional, by hanging off a parameter that lives
+// in a group that does. The instance details page attributes an instance's parameters to components
+// exactly this way, so a group satisfying neither leaves its parameters in a list dangling below the
+// components rather than under the thing they configure.
+func TestParameterGroupsBelongToComponents(t *testing.T) {
+	for _, s := range allStacks {
+		components := make(map[string]bool, len(s.Components))
+		for _, component := range s.Components {
+			components[component.ComponentName()] = true
+		}
+
+		for _, group := range s.ParameterGroups {
+			if components[group.Name] {
+				continue
+			}
+			require.NotNilf(t, group.When, "stack %q group %q names no component and has no condition to attribute it by", s.Name, group.Name)
+			owner := s.Parameters[group.When.Parameter].Group
+			assert.Truef(t, components[owner], "stack %q group %q is conditional on %q, which lives in group %q, which names no component", s.Name, group.Name, group.When.Parameter, owner)
+		}
+	}
+}
