@@ -30,5 +30,3 @@ var whoamiGoDefaults = struct {
 	imageTag:        "0.6.0",
 	replicaCount:    "1",
 }
-
-// Stack representing ../../stacks/im-job-runner/helmfile.yaml.gotmpl

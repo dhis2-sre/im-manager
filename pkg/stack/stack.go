@@ -30,7 +30,6 @@ var All = []Stack{
 	DHIS2V2,
 	PgAdmin,
 	WhoamiGo,
-	IMJobRunner,
 	Chap,
 }
 

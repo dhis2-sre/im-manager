@@ -22,7 +22,6 @@ func TestStackHandler(t *testing.T) {
 		stack.Chap,
 		stack.PgAdmin,
 		stack.WhoamiGo,
-		stack.IMJobRunner,
 	)
 	require.NoError(t, err)
 
