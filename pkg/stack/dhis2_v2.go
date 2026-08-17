@@ -63,14 +63,26 @@ var DHIS2V2 = withGroupedParameters(Stack{
 		// which is what DHIS 2 and the provisioning job connect to, the same way chap keeps its
 		// release-wide settings with its api.
 		{Name: "doris-fe", Title: "Doris frontend", When: whenDorisIsEnabled, Parameters: StackParameters{
-			"DORIS_VERSION":           {Priority: 41, DisplayName: "Doris Version", DefaultValue: &dhis2V2Defaults.dorisVersion},
-			"DORIS_DATABASE":          {Priority: 42, DisplayName: "Database Name", DefaultValue: &dhis2V2Defaults.dorisDatabase},
-			"DORIS_USERNAME":          {Priority: 43, DisplayName: "Username", DefaultValue: &dhis2V2Defaults.dorisUsername, Sensitive: true},
-			"DORIS_PASSWORD":          {Priority: 44, DisplayName: "Password", DefaultValue: &dhis2V2Defaults.dorisPassword, Sensitive: true},
-			"DORIS_FRONTEND_REPLICAS": {Priority: 45, DisplayName: "Replicas", DefaultValue: &dhis2V2Defaults.dorisReplicas},
+			"DORIS_FRONTEND_VERSION":                   {Priority: 41, DisplayName: "Doris Version", DefaultValue: &dhis2V2Defaults.dorisVersion},
+			"DORIS_DATABASE":                           {Priority: 42, DisplayName: "Database Name", DefaultValue: &dhis2V2Defaults.dorisDatabase},
+			"DORIS_USERNAME":                           {Priority: 43, DisplayName: "Username", DefaultValue: &dhis2V2Defaults.dorisUsername, Sensitive: true},
+			"DORIS_PASSWORD":                           {Priority: 44, DisplayName: "Password", DefaultValue: &dhis2V2Defaults.dorisPassword, Sensitive: true},
+			"DORIS_FRONTEND_REPLICAS":                  {Priority: 45, DisplayName: "Replicas", DefaultValue: &dhis2V2Defaults.dorisReplicas},
+			"DORIS_FRONTEND_RESOURCES_REQUESTS_CPU":    {Priority: 46, DisplayName: "Resources Requests CPU", DefaultValue: &dhis2V2Defaults.dorisRequestsCPU},
+			"DORIS_FRONTEND_RESOURCES_REQUESTS_MEMORY": {Priority: 47, DisplayName: "Resources Requests Memory", DefaultValue: &dhis2V2Defaults.dorisRequestsMemory},
+			"DORIS_FRONTEND_RESOURCES_LIMITS_CPU":      {Priority: 48, DisplayName: "Resources Limits CPU", DefaultValue: &dhis2V2Defaults.dorisLimitsCPU},
+			"DORIS_FRONTEND_RESOURCES_LIMITS_MEMORY":   {Priority: 49, DisplayName: "Resources Limits Memory", DefaultValue: &dhis2V2Defaults.dorisLimitsMemory},
 		}},
+		// The backend carries its own version because the tiers are separate images, though they are
+		// meant to run the same version outside of an upgrade. It is sized separately because it is
+		// the tier that holds the data and does the work.
 		{Name: "doris-be", Title: "Doris backend", When: whenDorisIsEnabled, Parameters: StackParameters{
-			"DORIS_BACKEND_REPLICAS": {Priority: 46, DisplayName: "Replicas", DefaultValue: &dhis2V2Defaults.dorisReplicas},
+			"DORIS_BACKEND_VERSION":                   {Priority: 50, DisplayName: "Doris Version", DefaultValue: &dhis2V2Defaults.dorisVersion},
+			"DORIS_BACKEND_REPLICAS":                  {Priority: 51, DisplayName: "Replicas", DefaultValue: &dhis2V2Defaults.dorisReplicas},
+			"DORIS_BACKEND_RESOURCES_REQUESTS_CPU":    {Priority: 52, DisplayName: "Resources Requests CPU", DefaultValue: &dhis2V2Defaults.dorisRequestsCPU},
+			"DORIS_BACKEND_RESOURCES_REQUESTS_MEMORY": {Priority: 53, DisplayName: "Resources Requests Memory", DefaultValue: &dhis2V2Defaults.dorisRequestsMemory},
+			"DORIS_BACKEND_RESOURCES_LIMITS_CPU":      {Priority: 54, DisplayName: "Resources Limits CPU", DefaultValue: &dhis2V2Defaults.dorisLimitsCPU},
+			"DORIS_BACKEND_RESOURCES_LIMITS_MEMORY":   {Priority: 55, DisplayName: "Resources Limits Memory", DefaultValue: &dhis2V2Defaults.dorisLimitsMemory},
 		}},
 		{Name: "filesystem", Title: "Storage: Filesystem", When: whenStorageIsFilesystem, Parameters: StackParameters{
 			"FILESYSTEM_VOLUME_SIZE": {Priority: 12, DisplayName: "Volume size", DefaultValue: &dhis2CoreDefaults.filesystemVolumeSize, Sensitive: true},
@@ -117,13 +129,17 @@ var DHIS2V2 = withGroupedParameters(Stack{
 })
 
 var dhis2V2Defaults = struct {
-	chartVersion  string
-	enableDoris   string
-	dorisVersion  string
-	dorisDatabase string
-	dorisUsername string
-	dorisPassword string
-	dorisReplicas string
+	chartVersion        string
+	enableDoris         string
+	dorisVersion        string
+	dorisDatabase       string
+	dorisUsername       string
+	dorisPassword       string
+	dorisReplicas       string
+	dorisRequestsCPU    string
+	dorisRequestsMemory string
+	dorisLimitsCPU      string
+	dorisLimitsMemory   string
 }{
 	chartVersion: "1.0.0",
 	enableDoris:  "false",
@@ -134,6 +150,12 @@ var dhis2V2Defaults = struct {
 	dorisUsername: "dhis2",
 	dorisPassword: "dhis2",
 	dorisReplicas: "1",
+	// The upstream chart asks for 8 CPU and 16Gi per tier, which does not schedule on our nodes;
+	// these match what the dhis2 chart sizes the bundled cluster down to.
+	dorisRequestsCPU:    "1",
+	dorisRequestsMemory: "4Gi",
+	dorisLimitsCPU:      "4",
+	dorisLimitsMemory:   "8Gi",
 }
 
 // Doris is bundled by the chart rather than being a stack of its own, the same way MinIO is, so the
