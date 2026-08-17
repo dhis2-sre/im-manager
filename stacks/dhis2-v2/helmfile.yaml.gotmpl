@@ -114,7 +114,15 @@ releases:
             replicas: {{ requiredEnv "DORIS_FRONTEND_REPLICAS" }}
             image:
               repository: dhis2/apache-doris
-              tag: fe-{{ requiredEnv "DORIS_VERSION" }}-postgres
+              tag: fe-{{ requiredEnv "DORIS_FRONTEND_VERSION" }}-postgres
+            # The upstream chart names this key in the singular.
+            resource:
+              requests:
+                cpu: {{ requiredEnv "DORIS_FRONTEND_RESOURCES_REQUESTS_CPU" }}
+                memory: {{ requiredEnv "DORIS_FRONTEND_RESOURCES_REQUESTS_MEMORY" }}
+              limits:
+                cpu: {{ requiredEnv "DORIS_FRONTEND_RESOURCES_LIMITS_CPU" }}
+                memory: {{ requiredEnv "DORIS_FRONTEND_RESOURCES_LIMITS_MEMORY" }}
             labels:
               im: "true"
               im-deployment-id: "{{ requiredEnv "DEPLOYMENT_ID" }}"
@@ -127,7 +135,14 @@ releases:
             replicas: {{ requiredEnv "DORIS_BACKEND_REPLICAS" }}
             image:
               repository: dhis2/apache-doris
-              tag: be-{{ requiredEnv "DORIS_VERSION" }}-postgres
+              tag: be-{{ requiredEnv "DORIS_BACKEND_VERSION" }}-postgres
+            resource:
+              requests:
+                cpu: {{ requiredEnv "DORIS_BACKEND_RESOURCES_REQUESTS_CPU" }}
+                memory: {{ requiredEnv "DORIS_BACKEND_RESOURCES_REQUESTS_MEMORY" }}
+              limits:
+                cpu: {{ requiredEnv "DORIS_BACKEND_RESOURCES_LIMITS_CPU" }}
+                memory: {{ requiredEnv "DORIS_BACKEND_RESOURCES_LIMITS_MEMORY" }}
             labels:
               im: "true"
               im-deployment-id: "{{ requiredEnv "DEPLOYMENT_ID" }}"
