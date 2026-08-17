@@ -153,6 +153,29 @@ func (c ChapAPIComponent) Restart(ctx context.Context, client *kube.Client, inst
 	return client.RestartDeployment(ctx, instance, c.Name)
 }
 
+// ChapRegisterComponent tracks the chap chart's DHIS 2 registration Job. The job is the only
+// evidence that registration ran, and its logs say why it failed, so it is a component even though a
+// Job is immutable: helm creates one per revision, and it is redeployment, not a restart, that runs
+// registration again. It therefore supports no operations, and its pods are the job runs kept
+// around by the chart's ttlSecondsAfterFinished.
+type ChapRegisterComponent struct {
+	kube.BaseComponent
+}
+
+func (c ChapRegisterComponent) Restart(ctx context.Context, client *kube.Client, instance *model.DeploymentInstance) error {
+	return errdef.NewBadRequest("component %q is a job and cannot be restarted, redeploy the instance to register again", c.Name)
+}
+
+func (c ChapRegisterComponent) RestartReplica(ctx context.Context, client *kube.Client, instance *model.DeploymentInstance, podName string) error {
+	return errdef.NewBadRequest("component %q is a job and its pods cannot be restarted, redeploy the instance to register again", c.Name)
+}
+
+// SupportedOperations returns nothing rather than the base restart pair, so clients do not offer
+// what a job cannot do.
+func (c ChapRegisterComponent) SupportedOperations(params model.DeploymentInstanceParameters) []kube.Operation {
+	return nil
+}
+
 // ChapWorkerComponent operates on the chap chart's worker Deployment.
 type ChapWorkerComponent struct {
 	kube.BaseComponent
