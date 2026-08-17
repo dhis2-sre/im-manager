@@ -110,6 +110,62 @@ func TestCNPGComponentRestartPatchesCluster(t *testing.T) {
 	assert.NotEmpty(t, annotations["kubectl.kubernetes.io/restartedAt"])
 }
 
+// TestDorisComponentRestartPatchesTier asserts each Doris component restarts through the
+// DorisCluster custom resource and stamps only its own tier, so a frontend restart leaves the
+// backends alone.
+func TestDorisComponentRestartPatchesTier(t *testing.T) {
+	instance := &model.DeploymentInstance{ID: 1, Name: "myinstance", Group: &model.Group{ID: 7, Namespace: "ns"}}
+	gvr := schema.GroupVersionResource{Group: "doris.selectdb.com", Version: "v1", Resource: "dorisclusters"}
+
+	tests := []struct {
+		name  string
+		tier  string
+		other string
+	}{
+		{"doris-fe", "fe", "be"},
+		{"doris-be", "be", "fe"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			cluster := &unstructured.Unstructured{Object: map[string]any{
+				"apiVersion": "doris.selectdb.com/v1",
+				"kind":       "DorisCluster",
+				"metadata":   map[string]any{"name": "myinstance-7-doris", "namespace": "ns"},
+			}}
+			scheme := runtime.NewScheme()
+			client := &kube.Client{Dynamic: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(scheme, map[schema.GroupVersionResource]string{gvr: "DorisClusterList"}, cluster)}
+
+			component := DorisComponent{BaseComponent: kube.BaseComponent{Name: test.name}, ClusterPattern: "%s-doris", Tier: test.tier}
+			require.NoError(t, component.Restart(context.Background(), client, instance))
+
+			got, err := client.Dynamic.Resource(gvr).Namespace("ns").Get(context.Background(), "myinstance-7-doris", metav1.GetOptions{})
+			require.NoError(t, err)
+			annotations := got.GetAnnotations()
+			assert.NotEmpty(t, annotations["apache.doris."+test.tier+"/restartedAt"])
+			assert.Empty(t, annotations["apache.doris."+test.other+"/restartedAt"])
+		})
+	}
+}
+
+// TestDHIS2V2DorisComponentPresence asserts both Doris tiers only exist when the analytics database
+// is enabled, mirroring the chart's dorisCluster.enabled condition.
+func TestDHIS2V2DorisComponentPresence(t *testing.T) {
+	names := func(params model.DeploymentInstanceParameters) []string {
+		var names []string
+		for _, c := range kube.PresentComponents(DHIS2V2.Components, params) {
+			names = append(names, c.ComponentName())
+		}
+		return names
+	}
+
+	enabled := model.DeploymentInstanceParameters{"STORAGE_TYPE": {Value: "s3"}, "ENABLE_DORIS": {Value: "true"}}
+	assert.Equal(t, []string{"dhis2", "db", "doris-fe", "doris-be"}, names(enabled))
+
+	disabled := model.DeploymentInstanceParameters{"STORAGE_TYPE": {Value: "s3"}, "ENABLE_DORIS": {Value: "false"}}
+	assert.Equal(t, []string{"dhis2", "db"}, names(disabled))
+}
+
 // TestDHIS2V2MinioComponentPresence asserts the minio component only exists when the file store
 // lives in the bundled MinIO, mirroring the chart's minio.enabled condition.
 func TestDHIS2V2MinioComponentPresence(t *testing.T) {
