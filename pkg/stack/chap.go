@@ -25,7 +25,7 @@ var Chap = withGroupedParameters(Stack{
 			"WORKER_IMAGE_TAG":         {Priority: 13, DisplayName: "Image Tag", DefaultValue: &chapDefaults.imageTag},
 			"WORKER_IMAGE_PULL_POLICY": {Priority: 14, DisplayName: "Image Pull Policy", DefaultValue: &chapDefaults.imagePullPolicy, Validator: imagePullPolicy},
 		}},
-		{Name: "dhis2", Title: "DHIS 2 registration", When: whenDhis2RegisterIsEnabled, Parameters: StackParameters{
+		{Name: "register", Title: "DHIS 2 registration", When: whenDhis2RegisterIsEnabled, Parameters: StackParameters{
 			"DHIS2_USERNAME": {Priority: 5, DisplayName: "DHIS2 Username", DefaultValue: &chapDefaults.dhis2Username},
 			"DHIS2_PASSWORD": {Priority: 6, DisplayName: "DHIS2 Password", DefaultValue: &chapDefaults.dhis2Password, Sensitive: true},
 		}},
@@ -43,6 +43,7 @@ var Chap = withGroupedParameters(Stack{
 	Components: []kube.Component{
 		ChapAPIComponent{BaseComponent: kube.BaseComponent{Name: "api"}},
 		ChapWorkerComponent{BaseComponent: kube.BaseComponent{Name: "worker"}},
+		ChapRegisterComponent{BaseComponent: kube.BaseComponent{Name: "register", When: whenDhis2RegisterIsEnabled}},
 		CNPGPostgresComponent{BaseComponent: kube.BaseComponent{
 			Name:        "db",
 			PVCPatterns: []string{"cnpg.io/cluster=%s-chap-db"},
@@ -76,7 +77,7 @@ var chapDefaults = struct {
 	redisPassword    string
 	redisStorageSize string
 }{
-	chartVersion:     "1.0.0",
+	chartVersion:     "1.1.0",
 	imageTag:         "v2.1.0",
 	imagePullPolicy:  ifNotPresent,
 	dhis2Register:    "true",

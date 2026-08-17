@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"testing"
 
+	"github.com/dhis2-sre/im-manager/internal/errdef"
 	"github.com/dhis2-sre/im-manager/pkg/kube"
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	"github.com/stretchr/testify/assert"
@@ -185,6 +186,25 @@ func TestDHIS2V2MinioComponentPresence(t *testing.T) {
 
 	s3Params := model.DeploymentInstanceParameters{"STORAGE_TYPE": {Value: "s3"}}
 	assert.Equal(t, []string{"dhis2", "db"}, names(s3Params))
+}
+
+// TestChapRegisterComponentIsAJob asserts the registration component behaves like the Job it
+// tracks: present only when CHAP registers itself, offering no operations, and refusing the restarts
+// a Job cannot perform.
+func TestChapRegisterComponentIsAJob(t *testing.T) {
+	instance := &model.DeploymentInstance{ID: 1, Name: "myinstance", Group: &model.Group{ID: 7, Namespace: "ns"}}
+
+	register, err := kube.FindComponent(Chap.Components, "register")
+	require.NoError(t, err)
+
+	assert.True(t, register.Present(model.DeploymentInstanceParameters{"DHIS2_REGISTER": {Value: "true"}}))
+	assert.False(t, register.Present(model.DeploymentInstanceParameters{"DHIS2_REGISTER": {Value: "false"}}))
+
+	assert.Empty(t, register.SupportedOperations(nil))
+
+	client := &kube.Client{Clientset: fake.NewSimpleClientset()}
+	assert.True(t, errdef.IsBadRequest(register.Restart(context.Background(), client, instance)))
+	assert.True(t, errdef.IsBadRequest(register.RestartReplica(context.Background(), client, instance, "pod")))
 }
 
 // TestDHIS2CoreAdvertisesFilestoreBackup asserts the capability listing: the dhis2-core component

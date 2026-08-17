@@ -70,6 +70,8 @@ releases:
           hostname: "{{ requiredEnv "INSTANCE_HOSTNAME" }}/{{ requiredEnv "INSTANCE_PATH_NAME" }}"
           username: "{{ requiredEnv "DHIS2_USERNAME" }}"
           password: "{{ requiredEnv "DHIS2_PASSWORD" }}"
+          labels:
+            im-type: "register"
 
 repositories:
   - name: chap
