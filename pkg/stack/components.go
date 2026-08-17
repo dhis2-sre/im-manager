@@ -87,6 +87,22 @@ func (c CNPGPostgresComponent) PostgresPod(ctx context.Context, client *kube.Cli
 	return pods[0].Name, cnpgPostgresContainer, nil
 }
 
+// DorisComponent operates on a Doris cluster managed by the doris-operator. Restart goes through the
+// custom resource, one annotation per tier, so the operator performs the rollout rather than us
+// patching the statefulsets it owns. Both tiers are one component because they are one database; the
+// operator restarts frontends and backends independently, which per role scaling can build on later.
+type DorisComponent struct {
+	kube.BaseComponent
+	// ClusterPattern names the DorisCluster resource, formatted with the instance's "<name>-<groupID>"
+	// unique name, e.g. "%s-doris".
+	ClusterPattern string
+}
+
+func (c DorisComponent) Restart(ctx context.Context, client *kube.Client, instance *model.DeploymentInstance) error {
+	clusterName := fmt.Sprintf(c.ClusterPattern, fmt.Sprintf("%s-%d", instance.Name, instance.Group.ID))
+	return client.RestartDorisCluster(ctx, instance.Group.Namespace, clusterName)
+}
+
 // MinioComponent operates on the Bitnami MinIO chart's Deployment.
 type MinioComponent struct {
 	kube.BaseComponent

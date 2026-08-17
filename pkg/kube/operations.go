@@ -111,6 +111,23 @@ func (c *Client) RestartCNPGCluster(ctx context.Context, namespace, name string)
 	return nil
 }
 
+var dorisClusterResource = schema.GroupVersionResource{Group: "doris.selectdb.com", Version: "v1", Resource: "dorisclusters"}
+
+// RestartDorisCluster triggers a rolling restart of a Doris cluster by stamping the operator's
+// restart annotations, one per tier, on the DorisCluster resource. The operator compares the
+// timestamp against what it last acted on, so both tiers roll once. It insists on RFC3339 with an
+// offset, and rejects anything it cannot parse, hence the explicit format rather than time.Now
+// formatted loosely.
+func (c *Client) RestartDorisCluster(ctx context.Context, namespace, name string) error {
+	restartedAt := time.Now().Format(time.RFC3339)
+	data := fmt.Sprintf(`{"metadata": {"annotations": {"apache.doris.fe/restartedAt": %q, "apache.doris.be/restartedAt": %q}}}`, restartedAt, restartedAt)
+	_, err := c.Dynamic.Resource(dorisClusterResource).Namespace(namespace).Patch(ctx, name, types.MergePatchType, []byte(data), metav1.PatchOptions{})
+	if err != nil {
+		return fmt.Errorf("error restarting %q: %v", name, err)
+	}
+	return nil
+}
+
 // DeletePVCs deletes the persistent volume claims matching each label selector in the given
 // namespace. Selectors are pre-formatted by the caller (a component's PVCSelectors).
 func (c *Client) DeletePVCs(ctx context.Context, namespace string, selectors []string) error {

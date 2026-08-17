@@ -39,6 +39,7 @@ var DHIS2V2 = withGroupedParameters(Stack{
 			"GOOGLE_AUTH_CLIENT_EMAIL":        {Priority: 37, DisplayName: "Google auth client email", DefaultValue: &dhis2CoreDefaults.googleAuthClientEmail, Sensitive: true},
 			"GOOGLE_AUTH_CLIENT_ID":           {Priority: 38, DisplayName: "Google auth client id", DefaultValue: &dhis2CoreDefaults.googleAuthClientId, Sensitive: true},
 			"DEPLOY_CHAP":                     {Priority: 39, DisplayName: "Deploy CHAP", DefaultValue: &dhis2CoreDefaults.deployChap},
+			"ENABLE_DORIS":                    {Priority: 40, DisplayName: "Use Doris as the analytics database", DefaultValue: &dhis2V2Defaults.enableDoris},
 		}},
 		{Name: "db", Title: "PostgreSQL", Parameters: StackParameters{
 			"DATABASE_ID":                  {Priority: 4, DisplayName: "Database"},
@@ -57,6 +58,14 @@ var DHIS2V2 = withGroupedParameters(Stack{
 			"S3_REGION":   {Priority: 14, DisplayName: "Region", DefaultValue: &dhis2CoreDefaults.s3Region, Sensitive: true},
 			"S3_IDENTITY": {Priority: 15, DisplayName: "Identity", DefaultValue: &dhis2CoreDefaults.s3Identity, Sensitive: true},
 			"S3_SECRET":   {Priority: 16, DisplayName: "Secret", DefaultValue: &dhis2CoreDefaults.s3Secret, Sensitive: true},
+		}},
+		{Name: "doris", Title: "Doris", When: whenDorisIsEnabled, Parameters: StackParameters{
+			"DORIS_VERSION":           {Priority: 41, DisplayName: "Doris Version", DefaultValue: &dhis2V2Defaults.dorisVersion},
+			"DORIS_DATABASE":          {Priority: 42, DisplayName: "Database Name", DefaultValue: &dhis2V2Defaults.dorisDatabase},
+			"DORIS_USERNAME":          {Priority: 43, DisplayName: "Username", DefaultValue: &dhis2V2Defaults.dorisUsername, Sensitive: true},
+			"DORIS_PASSWORD":          {Priority: 44, DisplayName: "Password", DefaultValue: &dhis2V2Defaults.dorisPassword, Sensitive: true},
+			"DORIS_FRONTEND_REPLICAS": {Priority: 45, DisplayName: "Frontend Replicas", DefaultValue: &dhis2V2Defaults.dorisReplicas},
+			"DORIS_BACKEND_REPLICAS":  {Priority: 46, DisplayName: "Backend Replicas", DefaultValue: &dhis2V2Defaults.dorisReplicas},
 		}},
 		{Name: "filesystem", Title: "Storage: Filesystem", When: whenStorageIsFilesystem, Parameters: StackParameters{
 			"FILESYSTEM_VOLUME_SIZE": {Priority: 12, DisplayName: "Volume size", DefaultValue: &dhis2CoreDefaults.filesystemVolumeSize, Sensitive: true},
@@ -88,14 +97,39 @@ var DHIS2V2 = withGroupedParameters(Stack{
 			PVCPatterns: []string{"app.kubernetes.io/instance=%s,app.kubernetes.io/name=minio"},
 			When:        whenStorageIsMinio,
 		}},
+		// No PVC patterns: the chart leaves the Doris cluster's persistentVolumeClaim unset, so the
+		// operator gives both tiers ephemeral storage and destroy has no volumes to clean up. Giving
+		// Doris volumes is a chart change, and this is where the selectors would follow.
+		DorisComponent{BaseComponent: kube.BaseComponent{
+			Name: "doris",
+			When: whenDorisIsEnabled,
+		}, ClusterPattern: "%s-doris"},
 	},
 })
 
 var dhis2V2Defaults = struct {
-	chartVersion string
+	chartVersion  string
+	enableDoris   string
+	dorisVersion  string
+	dorisDatabase string
+	dorisUsername string
+	dorisPassword string
+	dorisReplicas string
 }{
 	chartVersion: "1.0.0",
+	enableDoris:  "false",
+	// The tag suffix is dhis2/apache-doris, upstream Doris with the PostgreSQL JDBC driver already in
+	// its jdbc_drivers directory, so the chart refers to the driver by name instead of downloading it.
+	dorisVersion:  "4.0.8",
+	dorisDatabase: "dhis2",
+	dorisUsername: "dhis2",
+	dorisPassword: "dhis2",
+	dorisReplicas: "1",
 }
+
+// Doris is bundled by the chart rather than being a stack of its own, the same way MinIO is, so the
+// condition gates both the parameters and the component.
+var whenDorisIsEnabled = &kube.Condition{Parameter: "ENABLE_DORIS", Equals: "true"}
 
 // The storage conditions mirror the chart's own gating of each file store backend on STORAGE_TYPE.
 // The minio condition doubles as the minio component's presence predicate, so the deploy form's

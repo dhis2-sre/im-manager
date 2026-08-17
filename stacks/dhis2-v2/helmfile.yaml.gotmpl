@@ -95,6 +95,49 @@ releases:
           {{- . | nindent 10 }}
           {{- end }}
 
+      # Doris as the analytics database, bundled by the chart next to DHIS 2 rather than shared, so it
+      # lives and dies with the instance. Requires the doris-operator on the cluster. The image is
+      # upstream Doris with the PostgreSQL JDBC driver already in jdbc_drivers, which is why the
+      # driver is named rather than downloaded at startup.
+      {{- if eq (requiredEnv "ENABLE_DORIS") "true" }}
+      - doris:
+          enabled: true
+          database: {{ requiredEnv "DORIS_DATABASE" }}
+          username: {{ requiredEnv "DORIS_USERNAME" }}
+          password: {{ requiredEnv "DORIS_PASSWORD" }}
+          driverFilename: postgresql.jar
+      - dorisCluster:
+          enabled: true
+          dorisCluster:
+            name: "{{ requiredEnv "INSTANCE_NAME" }}-doris"
+          feSpec:
+            replicas: {{ requiredEnv "DORIS_FRONTEND_REPLICAS" }}
+            image:
+              repository: dhis2/apache-doris
+              tag: fe-{{ requiredEnv "DORIS_VERSION" }}-postgres
+            labels:
+              im: "true"
+              im-deployment-id: "{{ requiredEnv "DEPLOYMENT_ID" }}"
+              im-instance-id: "{{ requiredEnv "INSTANCE_ID" }}"
+              im-id: "{{ requiredEnv "INSTANCE_ID" }}"
+              im-type: "doris"
+              im-creation-timestamp: "{{ requiredEnv "INSTANCE_CREATION_TIMESTAMP" }}"
+              im-ttl: "{{ requiredEnv "INSTANCE_TTL" }}"
+          beSpec:
+            replicas: {{ requiredEnv "DORIS_BACKEND_REPLICAS" }}
+            image:
+              repository: dhis2/apache-doris
+              tag: be-{{ requiredEnv "DORIS_VERSION" }}-postgres
+            labels:
+              im: "true"
+              im-deployment-id: "{{ requiredEnv "DEPLOYMENT_ID" }}"
+              im-instance-id: "{{ requiredEnv "INSTANCE_ID" }}"
+              im-id: "{{ requiredEnv "INSTANCE_ID" }}"
+              im-type: "doris"
+              im-creation-timestamp: "{{ requiredEnv "INSTANCE_CREATION_TIMESTAMP" }}"
+              im-ttl: "{{ requiredEnv "INSTANCE_TTL" }}"
+      {{- end }}
+
       {{- if eq (requiredEnv "DEPLOY_CHAP") "true" }}
       - jobs:
           installApps:

@@ -110,6 +110,46 @@ func TestCNPGComponentRestartPatchesCluster(t *testing.T) {
 	assert.NotEmpty(t, annotations["kubectl.kubernetes.io/restartedAt"])
 }
 
+// TestDorisComponentRestartPatchesCluster asserts the Doris component restarts through the
+// DorisCluster custom resource, stamping both tiers so the operator rolls frontends and backends,
+// rather than touching the statefulsets it owns.
+func TestDorisComponentRestartPatchesCluster(t *testing.T) {
+	instance := &model.DeploymentInstance{ID: 1, Name: "myinstance", Group: &model.Group{ID: 7, Namespace: "ns"}}
+	gvr := schema.GroupVersionResource{Group: "doris.selectdb.com", Version: "v1", Resource: "dorisclusters"}
+	cluster := &unstructured.Unstructured{Object: map[string]any{
+		"apiVersion": "doris.selectdb.com/v1",
+		"kind":       "DorisCluster",
+		"metadata":   map[string]any{"name": "myinstance-7-doris", "namespace": "ns"},
+	}}
+	scheme := runtime.NewScheme()
+	client := &kube.Client{Dynamic: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(scheme, map[schema.GroupVersionResource]string{gvr: "DorisClusterList"}, cluster)}
+
+	component := DorisComponent{BaseComponent: kube.BaseComponent{Name: "doris"}, ClusterPattern: "%s-doris"}
+	require.NoError(t, component.Restart(context.Background(), client, instance))
+
+	got, err := client.Dynamic.Resource(gvr).Namespace("ns").Get(context.Background(), "myinstance-7-doris", metav1.GetOptions{})
+	require.NoError(t, err)
+	annotations := got.GetAnnotations()
+	assert.NotEmpty(t, annotations["apache.doris.fe/restartedAt"])
+	assert.NotEmpty(t, annotations["apache.doris.be/restartedAt"])
+}
+
+// TestDHIS2V2DorisComponentPresence asserts the doris component only exists when the analytics
+// database is enabled, mirroring the chart's dorisCluster.enabled condition.
+func TestDHIS2V2DorisComponentPresence(t *testing.T) {
+	present := func(params model.DeploymentInstanceParameters) bool {
+		for _, c := range kube.PresentComponents(DHIS2V2.Components, params) {
+			if c.ComponentName() == "doris" {
+				return true
+			}
+		}
+		return false
+	}
+
+	assert.True(t, present(model.DeploymentInstanceParameters{"ENABLE_DORIS": {Value: "true"}}))
+	assert.False(t, present(model.DeploymentInstanceParameters{"ENABLE_DORIS": {Value: "false"}}))
+}
+
 // TestDHIS2V2MinioComponentPresence asserts the minio component only exists when the file store
 // lives in the bundled MinIO, mirroring the chart's minio.enabled condition.
 func TestDHIS2V2MinioComponentPresence(t *testing.T) {
