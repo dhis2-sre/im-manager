@@ -59,13 +59,18 @@ var DHIS2V2 = withGroupedParameters(Stack{
 			"S3_IDENTITY": {Priority: 15, DisplayName: "Identity", DefaultValue: &dhis2CoreDefaults.s3Identity, Sensitive: true},
 			"S3_SECRET":   {Priority: 16, DisplayName: "Secret", DefaultValue: &dhis2CoreDefaults.s3Secret, Sensitive: true},
 		}},
-		{Name: "doris", Title: "Doris", When: whenDorisIsEnabled, Parameters: StackParameters{
+		// The settings that belong to the cluster rather than to either tier live with the frontend,
+		// which is what DHIS 2 and the provisioning job connect to, the same way chap keeps its
+		// release-wide settings with its api.
+		{Name: "doris-fe", Title: "Doris frontend", When: whenDorisIsEnabled, Parameters: StackParameters{
 			"DORIS_VERSION":           {Priority: 41, DisplayName: "Doris Version", DefaultValue: &dhis2V2Defaults.dorisVersion},
 			"DORIS_DATABASE":          {Priority: 42, DisplayName: "Database Name", DefaultValue: &dhis2V2Defaults.dorisDatabase},
 			"DORIS_USERNAME":          {Priority: 43, DisplayName: "Username", DefaultValue: &dhis2V2Defaults.dorisUsername, Sensitive: true},
 			"DORIS_PASSWORD":          {Priority: 44, DisplayName: "Password", DefaultValue: &dhis2V2Defaults.dorisPassword, Sensitive: true},
-			"DORIS_FRONTEND_REPLICAS": {Priority: 45, DisplayName: "Frontend Replicas", DefaultValue: &dhis2V2Defaults.dorisReplicas},
-			"DORIS_BACKEND_REPLICAS":  {Priority: 46, DisplayName: "Backend Replicas", DefaultValue: &dhis2V2Defaults.dorisReplicas},
+			"DORIS_FRONTEND_REPLICAS": {Priority: 45, DisplayName: "Replicas", DefaultValue: &dhis2V2Defaults.dorisReplicas},
+		}},
+		{Name: "doris-be", Title: "Doris backend", When: whenDorisIsEnabled, Parameters: StackParameters{
+			"DORIS_BACKEND_REPLICAS": {Priority: 46, DisplayName: "Replicas", DefaultValue: &dhis2V2Defaults.dorisReplicas},
 		}},
 		{Name: "filesystem", Title: "Storage: Filesystem", When: whenStorageIsFilesystem, Parameters: StackParameters{
 			"FILESYSTEM_VOLUME_SIZE": {Priority: 12, DisplayName: "Volume size", DefaultValue: &dhis2CoreDefaults.filesystemVolumeSize, Sensitive: true},
@@ -101,9 +106,13 @@ var DHIS2V2 = withGroupedParameters(Stack{
 		// operator gives both tiers ephemeral storage and destroy has no volumes to clean up. Giving
 		// Doris volumes is a chart change, and this is where the selectors would follow.
 		DorisComponent{BaseComponent: kube.BaseComponent{
-			Name: "doris",
+			Name: "doris-fe",
 			When: whenDorisIsEnabled,
-		}, ClusterPattern: "%s-doris"},
+		}, ClusterPattern: "%s-doris", Tier: "fe"},
+		DorisComponent{BaseComponent: kube.BaseComponent{
+			Name: "doris-be",
+			When: whenDorisIsEnabled,
+		}, ClusterPattern: "%s-doris", Tier: "be"},
 	},
 })
 

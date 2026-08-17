@@ -113,14 +113,15 @@ func (c *Client) RestartCNPGCluster(ctx context.Context, namespace, name string)
 
 var dorisClusterResource = schema.GroupVersionResource{Group: "doris.selectdb.com", Version: "v1", Resource: "dorisclusters"}
 
-// RestartDorisCluster triggers a rolling restart of a Doris cluster by stamping the operator's
-// restart annotations, one per tier, on the DorisCluster resource. The operator compares the
-// timestamp against what it last acted on, so both tiers roll once. It insists on RFC3339 with an
-// offset, and rejects anything it cannot parse, hence the explicit format rather than time.Now
-// formatted loosely.
-func (c *Client) RestartDorisCluster(ctx context.Context, namespace, name string) error {
+// RestartDorisTier triggers a rolling restart of one tier of a Doris cluster, "fe" or "be", by
+// stamping the operator's restart annotation for that tier on the DorisCluster resource. Frontends
+// and backends roll independently, which is why the tier is a parameter rather than both being
+// stamped at once. The operator compares the timestamp against what it last acted on, insists on
+// RFC3339 with an offset, and rejects anything it cannot parse, hence the explicit format rather
+// than time.Now formatted loosely.
+func (c *Client) RestartDorisTier(ctx context.Context, namespace, name, tier string) error {
 	restartedAt := time.Now().Format(time.RFC3339)
-	data := fmt.Sprintf(`{"metadata": {"annotations": {"apache.doris.fe/restartedAt": %q, "apache.doris.be/restartedAt": %q}}}`, restartedAt, restartedAt)
+	data := fmt.Sprintf(`{"metadata": {"annotations": {"apache.doris.%s/restartedAt": %q}}}`, tier, restartedAt)
 	_, err := c.Dynamic.Resource(dorisClusterResource).Namespace(namespace).Patch(ctx, name, types.MergePatchType, []byte(data), metav1.PatchOptions{})
 	if err != nil {
 		return fmt.Errorf("error restarting %q: %v", name, err)

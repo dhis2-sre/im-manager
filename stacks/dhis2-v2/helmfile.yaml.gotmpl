@@ -120,7 +120,7 @@ releases:
               im-deployment-id: "{{ requiredEnv "DEPLOYMENT_ID" }}"
               im-instance-id: "{{ requiredEnv "INSTANCE_ID" }}"
               im-id: "{{ requiredEnv "INSTANCE_ID" }}"
-              im-type: "doris"
+              im-type: "doris-fe"
               im-creation-timestamp: "{{ requiredEnv "INSTANCE_CREATION_TIMESTAMP" }}"
               im-ttl: "{{ requiredEnv "INSTANCE_TTL" }}"
           beSpec:
@@ -133,7 +133,7 @@ releases:
               im-deployment-id: "{{ requiredEnv "DEPLOYMENT_ID" }}"
               im-instance-id: "{{ requiredEnv "INSTANCE_ID" }}"
               im-id: "{{ requiredEnv "INSTANCE_ID" }}"
-              im-type: "doris"
+              im-type: "doris-be"
               im-creation-timestamp: "{{ requiredEnv "INSTANCE_CREATION_TIMESTAMP" }}"
               im-ttl: "{{ requiredEnv "INSTANCE_TTL" }}"
       {{- end }}
