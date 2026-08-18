@@ -1,0 +1,252 @@
+# stackParameters: GOOGLE_AUTH_PROJECT_ID,GOOGLE_AUTH_PRIVATE_KEY_ID,GOOGLE_AUTH_PRIVATE_KEY,GOOGLE_AUTH_CLIENT_EMAIL,GOOGLE_AUTH_CLIENT_ID
+{{ $_ := requiredEnv "DATABASE_ID" }}
+helmDefaults:
+  createNamespace: false
+  deleteWait: true
+
+releases:
+  - name: "{{ requiredEnv "INSTANCE_NAME" }}"
+    namespace: "{{ requiredEnv "INSTANCE_NAMESPACE" }}"
+    chart: dhis2/dhis2
+    version: "{{ requiredEnv "CHART_VERSION" }}"
+    values:
+      - image:
+          repository: dhis2/{{ requiredEnv "IMAGE_REPOSITORY" }}
+          tag: "{{ requiredEnv "IMAGE_TAG" }}"
+          pullPolicy: {{ requiredEnv "IMAGE_PULL_POLICY" }}
+      - ingress:
+          enabled: true
+          hostname: {{ requiredEnv "INSTANCE_HOSTNAME" }}
+          path: /{{ requiredEnv "INSTANCE_PATH_NAME" }}
+          certIssuer: "{{ env "CERT_ISSUER" }}"
+          className: "{{ env "INGRESS_CLASS" }}"
+          annotations:
+            nginx.ingress.kubernetes.io/proxy-body-size: 128m
+            nginx.ingress.kubernetes.io/proxy-read-timeout: "180"
+      - dhis2Home: "{{ requiredEnv "DHIS2_HOME" }}"
+      - catalinaOpts: "-Dcontext.path=/{{ requiredEnv "INSTANCE_PATH_NAME" }} -Dcontext.sameSiteCookies={{ requiredEnv "SAME_SITE_COOKIES" }}"
+      - contextPath: /{{ requiredEnv "INSTANCE_PATH_NAME" }}
+      - javaOpts: "{{ requiredEnv "JAVA_OPTS" }}"
+      - minReadySeconds: {{ requiredEnv "MIN_READY_SECONDS" }}
+      - startupProbe:
+          failureThreshold: {{ requiredEnv "STARTUP_PROBE_FAILURE_THRESHOLD" }}
+          periodSeconds: {{ requiredEnv "STARTUP_PROBE_PERIOD_SECONDS" }}
+          path: /{{ requiredEnv "INSTANCE_PATH_NAME" }}
+      - livenessProbe:
+          timeoutSeconds: {{ requiredEnv "LIVENESS_PROBE_TIMEOUT_SECONDS" }}
+          path: /{{ requiredEnv "INSTANCE_PATH_NAME" }}
+      - readinessProbe:
+          timeoutSeconds: {{ requiredEnv "READINESS_PROBE_TIMEOUT_SECONDS" }}
+          path: /{{ requiredEnv "INSTANCE_PATH_NAME" }}
+      - commonLabels:
+          im: "true"
+          im-default: "true"
+          im-deployment-id: "{{ requiredEnv "DEPLOYMENT_ID" }}"
+          im-instance-id: "{{ requiredEnv "INSTANCE_ID" }}"
+          im-id: "{{ requiredEnv "INSTANCE_ID" }}"
+          im-type: "dhis2"
+          im-creation-timestamp: "{{ requiredEnv "INSTANCE_CREATION_TIMESTAMP" }}"
+          im-ttl: "{{ requiredEnv "INSTANCE_TTL" }}"
+
+      - storage:
+          type: {{ requiredEnv "STORAGE_TYPE" }}
+
+      {{- if eq (requiredEnv "STORAGE_TYPE") "filesystem" }}
+      - storage:
+          volumeSize: {{ requiredEnv "FILESYSTEM_VOLUME_SIZE" }}
+      # Restore the filestore into dhis-home before core starts, ahead of the chart's
+      # dhis2-home-permissions init container so it fixes ownership of the extracted files.
+      - initContainers:
+          - name: "{{ requiredEnv "INSTANCE_NAME" }}-init-fs"
+            image: alpine:3.18
+            imagePullPolicy: {{ requiredEnv "IMAGE_PULL_POLICY" }}
+            env:
+              - name: DHIS2_HOME
+                value: "{{ requiredEnv "DHIS2_HOME" }}"
+              - name: FILESTORE_DOWNLOAD_URL
+                value: {{ env "FILESTORE_DOWNLOAD_URL" | default "" }}
+            command:
+              - "/bin/sh"
+              - "-c"
+              - |
+                {{- readFile "./seed-filesystem.sh" | nindent 16 }}
+            volumeMounts:
+              - name: dhis-home
+                mountPath: "{{ requiredEnv "DHIS2_HOME" }}"
+      {{- end }}
+
+      {{- if eq (requiredEnv "STORAGE_TYPE") "s3" }}
+      - S3:
+          provider: aws-s3
+          container: "{{ requiredEnv "S3_BUCKET" }}"
+          endpoint: ""
+          location: "{{ requiredEnv "S3_REGION" }}"
+          identity: "{{ requiredEnv "S3_IDENTITY" }}"
+          secret: "{{ requiredEnv "S3_SECRET" }}"
+      {{- end }}
+
+      # DEPLOY_CHAP allows DHIS 2 to proxy the route the chap companion registers, and installs the
+      # Modeling app that drives it. The custom config comes last so it can override the route rule.
+      - customConfigSnippet: |
+          {{- if eq (requiredEnv "DEPLOY_CHAP") "true" }}
+          route.remote_servers_allowed = http://*
+          {{- end }}
+          {{- with (requiredEnv "CUSTOM_DHIS2_CONFIG" | trim) }}
+          {{- . | nindent 10 }}
+          {{- end }}
+
+      # Doris as the analytics database, bundled by the chart next to DHIS 2 rather than shared, so it
+      # lives and dies with the instance. Requires the doris-operator on the cluster. The image is
+      # upstream Doris with the PostgreSQL JDBC driver already in jdbc_drivers, which is why the
+      # driver is named rather than downloaded at startup.
+      {{- if eq (requiredEnv "ENABLE_DORIS") "true" }}
+      - doris:
+          enabled: true
+          database: {{ requiredEnv "DORIS_DATABASE" }}
+          username: {{ requiredEnv "DORIS_USERNAME" }}
+          password: {{ requiredEnv "DORIS_PASSWORD" }}
+          driverFilename: postgresql.jar
+      - dorisCluster:
+          enabled: true
+          dorisCluster:
+            name: "{{ requiredEnv "INSTANCE_NAME" }}-doris"
+          feSpec:
+            replicas: {{ requiredEnv "DORIS_FRONTEND_REPLICAS" }}
+            image:
+              repository: dhis2/apache-doris
+              tag: fe-{{ requiredEnv "DORIS_FRONTEND_VERSION" }}-postgres
+            # The upstream chart names this key in the singular.
+            resource:
+              requests:
+                cpu: {{ requiredEnv "DORIS_FRONTEND_RESOURCES_REQUESTS_CPU" }}
+                memory: {{ requiredEnv "DORIS_FRONTEND_RESOURCES_REQUESTS_MEMORY" }}
+              limits:
+                cpu: {{ requiredEnv "DORIS_FRONTEND_RESOURCES_LIMITS_CPU" }}
+                memory: {{ requiredEnv "DORIS_FRONTEND_RESOURCES_LIMITS_MEMORY" }}
+            labels:
+              im: "true"
+              im-deployment-id: "{{ requiredEnv "DEPLOYMENT_ID" }}"
+              im-instance-id: "{{ requiredEnv "INSTANCE_ID" }}"
+              im-id: "{{ requiredEnv "INSTANCE_ID" }}"
+              im-type: "doris-fe"
+              im-creation-timestamp: "{{ requiredEnv "INSTANCE_CREATION_TIMESTAMP" }}"
+              im-ttl: "{{ requiredEnv "INSTANCE_TTL" }}"
+          beSpec:
+            replicas: {{ requiredEnv "DORIS_BACKEND_REPLICAS" }}
+            image:
+              repository: dhis2/apache-doris
+              tag: be-{{ requiredEnv "DORIS_BACKEND_VERSION" }}-postgres
+            resource:
+              requests:
+                cpu: {{ requiredEnv "DORIS_BACKEND_RESOURCES_REQUESTS_CPU" }}
+                memory: {{ requiredEnv "DORIS_BACKEND_RESOURCES_REQUESTS_MEMORY" }}
+              limits:
+                cpu: {{ requiredEnv "DORIS_BACKEND_RESOURCES_LIMITS_CPU" }}
+                memory: {{ requiredEnv "DORIS_BACKEND_RESOURCES_LIMITS_MEMORY" }}
+            labels:
+              im: "true"
+              im-deployment-id: "{{ requiredEnv "DEPLOYMENT_ID" }}"
+              im-instance-id: "{{ requiredEnv "INSTANCE_ID" }}"
+              im-id: "{{ requiredEnv "INSTANCE_ID" }}"
+              im-type: "doris-be"
+              im-creation-timestamp: "{{ requiredEnv "INSTANCE_CREATION_TIMESTAMP" }}"
+              im-ttl: "{{ requiredEnv "INSTANCE_TTL" }}"
+      {{- end }}
+
+      {{- if eq (requiredEnv "DEPLOY_CHAP") "true" }}
+      - jobs:
+          installApps:
+            enabled: true
+            apps:
+              - name: Modeling
+                version: latest
+      {{- end }}
+
+      - sessionCookieSameSite: {{ requiredEnv "SAME_SITE_COOKIES" }}
+
+      - flyway:
+          migrateOutOfOrder: {{ requiredEnv "FLYWAY_MIGRATE_OUT_OF_ORDER" }}
+          repairBeforeMigration: {{ requiredEnv "FLYWAY_REPAIR_BEFORE_MIGRATION" }}
+
+      - enableQueryLogging: {{ requiredEnv "ENABLE_QUERY_LOGGING" }}
+
+      - googleAuth:
+          projectId: "{{ requiredEnv "GOOGLE_AUTH_PROJECT_ID" }}"
+          privateKeyId: "{{ requiredEnv "GOOGLE_AUTH_PRIVATE_KEY_ID" }}"
+          privateKey: '{{ requiredEnv "GOOGLE_AUTH_PRIVATE_KEY" }}'
+          clientEmail: "{{ requiredEnv "GOOGLE_AUTH_CLIENT_EMAIL" }}"
+          clientId: "{{ requiredEnv "GOOGLE_AUTH_CLIENT_ID" }}"
+
+      - resources:
+          requests:
+            cpu: {{ requiredEnv "CORE_RESOURCES_REQUESTS_CPU" }}
+            memory: {{ requiredEnv "CORE_RESOURCES_REQUESTS_MEMORY" }}
+
+      # Database credentials are set once; the PostgreSQL subchart and core's connection settings
+      # both read them from here.
+      - global:
+          postgresql:
+            auth:
+              username: {{ requiredEnv "DATABASE_USERNAME" }}
+              password: {{ requiredEnv "DATABASE_PASSWORD" }}
+              database: {{ requiredEnv "DATABASE_NAME" }}
+
+      - postgresql:
+          commonLabels:
+            im: "true"
+            im-deployment-id: "{{ requiredEnv "DEPLOYMENT_ID" }}"
+            im-instance-id: "{{ requiredEnv "INSTANCE_ID" }}"
+            im-id: "{{ requiredEnv "INSTANCE_ID" }}"
+            im-type: "db"
+            im-creation-timestamp: "{{ requiredEnv "INSTANCE_CREATION_TIMESTAMP" }}"
+            im-ttl: "{{ requiredEnv "INSTANCE_TTL" }}"
+          storageSize: {{ requiredEnv "DATABASE_SIZE" }}
+          resources:
+            requests:
+              cpu: {{ requiredEnv "DB_RESOURCES_REQUESTS_CPU" }}
+              memory: {{ requiredEnv "DB_RESOURCES_REQUESTS_MEMORY" }}
+          seed:
+            enabled: true
+            extraEnv:
+              - name: DATABASE_DOWNLOAD_URL
+                value: {{ env "DATABASE_DOWNLOAD_URL" | default "" }}
+              - name: DATABASE_USERNAME
+                value: {{ requiredEnv "DATABASE_USERNAME" }}
+            script: |
+              {{- readFile "./seed.sh" | indent 14 }}
+
+      {{- if eq (requiredEnv "STORAGE_TYPE") "minio" }}
+      - minio:
+          enabled: true
+          commonLabels:
+            im: "true"
+            im-deployment-id: "{{ requiredEnv "DEPLOYMENT_ID" }}"
+            im-instance-id: "{{ requiredEnv "INSTANCE_ID" }}"
+            im-id: "{{ requiredEnv "INSTANCE_ID" }}"
+            im-type: "minio"
+            im-creation-timestamp: "{{ requiredEnv "INSTANCE_CREATION_TIMESTAMP" }}"
+            im-ttl: "{{ requiredEnv "INSTANCE_TTL" }}"
+          persistence:
+            size: {{ requiredEnv "MINIO_STORAGE_SIZE" }}
+            annotations:
+              helm.sh/resource-policy: keep
+          sidecars:
+            - name: "{{ requiredEnv "INSTANCE_NAME" }}-minio-seed"
+              # Should match the version used by the main container
+              image: bitnamilegacy/minio:2024.8.29-debian-12-r2
+              pullPolicy: {{ requiredEnv "IMAGE_PULL_POLICY" }}
+              env:
+                - name: FILESTORE_DOWNLOAD_URL
+                  value: {{ env "FILESTORE_DOWNLOAD_URL" | default "" }}
+              command:
+                - "/bin/bash"
+                - "-c"
+                - |
+                  {{- readFile "./seed-minio.sh" | nindent 18 }}
+      {{- end }}
+
+repositories:
+  - name: dhis2
+    url: https://dhis2-sre.github.io/dhis2-core-chart
+  - name: bitnami
+    url: https://charts.bitnami.com/bitnami

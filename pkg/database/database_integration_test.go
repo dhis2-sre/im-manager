@@ -20,6 +20,7 @@ import (
 	"github.com/dhis2-sre/im-manager/pkg/instance"
 	"github.com/dhis2-sre/im-manager/pkg/inttest"
 	"github.com/dhis2-sre/im-manager/pkg/model"
+	"github.com/dhis2-sre/im-manager/pkg/stack"
 	"github.com/dhis2-sre/im-manager/pkg/storage"
 	userpkg "github.com/dhis2-sre/im-manager/pkg/user"
 	"github.com/gin-gonic/gin"
@@ -354,7 +355,7 @@ func TestSaveLockedUnlocksOnDumpFailure(t *testing.T) {
 	require.False(t, wasLocked)
 
 	// The instance has no database parameters, so the dump fails before touching pods or S3.
-	_, err = databaseService.SaveLocked(ctx, locked, instance, &model.Stack{}, wasLocked)
+	_, err = databaseService.SaveLocked(ctx, locked, instance, &stack.Stack{}, wasLocked)
 	require.Error(t, err)
 
 	reloaded, err := databaseService.FindById(ctx, locked.ID)
@@ -413,10 +414,39 @@ func (is instanceService) UpdateInstanceParameters(ctx context.Context, deployme
 
 type stackService struct{}
 
-func (ss stackService) Find(name string) (*model.Stack, error) {
+func (ss stackService) Find(name string) (*stack.Stack, error) {
 	return nil, nil
 }
 
 type noopPublisher struct{}
 
 func (noopPublisher) Publish(context.Context, uint, string, string, any) {}
+
+// TestFilestoreAssociationResolvesThroughFilestoreID guards the self-referential association: the
+// foreign key has to be FilestoreID, since resolving it through ID silently returns the database
+// itself as its own file store.
+func TestFilestoreAssociationResolvesThroughFilestoreID(t *testing.T) {
+	t.Parallel()
+
+	db := inttest.SetupDB(t)
+	repository := database.NewRepository(db)
+	ctx := context.Background()
+	user, _ := userpkg.CreateUserWithGroup(t, db, "packages", "some", "", "filestore-user@dhis2.org")
+
+	filestore := &model.Database{Name: "saved-fs.tar.gz", GroupName: "packages", Slug: "packages/saved-fs", Type: "fs", Size: 4096, UserID: user.ID}
+	require.NoError(t, db.Create(filestore).Error)
+
+	saved := &model.Database{Name: "saved.pgc", GroupName: "packages", Slug: "packages/saved", Type: "database", FilestoreID: filestore.ID, UserID: user.ID}
+	require.NoError(t, db.Create(saved).Error)
+
+	found, err := repository.FindById(ctx, saved.ID)
+	require.NoError(t, err)
+	require.NotNil(t, found.Filestore, "the file store should be loaded, not left nil")
+	assert.Equal(t, filestore.ID, found.Filestore.ID)
+	assert.Equal(t, "saved-fs.tar.gz", found.Filestore.Name, "resolving through ID would return the database itself")
+	assert.Equal(t, int64(4096), found.Filestore.Size)
+
+	withoutFilestore, err := repository.FindById(ctx, filestore.ID)
+	require.NoError(t, err)
+	assert.Nil(t, withoutFilestore.Filestore, "a file store row has no file store of its own")
+}

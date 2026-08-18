@@ -19,21 +19,32 @@ import (
 func reencryptCFBToGCM() *gormigrate.Migration {
 	const gcmPrefix = "v2:"
 
-	allStacks := []model.Stack{
+	allStacks := []stack.Stack{
 		stack.DHIS2DB,
 		stack.MINIO,
 		stack.DHIS2Core,
 		stack.DHIS2,
 		stack.PgAdmin,
 		stack.WhoamiGo,
-		stack.IMJobRunner,
-		stack.ChapDB,
-		stack.ChapValkey,
-		stack.ChapWorker,
-		stack.ChapCore,
 	}
 
-	sensitive := map[string]map[string]bool{}
+	// Stacks removed after this migration shipped: the chap-* ones replaced by the chap umbrella
+	// stack, and im-job-runner retired outright. Their sensitive parameters are frozen here so rows
+	// of instances deployed from them are still re-encrypted.
+	sensitive := map[string]map[string]bool{
+		"im-job-runner": {
+			"DHIS2_DATABASE_PASSWORD": true,
+			"DHIS2_DATABASE_USERNAME": true,
+		},
+		"chap-db":     {"DATABASE_PASSWORD": true},
+		"chap-valkey": {"REDIS_PASSWORD": true},
+		"chap-worker": {},
+		"chap-core": {
+			"GOOGLE_SERVICE_ACCOUNT_EMAIL":       true,
+			"GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY": true,
+			"DHIS2_PASSWORD":                     true,
+		},
+	}
 	for _, s := range allStacks {
 		m := map[string]bool{}
 		for name, p := range s.Parameters {

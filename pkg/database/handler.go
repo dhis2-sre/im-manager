@@ -11,9 +11,12 @@ import (
 	"strings"
 
 	"github.com/dhis2-sre/im-manager/internal/errdef"
+	"golang.org/x/exp/slices"
 
 	"github.com/dhis2-sre/im-manager/internal/handler"
+	"github.com/dhis2-sre/im-manager/pkg/kube"
 	"github.com/dhis2-sre/im-manager/pkg/model"
+	"github.com/dhis2-sre/im-manager/pkg/stack"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -42,15 +45,16 @@ type Handler struct {
 type instanceService interface {
 	FindDecryptedDeploymentInstanceById(ctx context.Context, id uint) (*model.DeploymentInstance, error)
 	FindDeploymentById(ctx context.Context, id uint) (*model.Deployment, error)
+	FindDecryptedDeploymentById(ctx context.Context, id uint) (*model.Deployment, error)
 }
 
 type stackService interface {
-	Find(name string) (*model.Stack, error)
+	Find(name string) (*stack.Stack, error)
 }
 
 type deploymentService interface {
-	SaveAs(ctx context.Context, userId uint, instance *model.DeploymentInstance, stack *model.Stack, coreInstance *model.DeploymentInstance, name string, format string) (*model.Database, error)
-	Save(ctx context.Context, userId uint, database *model.Database, instance *model.DeploymentInstance, stack *model.Stack, coreInstance *model.DeploymentInstance) error
+	SaveAs(ctx context.Context, userId uint, instance *model.DeploymentInstance, stack *stack.Stack, filestoreInstance *model.DeploymentInstance, name string, format string) (*model.Database, error)
+	Save(ctx context.Context, userId uint, database *model.Database, instance *model.DeploymentInstance, stack *stack.Stack, filestoreInstance *model.DeploymentInstance) error
 }
 
 // Upload database
@@ -199,19 +203,20 @@ func (h Handler) SaveAs(c *gin.Context) {
 		return
 	}
 
-	deployment, err := h.instanceService.FindDeploymentById(ctx, instance.DeploymentID)
+	if err := supportsDatabaseSave(stack, instance); err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	deployment, err := h.instanceService.FindDecryptedDeploymentById(ctx, instance.DeploymentID)
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
 
-	coreInstance, err := getInstanceByStack("dhis2-core", deployment.Instances)
-	if err != nil && !errdef.IsNotFound(err) {
-		_ = c.Error(err)
-		return
-	}
+	filestoreInstance := h.findInstanceWithOperation(deployment.Instances, kube.OperationFilestoreBackup)
 
-	savedDatabase, err := h.deploymentService.SaveAs(ctx, user.ID, instance, stack, coreInstance, request.Name, request.Format)
+	savedDatabase, err := h.deploymentService.SaveAs(ctx, user.ID, instance, stack, filestoreInstance, request.Name, request.Format)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -220,13 +225,34 @@ func (h Handler) SaveAs(c *gin.Context) {
 	c.JSON(http.StatusCreated, savedDatabase)
 }
 
-func getInstanceByStack(stack string, instances []*model.DeploymentInstance) (*model.DeploymentInstance, error) {
-	for _, instance := range instances {
-		if instance.StackName == stack {
-			return instance, nil
+// supportsDatabaseSave rejects save requests against stacks whose components advertise no
+// databaseSave capability, e.g. whoami or a redis-only stack.
+func supportsDatabaseSave(stack *stack.Stack, instance *model.DeploymentInstance) error {
+	for _, component := range kube.PresentComponents(stack.Components, instance.Parameters) {
+		if slices.Contains(component.SupportedOperations(instance.Parameters), kube.OperationDatabaseSave) {
+			return nil
 		}
 	}
-	return nil, errdef.NewNotFound("failed to find instance of type %s", stack)
+	return errdef.NewBadRequest("stack %q does not support database save", stack.Name)
+}
+
+// findInstanceWithOperation returns the deployment instance whose present components advertise the
+// given operation, or nil when none does. This replaces hardcoded stack names: the filestore backup
+// runs against whichever instance advertises it, the dhis2-core sibling in the classic composition
+// or the dhis2-v2 instance itself.
+func (h Handler) findInstanceWithOperation(instances []*model.DeploymentInstance, operation kube.Operation) *model.DeploymentInstance {
+	for _, candidate := range instances {
+		candidateStack, err := h.stackService.Find(candidate.StackName)
+		if err != nil {
+			continue
+		}
+		for _, component := range kube.PresentComponents(candidateStack.Components, candidate.Parameters) {
+			if slices.Contains(component.SupportedOperations(candidate.Parameters), operation) {
+				return candidate
+			}
+		}
+	}
+	return nil
 }
 
 // Save database
@@ -266,6 +292,11 @@ func (h Handler) Save(c *gin.Context) {
 		return
 	}
 
+	if err := supportsDatabaseSave(stack, instance); err != nil {
+		_ = c.Error(err)
+		return
+	}
+
 	parameter := "DATABASE_ID"
 	databaseId, exists := instance.Parameters[parameter]
 	if !exists {
@@ -290,19 +321,15 @@ func (h Handler) Save(c *gin.Context) {
 		return
 	}
 
-	deployment, err := h.instanceService.FindDeploymentById(ctx, instance.DeploymentID)
+	deployment, err := h.instanceService.FindDecryptedDeploymentById(ctx, instance.DeploymentID)
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
 
-	coreInstance, err := getInstanceByStack("dhis2-core", deployment.Instances)
-	if err != nil && !errdef.IsNotFound(err) {
-		_ = c.Error(err)
-		return
-	}
+	filestoreInstance := h.findInstanceWithOperation(deployment.Instances, kube.OperationFilestoreBackup)
 
-	if err := h.deploymentService.Save(ctx, user.ID, database, instance, stack, coreInstance); err != nil {
+	if err := h.deploymentService.Save(ctx, user.ID, database, instance, stack, filestoreInstance); err != nil {
 		_ = c.Error(err)
 		return
 	}

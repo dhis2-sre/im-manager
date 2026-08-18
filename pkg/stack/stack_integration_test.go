@@ -18,9 +18,10 @@ func TestStackHandler(t *testing.T) {
 		stack.DHIS2DB,
 		stack.DHIS2Core,
 		stack.DHIS2,
+		stack.DHIS2V2,
+		stack.Chap,
 		stack.PgAdmin,
 		stack.WhoamiGo,
-		stack.IMJobRunner,
 	)
 	require.NoError(t, err)
 
@@ -34,17 +35,32 @@ func TestStackHandler(t *testing.T) {
 	t.Run("GetStack", func(t *testing.T) {
 		t.Parallel()
 
-		var dhis2 stack.Stack
+		var dhis2 stack.StackResponse
 		client.GetJSON(t, "/stacks/dhis2", &dhis2)
 
 		assert.Equal(t, "dhis2", dhis2.Name)
 		assert.NotEmpty(t, dhis2.Parameters)
 	})
 
+	// The deploy form decides whether to offer a companion from what this endpoint serves, so the
+	// condition has to survive the trip rather than staying a backend-only detail.
+	t.Run("GetStackServesCompanionConditions", func(t *testing.T) {
+		t.Parallel()
+
+		var dhis2v2 stack.StackResponse
+		client.GetJSON(t, "/stacks/dhis2-v2", &dhis2v2)
+
+		require.Len(t, dhis2v2.Companions, 1)
+		assert.Equal(t, "chap", dhis2v2.Companions[0].Name)
+		require.NotNil(t, dhis2v2.Companions[0].When)
+		assert.Equal(t, "DEPLOY_CHAP", dhis2v2.Companions[0].When.Parameter)
+		assert.Equal(t, "true", dhis2v2.Companions[0].When.Equals)
+	})
+
 	t.Run("GetAllStacks", func(t *testing.T) {
 		t.Parallel()
 
-		var stacks []stack.Stack
+		var stacks []stack.StackResponse
 		client.GetJSON(t, "/stacks", &stacks)
 
 		assert.NotEmpty(t, stacks)

@@ -16,8 +16,10 @@ import (
 	"golang.org/x/exp/maps"
 
 	"github.com/dhis2-sre/im-manager/internal/errdef"
+	"github.com/dhis2-sre/im-manager/pkg/kube"
 
 	"github.com/dhis2-sre/im-manager/pkg/model"
+	"github.com/dhis2-sre/im-manager/pkg/stack"
 	"github.com/dhis2-sre/im-manager/pkg/storage"
 
 	pg "github.com/habx/pg-commands"
@@ -53,7 +55,7 @@ type PodExecutor interface {
 	Exec(ctx context.Context, namespace, podName, container string, command []string, stdout, stderr io.Writer) error
 }
 
-type podExecutorFunc func(cluster model.Cluster) (PodExecutor, error)
+type podExecutorFunc func(cluster model.Cluster) (*kube.Client, error)
 
 type Service struct {
 	logger       *slog.Logger
@@ -457,7 +459,7 @@ func (s Service) EnsureLocked(ctx context.Context, database *model.Database, ins
 // SaveLocked overwrites the given locked database with a fresh dump from the instance: it dumps
 // into a temporary record, moves the dump over the original in S3 and re-points the record to the
 // original name and id. It blocks until done and returns the finalized record.
-func (s Service) SaveLocked(ctx context.Context, database *model.Database, instance *model.DeploymentInstance, stack *model.Stack, wasLocked bool) (*model.Database, error) {
+func (s Service) SaveLocked(ctx context.Context, database *model.Database, instance *model.DeploymentInstance, stack *stack.Stack, wasLocked bool) (*model.Database, error) {
 	if !wasLocked {
 		defer func() {
 			err := s.repository.Unlock(ctx, database.ID)
@@ -566,7 +568,7 @@ func (s Service) CreateDatabase(ctx context.Context, userId uint, groupName, nam
 // Dump streams a pg_dump of the instance's database into S3 and updates the given record with the
 // resulting url and size. It blocks until the dump completes and publishes database-save events
 // along the way.
-func (s Service) Dump(ctx context.Context, userId uint, database *model.Database, instance *model.DeploymentInstance, stack *model.Stack, format string) (*model.Database, error) {
+func (s Service) Dump(ctx context.Context, userId uint, database *model.Database, instance *model.DeploymentInstance, stack *stack.Stack, format string) (*model.Database, error) {
 	publish := func(status, errMsg string, size int64) {
 		s.publisher.Publish(ctx, userId, database.GroupName, kindDatabaseSave, newDatabaseEvent(database, status, errMsg, size))
 	}
@@ -588,48 +590,59 @@ func (s Service) Dump(ctx context.Context, userId uint, database *model.Database
 	dump.Host = "localhost"
 	command := buildPgDumpCommand(dump, format)
 
-	podExecutor, err := s.podExecutor(group.Cluster)
+	client, err := s.podExecutor(group.Cluster)
 	if err != nil {
 		return fail(err)
 	}
 
-	hostname, err := stack.ParameterProviders["DATABASE_HOSTNAME"].Provide(*instance)
+	access, err := kube.FindPostgresAccess(stack.Components)
+	if err != nil {
+		return fail(errdef.NewBadRequest("stack %q does not support database save", stack.Name))
+	}
+	podName, container, err := access.PostgresPod(ctx, client, instance)
 	if err != nil {
 		return fail(err)
 	}
-	// TODO: get pod by label selector instead
-	podName := strings.Split(hostname, ".")[0] + "-0"
 	namespace := instance.Group.Namespace
-
-	pr, pw := io.Pipe()
 
 	key := fmt.Sprintf("%s/%s", group.Name, database.Name)
 
-	type uploadResult struct {
-		size int64
-		err  error
-	}
-	uploadDone := make(chan uploadResult, 1)
-	go func() {
-		defer pr.Close()
-		size, err := s.s3Client.StreamUpload(ctx, s.s3Bucket, key, "application/octet-stream", pr)
-		uploadDone <- uploadResult{size, err}
-	}()
-
-	s.logger.InfoContext(ctx, "starting pg_dump", "pod", podName, "namespace", namespace, "command", strings.Join(redactPgPassword(command), " "))
+	s.logger.InfoContext(ctx, "starting pg_dump", "pod", podName, "container", container, "namespace", namespace, "command", strings.Join(redactPgPassword(command), " "))
 	publish("started", "", 0)
 
-	if err := execPgDump(ctx, podExecutor, namespace, podName, command, pw, format, database.Name); err != nil {
+	// One attempt of the whole pipeline: pg_dump in the pod writing into a pipe that is streamed to
+	// S3. Retried as a unit, since a failed attempt leaves a partial object behind that the next
+	// upload to the same key replaces.
+	attempt := func() (int64, error) {
+		pr, pw := io.Pipe()
+
+		type uploadResult struct {
+			size int64
+			err  error
+		}
+		uploadDone := make(chan uploadResult, 1)
+		go func() {
+			defer pr.Close()
+			size, err := s.s3Client.StreamUpload(ctx, s.s3Bucket, key, "application/octet-stream", pr)
+			uploadDone <- uploadResult{size, err}
+		}()
+
+		if err := execPgDump(ctx, client, namespace, podName, container, command, pw, format, database.Name); err != nil {
+			<-uploadDone
+			return 0, err
+		}
+
+		upload := <-uploadDone
+		return upload.size, upload.err
+	}
+
+	size, err := s.dumpWithRetries(ctx, attempt)
+	if err != nil {
 		s.logger.ErrorContext(ctx, "failed to exec pg_dump", "error", err)
-		<-uploadDone
 		publish("error", err.Error(), 0)
 		return nil, err
 	}
-
-	result := <-uploadDone
-	if result.err != nil {
-		return fail(result.err)
-	}
+	result := uploadOutcome{size: size}
 
 	saved, err := s.repository.FindById(ctx, database.ID)
 	if err != nil {
@@ -647,7 +660,7 @@ func (s Service) Dump(ctx context.Context, userId uint, database *model.Database
 	return saved, nil
 }
 
-func execPgDump(ctx context.Context, executor PodExecutor, namespace, podName string, command []string, pw *io.PipeWriter, format string, databaseName string) error {
+func execPgDump(ctx context.Context, executor PodExecutor, namespace, podName, container string, command []string, pw *io.PipeWriter, format string, databaseName string) error {
 	var execWriter io.WriteCloser = pw
 	var gzWriter *gzip.Writer
 	if format == "plain" {
@@ -657,7 +670,7 @@ func execPgDump(ctx context.Context, executor PodExecutor, namespace, podName st
 	}
 
 	var stderrBuf strings.Builder
-	execErr := executor.Exec(ctx, namespace, podName, "postgresql", command, execWriter, &stderrBuf)
+	execErr := executor.Exec(ctx, namespace, podName, container, command, execWriter, &stderrBuf)
 
 	if gzWriter != nil {
 		gzWriter.Close()
@@ -671,12 +684,64 @@ func execPgDump(ctx context.Context, executor PodExecutor, namespace, podName st
 	return nil
 }
 
+type uploadOutcome struct {
+	size int64
+}
+
+// transientPostgresStates are the messages postgres returns while it is not accepting connections
+// yet or no longer is. Bitnami's chart runs a temporary server to execute the initdb scripts, which
+// seeding uses, and stops it once they finish; a dump that lands in that transition sees one of
+// these. They say nothing about the database being unusable, only that it is mid-transition, so a
+// backup should wait rather than fail.
+var transientPostgresStates = []string{
+	"the database system is shutting down",
+	"the database system is starting up",
+	"the database system is in recovery mode",
+	"connection refused",
+}
+
+func isTransientPostgresState(err error) bool {
+	message := strings.ToLower(err.Error())
+	return slices.ContainsFunc(transientPostgresStates, func(state string) bool {
+		return strings.Contains(message, state)
+	})
+}
+
+const (
+	dumpRetryBudget   = 2 * time.Minute
+	dumpRetryInterval = 5 * time.Second
+)
+
+// dumpWithRetries retries the dump while postgres reports a transient state, so a save issued
+// moments after a deploy waits for seeding to finish instead of failing with the server's
+// mid-restart message. Any other error fails immediately: retrying a genuine dump error would only
+// delay the report.
+func (s Service) dumpWithRetries(ctx context.Context, attempt func() (int64, error)) (int64, error) {
+	deadline := time.Now().Add(dumpRetryBudget)
+	for {
+		size, err := attempt()
+		if err == nil {
+			return size, nil
+		}
+		if !isTransientPostgresState(err) || time.Now().After(deadline) {
+			return 0, err
+		}
+
+		s.logger.InfoContext(ctx, "postgres is mid-transition, retrying the dump", "error", err, "retryIn", dumpRetryInterval)
+		select {
+		case <-ctx.Done():
+			return 0, ctx.Err()
+		case <-time.After(dumpRetryInterval):
+		}
+	}
+}
+
 func (s Service) logError(ctx context.Context, err error) {
 	// TODO: Persist error message
 	s.logger.ErrorContext(ctx, "Failed to SaveAs DB", "error", err)
 }
 
-func newPgDumpConfig(instance *model.DeploymentInstance, stack *model.Stack) (*pg.Dump, error) {
+func newPgDumpConfig(instance *model.DeploymentInstance, stack *stack.Stack) (*pg.Dump, error) {
 	errorMessage := "can't find parameter: %s"
 
 	databaseName, exists := instance.Parameters["DATABASE_NAME"]
@@ -706,8 +771,10 @@ func newPgDumpConfig(instance *model.DeploymentInstance, stack *model.Stack) (*p
 	}
 
 	// Restores target a freshly created, empty database, so replace the
-	// default arguments without the --clean option.
-	dump.Options = []string{"--no-owner", "--no-acl", "--blob"}
+	// default arguments without the --clean option. The dhis2 chart's seed marker table is chart
+	// bookkeeping owned by the superuser: excluding it keeps it out of the catalog artifact and
+	// keeps pg_dump from failing to lock it when running as the app user.
+	dump.Options = []string{"--no-owner", "--no-acl", "--blob", "--exclude-table=dhis2_chart_seed_complete"}
 
 	// TODO: This is very DHIS2 specific... More stack meta data?
 	dump.IgnoreTableData = []string{"analytics*", "_*"}
