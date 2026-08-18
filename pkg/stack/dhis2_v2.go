@@ -150,12 +150,14 @@ var dhis2V2Defaults = struct {
 	dorisUsername: "dhis2",
 	dorisPassword: "dhis2",
 	dorisReplicas: "1",
-	// The upstream chart asks for 8 CPU and 16Gi per tier, which does not schedule on our nodes;
-	// these match what the dhis2 chart sizes the bundled cluster down to.
+	// The CPU numbers size the tiers down from the 8 the upstream chart asks for, which does not
+	// schedule on our nodes. Memory cannot come down the same way: the frontend's config pins an 8Gi
+	// heap, so an 8Gi limit is exactly the heap with no room for the JVM itself and the tier is
+	// OOMKilled as soon as it starts. 8Gi requested with 16Gi to grow into is what actually runs.
 	dorisRequestsCPU:    "1",
-	dorisRequestsMemory: "4Gi",
+	dorisRequestsMemory: "8Gi",
 	dorisLimitsCPU:      "4",
-	dorisLimitsMemory:   "8Gi",
+	dorisLimitsMemory:   "16Gi",
 }
 
 // Doris is bundled by the chart rather than being a stack of its own, the same way MinIO is, so the
