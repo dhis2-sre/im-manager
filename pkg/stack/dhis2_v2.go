@@ -68,10 +68,10 @@ var DHIS2V2 = withGroupedParameters(Stack{
 			"DORIS_USERNAME":                           {Priority: 43, DisplayName: "Username", DefaultValue: &dhis2V2Defaults.dorisUsername, Sensitive: true},
 			"DORIS_PASSWORD":                           {Priority: 44, DisplayName: "Password", DefaultValue: &dhis2V2Defaults.dorisPassword, Sensitive: true},
 			"DORIS_FRONTEND_REPLICAS":                  {Priority: 45, DisplayName: "Replicas", DefaultValue: &dhis2V2Defaults.dorisReplicas},
-			"DORIS_FRONTEND_RESOURCES_REQUESTS_CPU":    {Priority: 46, DisplayName: "Resources Requests CPU", DefaultValue: &dhis2V2Defaults.dorisRequestsCPU},
-			"DORIS_FRONTEND_RESOURCES_REQUESTS_MEMORY": {Priority: 47, DisplayName: "Resources Requests Memory", DefaultValue: &dhis2V2Defaults.dorisRequestsMemory},
-			"DORIS_FRONTEND_RESOURCES_LIMITS_CPU":      {Priority: 48, DisplayName: "Resources Limits CPU", DefaultValue: &dhis2V2Defaults.dorisLimitsCPU},
-			"DORIS_FRONTEND_RESOURCES_LIMITS_MEMORY":   {Priority: 49, DisplayName: "Resources Limits Memory", DefaultValue: &dhis2V2Defaults.dorisLimitsMemory},
+			"DORIS_FRONTEND_RESOURCES_REQUESTS_CPU":    {Priority: 46, DisplayName: "Resources Requests CPU", DefaultValue: &dhis2V2Defaults.dorisFrontendRequestsCPU},
+			"DORIS_FRONTEND_RESOURCES_REQUESTS_MEMORY": {Priority: 47, DisplayName: "Resources Requests Memory", DefaultValue: &dhis2V2Defaults.dorisFrontendRequestsMemory},
+			"DORIS_FRONTEND_RESOURCES_LIMITS_CPU":      {Priority: 48, DisplayName: "Resources Limits CPU", DefaultValue: &dhis2V2Defaults.dorisFrontendLimitsCPU},
+			"DORIS_FRONTEND_RESOURCES_LIMITS_MEMORY":   {Priority: 49, DisplayName: "Resources Limits Memory", DefaultValue: &dhis2V2Defaults.dorisFrontendLimitsMemory},
 		}},
 		// The backend carries its own version because the tiers are separate images, though they are
 		// meant to run the same version outside of an upgrade. It is sized separately because it is
@@ -79,10 +79,10 @@ var DHIS2V2 = withGroupedParameters(Stack{
 		{Name: "doris-be", Title: "Doris backend", When: whenDorisIsEnabled, Parameters: StackParameters{
 			"DORIS_BACKEND_VERSION":                   {Priority: 50, DisplayName: "Doris Version", DefaultValue: &dhis2V2Defaults.dorisVersion},
 			"DORIS_BACKEND_REPLICAS":                  {Priority: 51, DisplayName: "Replicas", DefaultValue: &dhis2V2Defaults.dorisReplicas},
-			"DORIS_BACKEND_RESOURCES_REQUESTS_CPU":    {Priority: 52, DisplayName: "Resources Requests CPU", DefaultValue: &dhis2V2Defaults.dorisRequestsCPU},
-			"DORIS_BACKEND_RESOURCES_REQUESTS_MEMORY": {Priority: 53, DisplayName: "Resources Requests Memory", DefaultValue: &dhis2V2Defaults.dorisRequestsMemory},
-			"DORIS_BACKEND_RESOURCES_LIMITS_CPU":      {Priority: 54, DisplayName: "Resources Limits CPU", DefaultValue: &dhis2V2Defaults.dorisLimitsCPU},
-			"DORIS_BACKEND_RESOURCES_LIMITS_MEMORY":   {Priority: 55, DisplayName: "Resources Limits Memory", DefaultValue: &dhis2V2Defaults.dorisLimitsMemory},
+			"DORIS_BACKEND_RESOURCES_REQUESTS_CPU":    {Priority: 52, DisplayName: "Resources Requests CPU", DefaultValue: &dhis2V2Defaults.dorisBackendRequestsCPU},
+			"DORIS_BACKEND_RESOURCES_REQUESTS_MEMORY": {Priority: 53, DisplayName: "Resources Requests Memory", DefaultValue: &dhis2V2Defaults.dorisBackendRequestsMemory},
+			"DORIS_BACKEND_RESOURCES_LIMITS_CPU":      {Priority: 54, DisplayName: "Resources Limits CPU", DefaultValue: &dhis2V2Defaults.dorisBackendLimitsCPU},
+			"DORIS_BACKEND_RESOURCES_LIMITS_MEMORY":   {Priority: 55, DisplayName: "Resources Limits Memory", DefaultValue: &dhis2V2Defaults.dorisBackendLimitsMemory},
 		}},
 		{Name: "filesystem", Title: "Storage: Filesystem", When: whenStorageIsFilesystem, Parameters: StackParameters{
 			"FILESYSTEM_VOLUME_SIZE": {Priority: 12, DisplayName: "Volume size", DefaultValue: &dhis2CoreDefaults.filesystemVolumeSize, Sensitive: true},
@@ -129,17 +129,23 @@ var DHIS2V2 = withGroupedParameters(Stack{
 })
 
 var dhis2V2Defaults = struct {
-	chartVersion        string
-	enableDoris         string
-	dorisVersion        string
-	dorisDatabase       string
-	dorisUsername       string
-	dorisPassword       string
-	dorisReplicas       string
-	dorisRequestsCPU    string
-	dorisRequestsMemory string
-	dorisLimitsCPU      string
-	dorisLimitsMemory   string
+	chartVersion  string
+	enableDoris   string
+	dorisVersion  string
+	dorisDatabase string
+	dorisUsername string
+	dorisPassword string
+	dorisReplicas string
+
+	dorisFrontendRequestsCPU    string
+	dorisFrontendRequestsMemory string
+	dorisFrontendLimitsCPU      string
+	dorisFrontendLimitsMemory   string
+
+	dorisBackendRequestsCPU    string
+	dorisBackendRequestsMemory string
+	dorisBackendLimitsCPU      string
+	dorisBackendLimitsMemory   string
 }{
 	chartVersion: "1.0.0",
 	enableDoris:  "false",
@@ -150,14 +156,25 @@ var dhis2V2Defaults = struct {
 	dorisUsername: "dhis2",
 	dorisPassword: "dhis2",
 	dorisReplicas: "1",
-	// The CPU numbers size the tiers down from the 8 the upstream chart asks for, which does not
-	// schedule on our nodes. Memory cannot come down the same way: the frontend's config pins an 8Gi
-	// heap, so an 8Gi limit is exactly the heap with no room for the JVM itself and the tier is
-	// OOMKilled as soon as it starts. 8Gi requested with 16Gi to grow into is what actually runs.
-	dorisRequestsCPU:    "1",
-	dorisRequestsMemory: "8Gi",
-	dorisLimitsCPU:      "4",
-	dorisLimitsMemory:   "16Gi",
+	// Each tier is sized on its own because they are different programs with different appetites, not
+	// two copies of one. The CPU numbers size both down from the 8 per tier the upstream chart asks
+	// for, which does not schedule on our nodes.
+	//
+	// The frontend is a JVM whose fe.conf pins an 8Gi heap, so an 8Gi limit is exactly the heap with
+	// no room for the JVM itself and the tier is OOMKilled as soon as it starts. 8Gi requested with
+	// 16Gi to grow into is what actually runs.
+	dorisFrontendRequestsCPU:    "1",
+	dorisFrontendRequestsMemory: "8Gi",
+	dorisFrontendLimitsCPU:      "4",
+	dorisFrontendLimitsMemory:   "16Gi",
+
+	// The backend is C++ and sizes itself from what the container allows rather than from a pinned
+	// heap, so the frontend's floor does not apply to it. It starts at the same numbers because it is
+	// the tier holding the data and doing the work, and it should not be the smaller of the two.
+	dorisBackendRequestsCPU:    "1",
+	dorisBackendRequestsMemory: "8Gi",
+	dorisBackendLimitsCPU:      "4",
+	dorisBackendLimitsMemory:   "16Gi",
 }
 
 // Doris is bundled by the chart rather than being a stack of its own, the same way MinIO is, so the
