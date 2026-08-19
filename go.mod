@@ -4,11 +4,11 @@ go 1.26.2
 
 require (
 	filippo.io/age v1.3.1
-	github.com/aws/aws-sdk-go-v2 v1.43.5
+	github.com/aws/aws-sdk-go-v2 v1.43.6
 	github.com/aws/aws-sdk-go-v2/config v1.32.36
 	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.22.42
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.107.1
-	github.com/aws/smithy-go v1.27.7
+	github.com/aws/smithy-go v1.27.8
 	github.com/dominikbraun/graph v0.23.0
 	github.com/getsops/sops/v3 v3.13.3
 	github.com/gin-contrib/cors v1.7.7
