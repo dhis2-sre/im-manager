@@ -32,7 +32,7 @@ require (
 	github.com/orlangure/gnomock v0.0.0-00010101000000-000000000000
 	github.com/rabbitmq/amqp091-go v1.13.0
 	github.com/rabbitmq/rabbitmq-stream-go-client v1.8.3
-	github.com/stretchr/testify v1.12.0
+	github.com/stretchr/testify v1.12.1
 	github.com/testcontainers/testcontainers-go v0.44.0
 	github.com/testcontainers/testcontainers-go/modules/minio v0.44.0
 	github.com/uptrace/opentelemetry-go-extra/otelgorm v0.3.2
