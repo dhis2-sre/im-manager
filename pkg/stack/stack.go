@@ -94,59 +94,106 @@ func ValidateNoCycles(stacks []Stack) (graph.Graph[string, Stack], error) {
 // required stacks. Required stacks need to provide at least one consumed parameter.
 func ValidateConsumedParameters(stacks []Stack) error {
 	var errs []error
-	for _, stack := range stacks { // validate each stacks consumed parameters are provided by its required stacks
-		requiredStacks := make(map[string]int)
-		for _, requiredStack := range stack.Requires {
-			requiredStacks[requiredStack.Name] = 0
-		}
+	for _, stack := range stacks {
+		consumed := consumedParameterNames(stack)
 
-		// collect all consumed parameters
-		consumedParameterProviders := make(map[string]int)
-		for name, parameter := range stack.Parameters {
-			if !parameter.Consumed {
-				continue
-			}
-			consumedParameterProviders[name] = 0
-		}
-
-		// generate frequency map of provided parameters
-		for _, requiredStack := range stack.Requires {
-			for parameterName, parameter := range requiredStack.Parameters {
-				if parameter.Consumed { // consumed parameters cannot be provided
-					continue
-				}
-				_, ok := consumedParameterProviders[parameterName]
-				if ok {
-					consumedParameterProviders[parameterName]++
-					requiredStacks[requiredStack.Name]++
+		// Where the providers come from depends on how the stack is reached. A stack with required
+		// stacks is validated against those, which jointly provide, and being offered as a companion
+		// on top of that says nothing about the host: minio requires dhis2-db for DATABASE_ID while
+		// being a companion of dhis2-core, which provides no such thing. A stack with no required
+		// stacks and offered as a companion is validated against each host on its own, since exactly
+		// one host is deployed alongside it. A stack reached by neither has nowhere to consume from.
+		switch hosts := companionHosts(stacks, stack.Name); {
+		case len(stack.Requires) > 0:
+			errs = append(errs, validateProvidedBy(stack, consumed, stack.Requires, "requires")...)
+			// A required stack that provides nothing is a dependency the graph does not need.
+			for _, requiredStack := range stack.Requires {
+				if countProvided(requiredStack, consumed) == 0 {
+					errs = append(errs, fmt.Errorf("stack %q requires %q but does not consume from %q", stack.Name, requiredStack.Name, requiredStack.Name))
 				}
 			}
-			for parameterName := range requiredStack.ParameterProviders {
-				_, ok := consumedParameterProviders[parameterName]
-				if ok {
-					consumedParameterProviders[parameterName]++
-					requiredStacks[requiredStack.Name]++
-				}
+		case len(hosts) > 0:
+			for _, host := range hosts {
+				errs = append(errs, validateProvidedBy(stack, consumed, []Stack{host}, "is offered as a companion by")...)
 			}
-		}
-
-		for parameter, providerCount := range consumedParameterProviders {
-			if providerCount == 0 {
+		default:
+			for _, parameter := range consumed {
 				errs = append(errs, fmt.Errorf("no provider for stack %q parameter %q", stack.Name, parameter))
-			}
-			if providerCount > 1 {
-				errs = append(errs, fmt.Errorf("every consumed parameter must have exactly one provider. %d provider(s) for stack %q parameter %q", providerCount, stack.Name, parameter))
-			}
-		}
-
-		for requiredStackName, providedCount := range requiredStacks {
-			if providedCount == 0 {
-				errs = append(errs, fmt.Errorf("stack %q requires %q but does not consume from %q", stack.Name, requiredStackName, requiredStackName))
 			}
 		}
 	}
 
 	return errors.Join(errs...)
+}
+
+// consumedParameterNames lists the parameters a stack expects another stack to provide.
+func consumedParameterNames(stack Stack) []string {
+	var names []string
+	for name, parameter := range stack.Parameters {
+		if parameter.Consumed {
+			names = append(names, name)
+		}
+	}
+	slices.Sort(names)
+	return names
+}
+
+// companionHosts returns the stacks offering the named stack as a companion.
+func companionHosts(stacks []Stack, name string) []Stack {
+	var hosts []Stack
+	for _, candidate := range stacks {
+		for _, companion := range candidate.Companions {
+			if companion.Stack.Name == name {
+				hosts = append(hosts, candidate)
+			}
+		}
+	}
+	return hosts
+}
+
+// countProvided counts how many of the consumed parameters the provider supplies, either as its own
+// non-consumed parameter or through a parameter provider.
+func countProvided(provider Stack, consumed []string) int {
+	var count int
+	for _, name := range consumed {
+		// Both are counted rather than one short-circuiting the other: a stack declaring the same
+		// parameter as its own and through a provider is the ambiguity this is here to catch.
+		if parameter, ok := provider.Parameters[name]; ok && !parameter.Consumed {
+			count++
+		}
+		if _, ok := provider.ParameterProviders[name]; ok {
+			count++
+		}
+	}
+	return count
+}
+
+// validateProvidedBy checks the given providers supply each consumed parameter exactly once between
+// them. relation names how the providers relate to the stack, so the error says why they were
+// expected to provide it.
+func validateProvidedBy(stack Stack, consumed []string, providers []Stack, relation string) []error {
+	var errs []error
+	for _, name := range consumed {
+		var count int
+		for _, provider := range providers {
+			count += countProvided(provider, []string{name})
+		}
+		if count == 0 {
+			errs = append(errs, fmt.Errorf("no provider for stack %q parameter %q, which %s %s", stack.Name, name, relation, providerNames(providers)))
+		}
+		if count > 1 {
+			errs = append(errs, fmt.Errorf("every consumed parameter must have exactly one provider. %d provider(s) for stack %q parameter %q", count, stack.Name, name))
+		}
+	}
+	return errs
+}
+
+func providerNames(providers []Stack) string {
+	names := make([]string, len(providers))
+	for i, provider := range providers {
+		names[i] = provider.Name
+	}
+	return strings.Join(names, ", ")
 }
 
 // ValidateCompanionConditions validates that every companion condition names a parameter the

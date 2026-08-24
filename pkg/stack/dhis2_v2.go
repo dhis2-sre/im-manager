@@ -93,6 +93,9 @@ var DHIS2V2 = withGroupedParameters(Stack{
 	},
 	Companions: []Companion{
 		{Stack: Chap, When: whenChapIsDeployed},
+		// Unconditional: pgAdmin consumes the database connection parameters this stack provides, so
+		// it can always be offered. The opt-in is the form's checkbox rather than a condition.
+		{Stack: PgAdmin},
 	},
 	Components: []kube.Component{
 		DHIS2CoreComponent{BaseComponent: kube.BaseComponent{

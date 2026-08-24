@@ -50,11 +50,22 @@ func TestStackHandler(t *testing.T) {
 		var dhis2v2 stack.StackResponse
 		client.GetJSON(t, "/stacks/dhis2-v2", &dhis2v2)
 
-		require.Len(t, dhis2v2.Companions, 1)
-		assert.Equal(t, "chap", dhis2v2.Companions[0].Name)
-		require.NotNil(t, dhis2v2.Companions[0].When)
-		assert.Equal(t, "DEPLOY_CHAP", dhis2v2.Companions[0].When.Parameter)
-		assert.Equal(t, "true", dhis2v2.Companions[0].When.Equals)
+		byName := make(map[string]stack.StackCompanionResponse, len(dhis2v2.Companions))
+		for _, companion := range dhis2v2.Companions {
+			byName[companion.Name] = companion
+		}
+
+		chap, ok := byName["chap"]
+		require.True(t, ok, "dhis2-v2 should offer chap, got %v", byName)
+		require.NotNil(t, chap.When)
+		assert.Equal(t, "DEPLOY_CHAP", chap.When.Parameter)
+		assert.Equal(t, "true", chap.When.Equals)
+
+		// pgAdmin is offered unconditionally, so a nil condition has to survive the trip too: the
+		// form reads its absence as "always offer, opt in with the checkbox".
+		pgadmin, ok := byName["pgadmin"]
+		require.True(t, ok, "dhis2-v2 should offer pgadmin, got %v", byName)
+		assert.Nil(t, pgadmin.When)
 	})
 
 	t.Run("GetAllStacks", func(t *testing.T) {
