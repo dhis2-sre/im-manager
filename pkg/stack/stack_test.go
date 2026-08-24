@@ -251,6 +251,94 @@ func TestNew(t *testing.T) {
 		require.ErrorContains(t, err, `stack "b" parameter "a_param"`)
 	})
 
+	// A companion consumes from whichever stack offers it, so the provider is found by looking at the
+	// stacks declaring it rather than at its own Requires, which a companion does not have.
+	t.Run("GivenCompanionConsumingFromItsHost", func(t *testing.T) {
+		companion := stack.Stack{
+			Name: "companion",
+			Parameters: stack.StackParameters{
+				"a_param": {Consumed: true},
+			},
+		}
+		host := stack.Stack{
+			Name: "host",
+			Parameters: stack.StackParameters{
+				"a_param": {},
+			},
+			Companions: []stack.Companion{{Stack: companion}},
+		}
+
+		_, err := stack.New(host, companion)
+
+		require.NoError(t, err)
+	})
+
+	t.Run("FailGivenCompanionWhoseHostDoesNotProvideItsConsumedParameter", func(t *testing.T) {
+		companion := stack.Stack{
+			Name: "companion",
+			Parameters: stack.StackParameters{
+				"a_param": {Consumed: true},
+			},
+		}
+		host := stack.Stack{
+			Name:       "host",
+			Parameters: stack.StackParameters{},
+			Companions: []stack.Companion{{Stack: companion}},
+		}
+
+		_, err := stack.New(host, companion)
+
+		require.ErrorContains(t, err, `no provider for stack "companion" parameter "a_param"`)
+	})
+
+	// Each host provides on its own, since only one of them is deployed alongside the companion.
+	// Summing across hosts would read two perfectly good hosts as a duplicate-provider ambiguity.
+	t.Run("GivenCompanionOfferedBySeveralHostsEachProviding", func(t *testing.T) {
+		companion := stack.Stack{
+			Name: "companion",
+			Parameters: stack.StackParameters{
+				"a_param": {Consumed: true},
+			},
+		}
+		hostA := stack.Stack{
+			Name:       "host-a",
+			Parameters: stack.StackParameters{"a_param": {}},
+			Companions: []stack.Companion{{Stack: companion}},
+		}
+		hostB := stack.Stack{
+			Name:       "host-b",
+			Parameters: stack.StackParameters{"a_param": {}},
+			Companions: []stack.Companion{{Stack: companion}},
+		}
+
+		_, err := stack.New(hostA, hostB, companion)
+
+		require.NoError(t, err)
+	})
+
+	t.Run("FailGivenCompanionOfferedBySeveralHostsWhereOneDoesNotProvide", func(t *testing.T) {
+		companion := stack.Stack{
+			Name: "companion",
+			Parameters: stack.StackParameters{
+				"a_param": {Consumed: true},
+			},
+		}
+		good := stack.Stack{
+			Name:       "good-host",
+			Parameters: stack.StackParameters{"a_param": {}},
+			Companions: []stack.Companion{{Stack: companion}},
+		}
+		bad := stack.Stack{
+			Name:       "bad-host",
+			Parameters: stack.StackParameters{},
+			Companions: []stack.Companion{{Stack: companion}},
+		}
+
+		_, err := stack.New(good, bad, companion)
+
+		require.ErrorContains(t, err, `bad-host`)
+	})
+
 	t.Run("FailGivenStackIfItContainsDuplicateRequiredStacks", func(t *testing.T) {
 		a := stack.Stack{
 			Name: "a",

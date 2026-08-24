@@ -26,6 +26,12 @@ var DHIS2DB = Stack{
 	ParameterProviders: ParameterProviders{
 		"DATABASE_HOSTNAME": postgresHostnameProvider,
 	},
+	// pgAdmin is offered unconditionally: it consumes the database connection parameters this stack
+	// provides, so it can always be deployed alongside one. The opt-in is the form's checkbox rather
+	// than a condition over a parameter.
+	Companions: []Companion{
+		{Stack: PgAdmin},
+	},
 	Components: []kube.Component{
 		BitnamiPostgresComponent{BaseComponent: kube.BaseComponent{
 			Name:        "db",

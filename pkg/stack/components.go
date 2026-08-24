@@ -116,13 +116,14 @@ func (c MinioComponent) Restart(ctx context.Context, client *kube.Client, instan
 	return client.RestartDeployment(ctx, instance, c.Name)
 }
 
-// PgAdminComponent operates on the runix pgadmin4 chart's StatefulSet.
+// PgAdminComponent operates on the runix pgadmin4 chart's Deployment. The chart deploys a
+// Deployment, not a StatefulSet, so restart used to fail with "no statefulset found".
 type PgAdminComponent struct {
 	kube.BaseComponent
 }
 
 func (c PgAdminComponent) Restart(ctx context.Context, client *kube.Client, instance *model.DeploymentInstance) error {
-	return client.RestartStatefulSet(ctx, instance, c.Name)
+	return client.RestartDeployment(ctx, instance, c.Name)
 }
 
 // WhoamiComponent operates on the whoami-go chart's Deployment.

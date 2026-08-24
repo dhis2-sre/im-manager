@@ -52,7 +52,8 @@ func TestComponentRestartTargetsExpectedWorkload(t *testing.T) {
 		// CNPGPostgresComponent is absent: its restart patches the Cluster custom resource, covered
 		// by TestCNPGComponentRestartPatchesCluster.
 		{MinioComponent{kube.BaseComponent{Name: "minio"}}, false},
-		{PgAdminComponent{kube.BaseComponent{Name: "pgadmin"}}, true},
+		// runix/pgadmin4 deploys a Deployment; restart used to fail with "no statefulset found".
+		{PgAdminComponent{kube.BaseComponent{Name: "pgadmin"}}, false},
 		{WhoamiComponent{kube.BaseComponent{Name: "whoami"}}, false},
 		{ValkeyComponent{kube.BaseComponent{Name: "valkey"}}, false},
 		{ChapAPIComponent{kube.BaseComponent{Name: "api"}}, false},
