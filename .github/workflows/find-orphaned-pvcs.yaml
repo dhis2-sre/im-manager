@@ -1,0 +1,80 @@
+name: Find Orphaned PVCs
+
+on:
+  schedule:
+    - cron: '0 9 * * *'
+  workflow_dispatch:
+    inputs:
+      quota_gb:
+        description: 'Hetzner project volume size quota in GB'
+        required: false
+        default: '10240'
+
+jobs:
+  find-orphaned-pvcs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Install kubectl and Helm
+        uses: alexellis/arkade-get@master
+        with:
+          kubectl: v1.31.4
+          helm: v3.12.3
+
+      - name: Install Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.x'
+
+      - name: Create kubeconfig files
+        run: |
+          echo "${{ secrets.KUBECONFIG }}" > /tmp/eks-kubeconfig
+          echo "${{ secrets.HETZNER_KUBECONFIG }}" > /tmp/hetzner-kubeconfig
+
+      - name: Find orphaned PVCs
+        id: find-orphaned-pvcs
+        run: |
+          set -o pipefail
+          python scripts/util/find-orphaned-pvcs.py \
+            --quota-gb ${{ github.event.inputs.quota_gb || '10240' }} \
+            --kubeconfig /tmp/eks-kubeconfig \
+            --kubeconfig /tmp/hetzner-kubeconfig |
+            tee /tmp/find-orphaned-pvcs-output
+
+          ORPHANED_COUNT=$(grep 'Orphaned persistent volume claims' /tmp/find-orphaned-pvcs-output | grep --only-matching --regexp='([0-9]\+)' | tr --delete '()' || echo "0")
+          echo "orphaned_count=${ORPHANED_COUNT:-0}" >> $GITHUB_OUTPUT
+
+          {
+            echo "orphaned_list<<ORPHANS_EOF"
+            sed -n '/^Orphaned persistent volume claims/,/^$/p' /tmp/find-orphaned-pvcs-output | sed '$d' | head -40
+            echo "ORPHANS_EOF"
+          } >> $GITHUB_OUTPUT
+
+          QUOTA_LINE=$(grep 'Volume quota nearly exhausted' /tmp/find-orphaned-pvcs-output || echo "")
+          echo "quota_warning=$QUOTA_LINE" >> $GITHUB_OUTPUT
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          HCLOUD_TOKEN: ${{ secrets.HCLOUD_TOKEN }}
+
+      - name: Send Slack notification
+        if: steps.find-orphaned-pvcs.outputs.orphaned_count > '0' || steps.find-orphaned-pvcs.outputs.quota_warning != ''
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+          SLACK_CHANNEL: 'team-devops-internal'
+          SLACK_MESSAGE: |
+            :floppy_disk: Orphaned Persistent Volume Claims Found
+
+            ${{ steps.find-orphaned-pvcs.outputs.orphaned_count }} claim(s) that no pod, workload or Helm release owns.
+            ${{ steps.find-orphaned-pvcs.outputs.quota_warning }}
+
+            ```
+            ${{ steps.find-orphaned-pvcs.outputs.orphaned_list }}
+            ```
+
+            View deletion commands in the GitHub Actions logs (step: "Find orphaned PVCs"):
+            https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          SLACK_COLOR: 'warning'
