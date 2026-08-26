@@ -271,7 +271,21 @@ def print_orphans(reports: List[ClusterReport]):
     orphans.sort(key=lambda orphan: (orphan.age_days is None, -(orphan.age_days or 0)))
     total = sum(orphan.gibibytes for orphan in orphans)
 
+    # A per-namespace roll-up as well as the full list, because the full list runs to
+    # hundreds of lines once a leak has been running for a while, which is more than a
+    # Slack message can carry. The roll-up stays a handful of lines however bad it gets.
+    grouped: Dict[Tuple[str, str], List[OrphanedClaim]] = {}
+    for orphan in orphans:
+        grouped.setdefault((orphan.cluster, orphan.namespace), []).append(orphan)
+
     print()
+    print(f"Orphaned claims by namespace ({len(grouped)}): {len(orphans)} claims, {total} Gi")
+    for (cluster, namespace), claims in sorted(grouped.items(), key=lambda item: -sum(c.gibibytes for c in item[1])):
+        ages = [claim.age_days for claim in claims if claim.age_days is not None]
+        oldest = f", oldest {max(ages)} days" if ages else ""
+        print(f"  {cluster} / {namespace}: {len(claims)} claims, {sum(claim.gibibytes for claim in claims)} Gi{oldest}")
+    print()
+
     print(f"Orphaned persistent volume claims ({len(orphans)}): {total} Gi")
     for orphan in orphans:
         age = f"{orphan.age_days} days old" if orphan.age_days is not None else "age unknown"

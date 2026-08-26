@@ -1,6 +1,10 @@
 name: Find Orphaned PVCs
 
 on:
+  # TEMPORARY: remove before merging, only here to exercise the workflow on the branch
+  push:
+    branches:
+      - chore/find-orphaned-pvcs
   schedule:
     - cron: '0 9 * * *'
   workflow_dispatch:
@@ -47,10 +51,23 @@ jobs:
           echo "orphaned_count=${ORPHANED_COUNT:-0}" >> $GITHUB_OUTPUT
 
           {
+            echo "summary_list<<SUMMARY_EOF"
+            sed -n '/^Orphaned claims by namespace/,/^$/p' /tmp/find-orphaned-pvcs-output | sed '$d'
+            echo "SUMMARY_EOF"
+          } >> $GITHUB_OUTPUT
+
+          SHOWN=15
+          {
             echo "orphaned_list<<ORPHANS_EOF"
-            sed -n '/^Orphaned persistent volume claims/,/^$/p' /tmp/find-orphaned-pvcs-output | sed '$d' | head -40
+            sed -n '/^Orphaned persistent volume claims/,/^$/p' /tmp/find-orphaned-pvcs-output | sed '1d;$d' | head -$SHOWN
             echo "ORPHANS_EOF"
           } >> $GITHUB_OUTPUT
+
+          if [ "${ORPHANED_COUNT:-0}" -gt "$SHOWN" ]; then
+            echo "truncation=Showing the $SHOWN oldest of $ORPHANED_COUNT, full list in the logs." >> $GITHUB_OUTPUT
+          else
+            echo "truncation=" >> $GITHUB_OUTPUT
+          fi
 
           QUOTA_LINE=$(grep 'Volume quota nearly exhausted' /tmp/find-orphaned-pvcs-output || echo "")
           echo "quota_warning=$QUOTA_LINE" >> $GITHUB_OUTPUT
@@ -70,6 +87,12 @@ jobs:
 
             ${{ steps.find-orphaned-pvcs.outputs.orphaned_count }} claim(s) that no pod, workload or Helm release owns.
             ${{ steps.find-orphaned-pvcs.outputs.quota_warning }}
+
+            ```
+            ${{ steps.find-orphaned-pvcs.outputs.summary_list }}
+            ```
+
+            Oldest claims. ${{ steps.find-orphaned-pvcs.outputs.truncation }}
 
             ```
             ${{ steps.find-orphaned-pvcs.outputs.orphaned_list }}
