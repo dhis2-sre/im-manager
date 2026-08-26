@@ -451,7 +451,7 @@ func (ks kubernetesService) deletePersistentVolumeClaim(instance *model.Deployme
 	// TODO: This should be stack metadata
 	labelMap := map[string][]string{
 		"dhis2":      {"app.kubernetes.io/instance=%s-database", "app.kubernetes.io/instance=%s-redis"},
-		"dhis2-core": {"app.kubernetes.io/instance=%s", "app.kubernetes.io/instance=%s-minio"},
+		"dhis2-core": {"app.kubernetes.io/instance=%s"},
 		"dhis2-db":   {"app.kubernetes.io/instance=%s-database"},
 		"minio":      {"app.kubernetes.io/instance=%s-minio"},
 	}
