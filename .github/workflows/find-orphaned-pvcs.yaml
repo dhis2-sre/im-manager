@@ -1,10 +1,6 @@
 name: Find Orphaned PVCs
 
 on:
-  # TEMPORARY: remove before merging, only here to exercise the workflow on the branch
-  push:
-    branches:
-      - chore/find-orphaned-pvcs
   schedule:
     - cron: '0 9 * * *'
   workflow_dispatch:
