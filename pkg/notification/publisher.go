@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log/slog"
 	"strconv"
-	"sync/atomic"
 
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	"github.com/rabbitmq/rabbitmq-stream-go-client/pkg/amqp"
@@ -19,7 +18,6 @@ type Publisher struct {
 	logger     *slog.Logger
 	producer   *ha.ReliableProducer
 	repository *repository
-	counter    atomic.Int64
 }
 
 func NewPublisher(logger *slog.Logger, env *stream.Environment, streamName string, repo *repository) (*Publisher, error) {
@@ -29,8 +27,12 @@ func NewPublisher(logger *slog.Logger, env *stream.Environment, streamName strin
 	}
 
 	producerName := "notification-publisher"
+	// Deliberately not SetProducerName: a named producer is a deduplication reference, and RabbitMQ
+	// then silently drops (while still confirming) every message whose publishing id it has already
+	// seen for that name. Publishing ids come from a counter that restarts at zero with the process,
+	// so after a restart every event up to the stream's high water mark was discarded. This producer
+	// wants each event appended, not deduplicated. SetClientProvidedName only labels the connection.
 	opts := stream.NewProducerOptions().
-		SetProducerName(producerName).
 		SetClientProvidedName(producerName).
 		SetFilter(stream.NewProducerFilter(func(msg message.StreamMessage) string {
 			return fmt.Sprintf("%s", msg.GetApplicationProperties()["group"])
@@ -74,7 +76,6 @@ func (p *Publisher) Publish(ctx context.Context, userID uint, groupName, kind st
 	}
 
 	msg := amqp.NewMessage(data)
-	msg.SetPublishingId(p.counter.Add(1))
 	msg.ApplicationProperties = map[string]any{
 		"group": groupName,
 		"owner": strconv.FormatUint(uint64(userID), 10),
