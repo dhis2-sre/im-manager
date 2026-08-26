@@ -17,11 +17,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
-      - name: Install kubectl and Helm
+      - name: Install kubectl
         uses: alexellis/arkade-get@master
         with:
           kubectl: v1.31.4
-          helm: v3.12.3
 
       - name: Install Python
         uses: actions/setup-python@v7
@@ -31,7 +30,7 @@ jobs:
       - name: Create kubeconfig files
         run: |
           echo "${{ secrets.KUBECONFIG }}" > /tmp/eks-kubeconfig
-          echo "${{ secrets.HETZNER_KUBECONFIG }}" > /tmp/hetzner-kubeconfig
+          echo "${{ secrets.HETZNER_KUBECONFIG_RO }}" > /tmp/hetzner-kubeconfig
 
       - name: Find orphaned PVCs
         id: find-orphaned-pvcs
