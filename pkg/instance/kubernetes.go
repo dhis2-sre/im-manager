@@ -3,6 +3,7 @@ package instance
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -436,7 +437,17 @@ func (ks kubernetesService) resume(instance *model.DeploymentInstance) error {
 	return nil
 }
 
-func (ks kubernetesService) deletePersistentVolumeClaim(instance *model.DeploymentInstance) error {
+// pvcDeletionResult reports what deleting an instance's persistent volume claims
+// actually matched, so the caller can log a selector that matched nothing. A selector
+// matching nothing cannot be an error, because destroying an instance that never got as
+// far as creating its volumes has to keep working, but it is the shape a leak takes and
+// so it must not be silent.
+type pvcDeletionResult struct {
+	Deleted            []string
+	UnmatchedSelectors []string
+}
+
+func (ks kubernetesService) deletePersistentVolumeClaim(instance *model.DeploymentInstance) (pvcDeletionResult, error) {
 	// TODO: This should be stack metadata
 	labelMap := map[string][]string{
 		"dhis2":      {"app.kubernetes.io/instance=%s-database", "app.kubernetes.io/instance=%s-redis"},
@@ -445,35 +456,40 @@ func (ks kubernetesService) deletePersistentVolumeClaim(instance *model.Deployme
 		"minio":      {"app.kubernetes.io/instance=%s-minio"},
 	}
 
+	var result pvcDeletionResult
+
 	labelPatterns := labelMap[instance.StackName]
 	if labelPatterns == nil {
-		return nil
+		return result, nil
 	}
 
 	pvcs := ks.client.CoreV1().PersistentVolumeClaims(instance.Group.Namespace)
 
+	var errs error
 	for _, pattern := range labelPatterns {
 		selector := fmt.Sprintf(pattern, fmt.Sprintf("%s-%d", instance.Name, instance.Group.ID))
 		listOptions := metav1.ListOptions{LabelSelector: selector}
 		list, err := pvcs.List(context.TODO(), listOptions)
 		if err != nil {
-			return fmt.Errorf("error finding pvcs using selector %q: %v", selector, err)
+			errs = errors.Join(errs, fmt.Errorf("error finding pvcs using selector %q: %v", selector, err))
+			continue
 		}
 
-		if len(list.Items) > 1 {
-			return fmt.Errorf("multiple pvcs found using the selector: %q", selector)
+		if len(list.Items) == 0 {
+			result.UnmatchedSelectors = append(result.UnmatchedSelectors, selector)
+			continue
 		}
 
-		if len(list.Items) == 1 {
-			name := list.Items[0].Name
-			err := pvcs.Delete(context.TODO(), name, metav1.DeleteOptions{})
-			if err != nil {
-				return fmt.Errorf("failed to delete pvc: %v", err)
+		for _, pvc := range list.Items {
+			if err := pvcs.Delete(context.TODO(), pvc.Name, metav1.DeleteOptions{}); err != nil {
+				errs = errors.Join(errs, fmt.Errorf("failed to delete pvc %q matching selector %q: %v", pvc.Name, selector, err))
+				continue
 			}
+			result.Deleted = append(result.Deleted, pvc.Name)
 		}
 	}
 
-	return nil
+	return result, errs
 }
 
 func (ks kubernetesService) scale(instance *model.DeploymentInstance, replicas uint) error {
