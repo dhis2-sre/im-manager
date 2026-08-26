@@ -18,7 +18,14 @@ A claim is reported only when all three ownership signals say no:
 1. No pod mounts it
 2. No workload references it, including a workload scaled to zero, because pausing an
    instance scales it to zero and a paused instance is not an orphan
-3. No Helm release matches it, by release annotation or by instance label
+3. Nothing else in the namespace wears its app.kubernetes.io/instance label. Helm never
+   deletes a volumeClaimTemplate claim on uninstall but it does delete everything else,
+   so a destroyed instance leaves claims and nothing else standing
+
+Deliberately no Helm. Asking Helm whether a release exists means reading Secrets across
+every namespace, which is reading every instance's database password, so the check would
+need a credential that is read-only in name only. Signal 3 answers the same question from
+resources the read-only ClusterRole "view" already covers.
 
 With HCLOUD_TOKEN set the script also reports quota headroom and Hetzner volumes with no
 persistent volume in any of the given clusters, which the Kubernetes API cannot see at
@@ -109,14 +116,32 @@ def kubectl_json(kubeconfig: str, *args: str) -> dict:
     return json.loads(result.stdout)
 
 
-def helm_releases(kubeconfig: str) -> Set[Tuple[str, str]]:
-    cmd = ["helm", "list", "--kubeconfig", kubeconfig, "--all-namespaces", "--all", "--output", "json"]
-    result = subprocess.run(cmd, capture_output=True, text=True)
+LABELLED_KINDS = "statefulsets,deployments,daemonsets,jobs,cronjobs,services,ingresses,configmaps,serviceaccounts,pods"
 
-    if result.returncode != 0:
-        raise ClusterUnreachable(summarise_stderr(result.stderr))
 
-    return {(release["namespace"], release["name"]) for release in json.loads(result.stdout)}
+def get_labelled_instances(kubeconfig: str) -> Set[Tuple[str, str]]:
+    """Namespace and instance label of every non-claim resource that carries one.
+
+    This replaces asking Helm whether a release still exists. Helm keeps release state in
+    Secrets, and reading Secrets cluster-wide means reading every instance's database
+    password, so a credential that could do it would not be read-only in any sense worth
+    the name. The question is answerable without it: Helm never deletes a
+    volumeClaimTemplate claim on uninstall but it does delete everything else, so a
+    destroyed instance leaves claims and nothing else. If any other resource still wears
+    the same app.kubernetes.io/instance label, the release is still there.
+
+    It is also a stronger signal than the Helm check, which would call a claim orphaned
+    while a Service or Ingress of the same release was still standing.
+    """
+    resources = kubectl_json(kubeconfig, "get", LABELLED_KINDS, "--all-namespaces")
+
+    owned = set()
+    for item in resources["items"]:
+        metadata = item["metadata"]
+        label = (metadata.get("labels") or {}).get(INSTANCE_LABEL)
+        if label:
+            owned.add((metadata["namespace"], label))
+    return owned
 
 
 def parse_timestamp(value: str) -> Optional[datetime]:
@@ -209,7 +234,7 @@ def read_cluster(report: ClusterReport, kubeconfig: str, min_age_hours: int, ign
     mounted = get_mounted_claims(kubeconfig)
     referenced = get_referenced_claims(kubeconfig)
     template_prefixes = get_template_claim_prefixes(kubeconfig)
-    releases = helm_releases(kubeconfig)
+    owned_labels = get_labelled_instances(kubeconfig)
 
     claims = kubectl_json(kubeconfig, "get", "pvc", "--all-namespaces")
     now = datetime.now(timezone.utc)
@@ -238,7 +263,7 @@ def read_cluster(report: ClusterReport, kubeconfig: str, min_age_hours: int, ign
         labels = metadata.get("labels") or {}
         instance_label = labels.get(INSTANCE_LABEL, "")
         release = annotations.get(HELM_RELEASE_ANNOTATION) or instance_label
-        if release and (namespace, release) in releases:
+        if release and (namespace, release) in owned_labels:
             continue
 
         created = parse_timestamp(metadata.get("creationTimestamp"))
@@ -429,7 +454,7 @@ def main():
         print(f"Ignoring namespace(s): {', '.join(sorted(ignored_namespaces))}")
     print()
 
-    print("Fetching persistent volume claims, workloads and Helm releases from Kubernetes...")
+    print("Fetching persistent volume claims and the resources that own them from Kubernetes...")
     reports = [check_cluster(kubeconfig, args.min_age_hours, ignored_namespaces) for kubeconfig in kubeconfigs]
 
     print_unreachable(reports)
