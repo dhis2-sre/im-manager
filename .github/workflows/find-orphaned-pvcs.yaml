@@ -71,13 +71,19 @@ jobs:
 
           QUOTA_LINE=$(grep 'Volume quota nearly exhausted' /tmp/find-orphaned-pvcs-output || echo "")
           echo "quota_warning=$QUOTA_LINE" >> $GITHUB_OUTPUT
+
+          {
+            echo "unreachable<<UNREACHABLE_EOF"
+            sed -n '/^Unreachable clusters/,/^$/p' /tmp/find-orphaned-pvcs-output | sed '$d'
+            echo "UNREACHABLE_EOF"
+          } >> $GITHUB_OUTPUT
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           HCLOUD_TOKEN: ${{ secrets.HCLOUD_TOKEN }}
 
       - name: Send Slack notification
-        if: steps.find-orphaned-pvcs.outputs.orphaned_count > '0' || steps.find-orphaned-pvcs.outputs.quota_warning != ''
+        if: steps.find-orphaned-pvcs.outputs.orphaned_count > '0' || steps.find-orphaned-pvcs.outputs.quota_warning != '' || steps.find-orphaned-pvcs.outputs.unreachable != ''
         uses: rtCamp/action-slack-notify@v2
         env:
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
@@ -87,6 +93,7 @@ jobs:
 
             ${{ steps.find-orphaned-pvcs.outputs.orphaned_count }} claim(s) that no pod, workload or Helm release owns.
             ${{ steps.find-orphaned-pvcs.outputs.quota_warning }}
+            ${{ steps.find-orphaned-pvcs.outputs.unreachable }}
 
             ```
             ${{ steps.find-orphaned-pvcs.outputs.summary_list }}
@@ -101,3 +108,17 @@ jobs:
             View deletion commands in the GitHub Actions logs (step: "Find orphaned PVCs"):
             https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
           SLACK_COLOR: 'warning'
+
+      - name: Report a failed check to Slack
+        if: failure()
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+          SLACK_CHANNEL: 'team-devops-internal'
+          SLACK_MESSAGE: |
+            :rotating_light: The orphaned volume check failed to run
+
+            No volumes were reported because the check itself did not finish, so treat its last result as stale.
+
+            https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          SLACK_COLOR: 'failure'

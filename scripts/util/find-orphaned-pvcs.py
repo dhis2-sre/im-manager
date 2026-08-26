@@ -70,10 +70,26 @@ class ClusterReport:
     gibibytes_checked: int = 0
     orphans: List[OrphanedClaim] = field(default_factory=list)
     volume_names: Set[str] = field(default_factory=set)
+    error: Optional[str] = None
 
     @property
     def orphaned_gibibytes(self) -> int:
         return sum(orphan.gibibytes for orphan in self.orphans)
+
+
+class ClusterUnreachable(Exception):
+    """One cluster could not be read. The other clusters are still worth reporting, so
+    this is caught per cluster rather than ending the run: a check that goes dark when
+    one kubeconfig expires is no better than no check at all, which is how the sibling
+    checks sat failing for 27 days."""
+
+
+def summarise_stderr(stderr: str) -> str:
+    lines = [line.strip() for line in stderr.splitlines() if line.strip()]
+    for line in reversed(lines):
+        if line.startswith("error:"):
+            return line[len("error:"):].strip()
+    return lines[-1] if lines else "no error output"
 
 
 def print_separator(title: str = None):
@@ -88,8 +104,7 @@ def kubectl_json(kubeconfig: str, *args: str) -> dict:
     result = subprocess.run(cmd, capture_output=True, text=True)
 
     if result.returncode != 0:
-        print(f"Error running {' '.join(cmd)}: {result.stderr.strip()}")
-        sys.exit(1)
+        raise ClusterUnreachable(summarise_stderr(result.stderr))
 
     return json.loads(result.stdout)
 
@@ -99,8 +114,7 @@ def helm_releases(kubeconfig: str) -> Set[Tuple[str, str]]:
     result = subprocess.run(cmd, capture_output=True, text=True)
 
     if result.returncode != 0:
-        print(f"Error running {' '.join(cmd)}: {result.stderr.strip()}")
-        sys.exit(1)
+        raise ClusterUnreachable(summarise_stderr(result.stderr))
 
     return {(release["namespace"], release["name"]) for release in json.loads(result.stdout)}
 
@@ -184,7 +198,14 @@ def owned_by_statefulset_template(namespace: str, name: str, prefixes: Set[Tuple
 
 def check_cluster(kubeconfig: str, min_age_hours: int, ignored_namespaces: Set[str]) -> ClusterReport:
     report = ClusterReport(cluster=os.path.basename(kubeconfig))
+    try:
+        return read_cluster(report, kubeconfig, min_age_hours, ignored_namespaces)
+    except ClusterUnreachable as error:
+        report.error = str(error)
+        return report
 
+
+def read_cluster(report: ClusterReport, kubeconfig: str, min_age_hours: int, ignored_namespaces: Set[str]) -> ClusterReport:
     mounted = get_mounted_claims(kubeconfig)
     referenced = get_referenced_claims(kubeconfig)
     template_prefixes = get_template_claim_prefixes(kubeconfig)
@@ -262,6 +283,19 @@ def hcloud_volumes(token: str) -> List[dict]:
         page = next_page
 
 
+def print_unreachable(reports: List[ClusterReport]):
+    unreachable = [report for report in reports if report.error]
+    if not unreachable:
+        return
+
+    print()
+    print(f"Unreachable clusters ({len(unreachable)}):")
+    for report in unreachable:
+        print(f"  {report.cluster}: {report.error}")
+    print("  Claims in these clusters were not checked, so the counts below are incomplete")
+    print()
+
+
 def print_orphans(reports: List[ClusterReport]):
     orphans = [orphan for report in reports for orphan in report.orphans]
     if not orphans:
@@ -309,6 +343,12 @@ def print_quota(reports: List[ClusterReport], volumes: List[dict], quota_gb: int
     print_separator("Hetzner volume quota")
     print(f"Provisioned: {provisioned} GB of {quota_gb} GB across {len(volumes)} volume(s), {used_percent}% used")
 
+    # A volume looks detached when no cluster claims it, so a cluster that could not be
+    # read would put every volume it owns on the list, with a delete command next to it.
+    if any(report.error for report in reports):
+        detached = []
+        print("Skipping the detached volume comparison, a cluster could not be read and its volumes would look detached")
+
     if used_percent >= warn_percent:
         print()
         print(f"Volume quota nearly exhausted ({used_percent}%): {quota_gb - provisioned} GB left")
@@ -340,10 +380,11 @@ def generate_remediation_commands(reports: List[ClusterReport], kubeconfigs: Lis
                 cmd += f" --kubeconfig {kubeconfig_path}"
             commands.append(cmd)
 
-    known = {name for report in reports for name in report.volume_names}
-    for volume in volumes:
-        if volume["name"] not in known:
-            commands.append(f"hcloud volume delete {volume['name']}")
+    if not any(report.error for report in reports):
+        known = {name for report in reports for name in report.volume_names}
+        for volume in volumes:
+            if volume["name"] not in known:
+                commands.append(f"hcloud volume delete {volume['name']}")
 
     return commands
 
@@ -391,10 +432,16 @@ def main():
     print("Fetching persistent volume claims, workloads and Helm releases from Kubernetes...")
     reports = [check_cluster(kubeconfig, args.min_age_hours, ignored_namespaces) for kubeconfig in kubeconfigs]
 
+    print_unreachable(reports)
+
     checked = sum(report.claims_checked for report in reports)
     checked_gibibytes = sum(report.gibibytes_checked for report in reports)
-    print(f"Found {checked} persistent volume claims totalling {checked_gibibytes} Gi")
+    read = [report for report in reports if not report.error]
+    print(f"Found {checked} persistent volume claims totalling {checked_gibibytes} Gi in {len(read)} of {len(reports)} cluster(s)")
     for report in reports:
+        if report.error:
+            print(f"  {report.cluster}: unreachable")
+            continue
         print(f"  {report.cluster}: {report.claims_checked} claims, {report.gibibytes_checked} Gi, {len(report.orphans)} orphaned")
 
     print_orphans(reports)
