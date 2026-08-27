@@ -111,7 +111,11 @@ func TestInstanceHandler(t *testing.T) {
 	tokenRepository := token.NewRepository(redis)
 	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	require.NoError(t, err, "failed to generate RSA private key")
-	tokenService, err := token.NewService(logger, tokenRepository, privateKey, 100, 60, "secret", 100, 100)
+	// The access token is minted once and reused by every subtest below. At 100 seconds
+	// it expired part way through the suite in CI, and every request after that came back
+	// 500 with "exp" not satisfied, which read as a different flaky test each run
+	// depending on which subtest happened to be first past the deadline.
+	tokenService, err := token.NewService(logger, tokenRepository, privateKey, 3600, 60, "secret", 3600, 3600)
 	require.NoError(t, err, "failed to create token service")
 	instanceService := instance.NewService(logger, instanceRepo, groupService, stackService, helmfileService, nil, "")
 
