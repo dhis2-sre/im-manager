@@ -53,10 +53,10 @@ var DHIS2Core = Stack{
 	Components: []kube.Component{
 		DHIS2CoreComponent{BaseComponent: kube.BaseComponent{
 			Name: "dhis2",
-			PVCPatterns: []string{
-				"app.kubernetes.io/instance=%s",
-				"app.kubernetes.io/instance=%s-minio",
-			},
+			// Only the core release's own claim. The MinIO claim belongs to the minio stack's own
+			// release and its component deletes it, so destroying core must leave it alone: listing
+			// it here wedged 31 MinIO claims in production (#1732).
+			PVCPatterns: []string{"app.kubernetes.io/instance=%s"},
 			// All STORAGE_TYPE backends (minio, filesystem, s3) support filestore backup, so no
 			// predicate; the first parameter-gated capability arrives with CNPG-backed stacks.
 			Capabilities: []kube.Capability{

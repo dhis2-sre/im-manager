@@ -237,8 +237,10 @@ func TestComponentNamesMatchHelmfileImType(t *testing.T) {
 // the historic hardcoded map's output (empty for stacks that had no entry).
 func TestComponentPVCSelectorParity(t *testing.T) {
 	oldMap := map[string][]string{
-		"dhis2":      {"app.kubernetes.io/instance=%s-database", "app.kubernetes.io/instance=%s-redis"},
-		"dhis2-core": {"app.kubernetes.io/instance=%s", "app.kubernetes.io/instance=%s-minio"},
+		"dhis2": {"app.kubernetes.io/instance=%s-database", "app.kubernetes.io/instance=%s-redis"},
+		// The map listed the MinIO claim here too, which is the defect #1732 fixed on master: MinIO
+		// is its own stack with its own release and its own component, so core must not delete it.
+		"dhis2-core": {"app.kubernetes.io/instance=%s"},
 		"dhis2-db":   {"app.kubernetes.io/instance=%s-database"},
 		"minio":      {"app.kubernetes.io/instance=%s-minio"},
 		// dhis2-v2 postdates the hardcoded map; the release's own PVCs share its instance label so

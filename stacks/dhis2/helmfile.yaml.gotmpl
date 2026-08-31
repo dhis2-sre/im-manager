@@ -106,6 +106,15 @@ releases:
           persistence:
             size: {{ requiredEnv "DATABASE_SIZE" }}
 
+          # Kubernetes deletes the claim with the StatefulSet. Helm never deletes a
+          # volumeClaimTemplate claim on uninstall, and the labels that would let us find
+          # one afterwards are stripped by the chart, so without this a destroyed instance
+          # leaves its volume behind for good.
+          persistentVolumeClaimRetentionPolicy:
+            enabled: true
+            whenScaled: Retain
+            whenDeleted: Delete
+
           initdb:
             scripts:
               seed.sh: |
