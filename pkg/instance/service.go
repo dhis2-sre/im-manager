@@ -603,7 +603,15 @@ func (s Service) DestroyInstance(ctx context.Context, instance *model.Deployment
 		selectors = append(selectors, component.PVCSelectors(instance)...)
 	}
 
-	return client.DeletePVCs(ctx, instance.Group.Namespace, selectors)
+	result, err := client.DeletePVCs(ctx, instance.Group.Namespace, selectors)
+	if len(result.Deleted) > 0 {
+		s.logger.InfoContext(ctx, "Deleted persistent volume claims", "instance", instance.Name, "stack", instance.StackName, "namespace", group.Namespace, "claims", result.Deleted)
+	}
+	if len(result.UnmatchedSelectors) > 0 {
+		s.logger.WarnContext(ctx, "Destroy matched no persistent volume claim, volumes may have been left behind", "instance", instance.Name, "stack", instance.StackName, "namespace", group.Namespace, "selectors", result.UnmatchedSelectors)
+	}
+
+	return err
 }
 
 func deploymentOrder(deployment *model.Deployment, g graph.Graph[string, *model.DeploymentInstance]) ([]*model.DeploymentInstance, error) {

@@ -469,3 +469,40 @@ func TestPgAdminIsOfferedOnEnablePgAdmin(t *testing.T) {
 		assert.Equalf(t, "false", *parameter.DefaultValue, "stack %q should not deploy pgAdmin by default", s.Name)
 	}
 }
+
+// TestPVCSelectorsDoNotCrossStacks guards the defect that wedged 31 MinIO claims in production
+// (#1732). The dhis2-core component listed the MinIO claim among the ones it deletes, but MinIO is
+// its own stack with its own release, so destroying or resetting the core instance alone deleted a
+// live sibling's volume. Claims are only ever at risk from a stack deployed alongside them, which
+// is what Requires and Companions describe, so those are the pairs checked here rather than every
+// pair of stacks: dhis2 and dhis2-db legitimately name the same claim, since one is the umbrella
+// form of the other and they never appear in one deployment.
+func TestPVCSelectorsDoNotCrossStacks(t *testing.T) {
+	instance := &model.DeploymentInstance{Name: "test", Group: &model.Group{ID: 1, Namespace: "test"}}
+
+	selectorsOf := func(s stack.Stack) map[string]bool {
+		selectors := make(map[string]bool)
+		for _, component := range s.Components {
+			for _, selector := range component.PVCSelectors(instance) {
+				selectors[selector] = true
+			}
+		}
+		return selectors
+	}
+
+	for _, s := range stack.All {
+		own := selectorsOf(s)
+
+		neighbours := make([]stack.Stack, 0, len(s.Requires)+len(s.Companions))
+		neighbours = append(neighbours, s.Requires...)
+		for _, companion := range s.Companions {
+			neighbours = append(neighbours, companion.Stack)
+		}
+
+		for _, neighbour := range neighbours {
+			for selector := range selectorsOf(neighbour) {
+				assert.Falsef(t, own[selector], "stack %q would delete %q, a claim of %q, which it deploys alongside", s.Name, selector, neighbour.Name)
+			}
+		}
+	}
+}
