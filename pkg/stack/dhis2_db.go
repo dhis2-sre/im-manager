@@ -22,15 +22,15 @@ var DHIS2DB = Stack{
 		"RESOURCES_REQUESTS_CPU":    {Priority: 7, DisplayName: "Resources Requests CPU", DefaultValue: &dhis2DBDefaults.resourcesRequestsCPU},
 		"RESOURCES_REQUESTS_MEMORY": {Priority: 8, DisplayName: "Resources Requests Memory", DefaultValue: &dhis2DBDefaults.resourcesRequestsMemory},
 		"CHART_VERSION":             {Priority: 9, DisplayName: "Chart Version", DefaultValue: &dhis2DBDefaults.chartVersion},
+		"ENABLE_PGADMIN":            {Priority: 10, DisplayName: "Deploy pgAdmin", DefaultValue: &pgAdminDefaults.enabled},
 	},
 	ParameterProviders: ParameterProviders{
 		"DATABASE_HOSTNAME": postgresHostnameProvider,
 	},
-	// pgAdmin is offered unconditionally: it consumes the database connection parameters this stack
-	// provides, so it can always be deployed alongside one. The opt-in is the form's checkbox rather
-	// than a condition over a parameter.
+	// pgAdmin consumes the database connection parameters this stack provides, so it can be
+	// deployed alongside one; ENABLE_PGADMIN is where the user says they want it.
 	Companions: []Companion{
-		{Stack: PgAdmin},
+		{Stack: PgAdmin, When: whenPgAdminIsEnabled},
 	},
 	Components: []kube.Component{
 		BitnamiPostgresComponent{BaseComponent: kube.BaseComponent{

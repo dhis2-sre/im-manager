@@ -446,3 +446,26 @@ func TestChapIsOfferedOnDeployChap(t *testing.T) {
 		assert.Truef(t, found, "stack %q does not offer chap as a companion", s.Name)
 	}
 }
+
+// Every stack that can host pgAdmin gates it on its own ENABLE_PGADMIN, so the choice is a stored
+// parameter rather than form state, and so a new host cannot offer pgAdmin without one.
+func TestPgAdminIsOfferedOnEnablePgAdmin(t *testing.T) {
+	for _, s := range []stack.Stack{stack.DHIS2DB, stack.DHIS2, stack.DHIS2V2} {
+		var found bool
+		for _, companion := range s.Companions {
+			if companion.Stack.Name != stack.PgAdmin.Name {
+				continue
+			}
+			found = true
+			require.NotNilf(t, companion.When, "stack %q offers pgadmin unconditionally", s.Name)
+			assert.Equalf(t, "ENABLE_PGADMIN", companion.When.Parameter, "stack %q", s.Name)
+			assert.Equalf(t, "true", companion.When.Equals, "stack %q", s.Name)
+		}
+		require.Truef(t, found, "stack %q does not offer pgadmin as a companion", s.Name)
+
+		parameter, ok := s.Parameters["ENABLE_PGADMIN"]
+		require.Truef(t, ok, "stack %q has no ENABLE_PGADMIN parameter", s.Name)
+		require.NotNilf(t, parameter.DefaultValue, "stack %q leaves ENABLE_PGADMIN without a default", s.Name)
+		assert.Equalf(t, "false", *parameter.DefaultValue, "stack %q should not deploy pgAdmin by default", s.Name)
+	}
+}
