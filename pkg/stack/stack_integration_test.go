@@ -18,9 +18,10 @@ func TestStackHandler(t *testing.T) {
 		stack.DHIS2DB,
 		stack.DHIS2Core,
 		stack.DHIS2,
+		stack.DHIS2V2,
+		stack.Chap,
 		stack.PgAdmin,
 		stack.WhoamiGo,
-		stack.IMJobRunner,
 	)
 	require.NoError(t, err)
 
@@ -34,17 +35,43 @@ func TestStackHandler(t *testing.T) {
 	t.Run("GetStack", func(t *testing.T) {
 		t.Parallel()
 
-		var dhis2 stack.Stack
+		var dhis2 stack.StackResponse
 		client.GetJSON(t, "/stacks/dhis2", &dhis2)
 
 		assert.Equal(t, "dhis2", dhis2.Name)
 		assert.NotEmpty(t, dhis2.Parameters)
 	})
 
+	// The deploy form decides whether to offer a companion from what this endpoint serves, so the
+	// condition has to survive the trip rather than staying a backend-only detail.
+	t.Run("GetStackServesCompanionConditions", func(t *testing.T) {
+		t.Parallel()
+
+		var dhis2v2 stack.StackResponse
+		client.GetJSON(t, "/stacks/dhis2-v2", &dhis2v2)
+
+		byName := make(map[string]stack.StackCompanionResponse, len(dhis2v2.Companions))
+		for _, companion := range dhis2v2.Companions {
+			byName[companion.Name] = companion
+		}
+
+		chap, ok := byName["chap"]
+		require.True(t, ok, "dhis2-v2 should offer chap, got %v", byName)
+		require.NotNil(t, chap.When)
+		assert.Equal(t, "DEPLOY_CHAP", chap.When.Parameter)
+		assert.Equal(t, "true", chap.When.Equals)
+
+		pgadmin, ok := byName["pgadmin"]
+		require.True(t, ok, "dhis2-v2 should offer pgadmin, got %v", byName)
+		require.NotNil(t, pgadmin.When)
+		assert.Equal(t, "ENABLE_PGADMIN", pgadmin.When.Parameter)
+		assert.Equal(t, "true", pgadmin.When.Equals)
+	})
+
 	t.Run("GetAllStacks", func(t *testing.T) {
 		t.Parallel()
 
-		var stacks []stack.Stack
+		var stacks []stack.StackResponse
 		client.GetJSON(t, "/stacks", &stacks)
 
 		assert.NotEmpty(t, stacks)

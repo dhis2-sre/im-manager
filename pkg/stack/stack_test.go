@@ -3,6 +3,7 @@ package stack_test
 import (
 	"testing"
 
+	"github.com/dhis2-sre/im-manager/pkg/kube"
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	"github.com/dhis2-sre/im-manager/pkg/stack"
 	"github.com/stretchr/testify/assert"
@@ -10,29 +11,29 @@ import (
 )
 
 func TestNew(t *testing.T) {
-	provider := model.ParameterProviderFunc(func(instance model.DeploymentInstance) (string, error) {
+	provider := stack.ParameterProviderFunc(func(instance model.DeploymentInstance) (string, error) {
 		return "1", nil
 	})
 
 	t.Run("Success", func(t *testing.T) {
-		a := model.Stack{
+		a := stack.Stack{
 			Name: "a",
-			Parameters: model.StackParameters{
+			Parameters: stack.StackParameters{
 				"a_param": {},
 			},
 		}
-		b := model.Stack{
+		b := stack.Stack{
 			Name: "b",
-			Parameters: model.StackParameters{
+			Parameters: stack.StackParameters{
 				"b_param": {},
 			},
-			ParameterProviders: model.ParameterProviders{
+			ParameterProviders: stack.ParameterProviders{
 				"b_param_provided": provider,
 			},
 		}
-		c := model.Stack{
+		c := stack.Stack{
 			Name: "c",
-			Parameters: model.StackParameters{
+			Parameters: stack.StackParameters{
 				"a_param": {
 					Consumed: true,
 				},
@@ -40,7 +41,7 @@ func TestNew(t *testing.T) {
 					Consumed: true,
 				},
 			},
-			Requires: []model.Stack{a, b},
+			Requires: []stack.Stack{a, b},
 		}
 
 		stacks, err := stack.New(a, b, c)
@@ -52,26 +53,26 @@ func TestNew(t *testing.T) {
 	})
 
 	t.Run("FailGivenStacksIfTheyHaveACycle", func(t *testing.T) {
-		a := model.Stack{
+		a := stack.Stack{
 			Name: "a",
-			Parameters: model.StackParameters{
+			Parameters: stack.StackParameters{
 				"a_param": {},
 				"b_param": {
 					Consumed: true,
 				},
 			},
 		}
-		b := model.Stack{
+		b := stack.Stack{
 			Name: "b",
-			Parameters: model.StackParameters{
+			Parameters: stack.StackParameters{
 				"b_param": {},
 				"a_param": {
 					Consumed: true,
 				},
 			},
-			Requires: []model.Stack{a},
+			Requires: []stack.Stack{a},
 		}
-		a.Requires = []model.Stack{b}
+		a.Requires = []stack.Stack{b}
 
 		_, err := stack.New(a, b)
 
@@ -79,13 +80,13 @@ func TestNew(t *testing.T) {
 	})
 
 	t.Run("FailGivenStacksIfAStackHasASelfReferenceCycle", func(t *testing.T) {
-		a := model.Stack{
+		a := stack.Stack{
 			Name: "a",
-			Parameters: model.StackParameters{
+			Parameters: stack.StackParameters{
 				"a_param": {},
 			},
 		}
-		a.Requires = []model.Stack{a}
+		a.Requires = []stack.Stack{a}
 
 		_, err := stack.New(a)
 
@@ -93,15 +94,15 @@ func TestNew(t *testing.T) {
 	})
 
 	t.Run("FailGivenStackIfConsumedParameterIsNotProvidedByRequiredStack", func(t *testing.T) {
-		a := model.Stack{
+		a := stack.Stack{
 			Name: "a",
-			ParameterProviders: model.ParameterProviders{
+			ParameterProviders: stack.ParameterProviders{
 				"a_param_provided": provider,
 			},
 		}
-		b := model.Stack{
+		b := stack.Stack{
 			Name: "b",
-			Parameters: model.StackParameters{
+			Parameters: stack.StackParameters{
 				"a_param": {
 					Consumed: true,
 				},
@@ -109,7 +110,7 @@ func TestNew(t *testing.T) {
 					Consumed: true,
 				},
 			},
-			Requires: []model.Stack{a},
+			Requires: []stack.Stack{a},
 		}
 
 		_, err := stack.New(a, b)
@@ -118,15 +119,15 @@ func TestNew(t *testing.T) {
 	})
 
 	t.Run("FailGivenStackIfConsumedParameterIsNotProvidedByProvider", func(t *testing.T) {
-		a := model.Stack{
+		a := stack.Stack{
 			Name: "a",
-			Parameters: model.StackParameters{
+			Parameters: stack.StackParameters{
 				"a_param": {},
 			},
 		}
-		b := model.Stack{
+		b := stack.Stack{
 			Name: "b",
-			Parameters: model.StackParameters{
+			Parameters: stack.StackParameters{
 				"a_param": {
 					Consumed: true,
 				},
@@ -134,7 +135,7 @@ func TestNew(t *testing.T) {
 					Consumed: true,
 				},
 			},
-			Requires: []model.Stack{a},
+			Requires: []stack.Stack{a},
 		}
 
 		_, err := stack.New(a, b)
@@ -143,25 +144,25 @@ func TestNew(t *testing.T) {
 	})
 
 	t.Run("FailGivenStackIfConsumedParameterIsPointingToAnAlreadyConsumedParameter", func(t *testing.T) {
-		a := model.Stack{
+		a := stack.Stack{
 			Name: "a",
-			Parameters: model.StackParameters{
+			Parameters: stack.StackParameters{
 				"a_param": {},
 			},
 		}
-		b := model.Stack{
+		b := stack.Stack{
 			Name: "b",
-			Parameters: model.StackParameters{
+			Parameters: stack.StackParameters{
 				"a_param": {Consumed: true},
 			},
-			Requires: []model.Stack{a},
+			Requires: []stack.Stack{a},
 		}
-		c := model.Stack{
+		c := stack.Stack{
 			Name: "c",
-			Parameters: model.StackParameters{
+			Parameters: stack.StackParameters{
 				"a_param": {Consumed: true},
 			},
-			Requires: []model.Stack{b},
+			Requires: []stack.Stack{b},
 		}
 
 		_, err := stack.New(a, c, b)
@@ -170,26 +171,26 @@ func TestNew(t *testing.T) {
 	})
 
 	t.Run("FailGivenStackIfThereAreMultipleStacksProvidingTheSameConsumedParameter", func(t *testing.T) {
-		a := model.Stack{
+		a := stack.Stack{
 			Name: "a",
-			ParameterProviders: model.ParameterProviders{
+			ParameterProviders: stack.ParameterProviders{
 				"a_param_provided": provider,
 			},
 		}
-		b := model.Stack{
+		b := stack.Stack{
 			Name: "b",
-			ParameterProviders: model.ParameterProviders{
+			ParameterProviders: stack.ParameterProviders{
 				"a_param_provided": provider,
 			},
 		}
-		c := model.Stack{
+		c := stack.Stack{
 			Name: "c",
-			Parameters: model.StackParameters{
+			Parameters: stack.StackParameters{
 				"a_param_provided": {
 					Consumed: true,
 				},
 			},
-			Requires: []model.Stack{a, b},
+			Requires: []stack.Stack{a, b},
 		}
 
 		_, err := stack.New(a, b, c)
@@ -198,26 +199,26 @@ func TestNew(t *testing.T) {
 	})
 
 	t.Run("FailGivenStackIfThereAreMultipleProvidersForOneConsumedParameter", func(t *testing.T) {
-		a := model.Stack{
+		a := stack.Stack{
 			Name: "a",
-			Parameters: model.StackParameters{
+			Parameters: stack.StackParameters{
 				"a_param": {},
 			},
 		}
-		b := model.Stack{
+		b := stack.Stack{
 			Name: "b",
-			Parameters: model.StackParameters{
+			Parameters: stack.StackParameters{
 				"a_param": {},
 			},
 		}
-		c := model.Stack{
+		c := stack.Stack{
 			Name: "c",
-			Parameters: model.StackParameters{
+			Parameters: stack.StackParameters{
 				"a_param": {
 					Consumed: true,
 				},
 			},
-			Requires: []model.Stack{a, b},
+			Requires: []stack.Stack{a, b},
 		}
 
 		_, err := stack.New(a, b, c)
@@ -226,23 +227,23 @@ func TestNew(t *testing.T) {
 	})
 
 	t.Run("FailGivenStackIfARequiredStackProvidesTheSameConsumedParameterTwice", func(t *testing.T) {
-		a := model.Stack{
+		a := stack.Stack{
 			Name: "a",
-			Parameters: model.StackParameters{
+			Parameters: stack.StackParameters{
 				"a_param": {},
 			},
-			ParameterProviders: model.ParameterProviders{
+			ParameterProviders: stack.ParameterProviders{
 				"a_param": provider,
 			},
 		}
-		b := model.Stack{
+		b := stack.Stack{
 			Name: "b",
-			Parameters: model.StackParameters{
+			Parameters: stack.StackParameters{
 				"a_param": {
 					Consumed: true,
 				},
 			},
-			Requires: []model.Stack{a},
+			Requires: []stack.Stack{a},
 		}
 
 		_, err := stack.New(a, b)
@@ -250,21 +251,109 @@ func TestNew(t *testing.T) {
 		require.ErrorContains(t, err, `stack "b" parameter "a_param"`)
 	})
 
+	// A companion consumes from whichever stack offers it, so the provider is found by looking at the
+	// stacks declaring it rather than at its own Requires, which a companion does not have.
+	t.Run("GivenCompanionConsumingFromItsHost", func(t *testing.T) {
+		companion := stack.Stack{
+			Name: "companion",
+			Parameters: stack.StackParameters{
+				"a_param": {Consumed: true},
+			},
+		}
+		host := stack.Stack{
+			Name: "host",
+			Parameters: stack.StackParameters{
+				"a_param": {},
+			},
+			Companions: []stack.Companion{{Stack: companion}},
+		}
+
+		_, err := stack.New(host, companion)
+
+		require.NoError(t, err)
+	})
+
+	t.Run("FailGivenCompanionWhoseHostDoesNotProvideItsConsumedParameter", func(t *testing.T) {
+		companion := stack.Stack{
+			Name: "companion",
+			Parameters: stack.StackParameters{
+				"a_param": {Consumed: true},
+			},
+		}
+		host := stack.Stack{
+			Name:       "host",
+			Parameters: stack.StackParameters{},
+			Companions: []stack.Companion{{Stack: companion}},
+		}
+
+		_, err := stack.New(host, companion)
+
+		require.ErrorContains(t, err, `no provider for stack "companion" parameter "a_param"`)
+	})
+
+	// Each host provides on its own, since only one of them is deployed alongside the companion.
+	// Summing across hosts would read two perfectly good hosts as a duplicate-provider ambiguity.
+	t.Run("GivenCompanionOfferedBySeveralHostsEachProviding", func(t *testing.T) {
+		companion := stack.Stack{
+			Name: "companion",
+			Parameters: stack.StackParameters{
+				"a_param": {Consumed: true},
+			},
+		}
+		hostA := stack.Stack{
+			Name:       "host-a",
+			Parameters: stack.StackParameters{"a_param": {}},
+			Companions: []stack.Companion{{Stack: companion}},
+		}
+		hostB := stack.Stack{
+			Name:       "host-b",
+			Parameters: stack.StackParameters{"a_param": {}},
+			Companions: []stack.Companion{{Stack: companion}},
+		}
+
+		_, err := stack.New(hostA, hostB, companion)
+
+		require.NoError(t, err)
+	})
+
+	t.Run("FailGivenCompanionOfferedBySeveralHostsWhereOneDoesNotProvide", func(t *testing.T) {
+		companion := stack.Stack{
+			Name: "companion",
+			Parameters: stack.StackParameters{
+				"a_param": {Consumed: true},
+			},
+		}
+		good := stack.Stack{
+			Name:       "good-host",
+			Parameters: stack.StackParameters{"a_param": {}},
+			Companions: []stack.Companion{{Stack: companion}},
+		}
+		bad := stack.Stack{
+			Name:       "bad-host",
+			Parameters: stack.StackParameters{},
+			Companions: []stack.Companion{{Stack: companion}},
+		}
+
+		_, err := stack.New(good, bad, companion)
+
+		require.ErrorContains(t, err, `bad-host`)
+	})
+
 	t.Run("FailGivenStackIfItContainsDuplicateRequiredStacks", func(t *testing.T) {
-		a := model.Stack{
+		a := stack.Stack{
 			Name: "a",
-			Parameters: model.StackParameters{
+			Parameters: stack.StackParameters{
 				"a_param": {},
 			},
 		}
-		b := model.Stack{
+		b := stack.Stack{
 			Name: "b",
-			Parameters: model.StackParameters{
+			Parameters: stack.StackParameters{
 				"a_param": {
 					Consumed: true,
 				},
 			},
-			Requires: []model.Stack{a, a},
+			Requires: []stack.Stack{a, a},
 		}
 
 		_, err := stack.New(a, b)
@@ -273,19 +362,19 @@ func TestNew(t *testing.T) {
 	})
 
 	t.Run("FailGivenStackIfARequiredStackDoesNotProvideAnyOfItsConsumedParameters", func(t *testing.T) {
-		a := model.Stack{
+		a := stack.Stack{
 			Name: "a",
-			Parameters: model.StackParameters{
+			Parameters: stack.StackParameters{
 				"a_param": {},
 			},
 		}
-		b := model.Stack{
+		b := stack.Stack{
 			Name: "b",
-			Parameters: model.StackParameters{
+			Parameters: stack.StackParameters{
 				"b_param_1": {},
 				"b_param_2": {},
 			},
-			Requires: []model.Stack{a},
+			Requires: []stack.Stack{a},
 		}
 
 		_, err := stack.New(a, b)
@@ -300,4 +389,120 @@ func TestValidatorOneOf(t *testing.T) {
 	assert.NoError(t, validator("ok"))
 	assert.NoError(t, validator("not_ok"))
 	assert.ErrorContains(t, validator("maybe"), `"maybe" is not valid, only "ok", "not_ok" are allowed`)
+}
+
+func TestValidateCompanionConditions(t *testing.T) {
+	t.Run("ConditionOnAnExistingParameter", func(t *testing.T) {
+		offered := stack.Stack{Name: "offered"}
+		offering := stack.Stack{
+			Name:       "offering",
+			Parameters: stack.StackParameters{"DEPLOY_IT": {}},
+			Companions: []stack.Companion{{Stack: offered, When: &kube.Condition{Parameter: "DEPLOY_IT", Equals: "true"}}},
+		}
+
+		err := stack.ValidateCompanionConditions([]stack.Stack{offering, offered})
+
+		require.NoError(t, err)
+	})
+
+	t.Run("UnconditionalCompanion", func(t *testing.T) {
+		offered := stack.Stack{Name: "offered"}
+		offering := stack.Stack{Name: "offering", Companions: []stack.Companion{{Stack: offered}}}
+
+		err := stack.ValidateCompanionConditions([]stack.Stack{offering, offered})
+
+		require.NoError(t, err)
+	})
+
+	// A condition naming a parameter the stack does not have never holds, so the companion would
+	// silently never be offered instead of failing loudly at startup.
+	t.Run("ConditionOnAMissingParameter", func(t *testing.T) {
+		offered := stack.Stack{Name: "offered"}
+		offering := stack.Stack{
+			Name:       "offering",
+			Companions: []stack.Companion{{Stack: offered, When: &kube.Condition{Parameter: "TYPO", Equals: "true"}}},
+		}
+
+		err := stack.ValidateCompanionConditions([]stack.Stack{offering, offered})
+
+		require.ErrorContains(t, err, `stack "offering" offers companion "offered" conditional on parameter "TYPO" which it does not have`)
+	})
+}
+
+// The deploy form decides whether to offer CHAP from this declaration, so it has to survive a
+// rename of the parameter that gates it.
+func TestChapIsOfferedOnDeployChap(t *testing.T) {
+	for _, s := range []stack.Stack{stack.DHIS2Core, stack.DHIS2V2} {
+		var found bool
+		for _, companion := range s.Companions {
+			if companion.Stack.Name != stack.Chap.Name {
+				continue
+			}
+			found = true
+			require.NotNilf(t, companion.When, "stack %q offers chap unconditionally", s.Name)
+			assert.Equalf(t, "DEPLOY_CHAP", companion.When.Parameter, "stack %q", s.Name)
+			assert.Equalf(t, "true", companion.When.Equals, "stack %q", s.Name)
+		}
+		assert.Truef(t, found, "stack %q does not offer chap as a companion", s.Name)
+	}
+}
+
+// Every stack that can host pgAdmin gates it on its own ENABLE_PGADMIN, so the choice is a stored
+// parameter rather than form state, and so a new host cannot offer pgAdmin without one.
+func TestPgAdminIsOfferedOnEnablePgAdmin(t *testing.T) {
+	for _, s := range []stack.Stack{stack.DHIS2DB, stack.DHIS2, stack.DHIS2V2} {
+		var found bool
+		for _, companion := range s.Companions {
+			if companion.Stack.Name != stack.PgAdmin.Name {
+				continue
+			}
+			found = true
+			require.NotNilf(t, companion.When, "stack %q offers pgadmin unconditionally", s.Name)
+			assert.Equalf(t, "ENABLE_PGADMIN", companion.When.Parameter, "stack %q", s.Name)
+			assert.Equalf(t, "true", companion.When.Equals, "stack %q", s.Name)
+		}
+		require.Truef(t, found, "stack %q does not offer pgadmin as a companion", s.Name)
+
+		parameter, ok := s.Parameters["ENABLE_PGADMIN"]
+		require.Truef(t, ok, "stack %q has no ENABLE_PGADMIN parameter", s.Name)
+		require.NotNilf(t, parameter.DefaultValue, "stack %q leaves ENABLE_PGADMIN without a default", s.Name)
+		assert.Equalf(t, "false", *parameter.DefaultValue, "stack %q should not deploy pgAdmin by default", s.Name)
+	}
+}
+
+// TestPVCSelectorsDoNotCrossStacks guards the defect that wedged 31 MinIO claims in production
+// (#1732). The dhis2-core component listed the MinIO claim among the ones it deletes, but MinIO is
+// its own stack with its own release, so destroying or resetting the core instance alone deleted a
+// live sibling's volume. Claims are only ever at risk from a stack deployed alongside them, which
+// is what Requires and Companions describe, so those are the pairs checked here rather than every
+// pair of stacks: dhis2 and dhis2-db legitimately name the same claim, since one is the umbrella
+// form of the other and they never appear in one deployment.
+func TestPVCSelectorsDoNotCrossStacks(t *testing.T) {
+	instance := &model.DeploymentInstance{Name: "test", Group: &model.Group{ID: 1, Namespace: "test"}}
+
+	selectorsOf := func(s stack.Stack) map[string]bool {
+		selectors := make(map[string]bool)
+		for _, component := range s.Components {
+			for _, selector := range component.PVCSelectors(instance) {
+				selectors[selector] = true
+			}
+		}
+		return selectors
+	}
+
+	for _, s := range stack.All {
+		own := selectorsOf(s)
+
+		neighbours := make([]stack.Stack, 0, len(s.Requires)+len(s.Companions))
+		neighbours = append(neighbours, s.Requires...)
+		for _, companion := range s.Companions {
+			neighbours = append(neighbours, companion.Stack)
+		}
+
+		for _, neighbour := range neighbours {
+			for selector := range selectorsOf(neighbour) {
+				assert.Falsef(t, own[selector], "stack %q would delete %q, a claim of %q, which it deploys alongside", s.Name, selector, neighbour.Name)
+			}
+		}
+	}
 }

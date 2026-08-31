@@ -116,3 +116,19 @@ func updateDeployment(t *testing.T, client *inttest.HTTPClient, deploymentID uin
 
 	return updatedDeployment
 }
+
+/* heavyDeploys bounds how many subtests may hold a postgres or dhis2-core deployment at once. The
+ * runner cannot carry four postgres instances and two cores together: they schedule, then starve,
+ * fail their probes, restart, and every subtest waiting on readiness times out. Two runs of #1660
+ * failed that way with every postgres and core pod unready simultaneously while every lightweight
+ * pod stayed ready. FilestoreBackupFilesystemViaExec already opted out of the parallel batch for
+ * this reason; this bounds the rest instead of serialising them. */
+var heavyDeploys = make(chan struct{}, 2)
+
+// acquireHeavyDeploy blocks until this subtest may deploy postgres or dhis2-core, releasing the slot
+// once the subtest and its cleanup are done.
+func acquireHeavyDeploy(t *testing.T) {
+	t.Helper()
+	heavyDeploys <- struct{}{}
+	t.Cleanup(func() { <-heavyDeploys })
+}
