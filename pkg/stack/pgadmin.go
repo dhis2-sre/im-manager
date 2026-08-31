@@ -26,8 +26,15 @@ var PgAdmin = withGroupedParameters(Stack{
 
 var pgAdminDefaults = struct {
 	chartVersion string
+	enabled      string
 }{
 	chartVersion: "1.33.3",
+	enabled:      "false",
 }
+
+// whenPgAdminIsEnabled gates the companion on the host's own parameter, the same way DEPLOY_CHAP
+// gates chap. The host is where the flag has to live, since pgAdmin only exists once the user has
+// asked for it, and storing the choice as a parameter is what makes it outlast the deploy form.
+var whenPgAdminIsEnabled = &kube.Condition{Parameter: "ENABLE_PGADMIN", Equals: "true"}
 
 // Stack representing ../../stacks/whoami-go/helmfile.yaml.gotmpl

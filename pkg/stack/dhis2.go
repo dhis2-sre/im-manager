@@ -33,6 +33,7 @@ var DHIS2 = Stack{
 		"CHART_VERSION":                   {Priority: 23, DisplayName: "Chart Version", DefaultValue: &dhis2CoreDefaults.chartVersion},
 		"JAVA_OPTS":                       {Priority: 24, DisplayName: "JAVA Options", DefaultValue: &dhis2CoreDefaults.javaOpts},
 		"ENABLE_QUERY_LOGGING":            {Priority: 25, DisplayName: "Enable Query Logging", DefaultValue: &dhis2CoreDefaults.enableQueryLogging},
+		"ENABLE_PGADMIN":                  {Priority: 26, DisplayName: "Deploy pgAdmin", DefaultValue: &pgAdminDefaults.enabled},
 		"GOOGLE_AUTH_PROJECT_ID":          {Priority: 0, DisplayName: "Google auth project id", DefaultValue: &dhis2CoreDefaults.googleAuthClientId, Sensitive: true},
 		"GOOGLE_AUTH_PRIVATE_KEY":         {Priority: 0, DisplayName: "Google auth private key", DefaultValue: &dhis2CoreDefaults.googleAuthPrivateKey, Sensitive: true},
 		"GOOGLE_AUTH_PRIVATE_KEY_ID":      {Priority: 0, DisplayName: "Google auth private key id", DefaultValue: &dhis2CoreDefaults.googleAuthPrivateKeyId, Sensitive: true},
@@ -42,11 +43,10 @@ var DHIS2 = Stack{
 	ParameterProviders: ParameterProviders{
 		"DATABASE_HOSTNAME": postgresHostnameProvider,
 	},
-	// pgAdmin is offered unconditionally: it consumes the database connection parameters this stack
-	// provides, so it can always be deployed alongside one. The opt-in is the form's checkbox rather
-	// than a condition over a parameter.
+	// pgAdmin consumes the database connection parameters this stack provides, so it can be
+	// deployed alongside one; ENABLE_PGADMIN is where the user says they want it.
 	Companions: []Companion{
-		{Stack: PgAdmin},
+		{Stack: PgAdmin, When: whenPgAdminIsEnabled},
 	},
 	Components: []kube.Component{
 		DHIS2CoreComponent{BaseComponent: kube.BaseComponent{Name: "dhis2"}},

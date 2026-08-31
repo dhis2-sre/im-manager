@@ -40,6 +40,7 @@ var DHIS2V2 = withGroupedParameters(Stack{
 			"GOOGLE_AUTH_CLIENT_ID":           {Priority: 38, DisplayName: "Google auth client id", DefaultValue: &dhis2CoreDefaults.googleAuthClientId, Sensitive: true},
 			"DEPLOY_CHAP":                     {Priority: 39, DisplayName: "Deploy CHAP", DefaultValue: &dhis2CoreDefaults.deployChap},
 			"ENABLE_DORIS":                    {Priority: 40, DisplayName: "Use Doris as the analytics database", DefaultValue: &dhis2V2Defaults.enableDoris},
+			"ENABLE_PGADMIN":                  {Priority: 56, DisplayName: "Deploy pgAdmin", DefaultValue: &pgAdminDefaults.enabled},
 		}},
 		{Name: "db", Title: "PostgreSQL", Parameters: StackParameters{
 			"DATABASE_ID":                  {Priority: 4, DisplayName: "Database"},
@@ -93,9 +94,9 @@ var DHIS2V2 = withGroupedParameters(Stack{
 	},
 	Companions: []Companion{
 		{Stack: Chap, When: whenChapIsDeployed},
-		// Unconditional: pgAdmin consumes the database connection parameters this stack provides, so
-		// it can always be offered. The opt-in is the form's checkbox rather than a condition.
-		{Stack: PgAdmin},
+		// pgAdmin consumes the database connection parameters this stack provides, so it can be
+		// deployed alongside one; ENABLE_PGADMIN is where the user says they want it.
+		{Stack: PgAdmin, When: whenPgAdminIsEnabled},
 	},
 	Components: []kube.Component{
 		DHIS2CoreComponent{BaseComponent: kube.BaseComponent{

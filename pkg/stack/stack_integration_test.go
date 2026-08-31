@@ -61,11 +61,11 @@ func TestStackHandler(t *testing.T) {
 		assert.Equal(t, "DEPLOY_CHAP", chap.When.Parameter)
 		assert.Equal(t, "true", chap.When.Equals)
 
-		// pgAdmin is offered unconditionally, so a nil condition has to survive the trip too: the
-		// form reads its absence as "always offer, opt in with the checkbox".
 		pgadmin, ok := byName["pgadmin"]
 		require.True(t, ok, "dhis2-v2 should offer pgadmin, got %v", byName)
-		assert.Nil(t, pgadmin.When)
+		require.NotNil(t, pgadmin.When)
+		assert.Equal(t, "ENABLE_PGADMIN", pgadmin.When.Parameter)
+		assert.Equal(t, "true", pgadmin.When.Equals)
 	})
 
 	t.Run("GetAllStacks", func(t *testing.T) {
