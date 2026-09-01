@@ -254,9 +254,6 @@ func (s Service) FindOrCreate(ctx context.Context, email string, password string
 // unusable password when none exists. Used by the OAuth callback after the identity
 // provider has verified the email. New users get no group membership and must be
 // granted access by an administrator before they can do anything useful.
-//
-// The returned user is re-read with its groups preloaded as the access token claims are
-// built from it and are the only source of group membership on subsequent requests.
 func (s Service) SignInWithSSO(ctx context.Context, email string) (*model.User, error) {
 	randomPassword := make([]byte, 32)
 	if _, err := rand.Read(randomPassword); err != nil {
