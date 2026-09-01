@@ -1,0 +1,109 @@
+name: Deploy to im-vm
+
+# The Hetzner control plane in dhis2-sre/dhis2-infrastructure services/im-vm, which replaces the EKS
+# instance-cluster. Runs after Build, test and deploy has pushed the image, because it deploys a tag
+# that has to exist, and works out that tag exactly as the build does: the sanitized head branch for
+# a pull request, latest for master, the tag itself for a release. A pull request gets an
+# environment only while it carries the deploy label, which is the label the EKS deploy uses too.
+#
+# The whole interface is a forced command over SSH. A deploy key can start an environment and, for
+# feature environments only, destroy one. It cannot open a shell, and it cannot stop or destroy a
+# long lived environment.
+#
+# Secrets, one pair per server, because the prod key must not be reachable by anything a pull
+# request can trigger:
+#
+#   IM_VM_PROD_HOST, IM_VM_PROD_DEPLOY_KEY   releases
+#   IM_VM_DEV_HOST, IM_VM_DEV_DEPLOY_KEY     master and pull requests
+
+on:
+  workflow_run:
+    workflows: ["Build, test and deploy"]
+    types: [completed]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.workflow_run.head_branch }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy
+    if: github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Work out what to deploy, where
+        id: target
+        env:
+          EVENT: ${{ github.event.workflow_run.event }}
+          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          PULL_REQUESTS: ${{ toJSON(github.event.workflow_run.pull_requests) }}
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -o errexit -o nounset -o pipefail
+
+          pull_request=$(printf '%s' "$PULL_REQUESTS" | jq -r '.[0].number // empty')
+
+          if [ -n "$pull_request" ]; then
+            # Opt in per pull request, on the same label the EKS deploy in gha-workflows uses, so
+            # one label drives both and removing it tears both down. An environment costs a
+            # database, a Redis and a RabbitMQ on a box shared with dev, and the build runs on
+            # every pull request event, so without this every open pull request would claim one.
+            labelled=$(gh pr view "$pull_request" --repo "$REPOSITORY" --json labels \
+              --jq 'any(.labels[].name; . == "deploy")')
+            if [ "$labelled" != true ]; then
+              echo "pull request $pull_request is not labelled deploy, nothing to deploy"
+              echo "server=none" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+
+            # The same sanitisation the build uses for the image tag: lowercase, non-alphanumerics
+            # to hyphens, 25 characters, no trailing hyphen.
+            lowercase=$(printf '%s' "$HEAD_BRANCH" | tr '[:upper:]' '[:lower:]')
+            tag=${lowercase//[^[:alnum:]]/-}
+            tag=${tag::25}
+            tag=${tag%-}
+            echo "server=dev" >> "$GITHUB_OUTPUT"
+            echo "environment=feat-manager-$pull_request" >> "$GITHUB_OUTPUT"
+            echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          elif [ "$HEAD_BRANCH" = master ]; then
+            echo "server=dev" >> "$GITHUB_OUTPUT"
+            echo "environment=dev" >> "$GITHUB_OUTPUT"
+            echo "tag=latest" >> "$GITHUB_OUTPUT"
+          else
+            # A release: the build pushes the tag with any v prefix stripped.
+            echo "server=prod" >> "$GITHUB_OUTPUT"
+            echo "environment=prod" >> "$GITHUB_OUTPUT"
+            echo "tag=${HEAD_BRANCH#v}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Deploy to the dev and feature server
+        if: steps.target.outputs.server == 'dev'
+        env:
+          DEPLOY_KEY: ${{ secrets.IM_VM_DEV_DEPLOY_KEY }}
+          HOST: ${{ secrets.IM_VM_DEV_HOST }}
+          ENVIRONMENT: ${{ steps.target.outputs.environment }}
+          TAG: ${{ steps.target.outputs.tag }}
+        run: |
+          set -o errexit -o nounset -o pipefail
+          install --mode=600 /dev/null deploy-key
+          printf '%s\n' "$DEPLOY_KEY" > deploy-key
+          ssh -i deploy-key -o StrictHostKeyChecking=accept-new -o BatchMode=yes \
+            im@"$HOST" "up $ENVIRONMENT $TAG"
+
+      - name: Deploy to the prod server
+        if: steps.target.outputs.server == 'prod'
+        env:
+          DEPLOY_KEY: ${{ secrets.IM_VM_PROD_DEPLOY_KEY }}
+          HOST: ${{ secrets.IM_VM_PROD_HOST }}
+          TAG: ${{ steps.target.outputs.tag }}
+        run: |
+          set -o errexit -o nounset -o pipefail
+          install --mode=600 /dev/null deploy-key
+          printf '%s\n' "$DEPLOY_KEY" > deploy-key
+          ssh -i deploy-key -o StrictHostKeyChecking=accept-new -o BatchMode=yes \
+            im@"$HOST" "up prod $TAG"
+
+      - name: Forget the key
+        if: always()
+        run: rm --force deploy-key

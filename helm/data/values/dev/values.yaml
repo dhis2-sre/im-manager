@@ -1,3 +1,8 @@
+# im-dev.dhis2.org is served from the VM control plane in dhis2-sre/dhis2-infrastructure
+# services/im-vm, and its database was migrated there. Running this one too would give the same
+# instances two owners, each inspecting its own copy of the rows and destroying what the other still
+# manages, so it stays at zero replicas while EKS is being retired. Set back to 1 to roll dev back.
+replicaCount: 0
 image:
   pullPolicy: Always
 sameSiteMode: none
