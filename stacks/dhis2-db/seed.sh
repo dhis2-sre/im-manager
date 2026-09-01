@@ -25,18 +25,15 @@ curl --connect-timeout 10 --retry 5 --retry-delay 1 --fail -L "$DATABASE_DOWNLOA
   exit 1
 }
 
-# Detect the dump format up front rather than trying both, so a failure in the restore that actually
-# ran cannot be masked by falling through to the other one.
 if pg_restore --list "$tmp_file" >/dev/null 2>&1; then
   echo "Restoring pg_dump archive"
-  # --list already rejected a corrupt archive, and pg_restore exits non zero on benign errors such
-  # as a missing role, so its exit code is logged rather than treated as fatal.
+  # pg_restore exits non zero on benign errors such as a missing role, and --list has already
+  # rejected a corrupt archive, so its exit code is logged rather than treated as fatal.
   pg_restore --verbose -U postgres -d "$DATABASE_NAME" -j 4 "$tmp_file" || echo "pg_restore exited with $?, continuing"
 elif gunzip --test "$tmp_file" 2>/dev/null; then
-  # A truncated dump still decompresses cleanly, so pg_dump's completion marker is the only proof
-  # it is whole. Only pg_dump writes that marker, so the check is limited to its own output rather
-  # than applied to every upload. head and tail exit before gunzip finishes, hence pipefail is
-  # disabled for these two subshells.
+  # A truncated dump still decompresses cleanly, so pg_dump's completion marker is the only proof it
+  # is whole, and only pg_dump writes it. head and tail exit before gunzip finishes, hence pipefail
+  # is disabled for these two subshells.
   dump_head=$(set +o pipefail; gunzip -c "$tmp_file" 2>/dev/null | head -c 4096)
   if [[ "$dump_head" == *"PostgreSQL database dump"* ]]; then
     dump_tail=$(set +o pipefail; gunzip -c "$tmp_file" 2>/dev/null | tail -c 512)
