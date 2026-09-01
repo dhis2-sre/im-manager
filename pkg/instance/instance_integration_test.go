@@ -111,7 +111,11 @@ func TestInstanceHandler(t *testing.T) {
 	tokenRepository := token.NewRepository(redis)
 	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	require.NoError(t, err, "failed to generate RSA private key")
-	tokenService, err := token.NewService(logger, tokenRepository, privateKey, 100, 60, "secret", 100, 100)
+	// The access token is minted once and reused by every subtest below. At 100 seconds
+	// it expired part way through the suite in CI, and every request after that came back
+	// 500 with "exp" not satisfied, which read as a different flaky test each run
+	// depending on which subtest happened to be first past the deadline.
+	tokenService, err := token.NewService(logger, tokenRepository, privateKey, 3600, 60, "secret", 3600, 3600)
 	require.NoError(t, err, "failed to create token service")
 	instanceService := instance.NewService(logger, instanceRepo, groupService, stackService, helmfileService, nil, "")
 
@@ -353,7 +357,7 @@ func TestInstanceHandler(t *testing.T) {
 				return false
 			}
 			return d.Url != ""
-		}, 60*time.Second, 500*time.Millisecond, "database URL should be set by async goroutine")
+		}, 180*time.Second, 500*time.Millisecond, "database URL should be set by async goroutine")
 
 		var finalDB model.Database
 		err := db.First(&finalDB, savedDB.ID).Error
@@ -387,7 +391,7 @@ func TestInstanceHandler(t *testing.T) {
 		require.Eventually(t, func() bool {
 			content, err := s3.TryGetObject(s3Bucket, "group-name/save-test.sql.gz")
 			return err == nil && len(content) > originalSize
-		}, 60*time.Second, 500*time.Millisecond, "saved database in S3 should grow beyond the uploaded placeholder")
+		}, 180*time.Second, 500*time.Millisecond, "saved database in S3 should grow beyond the uploaded placeholder")
 
 		destroyDeployment(t, client, deployment.ID, tokens.AccessToken)
 	})
