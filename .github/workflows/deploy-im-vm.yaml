@@ -5,6 +5,7 @@ name: Deploy to im-vm
 # that has to exist, and works out that tag exactly as the build does: the sanitized head branch for
 # a pull request, latest for master, the tag itself for a release. A pull request gets an
 # environment only while it carries the deploy label, which is the label the EKS deploy uses too.
+# Anything that is none of those three deploys nothing.
 #
 # The whole interface is a forced command over SSH. A deploy key can start an environment and, for
 # feature environments only, destroy one. It cannot open a shell, and it cannot stop or destroy a
@@ -36,15 +37,25 @@ jobs:
         env:
           EVENT: ${{ github.event.workflow_run.event }}
           HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
           PULL_REQUESTS: ${{ toJSON(github.event.workflow_run.pull_requests) }}
           GH_TOKEN: ${{ github.token }}
           REPOSITORY: ${{ github.repository }}
         run: |
           set -o errexit -o nounset -o pipefail
 
-          pull_request=$(printf '%s' "$PULL_REQUESTS" | jq -r '.[0].number // empty')
+          # Every target is identified positively, so an unrecognised build deploys nothing.
+          if [ "$EVENT" = pull_request ]; then
+            pull_request=$(printf '%s' "$PULL_REQUESTS" | jq -r '.[0].number // empty')
+            # workflow_run.pull_requests is empty when GitHub cannot associate the run with an open
+            # pull request, so the commit's own pull requests are the fallback.
+            pull_request=${pull_request:-$(gh api "repos/$REPOSITORY/commits/$HEAD_SHA/pulls" --jq '.[0].number // empty')}
+            if [ -z "$pull_request" ]; then
+              echo "no pull request found for $HEAD_SHA, nothing to deploy"
+              echo "server=none" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
 
-          if [ -n "$pull_request" ]; then
             # Opt in per pull request, on the same label the EKS deploy in gha-workflows uses, so
             # one label drives both and removing it tears both down. An environment costs a
             # database, a Redis and a RabbitMQ on a box shared with dev, and the build runs on
@@ -70,11 +81,15 @@ jobs:
             echo "server=dev" >> "$GITHUB_OUTPUT"
             echo "environment=dev" >> "$GITHUB_OUTPUT"
             echo "tag=latest" >> "$GITHUB_OUTPUT"
-          else
-            # A release: the build pushes the tag with any v prefix stripped.
+          elif [ "$EVENT" = push ] && gh api "repos/$REPOSITORY/git/ref/tags/$HEAD_BRANCH" > /dev/null 2>&1; then
+            # head_branch is the tag name for a tag push, and the build pushes the image with any v
+            # prefix stripped.
             echo "server=prod" >> "$GITHUB_OUTPUT"
             echo "environment=prod" >> "$GITHUB_OUTPUT"
             echo "tag=${HEAD_BRANCH#v}" >> "$GITHUB_OUTPUT"
+          else
+            echo "$HEAD_BRANCH is neither master nor a tag, nothing to deploy"
+            echo "server=none" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Deploy to the dev and feature server
