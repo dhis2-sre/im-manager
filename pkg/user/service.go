@@ -282,7 +282,7 @@ func (s Service) SignInWithSSO(ctx context.Context, email string) (*model.User, 
 		}
 	}
 
-	return user, nil
+	return s.repository.findByEmail(ctx, user.Email)
 }
 
 func (s Service) Delete(ctx context.Context, id uint) error {
