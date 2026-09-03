@@ -308,6 +308,9 @@ func TestInstanceHandler(t *testing.T) {
 		ks, err := instance.NewKubernetesService(group.Cluster)
 		require.NoError(t, err)
 		corePod, coreContainer := waitForCorePodRunning(t, k8sClient, coreInstance.Group.Namespace, coreInstance.ID, 120*time.Second)
+
+		assertCoreHeapBounded(t, ks, coreInstance.Group.Namespace, corePod, coreContainer, testCoreMaxHeapSize)
+
 		seedScript := `mkdir -p /opt/dhis2/files/seeded && printf 'hello-filestore' > /opt/dhis2/files/seeded/marker.txt`
 		var seedOut, seedErr strings.Builder
 		require.NoError(t, ks.Exec(context.Background(), coreInstance.Group.Namespace, corePod, coreContainer, []string{"sh", "-c", seedScript}, &seedOut, &seedErr), "seed failed: %s", seedErr.String())
