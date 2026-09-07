@@ -69,13 +69,16 @@ jobs:
             fi
 
             # The same sanitisation the build uses for the image tag: lowercase, non-alphanumerics
-            # to hyphens, 25 characters, no trailing hyphen.
+            # to hyphens, 25 characters, no trailing hyphen. It names the environment too, so a pull
+            # request here and one in im-web-client on the same branch share it: each passes its own
+            # image tag and leaves the other's alone, and the hostnames come out as the EKS deploy
+            # spells them.
             lowercase=$(printf '%s' "$HEAD_BRANCH" | tr '[:upper:]' '[:lower:]')
             tag=${lowercase//[^[:alnum:]]/-}
             tag=${tag::25}
             tag=${tag%-}
             echo "server=dev" >> "$GITHUB_OUTPUT"
-            echo "environment=feat-manager-$pull_request" >> "$GITHUB_OUTPUT"
+            echo "environment=feat-$tag" >> "$GITHUB_OUTPUT"
             echo "tag=$tag" >> "$GITHUB_OUTPUT"
           elif [ "$HEAD_BRANCH" = master ]; then
             echo "server=dev" >> "$GITHUB_OUTPUT"

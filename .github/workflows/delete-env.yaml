@@ -31,13 +31,21 @@ jobs:
         env:
           DEPLOY_KEY: ${{ secrets.IM_VM_DEV_DEPLOY_KEY }}
           HOST: ${{ secrets.IM_VM_DEV_HOST }}
-          PULL_REQUEST: ${{ github.event.pull_request.number }}
+          HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
         run: |
           set -o errexit -o nounset -o pipefail
+
+          # Named after the head branch, sanitized exactly as the deploy does it, or this tears
+          # down nothing.
+          lowercase=$(printf '%s' "$HEAD_BRANCH" | tr '[:upper:]' '[:lower:]')
+          tag=${lowercase//[^[:alnum:]]/-}
+          tag=${tag::25}
+          tag=${tag%-}
+
           install --mode=600 /dev/null deploy-key
           printf '%s\n' "$DEPLOY_KEY" > deploy-key
           ssh -i deploy-key -o StrictHostKeyChecking=accept-new -o BatchMode=yes \
-            im@"$HOST" "down feat-manager-$PULL_REQUEST"
+            im@"$HOST" "down feat-$tag"
 
       - name: Forget the key
         if: always()
