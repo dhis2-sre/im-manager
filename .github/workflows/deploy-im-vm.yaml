@@ -32,9 +32,18 @@ jobs:
     if: github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-24.04
     steps:
+      - name: Work out the feature environment name
+        id: feature
+        if: github.event.workflow_run.event == 'pull_request'
+        uses: dhis2-sre/gha-workflows/.github/actions/feature-environment-name@master
+        with:
+          head-branch: ${{ github.event.workflow_run.head_branch }}
+
       - name: Work out what to deploy, where
         id: target
         env:
+          FEATURE_ENVIRONMENT: ${{ steps.feature.outputs.name }}
+          FEATURE_LABEL: ${{ steps.feature.outputs.label }}
           EVENT: ${{ github.event.workflow_run.event }}
           HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
           HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
@@ -68,18 +77,13 @@ jobs:
               exit 0
             fi
 
-            # The same sanitisation the build uses for the image tag: lowercase, non-alphanumerics
-            # to hyphens, 25 characters, no trailing hyphen. It names the environment too, so a pull
-            # request here and one in im-web-client on the same branch share it: each passes its own
-            # image tag and leaves the other's alone, and the hostnames come out as the EKS deploy
-            # spells them.
-            lowercase=$(printf '%s' "$HEAD_BRANCH" | tr '[:upper:]' '[:lower:]')
-            tag=${lowercase//[^[:alnum:]]/-}
-            tag=${tag::25}
-            tag=${tag%-}
+            # Named after the branch, so a pull request here and one in im-web-client on the
+            # same branch share one environment: each passes its own image tag and leaves the
+            # other's alone, and the hostnames come out as the EKS deploy spells them. The label is
+            # also the image tag the build pushed.
             echo "server=dev" >> "$GITHUB_OUTPUT"
-            echo "environment=feat-$tag" >> "$GITHUB_OUTPUT"
-            echo "tag=$tag" >> "$GITHUB_OUTPUT"
+            echo "environment=$FEATURE_ENVIRONMENT" >> "$GITHUB_OUTPUT"
+            echo "tag=$FEATURE_LABEL" >> "$GITHUB_OUTPUT"
           elif [ "$HEAD_BRANCH" = master ]; then
             echo "server=dev" >> "$GITHUB_OUTPUT"
             echo "environment=dev" >> "$GITHUB_OUTPUT"

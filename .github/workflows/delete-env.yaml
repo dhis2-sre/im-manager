@@ -27,25 +27,25 @@ jobs:
     # only this one created anything.
     if: github.event.action == 'closed' || github.event.label.name == 'deploy'
     steps:
+      # The same action the deploy uses, because a name derived any other way here tears down
+      # nothing and leaves the environment running.
+      - name: Work out the feature environment name
+        id: feature
+        uses: dhis2-sre/gha-workflows/.github/actions/feature-environment-name@master
+        with:
+          head-branch: ${{ github.event.pull_request.head.ref }}
+
       - name: Destroy
         env:
           DEPLOY_KEY: ${{ secrets.IM_VM_DEV_DEPLOY_KEY }}
           HOST: ${{ secrets.IM_VM_DEV_HOST }}
-          HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
+          ENVIRONMENT: ${{ steps.feature.outputs.name }}
         run: |
           set -o errexit -o nounset -o pipefail
-
-          # Named after the head branch, sanitized exactly as the deploy does it, or this tears
-          # down nothing.
-          lowercase=$(printf '%s' "$HEAD_BRANCH" | tr '[:upper:]' '[:lower:]')
-          tag=${lowercase//[^[:alnum:]]/-}
-          tag=${tag::25}
-          tag=${tag%-}
-
           install --mode=600 /dev/null deploy-key
           printf '%s\n' "$DEPLOY_KEY" > deploy-key
           ssh -i deploy-key -o StrictHostKeyChecking=accept-new -o BatchMode=yes \
-            im@"$HOST" "down feat-$tag"
+            im@"$HOST" "down $ENVIRONMENT"
 
       - name: Forget the key
         if: always()
