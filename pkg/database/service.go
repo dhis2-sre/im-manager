@@ -1,6 +1,7 @@
 package database
 
 import (
+	"bytes"
 	"cmp"
 	"compress/gzip"
 	"context"
@@ -647,28 +648,69 @@ func (s Service) Dump(ctx context.Context, userId uint, database *model.Database
 	return saved, nil
 }
 
+const (
+	pgDumpPlainTrailer = "-- PostgreSQL database dump complete"
+	pgDumpTailSize     = 4096
+)
+
 func execPgDump(ctx context.Context, executor PodExecutor, namespace, podName string, command []string, pw *io.PipeWriter, format string, databaseName string) error {
-	var execWriter io.WriteCloser = pw
+	// Errors have to reach the reader through the pipe, otherwise the upload sees a clean EOF and
+	// stores the partial dump as if it were complete.
+	fail := func(err error) error {
+		pw.CloseWithError(err)
+		return err
+	}
+
+	var execWriter io.Writer = pw
 	var gzWriter *gzip.Writer
+	var tail *tailWriter
 	if format == "plain" {
 		gzWriter = gzip.NewWriter(pw)
 		gzWriter.Name = strings.TrimSuffix(databaseName, ".gz")
-		execWriter = gzWriter
+		tail = &tailWriter{w: gzWriter, max: pgDumpTailSize}
+		execWriter = tail
 	}
 
 	var stderrBuf strings.Builder
-	execErr := executor.Exec(ctx, namespace, podName, "postgresql", command, execWriter, &stderrBuf)
+	if err := executor.Exec(ctx, namespace, podName, "postgresql", command, execWriter, &stderrBuf); err != nil {
+		return fail(fmt.Errorf("%w: %s", err, stderrBuf.String()))
+	}
+
+	// A pod exec can report success having delivered only part of pg_dump's stdout, and closing the
+	// gzip writer then seals a valid gzip stream around a truncated dump.
+	if tail != nil && !tail.contains(pgDumpPlainTrailer) {
+		return fail(fmt.Errorf("pg_dump output is truncated, %q not found in the last %d bytes: %s", pgDumpPlainTrailer, pgDumpTailSize, stderrBuf.String()))
+	}
 
 	if gzWriter != nil {
-		gzWriter.Close()
+		if err := gzWriter.Close(); err != nil {
+			return fail(fmt.Errorf("close gzip writer: %v", err))
+		}
 	}
 
-	if execErr != nil {
-		pw.CloseWithError(execErr)
-		return fmt.Errorf("%w: %s", execErr, stderrBuf.String())
+	return pw.Close()
+}
+
+// tailWriter passes writes through while retaining up to max trailing bytes.
+type tailWriter struct {
+	w    io.Writer
+	max  int
+	tail []byte
+}
+
+func (t *tailWriter) Write(p []byte) (int, error) {
+	n, err := t.w.Write(p)
+	if n > 0 {
+		t.tail = append(t.tail, p[:n]...)
+		if len(t.tail) > t.max {
+			t.tail = t.tail[len(t.tail)-t.max:]
+		}
 	}
-	pw.Close()
-	return nil
+	return n, err
+}
+
+func (t *tailWriter) contains(s string) bool {
+	return bytes.Contains(t.tail, []byte(s))
 }
 
 func (s Service) logError(ctx context.Context, err error) {

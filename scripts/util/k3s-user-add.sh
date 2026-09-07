@@ -6,10 +6,13 @@ USER_NAME=""
 NAMESPACE=""
 DURATION="8760h"
 CLUSTER_WIDE=""
+ROLE="edit"
 POSITIONAL_ARGS=()
 for arg in "$@"; do
     if [[ "$arg" == "--cluster-wide" ]]; then
         CLUSTER_WIDE="true"
+    elif [[ "$arg" == "--read-only" ]]; then
+        ROLE="view"
     else
         POSITIONAL_ARGS+=("$arg")
     fi
@@ -28,7 +31,7 @@ fi
 OUTPUT_FILE="${USER_NAME}-config.yaml"
 
 if [[ -z "$USER_NAME" ]]; then
-    echo "Usage: $0 <username> [namespace] [--cluster-wide] [duration]"
+    echo "Usage: $0 <username> [namespace] [--cluster-wide] [--read-only] [duration]"
     exit 1
 fi
 
@@ -57,7 +60,7 @@ if [[ -n "$EXISTING_NS" ]]; then
     exit 1
 fi
 
-echo "Creating access for '$USER_NAME' in '$NAMESPACE'..."
+echo "Creating access for '$USER_NAME' in '$NAMESPACE' with ClusterRole '$ROLE'..."
 
 if [[ -n "$CLUSTER_WIDE" ]]; then
     echo "Note: Cluster-wide access grants access to ALL namespaces."
@@ -79,7 +82,7 @@ subjects:
   namespace: ${NAMESPACE}
 roleRef:
   kind: ClusterRole
-  name: edit
+  name: ${ROLE}
   apiGroup: rbac.authorization.k8s.io
 EOF
 else
@@ -100,7 +103,7 @@ subjects:
   namespace: ${NAMESPACE}
 roleRef:
   kind: ClusterRole
-  name: edit
+  name: ${ROLE}
   apiGroup: rbac.authorization.k8s.io
 EOF
 fi

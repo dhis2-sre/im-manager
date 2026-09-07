@@ -69,3 +69,17 @@ jobs:
             View remediation commands in the GitHub Actions logs (step: "Find expiring certificates"):
             https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
           SLACK_COLOR: 'failure'
+
+      - name: Report a failed check to Slack
+        if: failure()
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+          SLACK_CHANNEL: 'team-devops-internal'
+          SLACK_MESSAGE: |
+            :rotating_light: Expiring certificate check failed to run
+
+            Nothing was reported because the check itself did not finish, so treat its last result as stale.
+
+            https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          SLACK_COLOR: 'failure'

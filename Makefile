@@ -36,8 +36,14 @@ dev:
 prod:
 	docker compose --profile prod up
 
+# -p limits how many packages run at once. Seven packages each start their own
+# Postgres, RabbitMQ, Redis, MinIO and localstack, and the default is GOMAXPROCS, which
+# is 4 on a CI runner: around twenty containers on four cores. That starvation is what
+# makes the integration tests flaky rather than any one test being wrong.
+TEST_PARALLEL ?= 2
+
 test:
-	go test -race ./...
+	go test -race -p $(TEST_PARALLEL) ./...
 
 test-coverage:
 	go test -coverprofile=./coverage.out ./... && go tool cover -html=./coverage.out -o ./coverage.html
