@@ -63,8 +63,32 @@ change_owner() {
 }
 
 change_owner_routines() {
+  local query="
+    SELECT format(
+             'ALTER %s %s OWNER TO %I',
+             CASE p.prokind
+               WHEN 'p' THEN 'PROCEDURE'
+               WHEN 'a' THEN 'AGGREGATE'
+               ELSE 'FUNCTION'
+             END,
+             p.oid::regprocedure,
+             '$DATABASE_USERNAME'
+           )
+    FROM pg_proc p
+    JOIN pg_namespace n ON n.oid = p.pronamespace
+    WHERE n.nspname = 'public'
+      AND p.prokind IN ('f', 'p', 'a')
+      AND NOT EXISTS (
+        SELECT 1
+        FROM pg_depend d
+        WHERE d.classid = 'pg_proc'::regclass
+          AND d.objid = p.oid
+          AND d.deptype = 'e'
+      )
+  "
+
   local statements
-  statements=$(exec_psql "SELECT format('ALTER %s %s OWNER TO %I', CASE p.prokind WHEN 'p' THEN 'PROCEDURE' WHEN 'a' THEN 'AGGREGATE' ELSE 'FUNCTION' END, p.oid::regprocedure, '$DATABASE_USERNAME') FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace WHERE n.nspname = 'public' AND p.prokind IN ('f', 'p', 'a') AND NOT EXISTS (SELECT 1 FROM pg_depend d WHERE d.classid = 'pg_proc'::regclass AND d.objid = p.oid AND d.deptype = 'e')")
+  statements=$(exec_psql "$query")
 
   while IFS= read -r statement; do
     [[ -z "$statement" ]] && continue
