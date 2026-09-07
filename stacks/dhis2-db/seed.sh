@@ -62,6 +62,18 @@ change_owner() {
   done
 }
 
+change_owner_routines() {
+  local statements
+  statements=$(exec_psql "SELECT format('ALTER %s %s OWNER TO %I', CASE p.prokind WHEN 'p' THEN 'PROCEDURE' WHEN 'a' THEN 'AGGREGATE' ELSE 'FUNCTION' END, p.oid::regprocedure, '$DATABASE_USERNAME') FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace WHERE n.nspname = 'public' AND p.prokind IN ('f', 'p', 'a') AND NOT EXISTS (SELECT 1 FROM pg_depend d WHERE d.classid = 'pg_proc'::regclass AND d.objid = p.oid AND d.deptype = 'e')")
+
+  while IFS= read -r statement; do
+    [[ -z "$statement" ]] && continue
+    echo "$statement"
+    exec_psql "$statement"
+  done <<<"$statements"
+}
+
 change_owner "SELECT tablename FROM pg_tables WHERE schemaname = 'public'" "TABLE"
 change_owner "SELECT sequence_name FROM information_schema.sequences WHERE sequence_schema = 'public'" "SEQUENCE"
 change_owner "SELECT table_name FROM information_schema.views WHERE table_schema = 'public'" "VIEW"
+change_owner_routines
