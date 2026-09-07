@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -124,8 +125,45 @@ func createMinioInstance(t *testing.T, client *inttest.HTTPClient, deploymentID 
 	return createInstance(t, client, deploymentID, "minio", authToken, opts...)
 }
 
+// A core with no -Xmx finds no cgroup limit, since the chart sets a memory request and no limit, and
+// takes a quarter of whatever /proc/meminfo reports, which inside the k3s container is the runner.
+const (
+	testCoreJavaOpts = "-Xmx1g"
+	// The same bound in bytes, as the JVM reports MaxHeapSize.
+	testCoreMaxHeapSize = int64(1) << 30
+)
+
 func createDHIS2CoreInstance(t *testing.T, client *inttest.HTTPClient, deploymentID uint, authToken string, opts ...InstanceOption) model.DeploymentInstance {
+	// Prepended, so a caller that wants a different heap can still override it.
+	opts = append([]InstanceOption{WithParameter("JAVA_OPTS", testCoreJavaOpts)}, opts...)
 	return createInstance(t, client, deploymentID, "dhis2-core", authToken, opts...)
+}
+
+// podExecer is the part of the kubernetes service these helpers need.
+type podExecer interface {
+	Exec(ctx context.Context, namespace, podName, container string, command []string, stdout, stderr io.Writer) error
+}
+
+// assertCoreHeapBounded reads the ceiling a throwaway JVM in the core container is given. The chart
+// appends javaOpts to JAVA_TOOL_OPTIONS, which every JVM there honours and none shows on its command
+// line, so this is the readable surface; {command line} rather than {ergonomic} is what distinguishes
+// a bound that was set from one the JVM derived from the node.
+func assertCoreHeapBounded(t *testing.T, executor podExecer, namespace, pod, container string, expected int64) {
+	t.Helper()
+
+	var flags, stderr strings.Builder
+	require.NoError(t, executor.Exec(context.Background(), namespace, pod, container,
+		[]string{"sh", "-c", `java -XX:+PrintFlagsFinal -version 2>/dev/null | grep MaxHeapSize`}, &flags, &stderr),
+		"reading the core's heap ceiling failed: %s", stderr.String())
+
+	line := strings.TrimSpace(flags.String())
+	fields := strings.Fields(line)
+	require.GreaterOrEqual(t, len(fields), 4, "unexpected MaxHeapSize line: %q", line)
+	actual, err := strconv.ParseInt(fields[3], 10, 64)
+	require.NoError(t, err, "unexpected MaxHeapSize line: %q", line)
+
+	assert.Equal(t, expected, actual, "the core's heap is not bounded to %s: %q", testCoreJavaOpts, line)
+	assert.Contains(t, line, "{command line}", "the core's heap ceiling came from the node, not from %s: %q", testCoreJavaOpts, line)
 }
 
 // minioPodName returns the name of the deployment's single minio pod.
