@@ -18,6 +18,13 @@ on:
   workflow_run:
     workflows: ["Build, test and deploy"]
     types: [completed]
+    # Prod is still served from EKS and the prod server has no environment file, so a release must
+    # not reach it yet. workflow_run takes no tag filter, and its branch filter matches the head
+    # branch of the run that triggered this one, which for a tag push is the tag. The pattern is the
+    # one the build filters tags on, so it excludes exactly the builds a release produces. Remove
+    # this filter at cutover.
+    branches-ignore:
+      - '[0-9]*'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.workflow_run.head_branch }}
