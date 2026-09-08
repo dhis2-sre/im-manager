@@ -76,7 +76,8 @@ type TokenService struct {
 func (t TokenService) GetTokens(user *model.User, previousRefreshTokenId string, rememberMe bool) (*Tokens, error) {
 	if previousRefreshTokenId != "" {
 		if err := t.repository.DeleteRefreshToken(user.ID, previousRefreshTokenId); err != nil {
-			return nil, errdef.NewUnauthorized("could not delete previous refreshToken for user.Id: %d, tokenId: %s", user.ID, previousRefreshTokenId)
+			t.logger.Error("could not delete previous refresh token", "userId", user.ID, "tokenId", previousRefreshTokenId, "error", err)
+			return nil, errdef.NewUnauthorized("session expired, please sign in again")
 		}
 	}
 

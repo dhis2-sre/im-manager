@@ -256,6 +256,8 @@ func (h Handler) SignIn(c *gin.Context) {
 	c.Status(http.StatusCreated)
 }
 
+const refreshCookiePath = "/refresh"
+
 type RefreshTokenRequest struct {
 	RefreshToken string `json:"refreshToken"`
 }
@@ -291,7 +293,7 @@ func (h Handler) RefreshToken(c *gin.Context) {
 	}
 
 	if refreshTokenString == "" {
-		_ = c.AbortWithError(http.StatusBadRequest, fmt.Errorf("refresh token not found"))
+		_ = c.Error(errdef.NewUnauthorized("session expired, please sign in again"))
 		return
 	}
 
@@ -331,10 +333,10 @@ func (h Handler) setCookies(c *gin.Context, tokens *token.Tokens, rememberMe boo
 	c.SetSameSite(h.sameSiteMode)
 	c.SetCookie("accessToken", tokens.AccessToken, h.accessTokenExpirationSeconds, "/", "", h.cookieSecure, true)
 	if rememberMe {
-		c.SetCookie("refreshToken", tokens.RefreshToken, h.refreshTokenRememberMeExpirationSeconds, "/refresh", "", h.cookieSecure, true)
-		c.SetCookie("rememberMe", "true", h.refreshTokenRememberMeExpirationSeconds, "/refresh", "", h.cookieSecure, true)
+		c.SetCookie("refreshToken", tokens.RefreshToken, h.refreshTokenRememberMeExpirationSeconds, refreshCookiePath, "", h.cookieSecure, true)
+		c.SetCookie("rememberMe", "true", h.refreshTokenRememberMeExpirationSeconds, refreshCookiePath, "", h.cookieSecure, true)
 	} else {
-		c.SetCookie("refreshToken", tokens.RefreshToken, h.refreshTokenExpirationSeconds, "/refresh", "", h.cookieSecure, true)
+		c.SetCookie("refreshToken", tokens.RefreshToken, h.refreshTokenExpirationSeconds, refreshCookiePath, "", h.cookieSecure, true)
 	}
 }
 
@@ -385,7 +387,7 @@ func (h Handler) SignOut(c *gin.Context) {
 	//	415: Error
 
 	// No matter what happens, if the user sends a sign-out request, delete all cookies
-	unsetCookie(c)
+	h.unsetCookie(c)
 
 	user, err := h.parseRequest(c.Request)
 	if err != nil {
@@ -433,10 +435,13 @@ func (h Handler) parseRequest(request *http.Request) (*model.User, error) {
 	return &user, nil
 }
 
-func unsetCookie(c *gin.Context) {
-	c.SetCookie("accessToken", "", -1, "/", "", true, true)
-	c.SetCookie("refreshToken", "", -1, "/", "", true, true)
-	c.SetCookie("rememberMe", "", -1, "/", "", true, true)
+// unsetCookie expires the cookies set by setCookies. A cookie is identified by name, domain and
+// path, so these have to match setCookies exactly or the browser keeps sending the old value.
+func (h Handler) unsetCookie(c *gin.Context) {
+	c.SetSameSite(h.sameSiteMode)
+	c.SetCookie("accessToken", "", -1, "/", "", h.cookieSecure, true)
+	c.SetCookie("refreshToken", "", -1, refreshCookiePath, "", h.cookieSecure, true)
+	c.SetCookie("rememberMe", "", -1, refreshCookiePath, "", h.cookieSecure, true)
 }
 
 // FindById user
