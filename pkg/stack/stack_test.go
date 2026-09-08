@@ -432,7 +432,7 @@ func TestValidateCompanionConditions(t *testing.T) {
 // The deploy form decides whether to offer CHAP from this declaration, so it has to survive a
 // rename of the parameter that gates it.
 func TestChapIsOfferedOnDeployChap(t *testing.T) {
-	for _, s := range []stack.Stack{stack.DHIS2Core, stack.DHIS2V2} {
+	for _, s := range []stack.Stack{stack.DHIS2V2} {
 		var found bool
 		for _, companion := range s.Companions {
 			if companion.Stack.Name != stack.Chap.Name {
@@ -450,7 +450,7 @@ func TestChapIsOfferedOnDeployChap(t *testing.T) {
 // Every stack that can host pgAdmin gates it on its own ENABLE_PGADMIN, so the choice is a stored
 // parameter rather than form state, and so a new host cannot offer pgAdmin without one.
 func TestPgAdminIsOfferedOnEnablePgAdmin(t *testing.T) {
-	for _, s := range []stack.Stack{stack.DHIS2DB, stack.DHIS2, stack.DHIS2V2} {
+	for _, s := range []stack.Stack{stack.DHIS2V2} {
 		var found bool
 		for _, companion := range s.Companions {
 			if companion.Stack.Name != stack.PgAdmin.Name {
@@ -471,12 +471,10 @@ func TestPgAdminIsOfferedOnEnablePgAdmin(t *testing.T) {
 }
 
 // TestPVCSelectorsDoNotCrossStacks guards the defect that wedged 31 MinIO claims in production
-// (#1732). The dhis2-core component listed the MinIO claim among the ones it deletes, but MinIO is
-// its own stack with its own release, so destroying or resetting the core instance alone deleted a
-// live sibling's volume. Claims are only ever at risk from a stack deployed alongside them, which
-// is what Requires and Companions describe, so those are the pairs checked here rather than every
-// pair of stacks: dhis2 and dhis2-db legitimately name the same claim, since one is the umbrella
-// form of the other and they never appear in one deployment.
+// (#1732). A component named a claim belonging to a sibling stack's own release, so destroying or
+// resetting one instance deleted a live sibling's volume. Claims are only ever at risk from a stack
+// deployed alongside them, which is what Requires and Companions describe, so those are the pairs
+// checked here rather than every pair of stacks.
 func TestPVCSelectorsDoNotCrossStacks(t *testing.T) {
 	instance := &model.DeploymentInstance{Name: "test", Group: &model.Group{ID: 1, Namespace: "test"}}
 

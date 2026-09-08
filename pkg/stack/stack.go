@@ -23,10 +23,6 @@ type Stacks map[string]Stack
 // All lists every stack the service serves. main.go registers exactly this list and the tests
 // derive their expectations from it, so a new stack is added here and nowhere else.
 var All = []Stack{
-	DHIS2DB,
-	MINIO,
-	DHIS2Core,
-	DHIS2,
 	DHIS2V2,
 	PgAdmin,
 	WhoamiGo,
@@ -99,10 +95,9 @@ func ValidateConsumedParameters(stacks []Stack) error {
 
 		// Where the providers come from depends on how the stack is reached. A stack with required
 		// stacks is validated against those, which jointly provide, and being offered as a companion
-		// on top of that says nothing about the host: minio requires dhis2-db for DATABASE_ID while
-		// being a companion of dhis2-core, which provides no such thing. A stack with no required
-		// stacks and offered as a companion is validated against each host on its own, since exactly
-		// one host is deployed alongside it. A stack reached by neither has nowhere to consume from.
+		// on top of that says nothing about the host. A stack with no required stacks and offered as
+		// a companion is validated against each host on its own, since exactly one host is deployed
+		// alongside it. A stack reached by neither has nowhere to consume from.
 		switch hosts := companionHosts(stacks, stack.Name); {
 		case len(stack.Requires) > 0:
 			errs = append(errs, validateProvidedBy(stack, consumed, stack.Requires, "requires")...)

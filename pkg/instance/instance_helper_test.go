@@ -116,26 +116,8 @@ func createWhoamiInstance(t *testing.T, client *inttest.HTTPClient, deploymentID
 	return createInstance(t, client, deploymentID, "whoami-go", authToken, opts...)
 }
 
-func createDHIS2DBInstance(t *testing.T, client *inttest.HTTPClient, deploymentID uint, databaseID, authToken string, opts ...InstanceOption) model.DeploymentInstance {
-	return createInstance(t, client, deploymentID, "dhis2-db", authToken, append([]InstanceOption{WithParameter("DATABASE_ID", databaseID)}, opts...)...)
-}
-
-func createMinioInstance(t *testing.T, client *inttest.HTTPClient, deploymentID uint, authToken string, opts ...InstanceOption) model.DeploymentInstance {
-	return createInstance(t, client, deploymentID, "minio", authToken, opts...)
-}
-
-func createDHIS2CoreInstance(t *testing.T, client *inttest.HTTPClient, deploymentID uint, authToken string, opts ...InstanceOption) model.DeploymentInstance {
-	return createInstance(t, client, deploymentID, "dhis2-core", authToken, opts...)
-}
-
-// minioPodName returns the name of the deployment's single minio pod.
-func minioPodName(t *testing.T, k8sClient *inttest.K8sClient, namespace string, deploymentID uint) string {
-	t.Helper()
-	selector := fmt.Sprintf("im-type=minio,im-deployment-id=%d", deploymentID)
-	pods, err := k8sClient.Client.CoreV1().Pods(namespace).List(context.Background(), metav1.ListOptions{LabelSelector: selector})
-	require.NoError(t, err)
-	require.Len(t, pods.Items, 1, "expected exactly one minio pod for selector %q", selector)
-	return pods.Items[0].Name
+func createDHIS2V2Instance(t *testing.T, client *inttest.HTTPClient, deploymentID uint, databaseID, authToken string, opts ...InstanceOption) model.DeploymentInstance {
+	return createInstance(t, client, deploymentID, "dhis2-v2", authToken, append([]InstanceOption{WithParameter("DATABASE_ID", databaseID)}, opts...)...)
 }
 
 // waitForCorePodRunning polls until the core instance's default pod is Running, returning its name

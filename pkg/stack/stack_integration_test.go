@@ -15,9 +15,6 @@ func TestStackHandler(t *testing.T) {
 	t.Parallel()
 
 	stacks, err := stack.New(
-		stack.DHIS2DB,
-		stack.DHIS2Core,
-		stack.DHIS2,
 		stack.DHIS2V2,
 		stack.Chap,
 		stack.PgAdmin,
@@ -36,9 +33,9 @@ func TestStackHandler(t *testing.T) {
 		t.Parallel()
 
 		var dhis2 stack.StackResponse
-		client.GetJSON(t, "/stacks/dhis2", &dhis2)
+		client.GetJSON(t, "/stacks/dhis2-v2", &dhis2)
 
-		assert.Equal(t, "dhis2", dhis2.Name)
+		assert.Equal(t, "dhis2-v2", dhis2.Name)
 		assert.NotEmpty(t, dhis2.Parameters)
 	})
 
