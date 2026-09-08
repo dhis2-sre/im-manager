@@ -68,7 +68,7 @@ func TestUserHandler(t *testing.T) {
 
 	client := inttest.SetupHTTPServer(t, func(engine *gin.Engine) {
 		userHandler := user.NewHandler(logger, "hostname", http.SameSiteStrictMode, true, 10, 20, 30, key.PublicKey, userService, tokenService)
-		oauthHandler := user.NewOAuthHandler(logger, "http://localhost", http.SameSiteLaxMode, true, 10, 20, userService, tokenService)
+		oauthHandler := user.NewOAuthHandler(logger, "http://localhost", http.SameSiteLaxMode, true, 10, 20, 30, userService, tokenService)
 		user.Routes(engine, authentication, authorization, userHandler, oauthHandler)
 	})
 
@@ -169,6 +169,37 @@ func TestUserHandler(t *testing.T) {
 
 			require.Equal(t, http.StatusOK, response.StatusCode)
 			assertClearedCookies(t, response.Cookies())
+		})
+	})
+
+	t.Run("SSORememberMeIntent", func(t *testing.T) {
+		t.Parallel()
+
+		// The provider round trip drops the query string, so BeginAuth has to stash the choice in a
+		// cookie for the callback. Lax or the cross-site redirect back would drop it.
+		t.Run("StashedWhenAsked", func(t *testing.T) {
+			request := client.NewRequest(t, http.MethodGet, "/auth/google?rememberMe=true", nil)
+
+			response, err := client.Client.Do(request)
+			require.NoError(t, err)
+			t.Cleanup(func() { require.NoError(t, response.Body.Close()) })
+
+			cookie := findCookieByName("oauthRememberMe", response.Cookies())
+			require.NotNil(t, cookie, "should stash the remember me choice for the callback")
+			assert.Equal(t, "true", cookie.Value)
+			assert.Equal(t, "/", cookie.Path)
+			assert.Equal(t, http.SameSiteLaxMode, cookie.SameSite)
+			assert.True(t, cookie.HttpOnly)
+		})
+
+		t.Run("NotStashedByDefault", func(t *testing.T) {
+			request := client.NewRequest(t, http.MethodGet, "/auth/google", nil)
+
+			response, err := client.Client.Do(request)
+			require.NoError(t, err)
+			t.Cleanup(func() { require.NoError(t, response.Body.Close()) })
+
+			assert.Nil(t, findCookieByName("oauthRememberMe", response.Cookies()))
 		})
 	})
 
