@@ -526,6 +526,14 @@ func TestUserHandler(t *testing.T) {
 				newPassword := newUser1.Password
 
 				require.NotEqual(t, oldPassword, newPassword, "old and new password should be different")
+
+				t.Log("SignInWithResetPassword")
+
+				signInReq := client.NewRequest(t, http.MethodPost, "/tokens", jsonBody(`{}`), inttest.WithBasicAuth(email, "ResetResetResetResetReset"), inttest.WithHeader("Content-Type", "application/json"))
+				signInResp, err := client.Client.Do(signInReq)
+				require.NoError(t, err)
+				t.Cleanup(func() { require.NoError(t, signInResp.Body.Close()) })
+				assert.Equal(t, http.StatusCreated, signInResp.StatusCode, "should be able to sign in with the password just set")
 			}
 
 			{
