@@ -120,6 +120,33 @@ func createDHIS2V2Instance(t *testing.T, client *inttest.HTTPClient, deploymentI
 	return createInstance(t, client, deploymentID, "dhis2-v2", authToken, append([]InstanceOption{WithParameter("DATABASE_ID", databaseID)}, opts...)...)
 }
 
+// minioPodName returns the name of the deployment's single minio pod.
+func minioPodName(t *testing.T, k8sClient *inttest.K8sClient, namespace string, deploymentID uint) string {
+	t.Helper()
+	selector := fmt.Sprintf("im-type=minio,im-deployment-id=%d", deploymentID)
+	var name string
+	require.Eventuallyf(t, func() bool {
+		pods, err := k8sClient.Client.CoreV1().Pods(namespace).List(context.Background(), metav1.ListOptions{LabelSelector: selector})
+		if err != nil || len(pods.Items) == 0 {
+			return false
+		}
+		name = pods.Items[0].Name
+		return true
+	}, 120*time.Second, 2*time.Second, "no pod matching %q", selector)
+	return name
+}
+
+// requireNoPodsMatching polls until no pod matches the selector, which is how destroy is asserted:
+// the release label also covers the seed job's completed pod, so the workloads are checked by their
+// own im labels instead.
+func requireNoPodsMatching(t *testing.T, k8sClient *inttest.K8sClient, namespace, selector string, timeout time.Duration) {
+	t.Helper()
+	require.Eventuallyf(t, func() bool {
+		pods, err := k8sClient.Client.CoreV1().Pods(namespace).List(context.Background(), metav1.ListOptions{LabelSelector: selector})
+		return err == nil && len(pods.Items) == 0
+	}, timeout, 2*time.Second, "pods matching %q should be gone", selector)
+}
+
 // waitForCorePodRunning polls until the core instance's default pod is Running, returning its name
 // and primary container.
 func waitForCorePodRunning(t *testing.T, k8sClient *inttest.K8sClient, namespace string, instanceID uint, timeout time.Duration) (string, string) {

@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -41,6 +42,7 @@ import (
 
 func TestInstanceHandler(t *testing.T) {
 	k8sClient := inttest.SetupK8s(t)
+	k8sClient.InstallCNPG(t)
 
 	err := createNamespace(t, k8sClient, "group-name")
 	require.NoError(t, err, "failed to create test namespace")
@@ -114,8 +116,6 @@ func TestInstanceHandler(t *testing.T) {
 	// blew through the previous 100 seconds.
 	tokenService, err := token.NewService(logger, tokenRepository, privateKey, 3600, 60, "secret", 3600, 3600)
 	require.NoError(t, err, "failed to create token service")
-	instanceService := instance.NewService(logger, instanceRepo, groupService, stackService, helmfileService, nil, "", kube.NewClients(slog.Default()))
-
 	s3Dir := t.TempDir()
 	s3Bucket := "database-bucket"
 	err = os.Mkdir(s3Dir+"/"+s3Bucket, 0o755)
@@ -123,6 +123,7 @@ func TestInstanceHandler(t *testing.T) {
 	s3 := inttest.SetupS3(t, s3Dir)
 	uploader := manager.NewUploader(s3.Client)
 	s3Client := storage.NewS3Client(logger, s3.Client, uploader)
+	instanceService := instance.NewService(logger, instanceRepo, groupService, stackService, helmfileService, s3Client, s3Bucket, kube.NewClients(slog.Default()))
 	databaseRepository := database.NewRepository(db)
 	databaseService := database.NewService(logger, s3Bucket, s3Client, groupService, databaseRepository, kube.NewClient, noopPublisher{})
 	deploymentService := deployment.NewService(logger, instanceService, databaseService, tokenService, noopPublisher{})
@@ -270,6 +271,130 @@ func TestInstanceHandler(t *testing.T) {
 		assert.Len(t, instances, 1)
 		assert.Equal(t, "dev-public-deployment", instances[0].Name)
 		assert.Equal(t, "https://some/dev-public-deployment", instances[0].Hostname)
+	})
+
+	t.Run("DHIS2V2Deployment", func(t *testing.T) {
+		// not parallel: one dhis2-v2 deploy carries core, a CloudNativePG cluster and minio, so it
+		// is shared by every assertion below rather than repeated per subtest.
+		seedID := database.UploadTestDatabase(t, client, "v2-save-test.sql.gz", "select now();", "group-name", inttest.WithAuthToken(tokens.AccessToken))
+
+		deployment := createDeployment(t, client, "v2-deployment", tokens.AccessToken, WithDescription("some description"))
+		coreInstance := createDHIS2V2Instance(t, client, deployment.ID, seedID, tokens.AccessToken)
+
+		deployDeployment(t, client, deployment.ID, tokens.AccessToken)
+
+		ks, err := kube.NewClient(group.Cluster)
+		require.NoError(t, err)
+		waitForCorePodRunning(t, k8sClient, coreInstance.Group.Namespace, coreInstance.ID, 300*time.Second)
+		minioPod := minioPodName(t, k8sClient, coreInstance.Group.Namespace, deployment.ID)
+
+		t.Run("FilestoreBackupMinioViaExec", func(t *testing.T) {
+			// create the bucket; the chart creates it asynchronously and we would otherwise race it
+			seedScript := `mc alias set local http://127.0.0.1:9000 dhisdhis dhisdhis >/dev/null 2>&1; mc mb --ignore-existing local/dhis2 >/dev/null 2>&1; printf 'hello-filestore' > /tmp/marker.txt; mc cp --quiet /tmp/marker.txt local/dhis2/seeded/marker.txt`
+			var seedOut, seedErr strings.Builder
+			require.NoError(t, ks.Exec(context.Background(), coreInstance.Group.Namespace, minioPod, "minio", []string{"sh", "-c", seedScript}, &seedOut, &seedErr), "seed failed: %s", seedErr.String())
+
+			// FilestoreBackup links the filestore to an existing (SaveAs target) database row.
+			target := &model.Database{Name: "fs-backup-target.sql.gz", GroupName: "group-name", Type: "database", Slug: "group-name/fs-backup-target", UserID: user.ID}
+			require.NoError(t, db.Create(target).Error)
+
+			// minio can briefly refuse connections right after its pod reports ready (the server
+			// restarts during first-run setup), so retry until it is serving. FilestoreBackup returns
+			// before recording anything when the mirror fails, so retries are side-effect free.
+			require.EventuallyWithT(t, func(c *assert.CollectT) {
+				assert.NoError(c, instanceService.FilestoreBackup(context.Background(), &coreInstance, target.Name, target))
+			}, 90*time.Second, 3*time.Second, "filestore backup should succeed once minio is serving")
+
+			content := s3.GetObject(t, s3Bucket, "group-name/fs-backup-target-fs.tar.gz")
+			require.NotEmpty(t, content)
+			entries := extractTarGzEntries(t, content)
+			assert.Equal(t, "hello-filestore", string(entries["seeded/marker.txt"]))
+			assert.Contains(t, rawTarGzNames(t, content), "./seeded/marker.txt",
+				"backup must tar with ./-relative keys so restore reproduces the original object key")
+
+			var saved model.Database
+			require.NoError(t, db.First(&saved, target.ID).Error)
+			assert.NotZero(t, saved.FilestoreID)
+		})
+
+		t.Run("SaveAsDatabase", func(t *testing.T) {
+			body := strings.NewReader(`{"name": "saved-copy.sql.gz", "format": "plain"}`)
+			var savedDB model.Database
+			instanceIDStr := strconv.FormatUint(uint64(coreInstance.ID), 10)
+			client.PostJSON(t, "/databases/save-as/"+instanceIDStr, body, &savedDB, inttest.WithAuthToken(tokens.AccessToken))
+
+			assert.Equal(t, "saved-copy.sql.gz", savedDB.Name)
+			assert.Equal(t, "group-name", savedDB.GroupName)
+
+			require.Eventually(t, func() bool {
+				var d model.Database
+				if err := db.First(&d, savedDB.ID).Error; err != nil {
+					return false
+				}
+				return d.Url != ""
+			}, 180*time.Second, 500*time.Millisecond, "database URL should be set by async goroutine")
+
+			var finalDB model.Database
+			require.NoError(t, db.First(&finalDB, savedDB.ID).Error)
+			assert.Equal(t, fmt.Sprintf("s3://%s/group-name/saved-copy.sql.gz", s3Bucket), finalDB.Url)
+			assert.Greater(t, finalDB.Size, int64(0))
+
+			s3Content := s3.GetObject(t, s3Bucket, "group-name/saved-copy.sql.gz")
+			assert.Greater(t, len(s3Content), 0, "S3 object should have content")
+		})
+
+		t.Run("SaveDatabase", func(t *testing.T) {
+			originalSize := len(s3.GetObject(t, s3Bucket, "group-name/v2-save-test.sql.gz"))
+
+			instanceIDStr := strconv.FormatUint(uint64(coreInstance.ID), 10)
+			client.Do(t, http.MethodPost, "/databases/save/"+instanceIDStr, nil, http.StatusAccepted, inttest.WithAuthToken(tokens.AccessToken))
+
+			require.Eventually(t, func() bool {
+				content, err := s3.TryGetObject(s3Bucket, "group-name/v2-save-test.sql.gz")
+				return err == nil && len(content) > originalSize
+			}, 180*time.Second, 500*time.Millisecond, "saved database in S3 should grow beyond the uploaded placeholder")
+		})
+
+		destroyDeployment(t, client, deployment.ID, tokens.AccessToken)
+		requireNoPodsMatching(t, k8sClient, coreInstance.Group.Namespace, fmt.Sprintf("im-id=%d,im-default=true", coreInstance.ID), 120*time.Second)
+		requireNoPodsMatching(t, k8sClient, coreInstance.Group.Namespace, fmt.Sprintf("im-type=minio,im-deployment-id=%d", deployment.ID), 120*time.Second)
+	})
+
+	t.Run("FilestoreBackupFilesystemViaExec", func(t *testing.T) {
+		// not parallel: another full dhis2-v2 deploy, and STORAGE_TYPE is fixed at deploy time, so
+		// the filesystem backend cannot share the deployment above
+		deployment := createDeployment(t, client, "fsstore-backup-deployment", tokens.AccessToken)
+		coreInstance := createDHIS2V2Instance(t, client, deployment.ID, databaseID, tokens.AccessToken,
+			WithParameter("STORAGE_TYPE", "filesystem"))
+
+		deployDeployment(t, client, deployment.ID, tokens.AccessToken)
+
+		// the backup execs into the core pod, so wait for Running, not Ready
+		ks, err := kube.NewClient(group.Cluster)
+		require.NoError(t, err)
+		corePod, coreContainer := waitForCorePodRunning(t, k8sClient, coreInstance.Group.Namespace, coreInstance.ID, 300*time.Second)
+		seedScript := `mkdir -p /opt/dhis2/files/seeded && printf 'hello-filestore' > /opt/dhis2/files/seeded/marker.txt`
+		var seedOut, seedErr strings.Builder
+		require.NoError(t, ks.Exec(context.Background(), coreInstance.Group.Namespace, corePod, coreContainer, []string{"sh", "-c", seedScript}, &seedOut, &seedErr), "seed failed: %s", seedErr.String())
+
+		// FilestoreBackup links the filestore to an existing (SaveAs target) database row.
+		target := &model.Database{Name: "fsstore-backup-target.sql.gz", GroupName: "group-name", Type: "database", Slug: "group-name/fsstore-backup-target", UserID: user.ID}
+		require.NoError(t, db.Create(target).Error)
+
+		require.NoError(t, instanceService.FilestoreBackup(context.Background(), &coreInstance, target.Name, target))
+
+		content := s3.GetObject(t, s3Bucket, "group-name/fsstore-backup-target-fs.tar.gz")
+		require.NotEmpty(t, content)
+		entries := extractTarGzEntries(t, content)
+		assert.Equal(t, "hello-filestore", string(entries["seeded/marker.txt"]))
+		assert.Contains(t, rawTarGzNames(t, content), "./seeded/marker.txt",
+			"backup must tar with ./-relative keys so restore reproduces the original object key")
+
+		var saved model.Database
+		require.NoError(t, db.First(&saved, target.ID).Error)
+		assert.NotZero(t, saved.FilestoreID)
+
+		destroyDeployment(t, client, deployment.ID, tokens.AccessToken)
 	})
 
 	t.Run("UpdateDeployment", func(t *testing.T) {
