@@ -8,6 +8,8 @@ package inttest
 import (
 	"context"
 	"fmt"
+	"net"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -25,6 +27,18 @@ const amqpPort = "5672"
 const natAMQPPort = amqpPort + "/tcp"
 const streamPort = "5552"
 const natStreamPort = streamPort + "/tcp"
+
+// freeHostPort asks the kernel for an unused port. RabbitMQ's stream protocol hands the client the
+// address to reconnect to, so the port has to be known before the container starts and cannot be
+// left to Docker to pick.
+func freeHostPort() (string, error) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		return "", err
+	}
+	defer listener.Close()
+	return strconv.Itoa(listener.Addr().(*net.TCPAddr).Port), nil
+}
 
 // SetupRabbitMQAMQP creates a RabbitMQ with an AMQP client ready to send messages to it.
 func SetupRabbitMQAMQP(t *testing.T, options ...rabbitMQOption) *AMQP {
@@ -197,7 +211,8 @@ func WithNetwork(name, alias string) rabbitMQOption {
 	}
 }
 
-// WithStreamingExposed exposes RabbitMQ streaming port 5552 to a fixed port of 5552.
+// WithStreamingExposed exposes RabbitMQ's streaming port on a free host port the broker then
+// advertises as its own.
 func WithStreamingExposed() rabbitMQOption {
 	return func(options *rabbitMQOptions) {
 		options.exposeStreaming = true
@@ -217,8 +232,15 @@ func NewRabbitMQ(ctx context.Context, options ...rabbitMQOption) (*rabbitmqConta
 	pw := "guest"
 	natPortMgmt := "15672/tcp"
 	exposedPorts := []string{natAMQPPort, natPortMgmt}
+	hostStreamPort := ""
 	if opts.exposeStreaming {
 		exposedPorts = append(exposedPorts, natStreamPort)
+
+		var err error
+		hostStreamPort, err = freeHostPort()
+		if err != nil {
+			return nil, fmt.Errorf("failed to find a free port for RabbitMQ streaming: %v", err)
+		}
 	}
 	req := testcontainers.ContainerRequest{
 		Image: "bitnamilegacy/rabbitmq:3.13",
@@ -233,7 +255,7 @@ func NewRabbitMQ(ctx context.Context, options ...rabbitMQOption) (*rabbitmqConta
 		ExposedPorts: exposedPorts,
 		Files: []testcontainers.ContainerFile{
 			{
-				Reader:            strings.NewReader(`SERVER_ADDITIONAL_ERL_ARGS="-rabbitmq_stream advertised_host localhost"`),
+				Reader:            strings.NewReader(fmt.Sprintf(`SERVER_ADDITIONAL_ERL_ARGS="-rabbitmq_stream advertised_host localhost -rabbitmq_stream advertised_port %s"`, hostStreamPort)),
 				ContainerFilePath: "/etc/rabbitmq/rabbitmq-env.conf",
 				FileMode:          0o444,
 			},
@@ -252,7 +274,7 @@ func NewRabbitMQ(ctx context.Context, options ...rabbitMQOption) (*rabbitmqConta
 				hc.PortBindings = mobynet.PortMap{}
 			}
 			hc.PortBindings[mobynet.MustParsePort(natStreamPort)] = []mobynet.PortBinding{
-				{HostPort: streamPort},
+				{HostPort: hostStreamPort},
 			}
 		}
 	}

@@ -11,6 +11,10 @@ rules:
       - pods
     verbs:
       - list
+      # The per-cluster informer cache watches the pods IM manages to serve status from memory.
+      - watch
+      # Per-replica restart deletes a pod and lets the owning controller or operator recreate it.
+      - delete
   - apiGroups:
       - ""
     resources:
@@ -67,3 +71,32 @@ rules:
       - create
       - delete
       - patch
+# Helm waits for chart hook jobs (e.g. the dhis2 chart's database seed) by watching them, and the
+# before-hook-creation delete policy recreates them on upgrades. Without watch, helm sits blind
+# until its timeout and marks the release failed even though the hook succeeded.
+  - apiGroups:
+      - batch
+    resources:
+      - jobs
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+      - update
+      - patch
+      - delete
+# CloudNativePG clusters deployed by the dhis2-v2 stack. Custom resources are not covered by the
+# namespace-scoped admin grants that handle native resources in group namespaces.
+  - apiGroups:
+      - postgresql.cnpg.io
+    resources:
+      - clusters
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+      - update
+      - patch
+      - delete

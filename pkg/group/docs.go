@@ -1,6 +1,6 @@
 package group
 
-import "github.com/dhis2-sre/im-manager/pkg/instance"
+import "github.com/dhis2-sre/im-manager/pkg/kube"
 
 // swagger:parameters groupCreate
 type _ struct {
@@ -53,7 +53,7 @@ type _ struct {
 // swagger:response ClusterResources
 type ClusterResourcesBody struct {
 	// in: body
-	Body instance.ClusterResources
+	Body kube.ClusterResources
 }
 
 // swagger:parameters addClusterToGroup removeClusterFromGroup

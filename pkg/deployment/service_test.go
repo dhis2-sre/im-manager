@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/dhis2-sre/im-manager/pkg/model"
+	"github.com/dhis2-sre/im-manager/pkg/stack"
 )
 
 // fakeDatabaseService resolves database records by id and mints deterministic download links.
@@ -33,7 +34,7 @@ func (f fakeDatabaseService) CreateDatabase(ctx context.Context, userId uint, gr
 	panic("not used")
 }
 
-func (f fakeDatabaseService) Dump(ctx context.Context, userId uint, database *model.Database, instance *model.DeploymentInstance, stack *model.Stack, format string) (*model.Database, error) {
+func (f fakeDatabaseService) Dump(ctx context.Context, userId uint, database *model.Database, instance *model.DeploymentInstance, stack *stack.Stack, format string) (*model.Database, error) {
 	panic("not used")
 }
 
@@ -41,7 +42,7 @@ func (f fakeDatabaseService) EnsureLocked(ctx context.Context, database *model.D
 	panic("not used")
 }
 
-func (f fakeDatabaseService) SaveLocked(ctx context.Context, database *model.Database, instance *model.DeploymentInstance, stack *model.Stack, wasLocked bool) (*model.Database, error) {
+func (f fakeDatabaseService) SaveLocked(ctx context.Context, database *model.Database, instance *model.DeploymentInstance, stack *stack.Stack, wasLocked bool) (*model.Database, error) {
 	panic("not used")
 }
 

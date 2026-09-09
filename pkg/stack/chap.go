@@ -1,146 +1,92 @@
 package stack
 
 import (
-	"fmt"
-
-	"github.com/dhis2-sre/im-manager/pkg/model"
+	"github.com/dhis2-sre/im-manager/pkg/kube"
 )
 
-// Stack representing ../../stacks/chap-db/helmfile.yaml.gotmpl
-var ChapDB = model.Stack{
-	Name: "chap-db",
-	Parameters: model.StackParameters{
-		"DATABASE_SIZE":     {Priority: 1, DisplayName: "Database Size", DefaultValue: &chapDBDefaults.dbSize},
-		"DATABASE_NAME":     {Priority: 2, DisplayName: "Database Name", DefaultValue: &chapDBDefaults.dbName},
-		"DATABASE_PASSWORD": {Priority: 3, DisplayName: "Database Password", DefaultValue: &chapDBDefaults.dbPassword, Sensitive: true},
-		"DATABASE_VERSION":  {Priority: 4, DisplayName: "Database Version", DefaultValue: &chapDBDefaults.dbVersion},
-		"CHART_VERSION":     {Priority: 5, DisplayName: "Chart Version", DefaultValue: &chapDBDefaults.chartVersion},
+// Chap deploys the chap umbrella chart: one release bundling the CHAP api, its Celery worker,
+// a CloudNativePG PostgreSQL cluster and Valkey, replacing the deployment-level composition of
+// chap-db, chap-valkey, chap-worker and chap-core.
+//
+// Every group is named after a component, which is what lets the instance details page show each
+// component's parameters under it. A group that matches no component ends up in a list dangling
+// below the components instead, so release-wide settings live with the api, the component a CHAP
+// deployment is built around, rather than in a group of their own.
+var Chap = withGroupedParameters(Stack{
+	Name: "chap",
+	ParameterGroups: []ParameterGroup{
+		{Name: "api", Title: "CHAP API", Parameters: StackParameters{
+			"IMAGE_TAG":         {Priority: 1, DisplayName: "Image Tag", DefaultValue: &chapDefaults.imageTag},
+			"IMAGE_PULL_POLICY": {Priority: 2, DisplayName: "Image Pull Policy", DefaultValue: &chapDefaults.imagePullPolicy, Validator: imagePullPolicy},
+			"CHART_VERSION":     {Priority: 3, DisplayName: "Chart Version", DefaultValue: &chapDefaults.chartVersion},
+			"DHIS2_REGISTER":    {Priority: 4, DisplayName: "Register as a route in DHIS 2", DefaultValue: &chapDefaults.dhis2Register},
+		}},
+		{Name: "worker", Title: "CHAP Worker", Parameters: StackParameters{
+			"WORKER_IMAGE_TAG":         {Priority: 13, DisplayName: "Image Tag", DefaultValue: &chapDefaults.imageTag},
+			"WORKER_IMAGE_PULL_POLICY": {Priority: 14, DisplayName: "Image Pull Policy", DefaultValue: &chapDefaults.imagePullPolicy, Validator: imagePullPolicy},
+		}},
+		{Name: "register", Title: "DHIS 2 registration", When: whenDhis2RegisterIsEnabled, Parameters: StackParameters{
+			"DHIS2_USERNAME": {Priority: 5, DisplayName: "DHIS2 Username", DefaultValue: &chapDefaults.dhis2Username},
+			"DHIS2_PASSWORD": {Priority: 6, DisplayName: "DHIS2 Password", DefaultValue: &chapDefaults.dhis2Password, Sensitive: true},
+		}},
+		{Name: "db", Title: "PostgreSQL", Parameters: StackParameters{
+			"DATABASE_NAME":     {Priority: 7, DisplayName: "Database Name", DefaultValue: &chapDefaults.dbName},
+			"DATABASE_PASSWORD": {Priority: 8, DisplayName: "Database Password", DefaultValue: &chapDefaults.dbPassword, Sensitive: true},
+			"DATABASE_SIZE":     {Priority: 9, DisplayName: "Database Size", DefaultValue: &chapDefaults.dbSize},
+			"DATABASE_VERSION":  {Priority: 10, DisplayName: "Database Version", DefaultValue: &chapDefaults.dbVersion},
+		}},
+		{Name: "valkey", Title: "Valkey", Parameters: StackParameters{
+			"REDIS_PASSWORD":     {Priority: 11, DisplayName: "Valkey Password", DefaultValue: &chapDefaults.redisPassword, Sensitive: true},
+			"REDIS_STORAGE_SIZE": {Priority: 12, DisplayName: "Valkey Storage Size", DefaultValue: &chapDefaults.redisStorageSize},
+		}},
 	},
-	ParameterProviders: model.ParameterProviders{
-		"DATABASE_HOSTNAME": chapDBHostnameProvider,
-		"DATABASE_SECRET":   chapDBSecretProvider,
+	Components: []kube.Component{
+		ChapAPIComponent{BaseComponent: kube.BaseComponent{Name: "api"}},
+		ChapWorkerComponent{BaseComponent: kube.BaseComponent{Name: "worker"}},
+		ChapRegisterComponent{BaseComponent: kube.BaseComponent{Name: "register", When: whenDhis2RegisterIsEnabled}},
+		CNPGPostgresComponent{BaseComponent: kube.BaseComponent{
+			Name:        "db",
+			PVCPatterns: []string{"cnpg.io/cluster=%s-chap-db"},
+		}, ClusterPattern: "%s-chap-db"},
+		ValkeyComponent{BaseComponent: kube.BaseComponent{
+			Name:        "valkey",
+			PVCPatterns: []string{"app.kubernetes.io/instance=%s-chap,app.kubernetes.io/name=valkey"},
+		}},
 	},
-	KubernetesResource: model.StatefulSetResource,
-}
-
-var chapDBHostnameProvider = model.ParameterProviderFunc(func(instance model.DeploymentInstance) (string, error) {
-	return fmt.Sprintf("%s-%d-chap-db-postgres-rw.%s.svc", instance.Name, instance.Group.ID, instance.Group.Namespace), nil
 })
 
-var chapDBSecretProvider = model.ParameterProviderFunc(func(instance model.DeploymentInstance) (string, error) {
-	return fmt.Sprintf("%s-%d-chap-db-postgres", instance.Name, instance.Group.ID), nil
-})
+// The DHIS 2 credentials are only needed when CHAP registers itself as a route, which mirrors the
+// chart's own gating of the register job on dhis2.enabled.
+var whenDhis2RegisterIsEnabled = &kube.Condition{Parameter: "DHIS2_REGISTER", Equals: "true"}
 
-var chapDBDefaults = struct {
-	chartVersion string
-	dbSize       string
-	dbName       string
-	dbPassword   string
-	dbVersion    string
+// Gates chap as a companion on the DEPLOY_CHAP parameter of the DHIS 2 stack offering it, which is
+// the same parameter that opens DHIS 2 up to the route chap registers.
+var whenChapIsDeployed = &kube.Condition{Parameter: "DEPLOY_CHAP", Equals: "true"}
+
+var chapDefaults = struct {
+	chartVersion     string
+	imageTag         string
+	imagePullPolicy  string
+	dhis2Register    string
+	dhis2Username    string
+	dhis2Password    string
+	dbName           string
+	dbPassword       string
+	dbSize           string
+	dbVersion        string
+	redisPassword    string
+	redisStorageSize string
 }{
-	chartVersion: "0.1.4",
-	dbSize:       "10Gi",
-	dbName:       "chap_core",
-	dbPassword:   "chap",
-	dbVersion:    "17",
-}
-
-// Stack representing ../../stacks/chap-valkey/helmfile.yaml.gotmpl
-var ChapValkey = model.Stack{
-	Name: "chap-valkey",
-	Parameters: model.StackParameters{
-		"REDIS_STORAGE_SIZE": {Priority: 1, DisplayName: "Redis Storage Size", DefaultValue: &chapValkeyDefaults.storageSize},
-		"REDIS_PASSWORD":     {Priority: 2, DisplayName: "Redis Password", DefaultValue: &chapValkeyDefaults.password, Sensitive: true},
-		"CHART_VERSION":      {Priority: 3, DisplayName: "Chart Version", DefaultValue: &chapValkeyDefaults.chartVersion},
-	},
-	ParameterProviders: model.ParameterProviders{
-		"REDIS_HOST":   chapValkeyHostnameProvider,
-		"REDIS_SECRET": chapValkeySecretProvider,
-	},
-	KubernetesResource: model.StatefulSetResource,
-}
-
-var chapValkeyHostnameProvider = model.ParameterProviderFunc(func(instance model.DeploymentInstance) (string, error) {
-	return fmt.Sprintf("%s-%d-chap-valkey.%s.svc", instance.Name, instance.Group.ID, instance.Group.Namespace), nil
-})
-
-var chapValkeySecretProvider = model.ParameterProviderFunc(func(instance model.DeploymentInstance) (string, error) {
-	return fmt.Sprintf("%s-%d-chap-valkey-auth", instance.Name, instance.Group.ID), nil
-})
-
-var chapValkeyDefaults = struct {
-	chartVersion string
-	storageSize  string
-	password     string
-}{
-	chartVersion: "0.9.2",
-	storageSize:  "10Gi",
-	password:     "chap",
-}
-
-// Stack representing ../../stacks/chap-worker/helmfile.yaml.gotmpl
-var ChapWorker = model.Stack{
-	Name: "chap-worker",
-	Parameters: model.StackParameters{
-		"IMAGE_TAG":         {Priority: 1, DisplayName: "Image Tag", DefaultValue: &chapWorkerDefaults.imageTag},
-		"IMAGE_PULL_POLICY": {Priority: 2, DisplayName: "Image Pull Policy", DefaultValue: &chapWorkerDefaults.imagePullPolicy, Validator: imagePullPolicy},
-		"CHART_VERSION":     {Priority: 3, DisplayName: "Chart Version", DefaultValue: &chapWorkerDefaults.chartVersion},
-		"DATABASE_HOSTNAME": {Priority: 0, DisplayName: "Database Hostname", Consumed: true},
-		"DATABASE_SECRET":   {Priority: 0, DisplayName: "Database Secret", Consumed: true},
-		"DATABASE_NAME":     {Priority: 0, DisplayName: "Database Name", Consumed: true},
-		"REDIS_HOST":        {Priority: 0, DisplayName: "Redis Host", Consumed: true},
-		"REDIS_SECRET":      {Priority: 0, DisplayName: "Redis Secret", Consumed: true},
-	},
-	Requires:           []model.Stack{ChapDB, ChapValkey},
-	KubernetesResource: model.DeploymentResource,
-}
-
-var chapWorkerDefaults = struct {
-	chartVersion    string
-	imageTag        string
-	imagePullPolicy string
-}{
-	chartVersion:    "0.1.1",
-	imageTag:        "latest",
-	imagePullPolicy: always,
-}
-
-// Stack representing ../../stacks/chap-core/helmfile.yaml.gotmpl
-var ChapCore = model.Stack{
-	Name: "chap-core",
-	Parameters: model.StackParameters{
-		"IMAGE_TAG":                          {Priority: 1, DisplayName: "Image Tag", DefaultValue: &chapCoreDefaults.imageTag},
-		"IMAGE_PULL_POLICY":                  {Priority: 2, DisplayName: "Image Pull Policy", DefaultValue: &chapCoreDefaults.imagePullPolicy, Validator: imagePullPolicy},
-		"CHART_VERSION":                      {Priority: 3, DisplayName: "Chart Version", DefaultValue: &chapCoreDefaults.chartVersion},
-		"GOOGLE_SERVICE_ACCOUNT_EMAIL":       {Priority: 4, DisplayName: "Google Service Account Email", DefaultValue: &chapCoreDefaults.googleServiceAccountEmail, Sensitive: true},
-		"GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY": {Priority: 5, DisplayName: "Google Service Account Key", DefaultValue: &chapCoreDefaults.googleServiceAccountPrivateKey, Sensitive: true},
-		"DHIS2_USERNAME":                     {Priority: 6, DisplayName: "DHIS2 Username", DefaultValue: &chapCoreDefaults.dhis2Username},
-		"DHIS2_PASSWORD":                     {Priority: 7, DisplayName: "DHIS2 Password", DefaultValue: &chapCoreDefaults.dhis2Password, Sensitive: true},
-		"DATABASE_HOSTNAME":                  {Priority: 0, DisplayName: "Database Hostname", Consumed: true},
-		"DATABASE_SECRET":                    {Priority: 0, DisplayName: "Database Secret", Consumed: true},
-		"DATABASE_NAME":                      {Priority: 0, DisplayName: "Database Name", Consumed: true},
-		"REDIS_HOST":                         {Priority: 0, DisplayName: "Redis Host", Consumed: true},
-		"REDIS_SECRET":                       {Priority: 0, DisplayName: "Redis Secret", Consumed: true},
-	},
-	Requires:           []model.Stack{ChapDB, ChapValkey},
-	Companions:         []model.Stack{ChapWorker},
-	KubernetesResource: model.DeploymentResource,
-}
-
-var chapCoreDefaults = struct {
-	chartVersion                   string
-	imageTag                       string
-	imagePullPolicy                string
-	googleServiceAccountEmail      string
-	googleServiceAccountPrivateKey string
-	dhis2Username                  string
-	dhis2Password                  string
-}{
-	chartVersion:                   "0.1.9",
-	imageTag:                       "latest",
-	imagePullPolicy:                always,
-	googleServiceAccountEmail:      " ",
-	googleServiceAccountPrivateKey: " ",
-	dhis2Username:                  "system",
-	dhis2Password:                  "System123",
+	chartVersion:     "1.1.0",
+	imageTag:         "v2.1.0",
+	imagePullPolicy:  ifNotPresent,
+	dhis2Register:    "true",
+	dhis2Username:    "system",
+	dhis2Password:    "System123",
+	dbName:           "chap_core",
+	dbPassword:       "chap",
+	dbSize:           "10Gi",
+	dbVersion:        "17",
+	redisPassword:    "chap",
+	redisStorageSize: "10Gi",
 }
