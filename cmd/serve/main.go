@@ -170,7 +170,7 @@ func run() (err error) {
 	if err := setupGoogleOAuth(authConfig.SameSiteMode, authConfig.CookieSecure); err != nil {
 		return err
 	}
-	oauthHandler := user.NewOAuthHandler(logger, uiURL, authConfig.SameSiteMode, authConfig.CookieSecure, authConfig.AccessTokenExpirationSeconds, authConfig.RefreshTokenExpirationSeconds, userService, tokenService)
+	oauthHandler := user.NewOAuthHandler(logger, uiURL, authConfig.SameSiteMode, authConfig.CookieSecure, authConfig.AccessTokenExpirationSeconds, authConfig.RefreshTokenExpirationSeconds, authConfig.RefreshTokenRememberMeExpirationSeconds, userService, tokenService)
 
 	clusterRepository := cluster.NewRepository(db)
 	encryptor, err := newEncryptor(err)

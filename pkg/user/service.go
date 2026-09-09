@@ -125,9 +125,12 @@ func (s Service) ValidateEmail(ctx context.Context, token uuid.UUID) error {
 func (s Service) SignIn(ctx context.Context, email string, password string) (*model.User, error) {
 	const unauthorizedError = "invalid email and password combination"
 
+	// The client is deliberately told nothing beyond unauthorizedError, so log which half failed or
+	// there is no way to tell an unknown email from a wrong password after the fact.
 	user, err := s.repository.findByEmail(ctx, email)
 	if err != nil {
 		if errdef.IsNotFound(err) {
+			slog.Default().InfoContext(ctx, "sign-in rejected, no user with that email", "email", email)
 			return nil, errdef.NewUnauthorized(unauthorizedError)
 		}
 		return nil, err
@@ -139,6 +142,7 @@ func (s Service) SignIn(ctx context.Context, email string, password string) (*mo
 	}
 
 	if !match {
+		slog.Default().InfoContext(ctx, "sign-in rejected, password did not match", "userId", user.ID)
 		return nil, errdef.NewUnauthorized(unauthorizedError)
 	}
 

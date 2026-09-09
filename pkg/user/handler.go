@@ -25,30 +25,30 @@ import (
 
 func NewHandler(logger *slog.Logger, hostname string, sameSiteMode http.SameSite, cookieSecure bool, accessTokenExpirationSeconds int, refreshTokenExpirationSeconds int, refreshTokenRememberMeExpirationSeconds int, publicKey rsa.PublicKey, userService *Service, tokenService tokenService) Handler {
 	return Handler{
-		logger:                                  logger,
-		hostname:                                hostname,
-		sameSiteMode:                            sameSiteMode,
-		cookieSecure:                            cookieSecure,
-		accessTokenExpirationSeconds:            accessTokenExpirationSeconds,
-		refreshTokenExpirationSeconds:           refreshTokenExpirationSeconds,
-		refreshTokenRememberMeExpirationSeconds: refreshTokenRememberMeExpirationSeconds,
-		publicKey:                               publicKey,
-		userService:                             userService,
-		tokenService:                            tokenService,
+		logger:   logger,
+		hostname: hostname,
+		cookies: cookieWriter{
+			sameSiteMode:                            sameSiteMode,
+			cookieSecure:                            cookieSecure,
+			accessTokenExpirationSeconds:            accessTokenExpirationSeconds,
+			refreshTokenExpirationSeconds:           refreshTokenExpirationSeconds,
+			refreshTokenRememberMeExpirationSeconds: refreshTokenRememberMeExpirationSeconds,
+		},
+		accessTokenExpirationSeconds: accessTokenExpirationSeconds,
+		publicKey:                    publicKey,
+		userService:                  userService,
+		tokenService:                 tokenService,
 	}
 }
 
 type Handler struct {
-	logger                                  *slog.Logger
-	hostname                                string
-	sameSiteMode                            http.SameSite
-	cookieSecure                            bool
-	accessTokenExpirationSeconds            int
-	refreshTokenExpirationSeconds           int
-	refreshTokenRememberMeExpirationSeconds int
-	publicKey                               rsa.PublicKey
-	userService                             *Service
-	tokenService                            tokenService
+	logger                       *slog.Logger
+	hostname                     string
+	cookies                      cookieWriter
+	accessTokenExpirationSeconds int
+	publicKey                    rsa.PublicKey
+	userService                  *Service
+	tokenService                 tokenService
 }
 
 type tokenService interface {
@@ -251,7 +251,7 @@ func (h Handler) SignIn(c *gin.Context) {
 		return
 	}
 
-	h.setCookies(c, tokens, request.RememberMe)
+	h.cookies.set(c, tokens, request.RememberMe)
 
 	c.Status(http.StatusCreated)
 }
@@ -291,7 +291,7 @@ func (h Handler) RefreshToken(c *gin.Context) {
 	}
 
 	if refreshTokenString == "" {
-		_ = c.AbortWithError(http.StatusBadRequest, fmt.Errorf("refresh token not found"))
+		_ = c.Error(errdef.NewUnauthorized("session expired, please sign in again"))
 		return
 	}
 
@@ -322,20 +322,9 @@ func (h Handler) RefreshToken(c *gin.Context) {
 		return
 	}
 
-	h.setCookies(c, tokens, refreshToken.RememberMe)
+	h.cookies.set(c, tokens, refreshToken.RememberMe)
 
 	c.Status(http.StatusCreated)
-}
-
-func (h Handler) setCookies(c *gin.Context, tokens *token.Tokens, rememberMe bool) {
-	c.SetSameSite(h.sameSiteMode)
-	c.SetCookie("accessToken", tokens.AccessToken, h.accessTokenExpirationSeconds, "/", "", h.cookieSecure, true)
-	if rememberMe {
-		c.SetCookie("refreshToken", tokens.RefreshToken, h.refreshTokenRememberMeExpirationSeconds, "/refresh", "", h.cookieSecure, true)
-		c.SetCookie("rememberMe", "true", h.refreshTokenRememberMeExpirationSeconds, "/refresh", "", h.cookieSecure, true)
-	} else {
-		c.SetCookie("refreshToken", tokens.RefreshToken, h.refreshTokenExpirationSeconds, "/refresh", "", h.cookieSecure, true)
-	}
 }
 
 // Me user
@@ -385,7 +374,7 @@ func (h Handler) SignOut(c *gin.Context) {
 	//	415: Error
 
 	// No matter what happens, if the user sends a sign-out request, delete all cookies
-	unsetCookie(c)
+	h.cookies.unset(c)
 
 	user, err := h.parseRequest(c.Request)
 	if err != nil {
@@ -431,12 +420,6 @@ func (h Handler) parseRequest(request *http.Request) (*model.User, error) {
 	}
 
 	return &user, nil
-}
-
-func unsetCookie(c *gin.Context) {
-	c.SetCookie("accessToken", "", -1, "/", "", true, true)
-	c.SetCookie("refreshToken", "", -1, "/", "", true, true)
-	c.SetCookie("rememberMe", "", -1, "/", "", true, true)
 }
 
 // FindById user
