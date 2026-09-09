@@ -68,7 +68,7 @@ func TestUserHandler(t *testing.T) {
 
 	client := inttest.SetupHTTPServer(t, func(engine *gin.Engine) {
 		userHandler := user.NewHandler(logger, "hostname", http.SameSiteStrictMode, true, 10, 20, 30, key.PublicKey, userService, tokenService)
-		oauthHandler := user.NewOAuthHandler(logger, "http://localhost", http.SameSiteLaxMode, true, 10, 20, userService, tokenService)
+		oauthHandler := user.NewOAuthHandler(logger, "http://localhost", http.SameSiteLaxMode, true, 10, 20, 30, userService, tokenService)
 		user.Routes(engine, authentication, authorization, userHandler, oauthHandler)
 	})
 
@@ -136,54 +136,6 @@ func TestUserHandler(t *testing.T) {
 	t.Run("SignOut", func(t *testing.T) {
 		t.Parallel()
 
-		expires, err := time.Parse(time.RFC3339, "0001-01-01T00:00:00Z")
-		require.NoError(t, err)
-
-		expectedCookies := []*http.Cookie{
-			{
-				Name:       "accessToken",
-				Value:      "",
-				Path:       "/",
-				Domain:     "",
-				Expires:    expires,
-				RawExpires: "",
-				MaxAge:     -1,
-				Secure:     true,
-				HttpOnly:   true,
-				SameSite:   0,
-				Raw:        "accessToken=; Path=/; Max-Age=0; HttpOnly; Secure",
-				Unparsed:   nil,
-			},
-			{
-				Name:       "refreshToken",
-				Value:      "",
-				Path:       "/",
-				Domain:     "",
-				Expires:    expires,
-				RawExpires: "",
-				MaxAge:     -1,
-				Secure:     true,
-				HttpOnly:   true,
-				SameSite:   0,
-				Raw:        "refreshToken=; Path=/; Max-Age=0; HttpOnly; Secure",
-				Unparsed:   nil,
-			},
-			{
-				Name:       "rememberMe",
-				Value:      "",
-				Path:       "/",
-				Domain:     "",
-				Expires:    expires,
-				RawExpires: "",
-				MaxAge:     -1,
-				Secure:     true,
-				HttpOnly:   true,
-				SameSite:   0,
-				Raw:        "rememberMe=; Path=/; Max-Age=0; HttpOnly; Secure",
-				Unparsed:   nil,
-			},
-		}
-
 		t.Run("NoToken", func(t *testing.T) {
 			request := client.NewRequest(t, http.MethodDelete, "/users", nil)
 
@@ -191,7 +143,7 @@ func TestUserHandler(t *testing.T) {
 			require.NoError(t, err)
 
 			require.Equal(t, http.StatusUnauthorized, response.StatusCode)
-			assert.EqualValues(t, expectedCookies, response.Cookies())
+			assertClearedCookies(t, response.Cookies())
 		})
 
 		t.Run("ValidToken", func(t *testing.T) {
@@ -203,7 +155,7 @@ func TestUserHandler(t *testing.T) {
 			require.NoError(t, err)
 
 			require.Equal(t, http.StatusOK, response.StatusCode)
-			assert.EqualValues(t, expectedCookies, response.Cookies())
+			assertClearedCookies(t, response.Cookies())
 		})
 
 		t.Run("ExpiredToken", func(t *testing.T) {
@@ -216,7 +168,38 @@ func TestUserHandler(t *testing.T) {
 			require.NoError(t, err)
 
 			require.Equal(t, http.StatusOK, response.StatusCode)
-			assert.EqualValues(t, expectedCookies, response.Cookies())
+			assertClearedCookies(t, response.Cookies())
+		})
+	})
+
+	t.Run("SSORememberMeIntent", func(t *testing.T) {
+		t.Parallel()
+
+		// The provider round trip drops the query string, so BeginAuth has to stash the choice in a
+		// cookie for the callback. Lax or the cross-site redirect back would drop it.
+		t.Run("StashedWhenAsked", func(t *testing.T) {
+			request := client.NewRequest(t, http.MethodGet, "/auth/google?rememberMe=true", nil)
+
+			response, err := client.Client.Do(request)
+			require.NoError(t, err)
+			t.Cleanup(func() { require.NoError(t, response.Body.Close()) })
+
+			cookie := findCookieByName("oauthRememberMe", response.Cookies())
+			require.NotNil(t, cookie, "should stash the remember me choice for the callback")
+			assert.Equal(t, "true", cookie.Value)
+			assert.Equal(t, "/", cookie.Path)
+			assert.Equal(t, http.SameSiteLaxMode, cookie.SameSite)
+			assert.True(t, cookie.HttpOnly)
+		})
+
+		t.Run("NotStashedByDefault", func(t *testing.T) {
+			request := client.NewRequest(t, http.MethodGet, "/auth/google", nil)
+
+			response, err := client.Client.Do(request)
+			require.NoError(t, err)
+			t.Cleanup(func() { require.NoError(t, response.Body.Close()) })
+
+			assert.Nil(t, findCookieByName("oauthRememberMe", response.Cookies()))
 		})
 	})
 
@@ -370,6 +353,44 @@ func TestUserHandler(t *testing.T) {
 				refreshTokenCookie := findCookieByName("refreshToken", actualCookies)
 				require.NotNil(t, refreshTokenCookie)
 				assertCookie(t, refreshTokenCookie, "/refresh", 20, http.SameSiteStrictMode)
+			}
+
+			{
+				t.Log("RefreshAfterSignOut")
+
+				_, email, password := createUser(t, client, userService)
+				accessToken, refreshToken := client.SignIn(t, email, password)
+
+				signOutReq := client.NewRequest(t, http.MethodDelete, "/users", nil, inttest.WithAuthToken(accessToken.Value))
+				signOutResp, err := client.Client.Do(signOutReq)
+				require.NoError(t, err)
+				t.Cleanup(func() { require.NoError(t, signOutResp.Body.Close()) })
+				require.Equal(t, http.StatusOK, signOutResp.StatusCode)
+
+				// Sign-out revokes the refresh token server side, so a browser that kept the cookie
+				// must be told the session is over rather than being handed a new one.
+				request := client.NewRequest(t, http.MethodPost, "/refresh", jsonBody(`{}`), inttest.WithHeader("Content-Type", "application/json"))
+				cookie := &http.Cookie{Name: "refreshToken", Value: refreshToken.Value, Path: "/refresh"}
+				require.NoError(t, cookie.Valid())
+				request.AddCookie(cookie)
+
+				response, err := client.Client.Do(request)
+				require.NoError(t, err)
+				t.Cleanup(func() { require.NoError(t, response.Body.Close()) })
+
+				assert.Equal(t, http.StatusUnauthorized, response.StatusCode)
+			}
+
+			{
+				t.Log("RefreshWithoutToken")
+
+				request := client.NewRequest(t, http.MethodPost, "/refresh", jsonBody(`{}`), inttest.WithHeader("Content-Type", "application/json"))
+
+				response, err := client.Client.Do(request)
+				require.NoError(t, err)
+				t.Cleanup(func() { require.NoError(t, response.Body.Close()) })
+
+				assert.Equal(t, http.StatusUnauthorized, response.StatusCode)
 			}
 
 			{
@@ -593,6 +614,19 @@ func TestUserHandler(t *testing.T) {
 			client.Do(t, http.MethodGet, path, nil, http.StatusNotFound, inttest.WithAuthToken(adminAccessToken.Value))
 		}
 	})
+}
+
+func assertClearedCookies(t *testing.T, cookies []*http.Cookie) {
+	t.Helper()
+
+	// A cookie is identified by name, domain and path, so clearing one only works when these match
+	// the values it was set with.
+	for name, path := range map[string]string{"accessToken": "/", "refreshToken": "/refresh", "rememberMe": "/refresh"} {
+		cookie := findCookieByName(name, cookies)
+		require.NotNil(t, cookie, "expected %s to be cleared", name)
+		assert.Empty(t, cookie.Value)
+		assertCookie(t, cookie, path, -1, http.SameSiteStrictMode)
+	}
 }
 
 func assertCookie(t *testing.T, cookie *http.Cookie, path string, maxAge int, sameSiteMode http.SameSite) {
