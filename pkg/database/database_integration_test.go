@@ -104,7 +104,7 @@ func TestDatabaseHandler(t *testing.T) {
 		instance := &model.DeploymentInstance{
 			Name:         "name",
 			GroupName:    "group-name",
-			StackName:    "dhis2",
+			StackName:    "dhis2-v2",
 			DeploymentID: deployment.ID,
 		}
 		db.Create(instance)
@@ -341,7 +341,7 @@ func TestSaveLockedUnlocksOnDumpFailure(t *testing.T) {
 	instance := &model.DeploymentInstance{
 		Name:         "name",
 		GroupName:    "group-name",
-		StackName:    "dhis2",
+		StackName:    "dhis2-v2",
 		DeploymentID: deployment.ID,
 	}
 	db.Create(instance)

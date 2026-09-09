@@ -19,41 +19,17 @@ func (s Service) Components(stackName string) ([]kube.Component, error) {
 }
 
 // Concrete component types are named for the chart/technology they operate on; the Kubernetes
-// workload kind behind each is an implementation detail of its Restart. This is what lets a future
-// dhis2 stack swap BitnamiPostgresComponent for CNPGPostgresComponent in its definition alone,
-// bringing operations specific to that technology (e.g. CNPG's native S3 backup) without any
-// dispatch changes.
+// workload kind behind each is an implementation detail of its Restart. A stack changing the
+// technology it deploys therefore swaps one component type for another in its definition alone,
+// bringing operations specific to that technology without any dispatch changes.
 
-// DHIS2CoreComponent operates on the dhis2-core chart's Deployment.
+// DHIS2CoreComponent operates on the DHIS 2 core Deployment the dhis2 chart deploys.
 type DHIS2CoreComponent struct {
 	kube.BaseComponent
 }
 
 func (c DHIS2CoreComponent) Restart(ctx context.Context, client *kube.Client, instance *model.DeploymentInstance) error {
 	return client.RestartDeployment(ctx, instance, c.Name)
-}
-
-// BitnamiPostgresComponent operates on the Bitnami PostgreSQL chart's StatefulSet.
-type BitnamiPostgresComponent struct {
-	kube.BaseComponent
-}
-
-func (c BitnamiPostgresComponent) Restart(ctx context.Context, client *kube.Client, instance *model.DeploymentInstance) error {
-	return client.RestartStatefulSet(ctx, instance, c.Name)
-}
-
-const bitnamiPostgresContainer = "postgresql"
-
-// PostgresPod returns the component's single pod, located by the im labels its chart applies.
-func (c BitnamiPostgresComponent) PostgresPod(ctx context.Context, client *kube.Client, instance *model.DeploymentInstance) (string, string, error) {
-	replicas, err := c.Replicas(ctx, client, instance)
-	if err != nil {
-		return "", "", err
-	}
-	if len(replicas) == 0 {
-		return "", "", errdef.NewNotFound("no postgres pod found for component %q", c.Name)
-	}
-	return replicas[0].Name, bitnamiPostgresContainer, nil
 }
 
 // CNPGPostgresComponent operates on a CloudNativePG-managed PostgreSQL cluster. Restart goes

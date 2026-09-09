@@ -20,21 +20,46 @@ func reencryptCFBToGCM() *gormigrate.Migration {
 	const gcmPrefix = "v2:"
 
 	allStacks := []stack.Stack{
-		stack.DHIS2DB,
-		stack.MINIO,
-		stack.DHIS2Core,
-		stack.DHIS2,
 		stack.PgAdmin,
 		stack.WhoamiGo,
 	}
 
 	// Stacks removed after this migration shipped: the chap-* ones replaced by the chap umbrella
-	// stack, and im-job-runner retired outright. Their sensitive parameters are frozen here so rows
-	// of instances deployed from them are still re-encrypted.
+	// stack, im-job-runner retired outright, and the four the component model replaced. Their
+	// sensitive parameters are frozen here so rows of instances deployed from them are still
+	// re-encrypted.
 	sensitive := map[string]map[string]bool{
 		"im-job-runner": {
 			"DHIS2_DATABASE_PASSWORD": true,
 			"DHIS2_DATABASE_USERNAME": true,
+		},
+		"minio": {},
+		"dhis2-db": {
+			"DATABASE_PASSWORD": true,
+			"DATABASE_USERNAME": true,
+		},
+		"dhis2": {
+			"DATABASE_PASSWORD":          true,
+			"DATABASE_USERNAME":          true,
+			"GOOGLE_AUTH_PROJECT_ID":     true,
+			"GOOGLE_AUTH_PRIVATE_KEY":    true,
+			"GOOGLE_AUTH_PRIVATE_KEY_ID": true,
+			"GOOGLE_AUTH_CLIENT_EMAIL":   true,
+			"GOOGLE_AUTH_CLIENT_ID":      true,
+		},
+		"dhis2-core": {
+			"DATABASE_PASSWORD":          true,
+			"DATABASE_USERNAME":          true,
+			"S3_REGION":                  true,
+			"S3_IDENTITY":                true,
+			"S3_SECRET":                  true,
+			"FILESYSTEM_VOLUME_SIZE":     true,
+			"CUSTOM_DHIS2_CONFIG":        true,
+			"GOOGLE_AUTH_PROJECT_ID":     true,
+			"GOOGLE_AUTH_PRIVATE_KEY":    true,
+			"GOOGLE_AUTH_PRIVATE_KEY_ID": true,
+			"GOOGLE_AUTH_CLIENT_EMAIL":   true,
+			"GOOGLE_AUTH_CLIENT_ID":      true,
 		},
 		"chap-db":     {"DATABASE_PASSWORD": true},
 		"chap-valkey": {"REDIS_PASSWORD": true},

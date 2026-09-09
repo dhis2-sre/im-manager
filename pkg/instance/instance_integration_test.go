@@ -42,6 +42,7 @@ import (
 
 func TestInstanceHandler(t *testing.T) {
 	k8sClient := inttest.SetupK8s(t)
+	k8sClient.InstallCNPG(t)
 
 	err := createNamespace(t, k8sClient, "group-name")
 	require.NoError(t, err, "failed to create test namespace")
@@ -100,11 +101,8 @@ func TestInstanceHandler(t *testing.T) {
 	require.NoError(t, err)
 	groupService := groupService{group: group}
 	stacks := stack.Stacks{
-		"minio":      stack.MINIO,
-		"whoami-go":  stack.WhoamiGo,
-		"dhis2-db":   stack.DHIS2DB,
-		"dhis2-core": stack.DHIS2Core,
-		"dhis2":      stack.DHIS2,
+		"whoami-go": stack.WhoamiGo,
+		"dhis2-v2":  stack.DHIS2V2,
 	}
 	stackService := stack.NewService(stacks)
 	// classification 'test' does not actually exist, this is used to decrypt the stack parameters
@@ -118,8 +116,6 @@ func TestInstanceHandler(t *testing.T) {
 	// blew through the previous 100 seconds.
 	tokenService, err := token.NewService(logger, tokenRepository, privateKey, 3600, 60, "secret", 3600, 3600)
 	require.NoError(t, err, "failed to create token service")
-	instanceService := instance.NewService(logger, instanceRepo, groupService, stackService, helmfileService, nil, "", kube.NewClients(slog.Default()))
-
 	s3Dir := t.TempDir()
 	s3Bucket := "database-bucket"
 	err = os.Mkdir(s3Dir+"/"+s3Bucket, 0o755)
@@ -127,6 +123,7 @@ func TestInstanceHandler(t *testing.T) {
 	s3 := inttest.SetupS3(t, s3Dir)
 	uploader := manager.NewUploader(s3.Client)
 	s3Client := storage.NewS3Client(logger, s3.Client, uploader)
+	instanceService := instance.NewService(logger, instanceRepo, groupService, stackService, helmfileService, s3Client, s3Bucket, kube.NewClients(slog.Default()))
 	databaseRepository := database.NewRepository(db)
 	databaseService := database.NewService(logger, s3Bucket, s3Client, groupService, databaseRepository, kube.NewClient, noopPublisher{})
 	deploymentService := deployment.NewService(logger, instanceService, databaseService, tokenService, noopPublisher{})
@@ -260,13 +257,10 @@ func TestInstanceHandler(t *testing.T) {
 
 	t.Run("GetPublicDeployments", func(t *testing.T) {
 		t.Parallel()
-		acquireHeavyDeploy(t)
 		privateDeployment := createDeployment(t, client, "private-deployment", tokens.AccessToken)
-		createDHIS2DBInstance(t, client, privateDeployment.ID, databaseID, tokens.AccessToken)
-		createDHIS2CoreInstance(t, client, privateDeployment.ID, tokens.AccessToken)
+		createDHIS2V2Instance(t, client, privateDeployment.ID, databaseID, tokens.AccessToken)
 		publicDeployment := createDeployment(t, client, "dev-public-deployment", tokens.AccessToken)
-		createDHIS2DBInstance(t, client, publicDeployment.ID, databaseID, tokens.AccessToken)
-		createDHIS2CoreInstance(t, client, publicDeployment.ID, tokens.AccessToken, WithPublic(true))
+		createDHIS2V2Instance(t, client, publicDeployment.ID, databaseID, tokens.AccessToken, WithPublic(true))
 
 		var groupsWithInstances []instance.GroupWithPublicInstances
 		client.GetJSON(t, "/instances/public", &groupsWithInstances)
@@ -279,92 +273,107 @@ func TestInstanceHandler(t *testing.T) {
 		assert.Equal(t, "https://some/dev-public-deployment", instances[0].Hostname)
 	})
 
-	t.Run("DeploymentWithCompanionStack", func(t *testing.T) {
-		t.Parallel()
-		acquireHeavyDeploy(t)
-		deployment := createDeployment(t, client, "companion-deployment", tokens.AccessToken, WithDescription("some description"))
-		deploymentInstance := createDHIS2DBInstance(t, client, deployment.ID, databaseID, tokens.AccessToken)
-		deploymentInstance = createMinioInstance(t, client, deployment.ID, tokens.AccessToken)
-		deploymentInstance = createDHIS2CoreInstance(t, client, deployment.ID, tokens.AccessToken, WithParameter("ALLOW_SUSPEND", "false"))
-		groupedName := fmt.Sprintf("%s-%d", deploymentInstance.Name, deploymentInstance.Group.ID)
+	t.Run("DHIS2V2Deployment", func(t *testing.T) {
+		// not parallel: one dhis2-v2 deploy carries core, a CloudNativePG cluster and minio, so it
+		// is shared by every assertion below rather than repeated per subtest.
+		seedID := database.UploadTestDatabase(t, client, "v2-save-test.sql.gz", "select now();", "group-name", inttest.WithAuthToken(tokens.AccessToken))
 
-		deployDeployment(t, client, deployment.ID, tokens.AccessToken)
-		k8sClient.AssertPodIsReady(t, deploymentInstance.Group.Namespace, groupedName+"-database", 30)
-		k8sClient.AssertPodIsReady(t, deploymentInstance.Group.Namespace, groupedName+"-minio", 30)
-		k8sClient.AssertPodIsReady(t, deploymentInstance.Group.Namespace, deploymentInstance.Name, 90, deploymentInstance.Group.ID)
-
-		destroyDeployment(t, client, deployment.ID, tokens.AccessToken)
-		k8sClient.AssertPodIsNotRunning(t, deploymentInstance.Group.Namespace, deploymentInstance.Name, 10, deploymentInstance.Group.ID)
-		k8sClient.AssertPodIsNotRunning(t, deploymentInstance.Group.Namespace, groupedName+"-minio", 30)
-		k8sClient.AssertPodIsNotRunning(t, deploymentInstance.Group.Namespace, groupedName+"-database", 10)
-	})
-
-	t.Run("FilestoreBackupMinioViaExec", func(t *testing.T) {
-		t.Parallel()
-		acquireHeavyDeploy(t)
-
-		deployment := createDeployment(t, client, "fs-backup-deployment", tokens.AccessToken)
-		createDHIS2DBInstance(t, client, deployment.ID, databaseID, tokens.AccessToken)
-		createMinioInstance(t, client, deployment.ID, tokens.AccessToken)
-		coreInstance := createDHIS2CoreInstance(t, client, deployment.ID, tokens.AccessToken, WithParameter("ALLOW_SUSPEND", "false"))
+		deployment := createDeployment(t, client, "v2-deployment", tokens.AccessToken, WithDescription("some description"))
+		coreInstance := createDHIS2V2Instance(t, client, deployment.ID, seedID, tokens.AccessToken)
 
 		deployDeployment(t, client, deployment.ID, tokens.AccessToken)
 
-		groupedName := fmt.Sprintf("%s-%d", coreInstance.Name, coreInstance.Group.ID)
-		k8sClient.AssertPodIsReady(t, coreInstance.Group.Namespace, groupedName+"-minio", 120)
-
-		// seed an object into the minio bucket via exec
 		ks, err := kube.NewClient(group.Cluster)
 		require.NoError(t, err)
+		corePod, coreContainer := waitForCorePodRunning(t, k8sClient, coreInstance.Group.Namespace, coreInstance.ID, 300*time.Second)
+		assertCoreHeapBounded(t, ks, coreInstance.Group.Namespace, corePod, coreContainer, testCoreMaxHeapSize)
 		minioPod := minioPodName(t, k8sClient, coreInstance.Group.Namespace, deployment.ID)
-		// create the bucket; the stack creates it asynchronously and we'd otherwise race it
-		seedScript := `mc alias set local http://127.0.0.1:9000 dhisdhis dhisdhis >/dev/null 2>&1; mc mb --ignore-existing local/dhis2 >/dev/null 2>&1; printf 'hello-filestore' > /tmp/marker.txt; mc cp --quiet /tmp/marker.txt local/dhis2/seeded/marker.txt`
-		var seedOut, seedErr strings.Builder
-		require.NoError(t, ks.Exec(context.Background(), coreInstance.Group.Namespace, minioPod, "minio", []string{"sh", "-c", seedScript}, &seedOut, &seedErr), "seed failed: %s", seedErr.String())
 
-		// FilestoreBackup links the filestore to an existing (SaveAs target) database row.
-		target := &model.Database{Name: "fs-backup-target.sql.gz", GroupName: "group-name", Type: "database", Slug: "group-name/fs-backup-target", UserID: user.ID}
-		require.NoError(t, db.Create(target).Error)
+		t.Run("FilestoreBackupMinioViaExec", func(t *testing.T) {
+			// create the bucket; the chart creates it asynchronously and we would otherwise race it
+			seedScript := `mc alias set local http://127.0.0.1:9000 dhisdhis dhisdhis >/dev/null 2>&1; mc mb --ignore-existing local/dhis2 >/dev/null 2>&1; printf 'hello-filestore' > /tmp/marker.txt; mc cp --quiet /tmp/marker.txt local/dhis2/seeded/marker.txt`
+			var seedOut, seedErr strings.Builder
+			require.NoError(t, ks.Exec(context.Background(), coreInstance.Group.Namespace, minioPod, "minio", []string{"sh", "-c", seedScript}, &seedOut, &seedErr), "seed failed: %s", seedErr.String())
 
-		// The shared instanceService is wired with a nil S3 client; build one with the real client.
-		fsService := instance.NewService(logger, instanceRepo, groupService, stackService, helmfileService, s3Client, s3Bucket, kube.NewClients(slog.Default()))
-		// minio can briefly refuse connections right after its pod reports ready (the server
-		// restarts during first-run setup), so retry until it is serving. FilestoreBackup returns
-		// before recording anything when the mirror fails, so retries are side-effect free.
-		require.EventuallyWithT(t, func(c *assert.CollectT) {
-			assert.NoError(c, fsService.FilestoreBackup(context.Background(), &coreInstance, target.Name, target))
-		}, 90*time.Second, 3*time.Second, "filestore backup should succeed once minio is serving")
+			// FilestoreBackup links the filestore to an existing (SaveAs target) database row.
+			target := &model.Database{Name: "fs-backup-target.sql.gz", GroupName: "group-name", Type: "database", Slug: "group-name/fs-backup-target", UserID: user.ID}
+			require.NoError(t, db.Create(target).Error)
 
-		content := s3.GetObject(t, s3Bucket, "group-name/fs-backup-target-fs.tar.gz")
-		require.NotEmpty(t, content)
-		entries := extractTarGzEntries(t, content)
-		assert.Equal(t, "hello-filestore", string(entries["seeded/marker.txt"]))
-		assert.Contains(t, rawTarGzNames(t, content), "./seeded/marker.txt",
-			"backup must tar with ./-relative keys so restore reproduces the original object key")
+			// minio can briefly refuse connections right after its pod reports ready (the server
+			// restarts during first-run setup), so retry until it is serving. FilestoreBackup returns
+			// before recording anything when the mirror fails, so retries are side-effect free.
+			require.EventuallyWithT(t, func(c *assert.CollectT) {
+				assert.NoError(c, instanceService.FilestoreBackup(context.Background(), &coreInstance, target.Name, target))
+			}, 90*time.Second, 3*time.Second, "filestore backup should succeed once minio is serving")
 
-		var saved model.Database
-		require.NoError(t, db.First(&saved, target.ID).Error)
-		assert.NotZero(t, saved.FilestoreID)
+			content := s3.GetObject(t, s3Bucket, "group-name/fs-backup-target-fs.tar.gz")
+			require.NotEmpty(t, content)
+			entries := extractTarGzEntries(t, content)
+			assert.Equal(t, "hello-filestore", string(entries["seeded/marker.txt"]))
+			assert.Contains(t, rawTarGzNames(t, content), "./seeded/marker.txt",
+				"backup must tar with ./-relative keys so restore reproduces the original object key")
+
+			var saved model.Database
+			require.NoError(t, db.First(&saved, target.ID).Error)
+			assert.NotZero(t, saved.FilestoreID)
+		})
+
+		t.Run("SaveAsDatabase", func(t *testing.T) {
+			body := strings.NewReader(`{"name": "saved-copy.sql.gz", "format": "plain"}`)
+			var savedDB model.Database
+			instanceIDStr := strconv.FormatUint(uint64(coreInstance.ID), 10)
+			client.PostJSON(t, "/databases/save-as/"+instanceIDStr, body, &savedDB, inttest.WithAuthToken(tokens.AccessToken))
+
+			assert.Equal(t, "saved-copy.sql.gz", savedDB.Name)
+			assert.Equal(t, "group-name", savedDB.GroupName)
+
+			require.Eventually(t, func() bool {
+				var d model.Database
+				if err := db.First(&d, savedDB.ID).Error; err != nil {
+					return false
+				}
+				return d.Url != ""
+			}, 180*time.Second, 500*time.Millisecond, "database URL should be set by async goroutine")
+
+			var finalDB model.Database
+			require.NoError(t, db.First(&finalDB, savedDB.ID).Error)
+			assert.Equal(t, fmt.Sprintf("s3://%s/group-name/saved-copy.sql.gz", s3Bucket), finalDB.Url)
+			assert.Greater(t, finalDB.Size, int64(0))
+
+			s3Content := s3.GetObject(t, s3Bucket, "group-name/saved-copy.sql.gz")
+			assert.Greater(t, len(s3Content), 0, "S3 object should have content")
+		})
+
+		t.Run("SaveDatabase", func(t *testing.T) {
+			originalSize := len(s3.GetObject(t, s3Bucket, "group-name/v2-save-test.sql.gz"))
+
+			instanceIDStr := strconv.FormatUint(uint64(coreInstance.ID), 10)
+			client.Do(t, http.MethodPost, "/databases/save/"+instanceIDStr, nil, http.StatusAccepted, inttest.WithAuthToken(tokens.AccessToken))
+
+			require.Eventually(t, func() bool {
+				content, err := s3.TryGetObject(s3Bucket, "group-name/v2-save-test.sql.gz")
+				return err == nil && len(content) > originalSize
+			}, 180*time.Second, 500*time.Millisecond, "saved database in S3 should grow beyond the uploaded placeholder")
+		})
 
 		destroyDeployment(t, client, deployment.ID, tokens.AccessToken)
+		requireNoPodsMatching(t, k8sClient, coreInstance.Group.Namespace, fmt.Sprintf("im-id=%d,im-default=true", coreInstance.ID), 120*time.Second)
+		requireNoPodsMatching(t, k8sClient, coreInstance.Group.Namespace, fmt.Sprintf("im-type=minio,im-deployment-id=%d", deployment.ID), 120*time.Second)
 	})
 
 	t.Run("FilestoreBackupFilesystemViaExec", func(t *testing.T) {
-		// not parallel: a full dhis2-core deploy is heavy; running it outside the parallel batch avoids starving the runner
-
-		// STORAGE_TYPE=filesystem: no minio stack; the filestore lives on a PVC in the core pod
+		// not parallel: another full dhis2-v2 deploy, and STORAGE_TYPE is fixed at deploy time, so
+		// the filesystem backend cannot share the deployment above
 		deployment := createDeployment(t, client, "fsstore-backup-deployment", tokens.AccessToken)
-		createDHIS2DBInstance(t, client, deployment.ID, databaseID, tokens.AccessToken)
-		coreInstance := createDHIS2CoreInstance(t, client, deployment.ID, tokens.AccessToken,
-			WithParameter("STORAGE_TYPE", "filesystem"),
-			WithParameter("ALLOW_SUSPEND", "false"))
+		coreInstance := createDHIS2V2Instance(t, client, deployment.ID, databaseID, tokens.AccessToken,
+			WithParameter("STORAGE_TYPE", "filesystem"))
 
 		deployDeployment(t, client, deployment.ID, tokens.AccessToken)
 
 		// the backup execs into the core pod, so wait for Running, not Ready
 		ks, err := kube.NewClient(group.Cluster)
 		require.NoError(t, err)
-		corePod, coreContainer := waitForCorePodRunning(t, k8sClient, coreInstance.Group.Namespace, coreInstance.ID, 120*time.Second)
+		corePod, coreContainer := waitForCorePodRunning(t, k8sClient, coreInstance.Group.Namespace, coreInstance.ID, 300*time.Second)
 
 		assertCoreHeapBounded(t, ks, coreInstance.Group.Namespace, corePod, coreContainer, testCoreMaxHeapSize)
 
@@ -376,9 +385,7 @@ func TestInstanceHandler(t *testing.T) {
 		target := &model.Database{Name: "fsstore-backup-target.sql.gz", GroupName: "group-name", Type: "database", Slug: "group-name/fsstore-backup-target", UserID: user.ID}
 		require.NoError(t, db.Create(target).Error)
 
-		// The shared instanceService is wired with a nil S3 client; build one with the real client.
-		fsService := instance.NewService(logger, instanceRepo, groupService, stackService, helmfileService, s3Client, s3Bucket, kube.NewClients(slog.Default()))
-		require.NoError(t, fsService.FilestoreBackup(context.Background(), &coreInstance, target.Name, target))
+		require.NoError(t, instanceService.FilestoreBackup(context.Background(), &coreInstance, target.Name, target))
 
 		content := s3.GetObject(t, s3Bucket, "group-name/fsstore-backup-target-fs.tar.gz")
 		require.NotEmpty(t, content)
@@ -390,70 +397,6 @@ func TestInstanceHandler(t *testing.T) {
 		var saved model.Database
 		require.NoError(t, db.First(&saved, target.ID).Error)
 		assert.NotZero(t, saved.FilestoreID)
-
-		destroyDeployment(t, client, deployment.ID, tokens.AccessToken)
-	})
-
-	t.Run("SaveAsDatabase", func(t *testing.T) {
-		t.Parallel()
-		acquireHeavyDeploy(t)
-		deployment := createDeployment(t, client, "save-as-deployment", tokens.AccessToken)
-		dbInstance := createDHIS2DBInstance(t, client, deployment.ID, databaseID, tokens.AccessToken)
-
-		deployDeployment(t, client, deployment.ID, tokens.AccessToken)
-		groupedName := fmt.Sprintf("%s-%d", dbInstance.Name, dbInstance.Group.ID)
-		k8sClient.AssertPodIsReady(t, dbInstance.Group.Namespace, groupedName+"-database", 60)
-
-		body := strings.NewReader(`{"name": "saved-copy.sql.gz", "format": "plain"}`)
-		var savedDB model.Database
-		instanceIDStr := strconv.FormatUint(uint64(dbInstance.ID), 10)
-		client.PostJSON(t, "/databases/save-as/"+instanceIDStr, body, &savedDB, inttest.WithAuthToken(tokens.AccessToken))
-
-		assert.Equal(t, "saved-copy.sql.gz", savedDB.Name)
-		assert.Equal(t, "group-name", savedDB.GroupName)
-
-		require.Eventually(t, func() bool {
-			var d model.Database
-			if err := db.First(&d, savedDB.ID).Error; err != nil {
-				return false
-			}
-			return d.Url != ""
-		}, 180*time.Second, 500*time.Millisecond, "database URL should be set by async goroutine")
-
-		var finalDB model.Database
-		err := db.First(&finalDB, savedDB.ID).Error
-		require.NoError(t, err)
-		assert.Equal(t, fmt.Sprintf("s3://%s/group-name/saved-copy.sql.gz", s3Bucket), finalDB.Url)
-		assert.Greater(t, finalDB.Size, int64(0))
-
-		s3Content := s3.GetObject(t, s3Bucket, "group-name/saved-copy.sql.gz")
-		assert.Greater(t, len(s3Content), 0, "S3 object should have content")
-
-		destroyDeployment(t, client, deployment.ID, tokens.AccessToken)
-	})
-
-	t.Run("SaveDatabase", func(t *testing.T) {
-		t.Parallel()
-		acquireHeavyDeploy(t)
-
-		dbID := database.UploadTestDatabase(t, client, "save-test.sql.gz", "select now();", "group-name", inttest.WithAuthToken(tokens.AccessToken))
-
-		deployment := createDeployment(t, client, "save-deployment", tokens.AccessToken)
-		dbInstance := createDHIS2DBInstance(t, client, deployment.ID, dbID, tokens.AccessToken)
-
-		deployDeployment(t, client, deployment.ID, tokens.AccessToken)
-		groupedName := fmt.Sprintf("%s-%d", dbInstance.Name, dbInstance.Group.ID)
-		k8sClient.AssertPodIsReady(t, dbInstance.Group.Namespace, groupedName+"-database", 60)
-
-		originalSize := len(s3.GetObject(t, s3Bucket, "group-name/save-test.sql.gz"))
-
-		instanceIDStr := strconv.FormatUint(uint64(dbInstance.ID), 10)
-		client.Do(t, http.MethodPost, "/databases/save/"+instanceIDStr, nil, http.StatusAccepted, inttest.WithAuthToken(tokens.AccessToken))
-
-		require.Eventually(t, func() bool {
-			content, err := s3.TryGetObject(s3Bucket, "group-name/save-test.sql.gz")
-			return err == nil && len(content) > originalSize
-		}, 180*time.Second, 500*time.Millisecond, "saved database in S3 should grow beyond the uploaded placeholder")
 
 		destroyDeployment(t, client, deployment.ID, tokens.AccessToken)
 	})
@@ -470,22 +413,18 @@ func TestInstanceHandler(t *testing.T) {
 
 	t.Run("UpdateDeploymentInstance", func(t *testing.T) {
 		t.Parallel()
-		acquireHeavyDeploy(t)
 		deployment := createDeployment(t, client, "test-deployment-instance-update", tokens.AccessToken, WithDescription("some description"))
 
-		createDHIS2DBInstance(t, client, deployment.ID, databaseID, tokens.AccessToken)
-		createMinioInstance(t, client, deployment.ID, tokens.AccessToken)
-		deploymentInstance := createDHIS2CoreInstance(t, client, deployment.ID, tokens.AccessToken,
-			WithParameter("IMAGE_TAG", "2.42.0"),
-			WithParameter("ALLOW_SUSPEND", "false"),
+		deploymentInstance := createWhoamiInstance(t, client, deployment.ID, tokens.AccessToken,
+			WithParameter("IMAGE_TAG", "0.6.0"),
 			WithPublic(false))
 
 		updatedInstance := updateInstance(t, client, deploymentInstance, tokens.AccessToken,
-			WithParameter("IMAGE_TAG", "2.43.0"),
+			WithParameter("IMAGE_TAG", "0.7.0"),
 			WithPublic(true))
 
 		assert.Equal(t, deploymentInstance.ID, updatedInstance.ID)
-		assert.Equal(t, "2.43.0", updatedInstance.Parameters["IMAGE_TAG"].Value)
+		assert.Equal(t, "0.7.0", updatedInstance.Parameters["IMAGE_TAG"].Value)
 		assert.True(t, updatedInstance.Public)
 	})
 

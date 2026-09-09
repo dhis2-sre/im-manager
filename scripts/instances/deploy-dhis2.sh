@@ -18,18 +18,17 @@ DATABASE_SIZE=${DATABASE_SIZE:-20Gi}
 DB_RESOURCES_REQUESTS_CPU=${DB_RESOURCES_REQUESTS_CPU:-250m}
 DB_RESOURCES_REQUESTS_MEMORY=${DB_RESOURCES_REQUESTS_MEMORY:-256Mi}
 
-MINIO_CHART_VERSION=${MINIO_CHART_VERSION:-14.7.5}
+STORAGE_TYPE=${STORAGE_TYPE:-minio}
 MINIO_STORAGE_SIZE=${MINIO_STORAGE_SIZE:-8Gi}
-MINIO_IMAGE_PULL_POLICY=${MINIO_IMAGE_PULL_POLICY:-IfNotPresent}
 
-CHART_VERSION=${CHART_VERSION:-0.31.0}
+CHART_VERSION=${CHART_VERSION:-1.0.1}
 MIN_READY_SECONDS=${MIN_READY_SECONDS:-120}
 # container(s) in dhis2 pod will be restarted after that due to restartPolicy
 # 5*26=130s
 STARTUP_PROBE_FAILURE_THRESHOLD=${STARTUP_PROBE_FAILURE_THRESHOLD:-26}
 STARTUP_PROBE_PERIOD_SECONDS=${STARTUP_PROBE_PERIOD_SECONDS:-5}
 LIVENESS_PROBE_TIMEOUT_SECONDS=${LIVENESS_PROBE_TIMEOUT_SECONDS:-1}
-READINESS_PROBE_TIMEOUT_SECONDS=${LIVENESS_PROBE_TIMEOUT_SECONDS:-1}
+READINESS_PROBE_TIMEOUT_SECONDS=${READINESS_PROBE_TIMEOUT_SECONDS:-1}
 IMAGE_REPOSITORY=${IMAGE_REPOSITORY:-core}
 IMAGE_PULL_POLICY=${IMAGE_PULL_POLICY:-IfNotPresent}
 IMAGE_TAG=${IMAGE_TAG:-2.42}
@@ -38,8 +37,6 @@ CORE_RESOURCES_REQUESTS_MEMORY=${CORE_RESOURCES_REQUESTS_MEMORY:-1500Mi}
 FLYWAY_MIGRATE_OUT_OF_ORDER=${FLYWAY_MIGRATE_OUT_OF_ORDER:-false}
 FLYWAY_REPAIR_BEFORE_MIGRATION=${FLYWAY_REPAIR_BEFORE_MIGRATION:-false}
 ENABLE_QUERY_LOGGING=${ENABLE_QUERY_LOGGING:-false}
-ALLOW_SUSPEND=${ALLOW_SUSPEND:-true}
-STORAGE_TYPE=${STORAGE_TYPE:-filesystem}
 
 DEPLOYMENT_ID=$(echo "{
   \"name\": \"$NAME\",
@@ -49,7 +46,8 @@ DEPLOYMENT_ID=$(echo "{
 }" | $HTTP post "$IM_HOST/deployments" "Authorization: Bearer $ACCESS_TOKEN" | jq -r '.id')
 
 echo "{
-  \"stackName\": \"dhis2-db\",
+  \"stackName\": \"dhis2-v2\",
+  \"public\": $PUBLIC,
   \"parameters\": {
     \"DATABASE_ID\": {
       \"value\": \"$DATABASE_ID\"
@@ -57,42 +55,23 @@ echo "{
     \"DATABASE_SIZE\": {
       \"value\": \"$DATABASE_SIZE\"
     },
-    \"RESOURCES_REQUESTS_CPU\": {
+    \"DB_RESOURCES_REQUESTS_CPU\": {
       \"value\": \"$DB_RESOURCES_REQUESTS_CPU\"
     },
-    \"RESOURCES_REQUESTS_MEMORY\": {
+    \"DB_RESOURCES_REQUESTS_MEMORY\": {
       \"value\": \"$DB_RESOURCES_REQUESTS_MEMORY\"
-    }
-  }
-}" | $HTTP post "$IM_HOST/deployments/$DEPLOYMENT_ID/instance" "Authorization: Bearer $ACCESS_TOKEN"
-
-echo "{
-  \"stackName\": \"minio\",
-  \"parameters\": {
+    },
+    \"STORAGE_TYPE\": {
+      \"value\": \"$STORAGE_TYPE\"
+    },
     \"MINIO_STORAGE_SIZE\": {
-      \"value\": \"8Gi\"
+      \"value\": \"$MINIO_STORAGE_SIZE\"
     },
-    \"MINIO_CHART_VERSION\": {
-      \"value\": \"14.7.5\"
-    },
-    \"IMAGE_PULL_POLICY\": {
-      \"value\": \"IfNotPresent\"
-    }
-  }
-}" | $HTTP post "$IM_HOST/deployments/$DEPLOYMENT_ID/instance" "Authorization: Bearer $ACCESS_TOKEN"
-
-echo "{
-  \"stackName\": \"dhis2-core\",
-  \"public\": $PUBLIC,
-  \"parameters\": {
     \"CHART_VERSION\": {
       \"value\": \"$CHART_VERSION\"
     },
     \"MIN_READY_SECONDS\": {
       \"value\": \"$MIN_READY_SECONDS\"
-    },
-    \"IMAGE_PULL_POLICY\": {
-      \"value\": \"$IMAGE_PULL_POLICY\"
     },
     \"STARTUP_PROBE_FAILURE_THRESHOLD\": {
       \"value\": \"$STARTUP_PROBE_FAILURE_THRESHOLD\"
@@ -115,10 +94,10 @@ echo "{
     \"IMAGE_TAG\": {
       \"value\": \"$IMAGE_TAG\"
     },
-    \"RESOURCES_REQUESTS_CPU\": {
+    \"CORE_RESOURCES_REQUESTS_CPU\": {
       \"value\": \"$CORE_RESOURCES_REQUESTS_CPU\"
     },
-    \"RESOURCES_REQUESTS_MEMORY\": {
+    \"CORE_RESOURCES_REQUESTS_MEMORY\": {
       \"value\": \"$CORE_RESOURCES_REQUESTS_MEMORY\"
     },
     \"FLYWAY_MIGRATE_OUT_OF_ORDER\": {
@@ -129,9 +108,6 @@ echo "{
     },
     \"ENABLE_QUERY_LOGGING\": {
       \"value\": \"$ENABLE_QUERY_LOGGING\"
-    },
-    \"ALLOW_SUSPEND\": {
-      \"value\": \"$ALLOW_SUSPEND\"
     }
   }
 }" | $HTTP post "$IM_HOST/deployments/$DEPLOYMENT_ID/instance" "Authorization: Bearer $ACCESS_TOKEN"

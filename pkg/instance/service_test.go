@@ -324,7 +324,7 @@ func TestProviderBasedRequirements(t *testing.T) {
 		group := &model.Group{Name: "group", Namespace: "namespace"}
 		deployment := &model.Deployment{
 			Instances: []*model.DeploymentInstance{
-				{Name: "db", StackName: "dhis2-db", GroupName: "group", Group: group, Parameters: map[string]model.DeploymentInstanceParameter{}},
+				{Name: "db", StackName: "dhis2-v2", GroupName: "group", Group: group, Parameters: map[string]model.DeploymentInstanceParameter{}},
 				{Name: "admin", StackName: "pgadmin", GroupName: "group", Group: group, Parameters: map[string]model.DeploymentInstanceParameter{}},
 			},
 		}

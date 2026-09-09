@@ -48,7 +48,6 @@ func TestComponentRestartTargetsExpectedWorkload(t *testing.T) {
 		statefulSet bool
 	}{
 		{DHIS2CoreComponent{kube.BaseComponent{Name: "dhis2"}}, false},
-		{BitnamiPostgresComponent{kube.BaseComponent{Name: "db"}}, true},
 		// CNPGPostgresComponent is absent: its restart patches the Cluster custom resource, covered
 		// by TestCNPGComponentRestartPatchesCluster.
 		{MinioComponent{kube.BaseComponent{Name: "minio"}}, false},
@@ -208,11 +207,11 @@ func TestChapRegisterComponentIsAJob(t *testing.T) {
 	assert.True(t, errdef.IsBadRequest(register.RestartReplica(context.Background(), client, instance, "pod")))
 }
 
-// TestDHIS2CoreAdvertisesFilestoreBackup asserts the capability listing: the dhis2-core component
+// TestDHIS2CoreAdvertisesFilestoreBackup asserts the capability listing: the core component
 // supports filestore backup for every storage backend, while other stacks only expose the base
 // operations.
 func TestDHIS2CoreAdvertisesFilestoreBackup(t *testing.T) {
-	core, err := kube.FindComponent(DHIS2Core.Components, "dhis2")
+	core, err := kube.FindComponent(DHIS2V2.Components, "dhis2")
 	require.NoError(t, err)
 	assert.Contains(t, core.SupportedOperations(nil), kube.OperationFilestoreBackup)
 
@@ -233,25 +232,19 @@ func TestComponentNamesMatchHelmfileImType(t *testing.T) {
 	}
 }
 
-// TestComponentPVCSelectorParity asserts the union of each stack's component PVC selectors equals
-// the historic hardcoded map's output (empty for stacks that had no entry).
+// TestComponentPVCSelectorParity asserts the union of each stack's component PVC selectors is the
+// one expected per stack, empty for the stacks that claim no volumes.
 func TestComponentPVCSelectorParity(t *testing.T) {
 	oldMap := map[string][]string{
-		"dhis2": {"app.kubernetes.io/instance=%s-database", "app.kubernetes.io/instance=%s-redis"},
-		// The map listed the MinIO claim here too, which is the defect #1732 fixed on master: MinIO
-		// is its own stack with its own release and its own component, so core must not delete it.
-		"dhis2-core": {"app.kubernetes.io/instance=%s"},
-		"dhis2-db":   {"app.kubernetes.io/instance=%s-database"},
-		"minio":      {"app.kubernetes.io/instance=%s-minio"},
-		// dhis2-v2 postdates the hardcoded map; the release's own PVCs share its instance label so
-		// selectors are qualified by chart name, and the CNPG cluster labels its volumes itself.
+		// The release's own PVCs share its instance label, so selectors are qualified by chart
+		// name, and the CNPG cluster labels its volumes itself.
 		"dhis2-v2": {
 			"app.kubernetes.io/instance=%s,app.kubernetes.io/name=dhis2",
 			"cnpg.io/cluster=%s-dhis2-postgresql",
 			"app.kubernetes.io/instance=%s,app.kubernetes.io/name=minio",
 		},
-		// chap postdates the map too; the CNPG cluster labels its own volumes and the valkey
-		// subchart's PVC is qualified by chart name since it shares the release's instance label.
+		// The CNPG cluster labels its own volumes and the valkey subchart's PVC is qualified by
+		// chart name, since it shares the release's instance label.
 		"chap": {
 			"cnpg.io/cluster=%s-chap-db",
 			"app.kubernetes.io/instance=%s-chap,app.kubernetes.io/name=valkey",
@@ -295,31 +288,6 @@ func helmfileImTypes(t *testing.T, stackDir string) []string {
 func TestPostgresPod(t *testing.T) {
 	instance := &model.DeploymentInstance{ID: 1, Name: "myinstance", Group: &model.Group{ID: 7, Namespace: "ns"}}
 
-	t.Run("BitnamiViaImLabels", func(t *testing.T) {
-		component := BitnamiPostgresComponent{BaseComponent: kube.BaseComponent{Name: "db"}}
-		pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{
-			Name:      "myinstance-database-0",
-			Namespace: "ns",
-			Labels:    map[string]string{"im-id": "1", "im-type": "db"},
-		}}
-		client := &kube.Client{Clientset: fake.NewSimpleClientset(pod)}
-
-		name, container, err := component.PostgresPod(context.Background(), client, instance)
-
-		require.NoError(t, err)
-		assert.Equal(t, "myinstance-database-0", name)
-		assert.Equal(t, "postgresql", container)
-	})
-
-	t.Run("BitnamiNoPod", func(t *testing.T) {
-		component := BitnamiPostgresComponent{BaseComponent: kube.BaseComponent{Name: "db"}}
-		client := &kube.Client{Clientset: fake.NewSimpleClientset()}
-
-		_, _, err := component.PostgresPod(context.Background(), client, instance)
-
-		require.ErrorContains(t, err, "no postgres pod found")
-	})
-
 	t.Run("CNPGViaPrimaryRoleLabel", func(t *testing.T) {
 		component := CNPGPostgresComponent{BaseComponent: kube.BaseComponent{Name: "db"}, ClusterPattern: "%s-dhis2-postgresql"}
 		primary := &v1.Pod{ObjectMeta: metav1.ObjectMeta{
@@ -352,7 +320,7 @@ func TestPostgresPod(t *testing.T) {
 }
 
 func TestFindPostgresAccess(t *testing.T) {
-	for _, s := range []Stack{DHIS2DB, DHIS2, DHIS2V2, Chap} {
+	for _, s := range []Stack{DHIS2V2, Chap} {
 		_, err := kube.FindPostgresAccess(s.Components)
 		assert.NoErrorf(t, err, "stack %q should have a postgres component", s.Name)
 	}
@@ -363,7 +331,7 @@ func TestFindPostgresAccess(t *testing.T) {
 
 func TestDatabaseSaveCapability(t *testing.T) {
 	params := model.DeploymentInstanceParameters{}
-	for _, s := range []Stack{DHIS2DB, DHIS2, DHIS2V2} {
+	for _, s := range []Stack{DHIS2V2} {
 		access, err := kube.FindPostgresAccess(s.Components)
 		require.NoErrorf(t, err, "stack %q", s.Name)
 		component := access.(kube.Component)
