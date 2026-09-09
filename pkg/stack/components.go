@@ -23,7 +23,7 @@ func (s Service) Components(stackName string) ([]kube.Component, error) {
 // technology it deploys therefore swaps one component type for another in its definition alone,
 // bringing operations specific to that technology without any dispatch changes.
 
-// DHIS2CoreComponent operates on the dhis2-core chart's Deployment.
+// DHIS2CoreComponent operates on the DHIS 2 core Deployment the dhis2 chart deploys.
 type DHIS2CoreComponent struct {
 	kube.BaseComponent
 }

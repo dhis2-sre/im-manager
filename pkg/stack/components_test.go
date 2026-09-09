@@ -232,25 +232,19 @@ func TestComponentNamesMatchHelmfileImType(t *testing.T) {
 	}
 }
 
-// TestComponentPVCSelectorParity asserts the union of each stack's component PVC selectors equals
-// the historic hardcoded map's output (empty for stacks that had no entry).
+// TestComponentPVCSelectorParity asserts the union of each stack's component PVC selectors is the
+// one expected per stack, empty for the stacks that claim no volumes.
 func TestComponentPVCSelectorParity(t *testing.T) {
 	oldMap := map[string][]string{
-		"dhis2": {"app.kubernetes.io/instance=%s-database", "app.kubernetes.io/instance=%s-redis"},
-		// The map listed the MinIO claim here too, which is the defect #1732 fixed on master: MinIO
-		// is its own stack with its own release and its own component, so core must not delete it.
-		"dhis2-core": {"app.kubernetes.io/instance=%s"},
-		"dhis2-db":   {"app.kubernetes.io/instance=%s-database"},
-		"minio":      {"app.kubernetes.io/instance=%s-minio"},
-		// dhis2-v2 postdates the hardcoded map; the release's own PVCs share its instance label so
-		// selectors are qualified by chart name, and the CNPG cluster labels its volumes itself.
+		// The release's own PVCs share its instance label, so selectors are qualified by chart
+		// name, and the CNPG cluster labels its volumes itself.
 		"dhis2-v2": {
 			"app.kubernetes.io/instance=%s,app.kubernetes.io/name=dhis2",
 			"cnpg.io/cluster=%s-dhis2-postgresql",
 			"app.kubernetes.io/instance=%s,app.kubernetes.io/name=minio",
 		},
-		// chap postdates the map too; the CNPG cluster labels its own volumes and the valkey
-		// subchart's PVC is qualified by chart name since it shares the release's instance label.
+		// The CNPG cluster labels its own volumes and the valkey subchart's PVC is qualified by
+		// chart name, since it shares the release's instance label.
 		"chap": {
 			"cnpg.io/cluster=%s-chap-db",
 			"app.kubernetes.io/instance=%s-chap,app.kubernetes.io/name=valkey",

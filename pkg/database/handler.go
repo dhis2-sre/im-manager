@@ -238,8 +238,7 @@ func supportsDatabaseSave(stack *stack.Stack, instance *model.DeploymentInstance
 
 // findInstanceWithOperation returns the deployment instance whose present components advertise the
 // given operation, or nil when none does. This replaces hardcoded stack names: the filestore backup
-// runs against whichever instance advertises it, the dhis2-core sibling in the classic composition
-// or the dhis2-v2 instance itself.
+// runs against whichever instance advertises it.
 func (h Handler) findInstanceWithOperation(instances []*model.DeploymentInstance, operation kube.Operation) *model.DeploymentInstance {
 	for _, candidate := range instances {
 		candidateStack, err := h.stackService.Find(candidate.StackName)

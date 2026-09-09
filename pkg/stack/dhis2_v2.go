@@ -8,8 +8,7 @@ import (
 )
 
 // DHIS2V2 deploys the dhis2 umbrella chart: one release bundling DHIS 2 core, PostgreSQL and an
-// optional MinIO file store, replacing the deployment-level composition of dhis2-db, dhis2-core
-// and the minio companion.
+// optional MinIO file store.
 var DHIS2V2 = withGroupedParameters(Stack{
 	Name: "dhis2-v2",
 	ParameterGroups: []ParameterGroup{

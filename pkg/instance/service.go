@@ -312,7 +312,7 @@ func (s Service) validateNoCycles(instances []*model.DeploymentInstance) (graph.
 // findParameterProvider returns the instance providing the named parameter: the one whose stack
 // declares it as a non-consumed parameter or serves it through a parameter provider. A requirement
 // is therefore satisfied by whichever stack actually provides the parameter, so e.g. pgadmin
-// composes with dhis2-db and dhis2-v2 alike.
+// composes with any stack serving the database connection parameters.
 func (s Service) findParameterProvider(instances []*model.DeploymentInstance, consumer *model.DeploymentInstance, parameterName string) (*model.DeploymentInstance, *stack.Stack, error) {
 	var providerInstance *model.DeploymentInstance
 	var providerStack *stack.Stack

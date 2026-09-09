@@ -4,7 +4,7 @@ import "github.com/dhis2-sre/im-manager/pkg/kube"
 
 // Stack representing ../../stacks/pgadmin/helmfile.yaml.gotmpl
 // PgAdmin has no Requires. It consumes the database connection parameters, so any stack providing
-// them can offer it as a companion, which is what the hardcoded requirement on dhis2-db prevented.
+// them can offer it as a companion, which a hardcoded requirement on one database stack prevented.
 // Declaring it as a companion the other way round is also what lets these stacks initialise: a
 // Requires back onto a stack that lists PgAdmin as a companion is an initialisation cycle.
 var PgAdmin = withGroupedParameters(Stack{
