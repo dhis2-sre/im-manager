@@ -25,6 +25,8 @@ import (
 func SetupK8s(t *testing.T) *K8sClient {
 	t.Helper()
 
+	// Keep Docker auto-removal enabled: Gnomock debug mode disables it and
+	// leaves the k3s image's anonymous volumes behind after Stop.
 	container, err := gnomock.Start(
 		k3s.Preset(
 			k3s.WithVersion("v1.31.0-k3s1"),
@@ -32,7 +34,6 @@ func SetupK8s(t *testing.T) *K8sClient {
 				p.K3sServerFlags = []string{"--debug"}
 			},
 		),
-		gnomock.WithDebugMode(),
 	)
 	require.NoError(t, err, "failed to start k3s")
 	t.Cleanup(func() { require.NoError(t, gnomock.Stop(container), "failed to stop k3s") })

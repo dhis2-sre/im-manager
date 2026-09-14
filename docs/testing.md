@@ -8,7 +8,8 @@ make test TEST_FLAGS='-shuffle=on' # forwards additional go test flags
 make test-integration TEST_PARALLEL=4
 ```
 
-Docker is required. Kubernetes tests additionally need Helm and Helmfile on PATH.
+Docker is required. Kubernetes tests additionally need Helm, Helmfile and SOPS on PATH.
+Database backups execute pg_dump in the PostgreSQL pod; no host pg_dump is required.
 All make targets disable Go's test-result cache with `-count=1`; the build cache
 still applies. The default package concurrency is four; use `TEST_PARALLEL=2` to retain the
 previous setting on constrained Docker hosts.
@@ -182,12 +183,52 @@ The workflow reference is pinned to the companion cache-change PR while it is
 being evaluated; checks, image build, smoke tests and the full test suite keep
 their existing order.
 
-## Local Kubernetes platform limitation
+## Native ARM64 Kubernetes validation
 
-The current DHIS2 chart uses `ghcr.io/cloudnative-pg/postgis:17-3.5`, whose manifest
-has no Linux ARM64 image. A native ARM64 k3s node therefore gets ImagePullBackOff
-for PostgreSQL even with sufficient disk and memory. The post-prune local check
-confirmed DiskPressure=False and this platform error. Exact-image parity currently
-requires an AMD64 Docker host; changing the PostGIS image should be validated as a
-separate chart compatibility change. Pruning images makes the first test run pay
-for downloads again.
+Chart 1.0.1 has two AMD64-only database images: the CNPG operand
+`ghcr.io/cloudnative-pg/postgis:17-3.5` and the seed client
+`dhis2/postgresql-curl:17`. Pruning Docker cleared the observed disk pressure,
+but cannot resolve either image's missing ARM64 platform.
+
+The candidate [chart update](https://github.com/dhis2-sre/dhis2-core-chart/pull/89)
+keeps PostgreSQL 17 and uses a digest-pinned PostGIS 3.6 Bookworm manifest with
+AMD64 and ARM64 variants. Its
+[seed image update](https://github.com/dhis2-sre/bitnami-postgresql-curl/pull/3)
+uses the official PostgreSQL 17 Bookworm base plus curl, under the postgres user.
+The seed workflow builds and smoke tests both platforms before publication.
+
+Release order: publish `dhis2/postgresql-curl:17-bookworm`, remove the chart PR's
+temporary candidate-image import steps, release chart 1.1.0, then update
+im-manager's CHART_VERSION default. Until then, im-manager retains released chart
+1.0.1; ordinary native ARM64 Kubernetes runs still need the candidate chart.
+The changes do not parallelize CI gates.
+
+Local validation on 2026-09-14 used a packaged candidate chart in place of the
+released chart reference and imported the locally built seed image into the
+disposable k3s container. The complete `make test-e2e` passed with `-race`:
+3m10s for the Go test phase and 3m24s including service setup and cleanup.
+PostgreSQL reported 17.11 on aarch64 and PostGIS reported 3.6.4. Database
+save/restore, MinIO backup and filesystem backup all passed. The node reported
+DiskPressure=False and MemoryPressure=False. This is a compatibility measurement,
+not a controlled speed comparison against a previously passing local baseline.
+The final full `make test` run also passed with `-race -p 4 -count=1`, taking
+3m33s including shared-service setup and cleanup. Other local Docker work was
+active during these measurements.
+
+If an image was previously pulled for AMD64, Docker can reuse that cached variant
+on an ARM64 host. The shared MinIO release already provides both architectures;
+verify the selected image with `docker image inspect IMAGE` and refresh its native
+variant with `docker pull --platform linux/arm64 IMAGE` on an ARM64 Docker daemon.
+The diagnosed cached AMD64 MinIO process crashed under emulation; its native ARM64
+binary starts successfully. Use the Docker daemon's architecture when the daemon
+is remote, rather than assuming it matches the Go host.
+
+### Kubernetes volume cleanup
+
+Gnomock debug mode disables Docker auto-removal, and this fork's explicit Stop
+removes containers without their anonymous volumes. Repeated Kubernetes runs
+therefore accumulate several GB per run and eventually cause disk pressure again.
+The test helper leaves debug mode disabled so Docker removes those volumes with
+the container; Kubernetes logs can still be inspected while the test is running.
+This cleanup applies only to the test container's anonymous volumes, not named
+volumes or other local workloads.
