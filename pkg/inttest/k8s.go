@@ -34,6 +34,9 @@ func SetupK8s(t *testing.T) *K8sClient {
 				p.K3sServerFlags = []string{"--debug"}
 			},
 		),
+		// t.Cleanup owns the lifecycle. The k3s preset expects a plain Docker ID,
+		// while the optional cleaner sidecar produces a compound container ID.
+		gnomock.WithDisableAutoCleanup(),
 	)
 	require.NoError(t, err, "failed to start k3s")
 	t.Cleanup(func() { require.NoError(t, gnomock.Stop(container), "failed to stop k3s") })
