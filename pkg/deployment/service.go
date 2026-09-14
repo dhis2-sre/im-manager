@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
-	"strconv"
 
 	"github.com/dhis2-sre/im-manager/pkg/instance"
 	"github.com/dhis2-sre/im-manager/pkg/model"
@@ -34,6 +33,7 @@ type instanceService interface {
 
 type databaseService interface {
 	FindById(ctx context.Context, id uint) (*model.Database, error)
+	FindByIdentifier(ctx context.Context, identifier string) (*model.Database, error)
 	CreateExternalDownload(ctx context.Context, databaseID uint, expiration uint) (*model.ExternalDownload, error)
 	CreateDatabase(ctx context.Context, userId uint, groupName, name string) (*model.Database, error)
 	Dump(ctx context.Context, userId uint, database *model.Database, instance *model.DeploymentInstance, stack *model.Stack, format string) (*model.Database, error)
@@ -225,30 +225,31 @@ func (s Service) deployInstance(ctx context.Context, token string, instance *mod
 
 const seedDownloadTTLSeconds uint = 1800
 
-// databaseIDFromInstances resolves the DATABASE_ID parameter from whichever instance in the
-// deployment carries it. DATABASE_ID lives on the db instance, while storage parameters live on
-// the core instance, so callers operating on the core must look across siblings to find it.
-func databaseIDFromInstances(instances []*model.DeploymentInstance) (uint, bool) {
+// databaseIdentifierFromInstances resolves the DATABASE_ID parameter from whichever instance in
+// the deployment carries it. DATABASE_ID lives on the db instance, while storage parameters live
+// on the core instance, so callers operating on the core must look across siblings to find it.
+// The value is either a numeric id or a slug, so it is returned unparsed for the database service
+// to resolve; "0" is the sentinel for a deployment that has no database to seed from.
+func databaseIdentifierFromInstances(instances []*model.DeploymentInstance) (string, bool) {
 	for _, instance := range instances {
 		param, ok := instance.Parameters["DATABASE_ID"]
 		if !ok {
 			continue
 		}
 
-		databaseID, err := strconv.ParseUint(param.Value, 10, strconv.IntSize)
-		if err != nil || databaseID == 0 {
+		if param.Value == "" || param.Value == "0" {
 			continue
 		}
 
-		return uint(databaseID), true
+		return param.Value, true
 	}
-	return 0, false
+	return "", false
 }
 
 // buildSeed resolves the database referenced by the deployment's DATABASE_ID parameter into the
 // environment variables and filestore backup record needed to seed an instance at deploy time.
 func (s Service) buildSeed(ctx context.Context, instances []*model.DeploymentInstance) (map[string]string, *model.Database, error) {
-	databaseID, ok := databaseIDFromInstances(instances)
+	identifier, ok := databaseIdentifierFromInstances(instances)
 	if !ok {
 		return nil, nil, nil
 	}
@@ -256,9 +257,9 @@ func (s Service) buildSeed(ctx context.Context, instances []*model.DeploymentIns
 	hostname := os.Getenv("HOSTNAME")
 	extraEnv := make(map[string]string)
 
-	db, err := s.databaseService.FindById(ctx, databaseID)
+	db, err := s.databaseService.FindByIdentifier(ctx, identifier)
 	if err != nil {
-		return nil, nil, fmt.Errorf("database %d not found: %w", databaseID, err)
+		return nil, nil, fmt.Errorf("database %q not found: %w", identifier, err)
 	}
 
 	dbDownload, err := s.databaseService.CreateExternalDownload(ctx, db.ID, seedDownloadTTLSeconds)
