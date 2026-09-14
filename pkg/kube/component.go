@@ -1,0 +1,191 @@
+package kube
+
+import (
+	"context"
+	"fmt"
+	"slices"
+	"time"
+
+	"github.com/dhis2-sre/im-manager/internal/errdef"
+	"github.com/dhis2-sre/im-manager/pkg/model"
+
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
+
+// Operation is the name of an action a component supports, as exposed to API clients.
+type Operation string
+
+const (
+	OperationRestart         Operation = "restart"
+	OperationRestartReplica  Operation = "restartReplica"
+	OperationFilestoreBackup Operation = "filestoreBackup"
+	OperationDatabaseSave    Operation = "databaseSave"
+)
+
+// CapabilityPredicate decides whether a capability applies given the instance's decrypted parameters.
+type CapabilityPredicate func(params model.DeploymentInstanceParameters) bool
+
+// Capability declares an operation a component supports beyond the base set. A nil When means the
+// operation is always supported.
+type Capability struct {
+	Operation Operation
+	When      CapabilityPredicate
+}
+
+// Replica is a live pod backing a component. Replicas are discovered from the cluster on demand
+// and never persisted.
+type Replica struct {
+	Name      string    `json:"name"`
+	Phase     string    `json:"phase"`
+	Ready     bool      `json:"ready"`
+	Restarts  int32     `json:"restarts"`
+	CreatedAt time.Time `json:"createdAt"`
+}
+
+// Component is a single addressable part of a deployed stack (e.g. dhis2 core, its database).
+// Components are static stack metadata; pkg/stack defines the concrete types, each named for the
+// chart/technology it operates on and implementing Restart against its own Kubernetes resource.
+type Component interface {
+	ComponentName() string
+	Present(params model.DeploymentInstanceParameters) bool
+	Restart(ctx context.Context, client *Client, instance *model.DeploymentInstance) error
+	RestartReplica(ctx context.Context, client *Client, instance *model.DeploymentInstance, podName string) error
+	Replicas(ctx context.Context, client *Client, instance *model.DeploymentInstance) ([]Replica, error)
+	PVCSelectors(instance *model.DeploymentInstance) []string
+	SupportedOperations(params model.DeploymentInstanceParameters) []Operation
+}
+
+// BaseComponent supplies the shared name, capability evaluation, replica discovery and PVC-selector
+// formatting; concrete component types embed it and implement Restart.
+type BaseComponent struct {
+	Name         string
+	PVCPatterns  []string
+	Capabilities []Capability
+	// When gates the component's presence on the instance's decrypted parameters; nil means the
+	// component is always present (e.g. a minio component only exists when STORAGE_TYPE is minio,
+	// mirroring the chart's own enable condition). Declarative so the stacks API can serve the
+	// same condition to clients.
+	When *Condition
+}
+
+func (b BaseComponent) ComponentName() string {
+	return b.Name
+}
+
+// Present reports whether this component exists for an instance with the given decrypted parameters.
+func (b BaseComponent) Present(params model.DeploymentInstanceParameters) bool {
+	return b.When.Matches(params)
+}
+
+// PresentComponents returns the components present for an instance with the given decrypted parameters.
+func PresentComponents(components []Component, params model.DeploymentInstanceParameters) []Component {
+	present := make([]Component, 0, len(components))
+	for _, component := range components {
+		if component.Present(params) {
+			present = append(present, component)
+		}
+	}
+	return present
+}
+
+// SupportedOperations returns the base operations every component supports plus the capabilities
+// whose predicate passes on the instance's decrypted parameters.
+func (b BaseComponent) SupportedOperations(params model.DeploymentInstanceParameters) []Operation {
+	operations := []Operation{OperationRestart, OperationRestartReplica}
+	for _, capability := range b.Capabilities {
+		if capability.When == nil || capability.When(params) {
+			operations = append(operations, capability.Operation)
+		}
+	}
+	return operations
+}
+
+// Replicas lists the pods currently backing this component in the instance's namespace.
+func (b BaseComponent) Replicas(ctx context.Context, client *Client, instance *model.DeploymentInstance) ([]Replica, error) {
+	pods, err := b.pods(ctx, client, instance)
+	if err != nil {
+		return nil, err
+	}
+
+	replicas := make([]Replica, len(pods))
+	for i, pod := range pods {
+		replicas[i] = newReplica(pod)
+	}
+	return replicas, nil
+}
+
+// RestartReplica deletes the named pod after validating it belongs to this component, letting the
+// owning Deployment/StatefulSet controller recreate it.
+func (b BaseComponent) RestartReplica(ctx context.Context, client *Client, instance *model.DeploymentInstance, podName string) error {
+	pods, err := b.pods(ctx, client, instance)
+	if err != nil {
+		return err
+	}
+
+	if !slices.ContainsFunc(pods, func(pod v1.Pod) bool { return pod.Name == podName }) {
+		return errdef.NewNotFound("pod %q not found for component %q", podName, b.Name)
+	}
+
+	err = client.Clientset.CoreV1().Pods(instance.Group.Namespace).Delete(ctx, podName, metav1.DeleteOptions{})
+	if err != nil {
+		return fmt.Errorf("error deleting pod %q: %v", podName, err)
+	}
+	return nil
+}
+
+func (b BaseComponent) pods(ctx context.Context, client *Client, instance *model.DeploymentInstance) ([]v1.Pod, error) {
+	selector, err := labelSelector(instance.ID, b.Name)
+	if err != nil {
+		return nil, err
+	}
+	return client.ListPods(ctx, instance.Group.Namespace, selector)
+}
+
+// NewReplica derives the replica view of a pod, shared by the cache event handlers.
+func NewReplica(pod v1.Pod) Replica {
+	return newReplica(pod)
+}
+
+func newReplica(pod v1.Pod) Replica {
+	var restarts int32
+	for _, status := range pod.Status.ContainerStatuses {
+		restarts += status.RestartCount
+	}
+
+	ready := false
+	for _, condition := range pod.Status.Conditions {
+		if condition.Type == v1.PodReady {
+			ready = condition.Status == v1.ConditionTrue
+			break
+		}
+	}
+
+	return Replica{
+		Name:      pod.Name,
+		Phase:     string(pod.Status.Phase),
+		Ready:     ready,
+		Restarts:  restarts,
+		CreatedAt: pod.CreationTimestamp.Time,
+	}
+}
+
+// PVCSelectors formats each PVC pattern with the instance's "<name>-<groupID>" unique name.
+func (b BaseComponent) PVCSelectors(instance *model.DeploymentInstance) []string {
+	uniqueName := fmt.Sprintf("%s-%d", instance.Name, instance.Group.ID)
+	selectors := make([]string, len(b.PVCPatterns))
+	for i, pattern := range b.PVCPatterns {
+		selectors[i] = fmt.Sprintf(pattern, uniqueName)
+	}
+	return selectors
+}
+
+// FindComponent returns the component with the given name, or a not-found error.
+func FindComponent(components []Component, name string) (Component, error) {
+	for _, component := range components {
+		if component.ComponentName() == name {
+			return component, nil
+		}
+	}
+	return nil, errdef.NewNotFound("component not found: %s", name)
+}

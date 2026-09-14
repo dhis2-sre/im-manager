@@ -26,6 +26,15 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// ownGroups scopes the stream to the groups the user belongs to, which is what these tests assert
+// on. The real group service widens that to every group for an administrator.
+type ownGroups struct{}
+
+func (ownGroups) FindAll(_ context.Context, user *model.User, _ bool) ([]model.Group, error) {
+	groups := append([]model.Group{}, user.Groups...)
+	return append(groups, user.AdminGroups...), nil
+}
+
 func TestEventHandler(t *testing.T) {
 	t.Parallel()
 
@@ -94,7 +103,7 @@ func TestEventHandler(t *testing.T) {
 		require.FailNow(t, "provide query param user=userID in the test")
 	}
 	client := inttest.SetupHTTPServer(t, func(engine *gin.Engine) {
-		eventHandler := event.NewHandler(logger, rabbitmq.Environment, streamName)
+		eventHandler := event.NewHandler(logger, rabbitmq.Environment, streamName, ownGroups{})
 		event.Routes(engine, authenticator, eventHandler)
 	})
 

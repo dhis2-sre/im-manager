@@ -103,7 +103,7 @@ are intentionally limited to drafts/manual runs to avoid permanently duplicating
 that gate. Moving the gate out of the reusable workflow requires a coordinated
 change to `dhis2-sre/gha-workflows` so deployments still depend on all tests passing.
 
-## Initial CI baseline
+## CI baselines
 
 The latest successful master run inspected was
 [34339403680](https://github.com/dhis2-sre/im-manager/actions/runs/34339403680):
@@ -116,14 +116,17 @@ The latest successful master run inspected was
 | `pkg/instance`, including Kubernetes | 4m10s |
 
 The slower [34355983640](https://github.com/dhis2-sre/im-manager/actions/runs/34355983640)
-run spent 9m11s in the test step and 6m35s building the image. It used a different
-branch, so it provides context rather than a controlled before/after comparison.
+run on `version-3.0` commit `29d1cb9b` spent 9m11s in the test step and 6m35s
+building the image. The refactor is now based on that same revision. These are
+historical timings; runner load, dependency versions and cache state may differ.
 Halving the test step alone cannot halve a workflow with substantial serial build,
 setup and deployment work.
 
-## Local results (2026-09-14)
+## Initial local results on master (2026-09-14)
 
-Measured on macOS/arm64 with Go 1.26.2 and Docker Desktop. Baseline revision:
+These measurements predate the rebase onto `version-3.0`; they do not measure its
+updated Kubernetes/CNPG tests. Measured on macOS/arm64 with Go 1.26.2 and Docker
+Desktop. Baseline revision:
 `a2446d6a`, with only the MinIO registry corrected so all integration tests could
 run. Tests ran sequentially across revisions, with warmed dependency/image caches,
 `-race`, `-count=1`, and `TestInstanceHandler` excluded. Wall times include the
