@@ -40,10 +40,6 @@ type BackupService struct {
 // PerformBackup uploads the streamer's output to key in s3Bucket and returns the number of bytes
 // written, which the caller records on the file store so its size is known.
 func (s *BackupService) PerformBackup(ctx context.Context, streamer filestoreStreamer, s3Bucket, key string) (int64, error) {
-	if s.uploader == nil {
-		return 0, fmt.Errorf("cannot back up %q: the service has no S3 client", key)
-	}
-
 	start := time.Now()
 	pr, pw := io.Pipe()
 

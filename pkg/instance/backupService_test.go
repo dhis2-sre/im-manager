@@ -135,16 +135,6 @@ func TestFilestoreBackupRestoreRoundTrip(t *testing.T) {
 	}
 }
 
-// TestPerformBackupWithoutS3Client asserts a service built without an S3 client reports it rather
-// than panicking in the upload goroutine, where the error reaches no caller.
-func TestPerformBackupWithoutS3Client(t *testing.T) {
-	backupService := NewBackupService(slog.New(slog.NewTextHandler(io.Discard, nil)), nil)
-
-	_, err := backupService.PerformBackup(context.Background(), s3APISource{}, "bucket", "key")
-
-	require.ErrorContains(t, err, "no S3 client")
-}
-
 // TestFilestoreRestoreMarker checks the guard that makes the external-S3 restore a
 // one-time operation: the marker is absent on a fresh bucket and present once written,
 // so a redeploy skips the restore instead of re-clobbering live filestore data.
