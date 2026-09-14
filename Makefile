@@ -4,16 +4,9 @@ keys:
 	openssl genpkey -algorithm RSA -out ./rsa_private.pem -pkeyopt rsa_keygen_bits:2048
 
 init:
-	pip install pre-commit
-	pre-commit clean
+	pip install 'pre-commit==4.6.2'
 	pre-commit install --install-hooks --overwrite
-
-	go install golang.org/x/tools/cmd/goimports@latest
-
-	go install github.com/go-swagger/go-swagger/cmd/swagger@latest
-	swagger version
-
-	go install github.com/git-chglog/git-chglog/cmd/git-chglog@latest
+	sh scripts/install-test-tools.sh
 
 check:
 	pre-commit run --verbose --all-files --show-diff-on-failure

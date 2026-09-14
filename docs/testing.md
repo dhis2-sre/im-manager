@@ -94,13 +94,12 @@ The runner reports service startup, Go test execution (including compilation),
 cleanup and total runner time. Compilation of the runner itself occurs before its
 timer starts; the enclosing command or Actions step includes that cost.
 
-The `Test performance` workflow runs separate integration and Kubernetes jobs for
-relevant draft PRs, and also supports manual dispatch. Each job uploads JSON test
+The `Test performance` workflow runs separate integration and Kubernetes jobs on
+manual dispatch. It does not duplicate the full gate on every PR update. Each job uploads JSON test
 results and writes phase timings to the Actions summary. It uses disposable test
 services and does not require application/deployment secrets. The existing shared
 build workflow still runs the full `make test` gate. Independent measurement jobs
-are intentionally limited to drafts/manual runs to avoid permanently duplicating
-that gate. Moving the gate out of the reusable workflow requires a coordinated
+are intentionally manual to avoid duplicating that gate. Moving the gate out of the reusable workflow requires a coordinated
 change to `dhis2-sre/gha-workflows` so deployments still depend on all tests passing.
 
 ## CI baselines
@@ -171,3 +170,24 @@ That run exposed an existing package-global user counter; it now belongs to
 The isolation tests cover concurrent cloned databases, cross-process Redis
 allocation, bucket separation, database/bucket cleanup and unfinished S3 uploads.
 The runner's partial-startup failure path was also checked for container cleanup.
+
+## Setup and CI caches
+
+`make init` preserves pre-commit environments and installs pinned tool versions.
+The tool installer checks installed Go binary metadata before reinstalling a tool.
+The sequential build workflow opts into separate module, compilation and setup
+caches. Compilation keys include source content and restore compatible older
+entries; Go still validates cached objects and the tests still use `-count=1`.
+The workflow reference is pinned to the companion cache-change PR while it is
+being evaluated; checks, image build, smoke tests and the full test suite keep
+their existing order.
+
+## Local Kubernetes platform limitation
+
+The current DHIS2 chart uses `ghcr.io/cloudnative-pg/postgis:17-3.5`, whose manifest
+has no Linux ARM64 image. A native ARM64 k3s node therefore gets ImagePullBackOff
+for PostgreSQL even with sufficient disk and memory. The post-prune local check
+confirmed DiskPressure=False and this platform error. Exact-image parity currently
+requires an AMD64 Docker host; changing the PostGIS image should be validated as a
+separate chart compatibility change. Pruning images makes the first test run pay
+for downloads again.

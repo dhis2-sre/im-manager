@@ -22,8 +22,9 @@ concurrency:
 
 jobs:
   call-workflow:
-    uses: dhis2-sre/gha-workflows/.github/workflows/im-build-test-deploy.yaml@master
+    uses: dhis2-sre/gha-workflows/.github/workflows/im-build-test-deploy.yaml@5441b57fb276098562714cb8aaa977376cc0c97e
     with:
+      CACHE_NAMESPACE: im-manager-full
       PROCESS_NAME: im-manager
       POD_NAME: im-manager
     secrets:
