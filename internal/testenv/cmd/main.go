@@ -22,6 +22,10 @@ func main() { os.Exit(run()) }
 func run() (code int) {
 	services := flag.String("services", "postgres,redis,s3,minio", "comma-separated services to start")
 	flag.Parse()
+	if err := testenv.Configure(); err != nil {
+		fmt.Fprintln(os.Stderr, "configure test environment:", err)
+		return 1
+	}
 	started := time.Now()
 	var setup, tests time.Duration
 	e := testenv.New()

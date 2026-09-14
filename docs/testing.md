@@ -27,6 +27,11 @@ terminates its containers. Each invocation owns fresh containers with dynamicall
 allocated ports. Concurrent invocations do not share services or persistent data.
 RabbitMQ and Kubernetes retain their existing lifetimes.
 
+The runner and package `TestMain` configure a fixed test-only
+`INSTANCE_PARAMETER_ENCRYPTION_KEY` before starting services or tests. The template
+migrations require this variable even on an empty database. Tests do not depend on
+an application `.env` file or inherit its encryption key.
+
 Each call to a fixture helper allocates isolated data:
 
 | Helper | Isolation | Cleanup |

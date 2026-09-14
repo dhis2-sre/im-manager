@@ -31,6 +31,13 @@ const Region = "eu-west-1"
 const AccessKey = "minioadmin"
 const SecretKey = "minioadmin"
 
+// Configure sets process-wide test configuration before service or test
+// goroutines start. The fresh template has no application data, so its migrations
+// use a fixed test-only key instead of depending on the developer's environment.
+func Configure() error {
+	return os.Setenv("INSTANCE_PARAMETER_ENCRYPTION_KEY", "0123456789abcdef0123456789abcdef")
+}
+
 // Config contains only addresses of disposable test services, never application
 // configuration. DB 0 in Redis is reserved for coordinating fixture leases.
 type Config struct {
