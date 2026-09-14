@@ -1,4 +1,25 @@
 
+<a name="0.73.0"></a>
+## [0.73.0](https://github.com/dhis2-sre/im-manager/compare/0.72.0...0.73.0)
+
+> 2026-09-14
+
+### Chore
+
+* generate change log
+
+### Fix
+
+* seed a database referenced by slug ([#1765](https://github.com/dhis2-sre/im-manager/issues/1765))
+* declare basicAuth in the swagger security definitions ([#1766](https://github.com/dhis2-sre/im-manager/issues/1766))
+* clear the refresh cookie on sign-out ([#1758](https://github.com/dhis2-sre/im-manager/issues/1758))
+* persist valkey so a restart does not sign everyone out ([#1759](https://github.com/dhis2-sre/im-manager/issues/1759))
+
+### Test
+
+* sign in with the password a reset just set ([#1760](https://github.com/dhis2-sre/im-manager/issues/1760))
+
+
 <a name="0.72.0"></a>
 ## [0.72.0](https://github.com/dhis2-sre/im-manager/compare/0.71.0...0.72.0)
 
@@ -204,7 +225,7 @@
 
 
 <a name="v0.67.0"></a>
-## [v0.67.0](https://github.com/dhis2-sre/im-manager/compare/0.66.0...v0.67.0)
+## [v0.67.0](https://github.com/dhis2-sre/im-manager/compare/v0.66.0...v0.67.0)
 
 > 2026-05-07
 
@@ -229,14 +250,14 @@
 * add SaveAs and BackupService integration tests ([#1375](https://github.com/dhis2-sre/im-manager/issues/1375))
 
 
-<a name="0.66.0"></a>
-## [0.66.0](https://github.com/dhis2-sre/im-manager/compare/v0.66.0...0.66.0)
+<a name="v0.66.0"></a>
+## [v0.66.0](https://github.com/dhis2-sre/im-manager/compare/0.66.0...v0.66.0)
 
 > 2026-04-22
 
 
-<a name="v0.66.0"></a>
-## [v0.66.0](https://github.com/dhis2-sre/im-manager/compare/0.65.3...v0.66.0)
+<a name="0.66.0"></a>
+## [0.66.0](https://github.com/dhis2-sre/im-manager/compare/0.65.3...0.66.0)
 
 > 2026-04-22
 
@@ -328,7 +349,7 @@
 
 
 <a name="v0.65.0"></a>
-## [v0.65.0](https://github.com/dhis2-sre/im-manager/compare/v0.64.0...v0.65.0)
+## [v0.65.0](https://github.com/dhis2-sre/im-manager/compare/ls...v0.65.0)
 
 > 2026-03-19
 
@@ -339,13 +360,22 @@
 * util scripts for creating, and deleting, restricted users on K3s ([#1370](https://github.com/dhis2-sre/im-manager/issues/1370))
 * update IM cluster role to allow remote pod exec ([#1361](https://github.com/dhis2-sre/im-manager/issues/1361))
 * use mc mirror instead of recursive copy ([#1369](https://github.com/dhis2-sre/im-manager/issues/1369))
-* generate change log for v0.64.0
 
 ### Feat
 
 * unique instance names ([#1410](https://github.com/dhis2-sre/im-manager/issues/1410))
 * Postgresql connection pool ([#1401](https://github.com/dhis2-sre/im-manager/issues/1401))
 * encrypt Kubernetes cluster config server side ([#1396](https://github.com/dhis2-sre/im-manager/issues/1396))
+
+
+<a name="ls"></a>
+## [ls](https://github.com/dhis2-sre/im-manager/compare/v0.64.0...ls)
+
+> 2026-02-20
+
+### Chore
+
+* generate change log for v0.64.0
 
 
 <a name="v0.64.0"></a>
@@ -819,7 +849,7 @@
 
 
 <a name="v0.45.0"></a>
-## [v0.45.0](https://github.com/dhis2-sre/im-manager/compare/v0.43.0...v0.45.0)
+## [v0.45.0](https://github.com/dhis2-sre/im-manager/compare/v0.44.0...v0.45.0)
 
 > 2024-11-27
 
@@ -829,14 +859,14 @@
 * order public instances as stable, development and nightly
 
 
-<a name="v0.43.0"></a>
-## [v0.43.0](https://github.com/dhis2-sre/im-manager/compare/v0.44.0...v0.43.0)
+<a name="v0.44.0"></a>
+## [v0.44.0](https://github.com/dhis2-sre/im-manager/compare/v0.43.0...v0.44.0)
 
 > 2024-11-27
 
 
-<a name="v0.44.0"></a>
-## [v0.44.0](https://github.com/dhis2-sre/im-manager/compare/v0.42.0...v0.44.0)
+<a name="v0.43.0"></a>
+## [v0.43.0](https://github.com/dhis2-sre/im-manager/compare/v0.41.0...v0.43.0)
 
 > 2024-11-27
 
@@ -846,14 +876,14 @@
 * use PAT
 
 
-<a name="v0.42.0"></a>
-## [v0.42.0](https://github.com/dhis2-sre/im-manager/compare/v0.41.0...v0.42.0)
+<a name="v0.41.0"></a>
+## [v0.41.0](https://github.com/dhis2-sre/im-manager/compare/v0.42.0...v0.41.0)
 
 > 2024-11-20
 
 
-<a name="v0.41.0"></a>
-## [v0.41.0](https://github.com/dhis2-sre/im-manager/compare/v0.40.0...v0.41.0)
+<a name="v0.42.0"></a>
+## [v0.42.0](https://github.com/dhis2-sre/im-manager/compare/v0.40.0...v0.42.0)
 
 > 2024-11-20
 
@@ -2077,13 +2107,33 @@
 
 
 <a name="v0.5.10"></a>
-## [v0.5.10](https://github.com/dhis2-sre/im-manager/compare/v0.5.6...v0.5.10)
+## [v0.5.10](https://github.com/dhis2-sre/im-manager/compare/v0.5.8...v0.5.10)
 
 > 2022-04-11
 
 ### Fix
 
 * Only change the ownership of generate_uid() func [DEVOPS-102]
+* Use func names with argument signatures to change ownership [DEVOPS-102]
+
+
+<a name="v0.5.8"></a>
+## [v0.5.8](https://github.com/dhis2-sre/im-manager/compare/v0.5.7...v0.5.8)
+
+> 2022-04-11
+
+### Fix
+
+* Use func names with argument signatures to change ownership [DEVOPS-102]
+
+
+<a name="v0.5.7"></a>
+## [v0.5.7](https://github.com/dhis2-sre/im-manager/compare/v0.5.6...v0.5.7)
+
+> 2022-04-11
+
+### Fix
+
 * Use func names with argument signatures to change ownership [DEVOPS-102]
 
 
@@ -2108,7 +2158,7 @@
 
 
 <a name="v0.5.9"></a>
-## [v0.5.9](https://github.com/dhis2-sre/im-manager/compare/v0.5.7...v0.5.9)
+## [v0.5.9](https://github.com/dhis2-sre/im-manager/compare/v0.5.4...v0.5.9)
 
 > 2022-04-11
 
@@ -2117,34 +2167,14 @@
 * Use func names with argument signatures to change ownership [DEVOPS-102]
 
 
-<a name="v0.5.7"></a>
-## [v0.5.7](https://github.com/dhis2-sre/im-manager/compare/v0.5.8...v0.5.7)
-
-> 2022-04-11
-
-### Fix
-
-* Use func names with argument signatures to change ownership [DEVOPS-102]
-
-
-<a name="v0.5.8"></a>
-## [v0.5.8](https://github.com/dhis2-sre/im-manager/compare/v0.5.3...v0.5.8)
-
-> 2022-04-11
-
-### Fix
-
-* Use func names with argument signatures to change ownership [DEVOPS-102]
-
-
-<a name="v0.5.3"></a>
-## [v0.5.3](https://github.com/dhis2-sre/im-manager/compare/v0.5.4...v0.5.3)
+<a name="v0.5.4"></a>
+## [v0.5.4](https://github.com/dhis2-sre/im-manager/compare/v0.5.3...v0.5.4)
 
 > 2022-04-08
 
 
-<a name="v0.5.4"></a>
-## [v0.5.4](https://github.com/dhis2-sre/im-manager/compare/v0.5.2...v0.5.4)
+<a name="v0.5.3"></a>
+## [v0.5.3](https://github.com/dhis2-sre/im-manager/compare/v0.5.2...v0.5.3)
 
 > 2022-04-08
 
