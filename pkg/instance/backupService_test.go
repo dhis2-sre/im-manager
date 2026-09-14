@@ -69,6 +69,53 @@ func TestBackupServiceIntegration(t *testing.T) {
 	}
 }
 
+// TestFilestoreBackupRestoreRoundTrip covers the external S3 backend end to end, the one backend
+// whose restore runs inside IM rather than in a seed script: objects are backed up out of one
+// bucket and restored into another, which has to reproduce the original keys byte for byte or a
+// restored DHIS 2 references file store objects that are not where it left them.
+func TestFilestoreBackupRestoreRoundTrip(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test")
+	}
+
+	ctx := context.Background()
+	minioClient, sourceBucket := inttest.SetupMinIO(t)
+	_, targetBucket := inttest.SetupMinIO(t)
+
+	objects := map[string][]byte{
+		"dataValue/uid1":          []byte("data-value-content"),
+		"userAvatar/uid2":         []byte("avatar-content"),
+		"apps/app1/manifest.json": []byte(`{"name":"app1"}`),
+	}
+	for key, content := range objects {
+		_, err := minioClient.PutObject(ctx, sourceBucket, key, bytes.NewReader(content), int64(len(content)), minio.PutObjectOptions{})
+		require.NoError(t, err)
+	}
+
+	s3Test := inttest.SetupS3(t)
+	s3Bucket := s3Test.Bucket
+
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	backupService := NewBackupService(logger, storage.NewS3Client(logger, s3Test.Client, nil))
+	source := NewMinioBackupSource(logger, minioClient, sourceBucket)
+
+	s3Key := "group/round-trip-fs.tar.gz"
+	_, err := backupService.PerformBackup(ctx, s3APISource{source}, s3Bucket, s3Key)
+	require.NoError(t, err)
+
+	tarball := s3Test.GetObject(t, s3Bucket, s3Key)
+	require.NoError(t, restoreTarGzToBucket(ctx, minioClient, targetBucket, bytes.NewReader(tarball)))
+
+	for key, content := range objects {
+		object, err := minioClient.GetObject(ctx, targetBucket, key, minio.GetObjectOptions{})
+		require.NoErrorf(t, err, "restored object %q", key)
+		t.Cleanup(func() { require.NoError(t, object.Close()) })
+		restored, err := io.ReadAll(object)
+		require.NoErrorf(t, err, "restored object %q", key)
+		assert.Equalf(t, content, restored, "restored object %q", key)
+	}
+}
+
 // TestFilestoreRestoreMarker checks the guard that makes the external-S3 restore a
 // one-time operation: the marker is absent on a fresh bucket and present once written,
 // so a redeploy skips the restore instead of re-clobbering live filestore data.

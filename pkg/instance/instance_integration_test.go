@@ -313,6 +313,25 @@ func TestInstanceHandler(t *testing.T) {
 			var saved model.Database
 			require.NoError(t, db.First(&saved, target.ID).Error)
 			assert.NotZero(t, saved.FilestoreID)
+
+			// A second backup of the same database keeps the one file store it already has: the
+			// tarball overwrites the same key, so a second row would both leak and collide on the
+			// unique name, which used to report every repeated save as "already exists".
+			require.NoError(t, instanceService.FilestoreBackup(context.Background(), &coreInstance, target.Name, &saved))
+
+			var resaved model.Database
+			require.NoError(t, db.First(&resaved, target.ID).Error)
+			assert.Equal(t, saved.FilestoreID, resaved.FilestoreID, "the database keeps the file store it already had")
+
+			var filestores []model.Database
+			require.NoError(t, db.Where("type = ? AND group_name = ?", "fs", "group-name").Find(&filestores).Error)
+			var matching int
+			for _, filestore := range filestores {
+				if filestore.Name == "fs-backup-target-fs.tar.gz" {
+					matching++
+				}
+			}
+			assert.Equal(t, 1, matching, "a repeated save must not leave a second file store row behind")
 		})
 
 		t.Run("SaveAsDatabase", func(t *testing.T) {

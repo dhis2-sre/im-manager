@@ -1054,7 +1054,7 @@ func (s Service) FilestoreBackup(ctx context.Context, instance *model.Deployment
 	}
 
 	s3Uri := fmt.Sprintf("s3://%s/%s", s.s3Bucket, key)
-	filestore, err := s.recordBackup(ctx, instance.GroupName, s3Uri, baseName+"-fs.tar.gz", database.UserID, size)
+	filestore, err := s.recordBackup(ctx, instance.GroupName, s3Uri, baseName+"-fs.tar.gz", database.UserID, size, database.FilestoreID)
 	if err != nil {
 		return err
 	}
@@ -1064,7 +1064,28 @@ func (s Service) FilestoreBackup(ctx context.Context, instance *model.Deployment
 	return s.instanceRepository.SaveDatabase(ctx, database)
 }
 
-func (s Service) recordBackup(ctx context.Context, groupName, s3uri, name string, userID uint, size int64) (*model.Database, error) {
+// recordBackup records the file store the save just wrote. A database keeps one file store across
+// saves: the artifact overwrites the same key, so inserting a second row would both leak a row
+// pointing at that same key and fail the unique name, which is what made every repeated save report
+// the file store half as "already exists" while the tarball itself was written fine.
+func (s Service) recordBackup(ctx context.Context, groupName, s3uri, name string, userID uint, size int64, existingID uint) (*model.Database, error) {
+	if existingID != 0 {
+		existing, err := s.instanceRepository.FindDatabaseById(ctx, existingID)
+		if err != nil && !errdef.IsNotFound(err) {
+			return nil, err
+		}
+		if err == nil {
+			existing.Name = name
+			existing.GroupName = groupName
+			existing.Url = s3uri
+			existing.Size = size
+			if err := s.instanceRepository.SaveDatabase(ctx, existing); err != nil {
+				return nil, err
+			}
+			return existing, nil
+		}
+	}
+
 	database := &model.Database{
 		Name:      name,
 		GroupName: groupName,
