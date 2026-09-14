@@ -150,7 +150,7 @@ func TestInstanceHandler(t *testing.T) {
 	tokens, err := tokenService.GetTokens(user, "", false)
 	require.NoError(t, err, "failed to get tokens")
 
-	databaseID := database.UploadTestDatabase(t, client, "path/name.extension", "select now();", "group-name", inttest.WithAuthToken(tokens.AccessToken))
+	databaseID := inttest.UploadTestDatabase(t, client, "path/name.extension", "select now();", "group-name", inttest.WithAuthToken(tokens.AccessToken))
 
 	t.Run("DeployDeploymentWithoutInstances", func(t *testing.T) {
 		t.Parallel()
@@ -273,7 +273,7 @@ func TestInstanceHandler(t *testing.T) {
 	t.Run("DHIS2V2Deployment", func(t *testing.T) {
 		// not parallel: one dhis2-v2 deploy carries core, a CloudNativePG cluster and minio, so it
 		// is shared by every assertion below rather than repeated per subtest.
-		seedID := database.UploadTestDatabase(t, client, "v2-save-test.sql.gz", "select now();", "group-name", inttest.WithAuthToken(tokens.AccessToken))
+		seedID := inttest.UploadTestDatabase(t, client, "v2-save-test.sql.gz", "select now();", "group-name", inttest.WithAuthToken(tokens.AccessToken))
 
 		deployment := createDeployment(t, client, "v2-deployment", tokens.AccessToken, WithDescription("some description"))
 		coreInstance := createDHIS2V2Instance(t, client, deployment.ID, seedID, tokens.AccessToken)
