@@ -119,11 +119,8 @@ func TestInstanceHandler(t *testing.T) {
 	require.NoError(t, err, "failed to create token service")
 	instanceService := instance.NewService(logger, instanceRepo, groupService, stackService, helmfileService, nil, "")
 
-	s3Dir := t.TempDir()
-	s3Bucket := "database-bucket"
-	err = os.Mkdir(s3Dir+"/"+s3Bucket, 0o755)
-	require.NoError(t, err, "failed to create S3 output bucket")
-	s3 := inttest.SetupS3(t, s3Dir)
+	s3 := inttest.SetupS3(t)
+	s3Bucket := s3.Bucket
 	uploader := manager.NewUploader(s3.Client)
 	s3Client := storage.NewS3Client(logger, s3.Client, uploader)
 	databaseRepository := database.NewRepository(db)
