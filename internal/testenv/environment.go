@@ -23,6 +23,13 @@ import (
 	"github.com/testcontainers/testcontainers-go/wait"
 )
 
+const (
+	postgresImage   = "postgres:16.2"
+	redisImage      = "redis:6.0.9"
+	localstackImage = "localstack/localstack:3.0.0"
+	minioImage      = "quay.io/minio/minio:RELEASE.2025-01-20T14-49-07Z"
+)
+
 const ConfigEnv = "IM_TEST_SERVICES"
 const Template = "im_test_template"
 const RedisPool = "im-test-free-databases"
@@ -62,14 +69,14 @@ func New() *Environment {
 	e.redis = sync.OnceValues(e.startRedis)
 	e.s3 = sync.OnceValues(func() (string, error) {
 		return e.startEndpoint(testcontainers.ContainerRequest{
-			Image: "localstack/localstack:3.0.0", ExposedPorts: []string{"4566/tcp"},
+			Image: localstackImage, ExposedPorts: []string{"4566/tcp"},
 			Env:        map[string]string{"SERVICES": "s3", "DEFAULT_REGION": Region},
 			WaitingFor: wait.ForHTTP("/_localstack/health").WithPort("4566/tcp"),
 		}, "4566/tcp", "http")
 	})
 	e.minio = sync.OnceValues(func() (string, error) {
 		return e.startEndpoint(testcontainers.ContainerRequest{
-			Image: "quay.io/minio/minio:RELEASE.2025-01-20T14-49-07Z", ExposedPorts: []string{"9000/tcp"},
+			Image: minioImage, ExposedPorts: []string{"9000/tcp"},
 			Env:        map[string]string{"MINIO_ROOT_USER": AccessKey, "MINIO_ROOT_PASSWORD": SecretKey},
 			Cmd:        []string{"server", "/data"},
 			WaitingFor: wait.ForHTTP("/minio/health/ready").WithPort("9000/tcp"),
@@ -165,7 +172,7 @@ func (e *Environment) startEndpoint(req testcontainers.ContainerRequest, port, s
 func (e *Environment) startPostgres() (storage.PostgresqlConfig, error) {
 	c := storage.PostgresqlConfig{Username: "im", Password: "im", DatabaseName: Template}
 	address, err := e.startEndpoint(testcontainers.ContainerRequest{
-		Image: "postgres:16.2", ExposedPorts: []string{"5432/tcp"},
+		Image: postgresImage, ExposedPorts: []string{"5432/tcp"},
 		Env:        map[string]string{"POSTGRES_USER": c.Username, "POSTGRES_PASSWORD": c.Password, "POSTGRES_DB": Template},
 		WaitingFor: wait.ForLog("database system is ready to accept connections").WithOccurrence(2),
 	}, "5432/tcp", "")
@@ -213,7 +220,7 @@ func Admin(c storage.PostgresqlConfig) (*sql.DB, error) {
 
 func (e *Environment) startRedis() (string, error) {
 	address, err := e.startEndpoint(testcontainers.ContainerRequest{
-		Image: "redis:6.0.9", ExposedPorts: []string{"6379/tcp"},
+		Image: redisImage, ExposedPorts: []string{"6379/tcp"},
 		Cmd:        []string{"redis-server", "--databases", strconv.Itoa(RedisDatabases), "--save", "", "--appendonly", "no"},
 		WaitingFor: wait.ForLog("Ready to accept connections"),
 	}, "6379/tcp", "")
