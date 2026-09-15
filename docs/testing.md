@@ -22,11 +22,11 @@ go test -race -count=1 ./pkg/database
 
 ## Service ownership and isolation
 
-`internal/testenv/cmd` starts PostgreSQL, Redis, LocalStack S3 and MinIO
+`internal/testenv/cmd` starts PostgreSQL, Redis, LocalStack S3, MinIO and RabbitMQ
 concurrently, exports their addresses in `IM_TEST_SERVICES`, runs `go test`, then
 terminates its containers. Each invocation owns fresh containers with dynamically
 allocated ports. Concurrent invocations do not share services or persistent data.
-RabbitMQ shares the runner lifecycle too; Kubernetes retains its existing lifetime.
+Kubernetes retains its existing lifetime.
 
 The runner and package `TestMain` configure a fixed test-only
 `INSTANCE_PARAMETER_ENCRYPTION_KEY` before starting services or tests. The template
@@ -248,3 +248,37 @@ The test helper leaves debug mode disabled so Docker removes those volumes with
 the container; Kubernetes logs can still be inspected while the test is running.
 This cleanup applies only to the test container's anonymous volumes, not named
 volumes or other local workloads.
+
+## RabbitMQ sharing follow-up (2026-09-15)
+
+RabbitMQ now follows the shared-service ownership model, with a virtual host per
+fixture and automatic client/virtual-host cleanup. The broker version remains
+3.13.7; the official management image replaces Bitnami's bootstrap restart.
+
+Local measurements compare `ab6bdeef` (dedicated brokers) with `695c7d89` (shared
+broker and official image), using Go 1.26.2, macOS/ARM64, Docker 29.8.0, warm image
+and build caches, `-race -count=1 -p 4`. Each measurement uses fresh containers.
+Times are runner totals: service setup, Go test compilation/execution, and
+cleanup; they exclude compilation of the runner itself.
+
+| Local scope | Before | After (two runs) | Interpretation |
+|---|---:|---:|---|
+| `pkg/event` + `pkg/notification` | 35.307s | 22.253–26.803s | 24.1–37.0% faster |
+| Integration excluding Kubernetes | 77.077s | 78.549–81.631s | 1.9–5.9% slower; no full-suite speedup demonstrated |
+
+These small samples are observations, not statistically established effects.
+Sharing alone, with the old Bitnami image, increased an earlier integration run
+from 71.169s to 80.366s: eager broker readiness delayed all packages. The official
+image reduced broker setup, but the full local suite still does not show a gain.
+Those earlier runs used Docker 29.7.2 and are not combined with the table above.
+A baseline interrupted by the Docker upgrade was excluded.
+
+Validation includes repeated/shuffled race-enabled tests for stream isolation
+across processes, AMQP queue/message isolation, closed clients and deleted virtual
+hosts, plus the existing publisher restart and concurrent-publish tests. The full
+integration suite also passed. Kubernetes-only commands do not start RabbitMQ.
+
+After merging the subsequent `version-3.0` update (`2c68519d`), local integration
+passed again in 76.610s. That run includes upstream changes and is a validation
+result, not an isolated RabbitMQ comparison. The PR description records the CI
+follow-up separately from the earlier historical timing tables.
