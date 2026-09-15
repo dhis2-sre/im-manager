@@ -13,6 +13,8 @@
 //	  - application/json
 //
 //	SecurityDefinitions:
+//	  basicAuth:
+//	    type: basic
 //	  oauth2:
 //	    type: oauth2
 //	    tokenUrl: /tokens

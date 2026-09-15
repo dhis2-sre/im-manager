@@ -5,16 +5,18 @@ function exec_psql() {
   psql --no-align --tuples-only --command="$1"
 }
 
+# DHIS2 builds its own schema when the database is empty and that schema needs postgis, so the
+# extensions are created whether or not there is a dump to restore.
+exec_psql "create extension if not exists postgis"
+exec_psql "create extension if not exists pg_trgm"
+exec_psql "create extension if not exists btree_gin"
+
 if [[ -z "${DATABASE_DOWNLOAD_URL:-}" ]]; then
-  echo "Seeding aborted. No database download URL found!"
+  echo "No database download URL found, leaving the database empty for DHIS2 to populate"
   exit 0
 fi
 
 echo "DATABASE_DOWNLOAD_URL: $DATABASE_DOWNLOAD_URL"
-
-exec_psql "create extension if not exists postgis"
-exec_psql "create extension if not exists pg_trgm"
-exec_psql "create extension if not exists btree_gin"
 
 tmp_file=$(mktemp)
 curl --connect-timeout 10 --retry 5 --retry-delay 1 --fail -L "$DATABASE_DOWNLOAD_URL" >"$tmp_file" || {

@@ -2765,6 +2765,8 @@ responses:
                 $ref: '#/definitions/User'
             type: array
 securityDefinitions:
+    basicAuth:
+        type: basic
     oauth2:
         flow: password
         tokenUrl: /tokens
