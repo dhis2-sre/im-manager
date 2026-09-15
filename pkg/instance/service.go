@@ -466,6 +466,11 @@ func (s Service) DeployInstance(ctx context.Context, token string, instance *mod
 		if strings.Contains(string(deployErrorLog), fmt.Sprintf("namespaces %q not found", group.Namespace)) {
 			return errdef.NewBadRequest("namespace %q does not exist", group.Namespace)
 		}
+		failureLog := string(deployLog) + string(deployErrorLog)
+		if saveErr := s.instanceRepository.SaveDeployLog(ctx, instance, failureLog); saveErr != nil {
+			s.logger.ErrorContext(ctx, "Failed saving deploy log", "error", saveErr)
+		}
+		instance.DeployLog = failureLog
 		return fmt.Errorf("%w: %s", err, deployErrorLog)
 	}
 
