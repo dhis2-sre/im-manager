@@ -8,6 +8,7 @@ import (
 	"math/rand/v2"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/dhis2-sre/im-manager/internal/errdef"
 	"github.com/dhis2-sre/im-manager/internal/handler"
@@ -21,18 +22,27 @@ import (
 	"golang.org/x/exp/maps"
 )
 
-func NewHandler(logger *slog.Logger, env *stream.Environment, streamName string) Handler {
+func NewHandler(logger *slog.Logger, env *stream.Environment, streamName string, groups groupService) Handler {
 	return Handler{
 		logger:     logger,
 		env:        env,
 		streamName: streamName,
+		groups:     groups,
 	}
+}
+
+// groupService resolves the groups a user may receive events for. FindAll already encodes the same
+// rule the deployment read authorization uses: every group for an administrator, and the user's own
+// plus group-administered ones for everybody else.
+type groupService interface {
+	FindAll(ctx context.Context, user *model.User, deployable bool) ([]model.Group, error)
 }
 
 type Handler struct {
 	logger     *slog.Logger
 	env        *stream.Environment
 	streamName string
+	groups     groupService
 }
 
 func (h Handler) StreamEvents(c *gin.Context) {
@@ -58,7 +68,12 @@ func (h Handler) StreamEvents(c *gin.Context) {
 		return
 	}
 
-	userGroups := mapUserGroups(user)
+	userGroups, err := h.streamableGroups(ctx, user)
+	if err != nil {
+		h.logger.ErrorContext(ctx, "Failed to resolve the groups to stream events for", "error", err, "userId", user.ID)
+		_ = c.Error(err)
+		return
+	}
 	if len(userGroups) == 0 {
 		_ = c.Error(errdef.NewForbidden("you cannot stream events as you are not part of a group. Ask an administrator for help."))
 		return
@@ -76,7 +91,8 @@ func (h Handler) StreamEvents(c *gin.Context) {
 	logger := h.logger.
 		With("consumerName", consumerName).
 		With("consumerOffsetSpec", offsetSpec.String()).
-		With("sseRetry", retry)
+		With("sseRetry", retry).
+		With("groups", maps.Keys(userGroups))
 
 	filter := stream.NewConsumerFilter(maps.Keys(userGroups), false, postFilter(ctx, logger, user.ID, userGroups))
 	opts := stream.NewConsumerOptions().
@@ -102,11 +118,21 @@ func (h Handler) StreamEvents(c *gin.Context) {
 	c.Writer.Flush()
 	logger.InfoContext(ctx, "Connection established for sending SSE events")
 
+	heartbeat := time.NewTicker(30 * time.Second)
+	defer heartbeat.Stop()
+
 	for {
 		select {
 		case <-ctx.Done():
 			logger.InfoContext(ctx, "Request canceled, returning from /events handler")
 			return
+		case <-heartbeat.C:
+			// A comment frame keeps idle connections alive through proxies; browsers ignore it.
+			if _, err := c.Writer.WriteString(": heartbeat\n\n"); err != nil {
+				logger.InfoContext(ctx, "Failed to write SSE heartbeat, client likely gone", "error", err)
+				return
+			}
+			c.Writer.Flush()
 		case sseEvent := <-sseEvents:
 			c.Render(-1, sseEvent)
 			c.Writer.Flush()
@@ -142,12 +168,21 @@ func computeRetry() uint {
 	return base + rand.UintN(maxJitter) //nolint:gosec
 }
 
-func mapUserGroups(user *model.User) map[string]struct{} {
-	result := make(map[string]struct{}, len(user.Groups))
-	for _, group := range user.Groups {
+// streamableGroups returns the groups whose events the user may receive. It has to match what the
+// deployment endpoints let the user read, otherwise a user who can load a deployment and operate on
+// it never receives its events. That is what happens to an administrator, who is authorized for
+// every deployment but is a member of the administrators group only.
+func (h Handler) streamableGroups(ctx context.Context, user *model.User) (map[string]struct{}, error) {
+	groups, err := h.groups.FindAll(ctx, user, false)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make(map[string]struct{}, len(groups))
+	for _, group := range groups {
 		result[group.Name] = struct{}{}
 	}
-	return result
+	return result, nil
 }
 
 // postFilter is a RabbitMQ stream post filter that is applied client side. This is necessary as the

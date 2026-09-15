@@ -10,8 +10,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/dhis2-sre/im-manager/pkg/model"
 )
 
 // assert every stack defined in Go has a helmfile
@@ -21,17 +19,17 @@ func TestStackDefinitionsAreInSyncWithHelmfile(t *testing.T) {
 	helmfileStacks, err := parseStacks("../../stacks")
 	require.NoError(t, err)
 
-	helmfileParameters := make(map[string]model.StackParameters, len(helmfileStacks))
+	helmfileParameters := make(map[string]StackParameters, len(helmfileStacks))
 	for stackName, helmfileStack := range helmfileStacks {
 		consumedParameter := make(map[string]struct{})
 		for _, p := range helmfileStack.consumedParameters {
 			consumedParameter[p] = struct{}{}
 		}
 
-		parameters := make(model.StackParameters)
+		parameters := make(StackParameters)
 		for name, value := range helmfileStack.parameters {
 			_, consumed := consumedParameter[name]
-			parameters[name] = model.StackParameter{DefaultValue: value, Consumed: consumed}
+			parameters[name] = StackParameter{DefaultValue: value, Consumed: consumed}
 		}
 		helmfileParameters[stackName] = parameters
 	}
@@ -39,25 +37,16 @@ func TestStackDefinitionsAreInSyncWithHelmfile(t *testing.T) {
 	// helmfileParameters will not contain Go Validator or Provider functions. We therefore need to
 	// create a map of stack name to parameters with parameters only containing. DefaultValue and
 	// Consumed as we cannot ignore fields in the assertions we use.
-	stacks := map[string]model.StackParameters{
-		"dhis2-db":      DHIS2DB.Parameters,
-		"dhis2-core":    DHIS2Core.Parameters,
-		"dhis2":         DHIS2.Parameters,
-		"minio":         MINIO.Parameters,
-		"pgadmin":       PgAdmin.Parameters,
-		"whoami-go":     WhoamiGo.Parameters,
-		"im-job-runner": IMJobRunner.Parameters,
-		"chap-db":       ChapDB.Parameters,
-		"chap-valkey":   ChapValkey.Parameters,
-		"chap-worker":   ChapWorker.Parameters,
-		"chap-core":     ChapCore.Parameters,
+	stacks := make(map[string]StackParameters, len(All))
+	for _, s := range All {
+		stacks[s.Name] = s.Parameters
 	}
-	stackDefinitions := make(map[string]model.StackParameters)
+	stackDefinitions := make(map[string]StackParameters)
 	for stackName, stackParameters := range stacks {
-		stackDefinitionParameters := make(map[string]model.StackParameter, len(stackParameters))
+		stackDefinitionParameters := make(map[string]StackParameter, len(stackParameters))
 		for parameterName, parameter := range stackParameters {
 			// DefaultValue is nil since it's no longer in the helmfile and therefor we don't have anything to compare it to
-			stackDefinitionParameters[parameterName] = model.StackParameter{DefaultValue: nil, Consumed: parameter.Consumed}
+			stackDefinitionParameters[parameterName] = StackParameter{DefaultValue: nil, Consumed: parameter.Consumed}
 		}
 		stackDefinitions[stackName] = stackDefinitionParameters
 	}
@@ -208,4 +197,35 @@ func getSystemParameters() []string {
 	parameters := []string{"HOSTNAME", "DEPLOYMENT_ID", "INSTANCE_ID", "INSTANCE_TTL", "INSTANCE_NAME", "INSTANCE_PATH_NAME", "INSTANCE_HOSTNAME", "INSTANCE_NAMESPACE", "IM_ACCESS_TOKEN", "INSTANCE_CREATION_TIMESTAMP"}
 	sort.Strings(parameters)
 	return parameters
+}
+
+// assert group declarations are consistent: unique group names with titles, every parameter's
+// group referencing a declared group, and every group condition referencing a stack parameter.
+func TestParameterGroupsAreConsistent(t *testing.T) {
+	for _, s := range All {
+		groups := make(map[string]bool, len(s.ParameterGroups))
+		for _, group := range s.ParameterGroups {
+			assert.NotEmptyf(t, group.Name, "stack %q declares a group without a name", s.Name)
+			assert.NotEmptyf(t, group.Title, "stack %q group %q has no title", s.Name, group.Name)
+			assert.Falsef(t, groups[group.Name], "stack %q declares group %q twice", s.Name, group.Name)
+			groups[group.Name] = true
+
+			if group.When != nil {
+				_, ok := s.Parameters[group.When.Parameter]
+				assert.Truef(t, ok, "stack %q group %q condition references unknown parameter %q", s.Name, group.Name, group.When.Parameter)
+			}
+		}
+
+		for name, parameter := range s.Parameters {
+			if parameter.Group != "" {
+				assert.Truef(t, groups[parameter.Group], "stack %q parameter %q references undeclared group %q", s.Name, name, parameter.Group)
+			}
+		}
+
+		if len(s.ParameterGroups) > 0 {
+			for name, parameter := range s.Parameters {
+				assert.NotEmptyf(t, parameter.Group, "stack %q parameter %q has no group but the stack declares groups", s.Name, name)
+			}
+		}
+	}
 }

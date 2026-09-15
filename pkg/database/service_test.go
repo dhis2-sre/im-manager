@@ -51,7 +51,7 @@ func TestExecPgDumpRejectsTruncatedPlainDump(t *testing.T) {
 	pr, pw := io.Pipe()
 	_, uploadErrCh := drainPipe(t, pr)
 
-	err := execPgDump(context.Background(), executor, "ns", "pod", []string{"pg_dump"}, pw, "plain", "db.gz")
+	err := execPgDump(context.Background(), executor, "ns", "pod", "postgresql", []string{"pg_dump"}, pw, "plain", "db.gz")
 
 	require.Error(t, err, "a truncated dump must not be reported as a successful save")
 	assert.Contains(t, err.Error(), "truncated")
@@ -64,7 +64,7 @@ func TestExecPgDumpAcceptsCompletePlainDump(t *testing.T) {
 	pr, pw := io.Pipe()
 	dataCh, uploadErrCh := drainPipe(t, pr)
 
-	err := execPgDump(context.Background(), executor, "ns", "pod", []string{"pg_dump"}, pw, "plain", "db.gz")
+	err := execPgDump(context.Background(), executor, "ns", "pod", "postgresql", []string{"pg_dump"}, pw, "plain", "db.gz")
 
 	require.NoError(t, err)
 	require.NoError(t, <-uploadErrCh)
@@ -82,7 +82,7 @@ func TestExecPgDumpPropagatesExecError(t *testing.T) {
 	pr, pw := io.Pipe()
 	_, uploadErrCh := drainPipe(t, pr)
 
-	err := execPgDump(context.Background(), executor, "ns", "pod", []string{"pg_dump"}, pw, "plain", "db.gz")
+	err := execPgDump(context.Background(), executor, "ns", "pod", "postgresql", []string{"pg_dump"}, pw, "plain", "db.gz")
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "connection lost")
@@ -96,7 +96,7 @@ func TestExecPgDumpSkipsTrailerCheckForArchiveFormat(t *testing.T) {
 	pr, pw := io.Pipe()
 	dataCh, uploadErrCh := drainPipe(t, pr)
 
-	err := execPgDump(context.Background(), executor, "ns", "pod", []string{"pg_dump"}, pw, "custom", "db")
+	err := execPgDump(context.Background(), executor, "ns", "pod", "postgresql", []string{"pg_dump"}, pw, "custom", "db")
 
 	require.NoError(t, err)
 	require.NoError(t, <-uploadErrCh)
