@@ -13,3 +13,8 @@ scripts
 .idea
 docker-compose.yml
 skaffold.yaml
+
+# The production binary does not depend on the test harness.
+**/*_test.go
+internal/testenv
+pkg/inttest

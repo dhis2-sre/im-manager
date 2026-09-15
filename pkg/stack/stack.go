@@ -211,7 +211,6 @@ func ValidateCompanionConditions(stacks []Stack) error {
 }
 
 const ifNotPresent = "IfNotPresent"
-const always = "Always"
 
 // withGroupedParameters flattens the parameters declared inside a stack's groups into the stack's
 // parameter map, stamping each parameter's Group with the declaring group's name, so membership

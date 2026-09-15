@@ -33,17 +33,13 @@ func TestDatabaseHandler(t *testing.T) {
 
 	db := inttest.SetupDB(t)
 
-	s3Dir := t.TempDir()
-	s3Bucket := "database-bucket"
-	err := os.Mkdir(s3Dir+"/"+s3Bucket, 0o755)
-	require.NoError(t, err, "failed to create S3 output bucket")
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	s3 := inttest.SetupS3(t, s3Dir)
+	s3 := inttest.SetupS3(t)
 	uploader := manager.NewUploader(s3.Client)
 	s3Client := storage.NewS3Client(logger, s3.Client, uploader)
 
 	databaseRepository := database.NewRepository(db)
-	databaseService := database.NewService(logger, s3Bucket, s3Client, groupService{}, databaseRepository, nil, noopPublisher{})
+	databaseService := database.NewService(logger, s3.Bucket, s3Client, groupService{}, databaseRepository, nil, noopPublisher{})
 	deploymentService := deployment.NewService(logger, instanceService{}, databaseService, nil, noopPublisher{})
 
 	client := inttest.SetupHTTPServer(t, func(engine *gin.Engine) {
@@ -79,14 +75,14 @@ func TestDatabaseHandler(t *testing.T) {
 		body := client.Put(t, "/databases", requestBody, http.StatusCreated, nameHeader, groupHeader)
 
 		var database model.Database
-		err = json.Unmarshal(body, &database)
+		err := json.Unmarshal(body, &database)
 		require.NoError(t, err, "POST /databases: failed to unmarshal HTTP response body")
 		require.Equal(t, "path/name.extension", database.Name)
 		require.Equal(t, "packages", database.GroupName)
-		require.Equal(t, "s3://database-bucket/packages/path/name.extension", database.Url)
+		require.Equal(t, "s3://"+s3.Bucket+"/packages/path/name.extension", database.Url)
 		require.Equal(t, int64(13), database.Size)
 
-		actualContent := s3.GetObject(t, s3Bucket, "packages/path/name.extension")
+		actualContent := s3.GetObject(t, s3.Bucket, "packages/path/name.extension")
 		require.Equalf(t, "file contents", string(actualContent), "DB in S3 should have expected content")
 
 		databaseID = strconv.FormatUint(uint64(database.ID), 10)
@@ -131,7 +127,7 @@ func TestDatabaseHandler(t *testing.T) {
 		ghost := &model.Database{
 			Name:      "path/ghost.sql.gz",
 			GroupName: "packages",
-			Url:       "s3://database-bucket/packages/path/ghost.sql.gz",
+			Url:       "s3://" + s3.Bucket + "/packages/path/ghost.sql.gz",
 			Slug:      "packages-path-ghost-sql-gz",
 			UserID:    userID,
 		}
@@ -156,7 +152,7 @@ func TestDatabaseHandler(t *testing.T) {
 			require.Equal(t, "packages", actualDB.GroupName)
 			assert.Equal(t, userID, actualDB.UserID)
 
-			actualContent := s3.GetObject(t, s3Bucket, "packages/path/copy.extension")
+			actualContent := s3.GetObject(t, s3.Bucket, "packages/path/copy.extension")
 			require.Equalf(t, "file contents", string(actualContent), "DB in S3 should have expected content")
 		}
 
@@ -183,7 +179,7 @@ func TestDatabaseHandler(t *testing.T) {
 			t.Log("Setup filestore")
 
 			_, err := s3.Client.PutObject(context.TODO(), &awss3.PutObjectInput{
-				Bucket: aws.String(s3Bucket),
+				Bucket: aws.String(s3.Bucket),
 				Key:    aws.String("packages/path/name-fs.tar.gz"),
 				Body:   strings.NewReader("filestore contents"),
 			})
@@ -192,7 +188,7 @@ func TestDatabaseHandler(t *testing.T) {
 			filestoreRecord := &model.Database{
 				Name:      "path/name-fs.tar.gz",
 				GroupName: "packages",
-				Url:       "s3://database-bucket/packages/path/name-fs.tar.gz",
+				Url:       "s3://" + s3.Bucket + "/packages/path/name-fs.tar.gz",
 				Type:      "fs",
 				UserID:    userID,
 			}
@@ -217,7 +213,7 @@ func TestDatabaseHandler(t *testing.T) {
 			require.Equal(t, "path/rename.extension", actualDB.Name)
 			require.Equal(t, "packages", actualDB.GroupName)
 
-			actualContent := s3.GetObject(t, s3Bucket, "packages/path/rename.extension")
+			actualContent := s3.GetObject(t, s3.Bucket, "packages/path/rename.extension")
 			require.Equalf(t, "file contents", string(actualContent), "DB in S3 should have expected content")
 		}
 
@@ -296,11 +292,12 @@ func TestDatabaseHandler(t *testing.T) {
 		// Attempt delete but expect a bad request response
 		client.Do(t, http.MethodDelete, "/databases/"+databaseID, nil, http.StatusBadRequest, inttest.WithAuthToken("sometoken"))
 		// The rejected delete must not have removed the underlying S3 object
-		_, err = s3.Client.GetObject(context.TODO(), &awss3.GetObjectInput{
-			Bucket: aws.String(s3Bucket),
+		object, err := s3.Client.GetObject(context.TODO(), &awss3.GetObjectInput{
+			Bucket: aws.String(s3.Bucket),
 			Key:    aws.String("packages/path/rename.extension"),
 		})
 		require.NoErrorf(t, err, "delete of a locked database must not delete its S3 object")
+		require.NoError(t, object.Body.Close())
 		// Unlock database
 		client.Delete(t, "/databases/"+databaseID+"/lock")
 
@@ -312,7 +309,7 @@ func TestDatabaseHandler(t *testing.T) {
 		client.Delete(t, "/databases/"+databaseID)
 
 		_, err = s3.Client.GetObject(context.TODO(), &awss3.GetObjectInput{
-			Bucket: aws.String(s3Bucket),
+			Bucket: aws.String(s3.Bucket),
 			Key:    aws.String("packages/path/rename.extension"),
 		})
 		var e *types.NoSuchKey

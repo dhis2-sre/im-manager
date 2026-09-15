@@ -4,16 +4,9 @@ keys:
 	openssl genpkey -algorithm RSA -out ./rsa_private.pem -pkeyopt rsa_keygen_bits:2048
 
 init:
-	pip install pre-commit
-	pre-commit clean
+	pip install 'pre-commit==4.6.2'
 	pre-commit install --install-hooks --overwrite
-
-	go install golang.org/x/tools/cmd/goimports@latest
-
-	go install github.com/go-swagger/go-swagger/cmd/swagger@latest
-	swagger version
-
-	go install github.com/git-chglog/git-chglog/cmd/git-chglog@latest
+	sh scripts/install-test-tools.sh
 
 check:
 	pre-commit run --verbose --all-files --show-diff-on-failure
@@ -36,17 +29,23 @@ dev:
 prod:
 	docker compose --profile prod up
 
-# -p limits how many packages run at once. Seven packages each start their own
-# Postgres, RabbitMQ, Redis, MinIO and localstack, and the default is GOMAXPROCS, which
-# is 4 on a CI runner: around twenty containers on four cores. That starvation is what
-# makes the integration tests flaky rather than any one test being wrong.
-TEST_PARALLEL ?= 2
+# Shared services allow four packages without multiplying their containers.
+# Override with TEST_PARALLEL=2 on resource-constrained Docker hosts.
+TEST_PARALLEL ?= 4
+TEST_FLAGS ?=
+TEST_RUNNER = go run ./internal/testenv/cmd
 
 test:
-	go test -race -p $(TEST_PARALLEL) ./...
+	$(TEST_RUNNER) -- -race -count=1 -p $(TEST_PARALLEL) $(TEST_FLAGS) ./...
+
+test-integration:
+	$(TEST_RUNNER) -- -race -count=1 -p $(TEST_PARALLEL) -skip '^TestInstanceHandler$$' $(TEST_FLAGS) ./...
+
+test-e2e:
+	$(TEST_RUNNER) -services postgres,redis,s3 -- -race -count=1 -run '^TestInstanceHandler$$' $(TEST_FLAGS) ./pkg/instance
 
 test-coverage:
-	go test -coverprofile=./coverage.out ./... && go tool cover -html=./coverage.out -o ./coverage.html
+	$(TEST_RUNNER) -- -count=1 -p $(TEST_PARALLEL) -coverprofile=./coverage.out ./... && go tool cover -html=./coverage.out -o ./coverage.html
 
 clean-dev:
 	docker compose --profile dev down --remove-orphans --volumes
@@ -65,3 +64,5 @@ swagger-spec:
 swagger: swagger-clean swagger-spec
 
 .PHONY: keys init check smoke-test docker-image push-docker-image dev cluster-dev test test-coverage clean-dev clean-cluster-dev swagger-clean swagger-spec swagger
+
+.PHONY: test-integration test-e2e

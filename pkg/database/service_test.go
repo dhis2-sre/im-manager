@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/dhis2-sre/im-manager/pkg/model"
+	"github.com/dhis2-sre/im-manager/pkg/stack"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -117,4 +119,23 @@ func TestTailWriterRetainsOnlyTheLastMaxBytes(t *testing.T) {
 	assert.Equal(t, "bbbbcccc", string(tail.tail))
 	assert.True(t, tail.contains("cccc"))
 	assert.False(t, tail.contains("aaaa"))
+}
+
+func TestPodDumpDoesNotRequireHostPgDump(t *testing.T) {
+	t.Setenv("PATH", t.TempDir())
+	instance := &model.DeploymentInstance{
+		Parameters: model.DeploymentInstanceParameters{
+			"DATABASE_NAME":     {Value: "dhis2"},
+			"DATABASE_USERNAME": {Value: "dhis"},
+			"DATABASE_PASSWORD": {Value: "test-password"},
+		},
+		Group: &model.Group{Namespace: "test"},
+	}
+	dump, err := newPgDumpConfig(instance, &stack.Stack{HostnamePattern: "%s.%s"})
+	require.NoError(t, err)
+	command := buildPgDumpCommand(dump, "custom")
+	require.GreaterOrEqual(t, len(command), 3)
+	assert.Equal(t, []string{"env", "PGPASSWORD=test-password", "pg_dump"}, command[:3])
+	assert.Contains(t, command, "--dbname=dhis2")
+	assert.Contains(t, command, "--exclude-table=dhis2_chart_seed_complete")
 }

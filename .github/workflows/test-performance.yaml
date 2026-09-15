@@ -1,0 +1,57 @@
+name: Test performance
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: test-performance-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  measure:
+    # Optional measurements; the sequential build workflow runs the full gate.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: [integration, e2e]
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6.5.0
+        with:
+          go-version: 1.26.3
+          cache: true
+      - name: Install Kubernetes test tools
+        if: matrix.suite == 'e2e'
+        uses: alexellis/arkade-get@master
+        with:
+          helm: v3.12.3
+          helmfile: v1.2.3
+          sops: v3.7.3
+      - name: Add tools to PATH
+        if: matrix.suite == 'e2e'
+        run: echo "$HOME/.arkade/bin" >> "$GITHUB_PATH"
+      - name: Free disk space for Kubernetes workloads
+        if: matrix.suite == 'e2e'
+        uses: jlumbroso/free-disk-space@main
+        with:
+          android: true
+          dotnet: false
+          haskell: false
+          large-packages: false
+          docker-images: false
+          swap-storage: false
+      - name: Measure tests
+        run: make test-${{ matrix.suite }} TEST_FLAGS='-json -timeout=15m' > test-results.json
+      - name: Show failing test output
+        if: failure()
+        run: tail -100 test-results.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results-${{ matrix.suite }}
+          path: test-results.json
