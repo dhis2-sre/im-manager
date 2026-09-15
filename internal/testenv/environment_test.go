@@ -12,6 +12,7 @@ import (
 
 func TestTypedServicesUseRunnerConfig(t *testing.T) {
 	config := Config{
+		RabbitMQ: RabbitMQConfig{AMQP: "amqp://runner:5672", Stream: "rabbitmq-stream://runner:5552", Management: "http://runner:15672"},
 		Postgres: storage.PostgresqlConfig{Host: "runner-postgres", Port: 5432},
 		Redis:    "runner-redis:6379", S3: "http://runner-s3:4566", MinIO: "runner-minio:9000",
 	}
@@ -24,6 +25,7 @@ func TestTypedServicesUseRunnerConfig(t *testing.T) {
 		get  func() (any, error)
 		want any
 	}{
+		{"rabbitmq", func() (any, error) { return e.RabbitMQ() }, config.RabbitMQ},
 		{"postgres", func() (any, error) { return e.Postgres() }, config.Postgres},
 		{"redis", func() (any, error) { return e.Redis() }, config.Redis},
 		{"s3", func() (any, error) { return e.S3() }, config.S3},

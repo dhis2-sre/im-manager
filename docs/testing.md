@@ -26,7 +26,7 @@ go test -race -count=1 ./pkg/database
 concurrently, exports their addresses in `IM_TEST_SERVICES`, runs `go test`, then
 terminates its containers. Each invocation owns fresh containers with dynamically
 allocated ports. Concurrent invocations do not share services or persistent data.
-RabbitMQ and Kubernetes retain their existing lifetimes.
+RabbitMQ shares the runner lifecycle too; Kubernetes retains its existing lifetime.
 
 The runner and package `TestMain` configure a fixed test-only
 `INSTANCE_PARAMETER_ENCRYPTION_KEY` before starting services or tests. The template
@@ -41,6 +41,7 @@ Each call to a fixture helper allocates isolated data:
 | `SetupRedis(t)` | Exclusively leased logical database | Flush that database, close client, return lease |
 | `SetupS3(t)` | Unique LocalStack bucket returned as `Bucket` | Delete objects, abort unfinished uploads, delete bucket |
 | `SetupMinIO(t)` | Unique MinIO bucket returned with client | Same bucket cleanup |
+| `SetupRabbitStream(t)` / `SetupRabbitMQAMQP(t)` | Unique RabbitMQ virtual host | Close clients, delete virtual host |
 
 PostgreSQL migrations, extensions and indexes run once during template creation.
 The template's connections are then closed and new connections to it disabled.
@@ -53,6 +54,17 @@ DBs 1–127 are available to fixtures across all Go test processes. Exhaustion w
 up to 30 seconds and fails explicitly. A database whose cleanup fails is not
 returned to the pool. Tests must not run FLUSHALL or alter global Redis settings.
 
+The test broker uses the multiarchitecture official RabbitMQ 3.13.7 management
+image, pinned by manifest digest. Plugins are enabled before its single startup;
+this preserves the previous broker version while avoiding Bitnami bootstrap restarts.
+
+RabbitMQ fixtures share one broker and use separate virtual hosts, so stream and
+queue names can repeat without sharing messages or consumer offsets. Fixture
+cleanup closes stream environments or AMQP channels/connections before deleting
+the virtual host. Register producer/consumer cleanup after fixture setup so it
+runs first. Tests that change broker-wide configuration or restart the broker
+need a separately owned broker. Kubernetes-only runs omit RabbitMQ.
+
 Fixture ownership follows Go's test lifetime, including all subtests. Existing
 parent fixtures continue to be shared by their subtests. Stop background workers
 before fixture cleanup, using later-registered `t.Cleanup` callbacks where needed.
@@ -60,7 +72,7 @@ S3 fixture buckets do not enable versioning; tests of versioning or global servi
 configuration need an appropriately specialized fixture.
 
 Fixture helpers access services through the typed `testenv.Shared.Postgres()`,
-`Redis()`, `S3()`, and `MinIO()` methods. Missing or malformed runner configuration
+`Redis()`, `S3()`, `MinIO()`, and `RabbitMQ()` methods. Missing or malformed runner configuration
 fails explicitly instead of starting replacement containers.
 
 Without `IM_TEST_SERVICES`, helpers lazily start one service instance per package

@@ -24,6 +24,7 @@ import (
 )
 
 const (
+	rabbitMQImage   = "rabbitmq:3.13.7-management@sha256:e582c0bc7766f3342496d8485efb5a1df782b5ce3886ad017e2eaae442311f69"
 	postgresImage   = "postgres:16.2"
 	redisImage      = "redis:6.0.9"
 	localstackImage = "localstack/localstack:3.0.0"
@@ -45,13 +46,14 @@ func Configure() error {
 	return os.Setenv("INSTANCE_PARAMETER_ENCRYPTION_KEY", "0123456789abcdef0123456789abcdef")
 }
 
-// Config contains only addresses of disposable test services, never application
-// configuration. DB 0 in Redis is reserved for coordinating fixture leases.
+// Config contains endpoints and credentials for disposable test services, never
+// application configuration. DB 0 in Redis is reserved for coordinating fixture leases.
 type Config struct {
 	Postgres storage.PostgresqlConfig
 	Redis    string
 	S3       string
 	MinIO    string
+	RabbitMQ RabbitMQConfig
 }
 
 type Environment struct {
@@ -61,10 +63,12 @@ type Environment struct {
 	redis      func() (string, error)
 	s3         func() (string, error)
 	minio      func() (string, error)
+	rabbitmq   func() (RabbitMQConfig, error)
 }
 
 func New() *Environment {
 	e := &Environment{}
+	e.rabbitmq = sync.OnceValues(e.startRabbitMQ)
 	e.postgres = sync.OnceValues(e.startPostgres)
 	e.redis = sync.OnceValues(e.startRedis)
 	e.s3 = sync.OnceValues(func() (string, error) {
@@ -176,7 +180,10 @@ func (e *Environment) Start(services []string) (Config, error) {
 			var err error
 			var address string
 			var pg storage.PostgresqlConfig
+			var rabbit RabbitMQConfig
 			switch name {
+			case "rabbitmq":
+				rabbit, err = e.rabbitmq()
 			case "postgres":
 				pg, err = e.postgres()
 			case "redis":
@@ -195,6 +202,8 @@ func (e *Environment) Start(services []string) (Config, error) {
 				return
 			}
 			switch name {
+			case "rabbitmq":
+				c.RabbitMQ = rabbit
 			case "postgres":
 				c.Postgres = pg
 			case "redis":

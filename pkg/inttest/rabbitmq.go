@@ -1,306 +1,129 @@
-// Package inttest provides setup functions that create a RabbitMQ container. We are using the
-// management image for RabbitMQ so you can debug and interact with tests using its admin panel. Use
-// a debugger, adjust timeouts waiting for a message or add a time.Sleep and find the exposed
-// management port to login to the UI. You will find it easier to debug if your test configures the
-// consumers connection and or consumer tag prefix.
 package inttest
 
 import (
 	"context"
 	"fmt"
-	"net"
-	"strconv"
+	"io"
+	"net/http"
+	"net/url"
 	"strings"
 	"testing"
+	"time"
 
-	"github.com/moby/moby/api/types/container"
-	mobynet "github.com/moby/moby/api/types/network"
+	"github.com/dhis2-sre/im-manager/internal/testenv"
+	"github.com/google/uuid"
 	amqpgo "github.com/rabbitmq/amqp091-go"
 	"github.com/rabbitmq/rabbitmq-stream-go-client/pkg/stream"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/testcontainers/testcontainers-go"
-	"github.com/testcontainers/testcontainers-go/network"
-	"github.com/testcontainers/testcontainers-go/wait"
 )
 
-const amqpPort = "5672"
-const natAMQPPort = amqpPort + "/tcp"
-const streamPort = "5552"
-const natStreamPort = streamPort + "/tcp"
-
-// freeHostPort asks the kernel for an unused port. RabbitMQ's stream protocol hands the client the
-// address to reconnect to, so the port has to be known before the container starts and cannot be
-// left to Docker to pick.
-func freeHostPort() (string, error) {
-	listener, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		return "", err
-	}
-	defer listener.Close()
-	return strconv.Itoa(listener.Addr().(*net.TCPAddr).Port), nil
+// rabbitFixture owns one virtual host; the runner or TestMain owns the broker.
+type rabbitFixture struct {
+	config testenv.RabbitMQConfig
+	vhost  string
 }
 
-// SetupRabbitMQAMQP creates a RabbitMQ with an AMQP client ready to send messages to it.
-func SetupRabbitMQAMQP(t *testing.T, options ...rabbitMQOption) *AMQP {
+func setupRabbit(t *testing.T) rabbitFixture {
 	t.Helper()
-	require := require.New(t)
-	ctx := context.TODO()
-
-	net, err := network.New(ctx)
-	require.NoError(err, "failed setting up Docker network")
+	config, err := testenv.Shared.RabbitMQ()
+	require.NoError(t, err)
+	fixture := rabbitFixture{config: config, vhost: "im-test-" + uuid.NewString()}
+	require.NoError(t, fixture.request(http.MethodPut, "/api/vhosts/"+fixture.vhost, `{}`))
+	// Register immediately so permission or client initialization failures also clean up.
 	t.Cleanup(func() {
-		require.NoError(net.Remove(ctx), "failed to remove the Docker network")
+		assert.NoError(t, fixture.request(http.MethodDelete, "/api/vhosts/"+fixture.vhost, ""))
 	})
+	require.NoError(t, fixture.request(http.MethodPut,
+		"/api/permissions/"+fixture.vhost+"/"+url.PathEscape(config.Username),
+		`{"configure":".*","write":".*","read":".*"}`))
+	return fixture
+}
 
-	rabbitMQContainer, err := NewRabbitMQ(ctx, WithNetwork(net.Name, "rabbitmq"))
-	require.NoError(err, "failed setting up RabbitMQ")
-	t.Cleanup(func() {
-		require.NoError(rabbitMQContainer.Terminate(ctx), "failed to terminate RabbitMQ")
-	})
-
-	URI, err := rabbitMQContainer.AMQPURI(ctx)
-	require.NoError(err, "failed to get RabbitMQ AMQP URI")
-	conn, err := amqpgo.Dial(URI)
-	require.NoError(err, "failed setting up AMQP connection")
-	channel, err := conn.Channel()
-	require.NoError(err, "failed setting up AMQP channel")
-
-	return &AMQP{
-		rabbitMQContainer: rabbitMQContainer,
-		conn:              conn,
-		Channel:           channel,
+func (f rabbitFixture) request(method, path, body string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, method, f.config.Management+path, strings.NewReader(body))
+	if err != nil {
+		return err
 	}
+	req.SetBasicAuth(f.config.Username, f.config.Password)
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	response, err := io.ReadAll(io.LimitReader(resp.Body, 4096))
+	if err != nil {
+		return err
+	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return fmt.Errorf("RabbitMQ %s %s: HTTP %d: %s", method, path, resp.StatusCode, response)
+	}
+	return nil
 }
 
-// AMQP allows making requests to RabbitMQ. It does so by opening a connection and channel to
-// RabbitMQ via the low-level github.com/rabbitmq/amqp091-go library.
+// SetupRabbitMQAMQP creates an isolated virtual host and closes its clients
+// before deleting the virtual host when this test and its subtests finish.
+func SetupRabbitMQAMQP(t *testing.T) *AMQP {
+	t.Helper()
+	fixture := setupRabbit(t)
+	uri, err := fixture.config.URI(fixture.config.AMQP, fixture.vhost)
+	require.NoError(t, err)
+	conn, err := amqpgo.Dial(uri)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		if !conn.IsClosed() {
+			assert.NoError(t, conn.Close())
+		}
+	})
+	channel, err := conn.Channel()
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		if !channel.IsClosed() {
+			assert.NoError(t, channel.Close())
+		}
+	})
+	return &AMQP{Channel: channel, uri: uri}
+}
+
 type AMQP struct {
-	rabbitMQContainer *rabbitmqContainer
-	conn              *amqpgo.Connection // Connection established with RabbitMQ
-	Channel           *amqpgo.Channel    // Channel established with RabbitMQ
+	Channel *amqpgo.Channel
+	uri     string
 }
 
-// URI is the AMQP URI going to RabbitMQ.
 func (a *AMQP) URI(t *testing.T) string {
 	t.Helper()
-
-	URI, err := a.rabbitMQContainer.AMQPURI(context.TODO())
-	require.NoError(t, err, "failed to get RabbitMQ URI")
-	return URI
+	return a.uri
 }
 
-// SetupRabbitStream creates a RabbitMQ container with a streaming environment ready to create a
-// producer or consumer.
+// SetupRabbitStream creates an isolated virtual host on the shared broker.
+// Tests must close their producers/consumers before this fixture's cleanup.
 func SetupRabbitStream(t *testing.T) *Stream {
 	t.Helper()
-	require := require.New(t)
-	ctx := context.TODO()
-
-	net, err := network.New(ctx)
-	require.NoError(err, "failed setting up Docker network")
-	t.Cleanup(func() {
-		require.NoError(net.Remove(ctx), "failed to remove the Docker network")
-	})
-
-	rabbitMQContainer, err := NewRabbitMQ(ctx, WithNetwork(net.Name, "rabbitmq"), WithStreamingExposed())
-	require.NoError(err, "failed setting up RabbitMQ")
-	t.Cleanup(func() {
-		require.NoError(rabbitMQContainer.Terminate(ctx), "failed to terminate RabbitMQ")
-	})
-
-	URI, err := rabbitMQContainer.StreamURI(ctx)
-	require.NoError(err, "failed to get RabbitMQ stream URI")
-	env, err := stream.NewEnvironment(
-		stream.NewEnvironmentOptions().
-			SetUri(URI))
-	require.NoError(err, "failed to create new RabbitMQ stream environment")
-
-	return &Stream{
-		rabbitMQContainer: rabbitMQContainer,
-		Environment:       env,
-	}
+	fixture := setupRabbit(t)
+	uri, err := fixture.config.URI(fixture.config.Stream, fixture.vhost)
+	require.NoError(t, err)
+	env, err := stream.NewEnvironment(stream.NewEnvironmentOptions().SetUri(uri))
+	require.NoError(t, err)
+	t.Cleanup(func() { assert.NoError(t, env.Close()) })
+	return &Stream{Environment: env, uri: uri}
 }
 
-// Stream allows making requests to RabbitMQ. It does so by opening a stream environment via
-// github.com/rabbitmq/rabbitmq-stream-go-client.
 type Stream struct {
-	rabbitMQContainer *rabbitmqContainer
-	Environment       *stream.Environment
+	Environment *stream.Environment
+	uri         string
 }
 
-// StreamURI is the stream URI going to RabbitMQ.
 func (s *Stream) StreamURI(t *testing.T) string {
 	t.Helper()
-
-	URI, err := s.rabbitMQContainer.StreamURI(context.TODO())
-	require.NoError(t, err, "failed to get RabbitMQ stream URI")
-	return URI
+	return s.uri
 }
 
 func (s *Stream) StreamPort(t *testing.T) string {
 	t.Helper()
-
-	port, err := s.rabbitMQContainer.ExposedStreamPort(context.TODO())
-	require.NoError(t, err, "failed to get RabbitMQ stream port")
-	return port
-}
-
-type rabbitmqContainer struct {
-	testcontainers.Container
-	user         string
-	pw           string
-	network      string
-	networkAlias string
-	internalPort string
-}
-
-func (rc *rabbitmqContainer) AMQPURI(ctx context.Context) (string, error) {
-	ip, err := rc.Host(ctx)
-	if err != nil {
-		return "", err
-	}
-	port, err := rc.ExposedAMQPPort(ctx)
-	if err != nil {
-		return "", err
-	}
-	return amqpURI(rc.user, rc.pw, ip, port), nil
-}
-
-func (rc *rabbitmqContainer) ExposedAMQPPort(ctx context.Context) (string, error) {
-	port, err := rc.MappedPort(ctx, natAMQPPort)
-	if err != nil {
-		return "", err
-	}
-	return port.Port(), nil
-}
-
-func (rc *rabbitmqContainer) StreamURI(ctx context.Context) (string, error) {
-	ip, err := rc.Host(ctx)
-	if err != nil {
-		return "", err
-	}
-	port, err := rc.ExposedStreamPort(ctx)
-	if err != nil {
-		return "", err
-	}
-	return streamURI(rc.user, rc.pw, ip, port), nil
-}
-
-func (rc *rabbitmqContainer) ExposedStreamPort(ctx context.Context) (string, error) {
-	port, err := rc.MappedPort(ctx, natStreamPort)
-	if err != nil {
-		return "", err
-	}
-	return port.Port(), nil
-}
-
-type rabbitMQOptions struct {
-	network         string
-	networkAlias    string
-	exposeStreaming bool
-}
-
-type rabbitMQOption func(*rabbitMQOptions)
-
-// WithNetwork connects the RabbitMQ container to a specific network and gives it an alias with
-// which you can reach it on this network.
-func WithNetwork(name, alias string) rabbitMQOption {
-	return func(options *rabbitMQOptions) {
-		options.network = name
-		options.networkAlias = alias
-	}
-}
-
-// WithStreamingExposed exposes RabbitMQ's streaming port on a free host port the broker then
-// advertises as its own.
-func WithStreamingExposed() rabbitMQOption {
-	return func(options *rabbitMQOptions) {
-		options.exposeStreaming = true
-	}
-}
-
-// NewRabbitMQ creates a RabbitMQ container. The container will be listening and ready to accept
-// connections. Connect using default user and password rabbitmq or the credentials you provided via
-// the options.
-func NewRabbitMQ(ctx context.Context, options ...rabbitMQOption) (*rabbitmqContainer, error) {
-	opts := &rabbitMQOptions{}
-	for _, o := range options {
-		o(opts)
-	}
-
-	user := "guest"
-	pw := "guest"
-	natPortMgmt := "15672/tcp"
-	exposedPorts := []string{natAMQPPort, natPortMgmt}
-	hostStreamPort := ""
-	if opts.exposeStreaming {
-		exposedPorts = append(exposedPorts, natStreamPort)
-
-		var err error
-		hostStreamPort, err = freeHostPort()
-		if err != nil {
-			return nil, fmt.Errorf("failed to find a free port for RabbitMQ streaming: %v", err)
-		}
-	}
-	req := testcontainers.ContainerRequest{
-		Image: "bitnamilegacy/rabbitmq:3.13",
-		Env: map[string]string{
-			"RABBITMQ_USERNAME":                    user,
-			"RABBITMQ_PASSWORD":                    pw,
-			"BITNAMI_DEBUG":                        "true",
-			"RABBITMQ_MANAGEMENT_ALLOW_WEB_ACCESS": "true",
-			"RABBITMQ_DISK_FREE_ABSOLUTE_LIMIT":    "100MB",
-			"RABBITMQ_PLUGINS":                     "rabbitmq_management,rabbitmq_management_agent,rabbitmq_stream,rabbitmq_stream_management",
-		},
-		ExposedPorts: exposedPorts,
-		Files: []testcontainers.ContainerFile{
-			{
-				Reader:            strings.NewReader(fmt.Sprintf(`SERVER_ADDITIONAL_ERL_ARGS="-rabbitmq_stream advertised_host localhost -rabbitmq_stream advertised_port %s"`, hostStreamPort)),
-				ContainerFilePath: "/etc/rabbitmq/rabbitmq-env.conf",
-				FileMode:          0o444,
-			},
-		},
-		WaitingFor: wait.ForLog("Time to start RabbitMQ").WithOccurrence(2),
-	}
-	if opts.network != "" {
-		req.Networks = []string{opts.network}
-		req.NetworkAliases = map[string][]string{
-			opts.network: {opts.networkAlias},
-		}
-	}
-	if opts.exposeStreaming {
-		req.HostConfigModifier = func(hc *container.HostConfig) {
-			if hc.PortBindings == nil {
-				hc.PortBindings = mobynet.PortMap{}
-			}
-			hc.PortBindings[mobynet.MustParsePort(natStreamPort)] = []mobynet.PortBinding{
-				{HostPort: hostStreamPort},
-			}
-		}
-	}
-
-	container, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
-		ContainerRequest: req,
-		Started:          true,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	return &rabbitmqContainer{
-		Container:    container,
-		network:      opts.network,
-		networkAlias: opts.networkAlias,
-		internalPort: amqpPort,
-		user:         user,
-		pw:           pw,
-	}, nil
-}
-
-func amqpURI(user, pw, ip, port string) string {
-	return fmt.Sprintf("amqp://%s:%s@%s:%s", user, pw, ip, port)
-}
-
-func streamURI(user, pw, ip, port string) string {
-	return fmt.Sprintf("rabbitmq-stream://%s:%s@%s:%s", user, pw, ip, port)
+	u, err := url.Parse(s.uri)
+	require.NoError(t, err)
+	return u.Port()
 }

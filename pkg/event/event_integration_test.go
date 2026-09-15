@@ -108,7 +108,7 @@ func TestEventHandler(t *testing.T) {
 	})
 
 	eventEmitter := NewEventEmitter(t, rabbitmq.Environment, streamName)
-	defer eventEmitter.Close()
+	t.Cleanup(func() { require.NoError(t, eventEmitter.Close()) })
 
 	t.Log("Sending messages before users are subscribed")
 	// users should only get the next published message after they subscribed so these messages
