@@ -46,9 +46,9 @@ func TestDatabaseFixturesAreIsolated(t *testing.T) {
 		}
 	})
 	require.Len(t, names, 4)
-	config, err := testenv.Resolve("postgres")
+	config, err := testenv.Shared.Postgres()
 	require.NoError(t, err)
-	admin, err := testenv.Admin(config.Postgres)
+	admin, err := testenv.Admin(config)
 	require.NoError(t, err)
 	defer admin.Close()
 	for name := range names {
@@ -67,9 +67,9 @@ func TestRedisLeasesAcrossProcesses(t *testing.T) {
 	}
 	client := inttest.SetupRedis(t)
 	require.NoError(t, client.Set("same-key", "parent", 0).Err())
-	config, err := testenv.Resolve("redis")
+	address, err := testenv.Shared.Redis()
 	require.NoError(t, err)
-	encoded, err := json.Marshal(config)
+	encoded, err := json.Marshal(testenv.Config{Redis: address})
 	require.NoError(t, err)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()

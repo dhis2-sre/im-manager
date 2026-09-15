@@ -21,23 +21,23 @@ import (
 // SetupS3 creates an isolated bucket on the shared LocalStack S3 service.
 func SetupS3(t *testing.T) *S3Client {
 	t.Helper()
-	config, err := testenv.Resolve("s3")
+	address, err := testenv.Shared.S3()
 	require.NoError(t, err)
-	client := newS3(config.S3)
+	client := newS3(address)
 	return &S3Client{Client: client, Bucket: newBucket(t, client)}
 }
 
 // SetupMinIO creates an isolated bucket on the shared MinIO service.
 func SetupMinIO(t *testing.T) (*minio.Client, string) {
 	t.Helper()
-	config, err := testenv.Resolve("minio")
+	address, err := testenv.Shared.MinIO()
 	require.NoError(t, err)
-	client, err := minio.New(config.MinIO, &minio.Options{
+	client, err := minio.New(address, &minio.Options{
 		Creds:  miniocredentials.NewStaticV4(testenv.AccessKey, testenv.SecretKey, ""),
 		Secure: false,
 	})
 	require.NoError(t, err)
-	return client, newBucket(t, newS3("http://"+config.MinIO))
+	return client, newBucket(t, newS3("http://"+address))
 }
 
 func newS3(endpoint string) *s3.Client {

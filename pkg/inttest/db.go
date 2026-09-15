@@ -20,9 +20,9 @@ import (
 // Parent tests may share the fixture with their subtests.
 func SetupDB(t *testing.T) *gorm.DB {
 	t.Helper()
-	config, err := testenv.Resolve("postgres")
+	config, err := testenv.Shared.Postgres()
 	require.NoError(t, err)
-	admin, err := testenv.Admin(config.Postgres)
+	admin, err := testenv.Admin(config)
 	require.NoError(t, err)
 	t.Cleanup(func() { assert.NoError(t, admin.Close()) })
 
@@ -37,8 +37,8 @@ func SetupDB(t *testing.T) *gorm.DB {
 		_, err := admin.ExecContext(ctx, "DROP DATABASE "+pq.QuoteIdentifier(name))
 		assert.NoError(t, err, "drop test database after closing its clients")
 	})
-	config.Postgres.DatabaseName = name
-	db, err := storage.ConnectDatabase(slog.New(slog.NewTextHandler(os.Stdout, nil)), config.Postgres)
+	config.DatabaseName = name
+	db, err := storage.ConnectDatabase(slog.New(slog.NewTextHandler(os.Stdout, nil)), config)
 	require.NoError(t, err)
 	pool, err := db.DB()
 	require.NoError(t, err)

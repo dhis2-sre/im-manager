@@ -15,9 +15,9 @@ import (
 // is atomic across Go test processes, including concurrent package runs.
 func SetupRedis(t *testing.T) *redis.Client {
 	t.Helper()
-	config, err := testenv.Resolve("redis")
+	address, err := testenv.Shared.Redis()
 	require.NoError(t, err)
-	admin := redis.NewClient(&redis.Options{Addr: config.Redis})
+	admin := redis.NewClient(&redis.Options{Addr: address})
 	t.Cleanup(func() { assert.NoError(t, admin.Close()) })
 
 	var value string
@@ -33,7 +33,7 @@ func SetupRedis(t *testing.T) *redis.Client {
 	require.NoError(t, err)
 	index, err := strconv.Atoi(value)
 	require.NoError(t, err)
-	client := redis.NewClient(&redis.Options{Addr: config.Redis, DB: index})
+	client := redis.NewClient(&redis.Options{Addr: address, DB: index})
 	t.Cleanup(func() {
 		// Never release a dirty database. Fixture workers must stop before cleanup.
 		err := client.FlushDB().Err()

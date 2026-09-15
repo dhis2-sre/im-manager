@@ -48,8 +48,8 @@ Fixtures connect to clones using `storage.ConnectDatabase`; production startup
 still calls `storage.NewDatabase` and runs migrations. Tests specifically covering
 migrations should use a fresh database and the production initialization path.
 
-Redis is configured with 64 logical databases. DB 0 holds an atomic lease pool;
-DBs 1–63 are available to fixtures across all Go test processes. Exhaustion waits
+Redis is configured with 128 logical databases. DB 0 holds an atomic lease pool;
+DBs 1–127 are available to fixtures across all Go test processes. Exhaustion waits
 up to 30 seconds and fails explicitly. A database whose cleanup fails is not
 returned to the pool. Tests must not run FLUSHALL or alter global Redis settings.
 
@@ -58,6 +58,10 @@ parent fixtures continue to be shared by their subtests. Stop background workers
 before fixture cleanup, using later-registered `t.Cleanup` callbacks where needed.
 S3 fixture buckets do not enable versioning; tests of versioning or global service
 configuration need an appropriately specialized fixture.
+
+Fixture helpers access services through the typed `testenv.Shared.Postgres()`,
+`Redis()`, `S3()`, and `MinIO()` methods. Missing or malformed runner configuration
+fails explicitly instead of starting replacement containers.
 
 Without `IM_TEST_SERVICES`, helpers lazily start one service instance per package
 using `sync.OnceValues`. Packages using these helpers must include:

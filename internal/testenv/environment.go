@@ -33,7 +33,7 @@ const (
 const ConfigEnv = "IM_TEST_SERVICES"
 const Template = "im_test_template"
 const RedisPool = "im-test-free-databases"
-const RedisDatabases = 64
+const RedisDatabases = 128
 const Region = "eu-west-1"
 const AccessKey = "minioadmin"
 const SecretKey = "minioadmin"
@@ -85,26 +85,84 @@ func New() *Environment {
 	return e
 }
 
-var local = New()
+// Shared provides typed access to runner-owned services, or starts package-local
+// services lazily when running go test directly.
+var Shared = New()
 
-// Resolve uses the runner's services when supplied. Missing services are errors:
-// silently falling back would conceal a broken runner configuration.
-func Resolve(service string) (Config, error) {
-	if value, ok := os.LookupEnv(ConfigEnv); ok {
-		var c Config
+// runnerConfig distinguishes an absent runner from malformed or incomplete
+// runner configuration. Only an absent runner permits local service startup.
+func runnerConfig() (Config, bool, error) {
+	value, supplied := os.LookupEnv(ConfigEnv)
+	var c Config
+	if supplied {
 		if err := json.Unmarshal([]byte(value), &c); err != nil {
-			return c, fmt.Errorf("parse %s: %w", ConfigEnv, err)
+			return c, true, fmt.Errorf("parse %s: %w", ConfigEnv, err)
 		}
-		present := map[string]bool{"postgres": c.Postgres.Host != "", "redis": c.Redis != "", "s3": c.S3 != "", "minio": c.MinIO != ""}
-		if !present[service] {
-			return c, fmt.Errorf("runner did not start %s", service)
-		}
-		return c, nil
 	}
-	return local.Start([]string{service})
+	return c, supplied, nil
 }
 
-func CloseLocal() error { return local.Close() }
+// Postgres returns the runner database configuration or starts local PostgreSQL.
+func (e *Environment) Postgres() (storage.PostgresqlConfig, error) {
+	c, supplied, err := runnerConfig()
+	if err != nil {
+		return storage.PostgresqlConfig{}, err
+	}
+	if supplied {
+		if c.Postgres.Host == "" {
+			return storage.PostgresqlConfig{}, errors.New("runner did not start postgres")
+		}
+		return c.Postgres, nil
+	}
+	return e.postgres()
+}
+
+// Redis returns the runner endpoint or starts local Redis.
+func (e *Environment) Redis() (string, error) {
+	c, supplied, err := runnerConfig()
+	if err != nil {
+		return "", err
+	}
+	if supplied {
+		if c.Redis == "" {
+			return "", errors.New("runner did not start redis")
+		}
+		return c.Redis, nil
+	}
+	return e.redis()
+}
+
+// S3 returns the runner endpoint or starts local LocalStack S3.
+func (e *Environment) S3() (string, error) {
+	c, supplied, err := runnerConfig()
+	if err != nil {
+		return "", err
+	}
+	if supplied {
+		if c.S3 == "" {
+			return "", errors.New("runner did not start s3")
+		}
+		return c.S3, nil
+	}
+	return e.s3()
+}
+
+// MinIO returns the runner endpoint or starts local MinIO.
+func (e *Environment) MinIO() (string, error) {
+	c, supplied, err := runnerConfig()
+	if err != nil {
+		return "", err
+	}
+	if supplied {
+		if c.MinIO == "" {
+			return "", errors.New("runner did not start minio")
+		}
+		return c.MinIO, nil
+	}
+	return e.minio()
+}
+
+func CloseLocal() error { return Shared.Close() }
 
 // Start starts independent services concurrently. Call Close even on failure.
 func (e *Environment) Start(services []string) (Config, error) {
