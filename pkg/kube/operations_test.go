@@ -19,14 +19,16 @@ func TestDeletePVCs(t *testing.T) {
 		name          string
 		pvcs          []*v1.PersistentVolumeClaim
 		selectors     []string
-		wantErr       bool
 		wantRemaining int
+		wantDeleted   int
+		wantUnmatched int
 	}{
 		{
 			name:          "deletes the single match",
 			pvcs:          []*v1.PersistentVolumeClaim{labeledPVC(namespace, "data-db-0", "mydb-7-database")},
 			selectors:     []string{"app.kubernetes.io/instance=mydb-7-database"},
 			wantRemaining: 0,
+			wantDeleted:   1,
 		},
 		{
 			name: "deletes across multiple selectors",
@@ -39,12 +41,16 @@ func TestDeletePVCs(t *testing.T) {
 				"app.kubernetes.io/instance=mydb-7-redis",
 			},
 			wantRemaining: 0,
+			wantDeleted:   2,
 		},
 		{
-			name:          "no matching pvc is a no-op",
+			// Another instance's claim, so nothing to delete. Reported rather than silent: a
+			// selector matching nothing is how a leaked volume looks.
+			name:          "a selector matching nothing is reported",
 			pvcs:          []*v1.PersistentVolumeClaim{labeledPVC(namespace, "data-db-0", "other")},
 			selectors:     []string{"app.kubernetes.io/instance=mydb-7-database"},
 			wantRemaining: 1,
+			wantUnmatched: 1,
 		},
 		{
 			name:          "empty selectors deletes nothing",
@@ -53,13 +59,27 @@ func TestDeletePVCs(t *testing.T) {
 			wantRemaining: 1,
 		},
 		{
-			name: "more than one match errors",
+			// A StatefulSet scaled past one replica leaves one claim per replica, so every match
+			// has to go. This asserted an error until #1727.
+			name: "every claim a selector matches is deleted",
 			pvcs: []*v1.PersistentVolumeClaim{
 				labeledPVC(namespace, "data-db-0", "mydb-7-database"),
 				labeledPVC(namespace, "data-db-1", "mydb-7-database"),
 			},
-			selectors: []string{"app.kubernetes.io/instance=mydb-7-database"},
-			wantErr:   true,
+			selectors:     []string{"app.kubernetes.io/instance=mydb-7-database"},
+			wantRemaining: 0,
+			wantDeleted:   2,
+		},
+		{
+			name: "one selector matching nothing does not stop the others",
+			pvcs: []*v1.PersistentVolumeClaim{labeledPVC(namespace, "data-redis-0", "mydb-7-redis")},
+			selectors: []string{
+				"app.kubernetes.io/instance=mydb-7-database",
+				"app.kubernetes.io/instance=mydb-7-redis",
+			},
+			wantRemaining: 0,
+			wantDeleted:   1,
+			wantUnmatched: 1,
 		},
 	}
 
@@ -71,12 +91,11 @@ func TestDeletePVCs(t *testing.T) {
 			}
 			c := &Client{Clientset: fake.NewSimpleClientset(objs...)}
 
-			err := c.DeletePVCs(context.Background(), namespace, tc.selectors)
-			if tc.wantErr {
-				require.Error(t, err)
-				return
-			}
+			result, err := c.DeletePVCs(context.Background(), namespace, tc.selectors)
 			require.NoError(t, err)
+
+			assert.Len(t, result.Deleted, tc.wantDeleted, "deleted claims reported")
+			assert.Len(t, result.UnmatchedSelectors, tc.wantUnmatched, "selectors matching nothing reported")
 
 			remaining, err := c.Clientset.CoreV1().PersistentVolumeClaims(namespace).List(context.TODO(), metav1.ListOptions{})
 			require.NoError(t, err)

@@ -37,8 +37,9 @@ type BackupService struct {
 	uploader *storage.S3Client
 }
 
-// PerformBackup uploads the streamer's output to key in s3Bucket.
-func (s *BackupService) PerformBackup(ctx context.Context, streamer filestoreStreamer, s3Bucket, key string) error {
+// PerformBackup uploads the streamer's output to key in s3Bucket and returns the number of bytes
+// written, which the caller records on the file store so its size is known.
+func (s *BackupService) PerformBackup(ctx context.Context, streamer filestoreStreamer, s3Bucket, key string) (int64, error) {
 	start := time.Now()
 	pr, pw := io.Pipe()
 
@@ -57,10 +58,9 @@ func (s *BackupService) PerformBackup(ctx context.Context, streamer filestoreStr
 	})
 
 	if err := g.Wait(); err != nil {
-		return fmt.Errorf("backup failed: %v", err)
+		return 0, fmt.Errorf("backup failed: %v", err)
 	}
 
-	s.logger.InfoContext(ctx, "Filestore backup completed", "key", key, "duration", time.Since(start))
-	s.logger.DebugContext(ctx, "Filestore backup stats", "key", key, "bytesUploaded", uploaded)
-	return nil
+	s.logger.InfoContext(ctx, "Filestore backup completed", "key", key, "duration", time.Since(start), "bytesUploaded", uploaded)
+	return uploaded, nil
 }

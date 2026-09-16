@@ -1,0 +1,42 @@
+name: Deploy to im-vm
+
+# The Hetzner control plane in dhis2-sre/dhis2-infrastructure services/im-vm, which replaces the EKS
+# instance-cluster. What it deploys and where lives in gha-workflows, shared with im-web-client,
+# because the two repositories differ only in which image they move.
+#
+# The trigger stays here: a reusable workflow cannot declare one, and a workflow_run filter in
+# gha-workflows would watch that repository's own workflows rather than this one's. So which builds
+# reach the deploy at all is decided here.
+#
+# Secrets, one pair per server, because the prod key must not be reachable by anything a pull
+# request can trigger:
+#
+#   IM_VM_PROD_HOST, IM_VM_PROD_DEPLOY_KEY   releases
+#   IM_VM_DEV_HOST, IM_VM_DEV_DEPLOY_KEY     master and pull requests
+
+on:
+  workflow_run:
+    workflows: ["Build, test and deploy"]
+    types: [completed]
+    # Prod is still served from EKS and the prod server has no environment file, so a release must
+    # not reach it yet. workflow_run takes no tag filter, and its branch filter matches the head
+    # branch of the run that triggered this one, which for a tag push is the tag. The pattern is the
+    # one the build filters tags on, so it excludes exactly the builds a release produces. Remove
+    # this filter at cutover.
+    branches-ignore:
+      - '[0-9]*'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.workflow_run.head_branch }}
+  cancel-in-progress: false
+
+jobs:
+  call-workflow:
+    uses: dhis2-sre/gha-workflows/.github/workflows/im-deploy-im-vm.yaml@master
+    with:
+      component: manager
+    secrets:
+      IM_VM_DEV_HOST: ${{ secrets.IM_VM_DEV_HOST }}
+      IM_VM_DEV_DEPLOY_KEY: ${{ secrets.IM_VM_DEV_DEPLOY_KEY }}
+      IM_VM_PROD_HOST: ${{ secrets.IM_VM_PROD_HOST }}
+      IM_VM_PROD_DEPLOY_KEY: ${{ secrets.IM_VM_PROD_DEPLOY_KEY }}

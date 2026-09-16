@@ -2,6 +2,7 @@ package kube
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -111,32 +112,65 @@ func (c *Client) RestartCNPGCluster(ctx context.Context, namespace, name string)
 	return nil
 }
 
-// DeletePVCs deletes the persistent volume claims matching each label selector in the given
-// namespace. Selectors are pre-formatted by the caller (a component's PVCSelectors).
-func (c *Client) DeletePVCs(ctx context.Context, namespace string, selectors []string) error {
+var dorisClusterResource = schema.GroupVersionResource{Group: "doris.selectdb.com", Version: "v1", Resource: "dorisclusters"}
+
+// RestartDorisTier triggers a rolling restart of one tier of a Doris cluster, "fe" or "be", by
+// stamping the operator's restart annotation for that tier on the DorisCluster resource. Frontends
+// and backends roll independently, which is why the tier is a parameter rather than both being
+// stamped at once. The operator compares the timestamp against what it last acted on, insists on
+// RFC3339 with an offset, and rejects anything it cannot parse, hence the explicit format rather
+// than time.Now formatted loosely.
+func (c *Client) RestartDorisTier(ctx context.Context, namespace, name, tier string) error {
+	restartedAt := time.Now().Format(time.RFC3339)
+	data := fmt.Sprintf(`{"metadata": {"annotations": {"apache.doris.%s/restartedAt": %q}}}`, tier, restartedAt)
+	_, err := c.Dynamic.Resource(dorisClusterResource).Namespace(namespace).Patch(ctx, name, types.MergePatchType, []byte(data), metav1.PatchOptions{})
+	if err != nil {
+		return fmt.Errorf("error restarting %q: %v", name, err)
+	}
+	return nil
+}
+
+// PVCDeletionResult reports what deleting an instance's persistent volume claims actually matched,
+// so the caller can log a selector that matched nothing. A selector matching nothing cannot be an
+// error, because destroying an instance that never got as far as creating its volumes has to keep
+// working, but it is the shape a leak takes and so it must not be silent.
+type PVCDeletionResult struct {
+	Deleted            []string
+	UnmatchedSelectors []string
+}
+
+// DeletePVCs deletes every persistent volume claim matching each label selector in the given
+// namespace. Selectors are pre-formatted by the caller (a component's PVCSelectors). A selector
+// matching several claims deletes all of them, which is what a StatefulSet scaled beyond one
+// replica leaves behind, and one failure does not stop the remaining selectors.
+func (c *Client) DeletePVCs(ctx context.Context, namespace string, selectors []string) (PVCDeletionResult, error) {
 	pvcs := c.Clientset.CoreV1().PersistentVolumeClaims(namespace)
 
+	var result PVCDeletionResult
+	var errs error
 	for _, selector := range selectors {
 		listOptions := metav1.ListOptions{LabelSelector: selector}
 		list, err := pvcs.List(ctx, listOptions)
 		if err != nil {
-			return fmt.Errorf("error finding pvcs using selector %q: %v", selector, err)
+			errs = errors.Join(errs, fmt.Errorf("error finding pvcs using selector %q: %v", selector, err))
+			continue
 		}
 
-		if len(list.Items) > 1 {
-			return fmt.Errorf("multiple pvcs found using the selector: %q", selector)
+		if len(list.Items) == 0 {
+			result.UnmatchedSelectors = append(result.UnmatchedSelectors, selector)
+			continue
 		}
 
-		if len(list.Items) == 1 {
-			name := list.Items[0].Name
-			err := pvcs.Delete(ctx, name, metav1.DeleteOptions{})
-			if err != nil {
-				return fmt.Errorf("failed to delete pvc: %v", err)
+		for _, pvc := range list.Items {
+			if err := pvcs.Delete(ctx, pvc.Name, metav1.DeleteOptions{}); err != nil {
+				errs = errors.Join(errs, fmt.Errorf("failed to delete pvc %q matching selector %q: %v", pvc.Name, selector, err))
+				continue
 			}
+			result.Deleted = append(result.Deleted, pvc.Name)
 		}
 	}
 
-	return nil
+	return result, errs
 }
 
 func (c *Client) scale(ctx context.Context, instance *model.DeploymentInstance, replicas int32) error {

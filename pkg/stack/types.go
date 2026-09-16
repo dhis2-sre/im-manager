@@ -20,10 +20,19 @@ type Stack struct {
 	// Requires these stacks to deploy an instance of this stack.
 	Requires []Stack `json:"requires"`
 	// Companions are optional stacks that can be deployed alongside this stack. Certain parameters can require a companion stack.
-	Companions []Stack `json:"companions"`
+	Companions []Companion `json:"companions"`
 	// Components are the addressable parts a deployed instance of this stack consists of. Their
 	// names equal the im-type label values the stack's helmfile applies.
 	Components []kube.Component `json:"-"`
+}
+
+// Companion is a stack that can be deployed alongside the stack declaring it, optionally only when
+// a condition over the declaring stack's parameters holds. The condition is data rather than code,
+// so a deploy form decides whether to offer the companion from the same declaration the backend
+// reads, and the two cannot disagree.
+type Companion struct {
+	Stack Stack           `json:"stack"`
+	When  *kube.Condition `json:"when,omitempty"`
 }
 
 // ParameterGroup is a named section of a stack's parameters, naturally the component the

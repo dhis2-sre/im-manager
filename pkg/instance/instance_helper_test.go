@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -116,26 +117,72 @@ func createWhoamiInstance(t *testing.T, client *inttest.HTTPClient, deploymentID
 	return createInstance(t, client, deploymentID, "whoami-go", authToken, opts...)
 }
 
-func createDHIS2DBInstance(t *testing.T, client *inttest.HTTPClient, deploymentID uint, databaseID, authToken string, opts ...InstanceOption) model.DeploymentInstance {
-	return createInstance(t, client, deploymentID, "dhis2-db", authToken, append([]InstanceOption{WithParameter("DATABASE_ID", databaseID)}, opts...)...)
+// A core with no -Xmx finds no cgroup limit, since the chart sets a memory request and no limit, and
+// takes a quarter of whatever /proc/meminfo reports, which inside the k3s container is the runner.
+const (
+	testCoreJavaOpts = "-Xmx1g"
+	// The same bound in bytes, as the JVM reports MaxHeapSize.
+	testCoreMaxHeapSize = int64(1) << 30
+)
+
+func createDHIS2V2Instance(t *testing.T, client *inttest.HTTPClient, deploymentID uint, databaseID, authToken string, opts ...InstanceOption) model.DeploymentInstance {
+	// Prepended, so a caller that wants a different heap or seed can still override them.
+	opts = append([]InstanceOption{WithParameter("DATABASE_ID", databaseID), WithParameter("JAVA_OPTS", testCoreJavaOpts)}, opts...)
+	return createInstance(t, client, deploymentID, "dhis2-v2", authToken, opts...)
 }
 
-func createMinioInstance(t *testing.T, client *inttest.HTTPClient, deploymentID uint, authToken string, opts ...InstanceOption) model.DeploymentInstance {
-	return createInstance(t, client, deploymentID, "minio", authToken, opts...)
+// podExecer is the part of the kubernetes service these helpers need.
+type podExecer interface {
+	Exec(ctx context.Context, namespace, podName, container string, command []string, stdout, stderr io.Writer) error
 }
 
-func createDHIS2CoreInstance(t *testing.T, client *inttest.HTTPClient, deploymentID uint, authToken string, opts ...InstanceOption) model.DeploymentInstance {
-	return createInstance(t, client, deploymentID, "dhis2-core", authToken, opts...)
+// assertCoreHeapBounded reads the ceiling a throwaway JVM in the core container is given. The chart
+// appends javaOpts to JAVA_TOOL_OPTIONS, which every JVM there honours and none shows on its command
+// line, so this is the readable surface; {command line} rather than {ergonomic} is what distinguishes
+// a bound that was set from one the JVM derived from the node.
+func assertCoreHeapBounded(t *testing.T, executor podExecer, namespace, pod, container string, expected int64) {
+	t.Helper()
+
+	var flags, stderr strings.Builder
+	require.NoError(t, executor.Exec(context.Background(), namespace, pod, container,
+		[]string{"sh", "-c", `java -XX:+PrintFlagsFinal -version 2>/dev/null | grep MaxHeapSize`}, &flags, &stderr),
+		"reading the core's heap ceiling failed: %s", stderr.String())
+
+	line := strings.TrimSpace(flags.String())
+	fields := strings.Fields(line)
+	require.GreaterOrEqual(t, len(fields), 4, "unexpected MaxHeapSize line: %q", line)
+	actual, err := strconv.ParseInt(fields[3], 10, 64)
+	require.NoError(t, err, "unexpected MaxHeapSize line: %q", line)
+
+	assert.Equal(t, expected, actual, "the core's heap is not bounded to %s: %q", testCoreJavaOpts, line)
+	assert.Contains(t, line, "{command line}", "the core's heap ceiling came from the node, not from %s: %q", testCoreJavaOpts, line)
 }
 
 // minioPodName returns the name of the deployment's single minio pod.
 func minioPodName(t *testing.T, k8sClient *inttest.K8sClient, namespace string, deploymentID uint) string {
 	t.Helper()
 	selector := fmt.Sprintf("im-type=minio,im-deployment-id=%d", deploymentID)
-	pods, err := k8sClient.Client.CoreV1().Pods(namespace).List(context.Background(), metav1.ListOptions{LabelSelector: selector})
-	require.NoError(t, err)
-	require.Len(t, pods.Items, 1, "expected exactly one minio pod for selector %q", selector)
-	return pods.Items[0].Name
+	var name string
+	require.Eventuallyf(t, func() bool {
+		pods, err := k8sClient.Client.CoreV1().Pods(namespace).List(context.Background(), metav1.ListOptions{LabelSelector: selector})
+		if err != nil || len(pods.Items) == 0 {
+			return false
+		}
+		name = pods.Items[0].Name
+		return true
+	}, 120*time.Second, 2*time.Second, "no pod matching %q", selector)
+	return name
+}
+
+// requireNoPodsMatching polls until no pod matches the selector, which is how destroy is asserted:
+// the release label also covers the seed job's completed pod, so the workloads are checked by their
+// own im labels instead.
+func requireNoPodsMatching(t *testing.T, k8sClient *inttest.K8sClient, namespace, selector string, timeout time.Duration) {
+	t.Helper()
+	require.Eventuallyf(t, func() bool {
+		pods, err := k8sClient.Client.CoreV1().Pods(namespace).List(context.Background(), metav1.ListOptions{LabelSelector: selector})
+		return err == nil && len(pods.Items) == 0
+	}, timeout, 2*time.Second, "pods matching %q should be gone", selector)
 }
 
 // waitForCorePodRunning polls until the core instance's default pod is Running, returning its name

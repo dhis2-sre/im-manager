@@ -231,6 +231,19 @@ func (r repository) RecordBackup(ctx context.Context, database *model.Database) 
 	return err
 }
 
+func (r repository) FindDatabaseById(ctx context.Context, id uint) (*model.Database, error) {
+	var database model.Database
+	err := r.db.WithContext(ctx).First(&database, id).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, errdef.NewNotFound("database %d not found", id)
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	return &database, nil
+}
+
 func (r repository) SaveDatabase(ctx context.Context, database *model.Database) error {
 	return r.db.WithContext(ctx).Save(&database).Error
 }

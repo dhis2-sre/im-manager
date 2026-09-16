@@ -8,11 +8,13 @@ import (
 	"regexp"
 	"testing"
 
+	"github.com/dhis2-sre/im-manager/internal/errdef"
 	"github.com/dhis2-sre/im-manager/pkg/kube"
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -21,19 +23,8 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 )
 
-// allStacks are the deployable stack definitions; every one must declare its components. The
-// job-runner is exempt: it is an old jobs experiment that only labels pods, and jobs get their
-// own design in a separate task.
-var allStacks = func() []Stack {
-	var stacks []Stack
-	for _, s := range All {
-		if s.Name == IMJobRunner.Name {
-			continue
-		}
-		stacks = append(stacks, s)
-	}
-	return stacks
-}()
+// allStacks are the deployable stack definitions; every one must declare its components.
+var allStacks = All
 
 func TestEveryStackHasUniqueNamedComponents(t *testing.T) {
 	for _, s := range allStacks {
@@ -45,8 +36,6 @@ func TestEveryStackHasUniqueNamedComponents(t *testing.T) {
 			seen[c.ComponentName()] = true
 		}
 	}
-
-	assert.Empty(t, IMJobRunner.Components, "im-job-runner deliberately has no components until jobs are redesigned")
 }
 
 // TestComponentRestartTargetsExpectedWorkload asserts each technology component patches the
@@ -59,15 +48,15 @@ func TestComponentRestartTargetsExpectedWorkload(t *testing.T) {
 		statefulSet bool
 	}{
 		{DHIS2CoreComponent{kube.BaseComponent{Name: "dhis2"}}, false},
-		{BitnamiPostgresComponent{kube.BaseComponent{Name: "db"}}, true},
 		// CNPGPostgresComponent is absent: its restart patches the Cluster custom resource, covered
 		// by TestCNPGComponentRestartPatchesCluster.
 		{MinioComponent{kube.BaseComponent{Name: "minio"}}, false},
-		{PgAdminComponent{kube.BaseComponent{Name: "pgadmin"}}, true},
+		// runix/pgadmin4 deploys a Deployment; restart used to fail with "no statefulset found".
+		{PgAdminComponent{kube.BaseComponent{Name: "pgadmin"}}, false},
 		{WhoamiComponent{kube.BaseComponent{Name: "whoami"}}, false},
-		{ValkeyComponent{kube.BaseComponent{Name: "chap-valkey"}}, true},
-		{ChapWorkerComponent{kube.BaseComponent{Name: "chap-worker"}}, false},
-		{ChapCoreComponent{kube.BaseComponent{Name: "chap-core"}}, false},
+		{ValkeyComponent{kube.BaseComponent{Name: "valkey"}}, false},
+		{ChapAPIComponent{kube.BaseComponent{Name: "api"}}, false},
+		{ChapWorkerComponent{kube.BaseComponent{Name: "worker"}}, false},
 	}
 
 	for _, test := range tests {
@@ -122,6 +111,62 @@ func TestCNPGComponentRestartPatchesCluster(t *testing.T) {
 	assert.NotEmpty(t, annotations["kubectl.kubernetes.io/restartedAt"])
 }
 
+// TestDorisComponentRestartPatchesTier asserts each Doris component restarts through the
+// DorisCluster custom resource and stamps only its own tier, so a frontend restart leaves the
+// backends alone.
+func TestDorisComponentRestartPatchesTier(t *testing.T) {
+	instance := &model.DeploymentInstance{ID: 1, Name: "myinstance", Group: &model.Group{ID: 7, Namespace: "ns"}}
+	gvr := schema.GroupVersionResource{Group: "doris.selectdb.com", Version: "v1", Resource: "dorisclusters"}
+
+	tests := []struct {
+		name  string
+		tier  string
+		other string
+	}{
+		{"doris-fe", "fe", "be"},
+		{"doris-be", "be", "fe"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			cluster := &unstructured.Unstructured{Object: map[string]any{
+				"apiVersion": "doris.selectdb.com/v1",
+				"kind":       "DorisCluster",
+				"metadata":   map[string]any{"name": "myinstance-7-doris", "namespace": "ns"},
+			}}
+			scheme := runtime.NewScheme()
+			client := &kube.Client{Dynamic: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(scheme, map[schema.GroupVersionResource]string{gvr: "DorisClusterList"}, cluster)}
+
+			component := DorisComponent{BaseComponent: kube.BaseComponent{Name: test.name}, ClusterPattern: "%s-doris", Tier: test.tier}
+			require.NoError(t, component.Restart(context.Background(), client, instance))
+
+			got, err := client.Dynamic.Resource(gvr).Namespace("ns").Get(context.Background(), "myinstance-7-doris", metav1.GetOptions{})
+			require.NoError(t, err)
+			annotations := got.GetAnnotations()
+			assert.NotEmpty(t, annotations["apache.doris."+test.tier+"/restartedAt"])
+			assert.Empty(t, annotations["apache.doris."+test.other+"/restartedAt"])
+		})
+	}
+}
+
+// TestDHIS2V2DorisComponentPresence asserts both Doris tiers only exist when the analytics database
+// is enabled, mirroring the chart's dorisCluster.enabled condition.
+func TestDHIS2V2DorisComponentPresence(t *testing.T) {
+	names := func(params model.DeploymentInstanceParameters) []string {
+		var names []string
+		for _, c := range kube.PresentComponents(DHIS2V2.Components, params) {
+			names = append(names, c.ComponentName())
+		}
+		return names
+	}
+
+	enabled := model.DeploymentInstanceParameters{"STORAGE_TYPE": {Value: "s3"}, "ENABLE_DORIS": {Value: "true"}}
+	assert.Equal(t, []string{"dhis2", "db", "doris-fe", "doris-be"}, names(enabled))
+
+	disabled := model.DeploymentInstanceParameters{"STORAGE_TYPE": {Value: "s3"}, "ENABLE_DORIS": {Value: "false"}}
+	assert.Equal(t, []string{"dhis2", "db"}, names(disabled))
+}
+
 // TestDHIS2V2MinioComponentPresence asserts the minio component only exists when the file store
 // lives in the bundled MinIO, mirroring the chart's minio.enabled condition.
 func TestDHIS2V2MinioComponentPresence(t *testing.T) {
@@ -143,13 +188,57 @@ func TestDHIS2V2MinioComponentPresence(t *testing.T) {
 	assert.Equal(t, []string{"dhis2", "db"}, names(s3Params))
 }
 
-// TestDHIS2CoreAdvertisesFilestoreBackup asserts the capability listing: the dhis2-core component
-// supports filestore backup for every storage backend, while other stacks only expose the base
-// operations.
-func TestDHIS2CoreAdvertisesFilestoreBackup(t *testing.T) {
-	core, err := kube.FindComponent(DHIS2Core.Components, "dhis2")
+// TestChapRegisterComponentIsAJob asserts the registration component behaves like the Job it
+// tracks: present only when CHAP registers itself, offering no operations, and refusing the restarts
+// a Job cannot perform.
+func TestChapRegisterComponentIsAJob(t *testing.T) {
+	instance := &model.DeploymentInstance{ID: 1, Name: "myinstance", Group: &model.Group{ID: 7, Namespace: "ns"}}
+
+	register, err := kube.FindComponent(Chap.Components, "register")
 	require.NoError(t, err)
-	assert.Contains(t, core.SupportedOperations(nil), kube.OperationFilestoreBackup)
+
+	assert.True(t, register.Present(model.DeploymentInstanceParameters{"DHIS2_REGISTER": {Value: "true"}}))
+	assert.False(t, register.Present(model.DeploymentInstanceParameters{"DHIS2_REGISTER": {Value: "false"}}))
+
+	assert.Empty(t, register.SupportedOperations(nil))
+
+	client := &kube.Client{Clientset: fake.NewSimpleClientset()}
+	assert.True(t, errdef.IsBadRequest(register.Restart(context.Background(), client, instance)))
+	assert.True(t, errdef.IsBadRequest(register.RestartReplica(context.Background(), client, instance, "pod")))
+}
+
+// TestFilestoreBackupIsAdvertisedByTheComponentHoldingTheFiles asserts the capability listing:
+// filestore backup is offered on MinIO when that is the store and on the core component otherwise,
+// so it never appears on a component that does not hold the files. Other stacks only expose the
+// base operations.
+func TestFilestoreBackupIsAdvertisedByTheComponentHoldingTheFiles(t *testing.T) {
+	core, err := kube.FindComponent(DHIS2V2.Components, "dhis2")
+	require.NoError(t, err)
+	minio, err := kube.FindComponent(DHIS2V2.Components, "minio")
+	require.NoError(t, err)
+
+	tests := []struct {
+		storageType  string
+		minioPresent bool
+	}{
+		{storageType: "minio", minioPresent: true},
+		{storageType: "filesystem"},
+		{storageType: "s3"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.storageType, func(t *testing.T) {
+			params := model.DeploymentInstanceParameters{"STORAGE_TYPE": {Value: tt.storageType}}
+
+			assert.Equal(t, tt.minioPresent, minio.Present(params), "MinIO is only deployed when it is the store")
+			if tt.minioPresent {
+				assert.Contains(t, minio.SupportedOperations(params), kube.OperationFilestoreBackup)
+				assert.NotContains(t, core.SupportedOperations(params), kube.OperationFilestoreBackup, "the core pod does not hold the files")
+				return
+			}
+			assert.Contains(t, core.SupportedOperations(params), kube.OperationFilestoreBackup)
+		})
+	}
 
 	whoami, err := kube.FindComponent(WhoamiGo.Components, "whoami")
 	require.NoError(t, err)
@@ -168,20 +257,22 @@ func TestComponentNamesMatchHelmfileImType(t *testing.T) {
 	}
 }
 
-// TestComponentPVCSelectorParity asserts the union of each stack's component PVC selectors equals
-// the historic hardcoded map's output (empty for stacks that had no entry).
+// TestComponentPVCSelectorParity asserts the union of each stack's component PVC selectors is the
+// one expected per stack, empty for the stacks that claim no volumes.
 func TestComponentPVCSelectorParity(t *testing.T) {
 	oldMap := map[string][]string{
-		"dhis2":      {"app.kubernetes.io/instance=%s-database", "app.kubernetes.io/instance=%s-redis"},
-		"dhis2-core": {"app.kubernetes.io/instance=%s", "app.kubernetes.io/instance=%s-minio"},
-		"dhis2-db":   {"app.kubernetes.io/instance=%s-database"},
-		"minio":      {"app.kubernetes.io/instance=%s-minio"},
-		// dhis2-v2 postdates the hardcoded map; the release's own PVCs share its instance label so
-		// selectors are qualified by chart name, and the CNPG cluster labels its volumes itself.
+		// The release's own PVCs share its instance label, so selectors are qualified by chart
+		// name, and the CNPG cluster labels its volumes itself.
 		"dhis2-v2": {
 			"app.kubernetes.io/instance=%s,app.kubernetes.io/name=dhis2",
 			"cnpg.io/cluster=%s-dhis2-postgresql",
 			"app.kubernetes.io/instance=%s,app.kubernetes.io/name=minio",
+		},
+		// The CNPG cluster labels its own volumes and the valkey subchart's PVC is qualified by
+		// chart name, since it shares the release's instance label.
+		"chap": {
+			"cnpg.io/cluster=%s-chap-db",
+			"app.kubernetes.io/instance=%s-chap,app.kubernetes.io/name=valkey",
 		},
 	}
 
@@ -217,4 +308,88 @@ func helmfileImTypes(t *testing.T, stackDir string) []string {
 		imTypes = append(imTypes, match[1])
 	}
 	return imTypes
+}
+
+func TestPostgresPod(t *testing.T) {
+	instance := &model.DeploymentInstance{ID: 1, Name: "myinstance", Group: &model.Group{ID: 7, Namespace: "ns"}}
+
+	t.Run("CNPGViaPrimaryRoleLabel", func(t *testing.T) {
+		component := CNPGPostgresComponent{BaseComponent: kube.BaseComponent{Name: "db"}, ClusterPattern: "%s-dhis2-postgresql"}
+		primary := &v1.Pod{ObjectMeta: metav1.ObjectMeta{
+			Name:      "myinstance-7-dhis2-postgresql-1",
+			Namespace: "ns",
+			Labels:    map[string]string{"cnpg.io/cluster": "myinstance-7-dhis2-postgresql", "cnpg.io/instanceRole": "primary"},
+		}}
+		replica := &v1.Pod{ObjectMeta: metav1.ObjectMeta{
+			Name:      "myinstance-7-dhis2-postgresql-2",
+			Namespace: "ns",
+			Labels:    map[string]string{"cnpg.io/cluster": "myinstance-7-dhis2-postgresql", "cnpg.io/instanceRole": "replica"},
+		}}
+		client := &kube.Client{Clientset: fake.NewSimpleClientset(primary, replica)}
+
+		name, container, err := component.PostgresPod(context.Background(), client, instance)
+
+		require.NoError(t, err)
+		assert.Equal(t, "myinstance-7-dhis2-postgresql-1", name)
+		assert.Equal(t, "postgres", container)
+	})
+
+	t.Run("CNPGNoPrimary", func(t *testing.T) {
+		component := CNPGPostgresComponent{BaseComponent: kube.BaseComponent{Name: "db"}, ClusterPattern: "%s-dhis2-postgresql"}
+		client := &kube.Client{Clientset: fake.NewSimpleClientset()}
+
+		_, _, err := component.PostgresPod(context.Background(), client, instance)
+
+		require.ErrorContains(t, err, "expected one primary pod")
+	})
+}
+
+func TestFindPostgresAccess(t *testing.T) {
+	for _, s := range []Stack{DHIS2V2, Chap} {
+		_, err := kube.FindPostgresAccess(s.Components)
+		assert.NoErrorf(t, err, "stack %q should have a postgres component", s.Name)
+	}
+
+	_, err := kube.FindPostgresAccess(WhoamiGo.Components)
+	require.ErrorContains(t, err, "no postgres component found")
+}
+
+func TestDatabaseSaveCapability(t *testing.T) {
+	params := model.DeploymentInstanceParameters{}
+	for _, s := range []Stack{DHIS2V2} {
+		access, err := kube.FindPostgresAccess(s.Components)
+		require.NoErrorf(t, err, "stack %q", s.Name)
+		component := access.(kube.Component)
+		assert.Containsf(t, component.SupportedOperations(params), kube.OperationDatabaseSave, "stack %q should advertise databaseSave", s.Name)
+	}
+
+	// chap's db does not advertise databaseSave yet: saving CHAP is planned, but needs its
+	// parameter names mapped in the dump config and a seed/restore path first. Enabling it then
+	// is just adding the capability to its component.
+	chapAccess, err := kube.FindPostgresAccess(Chap.Components)
+	require.NoError(t, err)
+	assert.NotContains(t, chapAccess.(kube.Component).SupportedOperations(params), kube.OperationDatabaseSave)
+}
+
+// TestParameterGroupsBelongToComponents asserts every parameter group can be attributed to a
+// component, either by naming one or, when it is conditional, by hanging off a parameter that lives
+// in a group that does. The instance details page attributes an instance's parameters to components
+// exactly this way, so a group satisfying neither leaves its parameters in a list dangling below the
+// components rather than under the thing they configure.
+func TestParameterGroupsBelongToComponents(t *testing.T) {
+	for _, s := range allStacks {
+		components := make(map[string]bool, len(s.Components))
+		for _, component := range s.Components {
+			components[component.ComponentName()] = true
+		}
+
+		for _, group := range s.ParameterGroups {
+			if components[group.Name] {
+				continue
+			}
+			require.NotNilf(t, group.When, "stack %q group %q names no component and has no condition to attribute it by", s.Name, group.Name)
+			owner := s.Parameters[group.When.Parameter].Group
+			assert.Truef(t, components[owner], "stack %q group %q is conditional on %q, which lives in group %q, which names no component", s.Name, group.Name, group.When.Parameter, owner)
+		}
+	}
 }

@@ -3,6 +3,7 @@ package deployment
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"testing"
 
 	"github.com/google/uuid"
@@ -13,15 +14,28 @@ import (
 	"github.com/dhis2-sre/im-manager/pkg/stack"
 )
 
-// fakeDatabaseService resolves database records by id and mints deterministic download links.
+// fakeDatabaseService resolves database records by id or slug and mints deterministic download links.
 type fakeDatabaseService struct {
-	byID map[uint]*model.Database
+	byID   map[uint]*model.Database
+	bySlug map[string]*model.Database
 }
 
 func (f fakeDatabaseService) FindById(ctx context.Context, id uint) (*model.Database, error) {
 	db, ok := f.byID[id]
 	if !ok {
 		return nil, fmt.Errorf("database %d not found", id)
+	}
+	return db, nil
+}
+
+func (f fakeDatabaseService) FindByIdentifier(ctx context.Context, identifier string) (*model.Database, error) {
+	if id, err := strconv.ParseUint(identifier, 10, 32); err == nil {
+		return f.FindById(ctx, uint(id))
+	}
+
+	db, ok := f.bySlug[identifier]
+	if !ok {
+		return nil, fmt.Errorf("database %q not found", identifier)
 	}
 	return db, nil
 }
@@ -110,4 +124,30 @@ func TestBuildSeedNoDatabaseID(t *testing.T) {
 	require.NoError(t, err)
 	assert.Nil(t, extraEnv, "a fresh instance with no DATABASE_ID has nothing to seed")
 	assert.Nil(t, filestore)
+}
+
+func TestBuildSeedResolvesDatabaseSlug(t *testing.T) {
+	t.Setenv("HOSTNAME", "http://im")
+	s := Service{databaseService: fakeDatabaseService{
+		bySlug: map[string]*model.Database{"test-dbs-sierra-leone-dev-sql-gz": {ID: 67}},
+	}}
+	instance := &model.DeploymentInstance{Parameters: model.DeploymentInstanceParameters{
+		"DATABASE_ID": {Value: "test-dbs-sierra-leone-dev-sql-gz"},
+	}}
+
+	extraEnv, _, err := s.buildSeed(context.Background(), []*model.DeploymentInstance{instance})
+	require.NoError(t, err, "a database referenced by slug must still be seeded")
+	dbUUID := uuid.NewSHA1(uuid.NameSpaceOID, []byte("67")).String()
+	assert.Equal(t, "http://im/databases/external/"+dbUUID, extraEnv["DATABASE_DOWNLOAD_URL"])
+}
+
+func TestBuildSeedUnresolvableDatabaseFails(t *testing.T) {
+	s := Service{databaseService: fakeDatabaseService{}}
+	instance := &model.DeploymentInstance{Parameters: model.DeploymentInstanceParameters{
+		"DATABASE_ID": {Value: "no-such-database"},
+	}}
+
+	_, _, err := s.buildSeed(context.Background(), []*model.DeploymentInstance{instance})
+	require.Error(t, err, "an unresolvable DATABASE_ID must fail the deploy rather than silently skip seeding")
+	assert.ErrorContains(t, err, "no-such-database")
 }

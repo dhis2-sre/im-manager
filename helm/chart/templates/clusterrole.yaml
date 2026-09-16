@@ -11,6 +11,8 @@ rules:
       - pods
     verbs:
       - list
+      # The per-cluster informer cache watches the pods IM manages to serve status from memory.
+      - watch
       # Per-replica restart deletes a pod and lets the owning controller or operator recreate it.
       - delete
   - apiGroups:

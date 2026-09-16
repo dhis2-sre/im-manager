@@ -27,30 +27,33 @@ func NewOAuthHandler(
 	cookieSecure bool,
 	accessTokenExpirationSeconds int,
 	refreshTokenExpirationSeconds int,
+	refreshTokenRememberMeExpirationSeconds int,
 	userService oauthUserService,
 	tokenService oauthTokenService,
 ) OAuthHandler {
 	return OAuthHandler{
-		logger:                        logger,
-		uiURL:                         uiURL,
-		sameSiteMode:                  sameSiteMode,
-		cookieSecure:                  cookieSecure,
-		accessTokenExpirationSeconds:  accessTokenExpirationSeconds,
-		refreshTokenExpirationSeconds: refreshTokenExpirationSeconds,
-		userService:                   userService,
-		tokenService:                  tokenService,
+		logger: logger,
+		uiURL:  uiURL,
+		cookies: cookieWriter{
+			sameSiteMode:                            sameSiteMode,
+			cookieSecure:                            cookieSecure,
+			accessTokenExpirationSeconds:            accessTokenExpirationSeconds,
+			refreshTokenExpirationSeconds:           refreshTokenExpirationSeconds,
+			refreshTokenRememberMeExpirationSeconds: refreshTokenRememberMeExpirationSeconds,
+		},
+		cookieSecure: cookieSecure,
+		userService:  userService,
+		tokenService: tokenService,
 	}
 }
 
 type OAuthHandler struct {
-	logger                        *slog.Logger
-	uiURL                         string
-	sameSiteMode                  http.SameSite
-	cookieSecure                  bool
-	accessTokenExpirationSeconds  int
-	refreshTokenExpirationSeconds int
-	userService                   oauthUserService
-	tokenService                  oauthTokenService
+	logger       *slog.Logger
+	uiURL        string
+	cookies      cookieWriter
+	cookieSecure bool
+	userService  oauthUserService
+	tokenService oauthTokenService
 }
 
 // gothic reads the provider name from a query parameter; gin path params won't do.
@@ -64,7 +67,33 @@ func withProviderQuery(c *gin.Context) {
 // BeginAuth starts the OAuth flow by redirecting to the identity provider.
 func (h OAuthHandler) BeginAuth(c *gin.Context) {
 	withProviderQuery(c)
+
+	// The provider round trip loses the query string, so the caller's "remember me" choice is
+	// stashed in a cookie the callback picks up. SameSite=Lax for the same reason the gothic state
+	// cookie uses it: Strict would drop the cookie on the cross-site redirect back from the
+	// provider. Its lifetime matches the gothic session, since it is useless once that expires.
+	if c.Query("rememberMe") == "true" {
+		c.SetSameSite(http.SameSiteLaxMode)
+		c.SetCookie(rememberMeIntentCookie, "true", oauthIntentTTLSeconds, "/", "", h.cookieSecure, true)
+	}
+
 	gothic.BeginAuthHandler(c.Writer, c.Request)
+}
+
+const (
+	rememberMeIntentCookie = "oauthRememberMe"
+	oauthIntentTTLSeconds  = 600
+)
+
+// consumeRememberMeIntent reports whether BeginAuth was asked to remember the session and clears
+// the cookie either way, so a later sign-in cannot inherit this one's choice.
+func (h OAuthHandler) consumeRememberMeIntent(c *gin.Context) bool {
+	cookie, err := c.Cookie(rememberMeIntentCookie)
+
+	c.SetSameSite(http.SameSiteLaxMode)
+	c.SetCookie(rememberMeIntentCookie, "", -1, "/", "", h.cookieSecure, true)
+
+	return err == nil && cookie == "true"
 }
 
 // Callback handles the OAuth callback, signs the user in, sets cookies and redirects to the UI.
@@ -90,15 +119,15 @@ func (h OAuthHandler) Callback(c *gin.Context) {
 		return
 	}
 
-	tokens, err := h.tokenService.GetTokens(user, "", false)
+	rememberMe := h.consumeRememberMeIntent(c)
+
+	tokens, err := h.tokenService.GetTokens(user, "", rememberMe)
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
 
-	c.SetSameSite(h.sameSiteMode)
-	c.SetCookie("accessToken", tokens.AccessToken, h.accessTokenExpirationSeconds, "/", "", h.cookieSecure, true)
-	c.SetCookie("refreshToken", tokens.RefreshToken, h.refreshTokenExpirationSeconds, "/refresh", "", h.cookieSecure, true)
+	h.cookies.set(c, tokens, rememberMe)
 
 	c.Redirect(http.StatusFound, h.uiURL)
 }

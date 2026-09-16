@@ -1063,7 +1063,7 @@ func (h Handler) Status(c *gin.Context) {
 		return
 	}
 
-	status, err := h.instanceService.GetStatus(instance)
+	status, err := h.instanceService.GetStatus(ctx, instance)
 	if err != nil {
 		_ = c.Error(err)
 		return

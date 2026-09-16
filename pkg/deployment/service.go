@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
-	"strconv"
 
 	"github.com/dhis2-sre/im-manager/pkg/instance"
 	"github.com/dhis2-sre/im-manager/pkg/model"
@@ -35,6 +34,7 @@ type instanceService interface {
 
 type databaseService interface {
 	FindById(ctx context.Context, id uint) (*model.Database, error)
+	FindByIdentifier(ctx context.Context, identifier string) (*model.Database, error)
 	CreateExternalDownload(ctx context.Context, databaseID uint, expiration uint) (*model.ExternalDownload, error)
 	CreateDatabase(ctx context.Context, userId uint, groupName, name string) (*model.Database, error)
 	Dump(ctx context.Context, userId uint, database *model.Database, instance *model.DeploymentInstance, stack *stack.Stack, format string) (*model.Database, error)
@@ -157,8 +157,9 @@ func findInstanceById(instances []*model.DeploymentInstance, id uint) (*model.De
 }
 
 // SaveAs dumps the instance's database into a new record. The record is returned right away
-// while the dump and the filestore backup of the dhis2-core sibling run in the background.
-func (s Service) SaveAs(ctx context.Context, userId uint, instance *model.DeploymentInstance, stack *stack.Stack, coreInstance *model.DeploymentInstance, name string, format string) (*model.Database, error) {
+// while the dump and the filestore backup run in the background against whichever instance
+// advertises the filestoreBackup capability.
+func (s Service) SaveAs(ctx context.Context, userId uint, instance *model.DeploymentInstance, stack *stack.Stack, filestoreInstance *model.DeploymentInstance, name string, format string) (*model.Database, error) {
 	created, err := s.databaseService.CreateDatabase(ctx, userId, instance.GroupName, name)
 	if err != nil {
 		return nil, err
@@ -172,7 +173,7 @@ func (s Service) SaveAs(ctx context.Context, userId uint, instance *model.Deploy
 		if err != nil {
 			return
 		}
-		s.saveFilestore(ctx, userId, coreInstance, dumped)
+		s.saveFilestore(ctx, userId, filestoreInstance, dumped)
 	}()
 
 	return created, nil
@@ -180,7 +181,7 @@ func (s Service) SaveAs(ctx context.Context, userId uint, instance *model.Deploy
 
 // Save overwrites the instance's source database with a fresh dump. The lock check runs before
 // returning; the dump, finalization and filestore backup run in the background.
-func (s Service) Save(ctx context.Context, userId uint, database *model.Database, instance *model.DeploymentInstance, stack *stack.Stack, coreInstance *model.DeploymentInstance) error {
+func (s Service) Save(ctx context.Context, userId uint, database *model.Database, instance *model.DeploymentInstance, stack *stack.Stack, filestoreInstance *model.DeploymentInstance) error {
 	locked, wasLocked, err := s.databaseService.EnsureLocked(ctx, database, instance.ID, userId)
 	if err != nil {
 		return err
@@ -195,19 +196,19 @@ func (s Service) Save(ctx context.Context, userId uint, database *model.Database
 			s.logger.ErrorContext(ctx, "save database failed", "databaseName", locked.Name, "error", err)
 			return
 		}
-		s.saveFilestore(ctx, locked.UserID, coreInstance, saved)
+		s.saveFilestore(ctx, locked.UserID, filestoreInstance, saved)
 	}()
 
 	return nil
 }
 
-func (s Service) saveFilestore(ctx context.Context, userId uint, coreInstance *model.DeploymentInstance, database *model.Database) {
-	if coreInstance == nil {
+func (s Service) saveFilestore(ctx context.Context, userId uint, filestoreInstance *model.DeploymentInstance, database *model.Database) {
+	if filestoreInstance == nil {
 		return
 	}
 
 	s.publisher.Publish(ctx, userId, database.GroupName, kindFilestoreBackup, newFilestoreEvent(database, "started", ""))
-	if err := s.instanceService.FilestoreBackup(ctx, coreInstance, database.Name, database); err != nil {
+	if err := s.instanceService.FilestoreBackup(ctx, filestoreInstance, database.Name, database); err != nil {
 		s.logger.ErrorContext(ctx, "filestore backup failed", "groupName", database.GroupName, "databaseName", database.Name, "error", err)
 		s.publisher.Publish(ctx, userId, database.GroupName, kindFilestoreBackup, newFilestoreEvent(database, "error", err.Error()))
 		return
@@ -226,30 +227,31 @@ func (s Service) deployInstance(ctx context.Context, token string, instance *mod
 
 const seedDownloadTTLSeconds uint = 1800
 
-// databaseIDFromInstances resolves the DATABASE_ID parameter from whichever instance in the
-// deployment carries it. DATABASE_ID lives on the db instance, while storage parameters live on
-// the core instance, so callers operating on the core must look across siblings to find it.
-func databaseIDFromInstances(instances []*model.DeploymentInstance) (uint, bool) {
+// databaseIdentifierFromInstances resolves the DATABASE_ID parameter from whichever instance in
+// the deployment carries it. DATABASE_ID lives on the db instance, while storage parameters live
+// on the core instance, so callers operating on the core must look across siblings to find it.
+// The value is either a numeric id or a slug, so it is returned unparsed for the database service
+// to resolve; "0" is the sentinel for a deployment that has no database to seed from.
+func databaseIdentifierFromInstances(instances []*model.DeploymentInstance) (string, bool) {
 	for _, instance := range instances {
 		param, ok := instance.Parameters["DATABASE_ID"]
 		if !ok {
 			continue
 		}
 
-		databaseID, err := strconv.ParseUint(param.Value, 10, strconv.IntSize)
-		if err != nil || databaseID == 0 {
+		if param.Value == "" || param.Value == "0" {
 			continue
 		}
 
-		return uint(databaseID), true
+		return param.Value, true
 	}
-	return 0, false
+	return "", false
 }
 
 // buildSeed resolves the database referenced by the deployment's DATABASE_ID parameter into the
 // environment variables and filestore backup record needed to seed an instance at deploy time.
 func (s Service) buildSeed(ctx context.Context, instances []*model.DeploymentInstance) (map[string]string, *model.Database, error) {
-	databaseID, ok := databaseIDFromInstances(instances)
+	identifier, ok := databaseIdentifierFromInstances(instances)
 	if !ok {
 		return nil, nil, nil
 	}
@@ -257,9 +259,9 @@ func (s Service) buildSeed(ctx context.Context, instances []*model.DeploymentIns
 	hostname := os.Getenv("HOSTNAME")
 	extraEnv := make(map[string]string)
 
-	db, err := s.databaseService.FindById(ctx, databaseID)
+	db, err := s.databaseService.FindByIdentifier(ctx, identifier)
 	if err != nil {
-		return nil, nil, fmt.Errorf("database %d not found: %w", databaseID, err)
+		return nil, nil, fmt.Errorf("database %q not found: %w", identifier, err)
 	}
 
 	dbDownload, err := s.databaseService.CreateExternalDownload(ctx, db.ID, seedDownloadTTLSeconds)

@@ -1,4 +1,4 @@
-# stackParameters: GOOGLE_AUTH_PROJECT_ID,GOOGLE_AUTH_PRIVATE_KEY_ID,GOOGLE_AUTH_PRIVATE_KEY,GOOGLE_AUTH_CLIENT_EMAIL,GOOGLE_AUTH_CLIENT_ID
+# stackParameters: GOOGLE_AUTH_PROJECT_ID,GOOGLE_AUTH_PRIVATE_KEY_ID,GOOGLE_AUTH_PRIVATE_KEY,GOOGLE_AUTH_CLIENT_EMAIL,GOOGLE_AUTH_CLIENT_ID,ENABLE_PGADMIN
 {{ $_ := requiredEnv "DATABASE_ID" }}
 helmDefaults:
   createNamespace: false
@@ -85,9 +85,81 @@ releases:
           secret: "{{ requiredEnv "S3_SECRET" }}"
       {{- end }}
 
-      {{- if ne (requiredEnv "CUSTOM_DHIS2_CONFIG") "" }}
-      - customConfigSnippet:
-          {{- requiredEnv "CUSTOM_DHIS2_CONFIG" | nindent 10 }}
+      # DEPLOY_CHAP allows DHIS 2 to proxy the route the chap companion registers, and installs the
+      # Modeling app that drives it. The custom config comes last so it can override the route rule.
+      - customConfigSnippet: |
+          {{- if eq (requiredEnv "DEPLOY_CHAP") "true" }}
+          route.remote_servers_allowed = http://*
+          {{- end }}
+          {{- with (requiredEnv "CUSTOM_DHIS2_CONFIG" | trim) }}
+          {{- . | nindent 10 }}
+          {{- end }}
+
+      # Doris as the analytics database, bundled by the chart next to DHIS 2 rather than shared, so it
+      # lives and dies with the instance. Requires the doris-operator on the cluster. The image is
+      # upstream Doris with the PostgreSQL JDBC driver already in jdbc_drivers, which is why the
+      # driver is named rather than downloaded at startup.
+      {{- if eq (requiredEnv "ENABLE_DORIS") "true" }}
+      - doris:
+          enabled: true
+          database: {{ requiredEnv "DORIS_DATABASE" }}
+          username: {{ requiredEnv "DORIS_USERNAME" }}
+          password: {{ requiredEnv "DORIS_PASSWORD" }}
+          driverFilename: postgresql.jar
+      - dorisCluster:
+          enabled: true
+          dorisCluster:
+            name: "{{ requiredEnv "INSTANCE_NAME" }}-doris"
+          feSpec:
+            replicas: {{ requiredEnv "DORIS_FRONTEND_REPLICAS" }}
+            image:
+              repository: dhis2/apache-doris
+              tag: fe-{{ requiredEnv "DORIS_FRONTEND_VERSION" }}-postgres
+            # The upstream chart names this key in the singular.
+            resource:
+              requests:
+                cpu: {{ requiredEnv "DORIS_FRONTEND_RESOURCES_REQUESTS_CPU" }}
+                memory: {{ requiredEnv "DORIS_FRONTEND_RESOURCES_REQUESTS_MEMORY" }}
+              limits:
+                cpu: {{ requiredEnv "DORIS_FRONTEND_RESOURCES_LIMITS_CPU" }}
+                memory: {{ requiredEnv "DORIS_FRONTEND_RESOURCES_LIMITS_MEMORY" }}
+            labels:
+              im: "true"
+              im-deployment-id: "{{ requiredEnv "DEPLOYMENT_ID" }}"
+              im-instance-id: "{{ requiredEnv "INSTANCE_ID" }}"
+              im-id: "{{ requiredEnv "INSTANCE_ID" }}"
+              im-type: "doris-fe"
+              im-creation-timestamp: "{{ requiredEnv "INSTANCE_CREATION_TIMESTAMP" }}"
+              im-ttl: "{{ requiredEnv "INSTANCE_TTL" }}"
+          beSpec:
+            replicas: {{ requiredEnv "DORIS_BACKEND_REPLICAS" }}
+            image:
+              repository: dhis2/apache-doris
+              tag: be-{{ requiredEnv "DORIS_BACKEND_VERSION" }}-postgres
+            resource:
+              requests:
+                cpu: {{ requiredEnv "DORIS_BACKEND_RESOURCES_REQUESTS_CPU" }}
+                memory: {{ requiredEnv "DORIS_BACKEND_RESOURCES_REQUESTS_MEMORY" }}
+              limits:
+                cpu: {{ requiredEnv "DORIS_BACKEND_RESOURCES_LIMITS_CPU" }}
+                memory: {{ requiredEnv "DORIS_BACKEND_RESOURCES_LIMITS_MEMORY" }}
+            labels:
+              im: "true"
+              im-deployment-id: "{{ requiredEnv "DEPLOYMENT_ID" }}"
+              im-instance-id: "{{ requiredEnv "INSTANCE_ID" }}"
+              im-id: "{{ requiredEnv "INSTANCE_ID" }}"
+              im-type: "doris-be"
+              im-creation-timestamp: "{{ requiredEnv "INSTANCE_CREATION_TIMESTAMP" }}"
+              im-ttl: "{{ requiredEnv "INSTANCE_TTL" }}"
+      {{- end }}
+
+      {{- if eq (requiredEnv "DEPLOY_CHAP") "true" }}
+      - jobs:
+          installApps:
+            enabled: true
+            apps:
+              - name: Modeling
+                version: latest
       {{- end }}
 
       - sessionCookieSameSite: {{ requiredEnv "SAME_SITE_COOKIES" }}
@@ -176,5 +248,3 @@ releases:
 repositories:
   - name: dhis2
     url: https://dhis2-sre.github.io/dhis2-core-chart
-  - name: bitnami
-    url: https://charts.bitnami.com/bitnami

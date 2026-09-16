@@ -25,6 +25,9 @@ type Client struct {
 	Clientset  kubernetes.Interface
 	Dynamic    dynamic.Interface
 	RestConfig *rest.Config
+	// pods is the per-cluster informer cache, set only on clients built through Clients; nil
+	// means every read goes to the API server as before.
+	pods *podCache
 }
 
 func NewClient(config model.Cluster) (*Client, error) {
