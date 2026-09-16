@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 
 	"github.com/dhis2-sre/im-manager/pkg/stack"
 
@@ -814,6 +815,25 @@ func (h Handler) DeleteDeploymentInstance(c *gin.Context) {
 	c.Status(http.StatusAccepted)
 }
 
+// logTailLines reads the "tail" query parameter: absent means the default amount of the log, 0
+// means all of it, and anything else is that many lines from the end.
+func logTailLines(tail string) (*int64, error) {
+	if tail == "" {
+		lines := DefaultLogTailLines
+		return &lines, nil
+	}
+
+	lines, err := strconv.ParseInt(tail, 10, 64)
+	if err != nil || lines < 0 {
+		return nil, errdef.NewBadRequest("tail must be a positive number of lines, or 0 for the whole log")
+	}
+	if lines == 0 {
+		return nil, nil
+	}
+
+	return &lines, nil
+}
+
 // Logs instance
 func (h Handler) Logs(c *gin.Context) {
 	// swagger:route GET /instances/{id}/logs instanceLogs
@@ -870,7 +890,14 @@ func (h Handler) Logs(c *gin.Context) {
 
 	selector := c.Query("selector")
 	replica := c.Query("replica")
-	r, err := h.instanceService.Logs(ctx, instance, group, selector, replica)
+
+	tailLines, err := logTailLines(c.Query("tail"))
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	r, err := h.instanceService.Logs(ctx, instance, group, selector, replica, tailLines)
 	if err != nil {
 		_ = c.Error(err)
 		return

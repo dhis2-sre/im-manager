@@ -42,6 +42,13 @@ type _ struct {
 	// type: string
 	// description: stream logs of a single replica (pod) of the component given by selector
 	Replica string `json:"replica"`
+
+	// tail
+	// in: query
+	// required: false
+	// type: integer
+	// description: number of lines to stream from the end of the log, 0 for the whole log (default 1000)
+	Tail int64 `json:"tail"`
 }
 
 // swagger:parameters deleteInstance findById findByIdDecrypted saveInstance pauseInstance resumeInstance resetInstance findDeploymentById deployDeployment deleteDeployment status instanceWithDetails filestoreBackup instanceComponents deploymentComponents
