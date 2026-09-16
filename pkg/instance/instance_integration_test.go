@@ -303,7 +303,7 @@ func TestInstanceHandler(t *testing.T) {
 				assert.NoError(c, instanceService.FilestoreBackup(context.Background(), &coreInstance, target.Name, target))
 			}, 90*time.Second, 3*time.Second, "filestore backup should succeed once minio is serving")
 
-			content := s3.GetObject(t, s3Bucket, "group-name/fs-backup-target-fs.tar.gz")
+			content := s3.GetObject(t, "group-name/fs-backup-target-fs.tar.gz")
 			require.NotEmpty(t, content)
 			entries := extractTarGzEntries(t, content)
 			assert.Equal(t, "hello-filestore", string(entries["seeded/marker.txt"]))
@@ -356,18 +356,18 @@ func TestInstanceHandler(t *testing.T) {
 			assert.Equal(t, fmt.Sprintf("s3://%s/group-name/saved-copy.sql.gz", s3Bucket), finalDB.Url)
 			assert.Greater(t, finalDB.Size, int64(0))
 
-			s3Content := s3.GetObject(t, s3Bucket, "group-name/saved-copy.sql.gz")
+			s3Content := s3.GetObject(t, "group-name/saved-copy.sql.gz")
 			assert.Greater(t, len(s3Content), 0, "S3 object should have content")
 		})
 
 		t.Run("SaveDatabase", func(t *testing.T) {
-			originalSize := len(s3.GetObject(t, s3Bucket, "group-name/v2-save-test.sql.gz"))
+			originalSize := len(s3.GetObject(t, "group-name/v2-save-test.sql.gz"))
 
 			instanceIDStr := strconv.FormatUint(uint64(coreInstance.ID), 10)
 			client.Do(t, http.MethodPost, "/databases/save/"+instanceIDStr, nil, http.StatusAccepted, inttest.WithAuthToken(tokens.AccessToken))
 
 			require.Eventually(t, func() bool {
-				content, err := s3.TryGetObject(s3Bucket, "group-name/v2-save-test.sql.gz")
+				content, err := s3.TryGetObject("group-name/v2-save-test.sql.gz")
 				return err == nil && len(content) > originalSize
 			}, 180*time.Second, 500*time.Millisecond, "saved database in S3 should grow beyond the uploaded placeholder")
 		})
@@ -403,7 +403,7 @@ func TestInstanceHandler(t *testing.T) {
 
 		require.NoError(t, instanceService.FilestoreBackup(context.Background(), &coreInstance, target.Name, target))
 
-		content := s3.GetObject(t, s3Bucket, "group-name/fsstore-backup-target-fs.tar.gz")
+		content := s3.GetObject(t, "group-name/fsstore-backup-target-fs.tar.gz")
 		require.NotEmpty(t, content)
 		entries := extractTarGzEntries(t, content)
 		assert.Equal(t, "hello-filestore", string(entries["seeded/marker.txt"]))

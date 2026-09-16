@@ -43,8 +43,14 @@ Each call to a fixture helper allocates isolated data:
 | `SetupDB(t)` | Database cloned from a migrated template | Close connection pool, drop database |
 | `SetupRedis(t)` | Exclusively leased logical database | Flush that database, close client, return lease |
 | `SetupS3(t)` | Unique LocalStack bucket returned as `Bucket` | Delete objects, abort unfinished uploads, delete bucket |
-| `SetupMinIO(t)` | Unique MinIO bucket returned with client | Same bucket cleanup |
+| `SetupMinIO(t)` | Unique MinIO bucket returned as `Bucket` | Same bucket cleanup |
 | `SetupRabbitStream(t)` / `SetupRabbitMQAMQP(t)` | Unique RabbitMQ virtual host | Close clients, delete virtual host |
+
+S3 and MinIO fixtures expose `Client` and `Bucket` together. S3 convenience methods
+`GetObject(t, key)` and `TryGetObject(key)` always use that fixture's bucket. Cleanup
+is registered automatically with `t.Cleanup`: it runs after the calling test and
+all its subtests finish, while the shared server stays running. Tests must stop
+any workers and close producers or consumers before their fixture is cleaned up.
 
 PostgreSQL migrations, extensions and indexes run once during template creation.
 The template's connections are then closed and new connections to it disabled.

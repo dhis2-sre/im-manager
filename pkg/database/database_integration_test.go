@@ -82,7 +82,7 @@ func TestDatabaseHandler(t *testing.T) {
 		require.Equal(t, "s3://"+s3.Bucket+"/packages/path/name.extension", database.Url)
 		require.Equal(t, int64(13), database.Size)
 
-		actualContent := s3.GetObject(t, s3.Bucket, "packages/path/name.extension")
+		actualContent := s3.GetObject(t, "packages/path/name.extension")
 		require.Equalf(t, "file contents", string(actualContent), "DB in S3 should have expected content")
 
 		databaseID = strconv.FormatUint(uint64(database.ID), 10)
@@ -152,7 +152,7 @@ func TestDatabaseHandler(t *testing.T) {
 			require.Equal(t, "packages", actualDB.GroupName)
 			assert.Equal(t, userID, actualDB.UserID)
 
-			actualContent := s3.GetObject(t, s3.Bucket, "packages/path/copy.extension")
+			actualContent := s3.GetObject(t, "packages/path/copy.extension")
 			require.Equalf(t, "file contents", string(actualContent), "DB in S3 should have expected content")
 		}
 
@@ -213,7 +213,7 @@ func TestDatabaseHandler(t *testing.T) {
 			require.Equal(t, "path/rename.extension", actualDB.Name)
 			require.Equal(t, "packages", actualDB.GroupName)
 
-			actualContent := s3.GetObject(t, s3.Bucket, "packages/path/rename.extension")
+			actualContent := s3.GetObject(t, "packages/path/rename.extension")
 			require.Equalf(t, "file contents", string(actualContent), "DB in S3 should have expected content")
 		}
 

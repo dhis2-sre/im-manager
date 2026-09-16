@@ -19,6 +19,7 @@ import (
 )
 
 // SetupS3 creates an isolated bucket on the shared LocalStack S3 service.
+// The bucket is cleaned up after t and all its subtests finish.
 func SetupS3(t *testing.T) *S3Client {
 	t.Helper()
 	address, err := testenv.Shared.S3()
@@ -28,7 +29,8 @@ func SetupS3(t *testing.T) *S3Client {
 }
 
 // SetupMinIO creates an isolated bucket on the shared MinIO service.
-func SetupMinIO(t *testing.T) (*minio.Client, string) {
+// The bucket is cleaned up after t and all its subtests finish.
+func SetupMinIO(t *testing.T) *MinIOClient {
 	t.Helper()
 	address, err := testenv.Shared.MinIO()
 	require.NoError(t, err)
@@ -37,7 +39,7 @@ func SetupMinIO(t *testing.T) (*minio.Client, string) {
 		Secure: false,
 	})
 	require.NoError(t, err)
-	return client, newBucket(t, newS3("http://"+address))
+	return &MinIOClient{Client: client, Bucket: newBucket(t, newS3("http://"+address))}
 }
 
 func newS3(endpoint string) *s3.Client {
@@ -105,23 +107,30 @@ func newBucket(t *testing.T, client *s3.Client) string {
 	return bucket
 }
 
+// MinIOClient holds a real client and the bucket allocated to this fixture.
+type MinIOClient struct {
+	Client *minio.Client
+	Bucket string
+}
+
 // S3Client holds a real client and the bucket allocated to this fixture.
 type S3Client struct {
 	Client *s3.Client
 	Bucket string
 }
 
-func (sc *S3Client) GetObject(t *testing.T, bucket, key string) []byte {
+// GetObject reads a key from this fixture's bucket.
+func (sc *S3Client) GetObject(t *testing.T, key string) []byte {
 	t.Helper()
-	body, err := sc.TryGetObject(bucket, key)
-	require.NoErrorf(t, err, "GET from S3 bucket %q and key %q", bucket, key)
+	body, err := sc.TryGetObject(key)
+	require.NoErrorf(t, err, "GET from S3 bucket %q and key %q", sc.Bucket, key)
 	return body
 }
 
-// TryGetObject supports polling for asynchronously uploaded objects.
-func (sc *S3Client) TryGetObject(bucket, key string) ([]byte, error) {
+// TryGetObject reads from this fixture's bucket, supporting polling for asynchronous uploads.
+func (sc *S3Client) TryGetObject(key string) ([]byte, error) {
 	object, err := sc.Client.GetObject(context.Background(), &s3.GetObjectInput{
-		Bucket: aws.String(bucket), Key: aws.String(key),
+		Bucket: aws.String(sc.Bucket), Key: aws.String(key),
 	})
 	if err != nil {
 		return nil, err

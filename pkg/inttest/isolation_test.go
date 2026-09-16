@@ -93,33 +93,33 @@ func TestS3BucketsAreIsolated(t *testing.T) {
 		require.NotEqual(t, left.Bucket, right.Bucket)
 		_, err := right.Client.PutObject(ctx, &s3.PutObjectInput{Bucket: aws.String(right.Bucket), Key: aws.String("same-key"), Body: bytes.NewReader([]byte("right"))})
 		require.NoError(t, err)
-		require.Equal(t, []byte("right"), right.GetObject(t, right.Bucket, "same-key"))
+		require.Equal(t, []byte("right"), right.GetObject(t, "same-key"))
 		// An interrupted upload must not outlive its fixture either.
 		_, err = right.Client.CreateMultipartUpload(ctx, &s3.CreateMultipartUploadInput{Bucket: aws.String(right.Bucket), Key: aws.String("unfinished")})
 		require.NoError(t, err)
 	})
-	require.Equal(t, []byte("left"), left.GetObject(t, left.Bucket, "same-key"))
+	require.Equal(t, []byte("left"), left.GetObject(t, "same-key"))
 	_, err = left.Client.HeadBucket(ctx, &s3.HeadBucketInput{Bucket: aws.String(removed)})
 	require.Error(t, err)
 }
 
 func TestMinIOBucketsAreIsolated(t *testing.T) {
-	left, bucket := inttest.SetupMinIO(t)
+	left := inttest.SetupMinIO(t)
 	ctx := context.Background()
-	_, err := left.PutObject(ctx, bucket, "same-key", bytes.NewReader([]byte("left")), 4, minio.PutObjectOptions{})
+	_, err := left.Client.PutObject(ctx, left.Bucket, "same-key", bytes.NewReader([]byte("left")), 4, minio.PutObjectOptions{})
 	require.NoError(t, err)
 	var removed string
 	t.Run("other fixture", func(t *testing.T) {
-		right, other := inttest.SetupMinIO(t)
-		removed = other
-		require.NotEqual(t, bucket, other)
-		_, err := right.PutObject(ctx, other, "same-key", bytes.NewReader([]byte("right")), 5, minio.PutObjectOptions{})
+		right := inttest.SetupMinIO(t)
+		removed = right.Bucket
+		require.NotEqual(t, left.Bucket, right.Bucket)
+		_, err := right.Client.PutObject(ctx, right.Bucket, "same-key", bytes.NewReader([]byte("right")), 5, minio.PutObjectOptions{})
 		require.NoError(t, err)
 	})
-	exists, err := left.BucketExists(ctx, removed)
+	exists, err := left.Client.BucketExists(ctx, removed)
 	require.NoError(t, err)
 	require.False(t, exists)
-	info, err := left.StatObject(ctx, bucket, "same-key", minio.StatObjectOptions{})
+	info, err := left.Client.StatObject(ctx, left.Bucket, "same-key", minio.StatObjectOptions{})
 	require.NoError(t, err)
 	require.EqualValues(t, 4, info.Size)
 }
