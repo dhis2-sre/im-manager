@@ -2096,6 +2096,14 @@ paths:
                   name: selector
                   type: string
                   x-go-name: Selector
+                - description: |-
+                    replica
+                    type: string
+                    description: stream logs of a single replica (pod) of the component given by selector
+                  in: query
+                  name: replica
+                  type: string
+                  x-go-name: Replica
             responses:
                 "200":
                     $ref: '#/responses/InstanceLogsResponse'

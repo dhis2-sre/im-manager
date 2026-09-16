@@ -678,17 +678,11 @@ func (s Service) Restart(ctx context.Context, instance *model.DeploymentInstance
 		return err
 	}
 
-	stack, err := s.stackService.Find(instance.StackName)
+	components, instance, err := s.presentComponents(instance)
 	if err != nil {
 		return err
 	}
 
-	instance, err = s.instanceRepository.DecryptDeploymentInstance(instance, stack)
-	if err != nil {
-		return err
-	}
-
-	components := kube.PresentComponents(stack.Components, instance.Parameters)
 	if len(components) == 0 {
 		return errdef.NewBadRequest("stack %q has no components to restart", instance.StackName)
 	}
@@ -793,13 +787,56 @@ func (s Service) DeploymentComponents(ctx context.Context, deployment *model.Dep
 	return result, nil
 }
 
-func (s Service) Logs(ctx context.Context, instance *model.DeploymentInstance, group *model.Group, typeSelector string) (io.ReadCloser, error) {
-	ks, err := s.kubeClients.For(group.Cluster)
+func (s Service) Logs(ctx context.Context, instance *model.DeploymentInstance, group *model.Group, componentName, podName string) (io.ReadCloser, error) {
+	if podName != "" && componentName == "" {
+		return nil, errdef.NewBadRequest("streaming the logs of a replica requires a component selector")
+	}
+
+	client, err := s.kubeClients.For(group.Cluster)
 	if err != nil {
 		return nil, err
 	}
 
-	return ks.Logs(ctx, instance, typeSelector)
+	if podName == "" {
+		return client.Logs(ctx, instance, componentName)
+	}
+
+	components, instance, err := s.presentComponents(instance)
+	if err != nil {
+		return nil, err
+	}
+
+	component, err := kube.FindComponent(components, componentName)
+	if err != nil {
+		return nil, err
+	}
+
+	replicas, err := component.Replicas(ctx, client, instance)
+	if err != nil {
+		return nil, err
+	}
+
+	if !slices.ContainsFunc(replicas, func(replica kube.Replica) bool { return replica.Name == podName }) {
+		return nil, errdef.NewNotFound("pod %q not found for component %q", podName, componentName)
+	}
+
+	return client.PodLogs(ctx, instance.Group.Namespace, podName)
+}
+
+// presentComponents returns the components of the instance's stack which are present given its
+// parameters, along with the decrypted instance those parameters were read from.
+func (s Service) presentComponents(instance *model.DeploymentInstance) ([]kube.Component, *model.DeploymentInstance, error) {
+	stack, err := s.stackService.Find(instance.StackName)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	instance, err = s.instanceRepository.DecryptDeploymentInstance(instance, stack)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return kube.PresentComponents(stack.Components, instance.Parameters), instance, nil
 }
 
 type GroupWithDeployments struct {

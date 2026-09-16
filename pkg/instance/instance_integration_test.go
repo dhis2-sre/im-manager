@@ -208,7 +208,7 @@ func TestInstanceHandler(t *testing.T) {
 
 		require.Len(t, components, 1)
 		assert.Equal(t, "whoami", components[0].Name)
-		assert.Equal(t, []kube.Operation{kube.OperationRestart, kube.OperationRestartReplica}, components[0].SupportedOperations)
+		assert.Equal(t, []kube.Operation{kube.OperationRestart, kube.OperationRestartReplica, kube.OperationLogs}, components[0].SupportedOperations)
 		require.Len(t, components[0].Replicas, 1)
 		replica := components[0].Replicas[0]
 		assert.Equal(t, "Running", replica.Phase)
@@ -225,8 +225,15 @@ func TestInstanceHandler(t *testing.T) {
 		assert.Equal(t, "whoami", deploymentComponents[0].Components[0].Name)
 		require.Len(t, deploymentComponents[0].Components[0].Replicas, 1)
 
+		path = fmt.Sprintf("/instances/%d/logs?replica=%s", deploymentInstance.ID, replica.Name)
+		response := client.Do(t, http.MethodGet, path, nil, http.StatusBadRequest, inttest.WithAuthToken(tokens.AccessToken))
+		assert.Contains(t, string(response), "replica requires a component selector")
+
+		path = fmt.Sprintf("/instances/%d/logs?selector=whoami&replica=no-such-pod", deploymentInstance.ID)
+		client.Do(t, http.MethodGet, path, nil, http.StatusNotFound, inttest.WithAuthToken(tokens.AccessToken))
+
 		path = fmt.Sprintf("/instances/%d/restart?replica=%s", deploymentInstance.ID, replica.Name)
-		response := client.Do(t, http.MethodPut, path, nil, http.StatusBadRequest, inttest.WithAuthToken(tokens.AccessToken))
+		response = client.Do(t, http.MethodPut, path, nil, http.StatusBadRequest, inttest.WithAuthToken(tokens.AccessToken))
 		assert.Contains(t, string(response), "replica requires a component selector")
 
 		path = fmt.Sprintf("/instances/%d/restart?selector=whoami&replica=no-such-pod", deploymentInstance.ID)

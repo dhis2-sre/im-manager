@@ -22,6 +22,24 @@ func (c *Client) Logs(ctx context.Context, instance *model.DeploymentInstance, t
 		return nil, err
 	}
 
+	return c.podLogs(ctx, pod)
+}
+
+// PodLogs streams the log of the named pod.
+func (c *Client) PodLogs(ctx context.Context, namespace, podName string) (io.ReadCloser, error) {
+	pod, err := c.Clientset.CoreV1().Pods(namespace).Get(ctx, podName, metav1.GetOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("error getting pod %q: %v", podName, err)
+	}
+
+	return c.podLogs(ctx, *pod)
+}
+
+func (c *Client) podLogs(ctx context.Context, pod v1.Pod) (io.ReadCloser, error) {
+	if len(pod.Spec.Containers) == 0 {
+		return nil, errdef.NewNotFound("pod %q has no containers", pod.Name)
+	}
+
 	podLogOptions := v1.PodLogOptions{
 		Follow: true,
 		// TODO: Just getting the first container isn't ideal. Ideally we would have an endpoint which returns all containers and allow the user to select one. However this is beyond the scope of the current changes and simply getting the first prevents a 500 error
@@ -32,7 +50,7 @@ func (c *Client) Logs(ctx context.Context, instance *model.DeploymentInstance, t
 		CoreV1().
 		Pods(pod.Namespace).
 		GetLogs(pod.Name, &podLogOptions).
-		Stream(context.TODO())
+		Stream(ctx)
 	if err != nil {
 		if strings.Contains(err.Error(), "ContainerCreating") || strings.Contains(err.Error(), "waiting to start") {
 			return nil, errdef.NewConflict("instance is still starting up, logs not available yet")
