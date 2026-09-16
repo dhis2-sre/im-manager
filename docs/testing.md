@@ -219,17 +219,21 @@ The candidate [chart update](https://github.com/dhis2-sre/dhis2-core-chart/pull/
 keeps PostgreSQL 17 and uses a digest-pinned PostGIS 3.6 Bookworm manifest with
 AMD64 and ARM64 variants. Its
 [seed image update](https://github.com/dhis2-sre/bitnami-postgresql-curl/pull/3)
-uses the official PostgreSQL 17 Bookworm base plus curl, under the postgres user.
-The seed workflow builds and smoke tests both platforms before publication.
+uses a digest-pinned Bitnami Legacy PostgreSQL 17 base with curl and CA
+certificates, preserving UID 1001 and the Bitnami entrypoint. The single image
+workflow validates server startup, HTTPS and SQL/archive restores on both
+platforms before publication. Existing numeric image tags remain untouched.
+The legacy base contains PostgreSQL 17.5 and receives no upstream updates; this
+is a compatibility bridge for version 3.0, not a long-term image migration.
 
-Release order: publish `dhis2/postgresql-curl:17-bookworm`, remove the chart PR's
+Release order: publish `dhis2/postgresql-curl:17-legacy-r1`, remove the chart PR's
 temporary candidate-image import steps, release chart 1.1.0, then update
 im-manager's CHART_VERSION default. Until then, im-manager retains released chart
 1.0.1; ordinary native ARM64 Kubernetes runs still need the candidate chart.
 The changes do not parallelize CI gates.
 
-Local validation on 2026-09-14 used a packaged candidate chart in place of the
-released chart reference and imported the locally built seed image into the
+Earlier validation on 2026-09-14 used the official PostgreSQL-based seed candidate
+and a packaged candidate chart in place of the released chart reference and imported the locally built seed image into the
 disposable k3s container. The complete `make test-e2e` passed with `-race`:
 3m10s for the Go test phase and 3m24s including service setup and cleanup.
 PostgreSQL reported 17.11 on aarch64 and PostGIS reported 3.6.4. Database
@@ -239,6 +243,18 @@ not a controlled speed comparison against a previously passing local baseline.
 The final full `make test` run also passed with `-race -p 4 -count=1`, taking
 3m33s including shared-service setup and cleanup. Other local Docker work was
 active during these measurements.
+
+The Bitnami Legacy replacement was validated on 2026-09-16. Its image tests
+passed on AMD64 (emulated locally) and native ARM64, including HTTPS downloads,
+Bitnami server initialization and SQL/custom-archive restores. The complete
+Kubernetes suite then passed with `-race -count=1` on native ARM64 OrbStack using
+the packaged candidate chart and imported `17-legacy-r1` image: 192.107s for
+`pkg/instance`, 36.261s service setup, 204.218s Go compilation/test execution and
+1.549s cleanup, totaling 242.029s. This used a fresh Docker image cache on a
+different daemon, so it is a compatibility result, not a speed comparison with
+the earlier Docker Desktop measurements. The first Docker Desktop attempt was
+stopped after its 32 GB disk filled and Kubernetes evicted pods; no passing time
+is claimed for that attempt.
 
 If an image was previously pulled for AMD64, Docker can reuse that cached variant
 on an ARM64 host. The shared MinIO release already provides both architectures;
