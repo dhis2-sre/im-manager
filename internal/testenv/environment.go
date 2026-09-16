@@ -168,56 +168,73 @@ func (e *Environment) MinIO() (string, error) {
 
 func CloseLocal() error { return Shared.Close() }
 
-// Start starts independent services concurrently. Call Close even on failure.
-func (e *Environment) Start(services []string) (Config, error) {
+// StartAll starts all five shared services concurrently.
+// Call Close even on failure.
+func (e *Environment) StartAll() (Config, error) {
 	var c Config
-	var mu sync.Mutex
-	var errs []error
+	var postgresErr, redisErr, s3Err, minioErr, rabbitmqErr error
 	var wg sync.WaitGroup
-	for _, name := range services {
-		wg.Go(func() {
-			started := time.Now()
-			var err error
-			var address string
-			var pg storage.PostgresqlConfig
-			var rabbit RabbitMQConfig
-			switch name {
-			case "rabbitmq":
-				rabbit, err = e.rabbitmq()
-			case "postgres":
-				pg, err = e.postgres()
-			case "redis":
-				address, err = e.redis()
-			case "s3":
-				address, err = e.s3()
-			case "minio":
-				address, err = e.minio()
-			default:
-				err = fmt.Errorf("unknown test service %q", name)
-			}
-			mu.Lock()
-			defer mu.Unlock()
-			if err != nil {
-				errs = append(errs, fmt.Errorf("start %s: %w", name, err))
-				return
-			}
-			switch name {
-			case "rabbitmq":
-				c.RabbitMQ = rabbit
-			case "postgres":
-				c.Postgres = pg
-			case "redis":
-				c.Redis = address
-			case "s3":
-				c.S3 = address
-			case "minio":
-				c.MinIO = address
-			}
-			fmt.Fprintf(os.Stderr, "test service %s ready in %s\n", name, time.Since(started).Round(time.Millisecond))
-		})
-	}
+	wg.Go(func() {
+		started := time.Now()
+		c.Postgres, postgresErr = e.postgres()
+		postgresErr = logStartup("postgres", started, postgresErr)
+	})
+	wg.Go(func() {
+		started := time.Now()
+		c.Redis, redisErr = e.redis()
+		redisErr = logStartup("redis", started, redisErr)
+	})
+	wg.Go(func() {
+		started := time.Now()
+		c.S3, s3Err = e.s3()
+		s3Err = logStartup("s3", started, s3Err)
+	})
+	wg.Go(func() {
+		started := time.Now()
+		c.MinIO, minioErr = e.minio()
+		minioErr = logStartup("minio", started, minioErr)
+	})
+	wg.Go(func() {
+		started := time.Now()
+		c.RabbitMQ, rabbitmqErr = e.rabbitmq()
+		rabbitmqErr = logStartup("rabbitmq", started, rabbitmqErr)
+	})
 	wg.Wait()
-	return c, errors.Join(errs...)
+	return c, errors.Join(postgresErr, redisErr, s3Err, minioErr, rabbitmqErr)
+}
+
+// StartE2E starts PostgreSQL, Redis and S3 for Kubernetes tests concurrently.
+// Call Close even on failure.
+func (e *Environment) StartE2E() (Config, error) {
+	var c Config
+	var postgresErr, redisErr, s3Err error
+	var wg sync.WaitGroup
+	wg.Go(func() {
+		started := time.Now()
+		c.Postgres, postgresErr = e.postgres()
+		postgresErr = logStartup("postgres", started, postgresErr)
+	})
+	wg.Go(func() {
+		started := time.Now()
+		c.Redis, redisErr = e.redis()
+		redisErr = logStartup("redis", started, redisErr)
+	})
+	wg.Go(func() {
+		started := time.Now()
+		c.S3, s3Err = e.s3()
+		s3Err = logStartup("s3", started, s3Err)
+	})
+	wg.Wait()
+	return c, errors.Join(postgresErr, redisErr, s3Err)
+}
+
+// logStartup keeps timing and error reporting consistent across explicit starts.
+func logStartup(name string, started time.Time, err error) error {
+	if err != nil {
+		return fmt.Errorf("start %s: %w", name, err)
+	}
+	fmt.Fprintf(os.Stderr, "test service %s ready in %s\n", name, time.Since(started).Round(time.Millisecond))
+	return nil
 }
 
 func (e *Environment) startEndpoint(req testcontainers.ContainerRequest, port, scheme string) (string, error) {

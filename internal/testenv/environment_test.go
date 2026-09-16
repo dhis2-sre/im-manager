@@ -2,9 +2,11 @@ package testenv
 
 import (
 	"encoding/json"
+	"errors"
 	"os"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/dhis2-sre/im-manager/pkg/storage"
 	"github.com/stretchr/testify/require"
@@ -72,4 +74,74 @@ func TestTypedServicesStartOnlyRequestedLocalService(t *testing.T) {
 	}
 	wg.Wait()
 	require.Equal(t, 1, starts)
+}
+
+func TestStartupPathsAreConcurrent(t *testing.T) {
+	for _, e2e := range []bool{false, true} {
+		name := "all"
+		want := []string{"postgres", "redis", "s3", "minio", "rabbitmq"}
+		if e2e {
+			name = "e2e"
+			want = []string{"postgres", "redis", "s3"}
+		}
+		t.Run(name, func(t *testing.T) {
+			entered := make(chan string, 5)
+			release := make(chan struct{})
+			done := make(chan struct{})
+			wait := func(name string) { entered <- name; <-release }
+			postgresErr := errors.New("postgres startup failed")
+			redisErr := errors.New("redis startup failed")
+			e := &Environment{
+				postgres: func() (storage.PostgresqlConfig, error) {
+					wait("postgres")
+					return storage.PostgresqlConfig{}, postgresErr
+				},
+				redis: func() (string, error) { wait("redis"); return "", redisErr },
+				s3:    func() (string, error) { wait("s3"); return "http://s3:4566", nil },
+				minio: func() (string, error) { wait("minio"); return "minio:9000", nil },
+				rabbitmq: func() (RabbitMQConfig, error) {
+					wait("rabbitmq")
+					return RabbitMQConfig{Management: "http://rabbitmq:15672"}, nil
+				},
+			}
+			var config Config
+			var err error
+			go func() {
+				defer close(done)
+				if e2e {
+					config, err = e.StartE2E()
+				} else {
+					config, err = e.StartAll()
+				}
+			}()
+			// Release blocked starts even when an assertion fails.
+			unblock := sync.OnceFunc(func() { close(release) })
+			defer func() { unblock(); <-done }()
+			timer := time.NewTimer(5 * time.Second)
+			defer timer.Stop()
+			var got []string
+			for range want {
+				select {
+				case service := <-entered:
+					got = append(got, service)
+				case <-timer.C:
+					t.Fatal("services did not start concurrently")
+				}
+			}
+			require.ElementsMatch(t, want, got)
+			unblock()
+			<-done
+			require.Empty(t, entered, "started an unexpected service")
+			require.ErrorIs(t, err, postgresErr)
+			require.ErrorIs(t, err, redisErr)
+			require.Equal(t, "http://s3:4566", config.S3, "successful starts survive other startup failures")
+			if e2e {
+				require.Empty(t, config.MinIO)
+				require.Empty(t, config.RabbitMQ)
+			} else {
+				require.Equal(t, "minio:9000", config.MinIO)
+				require.Equal(t, "http://rabbitmq:15672", config.RabbitMQ.Management)
+			}
+		})
+	}
 }

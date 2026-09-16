@@ -10,7 +10,6 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
-	"strings"
 	"syscall"
 	"time"
 
@@ -20,7 +19,7 @@ import (
 func main() { os.Exit(run()) }
 
 func run() (code int) {
-	services := flag.String("services", "postgres,redis,s3,minio,rabbitmq", "comma-separated services to start")
+	e2e := flag.Bool("e2e", false, "start PostgreSQL, Redis and S3 for Kubernetes-only tests")
 	flag.Parse()
 	if err := testenv.Configure(); err != nil {
 		fmt.Fprintln(os.Stderr, "configure test environment:", err)
@@ -37,20 +36,17 @@ func run() (code int) {
 		}
 		cleanupTime, total := time.Since(cleanup), time.Since(started)
 		fmt.Fprintf(os.Stderr, "test timing: cleanup=%s total=%s\n", cleanupTime.Round(time.Millisecond), total.Round(time.Millisecond))
-		if path := os.Getenv("GITHUB_STEP_SUMMARY"); path != "" {
-			f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600)
-			if err == nil {
-				_, err = fmt.Fprintf(f, "\n### Go test timing\n\n| Phase | Duration |\n|---|---:|\n| Shared service setup | %s |\n| Go test (including compilation) | %s |\n| Service cleanup | %s |\n| Total runner time | %s |\n\nExit code: %d. Services: `%s`.\n", setup.Round(time.Millisecond), tests.Round(time.Millisecond), cleanupTime.Round(time.Millisecond), total.Round(time.Millisecond), code, *services)
-				_ = f.Close()
-			}
-			if err != nil {
-				fmt.Fprintln(os.Stderr, "write test timing summary:", err)
-			}
-		}
+		writeTimingSummary(setup, tests, cleanupTime, total, code)
 	}()
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-	c, err := e.Start(strings.Split(*services, ","))
+	var c testenv.Config
+	var err error
+	if *e2e {
+		c, err = e.StartE2E()
+	} else {
+		c, err = e.StartAll()
+	}
 	setup = time.Since(started)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -63,7 +59,12 @@ func run() (code int) {
 	}
 	args := flag.Args()
 	if len(args) == 0 {
-		args = []string{"-race", "-count=1", "./..."}
+		args = []string{"-race", "-count=1"}
+		if *e2e {
+			args = append(args, "-run", "^TestInstanceHandler$", "./pkg/instance")
+		} else {
+			args = append(args, "./...")
+		}
 	}
 	cmd := exec.CommandContext(ctx, "go", append([]string{"test"}, args...)...) // #nosec G204 -- forwards explicit developer-supplied go test arguments.
 	cmd.Env = append(os.Environ(), testenv.ConfigEnv+"="+string(config))
@@ -85,4 +86,17 @@ func run() (code int) {
 		return 1
 	}
 	return 0
+}
+
+func writeTimingSummary(setup, tests, cleanup, total time.Duration, code int) {
+	if path := os.Getenv("GITHUB_STEP_SUMMARY"); path != "" {
+		f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600)
+		if err == nil {
+			_, err = fmt.Fprintf(f, "\n### Go test timing\n\n| Phase | Duration |\n|---|---:|\n| Shared service setup | %s |\n| Go test (including compilation) | %s |\n| Service cleanup | %s |\n| Total runner time | %s |\n\nExit code: %d.\n", setup.Round(time.Millisecond), tests.Round(time.Millisecond), cleanup.Round(time.Millisecond), total.Round(time.Millisecond), code)
+			_ = f.Close()
+		}
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "write test timing summary:", err)
+		}
+	}
 }
