@@ -207,13 +207,38 @@ func TestChapRegisterComponentIsAJob(t *testing.T) {
 	assert.True(t, errdef.IsBadRequest(register.RestartReplica(context.Background(), client, instance, "pod")))
 }
 
-// TestDHIS2CoreAdvertisesFilestoreBackup asserts the capability listing: the core component
-// supports filestore backup for every storage backend, while other stacks only expose the base
-// operations.
-func TestDHIS2CoreAdvertisesFilestoreBackup(t *testing.T) {
+// TestFilestoreBackupIsAdvertisedByTheComponentHoldingTheFiles asserts the capability listing:
+// filestore backup is offered on MinIO when that is the store and on the core component otherwise,
+// so it never appears on a component that does not hold the files. Other stacks only expose the
+// base operations.
+func TestFilestoreBackupIsAdvertisedByTheComponentHoldingTheFiles(t *testing.T) {
 	core, err := kube.FindComponent(DHIS2V2.Components, "dhis2")
 	require.NoError(t, err)
-	assert.Contains(t, core.SupportedOperations(nil), kube.OperationFilestoreBackup)
+	minio, err := kube.FindComponent(DHIS2V2.Components, "minio")
+	require.NoError(t, err)
+
+	tests := []struct {
+		storageType  string
+		minioPresent bool
+	}{
+		{storageType: "minio", minioPresent: true},
+		{storageType: "filesystem"},
+		{storageType: "s3"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.storageType, func(t *testing.T) {
+			params := model.DeploymentInstanceParameters{"STORAGE_TYPE": {Value: tt.storageType}}
+
+			assert.Equal(t, tt.minioPresent, minio.Present(params), "MinIO is only deployed when it is the store")
+			if tt.minioPresent {
+				assert.Contains(t, minio.SupportedOperations(params), kube.OperationFilestoreBackup)
+				assert.NotContains(t, core.SupportedOperations(params), kube.OperationFilestoreBackup, "the core pod does not hold the files")
+				return
+			}
+			assert.Contains(t, core.SupportedOperations(params), kube.OperationFilestoreBackup)
+		})
+	}
 
 	whoami, err := kube.FindComponent(WhoamiGo.Components, "whoami")
 	require.NoError(t, err)

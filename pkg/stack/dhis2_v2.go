@@ -102,7 +102,9 @@ var DHIS2V2 = withGroupedParameters(Stack{
 			Name:        "dhis2",
 			PVCPatterns: []string{"app.kubernetes.io/instance=%s,app.kubernetes.io/name=dhis2"},
 			Capabilities: []kube.Capability{
-				{Operation: kube.OperationFilestoreBackup},
+				// The core pod holds the files itself for the filesystem and s3 storage types. With
+				// MinIO it does not, and the operation belongs on the component that does.
+				{Operation: kube.OperationFilestoreBackup, When: whenStorageIsNotMinio},
 			},
 		}},
 		CNPGPostgresComponent{BaseComponent: kube.BaseComponent{
@@ -116,6 +118,9 @@ var DHIS2V2 = withGroupedParameters(Stack{
 			Name:        "minio",
 			PVCPatterns: []string{"app.kubernetes.io/instance=%s,app.kubernetes.io/name=minio"},
 			When:        whenStorageIsMinio,
+			Capabilities: []kube.Capability{
+				{Operation: kube.OperationFilestoreBackup},
+			},
 		}},
 		// No PVC patterns: the chart leaves the Doris cluster's persistentVolumeClaim unset, so the
 		// operator gives both tiers ephemeral storage and destroy has no volumes to clean up. Giving
@@ -196,6 +201,10 @@ var (
 	whenStorageIsS3         = &kube.Condition{Parameter: "STORAGE_TYPE", Equals: s3Storage}
 	whenStorageIsFilesystem = &kube.Condition{Parameter: "STORAGE_TYPE", Equals: filesystemStorage}
 )
+
+func whenStorageIsNotMinio(params model.DeploymentInstanceParameters) bool {
+	return !whenStorageIsMinio.Matches(params)
+}
 
 // Provides the PostgreSQL hostname of a dhis2-v2 instance: the CNPG cluster's read-write service,
 // named after the chart fullname (<release>-dhis2).
