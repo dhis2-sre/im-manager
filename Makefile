@@ -42,7 +42,7 @@ test-integration:
 	$(TEST_RUNNER) -- -race -count=1 -p $(TEST_PARALLEL) -skip '^TestInstanceHandler$$' $(TEST_FLAGS) ./...
 
 test-e2e:
-	$(TEST_RUNNER) -e2e -- -race -count=1 -run '^TestInstanceHandler$$' $(TEST_FLAGS) ./pkg/instance
+	$(TEST_RUNNER) -- -race -count=1 -run '^TestInstanceHandler$$' $(TEST_FLAGS) ./pkg/instance
 
 test-coverage:
 	$(TEST_RUNNER) -- -count=1 -p $(TEST_PARALLEL) -coverprofile=./coverage.out ./... && go tool cover -html=./coverage.out -o ./coverage.html

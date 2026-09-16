@@ -28,10 +28,8 @@ terminates its containers. Each invocation owns fresh containers with dynamicall
 allocated ports. Concurrent invocations do not share services or persistent data.
 Kubernetes retains its existing lifetime.
 
-Startup is explicit: `StartAll()` starts all five services concurrently;
-`StartE2E()` concurrently starts only PostgreSQL, Redis and S3. The runner uses
-`-e2e` for the latter, as wired into `make test-e2e`. There is no arbitrary service
-list or string-based dispatch.
+All runner invocations use `StartAll()`, including `make test-e2e`. The Makefile
+selects which tests run through standard `go test` arguments.
 
 The runner and package `TestMain` configure a fixed test-only
 `INSTANCE_PARAMETER_ENCRYPTION_KEY` before starting services or tests. The template

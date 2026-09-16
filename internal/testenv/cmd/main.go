@@ -19,7 +19,6 @@ import (
 func main() { os.Exit(run()) }
 
 func run() (code int) {
-	e2e := flag.Bool("e2e", false, "start PostgreSQL, Redis and S3 for Kubernetes-only tests")
 	flag.Parse()
 	if err := testenv.Configure(); err != nil {
 		fmt.Fprintln(os.Stderr, "configure test environment:", err)
@@ -40,13 +39,7 @@ func run() (code int) {
 	}()
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-	var c testenv.Config
-	var err error
-	if *e2e {
-		c, err = e.StartE2E()
-	} else {
-		c, err = e.StartAll()
-	}
+	c, err := e.StartAll()
 	setup = time.Since(started)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -59,12 +52,7 @@ func run() (code int) {
 	}
 	args := flag.Args()
 	if len(args) == 0 {
-		args = []string{"-race", "-count=1"}
-		if *e2e {
-			args = append(args, "-run", "^TestInstanceHandler$", "./pkg/instance")
-		} else {
-			args = append(args, "./...")
-		}
+		args = []string{"-race", "-count=1", "./..."}
 	}
 	cmd := exec.CommandContext(ctx, "go", append([]string{"test"}, args...)...) // #nosec G204 -- forwards explicit developer-supplied go test arguments.
 	cmd.Env = append(os.Environ(), testenv.ConfigEnv+"="+string(config))

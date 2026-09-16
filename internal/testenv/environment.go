@@ -203,31 +203,6 @@ func (e *Environment) StartAll() (Config, error) {
 	return c, errors.Join(postgresErr, redisErr, s3Err, minioErr, rabbitmqErr)
 }
 
-// StartE2E starts PostgreSQL, Redis and S3 for Kubernetes tests concurrently.
-// Call Close even on failure.
-func (e *Environment) StartE2E() (Config, error) {
-	var c Config
-	var postgresErr, redisErr, s3Err error
-	var wg sync.WaitGroup
-	wg.Go(func() {
-		started := time.Now()
-		c.Postgres, postgresErr = e.postgres()
-		postgresErr = logStartup("postgres", started, postgresErr)
-	})
-	wg.Go(func() {
-		started := time.Now()
-		c.Redis, redisErr = e.redis()
-		redisErr = logStartup("redis", started, redisErr)
-	})
-	wg.Go(func() {
-		started := time.Now()
-		c.S3, s3Err = e.s3()
-		s3Err = logStartup("s3", started, s3Err)
-	})
-	wg.Wait()
-	return c, errors.Join(postgresErr, redisErr, s3Err)
-}
-
 // logStartup keeps timing and error reporting consistent across explicit starts.
 func logStartup(name string, started time.Time, err error) error {
 	if err != nil {
