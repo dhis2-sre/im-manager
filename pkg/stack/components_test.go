@@ -153,7 +153,7 @@ func TestDHIS2CoreAdvertisesFilestoreBackup(t *testing.T) {
 
 	whoami, err := kube.FindComponent(WhoamiGo.Components, "whoami")
 	require.NoError(t, err)
-	assert.Equal(t, []kube.Operation{kube.OperationRestart, kube.OperationRestartReplica}, whoami.SupportedOperations(nil))
+	assert.Equal(t, []kube.Operation{kube.OperationRestart, kube.OperationRestartReplica, kube.OperationLogs}, whoami.SupportedOperations(nil))
 }
 
 // TestComponentNamesMatchHelmfileImType asserts every declared component name is an im-type label

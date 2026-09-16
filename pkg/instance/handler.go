@@ -869,7 +869,8 @@ func (h Handler) Logs(c *gin.Context) {
 	}
 
 	selector := c.Query("selector")
-	r, err := h.instanceService.Logs(instance, group, selector)
+	replica := c.Query("replica")
+	r, err := h.instanceService.Logs(ctx, instance, group, selector, replica)
 	if err != nil {
 		_ = c.Error(err)
 		return

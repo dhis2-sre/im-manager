@@ -67,7 +67,7 @@ func componentTestPod(name, componentName string) *v1.Pod {
 }
 
 func TestSupportedOperations(t *testing.T) {
-	assert.Equal(t, []Operation{OperationRestart, OperationRestartReplica},
+	assert.Equal(t, []Operation{OperationRestart, OperationRestartReplica, OperationLogs},
 		BaseComponent{Name: "db"}.SupportedOperations(nil))
 
 	storageTypeIsFilesystem := func(params model.DeploymentInstanceParameters) bool {
@@ -79,11 +79,11 @@ func TestSupportedOperations(t *testing.T) {
 	}}
 
 	filesystemParams := model.DeploymentInstanceParameters{"STORAGE_TYPE": {Value: "filesystem"}}
-	assert.Equal(t, []Operation{OperationRestart, OperationRestartReplica, OperationFilestoreBackup, Operation("alwaysOn")},
+	assert.Equal(t, []Operation{OperationRestart, OperationRestartReplica, OperationLogs, OperationFilestoreBackup, Operation("alwaysOn")},
 		component.SupportedOperations(filesystemParams))
 
 	minioParams := model.DeploymentInstanceParameters{"STORAGE_TYPE": {Value: "minio"}}
-	assert.Equal(t, []Operation{OperationRestart, OperationRestartReplica, Operation("alwaysOn")},
+	assert.Equal(t, []Operation{OperationRestart, OperationRestartReplica, OperationLogs, Operation("alwaysOn")},
 		component.SupportedOperations(minioParams))
 }
 

@@ -35,6 +35,13 @@ type _ struct {
 	// type: string
 	// description: stream logs of a specific pod labeled with im-type=<selector>
 	Selector string `json:"selector"`
+
+	// replica
+	// in: query
+	// required: false
+	// type: string
+	// description: stream logs of a single replica (pod) of the component given by selector
+	Replica string `json:"replica"`
 }
 
 // swagger:parameters deleteInstance findById findByIdDecrypted saveInstance pauseInstance resumeInstance resetInstance findDeploymentById deployDeployment deleteDeployment status instanceWithDetails filestoreBackup instanceComponents deploymentComponents

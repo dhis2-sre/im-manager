@@ -16,10 +16,28 @@ import (
 	"k8s.io/client-go/tools/remotecommand"
 )
 
-func (c *Client) Logs(instance *model.DeploymentInstance, typeSelector string) (io.ReadCloser, error) {
+func (c *Client) Logs(ctx context.Context, instance *model.DeploymentInstance, typeSelector string) (io.ReadCloser, error) {
 	pod, err := c.GetPod(instance.ID, typeSelector)
 	if err != nil {
 		return nil, err
+	}
+
+	return c.podLogs(ctx, pod)
+}
+
+// PodLogs streams the log of the named pod.
+func (c *Client) PodLogs(ctx context.Context, namespace, podName string) (io.ReadCloser, error) {
+	pod, err := c.Clientset.CoreV1().Pods(namespace).Get(ctx, podName, metav1.GetOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("error getting pod %q: %v", podName, err)
+	}
+
+	return c.podLogs(ctx, *pod)
+}
+
+func (c *Client) podLogs(ctx context.Context, pod v1.Pod) (io.ReadCloser, error) {
+	if len(pod.Spec.Containers) == 0 {
+		return nil, errdef.NewNotFound("pod %q has no containers", pod.Name)
 	}
 
 	podLogOptions := v1.PodLogOptions{
@@ -32,7 +50,7 @@ func (c *Client) Logs(instance *model.DeploymentInstance, typeSelector string) (
 		CoreV1().
 		Pods(pod.Namespace).
 		GetLogs(pod.Name, &podLogOptions).
-		Stream(context.TODO())
+		Stream(ctx)
 	if err != nil {
 		if strings.Contains(err.Error(), "ContainerCreating") || strings.Contains(err.Error(), "waiting to start") {
 			return nil, errdef.NewConflict("instance is still starting up, logs not available yet")
