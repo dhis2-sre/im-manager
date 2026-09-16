@@ -801,16 +801,15 @@ func newPgDumpConfig(instance *model.DeploymentInstance, stack *stack.Stack) (*p
 		return nil, fmt.Errorf(errorMessage, "DATABASE_PASSWORD")
 	}
 
-	dump, err := pg.NewDump(&pg.Postgres{
+	// Only build arguments here: pg_dump runs in the database pod. pg.NewDump
+	// checks the host PATH, which unnecessarily requires a local PostgreSQL client.
+	dump := &pg.Dump{Postgres: &pg.Postgres{
 		Host:     fmt.Sprintf(stack.HostnamePattern, instance.Name, instance.Group.Namespace),
 		Port:     5432,
 		DB:       databaseName.Value,
 		Username: databaseUsername.Value,
 		Password: databasePassword.Value,
-	})
-	if err != nil {
-		return nil, err
-	}
+	}}
 
 	// Restores target a freshly created, empty database, so replace the
 	// default arguments without the --clean option. The dhis2 chart's seed marker table is chart

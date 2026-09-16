@@ -1,7 +1,4 @@
-package database
-
-// Test helpers used across packages. Kept in the main package so they can be
-// reused by external tests that depend on database models and handlers.
+package inttest
 
 import (
 	"bytes"
@@ -11,12 +8,11 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/dhis2-sre/im-manager/pkg/inttest"
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	"github.com/stretchr/testify/require"
 )
 
-func UploadTestDatabase(t *testing.T, client *inttest.HTTPClient, name, content, group string, headers ...func(http.Header)) string {
+func UploadTestDatabase(t *testing.T, client *HTTPClient, name, content, group string, headers ...func(http.Header)) string {
 	t.Helper()
 
 	var buffer bytes.Buffer
@@ -38,10 +34,10 @@ func UploadTestDatabase(t *testing.T, client *inttest.HTTPClient, name, content,
 	require.NoError(t, err, "failed to close multipart writer")
 
 	baseHeaders := []func(http.Header){
-		inttest.WithHeader("X-Upload-Group", group),
-		inttest.WithHeader("X-Upload-Name", name),
-		inttest.WithHeader("X-Upload-Description", "Test database"),
-		inttest.WithHeader("Content-Type", writer.FormDataContentType()),
+		WithHeader("X-Upload-Group", group),
+		WithHeader("X-Upload-Name", name),
+		WithHeader("X-Upload-Description", "Test database"),
+		WithHeader("Content-Type", writer.FormDataContentType()),
 	}
 
 	if len(headers) > 0 {

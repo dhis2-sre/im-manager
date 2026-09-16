@@ -45,11 +45,13 @@ func TestPublisherDeliversEveryEvent(t *testing.T) {
 		delivered := collect(t, rabbit.Environment, streamName)
 
 		first := newPublisher(t, streamName)
+		closeFirst := sync.OnceValue(first.Close)
+		t.Cleanup(func() { require.NoError(t, closeFirst()) })
 		first.PublishTransient(context.Background(), "group-a", "event", payload{ID: "before-restart"})
 		// Waiting for it to land rather than closing straight away, since Close does not reliably
 		// flush a message sent a moment earlier, which would make this a test of that instead.
 		delivered.waitFor(t, "before-restart")
-		require.NoError(t, first.Close())
+		require.NoError(t, closeFirst())
 
 		second := newPublisher(t, streamName)
 		t.Cleanup(func() { _ = second.Close() })
