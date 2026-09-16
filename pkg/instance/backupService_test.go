@@ -10,6 +10,7 @@ import (
 	"os"
 	"sort"
 	"testing"
+	"time"
 
 	"github.com/dhis2-sre/im-manager/pkg/inttest"
 	"github.com/dhis2-sre/im-manager/pkg/storage"
@@ -19,6 +20,11 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go"
 	minioContainer "github.com/testcontainers/testcontainers-go/modules/minio"
+)
+
+const (
+	minioImage        = "quay.io/minio/minio:RELEASE.2025-01-20T14-49-07Z"
+	minioStartTimeout = 3 * time.Minute
 )
 
 func TestBackupServiceIntegration(t *testing.T) {
@@ -164,8 +170,16 @@ func TestFilestoreRestoreMarker(t *testing.T) {
 }
 
 func setupMinio(t *testing.T, ctx context.Context) (*minioContainer.MinioContainer, *minio.Client) {
-	container, err := minioContainer.Run(ctx, "quay.io/minio/minio:RELEASE.2025-01-20T14-49-07Z")
-	require.NoError(t, err)
+	t.Helper()
+
+	// Starting the container pulls the image. Without a deadline of its own a stalled pull waits
+	// forever, and the failure lands as the package wide test timeout panicking every test in
+	// pkg/instance ten minutes later, naming nothing but the test that happened to be running.
+	startCtx, cancel := context.WithTimeout(ctx, minioStartTimeout)
+	defer cancel()
+
+	container, err := minioContainer.Run(startCtx, minioImage)
+	require.NoErrorf(t, err, "MinIO container did not start within %s", minioStartTimeout)
 
 	endpoint, err := container.Endpoint(ctx, "")
 	require.NoError(t, err)
