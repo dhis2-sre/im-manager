@@ -150,7 +150,7 @@ var dhis2V2Defaults = struct {
 	dorisBackendLimitsCPU      string
 	dorisBackendLimitsMemory   string
 }{
-	chartVersion: "1.0.1",
+	chartVersion: "1.1.0",
 	enableDoris:  "false",
 	// The tag suffix is dhis2/apache-doris, upstream Doris with the PostgreSQL JDBC driver already in
 	// its jdbc_drivers directory, so the chart refers to the driver by name instead of downloading it.
