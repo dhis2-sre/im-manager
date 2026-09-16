@@ -17,7 +17,7 @@ func TestPodLogs(t *testing.T) {
 	pod.Spec.Containers = []v1.Container{{Name: "postgres"}, {Name: "sidecar"}}
 	client := &Client{Clientset: fake.NewSimpleClientset(pod)}
 
-	stream, err := client.PodLogs(context.Background(), "ns", "mydb-0")
+	stream, err := client.PodLogs(context.Background(), "ns", "mydb-0", nil)
 	require.NoError(t, err)
 	defer stream.Close()
 
@@ -29,7 +29,7 @@ func TestPodLogs(t *testing.T) {
 func TestPodLogsPodNotFound(t *testing.T) {
 	client := &Client{Clientset: fake.NewSimpleClientset()}
 
-	_, err := client.PodLogs(context.Background(), "ns", "mydb-0")
+	_, err := client.PodLogs(context.Background(), "ns", "mydb-0", nil)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "mydb-0")
 }
@@ -37,7 +37,7 @@ func TestPodLogsPodNotFound(t *testing.T) {
 func TestPodLogsWithoutContainers(t *testing.T) {
 	client := &Client{Clientset: fake.NewSimpleClientset(componentTestPod("mydb-0", "db"))}
 
-	_, err := client.PodLogs(context.Background(), "ns", "mydb-0")
+	_, err := client.PodLogs(context.Background(), "ns", "mydb-0", nil)
 	require.Error(t, err)
 	assert.True(t, errdef.IsNotFound(err), "expected a not found error, got %v", err)
 }
