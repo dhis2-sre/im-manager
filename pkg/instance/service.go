@@ -22,12 +22,13 @@ import (
 	"github.com/dhis2-sre/im-manager/internal/errdef"
 	"github.com/dominikbraun/graph"
 
+	"github.com/dhis2-sre/im-manager/pkg/kube"
 	"github.com/dhis2-sre/im-manager/pkg/stack"
 
 	"github.com/dhis2-sre/im-manager/pkg/model"
 )
 
-func NewService(logger *slog.Logger, instanceRepository *repository, groupService groupService, stackService stack.Service, helmfileService helmfile, s3Client *storage.S3Client, s3Bucket string) *Service {
+func NewService(logger *slog.Logger, instanceRepository *repository, groupService groupService, stackService stack.Service, helmfileService helmfile, s3Client *storage.S3Client, s3Bucket string, kubeClients *kube.Clients) *Service {
 	return &Service{
 		logger:             logger,
 		instanceRepository: instanceRepository,
@@ -36,6 +37,7 @@ func NewService(logger *slog.Logger, instanceRepository *repository, groupServic
 		helmfileService:    helmfileService,
 		s3Client:           s3Client,
 		s3Bucket:           s3Bucket,
+		kubeClients:        kubeClients,
 	}
 }
 
@@ -57,6 +59,7 @@ type Service struct {
 	helmfileService    helmfile
 	s3Client           *storage.S3Client
 	s3Bucket           string
+	kubeClients        *kube.Clients
 }
 
 // restoreFilestoreToS3 restores the given filestore backup into the instance's external
@@ -127,7 +130,7 @@ func (s Service) FindDecryptedDeploymentById(ctx context.Context, id uint) (*mod
 }
 
 func (s Service) decryptDeployment(deployment *model.Deployment) (*model.Deployment, error) {
-	var stacksByName = map[string]*model.Stack{}
+	var stacksByName = map[string]*stack.Stack{}
 	for _, instance := range deployment.Instances {
 		stack, err := s.stackService.Find(instance.StackName)
 		if err != nil {
@@ -283,23 +286,57 @@ func (s Service) validateNoCycles(instances []*model.DeploymentInstance) (graph.
 			}
 		}
 
-		for _, requiredStack := range stack.Requires {
-			requiredStackName := requiredStack.Name
-			err := g.AddEdge(src.StackName, requiredStackName)
+		for name, stackParameter := range stack.Parameters {
+			if !stackParameter.Consumed {
+				continue
+			}
+			provider, _, err := s.findParameterProvider(instances, src, name)
+			if err != nil {
+				return nil, err
+			}
+			err = g.AddEdge(src.StackName, provider.StackName)
 			if err != nil {
 				if errors.Is(err, graph.ErrEdgeAlreadyExists) {
-					return nil, fmt.Errorf("instance %q requires %q more than once", src.Name, requiredStackName)
+					continue
 				} else if errors.Is(err, graph.ErrEdgeCreatesCycle) {
-					return nil, fmt.Errorf("link from instance %q to stack %q creates a cycle", src.Name, requiredStackName)
-				} else if errors.Is(err, graph.ErrVertexNotFound) {
-					return nil, fmt.Errorf("%q is required by %q", requiredStackName, src.StackName)
+					return nil, fmt.Errorf("link from instance %q to stack %q creates a cycle", src.Name, provider.StackName)
 				}
-				return nil, fmt.Errorf("failed linking instance %q with instance %q: %v", src.Name, requiredStackName, err)
+				return nil, fmt.Errorf("failed linking instance %q with instance %q: %v", src.Name, provider.Name, err)
 			}
 		}
 	}
 
 	return g, nil
+}
+
+// findParameterProvider returns the instance providing the named parameter: the one whose stack
+// declares it as a non-consumed parameter or serves it through a parameter provider. A requirement
+// is therefore satisfied by whichever stack actually provides the parameter, so e.g. pgadmin
+// composes with any stack serving the database connection parameters.
+func (s Service) findParameterProvider(instances []*model.DeploymentInstance, consumer *model.DeploymentInstance, parameterName string) (*model.DeploymentInstance, *stack.Stack, error) {
+	var providerInstance *model.DeploymentInstance
+	var providerStack *stack.Stack
+	for _, candidate := range instances {
+		if candidate.StackName == consumer.StackName {
+			continue
+		}
+		candidateStack, err := s.stackService.Find(candidate.StackName)
+		if err != nil {
+			return nil, nil, err
+		}
+		candidateParameter, hasParameter := candidateStack.Parameters[parameterName]
+		_, hasProvider := candidateStack.ParameterProviders[parameterName]
+		if (hasParameter && !candidateParameter.Consumed) || hasProvider {
+			if providerInstance != nil {
+				return nil, nil, errdef.NewBadRequest("parameter %q consumed by %q is provided by both %q and %q", parameterName, consumer.StackName, providerInstance.StackName, candidate.StackName)
+			}
+			providerInstance, providerStack = candidate, candidateStack
+		}
+	}
+	if providerInstance == nil {
+		return nil, nil, errdef.NewBadRequest("no instance provides parameter %q consumed by %q", parameterName, consumer.StackName)
+	}
+	return providerInstance, providerStack, nil
 }
 
 func (s Service) resolveParameters(deployment *model.Deployment) error {
@@ -322,7 +359,7 @@ func (s Service) resolveParameters(deployment *model.Deployment) error {
 			return err
 		}
 
-		err = resolveConsumedParameters(deployment, instance, stack)
+		err = s.resolveConsumedParameters(deployment, instance, stack)
 		if err != nil {
 			return err
 		}
@@ -331,7 +368,7 @@ func (s Service) resolveParameters(deployment *model.Deployment) error {
 	return nil
 }
 
-func validateParameters(instanceParameters model.DeploymentInstanceParameters, stack *model.Stack) error {
+func validateParameters(instanceParameters model.DeploymentInstanceParameters, stack *stack.Stack) error {
 	var errs []error
 	for name, parameter := range instanceParameters {
 		stackParameter := stack.Parameters[name]
@@ -345,36 +382,34 @@ func validateParameters(instanceParameters model.DeploymentInstanceParameters, s
 	return errors.Join(errs...)
 }
 
-func resolveConsumedParameters(deployment *model.Deployment, instance *model.DeploymentInstance, stack *model.Stack) error {
+func (s Service) resolveConsumedParameters(deployment *model.Deployment, instance *model.DeploymentInstance, stack *stack.Stack) error {
 	for name, parameter := range instance.Parameters {
 		stackParameter := stack.Parameters[name]
 		if !stackParameter.Consumed {
 			continue
 		}
 
-		for _, requiredStack := range stack.Requires {
-			// consume from instance parameters
-			sourceInstance := findInstanceByStackName(requiredStack.Name, deployment)
-			if sourceInstance == nil {
-				return errdef.NewNotFound("failed to find required instance %q of instance %q", requiredStack.Name, instance.Name)
-			}
-
-			if sourceInstanceParameter, ok := sourceInstance.Parameters[name]; ok {
-				parameter.Value = sourceInstanceParameter.Value
-			}
-
-			// consume from provider
-			if provider, ok := requiredStack.ParameterProviders[name]; ok {
-				sourceInstance.Group = instance.Group
-				value, err := provider.Provide(*sourceInstance)
-				if err != nil {
-					return fmt.Errorf("failed to provide value for instance %q parameter %q: %v", instance.Name, name, err)
-				}
-				parameter.Value = value
-			}
-
-			instance.Parameters[name] = parameter
+		sourceInstance, sourceStack, err := s.findParameterProvider(deployment.Instances, instance, name)
+		if err != nil {
+			return err
 		}
+
+		// consume from instance parameters
+		if sourceInstanceParameter, ok := sourceInstance.Parameters[name]; ok {
+			parameter.Value = sourceInstanceParameter.Value
+		}
+
+		// consume from provider
+		if provider, ok := sourceStack.ParameterProviders[name]; ok {
+			sourceInstance.Group = instance.Group
+			value, err := provider.Provide(*sourceInstance)
+			if err != nil {
+				return fmt.Errorf("failed to provide value for instance %q parameter %q: %v", instance.Name, name, err)
+			}
+			parameter.Value = value
+		}
+
+		instance.Parameters[name] = parameter
 	}
 	return nil
 }
@@ -388,7 +423,7 @@ func findInstanceByStackName(name string, deployment *model.Deployment) *model.D
 	return nil
 }
 
-func rejectNonExistingParameters(instanceParameters model.DeploymentInstanceParameters, stack *model.Stack) error {
+func rejectNonExistingParameters(instanceParameters model.DeploymentInstanceParameters, stack *stack.Stack) error {
 	var errs []error
 	for name := range instanceParameters {
 		if _, ok := stack.Parameters[name]; !ok {
@@ -398,7 +433,7 @@ func rejectNonExistingParameters(instanceParameters model.DeploymentInstancePara
 	return errors.Join(errs...)
 }
 
-func addDefaultParameterValues(instanceParameters model.DeploymentInstanceParameters, stack *model.Stack) {
+func addDefaultParameterValues(instanceParameters model.DeploymentInstanceParameters, stack *stack.Stack) {
 	for name, stackParameter := range stack.Parameters {
 		if _, ok := instanceParameters[name]; !ok {
 			instanceParameter := model.DeploymentInstanceParameter{
@@ -556,12 +591,24 @@ func (s Service) DestroyInstance(ctx context.Context, instance *model.Deployment
 		return err
 	}
 
-	ks, err := NewKubernetesService(group.Cluster)
+	client, err := s.kubeClients.For(group.Cluster)
 	if err != nil {
 		return err
 	}
 
-	result, err := ks.deletePersistentVolumeClaim(instance)
+	components, err := s.stackService.Components(instance.StackName)
+	if err != nil {
+		return err
+	}
+
+	// Deliberately not filtered by presence: PVC deletion skips selectors matching nothing, and a
+	// storage type changed between deploys must not leave the previous component's volumes behind.
+	var selectors []string
+	for _, component := range components {
+		selectors = append(selectors, component.PVCSelectors(instance)...)
+	}
+
+	result, err := client.DeletePVCs(ctx, instance.Group.Namespace, selectors)
 	if len(result.Deleted) > 0 {
 		s.logger.InfoContext(ctx, "Deleted persistent volume claims", "instance", instance.Name, "stack", instance.StackName, "namespace", group.Namespace, "claims", result.Deleted)
 	}
@@ -594,12 +641,12 @@ func (s Service) Pause(ctx context.Context, instance *model.DeploymentInstance) 
 		return err
 	}
 
-	ks, err := NewKubernetesService(group.Cluster)
+	ks, err := s.kubeClients.For(group.Cluster)
 	if err != nil {
 		return err
 	}
 
-	return ks.pause(instance)
+	return ks.Pause(ctx, instance)
 }
 
 func (s Service) Resume(ctx context.Context, instance *model.DeploymentInstance) error {
@@ -608,40 +655,188 @@ func (s Service) Resume(ctx context.Context, instance *model.DeploymentInstance)
 		return err
 	}
 
-	ks, err := NewKubernetesService(group.Cluster)
+	ks, err := s.kubeClients.For(group.Cluster)
 	if err != nil {
 		return err
 	}
 
-	return ks.resume(instance)
+	return ks.Resume(ctx, instance)
 }
 
-func (s Service) Restart(ctx context.Context, instance *model.DeploymentInstance, typeSelector string) error {
+func (s Service) Restart(ctx context.Context, instance *model.DeploymentInstance, componentName, podName string) error {
+	if podName != "" && componentName == "" {
+		return errdef.NewBadRequest("restarting a replica requires a component selector")
+	}
+
 	group, err := s.groupService.Find(ctx, instance.GroupName)
 	if err != nil {
 		return err
 	}
 
-	ks, err := NewKubernetesService(group.Cluster)
+	client, err := s.kubeClients.For(group.Cluster)
 	if err != nil {
 		return err
 	}
 
-	stack, err := s.stackService.Find(instance.StackName)
+	components, instance, err := s.presentComponents(instance)
 	if err != nil {
 		return err
 	}
 
-	return ks.restart(instance, typeSelector, stack)
+	if len(components) == 0 {
+		return errdef.NewBadRequest("stack %q has no components to restart", instance.StackName)
+	}
+
+	if componentName == "" {
+		var errs error
+		for _, component := range components {
+			if err := component.Restart(ctx, client, instance); err != nil {
+				errs = errors.Join(errs, fmt.Errorf("restarting component %q: %w", component.ComponentName(), err))
+			}
+		}
+		return errs
+	}
+
+	component, err := kube.FindComponent(components, componentName)
+	if err != nil {
+		return err
+	}
+	if podName != "" {
+		return component.RestartReplica(ctx, client, instance, podName)
+	}
+	return component.Restart(ctx, client, instance)
 }
 
-func (s Service) Logs(instance *model.DeploymentInstance, group *model.Group, typeSelector string) (io.ReadCloser, error) {
-	ks, err := NewKubernetesService(group.Cluster)
+type ComponentStatus struct {
+	Name                string           `json:"name"`
+	SupportedOperations []kube.Operation `json:"supportedOperations"`
+	Replicas            []kube.Replica   `json:"replicas"`
+}
+
+// Components lists the instance's components with their supported operations and live replicas.
+// Parameters are decrypted here since capability predicates evaluate real parameter values, so
+// callers pass the instance as stored.
+func (s Service) Components(ctx context.Context, instance *model.DeploymentInstance) ([]ComponentStatus, error) {
+	group, err := s.groupService.Find(ctx, instance.GroupName)
 	if err != nil {
 		return nil, err
 	}
 
-	return ks.getLogs(instance, typeSelector)
+	client, err := s.kubeClients.For(group.Cluster)
+	if err != nil {
+		return nil, err
+	}
+
+	stack, err := s.stackService.Find(instance.StackName)
+	if err != nil {
+		return nil, err
+	}
+
+	instance, err = s.instanceRepository.DecryptDeploymentInstance(instance, stack)
+	if err != nil {
+		return nil, err
+	}
+
+	components := kube.PresentComponents(stack.Components, instance.Parameters)
+	statuses := make([]ComponentStatus, len(components))
+	for i, component := range components {
+		replicas, err := component.Replicas(ctx, client, instance)
+		if err != nil {
+			return nil, fmt.Errorf("listing replicas of component %q: %w", component.ComponentName(), err)
+		}
+		statuses[i] = ComponentStatus{
+			Name:                component.ComponentName(),
+			SupportedOperations: component.SupportedOperations(instance.Parameters),
+			Replicas:            replicas,
+		}
+	}
+	return statuses, nil
+}
+
+type InstanceComponents struct {
+	InstanceID   uint              `json:"instanceId"`
+	InstanceName string            `json:"instanceName"`
+	StackName    string            `json:"stackName"`
+	Components   []ComponentStatus `json:"components"`
+}
+
+// DeploymentComponents lists every instance's components with live replicas for a whole
+// deployment. Each instance costs cluster round trips, so instances are queried concurrently; the
+// cluster watch cache planned in the roadmap later swaps the implementation under this shape.
+func (s Service) DeploymentComponents(ctx context.Context, deployment *model.Deployment) ([]InstanceComponents, error) {
+	result := make([]InstanceComponents, len(deployment.Instances))
+	group, groupCtx := errgroup.WithContext(ctx)
+	for i, instance := range deployment.Instances {
+		group.Go(func() error {
+			components, err := s.Components(groupCtx, instance)
+			if err != nil {
+				return fmt.Errorf("listing components of instance %q: %w", instance.Name, err)
+			}
+			result[i] = InstanceComponents{
+				InstanceID:   instance.ID,
+				InstanceName: instance.Name,
+				StackName:    instance.StackName,
+				Components:   components,
+			}
+			return nil
+		})
+	}
+	if err := group.Wait(); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+func (s Service) Logs(ctx context.Context, instance *model.DeploymentInstance, group *model.Group, componentName, podName string) (io.ReadCloser, error) {
+	if podName != "" && componentName == "" {
+		return nil, errdef.NewBadRequest("streaming the logs of a replica requires a component selector")
+	}
+
+	client, err := s.kubeClients.For(group.Cluster)
+	if err != nil {
+		return nil, err
+	}
+
+	if podName == "" {
+		return client.Logs(ctx, instance, componentName)
+	}
+
+	components, instance, err := s.presentComponents(instance)
+	if err != nil {
+		return nil, err
+	}
+
+	component, err := kube.FindComponent(components, componentName)
+	if err != nil {
+		return nil, err
+	}
+
+	replicas, err := component.Replicas(ctx, client, instance)
+	if err != nil {
+		return nil, err
+	}
+
+	if !slices.ContainsFunc(replicas, func(replica kube.Replica) bool { return replica.Name == podName }) {
+		return nil, errdef.NewNotFound("pod %q not found for component %q", podName, componentName)
+	}
+
+	return client.PodLogs(ctx, instance.Group.Namespace, podName)
+}
+
+// presentComponents returns the components of the instance's stack which are present given its
+// parameters, along with the decrypted instance those parameters were read from.
+func (s Service) presentComponents(instance *model.DeploymentInstance) ([]kube.Component, *model.DeploymentInstance, error) {
+	stack, err := s.stackService.Find(instance.StackName)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	instance, err = s.instanceRepository.DecryptDeploymentInstance(instance, stack)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return kube.PresentComponents(stack.Components, instance.Parameters), instance, nil
 }
 
 type GroupWithDeployments struct {
@@ -752,7 +947,7 @@ func (s Service) groupPublicInstances(instances []*model.DeploymentInstance) ([]
 		devCategory := Category{Label: "Under Development"}
 		nightlyCategory := Category{Label: "Canary"}
 		for _, instance := range instances {
-			if instance.GroupName == name && instance.StackName == "dhis2-core" {
+			if instance.GroupName == name && instance.StackName == "dhis2-v2" {
 				publicInstance := PublicInstance{
 					Name:        instance.Name,
 					Description: instance.Deployment.Description,
@@ -802,13 +997,13 @@ const (
 	Error              InstanceStatus = "Error"
 )
 
-func (s Service) GetStatus(instance *model.DeploymentInstance) (InstanceStatus, error) {
-	ks, err := NewKubernetesService(instance.Group.Cluster)
+func (s Service) GetStatus(ctx context.Context, instance *model.DeploymentInstance) (InstanceStatus, error) {
+	ks, err := s.kubeClients.For(instance.Group.Cluster)
 	if err != nil {
 		return "", err
 	}
 
-	pod, err := ks.getPod(instance.ID, "")
+	pod, err := ks.GetPod(ctx, instance.ID, "")
 	if err != nil {
 		if errdef.IsNotFound(err) {
 			s.logger.Info("Pod not found, assuming not deployed", "instance", instance.ID, "group", instance.GroupName, "error", err)
@@ -888,19 +1083,20 @@ func (s Service) FilestoreBackup(ctx context.Context, instance *model.Deployment
 	baseName = strings.TrimSuffix(baseName, ".pgc")
 	baseName = strings.TrimSuffix(baseName, ".tar.gz")
 
-	streamer, err := s.filestoreStreamerFor(core, group.Cluster)
+	streamer, err := s.filestoreStreamerFor(ctx, core, group.Cluster)
 	if err != nil {
 		return err
 	}
 
 	key := fmt.Sprintf("%s/%s-%s.tar.gz", instance.GroupName, baseName, "fs")
 	backupService := NewBackupService(s.logger, s.s3Client)
-	if err := backupService.PerformBackup(ctx, streamer, s.s3Bucket, key); err != nil {
+	size, err := backupService.PerformBackup(ctx, streamer, s.s3Bucket, key)
+	if err != nil {
 		return err
 	}
 
 	s3Uri := fmt.Sprintf("s3://%s/%s", s.s3Bucket, key)
-	filestore, err := s.recordBackup(ctx, instance.GroupName, s3Uri, baseName+"-fs.tar.gz", database.UserID)
+	filestore, err := s.recordBackup(ctx, instance.GroupName, s3Uri, baseName+"-fs.tar.gz", database.UserID, size, database.FilestoreID)
 	if err != nil {
 		return err
 	}
@@ -910,13 +1106,35 @@ func (s Service) FilestoreBackup(ctx context.Context, instance *model.Deployment
 	return s.instanceRepository.SaveDatabase(ctx, database)
 }
 
-func (s Service) recordBackup(ctx context.Context, groupName, s3uri, name string, userID uint) (*model.Database, error) {
+// recordBackup records the file store the save just wrote. A database keeps one file store across
+// saves: the artifact overwrites the same key, so inserting a second row would both leak a row
+// pointing at that same key and fail the unique name, which is what made every repeated save report
+// the file store half as "already exists" while the tarball itself was written fine.
+func (s Service) recordBackup(ctx context.Context, groupName, s3uri, name string, userID uint, size int64, existingID uint) (*model.Database, error) {
+	if existingID != 0 {
+		existing, err := s.instanceRepository.FindDatabaseById(ctx, existingID)
+		if err != nil && !errdef.IsNotFound(err) {
+			return nil, err
+		}
+		if err == nil {
+			existing.Name = name
+			existing.GroupName = groupName
+			existing.Url = s3uri
+			existing.Size = size
+			if err := s.instanceRepository.SaveDatabase(ctx, existing); err != nil {
+				return nil, err
+			}
+			return existing, nil
+		}
+	}
+
 	database := &model.Database{
 		Name:      name,
 		GroupName: groupName,
 		Url:       s3uri,
 		Type:      "fs",
 		UserID:    userID,
+		Size:      size,
 	}
 	err := s.instanceRepository.RecordBackup(ctx, database)
 	if err != nil {

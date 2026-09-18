@@ -26,7 +26,7 @@ from dataclasses import dataclass
 from typing import List, Dict, Optional
 
 
-INSTANCE_MANAGER_CHARTS = {"core", "minio", "postgresql", "pgadmin"}
+INSTANCE_MANAGER_CHARTS = {"dhis2", "chap", "core", "minio", "postgresql", "pgadmin"}
 DEPLOYMENT_SUFFIXES = ["-database", "-minio", "-pgadmin"]
 IM_MANAGER_PREFIX = "im-manager-"
 ENVIRONMENTS = [("prod", "IM_HOST_PROD"), ("dev", "IM_HOST_DEV")]

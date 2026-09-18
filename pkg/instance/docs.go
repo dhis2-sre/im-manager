@@ -12,8 +12,15 @@ type _ struct {
 	// in: query
 	// required: false
 	// type: string
-	// description: restart a specific deployment labeled with im-type=<selector>
+	// description: restart a specific component labeled with im-type=<selector>
 	Selector string `json:"selector"`
+
+	// replica
+	// in: query
+	// required: false
+	// type: string
+	// description: restart a single replica (pod) of the component given by selector
+	Replica string `json:"replica"`
 }
 
 // swagger:parameters instanceLogs
@@ -28,9 +35,16 @@ type _ struct {
 	// type: string
 	// description: stream logs of a specific pod labeled with im-type=<selector>
 	Selector string `json:"selector"`
+
+	// replica
+	// in: query
+	// required: false
+	// type: string
+	// description: stream logs of a single replica (pod) of the component given by selector
+	Replica string `json:"replica"`
 }
 
-// swagger:parameters deleteInstance findById findByIdDecrypted saveInstance pauseInstance resumeInstance resetInstance findDeploymentById deployDeployment deleteDeployment status instanceWithDetails filestoreBackup
+// swagger:parameters deleteInstance findById findByIdDecrypted saveInstance pauseInstance resumeInstance resetInstance findDeploymentById deployDeployment deleteDeployment status instanceWithDetails filestoreBackup instanceComponents deploymentComponents
 type _ struct {
 	// in: path
 	// required: true
@@ -57,6 +71,18 @@ type InstanceLogsBody struct {
 type StatusBody struct {
 	// in: body
 	Body InstanceStatus
+}
+
+// swagger:response Components
+type ComponentsBody struct {
+	// in: body
+	Body []ComponentStatus
+}
+
+// swagger:response DeploymentComponents
+type DeploymentComponentsBody struct {
+	// in: body
+	Body []InstanceComponents
 }
 
 // swagger:parameters instanceNameToId
