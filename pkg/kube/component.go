@@ -19,6 +19,7 @@ type Operation string
 const (
 	OperationRestart         Operation = "restart"
 	OperationRestartReplica  Operation = "restartReplica"
+	OperationLogs            Operation = "logs"
 	OperationFilestoreBackup Operation = "filestoreBackup"
 	OperationDatabaseSave    Operation = "databaseSave"
 )
@@ -92,7 +93,7 @@ func PresentComponents(components []Component, params model.DeploymentInstancePa
 // SupportedOperations returns the base operations every component supports plus the capabilities
 // whose predicate passes on the instance's decrypted parameters.
 func (b BaseComponent) SupportedOperations(params model.DeploymentInstanceParameters) []Operation {
-	operations := []Operation{OperationRestart, OperationRestartReplica}
+	operations := []Operation{OperationRestart, OperationRestartReplica, OperationLogs}
 	for _, capability := range b.Capabilities {
 		if capability.When == nil || capability.When(params) {
 			operations = append(operations, capability.Operation)
