@@ -232,6 +232,10 @@ func TestInstanceHandler(t *testing.T) {
 		path = fmt.Sprintf("/instances/%d/logs?selector=whoami&replica=no-such-pod", deploymentInstance.ID)
 		client.Do(t, http.MethodGet, path, nil, http.StatusNotFound, inttest.WithAuthToken(tokens.AccessToken))
 
+		path = fmt.Sprintf("/instances/%d/logs?selector=whoami&tail=-1", deploymentInstance.ID)
+		response = client.Do(t, http.MethodGet, path, nil, http.StatusBadRequest, inttest.WithAuthToken(tokens.AccessToken))
+		assert.Contains(t, string(response), "tail must be a positive number of lines")
+
 		path = fmt.Sprintf("/instances/%d/restart?replica=%s", deploymentInstance.ID, replica.Name)
 		response = client.Do(t, http.MethodPut, path, nil, http.StatusBadRequest, inttest.WithAuthToken(tokens.AccessToken))
 		assert.Contains(t, string(response), "replica requires a component selector")

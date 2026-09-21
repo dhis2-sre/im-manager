@@ -787,7 +787,11 @@ func (s Service) DeploymentComponents(ctx context.Context, deployment *model.Dep
 	return result, nil
 }
 
-func (s Service) Logs(ctx context.Context, instance *model.DeploymentInstance, group *model.Group, componentName, podName string) (io.ReadCloser, error) {
+// DefaultLogTailLines is how much of a log the API serves when the caller asks for no particular
+// amount. Following a busy pod from the first line it ever wrote buries what is happening now.
+const DefaultLogTailLines int64 = 1000
+
+func (s Service) Logs(ctx context.Context, instance *model.DeploymentInstance, group *model.Group, componentName, podName string, tailLines *int64) (io.ReadCloser, error) {
 	if podName != "" && componentName == "" {
 		return nil, errdef.NewBadRequest("streaming the logs of a replica requires a component selector")
 	}
@@ -798,7 +802,7 @@ func (s Service) Logs(ctx context.Context, instance *model.DeploymentInstance, g
 	}
 
 	if podName == "" {
-		return client.Logs(ctx, instance, componentName)
+		return client.Logs(ctx, instance, componentName, tailLines)
 	}
 
 	components, instance, err := s.presentComponents(instance)
@@ -820,7 +824,7 @@ func (s Service) Logs(ctx context.Context, instance *model.DeploymentInstance, g
 		return nil, errdef.NewNotFound("pod %q not found for component %q", podName, componentName)
 	}
 
-	return client.PodLogs(ctx, instance.Group.Namespace, podName)
+	return client.PodLogs(ctx, instance.Group.Namespace, podName, tailLines)
 }
 
 // presentComponents returns the components of the instance's stack which are present given its

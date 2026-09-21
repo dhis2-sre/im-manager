@@ -2104,6 +2104,15 @@ paths:
                   name: replica
                   type: string
                   x-go-name: Replica
+                - description: |-
+                    tail
+                    type: integer
+                    description: number of lines to stream from the end of the log, 0 for the whole log (default 1000)
+                  format: int64
+                  in: query
+                  name: tail
+                  type: integer
+                  x-go-name: Tail
             responses:
                 "200":
                     $ref: '#/responses/InstanceLogsResponse'
