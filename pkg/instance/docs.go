@@ -175,3 +175,14 @@ type _ struct {
 	// required: true
 	Payload UpdateDeploymentRequest
 }
+
+// swagger:parameters editDeployment
+type _ struct {
+	// in: path
+	// required: true
+	ID uint `json:"id"`
+	// Edit deployment request body parameter
+	// in: body
+	// required: true
+	Payload EditDeploymentRequest
+}

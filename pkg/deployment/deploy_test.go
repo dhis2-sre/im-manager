@@ -60,9 +60,13 @@ type fakeInstanceService struct {
 	deployment *model.Deployment
 	locked     bool
 	deployed   []string
+	destroyed  []string
+	deleted    []string
 	statuses   map[uint]model.DeployStatus
 	deployErr  error
 	deployHook func()
+	changes    *instance.DeploymentChanges
+	editErr    error
 }
 
 func (f *fakeInstanceService) DeploymentOrder(deployment *model.Deployment) ([]*model.DeploymentInstance, error) {
@@ -82,7 +86,24 @@ func (f *fakeInstanceService) DeployInstance(_ context.Context, _ string, deploy
 	return nil
 }
 
-func (f *fakeInstanceService) DestroyInstance(context.Context, *model.DeploymentInstance) error {
+func (f *fakeInstanceService) DestroyInstance(_ context.Context, deploymentInstance *model.DeploymentInstance) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.destroyed = append(f.destroyed, deploymentInstance.StackName)
+	return nil
+}
+
+func (f *fakeInstanceService) EditDeployment(context.Context, uint, instance.Edit) (*instance.DeploymentChanges, error) {
+	if f.editErr != nil {
+		return nil, f.editErr
+	}
+	return f.changes, nil
+}
+
+func (f *fakeInstanceService) DeleteDestroyedInstance(_ context.Context, deploymentInstance *model.DeploymentInstance) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.deleted = append(f.deleted, deploymentInstance.StackName)
 	return nil
 }
 
@@ -137,6 +158,18 @@ func (f *fakeInstanceService) deployedStacks() []string {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	return append([]string(nil), f.deployed...)
+}
+
+func (f *fakeInstanceService) destroyedStacks() []string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]string(nil), f.destroyed...)
+}
+
+func (f *fakeInstanceService) deletedStacks() []string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]string(nil), f.deleted...)
 }
 
 func newTestDeployment() *model.Deployment {

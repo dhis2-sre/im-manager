@@ -42,6 +42,7 @@ type groupServiceHandler interface {
 type deploymentService interface {
 	StartDeployment(ctx context.Context, token string, deploymentId uint, userID uint) error
 	UpdateDeployment(ctx context.Context, token string, deploymentId uint, ttl uint, description string, userID uint) (*model.Deployment, error)
+	EditDeployment(ctx context.Context, token string, deploymentId uint, edit Edit, userID uint) (*model.Deployment, error)
 	UpdateInstance(ctx context.Context, token string, deploymentId, instanceId uint, parameters Parameters, public *bool) (*model.DeploymentInstance, error)
 	Reset(ctx context.Context, token string, deploymentId, instanceId uint, ttl uint, userID uint) error
 }
@@ -1168,6 +1169,102 @@ func (h Handler) UpdateInstance(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, instance)
+}
+
+// EditDeploymentRequest is a diff against the deployment, not a snapshot of it. An absent field, an
+// absent stack and an absent parameter all mean unchanged, which is the only contract a form can
+// honour when reads answer with *** in place of every sensitive value.
+//
+// swagger:model EditDeploymentRequest
+type EditDeploymentRequest struct {
+	Description *string `json:"description"`
+	TTL         *uint   `json:"ttl"`
+	// Instances are keyed by stack name, the key a deployment's instances are unique by and the only
+	// one that can name a companion that does not exist yet.
+	Instances map[string]EditInstanceRequest `json:"instances"`
+}
+
+// swagger:model EditInstanceRequest
+type EditInstanceRequest struct {
+	Parameters Parameters `json:"parameters"`
+	Public     *bool      `json:"public"`
+}
+
+// EditDeployment edits a deployment
+func (h Handler) EditDeployment(c *gin.Context) {
+	// swagger:route PATCH /deployments/{id} editDeployment
+	//
+	// Edit a deployment
+	//
+	// Edit a deployment and everything in it in one request. Whatever the edit changes is redeployed
+	// in the background; the response carries the deployment as it now stands.
+	//
+	// Security:
+	//   oauth2:
+	//
+	// Responses:
+	//   202: Deployment
+	//   400: Error
+	//   401: Error
+	//   403: Error
+	//   404: Error
+	//   409: Error
+	//   415: Error
+	id, ok := handler.GetPathParameter(c, "id")
+	if !ok {
+		return
+	}
+
+	var request EditDeploymentRequest
+	if err := handler.DataBinder(c, &request); err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	token, err := handler.GetTokenFromRequest(c)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	ctx := c.Request.Context()
+	user, err := handler.GetUserFromContext(ctx)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	deployment, err := h.instanceService.FindDeploymentById(ctx, id)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	if canWrite := handler.CanWriteDeployment(user, deployment); !canWrite {
+		_ = c.Error(errdef.NewUnauthorized("write access denied"))
+		return
+	}
+
+	edit := Edit{Description: request.Description, TTL: request.TTL}
+	if len(request.Instances) > 0 {
+		edit.Instances = make(map[string]InstanceEdit, len(request.Instances))
+		for stackName, instanceRequest := range request.Instances {
+			edit.Instances[stackName] = InstanceEdit(instanceRequest)
+		}
+	}
+
+	edited, err := h.deploymentService.EditDeployment(ctx, token, id, edit, user.ID)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	if err := h.stripDeploymentSensitiveParameterValues(edited); err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	c.JSON(http.StatusAccepted, edited)
 }
 
 type UpdateDeploymentRequest struct {
