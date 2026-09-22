@@ -66,7 +66,7 @@ func (w *ComponentStatusWatcher) OnUpdate(oldObj, newObj any) {
 	}
 	// Writes that leave the replica view untouched, e.g. an unrelated annotation, are not worth an
 	// event. Without the previous pod there is nothing to compare, so the event goes out.
-	if oldPod, ok := w.podFrom(oldObj); ok && kube.NewReplica(*oldPod) == kube.NewReplica(*newPod) {
+	if oldPod, ok := w.podFrom(oldObj); ok && kube.NewReplica(*oldPod).Equal(kube.NewReplica(*newPod)) {
 		return
 	}
 	w.publish(newPod, false)

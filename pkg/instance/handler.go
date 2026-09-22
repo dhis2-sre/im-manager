@@ -890,6 +890,7 @@ func (h Handler) Logs(c *gin.Context) {
 
 	selector := c.Query("selector")
 	replica := c.Query("replica")
+	container := c.Query("container")
 
 	tailLines, err := logTailLines(c.Query("tail"))
 	if err != nil {
@@ -897,7 +898,7 @@ func (h Handler) Logs(c *gin.Context) {
 		return
 	}
 
-	r, err := h.instanceService.Logs(ctx, instance, group, selector, replica, tailLines)
+	r, err := h.instanceService.Logs(ctx, instance, group, selector, replica, container, tailLines)
 	if err != nil {
 		_ = c.Error(err)
 		return

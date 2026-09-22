@@ -43,6 +43,13 @@ type _ struct {
 	// description: stream logs of a single replica (pod) of the component given by selector
 	Replica string `json:"replica"`
 
+	// container
+	// in: query
+	// required: false
+	// type: string
+	// description: stream the log of a single container of the pod, defaulting to the first container the pod declares
+	Container string `json:"container"`
+
 	// tail
 	// in: query
 	// required: false
