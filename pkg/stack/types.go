@@ -69,6 +69,13 @@ type StackParameter struct {
 	// empty means it can. The update path rejects a change to such a parameter and a client renders
 	// it read only with this as the explanation, so the two cannot disagree about what is editable.
 	ImmutableReason string `json:"immutableReason,omitempty"`
+	// NotRendered says the stack's own helmfile never reads this parameter, so changing it changes
+	// nothing about what the stack renders and an edit that touches only it leaves the instance
+	// alone. It is for the parameters whose only job is to decide whether a companion belongs to the
+	// deployment: ENABLE_PGADMIN appears nowhere in dhis2-v2's template, while DEPLOY_CHAP gates chap
+	// and is read by the template, so only the first is declared here. A parameter that starts being
+	// read by its stack's template has to lose this, or the cluster is left stale.
+	NotRendered bool `json:"-"`
 	// Group names the ParameterGroup this parameter belongs to; empty means ungrouped, which
 	// clients render in a single flat section. Populated by withGroupedParameters from the
 	// declaring group, never set by hand.

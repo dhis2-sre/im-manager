@@ -177,6 +177,14 @@ func minioPodName(t *testing.T, k8sClient *inttest.K8sClient, namespace string, 
 // requireNoPodsMatching polls until no pod matches the selector, which is how destroy is asserted:
 // the release label also covers the seed job's completed pod, so the workloads are checked by their
 // own im labels instead.
+func requirePodsMatching(t *testing.T, k8sClient *inttest.K8sClient, namespace, selector string, timeout time.Duration) {
+	t.Helper()
+	require.Eventuallyf(t, func() bool {
+		pods, err := k8sClient.Client.CoreV1().Pods(namespace).List(context.Background(), metav1.ListOptions{LabelSelector: selector})
+		return err == nil && len(pods.Items) > 0
+	}, timeout, 2*time.Second, "pods matching %q should exist", selector)
+}
+
 func requireNoPodsMatching(t *testing.T, k8sClient *inttest.K8sClient, namespace, selector string, timeout time.Duration) {
 	t.Helper()
 	require.Eventuallyf(t, func() bool {

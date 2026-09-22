@@ -87,6 +87,25 @@ func (r repository) SaveDeployment(ctx context.Context, deployment *model.Deploy
 	return nil
 }
 
+// SaveDeploymentDetails writes the deployment's own columns and leaves its instances alone. Saving
+// the deployment itself cascades into the instances hanging off it, and an edit holds those
+// decrypted, so an instance the edit added would be inserted with its sensitive parameters in clear.
+func (r repository) SaveDeploymentDetails(ctx context.Context, deployment *model.Deployment) error {
+	// only use ctx for values (logging) and not cancellation signals on cud operations for now. ctx
+	// cancellation can lead to rollbacks which we should decide individually.
+	ctx = context.WithoutCancel(ctx)
+
+	err := r.db.WithContext(ctx).
+		Model(&model.Deployment{}).
+		Where("id = ?", deployment.ID).
+		Updates(map[string]any{"description": deployment.Description, "ttl": deployment.TTL}).Error
+	if err != nil {
+		return fmt.Errorf("failed to save deployment %d: %v", deployment.ID, err)
+	}
+
+	return nil
+}
+
 func (r repository) FindDeploymentById(ctx context.Context, id uint) (*model.Deployment, error) {
 	var deployment *model.Deployment
 	err := r.db.

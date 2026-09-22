@@ -30,6 +30,8 @@ type instanceService interface {
 	FindDecryptedDeploymentById(ctx context.Context, id uint) (*model.Deployment, error)
 	SaveDeployment(ctx context.Context, deployment *model.Deployment) error
 	UpdateInstanceParameters(ctx context.Context, deploymentId, instanceId uint, parameters instance.Parameters, public *bool) (*model.DeploymentInstance, error)
+	EditDeployment(ctx context.Context, deploymentId uint, edit instance.Edit) (*instance.DeploymentChanges, error)
+	DeleteDestroyedInstance(ctx context.Context, deploymentInstance *model.DeploymentInstance) error
 	FilestoreBackup(ctx context.Context, instance *model.DeploymentInstance, name string, database *model.Database) error
 	AcquireDeployLock(ctx context.Context, deploymentId uint) (bool, error)
 	ReleaseDeployLock(ctx context.Context, deploymentId uint) error
@@ -125,6 +127,120 @@ func (s Service) StartDeployment(ctx context.Context, token string, deploymentId
 	return nil
 }
 
+// EditDeployment applies an edit to a deployment and runs whatever cluster work it implies in the
+// background, under the same deploy lock a deploy takes. The database is up to date by the time it
+// returns, so the caller answers with the edited deployment; the cluster catches up on the event
+// stream. An edit that changes nothing the cluster cares about, a TTL or a description, is finished
+// when it returns.
+func (s Service) EditDeployment(ctx context.Context, token string, deploymentId uint, edit instance.Edit, userID uint) (*model.Deployment, error) {
+	acquired, err := s.instanceService.AcquireDeployLock(ctx, deploymentId)
+	if err != nil {
+		return nil, err
+	}
+	if !acquired {
+		return nil, errdef.NewConflict("deployment %d is already being deployed", deploymentId)
+	}
+
+	changes, err := s.instanceService.EditDeployment(ctx, deploymentId, edit)
+	if err != nil {
+		s.releaseDeployLock(ctx, deploymentId)
+		return nil, err
+	}
+
+	if len(changes.Redeploy) == 0 && len(changes.Destroy) == 0 {
+		s.releaseDeployLock(ctx, deploymentId)
+		return changes.Deployment, nil
+	}
+
+	token, err = s.tokenService.RefreshAccessToken(token)
+	if err != nil {
+		s.releaseDeployLock(ctx, deploymentId)
+		return nil, err
+	}
+
+	for _, deploymentInstance := range changes.Redeploy {
+		if err := s.instanceService.SetDeployStatus(ctx, deploymentInstance, model.DeployStatusPending); err != nil {
+			s.releaseDeployLock(ctx, deploymentId)
+			return nil, err
+		}
+	}
+
+	redeploy := instanceIds(changes.Redeploy)
+	destroy := instanceIds(changes.Destroy)
+
+	ctx = context.WithoutCancel(ctx)
+	go func() {
+		defer s.releaseDeployLock(ctx, deploymentId)
+
+		if err := s.applyDeploymentChanges(ctx, token, deploymentId, redeploy, destroy); err != nil {
+			s.logger.ErrorContext(ctx, "edit failed", "deploymentId", deploymentId, "error", err)
+			s.publisher.Publish(ctx, userID, changes.Deployment.GroupName, kindDeployment, newDeploymentEvent(changes.Deployment, "error", err.Error()))
+			return
+		}
+		s.publisher.Publish(ctx, userID, changes.Deployment.GroupName, kindDeployment, newDeploymentEvent(changes.Deployment, "success", ""))
+	}()
+
+	return changes.Deployment, nil
+}
+
+// applyDeploymentChanges works from ids on its own copy of the deployment, so the caller stays free
+// to serialise, and strip the sensitive values from, the one it answers with.
+func (s Service) applyDeploymentChanges(ctx context.Context, token string, deploymentId uint, redeploy, destroy []uint) error {
+	deployment, err := s.instanceService.FindDecryptedDeploymentById(ctx, deploymentId)
+	if err != nil {
+		return err
+	}
+
+	for _, instanceId := range destroy {
+		deploymentInstance, err := findInstanceById(deployment.Instances, instanceId)
+		if err != nil {
+			return err
+		}
+
+		s.publisher.PublishTransient(ctx, deployment.GroupName, kindDeployment, newInstanceEvent(deployment, deploymentInstance, "started", ""))
+		if err := s.instanceService.DestroyInstance(ctx, deploymentInstance); err != nil {
+			err = fmt.Errorf("failed to destroy instance(%s) %q: %w", deploymentInstance.StackName, deploymentInstance.Name, err)
+			s.publisher.PublishTransient(ctx, deployment.GroupName, kindDeployment, newInstanceEvent(deployment, deploymentInstance, "error", err.Error()))
+			return err
+		}
+		if err := s.instanceService.DeleteDestroyedInstance(ctx, deploymentInstance); err != nil {
+			s.publisher.PublishTransient(ctx, deployment.GroupName, kindDeployment, newInstanceEvent(deployment, deploymentInstance, "error", err.Error()))
+			return err
+		}
+		s.publisher.PublishTransient(ctx, deployment.GroupName, kindDeployment, newInstanceEvent(deployment, deploymentInstance, "success", ""))
+	}
+
+	for _, instanceId := range redeploy {
+		deploymentInstance, err := findInstanceById(deployment.Instances, instanceId)
+		if err != nil {
+			return err
+		}
+
+		token, err = s.tokenService.RefreshAccessToken(token)
+		if err != nil {
+			return err
+		}
+
+		s.publisher.PublishTransient(ctx, deployment.GroupName, kindDeployment, newInstanceEvent(deployment, deploymentInstance, "started", ""))
+		if err := s.deployInstance(ctx, token, deploymentInstance, deployment.TTL, deployment.Instances); err != nil {
+			err = fmt.Errorf("failed to deploy instance(%s) %q: %w", deploymentInstance.StackName, deploymentInstance.Name, err)
+			s.publisher.PublishTransient(ctx, deployment.GroupName, kindDeployment, newInstanceEvent(deployment, deploymentInstance, "error", err.Error()))
+			return err
+		}
+		s.publisher.PublishTransient(ctx, deployment.GroupName, kindDeployment, newInstanceEvent(deployment, deploymentInstance, "success", ""))
+	}
+
+	return nil
+}
+
+func instanceIds(instances []*model.DeploymentInstance) []uint {
+	ids := make([]uint, len(instances))
+	for i, deploymentInstance := range instances {
+		ids[i] = deploymentInstance.ID
+	}
+	return ids
+}
+
 func (s Service) releaseDeployLock(ctx context.Context, deploymentId uint) {
 	if err := s.instanceService.ReleaseDeployLock(ctx, deploymentId); err != nil {
 		s.logger.ErrorContext(ctx, "failed to release deploy lock", "deploymentId", deploymentId, "error", err)
@@ -152,30 +268,12 @@ func (s Service) deployDeployment(ctx context.Context, token string, deployment 
 	return nil
 }
 
+// UpdateDeployment is the deployment-level edit restricted to the two fields PUT has always carried.
+// It is kept so the scripts that use it keep working, and it redeploys nothing: the inspector reads
+// the TTL out of the database, and the im-ttl label it also templates into the pod is read by no one,
+// so rolling DHIS 2 core to refresh a label was work done for nobody.
 func (s Service) UpdateDeployment(ctx context.Context, token string, deploymentId uint, ttl uint, description string, userID uint) (*model.Deployment, error) {
-	deployment, err := s.instanceService.FindDecryptedDeploymentById(ctx, deploymentId)
-	if err != nil {
-		return nil, err
-	}
-
-	ttlChanged := deployment.TTL != ttl
-
-	deployment.TTL = ttl
-	deployment.Description = description
-
-	err = s.instanceService.SaveDeployment(ctx, deployment)
-	if err != nil {
-		return nil, err
-	}
-
-	if ttlChanged {
-		err = s.StartDeployment(ctx, token, deployment.ID, userID)
-		if err != nil {
-			return nil, fmt.Errorf("failed to redeploy instances: %w", err)
-		}
-	}
-
-	return deployment, nil
+	return s.EditDeployment(ctx, token, deploymentId, instance.Edit{TTL: &ttl, Description: &description}, userID)
 }
 
 // Reset destroys the instance and deploys it again from the same parameters. Like StartDeployment it

@@ -157,3 +157,36 @@ func updateDeployment(t *testing.T, client *inttest.HTTPClient, deploymentID uin
 
 	return updatedDeployment
 }
+
+// editDeployment sends a PATCH and returns the deployment as the edit leaves it. The redeploy an
+// edit implies runs in the background, so callers that change a parameter follow it with
+// awaitDeployed.
+func editDeployment(t *testing.T, client *inttest.HTTPClient, deploymentID uint, authToken string, payload map[string]any) model.Deployment {
+	t.Helper()
+
+	body := editDeploymentExpecting(t, client, deploymentID, authToken, payload, http.StatusAccepted)
+
+	var edited model.Deployment
+	require.NoError(t, json.Unmarshal(body, &edited), "failed to unmarshal the edited deployment")
+	return edited
+}
+
+func editDeploymentExpecting(t *testing.T, client *inttest.HTTPClient, deploymentID uint, authToken string, payload map[string]any, status int) []byte {
+	t.Helper()
+
+	jsonData, err := json.Marshal(payload)
+	require.NoError(t, err, "failed to marshal edit payload")
+
+	path := fmt.Sprintf("/deployments/%d", deploymentID)
+	return client.Do(t, http.MethodPatch, path, strings.NewReader(string(jsonData)), status,
+		inttest.WithAuthToken(authToken), inttest.WithHeader("Content-Type", "application/json"))
+}
+
+func findInstanceByStack(deployment model.Deployment, stackName string) *model.DeploymentInstance {
+	for _, instance := range deployment.Instances {
+		if instance.StackName == stackName {
+			return instance
+		}
+	}
+	return nil
+}

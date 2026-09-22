@@ -39,7 +39,7 @@ var DHIS2V2 = withGroupedParameters(Stack{
 			"GOOGLE_AUTH_CLIENT_ID":           {Priority: 38, DisplayName: "Google auth client id", DefaultValue: &coreDefaults.googleAuthClientId, Sensitive: true},
 			"DEPLOY_CHAP":                     {Priority: 39, DisplayName: "Deploy CHAP", DefaultValue: &coreDefaults.deployChap},
 			"ENABLE_DORIS":                    {Priority: 40, DisplayName: "Use Doris as the analytics database", DefaultValue: &dhis2V2Defaults.enableDoris},
-			"ENABLE_PGADMIN":                  {Priority: 56, DisplayName: "Deploy pgAdmin", DefaultValue: &pgAdminDefaults.enabled},
+			"ENABLE_PGADMIN":                  {Priority: 56, DisplayName: "Deploy pgAdmin", DefaultValue: &pgAdminDefaults.enabled, NotRendered: true},
 		}},
 		{Name: "db", Title: "PostgreSQL", Parameters: StackParameters{
 			"DATABASE_ID":                  {Priority: 4, DisplayName: "Database", ImmutableReason: "the database is seeded once by a marker-guarded job, so pointing the instance at another database after it has been deployed has no effect"},

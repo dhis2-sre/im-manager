@@ -103,6 +103,9 @@ func TestInstanceHandler(t *testing.T) {
 	stacks := stack.Stacks{
 		"whoami-go": stack.WhoamiGo,
 		"dhis2-v2":  stack.DHIS2V2,
+		// dhis2-v2 offers pgadmin as a companion, and a companion has to be registered like any
+		// other stack for the deployment holding it to resolve.
+		"pgadmin": stack.PgAdmin,
 	}
 	stackService := stack.NewService(stacks)
 	// classification 'test' does not actually exist, this is used to decrypt the stack parameters
@@ -387,6 +390,52 @@ func TestInstanceHandler(t *testing.T) {
 			}, 180*time.Second, 500*time.Millisecond, "saved database in S3 should grow beyond the uploaded placeholder")
 		})
 
+		t.Run("EditRejectsAnImmutableParameter", func(t *testing.T) {
+			response := editDeploymentExpecting(t, client, deployment.ID, tokens.AccessToken, map[string]any{
+				"instances": map[string]any{
+					"dhis2-v2": map[string]any{"parameters": map[string]any{"DATABASE_ID": map[string]any{"value": "999"}}},
+				},
+			}, http.StatusBadRequest)
+
+			assert.Contains(t, string(response), "DATABASE_ID can't be changed once the instance has been deployed")
+
+			var unchanged model.DeploymentInstance
+			client.GetJSON(t, fmt.Sprintf("/instances/%d/details", coreInstance.ID), &unchanged, inttest.WithAuthToken(tokens.AccessToken))
+			assert.Equal(t, seedID, unchanged.Parameters["DATABASE_ID"].Value)
+		})
+
+		t.Run("EditAddsAndRemovesACompanion", func(t *testing.T) {
+			edited := editDeployment(t, client, deployment.ID, tokens.AccessToken, map[string]any{
+				"instances": map[string]any{
+					"dhis2-v2": map[string]any{"parameters": map[string]any{"ENABLE_PGADMIN": map[string]any{"value": "true"}}},
+					"pgadmin": map[string]any{"parameters": map[string]any{
+						"PGADMIN_USERNAME": map[string]any{"value": "admin@dhis2.org"},
+						"PGADMIN_PASSWORD": map[string]any{"value": "district"},
+					}},
+				},
+			})
+
+			pgAdmin := findInstanceByStack(edited, "pgadmin")
+			require.NotNil(t, pgAdmin, "turning ENABLE_PGADMIN on adds the companion")
+			awaitDeployed(t, client, deployment.ID, tokens.AccessToken)
+			requirePodsMatching(t, k8sClient, coreInstance.Group.Namespace, fmt.Sprintf("im-id=%d", pgAdmin.ID), 180*time.Second)
+
+			edited = editDeployment(t, client, deployment.ID, tokens.AccessToken, map[string]any{
+				"instances": map[string]any{
+					"dhis2-v2": map[string]any{"parameters": map[string]any{"ENABLE_PGADMIN": map[string]any{"value": "false"}}},
+				},
+			})
+
+			assert.Nil(t, findInstanceByStack(edited, "pgadmin"), "turning it off takes the companion out of the deployment")
+			requireNoPodsMatching(t, k8sClient, coreInstance.Group.Namespace, fmt.Sprintf("im-id=%d", pgAdmin.ID), 180*time.Second)
+
+			var afterRemoval model.Deployment
+			require.Eventually(t, func() bool {
+				client.GetJSON(t, fmt.Sprintf("/deployments/%d", deployment.ID), &afterRemoval, inttest.WithAuthToken(tokens.AccessToken))
+				return findInstanceByStack(afterRemoval, "pgadmin") == nil
+			}, 180*time.Second, time.Second, "the pgadmin row should be gone once the release is")
+		})
+
 		destroyDeployment(t, client, deployment.ID, tokens.AccessToken)
 		requireNoPodsMatching(t, k8sClient, coreInstance.Group.Namespace, fmt.Sprintf("im-id=%d,im-default=true", coreInstance.ID), 120*time.Second)
 		requireNoPodsMatching(t, k8sClient, coreInstance.Group.Namespace, fmt.Sprintf("im-type=minio,im-deployment-id=%d", deployment.ID), 120*time.Second)
@@ -473,6 +522,66 @@ func TestInstanceHandler(t *testing.T) {
 		assert.Equal(t, "Always", updatedInstance.Parameters["IMAGE_PULL_POLICY"].Value)
 		assert.Equal(t, "0.6.0", updatedInstance.Parameters["IMAGE_TAG"].Value,
 			"IMAGE_TAG should be preserved when omitted from the patch body")
+	})
+
+	t.Run("EditDeploymentTTLAndDescription", func(t *testing.T) {
+		t.Parallel()
+		deployment := createDeployment(t, client, "test-deployment-edit-ttl", tokens.AccessToken, WithDescription("initial description"), WithTTL(86400))
+		deploymentInstance := createWhoamiInstance(t, client, deployment.ID, tokens.AccessToken, WithParameter("IMAGE_TAG", "0.6.0"))
+		deployDeployment(t, client, deployment.ID, tokens.AccessToken)
+
+		var beforeEdit model.DeploymentInstance
+		client.GetJSON(t, fmt.Sprintf("/instances/%d/details", deploymentInstance.ID), &beforeEdit, inttest.WithAuthToken(tokens.AccessToken))
+
+		edited := editDeployment(t, client, deployment.ID, tokens.AccessToken, map[string]any{
+			"ttl":         172800,
+			"description": "edited description",
+		})
+
+		assert.Equal(t, uint(172800), edited.TTL)
+		assert.Equal(t, "edited description", edited.Description)
+
+		var afterEdit model.DeploymentInstance
+		client.GetJSON(t, fmt.Sprintf("/instances/%d/details", deploymentInstance.ID), &afterEdit, inttest.WithAuthToken(tokens.AccessToken))
+		assert.Equal(t, beforeEdit.DeployedAt, afterEdit.DeployedAt, "a TTL change must not redeploy anything")
+
+		destroyDeployment(t, client, deployment.ID, tokens.AccessToken)
+	})
+
+	t.Run("EditDeploymentParameter", func(t *testing.T) {
+		t.Parallel()
+		deployment := createDeployment(t, client, "test-deployment-edit-parameter", tokens.AccessToken)
+		deploymentInstance := createWhoamiInstance(t, client, deployment.ID, tokens.AccessToken, WithParameter("IMAGE_TAG", "0.6.0"))
+		deployDeployment(t, client, deployment.ID, tokens.AccessToken)
+
+		edited := editDeployment(t, client, deployment.ID, tokens.AccessToken, map[string]any{
+			"instances": map[string]any{
+				"whoami-go": map[string]any{"parameters": map[string]any{"IMAGE_TAG": map[string]any{"value": "0.7.0"}}},
+			},
+		})
+
+		require.NotNil(t, findInstanceByStack(edited, "whoami-go"))
+		awaitDeployed(t, client, deployment.ID, tokens.AccessToken)
+
+		var afterEdit model.DeploymentInstance
+		client.GetJSON(t, fmt.Sprintf("/instances/%d/details", deploymentInstance.ID), &afterEdit, inttest.WithAuthToken(tokens.AccessToken))
+		assert.Equal(t, "0.7.0", afterEdit.Parameters["IMAGE_TAG"].Value)
+
+		destroyDeployment(t, client, deployment.ID, tokens.AccessToken)
+	})
+
+	t.Run("EditDeploymentRejectsAnUnknownStack", func(t *testing.T) {
+		t.Parallel()
+		deployment := createDeployment(t, client, "test-deployment-edit-unknown", tokens.AccessToken)
+		createWhoamiInstance(t, client, deployment.ID, tokens.AccessToken)
+
+		response := editDeploymentExpecting(t, client, deployment.ID, tokens.AccessToken, map[string]any{
+			"instances": map[string]any{
+				"pgadmin": map[string]any{"parameters": map[string]any{"PGADMIN_PASSWORD": map[string]any{"value": "x"}}},
+			},
+		}, http.StatusBadRequest)
+
+		assert.Contains(t, string(response), `has no instance of stack "pgadmin"`)
 	})
 
 	t.Run("UpdateDeploymentInstancePublicOnly", func(t *testing.T) {
