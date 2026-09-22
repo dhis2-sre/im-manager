@@ -40,10 +40,10 @@ type groupServiceHandler interface {
 }
 
 type deploymentService interface {
-	DeployDeployment(ctx context.Context, token string, deployment *model.Deployment) error
-	UpdateDeployment(ctx context.Context, token string, deploymentId uint, ttl uint, description string) (*model.Deployment, error)
+	StartDeployment(ctx context.Context, token string, deploymentId uint, userID uint) error
+	UpdateDeployment(ctx context.Context, token string, deploymentId uint, ttl uint, description string, userID uint) (*model.Deployment, error)
 	UpdateInstance(ctx context.Context, token string, deploymentId, instanceId uint, parameters Parameters, public *bool) (*model.DeploymentInstance, error)
-	Reset(ctx context.Context, token string, instance *model.DeploymentInstance, ttl uint) error
+	Reset(ctx context.Context, token string, deploymentId, instanceId uint, ttl uint, userID uint) error
 }
 
 func (h Handler) DeployDeployment(c *gin.Context) {
@@ -57,10 +57,11 @@ func (h Handler) DeployDeployment(c *gin.Context) {
 	//	oauth2:
 	//
 	// responses:
-	//	200: DeploymentInstance
+	//	202:
 	//	401: Error
 	//	403: Error
 	//	404: Error
+	//	409: Error
 	//	415: Error
 	id, ok := handler.GetPathParameter(c, "id")
 	if !ok {
@@ -99,19 +100,13 @@ func (h Handler) DeployDeployment(c *gin.Context) {
 		return
 	}
 
-	err = h.deploymentService.DeployDeployment(ctx, token, deployment)
+	err = h.deploymentService.StartDeployment(ctx, token, deployment.ID, user.ID)
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
 
-	err = h.stripDeploymentSensitiveParameterValues(deployment)
-	if err != nil {
-		_ = c.Error(err)
-		return
-	}
-
-	c.JSON(http.StatusOK, deployment)
+	c.Status(http.StatusAccepted)
 }
 
 func (h Handler) stripDeploymentSensitiveParameterValues(deployment *model.Deployment) error {
@@ -511,7 +506,7 @@ func (h Handler) Reset(c *gin.Context) {
 		return
 	}
 
-	instance, err := h.instanceService.FindDecryptedDeploymentInstanceById(ctx, id)
+	instance, err := h.instanceService.FindDeploymentInstanceById(ctx, id)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -529,7 +524,7 @@ func (h Handler) Reset(c *gin.Context) {
 		return
 	}
 
-	err = h.deploymentService.Reset(ctx, token, instance, deployment.TTL)
+	err = h.deploymentService.Reset(ctx, token, deployment.ID, instance.ID, deployment.TTL, user.ID)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -1235,7 +1230,13 @@ func (h Handler) UpdateDeployment(c *gin.Context) {
 		return
 	}
 
-	updatedDeployment, err := h.deploymentService.UpdateDeployment(ctx, token, id, request.TTL, request.Description)
+	updatedDeployment, err := h.deploymentService.UpdateDeployment(ctx, token, id, request.TTL, request.Description, user.ID)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	err = h.stripDeploymentSensitiveParameterValues(updatedDeployment)
 	if err != nil {
 		_ = c.Error(err)
 		return

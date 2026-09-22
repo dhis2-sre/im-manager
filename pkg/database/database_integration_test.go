@@ -412,6 +412,18 @@ func (is instanceService) UpdateInstanceParameters(ctx context.Context, deployme
 	panic("implement me")
 }
 
+func (is instanceService) AcquireDeployLock(ctx context.Context, deploymentId uint) (bool, error) {
+	panic("implement me")
+}
+
+func (is instanceService) ReleaseDeployLock(ctx context.Context, deploymentId uint) error {
+	panic("implement me")
+}
+
+func (is instanceService) SetDeployStatus(ctx context.Context, instance *model.DeploymentInstance, status model.DeployStatus) error {
+	panic("implement me")
+}
+
 type stackService struct{}
 
 func (ss stackService) Find(name string) (*stack.Stack, error) {
@@ -421,6 +433,8 @@ func (ss stackService) Find(name string) (*stack.Stack, error) {
 type noopPublisher struct{}
 
 func (noopPublisher) Publish(context.Context, uint, string, string, any) {}
+
+func (noopPublisher) PublishTransient(context.Context, string, string, any) {}
 
 // TestFilestoreAssociationResolvesThroughFilestoreID guards the self-referential association: the
 // foreign key has to be FilestoreID, since resolving it through ID silently returns the database

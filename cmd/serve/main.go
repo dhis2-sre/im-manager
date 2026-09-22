@@ -203,6 +203,10 @@ func run() (err error) {
 		return err
 	}
 
+	if err := instanceService.AbandonDeploysInProgress(ctx); err != nil {
+		return fmt.Errorf("failed to settle deploys interrupted by the last shutdown: %v", err)
+	}
+
 	stackHandler := stack.NewHandler(stackService)
 
 	rabbitmqConfig, err := newRabbitMQ()
@@ -286,16 +290,22 @@ func run() (err error) {
 	event.Routes(r, authentication.TokenAuthentication, eventHandler)
 	notification.Routes(r, authentication.TokenAuthentication, notificationHandler)
 
-	logger.InfoContext(ctx, "Listening and serving HTTP")
-	if err := r.Run(); err != nil {
-		return fmt.Errorf("failed to start the HTTP server: %v", err)
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
 	}
+
+	// Read and write deadlines are deliberately left unset. The event stream, log following and
+	// database up- and downloads all hold a request open for far longer than any value that would
+	// protect the other endpoints, and a deploy no longer occupies a request at all.
 	server := &http.Server{
-		Addr:         ":8080",
-		Handler:      r,
-		WriteTimeout: 240 * time.Second,
-		ReadTimeout:  240 * time.Second,
+		Addr:              ":" + port,
+		Handler:           r,
+		ReadHeaderTimeout: 20 * time.Second,
+		IdleTimeout:       120 * time.Second,
 	}
+
+	logger.InfoContext(ctx, "Listening and serving HTTP", "address", server.Addr)
 	if err := server.ListenAndServe(); err != nil {
 		return fmt.Errorf("failed to start the HTTP server: %v", err)
 	}

@@ -207,6 +207,10 @@ definitions:
                 x-go-name: UserID
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/model
+    DeployStatus:
+        title: DeployStatus is how far an instance got the last time it was deployed.
+        type: string
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/model
     Deployment:
         properties:
             createdAt:
@@ -257,9 +261,18 @@ definitions:
                 format: date-time
                 type: string
                 x-go-name: CreatedAt
+            deployError:
+                type: string
+                x-go-name: DeployError
             deployLog:
                 type: string
                 x-go-name: DeployLog
+            deployStatus:
+                $ref: '#/definitions/DeployStatus'
+            deployedAt:
+                format: date-time
+                type: string
+                x-go-name: DeployedAt
             deployment:
                 $ref: '#/definitions/Deployment'
             deploymentId:
@@ -1545,13 +1558,15 @@ paths:
                   type: integer
                   x-go-name: ID
             responses:
-                "200":
-                    $ref: '#/responses/DeploymentInstance'
+                "202":
+                    description: ""
                 "401":
                     $ref: '#/responses/Error'
                 "403":
                     $ref: '#/responses/Error'
                 "404":
+                    $ref: '#/responses/Error'
+                "409":
                     $ref: '#/responses/Error'
                 "415":
                     $ref: '#/responses/Error'

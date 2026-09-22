@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/dhis2-sre/im-manager/pkg/inttest"
 	"github.com/dhis2-sre/im-manager/pkg/model"
@@ -82,7 +83,47 @@ func createDeployment(t *testing.T, client *inttest.HTTPClient, name string, aut
 func deployDeployment(t *testing.T, client *inttest.HTTPClient, deploymentID uint, authToken string) {
 	t.Helper()
 	path := fmt.Sprintf("/deployments/%d/deploy", deploymentID)
-	client.Do(t, http.MethodPost, path, nil, http.StatusOK, inttest.WithAuthToken(authToken))
+	client.Do(t, http.MethodPost, path, nil, http.StatusAccepted, inttest.WithAuthToken(authToken))
+	awaitDeployed(t, client, deploymentID, authToken)
+}
+
+const (
+	deployPollInterval = 2 * time.Second
+	deployPollTimeout  = 25 * time.Minute
+)
+
+// awaitDeployed blocks until every instance of the deployment reports that it deployed. Deploying
+// is asynchronous, so the accepted response only says the work started; the recorded deploy status
+// is what says it finished, and a failed instance stops the wait immediately with its own error
+// rather than running the timeout out.
+func awaitDeployed(t *testing.T, client *inttest.HTTPClient, deploymentID uint, authToken string) {
+	t.Helper()
+
+	path := fmt.Sprintf("/deployments/%d", deploymentID)
+	deadline := time.Now().Add(deployPollTimeout)
+	for {
+		var deployment model.Deployment
+		client.GetJSON(t, path, &deployment, inttest.WithAuthToken(authToken))
+
+		deployed := true
+		for _, instance := range deployment.Instances {
+			switch instance.DeployStatus {
+			case model.DeployStatusFailed:
+				t.Fatalf("instance %q of stack %q failed to deploy: %s", instance.Name, instance.StackName, instance.DeployError)
+			case model.DeployStatusDeployed:
+			default:
+				deployed = false
+			}
+		}
+		if deployed {
+			return
+		}
+
+		if time.Now().After(deadline) {
+			t.Fatalf("deployment %d did not finish deploying within %s", deploymentID, deployPollTimeout)
+		}
+		time.Sleep(deployPollInterval)
+	}
 }
 
 func destroyDeployment(t *testing.T, client *inttest.HTTPClient, deploymentID uint, authToken string) {
