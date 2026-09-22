@@ -58,6 +58,9 @@ func componentTestPod(name, componentName string) *v1.Pod {
 			Labels:            componentLabels(componentName),
 			CreationTimestamp: metav1.NewTime(time.Date(2026, 7, 27, 12, 0, 0, 0, time.UTC)),
 		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{{Name: componentName}},
+		},
 		Status: v1.PodStatus{
 			Phase:             v1.PodRunning,
 			Conditions:        []v1.PodCondition{{Type: v1.PodReady, Status: v1.ConditionTrue}},
@@ -118,8 +121,8 @@ func TestReplicas(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.ElementsMatch(t, []Replica{
-		{Name: "core-1", Phase: "Running", Ready: true, Restarts: 3, CreatedAt: pod.CreationTimestamp.Time},
-		{Name: "core-2", Phase: "Running", Ready: false, Restarts: 3, CreatedAt: pod.CreationTimestamp.Time},
+		{Name: "core-1", Phase: "Running", Ready: true, Restarts: 3, CreatedAt: pod.CreationTimestamp.Time, Containers: []string{"dhis2"}},
+		{Name: "core-2", Phase: "Running", Ready: false, Restarts: 3, CreatedAt: pod.CreationTimestamp.Time, Containers: []string{"dhis2"}},
 	}, replicas)
 }
 

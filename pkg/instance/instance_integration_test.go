@@ -213,6 +213,7 @@ func TestInstanceHandler(t *testing.T) {
 		replica := components[0].Replicas[0]
 		assert.Equal(t, "Running", replica.Phase)
 		assert.True(t, replica.Ready)
+		assert.NotEmpty(t, replica.Containers)
 
 		path = fmt.Sprintf("/deployments/%d/components", deployment.ID)
 		var deploymentComponents []instance.InstanceComponents
@@ -230,6 +231,9 @@ func TestInstanceHandler(t *testing.T) {
 		assert.Contains(t, string(response), "replica requires a component selector")
 
 		path = fmt.Sprintf("/instances/%d/logs?selector=whoami&replica=no-such-pod", deploymentInstance.ID)
+		client.Do(t, http.MethodGet, path, nil, http.StatusNotFound, inttest.WithAuthToken(tokens.AccessToken))
+
+		path = fmt.Sprintf("/instances/%d/logs?selector=whoami&container=no-such-container", deploymentInstance.ID)
 		client.Do(t, http.MethodGet, path, nil, http.StatusNotFound, inttest.WithAuthToken(tokens.AccessToken))
 
 		path = fmt.Sprintf("/instances/%d/logs?selector=whoami&tail=-1", deploymentInstance.ID)

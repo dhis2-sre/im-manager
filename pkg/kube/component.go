@@ -42,6 +42,20 @@ type Replica struct {
 	Ready     bool      `json:"ready"`
 	Restarts  int32     `json:"restarts"`
 	CreatedAt time.Time `json:"createdAt"`
+	// Containers names the pod's containers in the order it declares them, so a client can offer
+	// the log of a sidecar rather than only the log of the container which happens to come first.
+	Containers []string `json:"containers"`
+}
+
+// Equal reports whether two replica views hold the same state. Replica carries a slice, so it
+// cannot be compared with ==.
+func (r Replica) Equal(other Replica) bool {
+	return r.Name == other.Name &&
+		r.Phase == other.Phase &&
+		r.Ready == other.Ready &&
+		r.Restarts == other.Restarts &&
+		r.CreatedAt.Equal(other.CreatedAt) &&
+		slices.Equal(r.Containers, other.Containers)
 }
 
 // Component is a single addressable part of a deployed stack (e.g. dhis2 core, its database).
@@ -162,12 +176,18 @@ func newReplica(pod v1.Pod) Replica {
 		}
 	}
 
+	containers := make([]string, len(pod.Spec.Containers))
+	for i, container := range pod.Spec.Containers {
+		containers[i] = container.Name
+	}
+
 	return Replica{
-		Name:      pod.Name,
-		Phase:     string(pod.Status.Phase),
-		Ready:     ready,
-		Restarts:  restarts,
-		CreatedAt: pod.CreationTimestamp.Time,
+		Name:       pod.Name,
+		Phase:      string(pod.Status.Phase),
+		Ready:      ready,
+		Restarts:   restarts,
+		CreatedAt:  pod.CreationTimestamp.Time,
+		Containers: containers,
 	}
 }
 

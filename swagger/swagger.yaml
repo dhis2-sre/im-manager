@@ -580,6 +580,14 @@ definitions:
             Replica is a live pod backing a component. Replicas are discovered from the cluster on demand
             and never persisted.
         properties:
+            containers:
+                description: |-
+                    Containers names the pod's containers in the order it declares them, so a client can offer
+                    the log of a sidecar rather than only the log of the container which happens to come first.
+                items:
+                    type: string
+                type: array
+                x-go-name: Containers
             createdAt:
                 format: date-time
                 type: string
@@ -2104,6 +2112,14 @@ paths:
                   name: replica
                   type: string
                   x-go-name: Replica
+                - description: |-
+                    container
+                    type: string
+                    description: stream the log of a single container of the pod, defaulting to the first container the pod declares
+                  in: query
+                  name: container
+                  type: string
+                  x-go-name: Container
                 - description: |-
                     tail
                     type: integer

@@ -16,36 +16,36 @@ import (
 	"k8s.io/client-go/tools/remotecommand"
 )
 
-func (c *Client) Logs(ctx context.Context, instance *model.DeploymentInstance, typeSelector string, tailLines *int64) (io.ReadCloser, error) {
+func (c *Client) Logs(ctx context.Context, instance *model.DeploymentInstance, typeSelector, container string, tailLines *int64) (io.ReadCloser, error) {
 	pod, err := c.GetPod(ctx, instance.ID, typeSelector)
 	if err != nil {
 		return nil, err
 	}
 
-	return c.podLogs(ctx, pod, tailLines)
+	return c.podLogs(ctx, pod, container, tailLines)
 }
 
-// PodLogs streams the log of the named pod, starting at its last tailLines lines, or at the
-// beginning of the log when tailLines is nil.
-func (c *Client) PodLogs(ctx context.Context, namespace, podName string, tailLines *int64) (io.ReadCloser, error) {
+// PodLogs streams the log of the named container of the named pod, starting at its last tailLines
+// lines, or at the beginning of the log when tailLines is nil.
+func (c *Client) PodLogs(ctx context.Context, namespace, podName, container string, tailLines *int64) (io.ReadCloser, error) {
 	pod, err := c.Clientset.CoreV1().Pods(namespace).Get(ctx, podName, metav1.GetOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("error getting pod %q: %v", podName, err)
 	}
 
-	return c.podLogs(ctx, *pod, tailLines)
+	return c.podLogs(ctx, *pod, container, tailLines)
 }
 
-func (c *Client) podLogs(ctx context.Context, pod v1.Pod, tailLines *int64) (io.ReadCloser, error) {
-	if len(pod.Spec.Containers) == 0 {
-		return nil, errdef.NewNotFound("pod %q has no containers", pod.Name)
+func (c *Client) podLogs(ctx context.Context, pod v1.Pod, container string, tailLines *int64) (io.ReadCloser, error) {
+	container, err := containerName(pod, container)
+	if err != nil {
+		return nil, err
 	}
 
 	podLogOptions := v1.PodLogOptions{
 		Follow:    true,
 		TailLines: tailLines,
-		// TODO: Just getting the first container isn't ideal. Ideally we would have an endpoint which returns all containers and allow the user to select one. However this is beyond the scope of the current changes and simply getting the first prevents a 500 error
-		Container: pod.Spec.Containers[0].Name,
+		Container: container,
 	}
 
 	stream, err := c.Clientset.
@@ -60,6 +60,24 @@ func (c *Client) podLogs(ctx context.Context, pod v1.Pod, tailLines *int64) (io.
 		return nil, err
 	}
 	return stream, nil
+}
+
+// containerName picks the container to read the log of. A pod usually runs one, so a caller which
+// names none gets that one; naming a container matters for the pods carrying a sidecar.
+func containerName(pod v1.Pod, container string) (string, error) {
+	if len(pod.Spec.Containers) == 0 {
+		return "", errdef.NewNotFound("pod %q has no containers", pod.Name)
+	}
+
+	if container == "" {
+		return pod.Spec.Containers[0].Name, nil
+	}
+
+	if !slices.ContainsFunc(pod.Spec.Containers, func(c v1.Container) bool { return c.Name == container }) {
+		return "", errdef.NewNotFound("container %q not found in pod %q", container, pod.Name)
+	}
+
+	return container, nil
 }
 
 func (c *Client) Exec(ctx context.Context, namespace, podName, container string, command []string, stdout, stderr io.Writer) error {
