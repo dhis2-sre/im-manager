@@ -209,6 +209,33 @@ func (s Service) rejectConsumedParameters(stackName string, paramNames iter.Seq[
 	return errors.Join(errs...)
 }
 
+// rejectImmutableParameters refuses a change to a parameter the stack declares immutable, once the
+// instance has been deployed. Submitting the value the instance already holds is not a change, so a
+// client is free to send back everything it rendered.
+func (s Service) rejectImmutableParameters(instance *model.DeploymentInstance, parameters Parameters) error {
+	if instance.DeployedAt == nil {
+		return nil
+	}
+
+	stack, err := s.stackService.Find(instance.StackName)
+	if err != nil {
+		return err
+	}
+
+	var errs []error
+	for name, parameter := range parameters {
+		reason := stack.Parameters[name].ImmutableReason
+		if reason == "" {
+			continue
+		}
+		if current, ok := instance.Parameters[name]; ok && current.Value == parameter.Value {
+			continue
+		}
+		errs = append(errs, errdef.NewBadRequest("%s can't be changed once the instance has been deployed: %s", name, reason))
+	}
+	return errors.Join(errs...)
+}
+
 func (s Service) DeleteInstance(ctx context.Context, deploymentId, instanceId uint) error {
 	deployment, err := s.FindDeploymentById(ctx, deploymentId)
 	if err != nil {
@@ -1219,6 +1246,10 @@ func (s Service) UpdateInstanceParameters(ctx context.Context, deploymentId, ins
 	}
 
 	if err := s.rejectConsumedParameters(instance.StackName, maps.Keys(parameters)); err != nil {
+		return nil, err
+	}
+
+	if err := s.rejectImmutableParameters(instance, parameters); err != nil {
 		return nil, err
 	}
 

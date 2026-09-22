@@ -70,13 +70,14 @@ func toResponseStack(stack Stack) StackResponse {
 
 	for parameterName, parameter := range stack.Parameters {
 		s.Parameters = append(s.Parameters, StackParameterResponse{
-			ParameterName: parameterName,
-			DisplayName:   parameter.DisplayName,
-			DefaultValue:  parameter.DefaultValue,
-			Consumed:      parameter.Consumed,
-			Priority:      parameter.Priority,
-			Sensitive:     parameter.Sensitive,
-			Group:         parameter.Group,
+			ParameterName:   parameterName,
+			DisplayName:     parameter.DisplayName,
+			DefaultValue:    parameter.DefaultValue,
+			Consumed:        parameter.Consumed,
+			Priority:        parameter.Priority,
+			Sensitive:       parameter.Sensitive,
+			ImmutableReason: parameter.ImmutableReason,
+			Group:           parameter.Group,
 		})
 	}
 
@@ -91,7 +92,10 @@ type StackParameterResponse struct {
 	Consumed      bool    `json:"consumed"`
 	Priority      uint    `json:"priority"`
 	Sensitive     bool    `json:"sensitive"`
-	Group         string  `json:"group,omitempty"`
+	// ImmutableReason says why the parameter cannot be changed once the instance has been deployed;
+	// empty means it can.
+	ImmutableReason string `json:"immutableReason,omitempty"`
+	Group           string `json:"group,omitempty"`
 }
 
 // swagger:model Stack

@@ -731,6 +731,12 @@ definitions:
             group:
                 type: string
                 x-go-name: Group
+            immutableReason:
+                description: |-
+                    ImmutableReason says why the parameter cannot be changed once the instance has been deployed;
+                    empty means it can.
+                type: string
+                x-go-name: ImmutableReason
             parameterName:
                 type: string
                 x-go-name: ParameterName
