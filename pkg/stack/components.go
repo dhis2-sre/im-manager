@@ -147,10 +147,11 @@ func (c ChapRegisterComponent) RestartReplica(ctx context.Context, client *kube.
 	return errdef.NewBadRequest("component %q is a job and its pods cannot be restarted, redeploy the instance to register again", c.Name)
 }
 
-// SupportedOperations returns nothing rather than the base restart pair, so clients do not offer
-// what a job cannot do.
+// SupportedOperations returns an empty list rather than the base restart pair, so clients do not
+// offer what a job cannot do. The list is empty rather than nil so it serialises as a JSON array,
+// which is what clients iterate over.
 func (c ChapRegisterComponent) SupportedOperations(params model.DeploymentInstanceParameters) []kube.Operation {
-	return nil
+	return []kube.Operation{}
 }
 
 // ChapWorkerComponent operates on the chap chart's worker Deployment.
