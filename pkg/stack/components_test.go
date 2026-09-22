@@ -2,6 +2,7 @@ package stack
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -352,6 +353,19 @@ func TestFindPostgresAccess(t *testing.T) {
 
 	_, err := kube.FindPostgresAccess(WhoamiGo.Components)
 	require.ErrorContains(t, err, "no postgres component found")
+}
+
+// TestSupportedOperationsSerialiseAsAnArray asserts no component serialises its operations as JSON
+// null. Clients iterate the list, so a nil slice crashes them on a component that supports nothing.
+func TestSupportedOperationsSerialiseAsAnArray(t *testing.T) {
+	for _, s := range All {
+		for _, component := range s.Components {
+			operations, err := json.Marshal(component.SupportedOperations(nil))
+
+			require.NoErrorf(t, err, "stack %q component %q", s.Name, component.ComponentName())
+			assert.NotEqualf(t, "null", string(operations), "stack %q component %q", s.Name, component.ComponentName())
+		}
+	}
 }
 
 func TestDatabaseSaveCapability(t *testing.T) {
