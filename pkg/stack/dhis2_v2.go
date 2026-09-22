@@ -16,7 +16,7 @@ var DHIS2V2 = withGroupedParameters(Stack{
 			"IMAGE_TAG":                       {Priority: 1, DisplayName: "Image Tag", DefaultValue: &coreDefaults.imageTag},
 			"IMAGE_REPOSITORY":                {Priority: 2, DisplayName: "Image Repository", DefaultValue: &coreDefaults.imageRepository},
 			"IMAGE_PULL_POLICY":               {Priority: 3, DisplayName: "Image Pull Policy", DefaultValue: &coreDefaults.imagePullPolicy, Validator: imagePullPolicy},
-			"STORAGE_TYPE":                    {Priority: 10, DisplayName: "Storage type", DefaultValue: &coreDefaults.storageType, Validator: storage},
+			"STORAGE_TYPE":                    {Priority: 10, DisplayName: "Storage type", DefaultValue: &coreDefaults.storageType, Validator: storage, ImmutableReason: "the file store is built at first deploy and its volume is kept when the release that owns it goes away, so switching backend strands the files the instance already has"},
 			"DHIS2_HOME":                      {Priority: 17, DisplayName: "DHIS2 Home Directory", DefaultValue: &coreDefaults.dhis2Home},
 			"FLYWAY_MIGRATE_OUT_OF_ORDER":     {Priority: 18, DisplayName: "Flyway Migrate Out Of Order", DefaultValue: &coreDefaults.flywayMigrateOutOfOrder},
 			"FLYWAY_REPAIR_BEFORE_MIGRATION":  {Priority: 19, DisplayName: "Flyway Repair Before Migration", DefaultValue: &coreDefaults.flywayRepairBeforeMigration},
@@ -42,7 +42,7 @@ var DHIS2V2 = withGroupedParameters(Stack{
 			"ENABLE_PGADMIN":                  {Priority: 56, DisplayName: "Deploy pgAdmin", DefaultValue: &pgAdminDefaults.enabled},
 		}},
 		{Name: "db", Title: "PostgreSQL", Parameters: StackParameters{
-			"DATABASE_ID":                  {Priority: 4, DisplayName: "Database"},
+			"DATABASE_ID":                  {Priority: 4, DisplayName: "Database", ImmutableReason: "the database is seeded once by a marker-guarded job, so pointing the instance at another database after it has been deployed has no effect"},
 			"DATABASE_NAME":                {Priority: 5, DisplayName: "Database Name", DefaultValue: &dbDefaults.dbName},
 			"DATABASE_PASSWORD":            {Priority: 6, DisplayName: "Database Password", DefaultValue: &dbDefaults.dbPassword, Sensitive: true},
 			"DATABASE_SIZE":                {Priority: 7, DisplayName: "Database Size", DefaultValue: &dbDefaults.dbSize},
@@ -85,7 +85,7 @@ var DHIS2V2 = withGroupedParameters(Stack{
 			"DORIS_BACKEND_RESOURCES_LIMITS_MEMORY":   {Priority: 55, DisplayName: "Resources Limits Memory", DefaultValue: &dhis2V2Defaults.dorisBackendLimitsMemory},
 		}},
 		{Name: "filesystem", Title: "Storage: Filesystem", When: whenStorageIsFilesystem, Parameters: StackParameters{
-			"FILESYSTEM_VOLUME_SIZE": {Priority: 12, DisplayName: "Volume size", DefaultValue: &coreDefaults.filesystemVolumeSize, Sensitive: true},
+			"FILESYSTEM_VOLUME_SIZE": {Priority: 12, DisplayName: "Volume size", DefaultValue: &coreDefaults.filesystemVolumeSize},
 		}},
 	},
 	ParameterProviders: ParameterProviders{

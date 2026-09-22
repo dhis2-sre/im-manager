@@ -65,6 +65,10 @@ type StackParameter struct {
 	// Priority determines the order in which the parameter is shown.
 	Priority  uint `json:"priority"`
 	Sensitive bool `json:"sensitive"`
+	// ImmutableReason says why the parameter cannot be changed once the instance has been deployed;
+	// empty means it can. The update path rejects a change to such a parameter and a client renders
+	// it read only with this as the explanation, so the two cannot disagree about what is editable.
+	ImmutableReason string `json:"immutableReason,omitempty"`
 	// Group names the ParameterGroup this parameter belongs to; empty means ungrouped, which
 	// clients render in a single flat section. Populated by withGroupedParameters from the
 	// declaring group, never set by hand.

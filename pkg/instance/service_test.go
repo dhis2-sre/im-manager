@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"log/slog"
 	"testing"
+	"time"
+
+	"github.com/dhis2-sre/im-manager/internal/errdef"
 
 	"github.com/dhis2-sre/im-manager/pkg/kube"
 	"github.com/dhis2-sre/im-manager/pkg/model"
@@ -336,5 +339,54 @@ func TestProviderBasedRequirements(t *testing.T) {
 
 		pgadmin := deployment.Instances[1]
 		assert.NotEmpty(t, pgadmin.Parameters["DATABASE_HOSTNAME"].Value)
+	})
+}
+
+func TestRejectImmutableParameters(t *testing.T) {
+	stackService := stack.NewService(stack.Stacks{
+		"stack": {
+			Name: "stack",
+			Parameters: map[string]stack.StackParameter{
+				"IMMUTABLE": {ImmutableReason: "it is seeded once"},
+				"MUTABLE":   {},
+			},
+		},
+	})
+	service := NewService(nil, nil, nil, stackService, nil, nil, "", kube.NewClients(slog.Default()))
+
+	deployed := time.Now()
+	instanceWith := func(deployedAt *time.Time) *model.DeploymentInstance {
+		return &model.DeploymentInstance{
+			StackName:  "stack",
+			DeployedAt: deployedAt,
+			Parameters: map[string]model.DeploymentInstanceParameter{
+				"IMMUTABLE": {ParameterName: "IMMUTABLE", Value: "stored"},
+			},
+		}
+	}
+
+	t.Run("RejectsAChangeOnceDeployed", func(t *testing.T) {
+		err := service.rejectImmutableParameters(instanceWith(&deployed), Parameters{"IMMUTABLE": {Value: "new"}})
+
+		require.ErrorContains(t, err, "IMMUTABLE can't be changed once the instance has been deployed: it is seeded once")
+		assert.True(t, errdef.IsBadRequest(err))
+	})
+
+	t.Run("AllowsTheStoredValueToBeResubmitted", func(t *testing.T) {
+		err := service.rejectImmutableParameters(instanceWith(&deployed), Parameters{"IMMUTABLE": {Value: "stored"}})
+
+		require.NoError(t, err)
+	})
+
+	t.Run("AllowsAChangeBeforeTheFirstDeploy", func(t *testing.T) {
+		err := service.rejectImmutableParameters(instanceWith(nil), Parameters{"IMMUTABLE": {Value: "new"}})
+
+		require.NoError(t, err)
+	})
+
+	t.Run("IgnoresMutableParameters", func(t *testing.T) {
+		err := service.rejectImmutableParameters(instanceWith(&deployed), Parameters{"MUTABLE": {Value: "new"}})
+
+		require.NoError(t, err)
 	})
 }
