@@ -520,3 +520,5 @@ func (gs groupService) Find(ctx context.Context, name string) (*model.Group, err
 type noopPublisher struct{}
 
 func (noopPublisher) Publish(context.Context, uint, string, string, any) {}
+
+func (noopPublisher) PublishTransient(context.Context, string, string, any) {}

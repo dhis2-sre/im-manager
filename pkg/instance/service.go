@@ -479,34 +479,30 @@ func (s Service) DeployInstance(ctx context.Context, token string, instance *mod
 		}
 	}
 
-	syncCmd, err := s.helmfileService.sync(ctx, token, instance, group, ttl, extraEnv)
-	if err != nil {
+	if err := s.instanceRepository.SaveDeployState(ctx, instance, model.DeployStatusDeploying, ""); err != nil {
 		return err
+	}
+
+	syncCtx, cancel := context.WithTimeout(ctx, DeployTimeout)
+	defer cancel()
+
+	syncCmd, err := s.helmfileService.sync(syncCtx, token, instance, group, ttl, extraEnv)
+	if err != nil {
+		return s.deployFailed(ctx, instance, "", err)
 	}
 
 	deployLog, deployErrorLog, err := commandExecutor(syncCmd, group.Cluster)
 	// In recent versions of helmfile most of the command output is sent to stderr https://github.com/roboll/helmfile/pull/583
 	s.logger.InfoContext(ctx, "Deploy log", "log", string(deployLog), "errorLog", string(deployErrorLog))
-	/* TODO: return error log if relevant
-	if len(deployErrorLog) > 0 {
-		return errors.New(string(deployErrorLog))
-	}
-	*/
 	if err != nil {
-		// TODO: This is a hack to detect if the helmfile operation is already in progress.
-		if strings.Contains(string(deployErrorLog), "another operation (install/upgrade/rollback) is in progress") {
-			s.logger.WarnContext(ctx, "Helm operation already in progress, skipping", "instance", instance.Name, "stack", instance.StackName, "deployment", instance.DeploymentID, "errorLog", deployErrorLog)
-			return nil
+		failureLog := string(deployLog) + string(deployErrorLog)
+		if errors.Is(syncCtx.Err(), context.DeadlineExceeded) {
+			return s.deployFailed(ctx, instance, failureLog, fmt.Errorf("deploy exceeded the %s deadline", DeployTimeout))
 		}
 		if strings.Contains(string(deployErrorLog), fmt.Sprintf("namespaces %q not found", group.Namespace)) {
-			return errdef.NewBadRequest("namespace %q does not exist", group.Namespace)
+			return s.deployFailed(ctx, instance, failureLog, errdef.NewBadRequest("namespace %q does not exist", group.Namespace))
 		}
-		failureLog := string(deployLog) + string(deployErrorLog)
-		if saveErr := s.instanceRepository.SaveDeployLog(ctx, instance, failureLog); saveErr != nil {
-			s.logger.ErrorContext(ctx, "Failed saving deploy log", "error", saveErr)
-		}
-		instance.DeployLog = failureLog
-		return fmt.Errorf("%w: %s", err, deployErrorLog)
+		return s.deployFailed(ctx, instance, failureLog, fmt.Errorf("%w: %s", err, deployErrorLog))
 	}
 
 	// TODO: Encrypt before saving? Yes...
@@ -516,7 +512,60 @@ func (s Service) DeployInstance(ctx context.Context, token string, instance *mod
 		s.logger.ErrorContext(ctx, "Failed saving deploy log", "error", err)
 		return err
 	}
+
+	return s.instanceRepository.SaveDeployState(ctx, instance, model.DeployStatusDeployed, "")
+}
+
+// DeployLockStaleAfter is when a held deploy lock stops being believed. A restart clears locks
+// outright, so this only covers a process that is alive while its deploy is not, and it is set well
+// beyond any deploy a real deployment can produce.
+const DeployLockStaleAfter = 2 * time.Hour
+
+// AcquireDeployLock reports whether the caller now holds the deployment's deploy lock.
+func (s Service) AcquireDeployLock(ctx context.Context, deploymentId uint) (bool, error) {
+	return s.instanceRepository.AcquireDeployLock(ctx, deploymentId, DeployLockStaleAfter)
+}
+
+func (s Service) ReleaseDeployLock(ctx context.Context, deploymentId uint) error {
+	return s.instanceRepository.ReleaseDeployLock(ctx, deploymentId)
+}
+
+func (s Service) SetDeployStatus(ctx context.Context, instance *model.DeploymentInstance, status model.DeployStatus) error {
+	return s.instanceRepository.SaveDeployState(ctx, instance, status, "")
+}
+
+// AbandonDeploysInProgress settles the deploys that were running when the process last stopped.
+// Their goroutines did not survive, so reporting them as still deploying would be a lie that never
+// resolves.
+func (s Service) AbandonDeploysInProgress(ctx context.Context) error {
+	abandoned, err := s.instanceRepository.AbandonDeploysInProgress(ctx, "the deploy was interrupted by an instance manager restart")
+	if err != nil {
+		return err
+	}
+	if abandoned > 0 {
+		s.logger.InfoContext(ctx, "Marked interrupted deploys as failed", "instances", abandoned)
+	}
 	return nil
+}
+
+// DeployTimeout bounds a single helmfile run, sync or destroy. It matches the purge precedent and is
+// comfortably inside the lifetime of the access token the deploy refreshes for itself between
+// instances.
+const DeployTimeout = 30 * time.Minute
+
+// deployFailed records what went wrong on the instance and returns the error unchanged, so a failed
+// deploy leaves an account of itself rather than only a log line.
+func (s Service) deployFailed(ctx context.Context, instance *model.DeploymentInstance, deployLog string, deployErr error) error {
+	if deployLog != "" {
+		if saveErr := s.instanceRepository.SaveDeployLog(ctx, instance, deployLog); saveErr != nil {
+			s.logger.ErrorContext(ctx, "Failed saving deploy log", "error", saveErr)
+		}
+		instance.DeployLog = deployLog
+	}
+	if saveErr := s.instanceRepository.SaveDeployState(ctx, instance, model.DeployStatusFailed, deployErr.Error()); saveErr != nil {
+		s.logger.ErrorContext(ctx, "Failed saving deploy status", "error", saveErr)
+	}
+	return deployErr
 }
 
 func (s Service) Delete(ctx context.Context, deploymentInstanceId uint) error {
@@ -579,7 +628,10 @@ func (s Service) DestroyInstance(ctx context.Context, instance *model.Deployment
 		return err
 	}
 
-	destroyCmd, err := s.helmfileService.destroy(ctx, instance, group)
+	destroyCtx, cancel := context.WithTimeout(ctx, DeployTimeout)
+	defer cancel()
+
+	destroyCmd, err := s.helmfileService.destroy(destroyCtx, instance, group)
 	if err != nil {
 		return err
 	}

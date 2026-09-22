@@ -21,8 +21,22 @@ type Deployment struct {
 
 	TTL uint `json:"ttl"`
 
+	// DeployLockedAt is held for the duration of a deploy so a second one is refused rather than
+	// racing helm. A lock older than the deploy deadline is stale and may be taken over.
+	DeployLockedAt *time.Time `json:"-"`
+
 	Instances []*DeploymentInstance `json:"instances" gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
 }
+
+// DeployStatus is how far an instance got the last time it was deployed.
+type DeployStatus string
+
+const (
+	DeployStatusPending   DeployStatus = "pending"
+	DeployStatusDeploying DeployStatus = "deploying"
+	DeployStatusDeployed  DeployStatus = "deployed"
+	DeployStatusFailed    DeployStatus = "failed"
+)
 
 type DeploymentInstanceParameters map[string]DeploymentInstanceParameter
 
@@ -47,6 +61,10 @@ type DeploymentInstance struct {
 	Parameters     DeploymentInstanceParameters  `json:"parameters" gorm:"-:all"`
 
 	Public bool `json:"public"`
+
+	DeployStatus DeployStatus `json:"deployStatus"`
+	DeployedAt   *time.Time   `json:"deployedAt,omitempty"`
+	DeployError  string       `json:"deployError,omitempty" gorm:"type:text"`
 
 	DeployLog string `json:"deployLog" gorm:"type:text"`
 }

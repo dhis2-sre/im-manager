@@ -92,7 +92,10 @@ func (h helmfileService) executeHelmfileCommand(ctx context.Context, token strin
 		return nil, err
 	}
 
-	cmd := exec.Command(h.helmfileBinary, "--helm-binary", h.helmBinary, "-f", stackPath, operation) // #nosec
+	cmd := exec.CommandContext(ctx, h.helmfileBinary, "--helm-binary", h.helmBinary, "-f", stackPath, operation) // #nosec
+	// Output is collected through pipes, so Wait blocks until every writer closes them. A helm hook
+	// job that outlives the kill would otherwise hold the deadline open indefinitely.
+	cmd.WaitDelay = 10 * time.Second
 	h.logger.InfoContext(ctx, "Executing helmfile command", "command", cmd.String())
 	h.configureInstanceEnvironment(ctx, token, instance, group, ttl, stackParameters, extraEnv, cmd)
 
