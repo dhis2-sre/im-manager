@@ -24,6 +24,7 @@ jobs:
   call-workflow:
     uses: dhis2-sre/gha-workflows/.github/workflows/im-build-test-deploy.yaml@master
     with:
+      CACHE_NAMESPACE: im-manager-full
       PROCESS_NAME: im-manager
       POD_NAME: im-manager
     secrets:

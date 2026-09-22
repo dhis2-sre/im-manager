@@ -10,21 +10,12 @@ import (
 	"os"
 	"sort"
 	"testing"
-	"time"
 
 	"github.com/dhis2-sre/im-manager/pkg/inttest"
 	"github.com/dhis2-sre/im-manager/pkg/storage"
 	"github.com/minio/minio-go/v7"
-	"github.com/minio/minio-go/v7/pkg/credentials"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/testcontainers/testcontainers-go"
-	minioContainer "github.com/testcontainers/testcontainers-go/modules/minio"
-)
-
-const (
-	minioImage        = "quay.io/minio/minio:RELEASE.2025-01-20T14-49-07Z"
-	minioStartTimeout = 3 * time.Minute
 )
 
 func TestBackupServiceIntegration(t *testing.T) {
@@ -33,30 +24,22 @@ func TestBackupServiceIntegration(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	container, minioClient := setupMinio(t, ctx)
-	defer func() {
-		require.NoError(t, testcontainers.TerminateContainer(container))
-	}()
-
-	minioBucket := "dhis2"
-	require.NoError(t, minioClient.MakeBucket(ctx, minioBucket, minio.MakeBucketOptions{}))
+	minioFixture := inttest.SetupMinIO(t)
 
 	testFiles := map[string][]byte{
 		"apps/app1/manifest.json": []byte(`{"name":"app1"}`),
 		"userAvatar/uid1":         []byte("avatar-content"),
 	}
 	for name, content := range testFiles {
-		_, err := minioClient.PutObject(ctx, minioBucket, name, bytes.NewReader(content), int64(len(content)), minio.PutObjectOptions{})
+		_, err := minioFixture.Client.PutObject(ctx, minioFixture.Bucket, name, bytes.NewReader(content), int64(len(content)), minio.PutObjectOptions{})
 		require.NoError(t, err)
 	}
 
-	s3Dir := t.TempDir()
-	s3Bucket := "database-bucket"
-	require.NoError(t, os.Mkdir(s3Dir+"/"+s3Bucket, 0o755))
-	s3Test := inttest.SetupS3(t, s3Dir)
+	s3Test := inttest.SetupS3(t)
+	s3Bucket := s3Test.Bucket
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	source := NewMinioBackupSource(logger, minioClient, minioBucket)
+	source := NewMinioBackupSource(logger, minioFixture.Client, minioFixture.Bucket)
 	// nil uploader: PerformBackup uses StreamUpload, which only needs the multipart client methods.
 	backupService := NewBackupService(logger, storage.NewS3Client(logger, s3Test.Client, nil))
 
@@ -64,7 +47,7 @@ func TestBackupServiceIntegration(t *testing.T) {
 	uploaded, err := backupService.PerformBackup(ctx, s3APISource{source}, s3Bucket, s3Key)
 	require.NoError(t, err)
 
-	tarContent := s3Test.GetObject(t, s3Bucket, s3Key)
+	tarContent := s3Test.GetObject(t, s3Key)
 	assert.Equal(t, int64(len(tarContent)), uploaded, "the reported size is what landed in S3, so it can be recorded on the file store")
 	entries := extractTarGz(t, tarContent)
 
@@ -96,15 +79,8 @@ func TestFilestoreBackupRestoreRoundTrip(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	container, minioClient := setupMinio(t, ctx)
-	defer func() {
-		require.NoError(t, testcontainers.TerminateContainer(container))
-	}()
-
-	sourceBucket := "round-trip-source"
-	targetBucket := "round-trip-target"
-	require.NoError(t, minioClient.MakeBucket(ctx, sourceBucket, minio.MakeBucketOptions{}))
-	require.NoError(t, minioClient.MakeBucket(ctx, targetBucket, minio.MakeBucketOptions{}))
+	sourceFixture := inttest.SetupMinIO(t)
+	targetFixture := inttest.SetupMinIO(t)
 
 	objects := map[string][]byte{
 		"dataValue/uid1":          []byte("data-value-content"),
@@ -112,29 +88,28 @@ func TestFilestoreBackupRestoreRoundTrip(t *testing.T) {
 		"apps/app1/manifest.json": []byte(`{"name":"app1"}`),
 	}
 	for key, content := range objects {
-		_, err := minioClient.PutObject(ctx, sourceBucket, key, bytes.NewReader(content), int64(len(content)), minio.PutObjectOptions{})
+		_, err := sourceFixture.Client.PutObject(ctx, sourceFixture.Bucket, key, bytes.NewReader(content), int64(len(content)), minio.PutObjectOptions{})
 		require.NoError(t, err)
 	}
 
-	s3Dir := t.TempDir()
-	s3Bucket := "database-bucket"
-	require.NoError(t, os.Mkdir(s3Dir+"/"+s3Bucket, 0o755))
-	s3Test := inttest.SetupS3(t, s3Dir)
+	s3Test := inttest.SetupS3(t)
+	s3Bucket := s3Test.Bucket
 
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	backupService := NewBackupService(logger, storage.NewS3Client(logger, s3Test.Client, nil))
-	source := NewMinioBackupSource(logger, minioClient, sourceBucket)
+	source := NewMinioBackupSource(logger, sourceFixture.Client, sourceFixture.Bucket)
 
 	s3Key := "group/round-trip-fs.tar.gz"
 	_, err := backupService.PerformBackup(ctx, s3APISource{source}, s3Bucket, s3Key)
 	require.NoError(t, err)
 
-	tarball := s3Test.GetObject(t, s3Bucket, s3Key)
-	require.NoError(t, restoreTarGzToBucket(ctx, minioClient, targetBucket, bytes.NewReader(tarball)))
+	tarball := s3Test.GetObject(t, s3Key)
+	require.NoError(t, restoreTarGzToBucket(ctx, targetFixture.Client, targetFixture.Bucket, bytes.NewReader(tarball)))
 
 	for key, content := range objects {
-		object, err := minioClient.GetObject(ctx, targetBucket, key, minio.GetObjectOptions{})
+		object, err := targetFixture.Client.GetObject(ctx, targetFixture.Bucket, key, minio.GetObjectOptions{})
 		require.NoErrorf(t, err, "restored object %q", key)
+		t.Cleanup(func() { require.NoError(t, object.Close()) })
 		restored, err := io.ReadAll(object)
 		require.NoErrorf(t, err, "restored object %q", key)
 		assert.Equalf(t, content, restored, "restored object %q", key)
@@ -150,47 +125,17 @@ func TestFilestoreRestoreMarker(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	container, minioClient := setupMinio(t, ctx)
-	defer func() {
-		require.NoError(t, testcontainers.TerminateContainer(container))
-	}()
+	minioFixture := inttest.SetupMinIO(t)
 
-	bucket := "restore-marker"
-	require.NoError(t, minioClient.MakeBucket(ctx, bucket, minio.MakeBucketOptions{}))
-
-	restored, err := filestoreRestored(ctx, minioClient, bucket)
+	restored, err := filestoreRestored(ctx, minioFixture.Client, minioFixture.Bucket)
 	require.NoError(t, err)
 	assert.False(t, restored, "a fresh bucket has not been restored")
 
-	require.NoError(t, markFilestoreRestored(ctx, minioClient, bucket))
+	require.NoError(t, markFilestoreRestored(ctx, minioFixture.Client, minioFixture.Bucket))
 
-	restored, err = filestoreRestored(ctx, minioClient, bucket)
+	restored, err = filestoreRestored(ctx, minioFixture.Client, minioFixture.Bucket)
 	require.NoError(t, err)
 	assert.True(t, restored, "the marker makes a subsequent restore a no-op")
-}
-
-func setupMinio(t *testing.T, ctx context.Context) (*minioContainer.MinioContainer, *minio.Client) {
-	t.Helper()
-
-	// Starting the container pulls the image. Without a deadline of its own a stalled pull waits
-	// forever, and the failure lands as the package wide test timeout panicking every test in
-	// pkg/instance ten minutes later, naming nothing but the test that happened to be running.
-	startCtx, cancel := context.WithTimeout(ctx, minioStartTimeout)
-	defer cancel()
-
-	container, err := minioContainer.Run(startCtx, minioImage)
-	require.NoErrorf(t, err, "MinIO container did not start within %s", minioStartTimeout)
-
-	endpoint, err := container.Endpoint(ctx, "")
-	require.NoError(t, err)
-
-	minioClient, err := minio.New(endpoint, &minio.Options{
-		Creds:  credentials.NewStaticV4(container.Password, container.Password, ""),
-		Secure: false,
-	})
-	require.NoError(t, err)
-
-	return container, minioClient
 }
 
 func extractTarGz(t *testing.T, data []byte) map[string][]byte {
