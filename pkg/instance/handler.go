@@ -1003,6 +1003,7 @@ func (h Handler) DeleteDeployment(c *gin.Context) {
 	//	401: Error
 	//	403: Error
 	//	404: Error
+	//	409: Error
 	//	415: Error
 	id, ok := handler.GetPathParameter(c, "id")
 	if !ok {
@@ -1031,7 +1032,7 @@ func (h Handler) DeleteDeployment(c *gin.Context) {
 
 	err = h.instanceService.DeleteDeployment(ctx, deployment)
 	if err != nil {
-		_ = c.Error(fmt.Errorf("unable to delete deployment: %v", err))
+		_ = c.Error(fmt.Errorf("unable to delete deployment: %w", err))
 		return
 	}
 

@@ -17,8 +17,11 @@ func editTestService() *Service {
 	host := stack.Stack{
 		Name: "host",
 		Parameters: map[string]stack.StackParameter{
-			"IMAGE_TAG":       {DefaultValue: ptr("2.42.0")},
-			"ENABLE_SIDECAR":  {DefaultValue: ptr("false")},
+			"IMAGE_TAG": {DefaultValue: ptr("2.42.0")},
+			// ENABLE_SIDECAR only decides whether the companion belongs to the deployment, like
+			// ENABLE_PGADMIN; DEPLOY_EXTRA also reaches the host's own template, like DEPLOY_CHAP.
+			"ENABLE_SIDECAR":  {DefaultValue: ptr("false"), NotRendered: true},
+			"DEPLOY_EXTRA":    {DefaultValue: ptr("false")},
 			"DATABASE_ID":     {ImmutableReason: "it is seeded once"},
 			"SHARED_PASSWORD": {DefaultValue: ptr("secret")},
 		},
@@ -30,9 +33,18 @@ func editTestService() *Service {
 			"SIDECAR_TAG":     {DefaultValue: ptr("1.0.0")},
 		},
 	}
-	host.Companions = []stack.Companion{{Stack: sidecar, When: &kube.Condition{Parameter: "ENABLE_SIDECAR", Equals: "true"}}}
+	extra := stack.Stack{
+		Name: "extra",
+		Parameters: map[string]stack.StackParameter{
+			"SHARED_PASSWORD": {Consumed: true},
+		},
+	}
+	host.Companions = []stack.Companion{
+		{Stack: sidecar, When: &kube.Condition{Parameter: "ENABLE_SIDECAR", Equals: "true"}},
+		{Stack: extra, When: &kube.Condition{Parameter: "DEPLOY_EXTRA", Equals: "true"}},
+	}
 
-	stackService := stack.NewService(stack.Stacks{"host": host, "sidecar": sidecar})
+	stackService := stack.NewService(stack.Stacks{"host": host, "sidecar": sidecar, "extra": extra})
 	return NewService(slog.Default(), nil, nil, stackService, nil, nil, "", kube.NewClients(slog.Default()))
 }
 
@@ -147,7 +159,7 @@ func TestPlanEdit(t *testing.T) {
 		assert.True(t, deployment.Instances[0].Public)
 	})
 
-	t.Run("TheGatingParameterGoingTrueAddsTheCompanionAfterItsHost", func(t *testing.T) {
+	t.Run("AGatingParameterTheHostDoesNotRenderAddsTheCompanionWithoutRollingTheHost", func(t *testing.T) {
 		edit := Edit{Instances: map[string]InstanceEdit{
 			"host":    {Parameters: Parameters{"ENABLE_SIDECAR": {Value: "true"}}},
 			"sidecar": {Parameters: Parameters{"SIDECAR_TAG": {Value: "2.0.0"}}},
@@ -156,12 +168,23 @@ func TestPlanEdit(t *testing.T) {
 		changes, err := editTestService().planEdit(editTestDeployment(false), edit)
 
 		require.NoError(t, err)
-		assert.Equal(t, []string{"host", "sidecar"}, stackNames(changes.Redeploy))
+		assert.Equal(t, []string{"sidecar"}, stackNames(changes.Redeploy))
 		assert.Empty(t, changes.Destroy)
 
-		added := changes.Redeploy[1]
+		added := changes.Redeploy[0]
 		assert.Equal(t, "2.0.0", added.Parameters["SIDECAR_TAG"].Value)
 		assert.Equal(t, "secret", added.Parameters["SHARED_PASSWORD"].Value, "a consumed parameter is resolved from its provider")
+	})
+
+	t.Run("AGatingParameterTheHostRendersRollsTheHostToo", func(t *testing.T) {
+		edit := Edit{Instances: map[string]InstanceEdit{
+			"host": {Parameters: Parameters{"DEPLOY_EXTRA": {Value: "true"}}},
+		}}
+
+		changes, err := editTestService().planEdit(editTestDeployment(false), edit)
+
+		require.NoError(t, err)
+		assert.Equal(t, []string{"host", "extra"}, stackNames(changes.Redeploy))
 	})
 
 	t.Run("AnAddedCompanionFallsBackToTheStackDefaults", func(t *testing.T) {
@@ -172,7 +195,7 @@ func TestPlanEdit(t *testing.T) {
 		changes, err := editTestService().planEdit(editTestDeployment(false), edit)
 
 		require.NoError(t, err)
-		assert.Equal(t, "1.0.0", changes.Redeploy[1].Parameters["SIDECAR_TAG"].Value)
+		assert.Equal(t, "1.0.0", changes.Redeploy[0].Parameters["SIDECAR_TAG"].Value)
 	})
 
 	t.Run("TheGatingParameterGoingFalseDestroysTheCompanion", func(t *testing.T) {
@@ -185,7 +208,7 @@ func TestPlanEdit(t *testing.T) {
 
 		require.NoError(t, err)
 		assert.Equal(t, []string{"sidecar"}, stackNames(changes.Destroy))
-		assert.Equal(t, []string{"host"}, stackNames(changes.Redeploy))
+		assert.Empty(t, changes.Redeploy, "the host does not render the switch, so nothing is redeployed")
 		assert.Equal(t, []string{"host"}, stackNames(deployment.Instances), "the answer leaves out the instance on its way out")
 	})
 

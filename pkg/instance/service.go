@@ -618,9 +618,22 @@ func (s Service) Delete(ctx context.Context, deploymentInstanceId uint) error {
 	return nil
 }
 
+// DeleteDeployment destroys every instance of the deployment and removes it. It takes the deploy
+// lock and never gives it back, because a deploy and a destroy of the same release run helm against
+// each other: a destroy that landed mid-deploy used to leave both operations timing out, and the
+// deployment is gone by the time this returns so there is nothing left to unlock.
 func (s Service) DeleteDeployment(ctx context.Context, deployment *model.Deployment) error {
+	acquired, err := s.AcquireDeployLock(ctx, deployment.ID)
+	if err != nil {
+		return err
+	}
+	if !acquired {
+		return errdef.NewConflict("deployment %d is being deployed and cannot be deleted until that finishes", deployment.ID)
+	}
+
 	instances, err := s.DeploymentOrder(deployment)
 	if err != nil {
+		s.releaseDeployLockOnFailedDelete(ctx, deployment.ID)
 		return err
 	}
 	slices.Reverse(instances)
@@ -639,10 +652,17 @@ func (s Service) DeleteDeployment(ctx context.Context, deployment *model.Deploym
 		}
 	}
 	if errs != nil {
+		s.releaseDeployLockOnFailedDelete(ctx, deployment.ID)
 		return errs
 	}
 
 	return s.instanceRepository.DeleteDeployment(ctx, deployment)
+}
+
+func (s Service) releaseDeployLockOnFailedDelete(ctx context.Context, deploymentId uint) {
+	if err := s.ReleaseDeployLock(ctx, deploymentId); err != nil {
+		s.logger.ErrorContext(ctx, "failed to release the deploy lock of a deployment that could not be deleted", "deploymentId", deploymentId, "error", err)
+	}
 }
 
 func (s Service) DestroyInstance(ctx context.Context, instance *model.DeploymentInstance) error {

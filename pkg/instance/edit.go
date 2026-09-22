@@ -144,7 +144,11 @@ func (s Service) planEdit(deployment *model.Deployment, edit Edit) (*DeploymentC
 
 	changes := &DeploymentChanges{Deployment: deployment, Destroy: destroy}
 	for _, deploymentInstance := range order {
-		if !slices.Contains(added, deploymentInstance) && maps.Equal(before[deploymentInstance.StackName], parameterValues(deploymentInstance)) {
+		rendered, err := s.renderedParameterValues(deploymentInstance)
+		if err != nil {
+			return nil, err
+		}
+		if !slices.Contains(added, deploymentInstance) && maps.Equal(before[deploymentInstance.StackName], rendered) {
 			continue
 		}
 		changes.Redeploy = append(changes.Redeploy, deploymentInstance)
@@ -273,17 +277,32 @@ func (s Service) resolvedParameterValues(deployment *model.Deployment) map[strin
 
 	values := make(map[string]map[string]string, len(snapshot.Instances))
 	for _, deploymentInstance := range snapshot.Instances {
-		values[deploymentInstance.StackName] = parameterValues(deploymentInstance)
+		rendered, err := s.renderedParameterValues(deploymentInstance)
+		if err != nil {
+			return nil
+		}
+		values[deploymentInstance.StackName] = rendered
 	}
 	return values
 }
 
-func parameterValues(instance *model.DeploymentInstance) map[string]string {
+// renderedParameterValues is what the instance's release is built from, which is every parameter its
+// stack's template reads. The ones it does not read are left out so that flipping the switch which
+// adds a companion does not roll the host that carries the switch.
+func (s Service) renderedParameterValues(instance *model.DeploymentInstance) (map[string]string, error) {
+	instanceStack, err := s.stackService.Find(instance.StackName)
+	if err != nil {
+		return nil, err
+	}
+
 	values := make(map[string]string, len(instance.Parameters))
 	for name, parameter := range instance.Parameters {
+		if instanceStack.Parameters[name].NotRendered {
+			continue
+		}
 		values[name] = parameter.Value
 	}
-	return values
+	return values, nil
 }
 
 // DeleteDestroyedInstance removes the row of an instance the cluster is already rid of.
