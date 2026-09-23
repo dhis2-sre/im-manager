@@ -15,6 +15,7 @@ import (
 	"github.com/dhis2-sre/im-manager/pkg/stack"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gorm.io/gorm"
 )
 
 type failingDestroyHelmfile struct {
@@ -188,4 +189,38 @@ func TestFailedDeleteDeploymentReleasesTheLock(t *testing.T) {
 	acquired, err := service.AcquireDeployLock(context.Background(), deployment.ID)
 	require.NoError(t, err)
 	assert.True(t, acquired, "the lock must be free again after a delete that could not finish")
+}
+
+// A delete that gets as far as removing the deployment itself and fails there has to give the lock
+// back too. The TTL handler retries a failed delete every couple of minutes and each retry that
+// leaks the lock starts the stale window again, so the deployment stays locked and the user's own
+// delete is refused with a conflict that names a deploy which is not running.
+func TestDeleteDeploymentReleasesTheLockWhenTheDeploymentCannotBeRemoved(t *testing.T) {
+	db := inttest.SetupDB(t)
+
+	group := model.Group{Name: "group-name", Namespace: "group-name", Hostname: "some-host"}
+	user := &model.User{Email: "delete-row-fails@dhis2.org", Groups: []model.Group{group}}
+	require.NoError(t, db.Create(user).Error)
+	group = user.Groups[0]
+
+	instanceRepo, err := NewRepository(db, "01234567890123456789012345678901")
+	require.NoError(t, err)
+
+	deployment := &model.Deployment{Name: "dep", GroupName: group.Name, UserID: user.ID}
+	require.NoError(t, instanceRepo.SaveDeployment(context.Background(), deployment))
+
+	require.NoError(t, db.Callback().Delete().Before("gorm:delete").Register("fail_deployment_delete", func(tx *gorm.DB) {
+		if tx.Statement.Table == "deployments" {
+			_ = tx.AddError(errors.New("simulated deployment delete failure"))
+		}
+	}))
+
+	stackService := stack.NewService(stack.Stacks{"whoami-go": stack.WhoamiGo})
+	service := NewService(slog.New(slog.NewTextHandler(os.Stdout, nil)), instanceRepo, stubGroupService{group: &group}, stackService, failingDestroyHelmfile{}, nil, "", kube.NewClients(slog.Default()))
+
+	require.Error(t, service.DeleteDeployment(context.Background(), deployment))
+
+	acquired, err := service.AcquireDeployLock(context.Background(), deployment.ID)
+	require.NoError(t, err)
+	assert.True(t, acquired, "the lock must be free again after a delete that could not remove the deployment")
 }
