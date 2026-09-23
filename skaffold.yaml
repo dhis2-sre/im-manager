@@ -37,8 +37,7 @@ deploy:
       - name: im-rabbitmq-{{ .ENVIRONMENT }}
         namespace: instance-manager-{{ .CLASSIFICATION }}
         createNamespace: true
-        remoteChart: rabbitmq
-        repo: https://charts.bitnami.com/bitnami
+        remoteChart: oci://registry-1.docker.io/bitnamicharts/rabbitmq
         version: 14.4.2
         upgradeOnChange: true
         useHelmSecrets: true
@@ -65,8 +64,7 @@ deploy:
       - name: im-manager-postgresql-{{ .ENVIRONMENT }}
         namespace: instance-manager-{{ .CLASSIFICATION }}
         createNamespace: true
-        remoteChart: postgresql
-        repo: https://charts.bitnami.com/bitnami
+        remoteChart: oci://registry-1.docker.io/bitnamicharts/postgresql
         version: 13.2.30
         upgradeOnChange: true
         useHelmSecrets: true

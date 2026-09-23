@@ -20,6 +20,7 @@ import (
 	"github.com/dhis2-sre/im-manager/pkg/instance"
 	"github.com/dhis2-sre/im-manager/pkg/inttest"
 	"github.com/dhis2-sre/im-manager/pkg/model"
+	"github.com/dhis2-sre/im-manager/pkg/stack"
 	"github.com/dhis2-sre/im-manager/pkg/storage"
 	userpkg "github.com/dhis2-sre/im-manager/pkg/user"
 	"github.com/gin-gonic/gin"
@@ -32,17 +33,13 @@ func TestDatabaseHandler(t *testing.T) {
 
 	db := inttest.SetupDB(t)
 
-	s3Dir := t.TempDir()
-	s3Bucket := "database-bucket"
-	err := os.Mkdir(s3Dir+"/"+s3Bucket, 0o755)
-	require.NoError(t, err, "failed to create S3 output bucket")
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	s3 := inttest.SetupS3(t, s3Dir)
+	s3 := inttest.SetupS3(t)
 	uploader := manager.NewUploader(s3.Client)
 	s3Client := storage.NewS3Client(logger, s3.Client, uploader)
 
 	databaseRepository := database.NewRepository(db)
-	databaseService := database.NewService(logger, s3Bucket, s3Client, groupService{}, databaseRepository, nil, noopPublisher{})
+	databaseService := database.NewService(logger, s3.Bucket, s3Client, groupService{}, databaseRepository, nil, noopPublisher{})
 	deploymentService := deployment.NewService(logger, instanceService{}, databaseService, nil, noopPublisher{})
 
 	client := inttest.SetupHTTPServer(t, func(engine *gin.Engine) {
@@ -78,14 +75,14 @@ func TestDatabaseHandler(t *testing.T) {
 		body := client.Put(t, "/databases", requestBody, http.StatusCreated, nameHeader, groupHeader)
 
 		var database model.Database
-		err = json.Unmarshal(body, &database)
+		err := json.Unmarshal(body, &database)
 		require.NoError(t, err, "POST /databases: failed to unmarshal HTTP response body")
 		require.Equal(t, "path/name.extension", database.Name)
 		require.Equal(t, "packages", database.GroupName)
-		require.Equal(t, "s3://database-bucket/packages/path/name.extension", database.Url)
+		require.Equal(t, "s3://"+s3.Bucket+"/packages/path/name.extension", database.Url)
 		require.Equal(t, int64(13), database.Size)
 
-		actualContent := s3.GetObject(t, s3Bucket, "packages/path/name.extension")
+		actualContent := s3.GetObject(t, "packages/path/name.extension")
 		require.Equalf(t, "file contents", string(actualContent), "DB in S3 should have expected content")
 
 		databaseID = strconv.FormatUint(uint64(database.ID), 10)
@@ -103,7 +100,7 @@ func TestDatabaseHandler(t *testing.T) {
 		instance := &model.DeploymentInstance{
 			Name:         "name",
 			GroupName:    "group-name",
-			StackName:    "dhis2",
+			StackName:    "dhis2-v2",
 			DeploymentID: deployment.ID,
 		}
 		db.Create(instance)
@@ -130,7 +127,7 @@ func TestDatabaseHandler(t *testing.T) {
 		ghost := &model.Database{
 			Name:      "path/ghost.sql.gz",
 			GroupName: "packages",
-			Url:       "s3://database-bucket/packages/path/ghost.sql.gz",
+			Url:       "s3://" + s3.Bucket + "/packages/path/ghost.sql.gz",
 			Slug:      "packages-path-ghost-sql-gz",
 			UserID:    userID,
 		}
@@ -155,7 +152,7 @@ func TestDatabaseHandler(t *testing.T) {
 			require.Equal(t, "packages", actualDB.GroupName)
 			assert.Equal(t, userID, actualDB.UserID)
 
-			actualContent := s3.GetObject(t, s3Bucket, "packages/path/copy.extension")
+			actualContent := s3.GetObject(t, "packages/path/copy.extension")
 			require.Equalf(t, "file contents", string(actualContent), "DB in S3 should have expected content")
 		}
 
@@ -182,7 +179,7 @@ func TestDatabaseHandler(t *testing.T) {
 			t.Log("Setup filestore")
 
 			_, err := s3.Client.PutObject(context.TODO(), &awss3.PutObjectInput{
-				Bucket: aws.String(s3Bucket),
+				Bucket: aws.String(s3.Bucket),
 				Key:    aws.String("packages/path/name-fs.tar.gz"),
 				Body:   strings.NewReader("filestore contents"),
 			})
@@ -191,7 +188,7 @@ func TestDatabaseHandler(t *testing.T) {
 			filestoreRecord := &model.Database{
 				Name:      "path/name-fs.tar.gz",
 				GroupName: "packages",
-				Url:       "s3://database-bucket/packages/path/name-fs.tar.gz",
+				Url:       "s3://" + s3.Bucket + "/packages/path/name-fs.tar.gz",
 				Type:      "fs",
 				UserID:    userID,
 			}
@@ -216,7 +213,7 @@ func TestDatabaseHandler(t *testing.T) {
 			require.Equal(t, "path/rename.extension", actualDB.Name)
 			require.Equal(t, "packages", actualDB.GroupName)
 
-			actualContent := s3.GetObject(t, s3Bucket, "packages/path/rename.extension")
+			actualContent := s3.GetObject(t, "packages/path/rename.extension")
 			require.Equalf(t, "file contents", string(actualContent), "DB in S3 should have expected content")
 		}
 
@@ -295,11 +292,12 @@ func TestDatabaseHandler(t *testing.T) {
 		// Attempt delete but expect a bad request response
 		client.Do(t, http.MethodDelete, "/databases/"+databaseID, nil, http.StatusBadRequest, inttest.WithAuthToken("sometoken"))
 		// The rejected delete must not have removed the underlying S3 object
-		_, err = s3.Client.GetObject(context.TODO(), &awss3.GetObjectInput{
-			Bucket: aws.String(s3Bucket),
+		object, err := s3.Client.GetObject(context.TODO(), &awss3.GetObjectInput{
+			Bucket: aws.String(s3.Bucket),
 			Key:    aws.String("packages/path/rename.extension"),
 		})
 		require.NoErrorf(t, err, "delete of a locked database must not delete its S3 object")
+		require.NoError(t, object.Body.Close())
 		// Unlock database
 		client.Delete(t, "/databases/"+databaseID+"/lock")
 
@@ -311,7 +309,7 @@ func TestDatabaseHandler(t *testing.T) {
 		client.Delete(t, "/databases/"+databaseID)
 
 		_, err = s3.Client.GetObject(context.TODO(), &awss3.GetObjectInput{
-			Bucket: aws.String(s3Bucket),
+			Bucket: aws.String(s3.Bucket),
 			Key:    aws.String("packages/path/rename.extension"),
 		})
 		var e *types.NoSuchKey
@@ -340,7 +338,7 @@ func TestSaveLockedUnlocksOnDumpFailure(t *testing.T) {
 	instance := &model.DeploymentInstance{
 		Name:         "name",
 		GroupName:    "group-name",
-		StackName:    "dhis2",
+		StackName:    "dhis2-v2",
 		DeploymentID: deployment.ID,
 	}
 	db.Create(instance)
@@ -354,7 +352,7 @@ func TestSaveLockedUnlocksOnDumpFailure(t *testing.T) {
 	require.False(t, wasLocked)
 
 	// The instance has no database parameters, so the dump fails before touching pods or S3.
-	_, err = databaseService.SaveLocked(ctx, locked, instance, &model.Stack{}, wasLocked)
+	_, err = databaseService.SaveLocked(ctx, locked, instance, &stack.Stack{}, wasLocked)
 	require.Error(t, err)
 
 	reloaded, err := databaseService.FindById(ctx, locked.ID)
@@ -411,12 +409,63 @@ func (is instanceService) UpdateInstanceParameters(ctx context.Context, deployme
 	panic("implement me")
 }
 
+func (is instanceService) AcquireDeployLock(ctx context.Context, deploymentId uint) (bool, error) {
+	panic("implement me")
+}
+
+func (is instanceService) ReleaseDeployLock(ctx context.Context, deploymentId uint) error {
+	panic("implement me")
+}
+
+func (is instanceService) SetDeployStatus(ctx context.Context, instance *model.DeploymentInstance, status model.DeployStatus) error {
+	panic("implement me")
+}
+
+func (is instanceService) EditDeployment(ctx context.Context, deploymentId uint, edit instance.Edit) (*instance.DeploymentChanges, error) {
+	panic("implement me")
+}
+
+func (is instanceService) DeleteDestroyedInstance(ctx context.Context, deploymentInstance *model.DeploymentInstance) error {
+	panic("implement me")
+}
+
 type stackService struct{}
 
-func (ss stackService) Find(name string) (*model.Stack, error) {
+func (ss stackService) Find(name string) (*stack.Stack, error) {
 	return nil, nil
 }
 
 type noopPublisher struct{}
 
 func (noopPublisher) Publish(context.Context, uint, string, string, any) {}
+
+func (noopPublisher) PublishTransient(context.Context, string, string, any) {}
+
+// TestFilestoreAssociationResolvesThroughFilestoreID guards the self-referential association: the
+// foreign key has to be FilestoreID, since resolving it through ID silently returns the database
+// itself as its own file store.
+func TestFilestoreAssociationResolvesThroughFilestoreID(t *testing.T) {
+	t.Parallel()
+
+	db := inttest.SetupDB(t)
+	repository := database.NewRepository(db)
+	ctx := context.Background()
+	user, _ := userpkg.CreateUserWithGroup(t, db, "packages", "some", "", "filestore-user@dhis2.org")
+
+	filestore := &model.Database{Name: "saved-fs.tar.gz", GroupName: "packages", Slug: "packages/saved-fs", Type: "fs", Size: 4096, UserID: user.ID}
+	require.NoError(t, db.Create(filestore).Error)
+
+	saved := &model.Database{Name: "saved.pgc", GroupName: "packages", Slug: "packages/saved", Type: "database", FilestoreID: filestore.ID, UserID: user.ID}
+	require.NoError(t, db.Create(saved).Error)
+
+	found, err := repository.FindById(ctx, saved.ID)
+	require.NoError(t, err)
+	require.NotNil(t, found.Filestore, "the file store should be loaded, not left nil")
+	assert.Equal(t, filestore.ID, found.Filestore.ID)
+	assert.Equal(t, "saved-fs.tar.gz", found.Filestore.Name, "resolving through ID would return the database itself")
+	assert.Equal(t, int64(4096), found.Filestore.Size)
+
+	withoutFilestore, err := repository.FindById(ctx, filestore.ID)
+	require.NoError(t, err)
+	assert.Nil(t, withoutFilestore.Filestore, "a file store row has no file store of its own")
+}

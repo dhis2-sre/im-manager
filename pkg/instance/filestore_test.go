@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dhis2-sre/im-manager/pkg/kube"
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	"github.com/minio/minio-go/v7"
 	"github.com/stretchr/testify/assert"
@@ -143,7 +144,7 @@ func TestFilestoreStreamerForS3(t *testing.T) {
 	}}
 
 	// only s3 is unit-testable here; minio/filesystem resolve a pod and are covered by integration tests
-	streamer, err := s.filestoreStreamerFor(core, model.Cluster{})
+	streamer, err := s.filestoreStreamerFor(context.Background(), core, model.Cluster{})
 	require.NoError(t, err)
 	assert.IsType(t, s3APISource{}, streamer)
 }
@@ -291,17 +292,17 @@ func TestGetPodByLabels(t *testing.T) {
 		Namespace: "grp",
 		Labels:    map[string]string{"im-type": "minio", "im-deployment-id": "9"},
 	}}
-	ks := kubernetesService{client: fake.NewSimpleClientset(minioPod, otherPod)}
+	ks := kube.Client{Clientset: fake.NewSimpleClientset(minioPod, otherPod)}
 
-	pod, err := ks.getPodByLabels(map[string]string{"im-type": "minio", "im-deployment-id": "7"})
+	pod, err := ks.GetPodByLabels(context.Background(), map[string]string{"im-type": "minio", "im-deployment-id": "7"})
 	require.NoError(t, err)
 	assert.Equal(t, "test-1-minio-abc", pod.Name)
 	assert.Equal(t, "grp", pod.Namespace)
 }
 
 func TestGetPodByLabelsNotFound(t *testing.T) {
-	ks := kubernetesService{client: fake.NewSimpleClientset()}
-	_, err := ks.getPodByLabels(map[string]string{"im-type": "minio", "im-deployment-id": "7"})
+	ks := kube.Client{Clientset: fake.NewSimpleClientset()}
+	_, err := ks.GetPodByLabels(context.Background(), map[string]string{"im-type": "minio", "im-deployment-id": "7"})
 	require.Error(t, err)
 }
 

@@ -63,7 +63,39 @@ definitions:
                 format: int64
                 type: integer
         type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/kube
+    ComponentStatus:
+        properties:
+            name:
+                type: string
+                x-go-name: Name
+            replicas:
+                items:
+                    $ref: '#/definitions/Replica'
+                type: array
+                x-go-name: Replicas
+            supportedOperations:
+                items:
+                    $ref: '#/definitions/Operation'
+                type: array
+                x-go-name: SupportedOperations
+        type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
+    Condition:
+        description: |-
+            Condition is a declarative predicate over an instance's parameters: it holds when the named
+            parameter has the given value. Being data rather than code, the same condition both gates a
+            component's presence on the backend and is served to clients, so forms can react to parameter
+            edits without a round trip and cannot disagree with the backend about when something exists.
+        properties:
+            equals:
+                type: string
+                x-go-name: Equals
+            parameter:
+                type: string
+                x-go-name: Parameter
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/kube
     CopyDatabaseRequest:
         properties:
             group:
@@ -175,6 +207,10 @@ definitions:
                 x-go-name: UserID
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/model
+    DeployStatus:
+        title: DeployStatus is how far an instance got the last time it was deployed.
+        type: string
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/model
     Deployment:
         properties:
             createdAt:
@@ -225,9 +261,18 @@ definitions:
                 format: date-time
                 type: string
                 x-go-name: CreatedAt
+            deployError:
+                type: string
+                x-go-name: DeployError
             deployLog:
                 type: string
                 x-go-name: DeployLog
+            deployStatus:
+                $ref: '#/definitions/DeployStatus'
+            deployedAt:
+                format: date-time
+                type: string
+                x-go-name: DeployedAt
             deployment:
                 $ref: '#/definitions/Deployment'
             deploymentId:
@@ -274,6 +319,38 @@ definitions:
             $ref: '#/definitions/DeploymentInstanceParameter'
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/model
+    EditDeploymentRequest:
+        description: |-
+            EditDeploymentRequest is a diff against the deployment, not a snapshot of it. An absent field, an
+            absent stack and an absent parameter all mean unchanged, which is the only contract a form can
+            honour when reads answer with *** in place of every sensitive value.
+        properties:
+            description:
+                type: string
+                x-go-name: Description
+            instances:
+                additionalProperties:
+                    $ref: '#/definitions/EditInstanceRequest'
+                description: |-
+                    Instances are keyed by stack name, the key a deployment's instances are unique by and the only
+                    one that can name a companion that does not exist yet.
+                type: object
+                x-go-name: Instances
+            ttl:
+                format: uint64
+                type: integer
+                x-go-name: TTL
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
+    EditInstanceRequest:
+        properties:
+            parameters:
+                $ref: '#/definitions/Parameters'
+            public:
+                type: boolean
+                x-go-name: Public
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
     Event:
         properties:
             Data: {}
@@ -411,6 +488,25 @@ definitions:
                 x-go-name: Status
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/health
+    InstanceComponents:
+        properties:
+            components:
+                items:
+                    $ref: '#/definitions/ComponentStatus'
+                type: array
+                x-go-name: Components
+            instanceId:
+                format: uint64
+                type: integer
+                x-go-name: InstanceID
+            instanceName:
+                type: string
+                x-go-name: InstanceName
+            stackName:
+                type: string
+                x-go-name: StackName
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
     InstanceStatus:
         type: string
         x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
@@ -484,6 +580,10 @@ definitions:
                 x-go-name: UserID
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/model
+    Operation:
+        title: Operation is the name of an action a component supports, as exposed to API clients.
+        type: string
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/kube
     Parameter:
         properties:
             value:
@@ -520,6 +620,38 @@ definitions:
                 x-go-name: RefreshToken
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/user
+    Replica:
+        description: |-
+            Replica is a live pod backing a component. Replicas are discovered from the cluster on demand
+            and never persisted.
+        properties:
+            containers:
+                description: |-
+                    Containers names the pod's containers in the order it declares them, so a client can offer
+                    the log of a sidecar rather than only the log of the container which happens to come first.
+                items:
+                    type: string
+                type: array
+                x-go-name: Containers
+            createdAt:
+                format: date-time
+                type: string
+                x-go-name: CreatedAt
+            name:
+                type: string
+                x-go-name: Name
+            phase:
+                type: string
+                x-go-name: Phase
+            ready:
+                type: boolean
+                x-go-name: Ready
+            restarts:
+                format: int32
+                type: integer
+                x-go-name: Restarts
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/kube
     Request:
         properties:
             key:
@@ -577,9 +709,19 @@ definitions:
         x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
     Stack:
         properties:
+            companions:
+                items:
+                    $ref: '#/definitions/StackCompanion'
+                type: array
+                x-go-name: Companions
             name:
                 type: string
                 x-go-name: Name
+            parameterGroups:
+                items:
+                    $ref: '#/definitions/StackParameterGroup'
+                type: array
+                x-go-name: ParameterGroups
             parameters:
                 items:
                     $ref: '#/definitions/StackParameter'
@@ -591,6 +733,21 @@ definitions:
                 type: array
                 x-go-name: Requires
         type: object
+        x-go-name: StackResponse
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/stack
+    StackCompanion:
+        description: |-
+            StackCompanionResponse names a stack that can be deployed alongside this one. Like Requires it
+            carries only the name, so a client fetches that stack to learn its parameters. When it has a
+            condition, the companion applies only while that condition holds over this stack's parameters.
+        properties:
+            name:
+                type: string
+                x-go-name: Name
+            when:
+                $ref: '#/definitions/Condition'
+        type: object
+        x-go-name: StackCompanionResponse
         x-go-package: github.com/dhis2-sre/im-manager/pkg/stack
     StackParameter:
         properties:
@@ -603,6 +760,15 @@ definitions:
             displayName:
                 type: string
                 x-go-name: DisplayName
+            group:
+                type: string
+                x-go-name: Group
+            immutableReason:
+                description: |-
+                    ImmutableReason says why the parameter cannot be changed once the instance has been deployed;
+                    empty means it can.
+                type: string
+                x-go-name: ImmutableReason
             parameterName:
                 type: string
                 x-go-name: ParameterName
@@ -614,6 +780,23 @@ definitions:
                 type: boolean
                 x-go-name: Sensitive
         type: object
+        x-go-name: StackParameterResponse
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/stack
+    StackParameterGroup:
+        description: |-
+            ParameterGroup is a named section of a stack's parameters, naturally the component the
+            parameters belong to, with a human-readable title.
+        properties:
+            name:
+                type: string
+                x-go-name: Name
+            title:
+                type: string
+                x-go-name: Title
+            when:
+                $ref: '#/definitions/Condition'
+        type: object
+        x-go-name: ParameterGroup
         x-go-package: github.com/dhis2-sre/im-manager/pkg/stack
     UpdateClusterRequest:
         properties:
@@ -1311,6 +1494,8 @@ paths:
                     $ref: '#/responses/Error'
                 "404":
                     $ref: '#/responses/Error'
+                "409":
+                    $ref: '#/responses/Error'
                 "415":
                     $ref: '#/responses/Error'
             security:
@@ -1342,6 +1527,44 @@ paths:
             security:
                 - oauth2: []
             summary: Find a deployment
+        patch:
+            description: |-
+                Edit a deployment and everything in it in one request. Whatever the edit changes is redeployed
+                in the background; the response carries the deployment as it now stands.
+            operationId: editDeployment
+            parameters:
+                - format: uint64
+                  in: path
+                  name: id
+                  required: true
+                  type: integer
+                  x-go-name: ID
+                - description: Edit deployment request body parameter
+                  in: body
+                  name: Payload
+                  required: true
+                  schema:
+                    $ref: '#/definitions/EditDeploymentRequest'
+            responses:
+                "202":
+                    description: Accepted
+                    schema:
+                        $ref: '#/definitions/Deployment'
+                "400":
+                    $ref: '#/responses/Error'
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+                "409":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Edit a deployment
         put:
             description: Update a Deployment ...
             operationId: updateDeployment
@@ -1376,6 +1599,31 @@ paths:
             security:
                 - oauth2: []
             summary: Update a Deployment
+    /deployments/{id}/components:
+        get:
+            description: List the components of every instance in a deployment along with their supported operations and live replicas
+            operationId: deploymentComponents
+            parameters:
+                - format: uint64
+                  in: path
+                  name: id
+                  required: true
+                  type: integer
+                  x-go-name: ID
+            responses:
+                "200":
+                    $ref: '#/responses/DeploymentComponents'
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Deployment components
     /deployments/{id}/deploy:
         post:
             description: Deploy a deployment...
@@ -1388,13 +1636,15 @@ paths:
                   type: integer
                   x-go-name: ID
             responses:
-                "200":
-                    $ref: '#/responses/DeploymentInstance'
+                "202":
+                    description: ""
                 "401":
                     $ref: '#/responses/Error'
                 "403":
                     $ref: '#/responses/Error'
                 "404":
+                    $ref: '#/responses/Error'
+                "409":
                     $ref: '#/responses/Error'
                 "415":
                     $ref: '#/responses/Error'
@@ -1878,6 +2128,31 @@ paths:
                 "200":
                     $ref: '#/responses/HealthResponse'
             summary: Health status
+    /instances/{id}/components:
+        get:
+            description: List the components of an instance along with their supported operations and live replicas
+            operationId: instanceComponents
+            parameters:
+                - format: uint64
+                  in: path
+                  name: id
+                  required: true
+                  type: integer
+                  x-go-name: ID
+            responses:
+                "200":
+                    $ref: '#/responses/Components'
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Instance components
     /instances/{id}/details:
         put:
             description: Returns the details of an instance including parameters
@@ -1922,6 +2197,31 @@ paths:
                   name: selector
                   type: string
                   x-go-name: Selector
+                - description: |-
+                    replica
+                    type: string
+                    description: stream logs of a single replica (pod) of the component given by selector
+                  in: query
+                  name: replica
+                  type: string
+                  x-go-name: Replica
+                - description: |-
+                    container
+                    type: string
+                    description: stream the log of a single container of the pod, defaulting to the first container the pod declares
+                  in: query
+                  name: container
+                  type: string
+                  x-go-name: Container
+                - description: |-
+                    tail
+                    type: integer
+                    description: number of lines to stream from the end of the log, 0 for the whole log (default 1000)
+                  format: int64
+                  in: query
+                  name: tail
+                  type: integer
+                  x-go-name: Tail
             responses:
                 "200":
                     $ref: '#/responses/InstanceLogsResponse'
@@ -2002,11 +2302,19 @@ paths:
                 - description: |-
                     selector
                     type: string
-                    description: restart a specific deployment labeled with im-type=<selector>
+                    description: restart a specific component labeled with im-type=<selector>
                   in: query
                   name: selector
                   type: string
                   x-go-name: Selector
+                - description: |-
+                    replica
+                    type: string
+                    description: restart a single replica (pod) of the component given by selector
+                  in: query
+                  name: replica
+                  type: string
+                  x-go-name: Replica
             responses:
                 "202":
                     description: ""
@@ -2485,6 +2793,12 @@ responses:
             items:
                 $ref: '#/definitions/Cluster'
             type: array
+    Components:
+        description: ""
+        schema:
+            items:
+                $ref: '#/definitions/ComponentStatus'
+            type: array
     CreateExternalDownloadResponse:
         description: ""
         schema:
@@ -2493,6 +2807,12 @@ responses:
         description: ""
         schema:
             $ref: '#/definitions/Database'
+    DeploymentComponents:
+        description: ""
+        schema:
+            items:
+                $ref: '#/definitions/InstanceComponents'
+            type: array
     DeploymentInstance:
         description: ""
         schema:

@@ -80,6 +80,7 @@ import (
 	"github.com/dhis2-sre/im-manager/internal/server"
 	"github.com/dhis2-sre/im-manager/pkg/instance"
 	"github.com/dhis2-sre/im-manager/pkg/integration"
+	"github.com/dhis2-sre/im-manager/pkg/kube"
 	"github.com/dhis2-sre/im-manager/pkg/notification"
 	"github.com/dhis2-sre/im-manager/pkg/stack"
 	"github.com/dhis2-sre/im-manager/pkg/storage"
@@ -112,6 +113,13 @@ func run() (err error) {
 	enablePrettyPrint := exists && prettyPrint == "true"
 
 	options := log.PrettyJSONHandlerOptions{PrettyPrint: enablePrettyPrint}
+	if level, exists := os.LookupEnv("LOG_LEVEL"); exists {
+		var parsed slog.Level
+		if err := parsed.UnmarshalText([]byte(level)); err != nil {
+			return fmt.Errorf("invalid LOG_LEVEL %q: %v", level, err)
+		}
+		options.Level = parsed
+	}
 	logger := slog.New(log.New(log.NewPrettyJSONHandler(os.Stdout, &options)))
 
 	db, err := newDB(logger)
@@ -189,9 +197,14 @@ func run() (err error) {
 		return err
 	}
 
-	instanceService, err := newInstanceService(logger, db, stackService, groupService, s3Client)
+	kubeClients := kube.NewClients(logger)
+	instanceService, err := newInstanceService(logger, db, stackService, groupService, s3Client, kubeClients)
 	if err != nil {
 		return err
+	}
+
+	if err := instanceService.AbandonDeploysInProgress(ctx); err != nil {
+		return fmt.Errorf("failed to settle deploys interrupted by the last shutdown: %v", err)
 	}
 
 	stackHandler := stack.NewHandler(stackService)
@@ -208,12 +221,14 @@ func run() (err error) {
 
 	notificationHandler := newNotificationHandler(logger, db)
 
-	databaseService, publisher, err := newDatabaseService(ctx, logger, db, groupService, streamEnv, streamName)
+	databaseService, publisher, err := newDatabaseService(ctx, logger, db, groupService, streamEnv, streamName, kubeClients)
 	if err != nil {
 		return err
 	}
 
 	deploymentService := deployment.NewService(logger, instanceService, databaseService, tokenService, publisher)
+
+	kubeClients.RegisterPodHandler(instance.NewComponentStatusWatcher(logger, instanceService, publisher))
 
 	databaseHandler := database.NewHandler(logger, databaseService, groupService, instanceService, stackService, deploymentService)
 
@@ -232,7 +247,7 @@ func run() (err error) {
 		return err
 	}
 
-	eventHandler := event.NewHandler(logger, streamEnv, streamName)
+	eventHandler := event.NewHandler(logger, streamEnv, streamName, groupService)
 
 	_, err = createDefaultCluster(ctx, clusterService)
 	if err != nil {
@@ -275,16 +290,22 @@ func run() (err error) {
 	event.Routes(r, authentication.TokenAuthentication, eventHandler)
 	notification.Routes(r, authentication.TokenAuthentication, notificationHandler)
 
-	logger.InfoContext(ctx, "Listening and serving HTTP")
-	if err := r.Run(); err != nil {
-		return fmt.Errorf("failed to start the HTTP server: %v", err)
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
 	}
+
+	// Read and write deadlines are deliberately left unset. The event stream, log following and
+	// database up- and downloads all hold a request open for far longer than any value that would
+	// protect the other endpoints, and a deploy no longer occupies a request at all.
 	server := &http.Server{
-		Addr:         ":8080",
-		Handler:      r,
-		WriteTimeout: 240 * time.Second,
-		ReadTimeout:  240 * time.Second,
+		Addr:              ":" + port,
+		Handler:           r,
+		ReadHeaderTimeout: 20 * time.Second,
+		IdleTimeout:       120 * time.Second,
 	}
+
+	logger.InfoContext(ctx, "Listening and serving HTTP", "address", server.Addr)
 	if err := server.ListenAndServe(); err != nil {
 		return fmt.Errorf("failed to start the HTTP server: %v", err)
 	}
@@ -517,19 +538,7 @@ func getPrivateKey(ctx context.Context, logger *slog.Logger) (*rsa.PrivateKey, e
 }
 
 func newStackService() (stack.Service, error) {
-	stacks, err := stack.New(
-		stack.DHIS2DB,
-		stack.MINIO,
-		stack.DHIS2Core,
-		stack.DHIS2,
-		stack.PgAdmin,
-		stack.WhoamiGo,
-		stack.IMJobRunner,
-		stack.ChapDB,
-		stack.ChapValkey,
-		stack.ChapWorker,
-		stack.ChapCore,
-	)
+	stacks, err := stack.New(stack.All...)
 	if err != nil {
 		return stack.Service{}, fmt.Errorf("error in stack config: %v", err)
 	}
@@ -537,7 +546,7 @@ func newStackService() (stack.Service, error) {
 	return stack.NewService(stacks), nil
 }
 
-func newInstanceService(logger *slog.Logger, db *gorm.DB, stackService stack.Service, groupService *group.Service, s3Client *storage.S3Client) (*instance.Service, error) {
+func newInstanceService(logger *slog.Logger, db *gorm.DB, stackService stack.Service, groupService *group.Service, s3Client *storage.S3Client, kubeClients *kube.Clients) (*instance.Service, error) {
 	instanceParameterEncryptionKey, err := requireEnv("INSTANCE_PARAMETER_ENCRYPTION_KEY")
 	if err != nil {
 		return nil, err
@@ -560,7 +569,7 @@ func newInstanceService(logger *slog.Logger, db *gorm.DB, stackService stack.Ser
 		return nil, err
 	}
 
-	return instance.NewService(logger, instanceRepository, groupService, stackService, helmfileService, s3Client, s3Bucket), nil
+	return instance.NewService(logger, instanceRepository, groupService, stackService, helmfileService, s3Client, s3Bucket, kubeClients), nil
 }
 
 type rabbitMQConfig struct {
@@ -616,7 +625,7 @@ func newInstanceHandler(stackService stack.Service, groupService *group.Service,
 	return instance.NewHandler(stackService, groupService, instanceService, deploymentService, defaultTTL), nil
 }
 
-func newDatabaseService(ctx context.Context, logger *slog.Logger, db *gorm.DB, groupService *group.Service, env *stream.Environment, streamName string) (*database.Service, *notification.Publisher, error) {
+func newDatabaseService(ctx context.Context, logger *slog.Logger, db *gorm.DB, groupService *group.Service, env *stream.Environment, streamName string, kubeClients *kube.Clients) (*database.Service, *notification.Publisher, error) {
 	s3Bucket, err := requireEnv("S3_BUCKET")
 	if err != nil {
 		return nil, nil, err
@@ -631,9 +640,7 @@ func newDatabaseService(ctx context.Context, logger *slog.Logger, db *gorm.DB, g
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to create database notification publisher: %w", err)
 	}
-	databaseService := database.NewService(logger, s3Bucket, s3Client, groupService, databaseRepository, func(c model.Cluster) (database.PodExecutor, error) {
-		return instance.NewKubernetesService(c)
-	}, publisher)
+	databaseService := database.NewService(logger, s3Bucket, s3Client, groupService, databaseRepository, kubeClients.For, publisher)
 
 	return databaseService, publisher, nil
 }

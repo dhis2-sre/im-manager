@@ -1,0 +1,320 @@
+// Package testenv owns ephemeral services shared by test fixtures. The runner
+// exports their addresses to every Go test process; direct go test runs start
+// services lazily and close them from TestMain.
+package testenv
+
+import (
+	"context"
+	"database/sql"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"log/slog"
+	"net"
+	"os"
+	"strconv"
+	"sync"
+	"time"
+
+	"github.com/dhis2-sre/im-manager/pkg/storage"
+	"github.com/go-redis/redis"
+	"github.com/lib/pq"
+	"github.com/testcontainers/testcontainers-go"
+	"github.com/testcontainers/testcontainers-go/wait"
+)
+
+const (
+	rabbitMQImage   = "rabbitmq:3.13.7-management@sha256:e582c0bc7766f3342496d8485efb5a1df782b5ce3886ad017e2eaae442311f69"
+	postgresImage   = "postgres:16.2"
+	redisImage      = "redis:6.0.9"
+	localstackImage = "localstack/localstack:3.0.0"
+	minioImage      = "quay.io/minio/minio:RELEASE.2025-01-20T14-49-07Z"
+)
+
+const ConfigEnv = "IM_TEST_SERVICES"
+const Template = "im_test_template"
+const RedisPool = "im-test-free-databases"
+const RedisDatabases = 128
+const Region = "eu-west-1"
+const AccessKey = "minioadmin"
+const SecretKey = "minioadmin"
+
+// Configure sets process-wide test configuration before service or test
+// goroutines start. The fresh template has no application data, so its migrations
+// use a fixed test-only key instead of depending on the developer's environment.
+func Configure() error {
+	return os.Setenv("INSTANCE_PARAMETER_ENCRYPTION_KEY", "0123456789abcdef0123456789abcdef")
+}
+
+// Config contains endpoints and credentials for disposable test services, never
+// application configuration. DB 0 in Redis is reserved for coordinating fixture leases.
+type Config struct {
+	Postgres storage.PostgresqlConfig
+	Redis    string
+	S3       string
+	MinIO    string
+	RabbitMQ RabbitMQConfig
+}
+
+type Environment struct {
+	mu         sync.Mutex
+	containers []testcontainers.Container
+	postgres   func() (storage.PostgresqlConfig, error)
+	redis      func() (string, error)
+	s3         func() (string, error)
+	minio      func() (string, error)
+	rabbitmq   func() (RabbitMQConfig, error)
+}
+
+func New() *Environment {
+	e := &Environment{}
+	e.rabbitmq = sync.OnceValues(e.startRabbitMQ)
+	e.postgres = sync.OnceValues(e.startPostgres)
+	e.redis = sync.OnceValues(e.startRedis)
+	e.s3 = sync.OnceValues(func() (string, error) {
+		return e.startEndpoint(testcontainers.ContainerRequest{
+			Image: localstackImage, ExposedPorts: []string{"4566/tcp"},
+			Env:        map[string]string{"SERVICES": "s3", "DEFAULT_REGION": Region},
+			WaitingFor: wait.ForHTTP("/_localstack/health").WithPort("4566/tcp"),
+		}, "4566/tcp", "http")
+	})
+	e.minio = sync.OnceValues(func() (string, error) {
+		return e.startEndpoint(testcontainers.ContainerRequest{
+			Image: minioImage, ExposedPorts: []string{"9000/tcp"},
+			Env:        map[string]string{"MINIO_ROOT_USER": AccessKey, "MINIO_ROOT_PASSWORD": SecretKey},
+			Cmd:        []string{"server", "/data"},
+			WaitingFor: wait.ForHTTP("/minio/health/ready").WithPort("9000/tcp"),
+		}, "9000/tcp", "")
+	})
+	return e
+}
+
+// Shared provides typed access to runner-owned services, or starts package-local
+// services lazily when running go test directly.
+var Shared = New()
+
+// runnerConfig distinguishes an absent runner from malformed or incomplete
+// runner configuration. Only an absent runner permits local service startup.
+func runnerConfig() (Config, bool, error) {
+	value, supplied := os.LookupEnv(ConfigEnv)
+	var c Config
+	if supplied {
+		if err := json.Unmarshal([]byte(value), &c); err != nil {
+			return c, true, fmt.Errorf("parse %s: %w", ConfigEnv, err)
+		}
+	}
+	return c, supplied, nil
+}
+
+// Postgres returns the runner database configuration or starts local PostgreSQL.
+func (e *Environment) Postgres() (storage.PostgresqlConfig, error) {
+	c, supplied, err := runnerConfig()
+	if err != nil {
+		return storage.PostgresqlConfig{}, err
+	}
+	if supplied {
+		if c.Postgres.Host == "" {
+			return storage.PostgresqlConfig{}, errors.New("runner did not start postgres")
+		}
+		return c.Postgres, nil
+	}
+	return e.postgres()
+}
+
+// Redis returns the runner endpoint or starts local Redis.
+func (e *Environment) Redis() (string, error) {
+	c, supplied, err := runnerConfig()
+	if err != nil {
+		return "", err
+	}
+	if supplied {
+		if c.Redis == "" {
+			return "", errors.New("runner did not start redis")
+		}
+		return c.Redis, nil
+	}
+	return e.redis()
+}
+
+// S3 returns the runner endpoint or starts local LocalStack S3.
+func (e *Environment) S3() (string, error) {
+	c, supplied, err := runnerConfig()
+	if err != nil {
+		return "", err
+	}
+	if supplied {
+		if c.S3 == "" {
+			return "", errors.New("runner did not start s3")
+		}
+		return c.S3, nil
+	}
+	return e.s3()
+}
+
+// MinIO returns the runner endpoint or starts local MinIO.
+func (e *Environment) MinIO() (string, error) {
+	c, supplied, err := runnerConfig()
+	if err != nil {
+		return "", err
+	}
+	if supplied {
+		if c.MinIO == "" {
+			return "", errors.New("runner did not start minio")
+		}
+		return c.MinIO, nil
+	}
+	return e.minio()
+}
+
+func CloseLocal() error { return Shared.Close() }
+
+// StartAll starts all five shared services concurrently.
+// Call Close even on failure.
+func (e *Environment) StartAll() (Config, error) {
+	var c Config
+	var postgresErr, redisErr, s3Err, minioErr, rabbitmqErr error
+	var wg sync.WaitGroup
+	wg.Go(func() {
+		started := time.Now()
+		c.Postgres, postgresErr = e.postgres()
+		postgresErr = logStartup("postgres", started, postgresErr)
+	})
+	wg.Go(func() {
+		started := time.Now()
+		c.Redis, redisErr = e.redis()
+		redisErr = logStartup("redis", started, redisErr)
+	})
+	wg.Go(func() {
+		started := time.Now()
+		c.S3, s3Err = e.s3()
+		s3Err = logStartup("s3", started, s3Err)
+	})
+	wg.Go(func() {
+		started := time.Now()
+		c.MinIO, minioErr = e.minio()
+		minioErr = logStartup("minio", started, minioErr)
+	})
+	wg.Go(func() {
+		started := time.Now()
+		c.RabbitMQ, rabbitmqErr = e.rabbitmq()
+		rabbitmqErr = logStartup("rabbitmq", started, rabbitmqErr)
+	})
+	wg.Wait()
+	return c, errors.Join(postgresErr, redisErr, s3Err, minioErr, rabbitmqErr)
+}
+
+// logStartup keeps timing and error reporting consistent across explicit starts.
+func logStartup(name string, started time.Time, err error) error {
+	if err != nil {
+		return fmt.Errorf("start %s: %w", name, err)
+	}
+	fmt.Fprintf(os.Stderr, "test service %s ready in %s\n", name, time.Since(started).Round(time.Millisecond))
+	return nil
+}
+
+func (e *Environment) startEndpoint(req testcontainers.ContainerRequest, port, scheme string) (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	defer cancel()
+	c, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{ContainerRequest: req, Started: true})
+	// Failed readiness checks can still return an allocated container.
+	if c != nil {
+		e.mu.Lock()
+		e.containers = append(e.containers, c)
+		e.mu.Unlock()
+	}
+	if err != nil {
+		return "", err
+	}
+	return c.PortEndpoint(ctx, port, scheme)
+}
+
+func (e *Environment) startPostgres() (storage.PostgresqlConfig, error) {
+	c := storage.PostgresqlConfig{Username: "im", Password: "im", DatabaseName: Template}
+	address, err := e.startEndpoint(testcontainers.ContainerRequest{
+		Image: postgresImage, ExposedPorts: []string{"5432/tcp"},
+		Env:        map[string]string{"POSTGRES_USER": c.Username, "POSTGRES_PASSWORD": c.Password, "POSTGRES_DB": Template},
+		WaitingFor: wait.ForLog("database system is ready to accept connections").WithOccurrence(2),
+	}, "5432/tcp", "")
+	if err != nil {
+		return c, err
+	}
+	host, port, err := net.SplitHostPort(address)
+	if err != nil {
+		return c, err
+	}
+	c.Host = host
+	c.Port, err = strconv.Atoi(port)
+	if err != nil {
+		return c, err
+	}
+	db, err := storage.NewDatabase(slog.New(slog.NewTextHandler(os.Stderr, nil)), c)
+	if err != nil {
+		return c, err
+	}
+	pool, err := db.DB()
+	if err != nil {
+		return c, err
+	}
+	// PostgreSQL cannot clone a template with open sessions.
+	if err := pool.Close(); err != nil {
+		return c, err
+	}
+	admin, err := Admin(c)
+	if err != nil {
+		return c, err
+	}
+	defer admin.Close()
+	_, err = admin.Exec("ALTER DATABASE " + pq.QuoteIdentifier(Template) + " WITH ALLOW_CONNECTIONS false")
+	return c, err
+}
+
+// Admin connects outside the template so CREATE/DROP DATABASE can run safely.
+func Admin(c storage.PostgresqlConfig) (*sql.DB, error) {
+	db, err := sql.Open("postgres", fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=postgres sslmode=disable connect_timeout=10", c.Host, c.Port, c.Username, c.Password))
+	if err == nil {
+		db.SetMaxOpenConns(2)
+	}
+	return db, err
+}
+
+func (e *Environment) startRedis() (string, error) {
+	address, err := e.startEndpoint(testcontainers.ContainerRequest{
+		Image: redisImage, ExposedPorts: []string{"6379/tcp"},
+		Cmd:        []string{"redis-server", "--databases", strconv.Itoa(RedisDatabases), "--save", "", "--appendonly", "no"},
+		WaitingFor: wait.ForLog("Ready to accept connections"),
+	}, "6379/tcp", "")
+	if err != nil {
+		return "", err
+	}
+	client := redis.NewClient(&redis.Options{Addr: address})
+	defer client.Close()
+	ids := make([]interface{}, 0, RedisDatabases-1)
+	for i := 1; i < RedisDatabases; i++ {
+		ids = append(ids, i)
+	}
+	return address, client.SAdd(RedisPool, ids...).Err()
+}
+
+// Close runs after all test binaries exit. It also handles partial startup.
+func (e *Environment) Close() error {
+	e.mu.Lock()
+	containers := e.containers
+	e.containers = nil
+	e.mu.Unlock()
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+	var errs []error
+	for _, c := range containers {
+		wg.Go(func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+			if err := c.Terminate(ctx); err != nil {
+				mu.Lock()
+				errs = append(errs, err)
+				mu.Unlock()
+			}
+		})
+	}
+	wg.Wait()
+	return errors.Join(errs...)
+}
