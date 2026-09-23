@@ -29,7 +29,7 @@ http:
     im-api:
       loadBalancer:
         servers:
-          - url: "http://prod:8080"
+          - url: "http://api:8080"
     k3s-dev:
       loadBalancer:
         servers:

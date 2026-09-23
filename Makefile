@@ -22,13 +22,13 @@ change-log:
 	git-chglog -o CHANGELOG.md
 
 smoke-test:
-	IMAGE_TAG=$(tag) docker compose --profile prod up --detach prod
+	IMAGE_TAG=$(tag) docker compose --profile prod up --detach api
 
 docker-image:
-	IMAGE_TAG=$(tag) docker compose --profile prod build prod
+	IMAGE_TAG=$(tag) docker compose --profile prod build api
 
 push-docker-image:
-	IMAGE_TAG=$(tag) docker compose push prod
+	IMAGE_TAG=$(tag) docker compose push api
 
 dev:
 	docker compose --profile dev up
