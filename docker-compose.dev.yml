@@ -23,7 +23,7 @@ x-service: &common-dev-test
 services:
   # Profiled here so `make dev` runs the source variant instead. The base file has no profile, so a
   # server starts this unconditionally.
-  prod:
+  api:
     build: .
     profiles:
       - prod

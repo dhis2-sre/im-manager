@@ -4,7 +4,7 @@
 # dhis2-infrastructure runs this as one compose project per environment, alongside a second project
 # for the web client, both joined to a shared ingress network.
 services:
-  prod:
+  api:
     image: dhis2/im-manager:${IMAGE_TAG:-latest}
     env_file:
       - ${ENVIRONMENT_FILE:-.env}
