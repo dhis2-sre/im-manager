@@ -619,9 +619,10 @@ func (s Service) Delete(ctx context.Context, deploymentInstanceId uint) error {
 }
 
 // DeleteDeployment destroys every instance of the deployment and removes it. It takes the deploy
-// lock and never gives it back, because a deploy and a destroy of the same release run helm against
-// each other: a destroy that landed mid-deploy used to leave both operations timing out, and the
-// deployment is gone by the time this returns so there is nothing left to unlock.
+// lock for the duration, because a deploy and a destroy of the same release run helm against each
+// other: a destroy that landed mid-deploy used to leave both operations timing out. A delete that
+// finishes has nothing left to unlock, the deployment being gone, but one that fails anywhere has to
+// give the lock back, or the deployment can never be deployed or deleted again.
 func (s Service) DeleteDeployment(ctx context.Context, deployment *model.Deployment) error {
 	acquired, err := s.AcquireDeployLock(ctx, deployment.ID)
 	if err != nil {
@@ -631,9 +632,15 @@ func (s Service) DeleteDeployment(ctx context.Context, deployment *model.Deploym
 		return errdef.NewConflict("deployment %d is being deployed and cannot be deleted until that finishes", deployment.ID)
 	}
 
+	deleted := false
+	defer func() {
+		if !deleted {
+			s.releaseDeployLockOnFailedDelete(ctx, deployment.ID)
+		}
+	}()
+
 	instances, err := s.DeploymentOrder(deployment)
 	if err != nil {
-		s.releaseDeployLockOnFailedDelete(ctx, deployment.ID)
 		return err
 	}
 	slices.Reverse(instances)
@@ -652,11 +659,15 @@ func (s Service) DeleteDeployment(ctx context.Context, deployment *model.Deploym
 		}
 	}
 	if errs != nil {
-		s.releaseDeployLockOnFailedDelete(ctx, deployment.ID)
 		return errs
 	}
 
-	return s.instanceRepository.DeleteDeployment(ctx, deployment)
+	if err := s.instanceRepository.DeleteDeployment(ctx, deployment); err != nil {
+		return err
+	}
+
+	deleted = true
+	return nil
 }
 
 func (s Service) releaseDeployLockOnFailedDelete(ctx context.Context, deploymentId uint) {
