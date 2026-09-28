@@ -254,9 +254,11 @@ func (r repository) ReleaseDeployLock(ctx context.Context, deploymentId uint) er
 }
 
 // AbandonDeploysInProgress settles the deploys that were running when the process died. Their
-// goroutines are gone, so the rows they left behind are the only trace of them. Clearing every lock
-// is only right because instance manager runs a single replica; a second one would be releasing
-// locks its peer still holds.
+// goroutines are gone, so the rows they left behind are the only trace of them. Pending counts as
+// in progress: an instance queued behind the one that was deploying is waiting for a goroutine that
+// no longer exists, and left alone it reads as deploying forever. Clearing every lock is only right
+// because instance manager runs a single replica; a second one would be releasing locks its peer
+// still holds.
 func (r repository) AbandonDeploysInProgress(ctx context.Context, reason string) (int64, error) {
 	ctx = context.WithoutCancel(ctx)
 
@@ -267,7 +269,7 @@ func (r repository) AbandonDeploysInProgress(ctx context.Context, reason string)
 	}
 
 	result := r.db.WithContext(ctx).Model(&model.DeploymentInstance{}).
-		Where("deploy_status = ?", model.DeployStatusDeploying).
+		Where("deploy_status IN ?", []model.DeployStatus{model.DeployStatusDeploying, model.DeployStatusPending}).
 		Updates(map[string]any{"deploy_status": model.DeployStatusFailed, "deploy_error": reason})
 	if result.Error != nil {
 		return 0, fmt.Errorf("failed to abandon deploys in progress: %v", result.Error)

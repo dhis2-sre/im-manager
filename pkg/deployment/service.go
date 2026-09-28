@@ -114,9 +114,12 @@ func (s Service) StartDeployment(ctx context.Context, token string, deploymentId
 
 	ctx = context.WithoutCancel(ctx)
 	go func() {
-		defer s.releaseDeployLock(ctx, deployment.ID)
+		err := s.deployDeployment(ctx, token, deployment, userID)
+		// The lock goes back before the event goes out, so a client that acts on the event finds the
+		// deployment free rather than racing the release.
+		s.releaseDeployLock(ctx, deployment.ID)
 
-		if err := s.deployDeployment(ctx, token, deployment, userID); err != nil {
+		if err != nil {
 			s.logger.ErrorContext(ctx, "deploy failed", "deploymentId", deployment.ID, "deploymentName", deployment.Name, "error", err)
 			s.publisher.Publish(ctx, userID, deployment.GroupName, kindDeployment, newDeploymentEvent(deployment, "error", err.Error()))
 			return
@@ -170,9 +173,10 @@ func (s Service) EditDeployment(ctx context.Context, token string, deploymentId 
 
 	ctx = context.WithoutCancel(ctx)
 	go func() {
-		defer s.releaseDeployLock(ctx, deploymentId)
+		err := s.applyDeploymentChanges(ctx, token, deploymentId, redeploy, destroy)
+		s.releaseDeployLock(ctx, deploymentId)
 
-		if err := s.applyDeploymentChanges(ctx, token, deploymentId, redeploy, destroy); err != nil {
+		if err != nil {
 			s.logger.ErrorContext(ctx, "edit failed", "deploymentId", deploymentId, "error", err)
 			s.publisher.Publish(ctx, userID, changes.Deployment.GroupName, kindDeployment, newDeploymentEvent(changes.Deployment, "error", err.Error()))
 			return
