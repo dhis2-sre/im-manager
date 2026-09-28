@@ -27,11 +27,16 @@ func NewPublisher(logger *slog.Logger, env *stream.Environment, streamName strin
 	}
 
 	producerName := "notification-publisher"
-	// Deliberately not SetProducerName: a named producer is a deduplication reference, and RabbitMQ
-	// then silently drops (while still confirming) every message whose publishing id it has already
-	// seen for that name. Publishing ids come from a counter that restarts at zero with the process,
-	// so after a restart every event up to the stream's high water mark was discarded. This producer
-	// wants each event appended, not deduplicated. SetClientProvidedName only labels the connection.
+	// Deliberately not SetProducerName. A name makes the producer a deduplication reference, and
+	// RabbitMQ then discards every message whose publishing id it has already seen for that name,
+	// while still confirming it, so nothing downstream can tell. Deduplication needs publishing ids
+	// that are monotonic in the order they reach the broker, which we cannot offer: Send assigns the
+	// id and enqueues the message as separate steps, and we publish from concurrent goroutines, so
+	// two events can be numbered in one order and sent in another. The one that arrives below the
+	// high water mark is dropped silently. We would rather have a duplicate event, which a client
+	// can collapse, than a missing one nobody can detect. SetClientProvidedName only labels the
+	// connection and carries none of this. What we give up is the deduplication of the reliable
+	// producer's own re-sends after a reconnect, so delivery is at least once.
 	opts := stream.NewProducerOptions().
 		SetClientProvidedName(producerName).
 		SetFilter(stream.NewProducerFilter(func(msg message.StreamMessage) string {
@@ -84,5 +89,26 @@ func (p *Publisher) Publish(ctx context.Context, userID uint, groupName, kind st
 
 	if err := p.producer.Send(msg); err != nil {
 		p.logger.ErrorContext(ctx, "Failed to send notification to RabbitMQ", "kind", kind, "error", err)
+	}
+}
+
+// PublishTransient streams an event to the group without persisting a notification and without an
+// owner, so every group member's live connection receives it and it never appears in the
+// notification bell. Meant for high-frequency ephemeral state like component status.
+func (p *Publisher) PublishTransient(ctx context.Context, groupName, kind string, payload any) {
+	data, err := json.Marshal(payload)
+	if err != nil {
+		p.logger.ErrorContext(ctx, "Failed to marshal transient event payload", "kind", kind, "error", err)
+		return
+	}
+
+	msg := amqp.NewMessage(data)
+	msg.ApplicationProperties = map[string]any{
+		"group": groupName,
+		"kind":  kind,
+	}
+
+	if err := p.producer.Send(msg); err != nil {
+		p.logger.ErrorContext(ctx, "Failed to send transient event to RabbitMQ", "kind", kind, "error", err)
 	}
 }

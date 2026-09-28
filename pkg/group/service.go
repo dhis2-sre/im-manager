@@ -5,7 +5,7 @@ import (
 
 	"github.com/dhis2-sre/im-manager/pkg/cluster"
 
-	"github.com/dhis2-sre/im-manager/pkg/instance"
+	"github.com/dhis2-sre/im-manager/pkg/kube"
 
 	"github.com/dhis2-sre/im-manager/pkg/model"
 )
@@ -160,15 +160,15 @@ func (s *Service) FindByGroupNames(ctx context.Context, groupNames []string) ([]
 	return s.groupRepository.findByGroupNames(ctx, groupNames)
 }
 
-func (s *Service) FindResources(ctx context.Context, name string) (instance.ClusterResources, error) {
+func (s *Service) FindResources(ctx context.Context, name string) (kube.ClusterResources, error) {
 	group, err := s.groupRepository.find(ctx, name)
 	if err != nil {
-		return instance.ClusterResources{}, err
+		return kube.ClusterResources{}, err
 	}
 
-	resources, err := instance.FindResources(group.Cluster)
+	resources, err := kube.FindResources(group.Cluster)
 	if err != nil {
-		return instance.ClusterResources{}, err
+		return kube.ClusterResources{}, err
 	}
 
 	resources.Autoscaled = group.Cluster.Autoscaled

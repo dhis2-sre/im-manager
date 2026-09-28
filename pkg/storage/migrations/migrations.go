@@ -6,5 +6,8 @@ func All() []*gormigrate.Migration {
 	return []*gormigrate.Migration{
 		backfillDeployChap(),
 		reencryptCFBToGCM(),
+		backfillDeployChapDHIS2V2(),
+		backfillDeployStatus(),
+		decryptFilesystemVolumeSize(),
 	}
 }

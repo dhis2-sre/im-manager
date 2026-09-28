@@ -16,15 +16,18 @@ func Routes(r *gin.Engine, authenticator gin.HandlerFunc, handler Handler) {
 	tokenAuthenticationRouter.PUT("/instances/:id/restart", handler.Restart)
 	tokenAuthenticationRouter.GET("/instances/:id/logs", handler.Logs)
 	tokenAuthenticationRouter.GET("/instances/:id/status", handler.Status)
+	tokenAuthenticationRouter.GET("/instances/:id/components", handler.Components)
 	tokenAuthenticationRouter.GET("/instances/:id/details", handler.InstanceWithDetails)
 
 	tokenAuthenticationRouter.POST("/deployments", handler.SaveDeployment)
 	tokenAuthenticationRouter.GET("/deployments", handler.FindDeployments)
 	tokenAuthenticationRouter.GET("/deployments/:id", handler.FindDeploymentById)
+	tokenAuthenticationRouter.GET("/deployments/:id/components", handler.DeploymentComponents)
 	tokenAuthenticationRouter.DELETE("/deployments/:id", handler.DeleteDeployment)
 	tokenAuthenticationRouter.POST("/deployments/:id/instance", handler.SaveInstance)
 	tokenAuthenticationRouter.PATCH("/deployments/:id/instance/:instanceId", handler.UpdateInstance)
 	tokenAuthenticationRouter.DELETE("/deployments/:id/instance/:instanceId", handler.DeleteDeploymentInstance)
 	tokenAuthenticationRouter.POST("/deployments/:id/deploy", handler.DeployDeployment)
 	tokenAuthenticationRouter.PUT("/deployments/:id", handler.UpdateDeployment)
+	tokenAuthenticationRouter.PATCH("/deployments/:id", handler.EditDeployment)
 }

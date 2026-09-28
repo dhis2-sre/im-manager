@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 
 	"github.com/dhis2-sre/im-manager/pkg/stack"
 
@@ -39,10 +40,11 @@ type groupServiceHandler interface {
 }
 
 type deploymentService interface {
-	DeployDeployment(ctx context.Context, token string, deployment *model.Deployment) error
-	UpdateDeployment(ctx context.Context, token string, deploymentId uint, ttl uint, description string) (*model.Deployment, error)
+	StartDeployment(ctx context.Context, token string, deploymentId uint, userID uint) error
+	UpdateDeployment(ctx context.Context, token string, deploymentId uint, ttl uint, description string, userID uint) (*model.Deployment, error)
+	EditDeployment(ctx context.Context, token string, deploymentId uint, edit Edit, userID uint) (*model.Deployment, error)
 	UpdateInstance(ctx context.Context, token string, deploymentId, instanceId uint, parameters Parameters, public *bool) (*model.DeploymentInstance, error)
-	Reset(ctx context.Context, token string, instance *model.DeploymentInstance, ttl uint) error
+	Reset(ctx context.Context, token string, deploymentId, instanceId uint, ttl uint, userID uint) error
 }
 
 func (h Handler) DeployDeployment(c *gin.Context) {
@@ -56,10 +58,11 @@ func (h Handler) DeployDeployment(c *gin.Context) {
 	//	oauth2:
 	//
 	// responses:
-	//	200: DeploymentInstance
+	//	202:
 	//	401: Error
 	//	403: Error
 	//	404: Error
+	//	409: Error
 	//	415: Error
 	id, ok := handler.GetPathParameter(c, "id")
 	if !ok {
@@ -98,19 +101,13 @@ func (h Handler) DeployDeployment(c *gin.Context) {
 		return
 	}
 
-	err = h.deploymentService.DeployDeployment(ctx, token, deployment)
+	err = h.deploymentService.StartDeployment(ctx, token, deployment.ID, user.ID)
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
 
-	err = h.stripDeploymentSensitiveParameterValues(deployment)
-	if err != nil {
-		_ = c.Error(err)
-		return
-	}
-
-	c.JSON(http.StatusOK, deployment)
+	c.Status(http.StatusAccepted)
 }
 
 func (h Handler) stripDeploymentSensitiveParameterValues(deployment *model.Deployment) error {
@@ -510,7 +507,7 @@ func (h Handler) Reset(c *gin.Context) {
 		return
 	}
 
-	instance, err := h.instanceService.FindDecryptedDeploymentInstanceById(ctx, id)
+	instance, err := h.instanceService.FindDeploymentInstanceById(ctx, id)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -528,7 +525,7 @@ func (h Handler) Reset(c *gin.Context) {
 		return
 	}
 
-	err = h.deploymentService.Reset(ctx, token, instance, deployment.TTL)
+	err = h.deploymentService.Reset(ctx, token, deployment.ID, instance.ID, deployment.TTL, user.ID)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -642,13 +639,120 @@ func (h Handler) Restart(c *gin.Context) {
 	}
 
 	selector := c.Query("selector")
-	err = h.instanceService.Restart(ctx, instance, selector)
+	replica := c.Query("replica")
+	err = h.instanceService.Restart(ctx, instance, selector, replica)
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
 
 	c.Status(http.StatusAccepted)
+}
+
+// DeploymentComponents deployment components
+func (h Handler) DeploymentComponents(c *gin.Context) {
+	// swagger:route GET /deployments/{id}/components deploymentComponents
+	//
+	// Deployment components
+	//
+	// List the components of every instance in a deployment along with their supported operations and live replicas
+	//
+	// Security:
+	//	oauth2:
+	//
+	// responses:
+	//	200: DeploymentComponents
+	//	401: Error
+	//	403: Error
+	//	404: Error
+	//	415: Error
+	id, ok := handler.GetPathParameter(c, "id")
+	if !ok {
+		return
+	}
+
+	ctx := c.Request.Context()
+	user, err := handler.GetUserFromContext(ctx)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	deployment, err := h.instanceService.FindDeploymentById(ctx, id)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	canRead := handler.CanReadDeployment(user, deployment)
+	if !canRead {
+		_ = c.Error(errdef.NewUnauthorized("read access denied"))
+		return
+	}
+
+	components, err := h.instanceService.DeploymentComponents(ctx, deployment)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	c.JSON(http.StatusOK, components)
+}
+
+// Components instance components
+func (h Handler) Components(c *gin.Context) {
+	// swagger:route GET /instances/{id}/components instanceComponents
+	//
+	// Instance components
+	//
+	// List the components of an instance along with their supported operations and live replicas
+	//
+	// Security:
+	//	oauth2:
+	//
+	// responses:
+	//	200: Components
+	//	401: Error
+	//	403: Error
+	//	404: Error
+	//	415: Error
+	id, ok := handler.GetPathParameter(c, "id")
+	if !ok {
+		return
+	}
+
+	ctx := c.Request.Context()
+	user, err := handler.GetUserFromContext(ctx)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	instance, err := h.instanceService.FindDeploymentInstanceById(ctx, id)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	deployment, err := h.instanceService.FindDeploymentById(ctx, instance.DeploymentID)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	canRead := handler.CanReadDeployment(user, deployment)
+	if !canRead {
+		_ = c.Error(errdef.NewUnauthorized("read access denied"))
+		return
+	}
+
+	components, err := h.instanceService.Components(ctx, instance)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	c.JSON(http.StatusOK, components)
 }
 
 // DeleteDeploymentInstance delete deployment instance by id
@@ -707,6 +811,25 @@ func (h Handler) DeleteDeploymentInstance(c *gin.Context) {
 	c.Status(http.StatusAccepted)
 }
 
+// logTailLines reads the "tail" query parameter: absent means the default amount of the log, 0
+// means all of it, and anything else is that many lines from the end.
+func logTailLines(tail string) (*int64, error) {
+	if tail == "" {
+		lines := DefaultLogTailLines
+		return &lines, nil
+	}
+
+	lines, err := strconv.ParseInt(tail, 10, 64)
+	if err != nil || lines < 0 {
+		return nil, errdef.NewBadRequest("tail must be a positive number of lines, or 0 for the whole log")
+	}
+	if lines == 0 {
+		return nil, nil
+	}
+
+	return &lines, nil
+}
+
 // Logs instance
 func (h Handler) Logs(c *gin.Context) {
 	// swagger:route GET /instances/{id}/logs instanceLogs
@@ -762,7 +885,16 @@ func (h Handler) Logs(c *gin.Context) {
 	}
 
 	selector := c.Query("selector")
-	r, err := h.instanceService.Logs(instance, group, selector)
+	replica := c.Query("replica")
+	container := c.Query("container")
+
+	tailLines, err := logTailLines(c.Query("tail"))
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	r, err := h.instanceService.Logs(ctx, instance, group, selector, replica, container, tailLines)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -871,6 +1003,7 @@ func (h Handler) DeleteDeployment(c *gin.Context) {
 	//	401: Error
 	//	403: Error
 	//	404: Error
+	//	409: Error
 	//	415: Error
 	id, ok := handler.GetPathParameter(c, "id")
 	if !ok {
@@ -899,7 +1032,7 @@ func (h Handler) DeleteDeployment(c *gin.Context) {
 
 	err = h.instanceService.DeleteDeployment(ctx, deployment)
 	if err != nil {
-		_ = c.Error(fmt.Errorf("unable to delete deployment: %v", err))
+		_ = c.Error(fmt.Errorf("unable to delete deployment: %w", err))
 		return
 	}
 
@@ -955,7 +1088,7 @@ func (h Handler) Status(c *gin.Context) {
 		return
 	}
 
-	status, err := h.instanceService.GetStatus(instance)
+	status, err := h.instanceService.GetStatus(ctx, instance)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -1039,6 +1172,102 @@ func (h Handler) UpdateInstance(c *gin.Context) {
 	c.JSON(http.StatusOK, instance)
 }
 
+// EditDeploymentRequest is a diff against the deployment, not a snapshot of it. An absent field, an
+// absent stack and an absent parameter all mean unchanged, which is the only contract a form can
+// honour when reads answer with *** in place of every sensitive value.
+//
+// swagger:model EditDeploymentRequest
+type EditDeploymentRequest struct {
+	Description *string `json:"description"`
+	TTL         *uint   `json:"ttl"`
+	// Instances are keyed by stack name, the key a deployment's instances are unique by and the only
+	// one that can name a companion that does not exist yet.
+	Instances map[string]EditInstanceRequest `json:"instances"`
+}
+
+// swagger:model EditInstanceRequest
+type EditInstanceRequest struct {
+	Parameters Parameters `json:"parameters"`
+	Public     *bool      `json:"public"`
+}
+
+// EditDeployment edits a deployment
+func (h Handler) EditDeployment(c *gin.Context) {
+	// swagger:route PATCH /deployments/{id} editDeployment
+	//
+	// Edit a deployment
+	//
+	// Edit a deployment and everything in it in one request. Whatever the edit changes is redeployed
+	// in the background; the response carries the deployment as it now stands.
+	//
+	// Security:
+	//   oauth2:
+	//
+	// Responses:
+	//   202: Deployment
+	//   400: Error
+	//   401: Error
+	//   403: Error
+	//   404: Error
+	//   409: Error
+	//   415: Error
+	id, ok := handler.GetPathParameter(c, "id")
+	if !ok {
+		return
+	}
+
+	var request EditDeploymentRequest
+	if err := handler.DataBinder(c, &request); err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	token, err := handler.GetTokenFromRequest(c)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	ctx := c.Request.Context()
+	user, err := handler.GetUserFromContext(ctx)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	deployment, err := h.instanceService.FindDeploymentById(ctx, id)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	if canWrite := handler.CanWriteDeployment(user, deployment); !canWrite {
+		_ = c.Error(errdef.NewUnauthorized("write access denied"))
+		return
+	}
+
+	edit := Edit{Description: request.Description, TTL: request.TTL}
+	if len(request.Instances) > 0 {
+		edit.Instances = make(map[string]InstanceEdit, len(request.Instances))
+		for stackName, instanceRequest := range request.Instances {
+			edit.Instances[stackName] = InstanceEdit(instanceRequest)
+		}
+	}
+
+	edited, err := h.deploymentService.EditDeployment(ctx, token, id, edit, user.ID)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	if err := h.stripDeploymentSensitiveParameterValues(edited); err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	c.JSON(http.StatusAccepted, edited)
+}
+
 type UpdateDeploymentRequest struct {
 	TTL         uint   `json:"ttl"`
 	Description string `json:"description"`
@@ -1099,7 +1328,13 @@ func (h Handler) UpdateDeployment(c *gin.Context) {
 		return
 	}
 
-	updatedDeployment, err := h.deploymentService.UpdateDeployment(ctx, token, id, request.TTL, request.Description)
+	updatedDeployment, err := h.deploymentService.UpdateDeployment(ctx, token, id, request.TTL, request.Description, user.ID)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	err = h.stripDeploymentSensitiveParameterValues(updatedDeployment)
 	if err != nil {
 		_ = c.Error(err)
 		return
