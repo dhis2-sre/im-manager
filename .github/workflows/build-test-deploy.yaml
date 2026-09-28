@@ -27,6 +27,7 @@ jobs:
       CACHE_NAMESPACE: im-manager-full
       PROCESS_NAME: im-manager
       POD_NAME: im-manager
+      SERVICE_NAME: prod
     secrets:
       DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
       DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
