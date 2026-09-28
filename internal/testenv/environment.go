@@ -28,7 +28,7 @@ const (
 	postgresImage   = "postgres:16.2"
 	redisImage      = "redis:6.0.9"
 	localstackImage = "localstack/localstack:3.0.0"
-	minioImage      = "quay.io/minio/minio:RELEASE.2025-01-20T14-49-07Z"
+	minioImage      = "bitnamilegacy/minio:2025.1.20-debian-12-r0"
 )
 
 const ConfigEnv = "IM_TEST_SERVICES"
@@ -81,8 +81,8 @@ func New() *Environment {
 	e.minio = sync.OnceValues(func() (string, error) {
 		return e.startEndpoint(testcontainers.ContainerRequest{
 			Image: minioImage, ExposedPorts: []string{"9000/tcp"},
-			Env:        map[string]string{"MINIO_ROOT_USER": AccessKey, "MINIO_ROOT_PASSWORD": SecretKey},
-			Cmd:        []string{"server", "/data"},
+			Env:        map[string]string{"MINIO_ROOT_USER": AccessKey, "MINIO_ROOT_PASSWORD": SecretKey, "MINIO_SKIP_CLIENT": "yes"},
+			Cmd:        []string{"/opt/bitnami/scripts/minio/run.sh"},
 			WaitingFor: wait.ForHTTP("/minio/health/ready").WithPort("9000/tcp"),
 		}, "9000/tcp", "")
 	})
