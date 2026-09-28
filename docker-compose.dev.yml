@@ -114,8 +114,8 @@ services:
     profiles:
       - dev
       - prod
-    # The build the minio stack runs. MinIO stopped publishing images of its own, and its quay.io
-    # and Docker Hub repositories no longer serve them.
+    # The build the minio stack's seed sidecar runs. MinIO stopped publishing images of its own, and
+    # its quay.io and Docker Hub repositories no longer serve them.
     image: bitnamilegacy/minio:2025.1.20-debian-12-r0
     ports:
       - "9000:9000"
