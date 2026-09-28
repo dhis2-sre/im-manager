@@ -60,12 +60,12 @@ func (r repository) DeleteDeployment(ctx context.Context, deployment *model.Depl
 	// cancellation can lead to rollbacks which we should decide individually.
 	ctx = context.WithoutCancel(ctx)
 
-	err := r.db.WithContext(ctx).Unscoped().Delete(&model.Deployment{}, deployment).Error
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return errdef.NewNotFound("deployment not found by id: %d", deployment.ID)
-		}
-		return fmt.Errorf("failed to delete deployment: %v", err)
+	result := r.db.WithContext(ctx).Unscoped().Delete(&model.Deployment{}, deployment.ID)
+	if result.Error != nil {
+		return fmt.Errorf("failed to delete deployment: %v", result.Error)
+	}
+	if result.RowsAffected == 0 {
+		return errdef.NewNotFound("deployment not found by id: %d", deployment.ID)
 	}
 
 	return nil

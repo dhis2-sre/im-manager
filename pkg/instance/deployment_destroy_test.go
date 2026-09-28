@@ -224,3 +224,34 @@ func TestDeleteDeploymentReleasesTheLockWhenTheDeploymentCannotBeRemoved(t *test
 	require.NoError(t, err)
 	assert.True(t, acquired, "the lock must be free again after a delete that could not remove the deployment")
 }
+
+// The success path, which is what says the lock may be kept: a delete that reports success has to
+// have removed the deployment row. Taking the deploy lock bumps the deployment's updated_at, so a
+// delete that matched on the caller's copy of the row matched nothing and reported success anyway,
+// leaving the deployment behind holding a lock nothing would release.
+func TestDeleteDeploymentRemovesTheDeploymentAndLeavesNoLock(t *testing.T) {
+	db := inttest.SetupDB(t)
+
+	group := model.Group{Name: "group-name", Namespace: "group-name", Hostname: "some-host"}
+	user := &model.User{Email: "delete-succeeds@dhis2.org", Groups: []model.Group{group}}
+	require.NoError(t, db.Create(user).Error)
+	group = user.Groups[0]
+
+	instanceRepo, err := NewRepository(db, "01234567890123456789012345678901")
+	require.NoError(t, err)
+
+	deployment := &model.Deployment{Name: "dep", GroupName: group.Name, UserID: user.ID}
+	require.NoError(t, instanceRepo.SaveDeployment(context.Background(), deployment))
+
+	loaded, err := instanceRepo.FindDeploymentById(context.Background(), deployment.ID)
+	require.NoError(t, err)
+
+	stackService := stack.NewService(stack.Stacks{"whoami-go": stack.WhoamiGo})
+	service := NewService(slog.New(slog.NewTextHandler(os.Stdout, nil)), instanceRepo, stubGroupService{group: &group}, stackService, failingDestroyHelmfile{}, nil, "", kube.NewClients(slog.Default()))
+
+	require.NoError(t, service.DeleteDeployment(context.Background(), loaded))
+
+	var remaining int64
+	require.NoError(t, db.Model(&model.Deployment{}).Where("id = ?", deployment.ID).Count(&remaining).Error)
+	assert.Zero(t, remaining, "a delete that reported success must have removed the deployment")
+}
