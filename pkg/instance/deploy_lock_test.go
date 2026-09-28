@@ -95,6 +95,25 @@ func TestAbandonDeploysInProgressFailsThemAndClearsLocks(t *testing.T) {
 	assert.True(t, acquired, "a restart must leave no lock behind")
 }
 
+// An instance queued behind the one that was deploying is waiting for a goroutine the restart took
+// with it, so it has to be settled too. Left pending it reads as deploying forever, and anything
+// that refuses to act on a deploying deployment refuses forever with it.
+func TestAbandonDeploysInProgressSettlesPendingInstancesToo(t *testing.T) {
+	ctx := context.Background()
+	db, instanceRepo, deployment := setupDeployment(t)
+
+	deploymentInstance := deployment.Instances[0]
+	require.NoError(t, instanceRepo.SaveDeployState(ctx, deploymentInstance, model.DeployStatusPending, ""))
+
+	abandoned, err := instanceRepo.AbandonDeploysInProgress(ctx, "interrupted")
+	require.NoError(t, err)
+	assert.EqualValues(t, 1, abandoned)
+
+	var reloaded model.DeploymentInstance
+	require.NoError(t, db.First(&reloaded, deploymentInstance.ID).Error)
+	assert.Equal(t, model.DeployStatusFailed, reloaded.DeployStatus)
+}
+
 // A deploy that succeeds is the only one that gets a timestamp, so "when was this last deployed"
 // cannot be answered with the moment it last failed.
 func TestSaveDeployStateTimestampsOnlyASuccessfulDeploy(t *testing.T) {
