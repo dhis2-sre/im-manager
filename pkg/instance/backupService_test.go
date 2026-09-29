@@ -107,7 +107,10 @@ func TestFilestoreRestoreMarker(t *testing.T) {
 }
 
 func setupMinio(t *testing.T, ctx context.Context) (*minioContainer.MinioContainer, *minio.Client) {
-	container, err := minioContainer.Run(ctx, "quay.io/minio/minio:RELEASE.2025-01-20T14-49-07Z")
+	container, err := minioContainer.Run(ctx, "bitnamilegacy/minio:2025.1.20-debian-12-r0",
+		testcontainers.WithCmd("/opt/bitnami/scripts/minio/run.sh"),
+		testcontainers.WithEnv(map[string]string{"MINIO_SKIP_CLIENT": "yes"}),
+	)
 	require.NoError(t, err)
 
 	endpoint, err := container.Endpoint(ctx, "")
