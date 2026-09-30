@@ -9,6 +9,10 @@ on:
         description: 'Ignore deployments whose TTL expired less than this many hours ago'
         required: false
         default: '1'
+      ignore_cluster_ids:
+        description: 'Space-separated Instance Manager cluster ids to skip, for clusters no kubeconfig here reaches'
+        required: false
+        default: ''
 
 jobs:
   find-drifted-deployments:
@@ -46,7 +50,6 @@ jobs:
 
       - name: Create kubeconfig files
         run: |
-          echo "${{ secrets.KUBECONFIG }}" > /tmp/eks-kubeconfig
           echo "${{ secrets.HETZNER_KUBECONFIG_RO }}" > /tmp/hetzner-kubeconfig
 
       - name: Find drifted deployments
@@ -54,22 +57,15 @@ jobs:
         run: |
           set -o pipefail
 
-          # Which cluster each kubeconfig reaches is deployment data, not something to hardcode
-          # here: DRIFT_CLUSTERS is a repository variable holding space-separated NAME=PATH
-          # pairs, where NAME is the cluster's name in Instance Manager.
-          if [ -z "$DRIFT_CLUSTERS" ]; then
-            echo "DRIFT_CLUSTERS is not set. Set it to the Instance Manager cluster names and their kubeconfigs, for example 'hetzner=/tmp/hetzner-kubeconfig eks=/tmp/eks-kubeconfig'."
-            exit 1
-          fi
-
-          CLUSTER_ARGS=""
-          for pair in $DRIFT_CLUSTERS; do
-            CLUSTER_ARGS="$CLUSTER_ARGS --cluster $pair"
+          IGNORE_ARGS=""
+          for cluster_id in $IGNORE_CLUSTER_IDS; do
+            IGNORE_ARGS="$IGNORE_ARGS --ignore-cluster-id $cluster_id"
           done
 
           venv/bin/python scripts/util/find-drifted-deployments.py \
-            $CLUSTER_ARGS \
-            --ttl-grace-hours ${{ github.event.inputs.ttl_grace_hours || '1' }} |
+            --kubeconfig /tmp/hetzner-kubeconfig \
+            $IGNORE_ARGS \
+            --ttl-grace-hours "${TTL_GRACE_HOURS:-1}" |
             tee /tmp/find-drifted-deployments-output
 
           MISSING_COUNT=$(grep '^Deployed instances with no workloads (' /tmp/find-drifted-deployments-output | grep --only-matching --regexp='([0-9]\+)' | tr --delete '()' || echo "0")
@@ -92,11 +88,14 @@ jobs:
 
           {
             echo "unchecked<<UNCHECKED_EOF"
-            sed -n '/^Unchecked clusters/,/^$/p' /tmp/find-drifted-deployments-output | sed '$d'
+            sed -n '/^Unreadable clusters/,/^$/p' /tmp/find-drifted-deployments-output | sed '$d'
             echo "UNCHECKED_EOF"
           } >> $GITHUB_OUTPUT
         env:
-          DRIFT_CLUSTERS: ${{ vars.DRIFT_CLUSTERS }}
+          # Through the environment rather than interpolated into the script, so a dispatch
+          # input cannot inject shell.
+          IGNORE_CLUSTER_IDS: ${{ github.event.inputs.ignore_cluster_ids }}
+          TTL_GRACE_HOURS: ${{ github.event.inputs.ttl_grace_hours }}
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 

@@ -25,12 +25,17 @@ every finding is a bug report about Instance Manager or about the cluster it dri
 
 Check 2 needs no cluster access, so it still reports when every kubeconfig is expired.
 
-Clusters are named rather than guessed: --cluster NAME=PATH ties a kubeconfig to the
-cluster of that name in Instance Manager. A cluster Instance Manager knows about that was
-given no kubeconfig is reported as unchecked rather than silently skipped, and its
-instances are left out of check 1 instead of being called drifted. An empty cache or an
-unreadable cluster must never read as "nothing is running there", which would report
-every instance on it at once.
+Check 1 compares against every kubeconfig given, and a kubeconfig that cannot be read
+withdraws the check rather than narrowing it. An unreadable cluster looks exactly like a
+cluster running nothing, so continuing would report every instance on it at once, and an
+alarm that cries wolf once is an alarm nobody reads again.
+
+That leaves instances on a cluster no kubeconfig reaches, which would be reported as
+having lost workloads that are in fact running somewhere this script cannot see. Rather
+than resolve each deployment's cluster to a kubeconfig, which would mean naming clusters
+here, findings are grouped by the cluster id Instance Manager holds, so a cluster that is
+not covered stands out as a block of findings sharing one id. --ignore-cluster-id drops
+it until its kubeconfig is added.
 """
 
 import argparse
@@ -39,10 +44,9 @@ import os
 import shlex
 import subprocess
 import sys
-from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
-from typing import Dict, List, Optional, Set, Tuple
+from typing import List, Optional, Set
 
 import requests
 
@@ -83,17 +87,16 @@ class Deployment:
 @dataclass
 class ClusterReport:
     """What one cluster's pods say. A cluster that could not be read carries its error and
-    contributes nothing to the findings, so an expired kubeconfig shows up as a gap in
-    coverage rather than as every instance on that cluster having lost its workloads."""
+    withdraws check 1 entirely, because an unreadable cluster is indistinguishable from one
+    running nothing."""
 
-    name: str
-    kubeconfig: Optional[str] = None
-    namespaces_by_instance_id: Dict[int, Set[str]] = field(default_factory=dict)
+    kubeconfig: str
+    instance_ids: Set[int] = field(default_factory=set)
     error: Optional[str] = None
 
     @property
-    def checked(self) -> bool:
-        return self.kubeconfig is not None and self.error is None
+    def name(self) -> str:
+        return os.path.basename(self.kubeconfig)
 
 
 @dataclass
@@ -195,14 +198,6 @@ def get_json(access_token: str, url: str):
     return response.json()
 
 
-def get_cluster_names(access_token: str, im_host: str, environment: str) -> Dict[Tuple[str, int], str]:
-    """Cluster names keyed by environment as well as id. Prod and dev are separate databases
-    whose cluster ids collide, so merging them on id alone points a dev deployment at whichever
-    cluster prod happens to have under the same number."""
-    clusters = get_json(access_token, f"{im_host}/clusters")
-    return {(environment, cluster["id"]): cluster["name"].strip() for cluster in clusters}
-
-
 def get_deployments(access_token: str, im_host: str, environment: str) -> List[Deployment]:
     print(f"Fetching deployments from Instance Manager ({environment})...")
     groups = get_json(access_token, f"{im_host}/deployments")
@@ -239,7 +234,7 @@ def get_deployments(access_token: str, im_host: str, environment: str) -> List[D
     return deployments
 
 
-def get_all_deployments() -> Tuple[List[Deployment], Dict[Tuple[str, int], str]]:
+def get_all_deployments() -> List[Deployment]:
     env_configs = [(env, os.environ.get(env_var)) for env, env_var in ENVIRONMENTS if os.environ.get(env_var)]
 
     if not env_configs:
@@ -247,19 +242,17 @@ def get_all_deployments() -> Tuple[List[Deployment], Dict[Tuple[str, int], str]]
         sys.exit(1)
 
     deployments = []
-    cluster_names = {}
 
     for environment, im_host in env_configs:
         print(f"Authenticating with Instance Manager ({environment})...")
         access_token = authenticate(im_host, environment)
-        cluster_names.update(get_cluster_names(access_token, im_host, environment))
         deployments.extend(get_deployments(access_token, im_host, environment))
 
-    return deployments, cluster_names
+    return deployments
 
 
-def read_cluster(name: str, kubeconfig: str) -> ClusterReport:
-    report = ClusterReport(name=name, kubeconfig=kubeconfig)
+def read_cluster(kubeconfig: str) -> ClusterReport:
+    report = ClusterReport(kubeconfig=kubeconfig)
 
     try:
         pods = kubectl_json(kubeconfig, "get", "pods", "--all-namespaces", "--selector", INSTANCE_ID_LABEL)
@@ -270,55 +263,50 @@ def read_cluster(name: str, kubeconfig: str) -> ClusterReport:
         report.error = f"could not parse the pod listing: {e}"
         return report
 
-    namespaces_by_instance_id = defaultdict(set)
     for pod in pods.get("items") or []:
-        metadata = pod["metadata"]
-        label = (metadata.get("labels") or {}).get(INSTANCE_ID_LABEL)
+        label = (pod["metadata"].get("labels") or {}).get(INSTANCE_ID_LABEL)
         try:
-            instance_id = int(label)
+            report.instance_ids.add(int(label))
         except (TypeError, ValueError):
             continue
-        namespaces_by_instance_id[instance_id].add(metadata["namespace"])
 
-    report.namespaces_by_instance_id = dict(namespaces_by_instance_id)
     return report
 
 
-def read_clusters(cluster_kubeconfigs: Dict[str, str], cluster_names: Dict[Tuple[str, int], str]) -> Dict[str, ClusterReport]:
+def read_clusters(kubeconfigs: List[str]) -> List[ClusterReport]:
     print("\nReading pods from the clusters...")
 
-    reports = {}
-    for name in sorted(set(cluster_names.values()) | set(cluster_kubeconfigs)):
-        kubeconfig = cluster_kubeconfigs.get(name)
-        if kubeconfig is None:
-            reports[name] = ClusterReport(name=name)
-            print(f"  {name}: no kubeconfig given, not checked")
-            continue
-
-        report = read_cluster(name, kubeconfig)
-        reports[name] = report
+    reports = []
+    for kubeconfig in kubeconfigs:
+        report = read_cluster(kubeconfig)
+        reports.append(report)
         if report.error:
-            print(f"  {name}: {report.error}")
+            print(f"  {report.name}: {report.error}")
         else:
-            print(f"  {name}: {len(report.namespaces_by_instance_id)} instances running")
+            print(f"  {report.name}: {len(report.instance_ids)} instances running")
 
     return reports
 
 
-def find_missing_workloads(deployments: List[Deployment], reports: Dict[str, ClusterReport], cluster_names: Dict[Tuple[str, int], str]) -> List[MissingWorkloads]:
-    missing = []
+def find_missing_workloads(deployments: List[Deployment], reports: List[ClusterReport], ignored_cluster_ids: Set[int]) -> List[MissingWorkloads]:
+    """Instances whose im-id no checked cluster is running. Withdrawn entirely when any
+    kubeconfig failed, since the instances that cluster was running cannot be told apart from
+    the ones that really have lost their workloads."""
+    if any(report.error for report in reports):
+        return []
 
+    running = set().union(*(report.instance_ids for report in reports)) if reports else set()
+
+    missing = []
     for deployment in deployments:
-        cluster_name = cluster_names.get((deployment.environment, deployment.cluster_id)) if deployment.cluster_id else None
-        report = reports.get(cluster_name) if cluster_name else None
-        if report is None or not report.checked:
+        if deployment.cluster_id in ignored_cluster_ids:
             continue
 
         for instance in deployment.instances:
             if instance.deploy_status != DEPLOYED_STATUS:
                 continue
 
-            if instance.id not in report.namespaces_by_instance_id:
+            if instance.id not in running:
                 missing.append(MissingWorkloads(deployment=deployment, instance=instance))
 
     return missing
@@ -348,23 +336,16 @@ def describe_overdue(overdue: timedelta) -> str:
     return f"{hours}h"
 
 
-def print_unchecked(reports: Dict[str, ClusterReport], deployments: List[Deployment]):
-    unchecked = [report for report in reports.values() if not report.checked]
-    clusterless = [deployment for deployment in deployments if not deployment.cluster_id]
-
-    if not unchecked and not clusterless:
+def print_unchecked(reports: List[ClusterReport]):
+    unreadable = [report for report in reports if report.error]
+    if not unreadable:
         return
 
     print()
-    print(f"Unchecked clusters ({len(unchecked)}):")
-    for report in sorted(unchecked, key=lambda report: report.name):
-        reason = report.error or "no kubeconfig given"
-        print(f"  {report.name}: {reason}")
-
-    if clusterless:
-        print(f"  {len(clusterless)} deployment(s) belong to a group with no cluster, so there is no cluster to check them against")
-
-    print("  Instances in these clusters were not checked, so the counts below are incomplete")
+    print(f"Unreadable clusters ({len(unreadable)}):")
+    for report in unreadable:
+        print(f"  {report.name}: {report.error}")
+    print("  A cluster that cannot be read looks the same as a cluster running nothing, so the workload check is withdrawn rather than reporting every instance at once")
     print()
 
 
@@ -376,10 +357,13 @@ def print_missing_workloads(missing: List[MissingWorkloads]):
         return
 
     print(f"\nDeployed instances with no workloads ({len(missing)}):")
-    for finding in sorted(missing, key=lambda finding: (finding.deployment.environment, finding.deployment.group, finding.deployment.name, finding.instance.name)):
+    for finding in sorted(missing, key=lambda finding: (finding.deployment.cluster_id or 0, finding.deployment.environment, finding.deployment.group, finding.deployment.name, finding.instance.name)):
         deployment = finding.deployment
         instance = finding.instance
-        print(f"  {deployment.environment} / {deployment.group} / {deployment.name} / {instance.name} ({instance.stack}), im-id {instance.id}, namespace {deployment.namespace}")
+        cluster = f"cluster {deployment.cluster_id}" if deployment.cluster_id else "no cluster"
+        print(f"  {deployment.environment} / {deployment.group} / {deployment.name} / {instance.name} ({instance.stack}), im-id {instance.id}, namespace {deployment.namespace}, {cluster}")
+    print()
+    print("Findings sharing one cluster id are likely a cluster no kubeconfig here reaches, whose instances are running where this check cannot see them. Add its kubeconfig, or pass --ignore-cluster-id to drop it.")
     print()
 
 
@@ -399,26 +383,16 @@ def print_expired_deployments(expired: List[ExpiredDeployment]):
     print()
 
 
-def parse_cluster_arguments(values: List[str]) -> Dict[str, str]:
-    kubeconfigs = {}
-    for value in values:
-        name, separator, path = value.partition("=")
-        if not separator or not name.strip() or not path.strip():
-            print(f"Error: --cluster expects NAME=PATH, got {value!r}")
-            sys.exit(1)
-        kubeconfigs[name.strip()] = path.strip()
-    return kubeconfigs
-
-
 def main():
     parser = argparse.ArgumentParser(
         description="Find deployments Instance Manager records as deployed whose workloads are gone, and deployments that have outlived their TTL."
     )
+    parser.add_argument("--kubeconfig", action="append", help="Path to kubeconfig file (can be used multiple times)")
     parser.add_argument(
-        "--cluster",
+        "--ignore-cluster-id",
         action="append",
-        metavar="NAME=PATH",
-        help="An Instance Manager cluster name and the kubeconfig that reaches it (can be used multiple times)",
+        type=int,
+        help="Skip deployments on this Instance Manager cluster, for a cluster no kubeconfig here reaches (can be used multiple times)",
     )
     parser.add_argument(
         "--ttl-grace-hours",
@@ -428,21 +402,23 @@ def main():
     )
     args = parser.parse_args()
 
-    cluster_kubeconfigs = parse_cluster_arguments(args.cluster or [])
-    if not cluster_kubeconfigs:
-        print("Error: At least one --cluster NAME=PATH must be provided")
+    kubeconfigs = args.kubeconfig or []
+    if not kubeconfigs:
+        print("Error: At least one --kubeconfig must be provided")
         sys.exit(1)
+
+    ignored_cluster_ids = set(args.ignore_cluster_id or [])
 
     print("Drifted Deployments Check")
     print_separator()
 
-    deployments, cluster_names = get_all_deployments()
-    reports = read_clusters(cluster_kubeconfigs, cluster_names)
+    deployments = get_all_deployments()
+    reports = read_clusters(kubeconfigs)
 
-    missing = find_missing_workloads(deployments, reports, cluster_names)
+    missing = find_missing_workloads(deployments, reports, ignored_cluster_ids)
     expired = find_expired_deployments(deployments, timedelta(hours=args.ttl_grace_hours))
 
-    print_unchecked(reports, deployments)
+    print_unchecked(reports)
     print_missing_workloads(missing)
     print_expired_deployments(expired)
 
