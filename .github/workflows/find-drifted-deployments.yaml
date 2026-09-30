@@ -1,0 +1,138 @@
+name: Find Drifted Deployments
+
+on:
+  schedule:
+    - cron: '0 7 * * *'
+  workflow_dispatch:
+    inputs:
+      ttl_grace_hours:
+        description: 'Ignore deployments whose TTL expired less than this many hours ago'
+        required: false
+        default: '1'
+
+jobs:
+  find-drifted-deployments:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Install kubectl
+        uses: alexellis/arkade-get@master
+        with:
+          kubectl: v1.31.4
+
+      - name: Install Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.x'
+
+      - name: Set up Python virtual environment
+        run: |
+          python -m venv venv
+          venv/bin/pip install -r scripts/util/requirements.txt
+
+      - name: Set up Instance Manager credentials
+        run: |
+          echo "IM_HOST_PROD=https://api.im.dhis2.org" >> $GITHUB_ENV
+          echo "USER_EMAIL_PROD=${{ secrets.IM_ADMIN_USER }}" >> $GITHUB_ENV
+          echo "PASSWORD_PROD=${{ secrets.IM_ADMIN_PASSWORD }}" >> $GITHUB_ENV
+
+          echo "IM_HOST_DEV=https://api.im-dev.dhis2.org" >> $GITHUB_ENV
+          echo "USER_EMAIL_DEV=${{ secrets.IM_ADMIN_USER_DEV }}" >> $GITHUB_ENV
+          echo "PASSWORD_DEV=${{ secrets.IM_ADMIN_PASSWORD_DEV }}" >> $GITHUB_ENV
+
+          echo "HTTP=${{ github.workspace }}/venv/bin/https --check-status" >> $GITHUB_ENV
+
+      - name: Create kubeconfig files
+        run: |
+          echo "${{ secrets.KUBECONFIG }}" > /tmp/eks-kubeconfig
+          echo "${{ secrets.HETZNER_KUBECONFIG_RO }}" > /tmp/hetzner-kubeconfig
+
+      - name: Find drifted deployments
+        id: find-drifted-deployments
+        run: |
+          set -o pipefail
+
+          # Which cluster each kubeconfig reaches is deployment data, not something to hardcode
+          # here: DRIFT_CLUSTERS is a repository variable holding space-separated NAME=PATH
+          # pairs, where NAME is the cluster's name in Instance Manager.
+          if [ -z "$DRIFT_CLUSTERS" ]; then
+            echo "DRIFT_CLUSTERS is not set. Set it to the Instance Manager cluster names and their kubeconfigs, for example 'hetzner=/tmp/hetzner-kubeconfig eks=/tmp/eks-kubeconfig'."
+            exit 1
+          fi
+
+          CLUSTER_ARGS=""
+          for pair in $DRIFT_CLUSTERS; do
+            CLUSTER_ARGS="$CLUSTER_ARGS --cluster $pair"
+          done
+
+          venv/bin/python scripts/util/find-drifted-deployments.py \
+            $CLUSTER_ARGS \
+            --ttl-grace-hours ${{ github.event.inputs.ttl_grace_hours || '1' }} |
+            tee /tmp/find-drifted-deployments-output
+
+          MISSING_COUNT=$(grep '^Deployed instances with no workloads (' /tmp/find-drifted-deployments-output | grep --only-matching --regexp='([0-9]\+)' | tr --delete '()' || echo "0")
+          echo "missing_count=${MISSING_COUNT:-0}" >> $GITHUB_OUTPUT
+
+          EXPIRED_COUNT=$(grep '^Deployments past their TTL (' /tmp/find-drifted-deployments-output | grep --only-matching --regexp='([0-9]\+)' | tr --delete '()' || echo "0")
+          echo "expired_count=${EXPIRED_COUNT:-0}" >> $GITHUB_OUTPUT
+
+          {
+            echo "missing_list<<MISSING_EOF"
+            sed -n '/^Deployed instances with no workloads (/,/^$/p' /tmp/find-drifted-deployments-output | sed '1d;$d'
+            echo "MISSING_EOF"
+          } >> $GITHUB_OUTPUT
+
+          {
+            echo "expired_list<<EXPIRED_EOF"
+            sed -n '/^Deployments past their TTL (/,/^$/p' /tmp/find-drifted-deployments-output | sed '1d;$d'
+            echo "EXPIRED_EOF"
+          } >> $GITHUB_OUTPUT
+
+          {
+            echo "unchecked<<UNCHECKED_EOF"
+            sed -n '/^Unchecked clusters/,/^$/p' /tmp/find-drifted-deployments-output | sed '$d'
+            echo "UNCHECKED_EOF"
+          } >> $GITHUB_OUTPUT
+        env:
+          DRIFT_CLUSTERS: ${{ vars.DRIFT_CLUSTERS }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+      - name: Send Slack notification
+        if: steps.find-drifted-deployments.outputs.missing_count > '0' || steps.find-drifted-deployments.outputs.expired_count > '0' || steps.find-drifted-deployments.outputs.unchecked != ''
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+          SLACK_CHANNEL: 'team-devops-internal'
+          SLACK_MESSAGE: |
+            :mag: Instance Manager and the clusters disagree
+
+            ${{ steps.find-drifted-deployments.outputs.missing_count }} deployed instance(s) have no workloads, and ${{ steps.find-drifted-deployments.outputs.expired_count }} deployment(s) have outlived their TTL. Both are defects rather than states, so each one is worth a look at what produced it.
+            ${{ steps.find-drifted-deployments.outputs.unchecked }}
+
+            ```
+            ${{ steps.find-drifted-deployments.outputs.missing_list }}
+            ```
+
+            ```
+            ${{ steps.find-drifted-deployments.outputs.expired_list }}
+            ```
+
+            https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          SLACK_COLOR: 'warning'
+
+      - name: Report a failed check to Slack
+        if: failure()
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+          SLACK_CHANNEL: 'team-devops-internal'
+          SLACK_MESSAGE: |
+            :rotating_light: The drifted deployment check failed to run
+
+            Nothing was reported because the check itself did not finish, so treat its last result as stale.
+
+            https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          SLACK_COLOR: 'failure'
