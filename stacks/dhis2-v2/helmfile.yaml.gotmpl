@@ -3,6 +3,10 @@
 helmDefaults:
   createNamespace: false
   deleteWait: true
+  # Helm waits this long for the post-install seed hook instead of its 5 minute default, which a
+  # restore of anything but a small database outlasts. Kept below instance manager's DeployTimeout
+  # so helm reports its own timeout before the deploy is killed.
+  timeout: 1680
 
 releases:
   - name: "{{ requiredEnv "INSTANCE_NAME" }}"
