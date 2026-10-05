@@ -258,6 +258,24 @@ func TestComponentNamesMatchHelmfileImType(t *testing.T) {
 	}
 }
 
+// TestDHIS2V2NamesItsResourcesAfterTheReleaseWithTheDHIS2Suffix asserts the helmfile pins the
+// chart's fullname to <release>-dhis2, which the database hostname and cluster are derived from.
+// Left to the chart, a release name already containing "dhis2" loses the suffix.
+func TestDHIS2V2NamesItsResourcesAfterTheReleaseWithTheDHIS2Suffix(t *testing.T) {
+	helmfile, err := os.ReadFile("../../stacks/dhis2-v2/helmfile.yaml.gotmpl")
+	require.NoError(t, err)
+	assert.Contains(t, string(helmfile), `- fullnameOverride: "{{ requiredEnv "INSTANCE_NAME" }}-dhis2"`)
+
+	instance := model.DeploymentInstance{Name: "dhis2-play", Group: &model.Group{ID: 7, Namespace: "play"}}
+	hostname, err := dhis2V2PostgresHostnameProvider.Provide(instance)
+	require.NoError(t, err)
+	assert.Equal(t, "dhis2-play-7-dhis2-postgresql-rw.play.svc", hostname)
+
+	db, err := kube.FindComponent(DHIS2V2.Components, "db")
+	require.NoError(t, err)
+	assert.Equal(t, "%s-dhis2-postgresql", db.(CNPGPostgresComponent).ClusterPattern)
+}
+
 // TestComponentPVCSelectorParity asserts the union of each stack's component PVC selectors is the
 // one expected per stack, empty for the stacks that claim no volumes.
 func TestComponentPVCSelectorParity(t *testing.T) {
