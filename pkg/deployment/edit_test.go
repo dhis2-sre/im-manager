@@ -75,7 +75,7 @@ func TestEditPersistsOnlyTheTerminalEvent(t *testing.T) {
 	awaitUnlocked(t, instanceService)
 
 	var persisted []recordedEvent
-	for _, event := range publisher.recorded() {
+	for _, event := range awaitTerminalEvent(t, publisher) {
 		if !event.transient {
 			persisted = append(persisted, event)
 		}
