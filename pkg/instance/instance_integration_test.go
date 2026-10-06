@@ -481,6 +481,29 @@ func TestInstanceHandler(t *testing.T) {
 		destroyDeployment(t, client, deployment.ID, tokens.AccessToken)
 	})
 
+	t.Run("DeploymentNameAvailability", func(t *testing.T) {
+		t.Parallel()
+		createDeployment(t, client, "taken-name", tokens.AccessToken)
+
+		var availability instance.DeploymentNameAvailability
+		client.GetJSON(t, "/deployments/availability?group=group-name&name=taken-name", &availability, inttest.WithAuthToken(tokens.AccessToken))
+		assert.False(t, availability.Available)
+		assert.Contains(t, availability.Reason, "already exists")
+
+		availability = instance.DeploymentNameAvailability{}
+		client.GetJSON(t, "/deployments/availability?group=group-name&name=free-name", &availability, inttest.WithAuthToken(tokens.AccessToken))
+		assert.True(t, availability.Available)
+		assert.Empty(t, availability.Reason)
+
+		availability = instance.DeploymentNameAvailability{}
+		client.GetJSON(t, "/deployments/availability?group=group-name&name=Not_Valid", &availability, inttest.WithAuthToken(tokens.AccessToken))
+		assert.False(t, availability.Available)
+		assert.Contains(t, availability.Reason, "lowercase")
+
+		client.Do(t, http.MethodGet, "/deployments/availability?group=group-name", nil, http.StatusBadRequest, inttest.WithAuthToken(tokens.AccessToken))
+		client.Do(t, http.MethodGet, "/deployments/availability?group=group-name&name=free-name&user=non-member", nil, http.StatusUnauthorized, inttest.WithAuthToken(tokens.AccessToken))
+	})
+
 	t.Run("UpdateDeployment", func(t *testing.T) {
 		t.Parallel()
 		deployment := createDeployment(t, client, "test-deployment-update", tokens.AccessToken, WithDescription("initial description"), WithTTL(86400))

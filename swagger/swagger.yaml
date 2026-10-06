@@ -319,6 +319,16 @@ definitions:
             $ref: '#/definitions/DeploymentInstanceParameter'
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/model
+    DeploymentNameAvailability:
+        properties:
+            available:
+                type: boolean
+                x-go-name: Available
+            reason:
+                type: string
+                x-go-name: Reason
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
     EditDeploymentRequest:
         description: |-
             EditDeploymentRequest is a diff against the deployment, not a snapshot of it. An absent field, an
@@ -1749,6 +1759,35 @@ paths:
             security:
                 - oauth2: []
             summary: Update a Deployment Instance
+    /deployments/availability:
+        get:
+            description: Check whether a deployment name is free to use in a group
+            operationId: deploymentNameAvailability
+            parameters:
+                - in: query
+                  name: group
+                  required: true
+                  type: string
+                  x-go-name: Group
+                - in: query
+                  name: name
+                  required: true
+                  type: string
+                  x-go-name: Name
+            responses:
+                "200":
+                    $ref: '#/responses/DeploymentNameAvailability'
+                "400":
+                    $ref: '#/responses/Error'
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Deployment name availability
     /deployments/public:
         get:
             description: Find all public deployments
@@ -2817,6 +2856,10 @@ responses:
         description: ""
         schema:
             $ref: '#/definitions/DeploymentInstance'
+    DeploymentNameAvailability:
+        description: ""
+        schema:
+            $ref: '#/definitions/DeploymentNameAvailability'
     DownloadDatabaseResponse:
         description: ""
         schema:

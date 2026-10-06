@@ -129,6 +129,23 @@ type GroupsWithPublicInstancesBody struct {
 	Body []GroupWithPublicInstances
 }
 
+// swagger:parameters deploymentNameAvailability
+type _ struct {
+	// in: query
+	// required: true
+	Group string `json:"group"`
+
+	// in: query
+	// required: true
+	Name string `json:"name"`
+}
+
+// swagger:response DeploymentNameAvailability
+type DeploymentNameAvailabilityBody struct {
+	// in: body
+	Body DeploymentNameAvailability
+}
+
 // swagger:parameters saveDeployment
 type _ struct {
 	// Save deployment request body parameter

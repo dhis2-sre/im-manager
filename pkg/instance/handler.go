@@ -15,6 +15,8 @@ import (
 	"github.com/dhis2-sre/im-manager/internal/handler"
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/binding"
+	"github.com/go-playground/validator/v10"
 )
 
 func NewHandler(stackService stack.Service, groupService groupServiceHandler, instanceService *Service, deploymentService deploymentService, defaultTTL uint) Handler {
@@ -215,6 +217,79 @@ func (h Handler) SaveDeployment(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusCreated, deployment)
+}
+
+// swagger:model DeploymentNameAvailability
+type DeploymentNameAvailability struct {
+	Available bool   `json:"available"`
+	Reason    string `json:"reason,omitempty"`
+}
+
+func (h Handler) DeploymentNameAvailability(c *gin.Context) {
+	// swagger:route GET /deployments/availability deploymentNameAvailability
+	//
+	// Deployment name availability
+	//
+	// Check whether a deployment name is free to use in a group
+	//
+	// Security:
+	//	oauth2:
+	//
+	// responses:
+	//	200: DeploymentNameAvailability
+	//	400: Error
+	//	401: Error
+	//	403: Error
+	//	404: Error
+	var request struct {
+		Group string `form:"group" binding:"required"`
+		Name  string `form:"name" binding:"required"`
+	}
+	if err := c.ShouldBindQuery(&request); err != nil {
+		_ = c.Error(errdef.NewBadRequest("group and name query parameters are required"))
+		return
+	}
+
+	ctx := c.Request.Context()
+	group, err := h.groupService.Find(ctx, request.Group)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	user, err := handler.GetUserFromContext(ctx)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	if !handler.CanWriteDeployment(user, &model.Deployment{UserID: user.ID, GroupName: group.Name}) {
+		_ = c.Error(errdef.NewUnauthorized("write access denied"))
+		return
+	}
+
+	if !group.Deployable {
+		_ = c.Error(errdef.NewForbidden("group isn't deployable: %s", group.Name))
+		return
+	}
+
+	if v, ok := binding.Validator.Engine().(*validator.Validate); ok && v.Var(request.Name, "dns_rfc1035_label") != nil {
+		c.JSON(http.StatusOK, DeploymentNameAvailability{Reason: "name must be at most 63 characters of lowercase letters, digits and '-', start with a letter and end with a letter or digit"})
+		return
+	}
+
+	exists, err := h.instanceService.DeploymentNameExists(ctx, group.Name, request.Name)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	if exists {
+		c.JSON(http.StatusOK, DeploymentNameAvailability{Reason: fmt.Sprintf("a deployment named %q already exists in group %q", request.Name, group.Name)})
+		return
+	}
+
+	c.JSON(http.StatusOK, DeploymentNameAvailability{Available: true})
 }
 
 // FindDeploymentById deployment
