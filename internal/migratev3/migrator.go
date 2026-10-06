@@ -256,7 +256,7 @@ func (m *Migrator) snapshot(ctx context.Context, d LegacyDeployment, state *Stat
 			return err
 		}
 		if d.Minio != nil {
-			if err := m.scaleInstance(ctx, cluster, d.Minio, 1); err != nil {
+			if err := m.scaleSelected(ctx, cluster, minioSelector(d), 1); err != nil {
 				return m.undoSnapshot(ctx, cluster, d, state, nil, err)
 			}
 		}
@@ -274,7 +274,7 @@ func (m *Migrator) snapshot(ctx context.Context, d LegacyDeployment, state *Stat
 		filestoreKey, filestoreSize = key(".fs.tar.gz"), size
 	}
 
-	cores, err := cluster.deploymentsBySelector(ctx, instanceSelector(d.Core))
+	cores, err := cluster.deploymentsBySelector(ctx, coreSelector(d))
 	if err != nil {
 		return m.undoSnapshot(ctx, cluster, d, state, nil, err)
 	}
@@ -289,7 +289,7 @@ func (m *Migrator) snapshot(ctx context.Context, d LegacyDeployment, state *Stat
 			return m.undoSnapshot(ctx, cluster, d, state, stopped, err)
 		}
 	}
-	if err := cluster.waitForNoPods(ctx, instanceSelector(d.Core), 10*time.Minute); err != nil {
+	if err := cluster.waitForNoPods(ctx, coreSelector(d), 10*time.Minute); err != nil {
 		return m.undoSnapshot(ctx, cluster, d, state, stopped, err)
 	}
 
@@ -323,21 +323,21 @@ func (m *Migrator) undoSnapshot(ctx context.Context, cluster *Cluster, d LegacyD
 	if state.WasPaused {
 		errs = append(errs, cluster.scaleStatefulSet(ctx, databaseStatefulSet(d), 0))
 		if d.Minio != nil {
-			errs = append(errs, m.scaleInstance(ctx, cluster, d.Minio, 0))
+			errs = append(errs, m.scaleSelected(ctx, cluster, minioSelector(d), 0))
 		}
 	}
 	return errors.Join(errs...)
 }
 
-// scaleInstance scales every deployment of the instance, found by its labels rather than a name
+// scaleSelected scales every deployment matching the selector, found by labels rather than a name
 // the chart version may have chosen differently.
-func (m *Migrator) scaleInstance(ctx context.Context, cluster *Cluster, instance *model.DeploymentInstance, replicas int32) error {
-	deployments, err := cluster.deploymentsBySelector(ctx, instanceSelector(instance))
+func (m *Migrator) scaleSelected(ctx context.Context, cluster *Cluster, selector string, replicas int32) error {
+	deployments, err := cluster.deploymentsBySelector(ctx, selector)
 	if err != nil {
 		return err
 	}
 	if len(deployments) == 0 {
-		return fmt.Errorf("no deployment of instance %d", instance.ID)
+		return fmt.Errorf("no deployment matches %q", selector)
 	}
 	for _, deployment := range deployments {
 		if err := cluster.scaleDeployment(ctx, deployment.Name, replicas); err != nil {
@@ -369,7 +369,7 @@ func (m *Migrator) release(ctx context.Context, state *State) error {
 	}
 	// A filesystem file store's claim can outlive the core release. The dhis2-v2 instance keeps the
 	// core's instance id, so this runs before anything of it exists.
-	if err := cluster.deletePVCsBySelector(ctx, fmt.Sprintf("im-instance-id=%d", state.CoreInstanceID)); err != nil {
+	if err := cluster.deletePVCsBySelector(ctx, instanceSelector(d.ReleaseName(), &model.DeploymentInstance{ID: state.CoreInstanceID})); err != nil {
 		return fail(err)
 	}
 	if state.PgAdminInstanceID != 0 {

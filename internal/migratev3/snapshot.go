@@ -28,9 +28,18 @@ func databaseClaim(d LegacyDeployment) string       { return "data-" + databaseS
 func minioRelease(d LegacyDeployment) string        { return d.ReleaseName() + "-minio" }
 func pgAdminRelease(d LegacyDeployment) string      { return d.ReleaseName() + "-pgadmin" }
 
-func instanceSelector(instance *model.DeploymentInstance) string {
-	return fmt.Sprintf("im-instance-id=%d", instance.ID)
+// instanceSelector selects an instance's workloads by its release as well as its id. Instance ids
+// come from one instance manager's database, and an environment sharing the namespace, such as a
+// feature environment next to dev, numbers its own instances from the same range.
+func instanceSelector(release string, instance *model.DeploymentInstance) string {
+	return fmt.Sprintf("app.kubernetes.io/instance=%s,im-instance-id=%d", release, instance.ID)
 }
+
+func coreSelector(d LegacyDeployment) string { return instanceSelector(d.ReleaseName(), d.Core) }
+func databaseSelector(d LegacyDeployment) string {
+	return instanceSelector(databaseRelease(d), d.Database)
+}
+func minioSelector(d LegacyDeployment) string { return instanceSelector(minioRelease(d), d.Minio) }
 
 // Uploader streams an object to S3, as pkg/storage's S3Client does.
 type Uploader interface {
@@ -54,7 +63,7 @@ func snapshotName(d LegacyDeployment) string {
 // DatabaseSize is the on-disk size of the deployment's database, which orders the migration so the
 // longest dumps start first.
 func DatabaseSize(ctx context.Context, cluster *Cluster, d LegacyDeployment) (int64, error) {
-	pod, err := cluster.readyPod(ctx, instanceSelector(d.Database), time.Minute)
+	pod, err := cluster.readyPod(ctx, databaseSelector(d), time.Minute)
 	if err != nil {
 		return 0, err
 	}
@@ -84,7 +93,7 @@ const pgDumpPlainTrailer = "-- PostgreSQL database dump complete"
 // object's size. It runs as the database's own user with the options a save uses, so the snapshot
 // restores the way a saved database does.
 func (s Snapshotter) DumpDatabase(ctx context.Context, cluster *Cluster, d LegacyDeployment, key string) (int64, error) {
-	pod, err := cluster.readyPod(ctx, instanceSelector(d.Database), 10*time.Minute)
+	pod, err := cluster.readyPod(ctx, databaseSelector(d), 10*time.Minute)
 	if err != nil {
 		return 0, err
 	}
@@ -120,7 +129,7 @@ const minioHost = "MC_HOST_backup=http://dhisdhis:dhisdhis@127.0.0.1:9000"
 func (s Snapshotter) ArchiveFilestore(ctx context.Context, cluster *Cluster, d LegacyDeployment, key string) (int64, bool, error) {
 	switch d.StorageType() {
 	case "minio":
-		pod, err := cluster.readyPod(ctx, instanceSelector(d.Minio), 10*time.Minute)
+		pod, err := cluster.readyPod(ctx, minioSelector(d), 10*time.Minute)
 		if err != nil {
 			return 0, false, err
 		}
@@ -139,7 +148,7 @@ func (s Snapshotter) ArchiveFilestore(ctx context.Context, cluster *Cluster, d L
 		})
 		return size, true, err
 	case "filesystem":
-		pod, err := cluster.readyPod(ctx, instanceSelector(d.Core), 10*time.Minute)
+		pod, err := cluster.readyPod(ctx, coreSelector(d), 10*time.Minute)
 		if err != nil {
 			return 0, false, err
 		}

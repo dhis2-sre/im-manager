@@ -233,6 +233,16 @@ func TestClassify(t *testing.T) {
 	}
 }
 
+// Another environment in the namespace numbers its instances from the same range, so an id alone
+// would also select its workloads.
+func TestSelectorsNameTheReleaseAsWellAsTheInstance(t *testing.T) {
+	d := legacyDeployment()
+
+	assert.Equal(t, "app.kubernetes.io/instance=play-7,im-instance-id=3", coreSelector(d))
+	assert.Equal(t, "app.kubernetes.io/instance=play-7-database,im-instance-id=1", databaseSelector(d))
+	assert.Equal(t, "app.kubernetes.io/instance=play-7-minio,im-instance-id=2", minioSelector(d))
+}
+
 func keys[V any](m map[string]V) []string {
 	return slices.Collect(maps.Keys(m))
 }
