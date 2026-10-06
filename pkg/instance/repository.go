@@ -293,8 +293,8 @@ func (r repository) AbandonDeploysInProgress(ctx context.Context, reason string)
 
 const administratorGroupName = "administrators"
 
-func (r repository) FindDeployments(ctx context.Context, groupNames []string) ([]*model.Deployment, error) {
-	db := r.db.WithContext(ctx)
+func (r repository) FindDeployments(ctx context.Context, groupNames []string, preset bool) ([]*model.Deployment, error) {
+	db := r.db.WithContext(ctx).Where("deployments.preset = ?", preset)
 
 	isAdmin := slices.Contains(groupNames, administratorGroupName)
 	if !isAdmin {

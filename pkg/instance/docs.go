@@ -123,6 +123,12 @@ type GroupsWithDeploymentsBody struct {
 	Body []GroupWithDeployments
 }
 
+// swagger:response Presets
+type PresetsBody struct {
+	// in: body
+	Body []model.Deployment
+}
+
 // swagger:response GroupsWithPublicInstances
 type GroupsWithPublicInstancesBody struct {
 	// in: body

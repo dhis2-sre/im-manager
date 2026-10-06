@@ -281,3 +281,24 @@ func TestResetRefusesWhileADeployIsRunning(t *testing.T) {
 	close(release)
 	awaitUnlocked(t, instanceService)
 }
+
+func TestDeployPathsRefuseAPreset(t *testing.T) {
+	deployment := newTestDeployment()
+	deployment.Preset = true
+	instanceService := &fakeInstanceService{deployment: deployment}
+	service := newTestService(instanceService, &recordingPublisher{})
+
+	errs := map[string]error{
+		"start": service.StartDeployment(context.Background(), "token", deployment.ID, 7),
+		"reset": service.Reset(context.Background(), "token", deployment.ID, deployment.Instances[0].ID, 60, 7),
+	}
+	_, errs["update"] = service.UpdateInstance(context.Background(), "token", deployment.ID, deployment.Instances[0].ID, instance.Parameters{}, nil)
+	_, errs["edit"] = service.EditDeployment(context.Background(), "token", deployment.ID, instance.Edit{}, 7)
+
+	for path, err := range errs {
+		require.Error(t, err, path)
+		assert.True(t, errdef.IsBadRequest(err), "%s: expected a bad request, got %v", path, err)
+	}
+	assert.False(t, instanceService.isLocked())
+	assert.Empty(t, instanceService.deployedStacks())
+}

@@ -651,10 +651,12 @@ func (s Service) DeleteDeployment(ctx context.Context, deployment *model.Deploym
 
 	var errs error
 	for _, instance := range instances {
-		err := s.DestroyInstance(ctx, instance)
-		if err != nil {
-			errs = errors.Join(errs, fmt.Errorf("failed to destroy instance(%s) %q: %v", instance.StackName, instance.Name, err))
-			continue
+		if !deployment.Preset {
+			err := s.DestroyInstance(ctx, instance)
+			if err != nil {
+				errs = errors.Join(errs, fmt.Errorf("failed to destroy instance(%s) %q: %v", instance.StackName, instance.Name, err))
+				continue
+			}
 		}
 
 		err = s.instanceRepository.DeleteDeploymentInstance(ctx, instance)
@@ -964,15 +966,7 @@ type GroupWithDeployments struct {
 }
 
 func (s Service) FindDeployments(ctx context.Context, user *model.User) ([]GroupWithDeployments, error) {
-	groups := append(user.Groups, user.AdminGroups...) //nolint:gocritic
-
-	groupsByName := make(map[string]model.Group)
-	for _, group := range groups {
-		groupsByName[group.Name] = group
-	}
-	groupNames := slices.Collect(maps.Keys(groupsByName))
-
-	deployments, err := s.instanceRepository.FindDeployments(ctx, groupNames)
+	deployments, err := s.instanceRepository.FindDeployments(ctx, userGroupNames(user), false)
 	if err != nil {
 		return nil, err
 	}
@@ -982,6 +976,21 @@ func (s Service) FindDeployments(ctx context.Context, user *model.User) ([]Group
 	}
 
 	return s.groupDeployments(deployments)
+}
+
+// FindPresets returns the presets in the groups the user belongs to, newest first.
+func (s Service) FindPresets(ctx context.Context, user *model.User) ([]*model.Deployment, error) {
+	return s.instanceRepository.FindDeployments(ctx, userGroupNames(user), true)
+}
+
+func userGroupNames(user *model.User) []string {
+	groups := append(user.Groups, user.AdminGroups...) //nolint:gocritic
+
+	groupsByName := make(map[string]model.Group)
+	for _, group := range groups {
+		groupsByName[group.Name] = group
+	}
+	return slices.Collect(maps.Keys(groupsByName))
 }
 
 func (s Service) groupDeployments(deployments []*model.Deployment) ([]GroupWithDeployments, error) {
