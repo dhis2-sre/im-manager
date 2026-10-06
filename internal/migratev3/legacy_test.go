@@ -222,10 +222,6 @@ func TestClassify(t *testing.T) {
 			deployment: deployment("play", instance(1, legacyDatabaseStack, legacyDatabaseParameters()), instance(3, legacyCoreStack, legacyCoreParameters())),
 			reason:     `storage type "minio" does not match its instances dhis2-core, dhis2-db`,
 		},
-		"a release name containing dhis2": {
-			deployment: deployment("dhis2-play", legacyDeployment().Database, legacyDeployment().Minio, legacyDeployment().Core),
-			reason:     `release "dhis2-play-7" contains "dhis2", which dhis2-v2 does not resolve the database of`,
-		},
 	}
 	for name, test := range tests {
 		t.Run("refuses "+name, func(t *testing.T) {

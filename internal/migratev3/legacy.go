@@ -151,10 +151,6 @@ func classify(deployment *model.Deployment, encryptionKey string) (LegacyDeploym
 		return LegacyDeployment{}, fmt.Sprintf("storage type %q does not match its instances %s", candidate.StorageType(), strings.Join(stacks, ", ")), nil
 	case candidate.Core.Parameters["DEPLOY_CHAP"].Value == "true":
 		return LegacyDeployment{}, "DEPLOY_CHAP is enabled, and chap is not migrated", nil
-	case strings.Contains(candidate.ReleaseName(), "dhis2"):
-		// The chart then names its resources after the release alone, while dhis2-v2 derives the
-		// database hostname as <release>-dhis2-postgresql-rw, so the instance could not reach it.
-		return LegacyDeployment{}, fmt.Sprintf("release %q contains \"dhis2\", which dhis2-v2 does not resolve the database of", candidate.ReleaseName()), nil
 	}
 	return candidate, "", nil
 }
