@@ -10,6 +10,10 @@ releases:
     chart: dhis2/dhis2
     version: "{{ requiredEnv "CHART_VERSION" }}"
     values:
+      # Pinned because the chart drops the -dhis2 suffix from a release name already containing
+      # "dhis2", while the stack definition derives the database hostname and cluster as
+      # <release>-dhis2-postgresql.
+      - fullnameOverride: "{{ requiredEnv "INSTANCE_NAME" }}-dhis2"
       - image:
           repository: dhis2/{{ requiredEnv "IMAGE_REPOSITORY" }}
           tag: "{{ requiredEnv "IMAGE_TAG" }}"
