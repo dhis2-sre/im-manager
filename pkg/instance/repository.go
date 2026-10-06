@@ -5,11 +5,14 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strings"
+	"time"
 
 	"github.com/gosimple/slug"
 
 	"github.com/dhis2-sre/im-manager/internal/errdef"
 	"github.com/dhis2-sre/im-manager/pkg/model"
+	"github.com/dhis2-sre/im-manager/pkg/stack"
 	"gorm.io/gorm"
 )
 
@@ -57,12 +60,12 @@ func (r repository) DeleteDeployment(ctx context.Context, deployment *model.Depl
 	// cancellation can lead to rollbacks which we should decide individually.
 	ctx = context.WithoutCancel(ctx)
 
-	err := r.db.WithContext(ctx).Unscoped().Delete(&model.Deployment{}, deployment).Error
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return errdef.NewNotFound("deployment not found by id: %d", deployment.ID)
-		}
-		return fmt.Errorf("failed to delete deployment: %v", err)
+	result := r.db.WithContext(ctx).Unscoped().Delete(&model.Deployment{}, deployment.ID)
+	if result.Error != nil {
+		return fmt.Errorf("failed to delete deployment: %v", result.Error)
+	}
+	if result.RowsAffected == 0 {
+		return errdef.NewNotFound("deployment not found by id: %d", deployment.ID)
 	}
 
 	return nil
@@ -79,6 +82,38 @@ func (r repository) SaveDeployment(ctx context.Context, deployment *model.Deploy
 			return errdef.NewDuplicated("a deployment named %q already exists in group %q", deployment.Name, deployment.GroupName)
 		}
 		return fmt.Errorf("failed to save deployment: %v", err)
+	}
+
+	return nil
+}
+
+func (r repository) DeploymentNameExists(ctx context.Context, groupName, name string) (bool, error) {
+	var count int64
+	err := r.db.WithContext(ctx).
+		Model(&model.Deployment{}).
+		Where("group_name = ? AND name = ?", groupName, name).
+		Count(&count).Error
+	if err != nil {
+		return false, fmt.Errorf("failed to look up deployment %q in group %q: %v", name, groupName, err)
+	}
+
+	return count > 0, nil
+}
+
+// SaveDeploymentDetails writes the deployment's own columns and leaves its instances alone. Saving
+// the deployment itself cascades into the instances hanging off it, and an edit holds those
+// decrypted, so an instance the edit added would be inserted with its sensitive parameters in clear.
+func (r repository) SaveDeploymentDetails(ctx context.Context, deployment *model.Deployment) error {
+	// only use ctx for values (logging) and not cancellation signals on cud operations for now. ctx
+	// cancellation can lead to rollbacks which we should decide individually.
+	ctx = context.WithoutCancel(ctx)
+
+	err := r.db.WithContext(ctx).
+		Model(&model.Deployment{}).
+		Where("id = ?", deployment.ID).
+		Updates(map[string]any{"description": deployment.Description, "ttl": deployment.TTL}).Error
+	if err != nil {
+		return fmt.Errorf("failed to save deployment %d: %v", deployment.ID, err)
 	}
 
 	return nil
@@ -120,7 +155,7 @@ func (r repository) FindDeploymentInstanceById(ctx context.Context, id uint) (*m
 	return instance, nil
 }
 
-func (r repository) DecryptDeploymentInstance(deploymentInstance *model.DeploymentInstance, stack *model.Stack) (*model.DeploymentInstance, error) {
+func (r repository) DecryptDeploymentInstance(deploymentInstance *model.DeploymentInstance, stack *stack.Stack) (*model.DeploymentInstance, error) {
 	err := decryptParameters(r.instanceParameterEncryptionKey, deploymentInstance, stack)
 	if err != nil {
 		return nil, err
@@ -129,7 +164,7 @@ func (r repository) DecryptDeploymentInstance(deploymentInstance *model.Deployme
 	return deploymentInstance, nil
 }
 
-func (r repository) DecryptDeployment(deployment *model.Deployment, stacksByName map[string]*model.Stack) (*model.Deployment, error) {
+func (r repository) DecryptDeployment(deployment *model.Deployment, stacksByName map[string]*stack.Stack) (*model.Deployment, error) {
 	for _, instance := range deployment.Instances {
 		err := decryptParameters(r.instanceParameterEncryptionKey, instance, stacksByName[instance.StackName])
 		if err != nil {
@@ -140,7 +175,7 @@ func (r repository) DecryptDeployment(deployment *model.Deployment, stacksByName
 	return deployment, nil
 }
 
-func (r repository) SaveInstance(ctx context.Context, instance *model.DeploymentInstance, stack *model.Stack) error {
+func (r repository) SaveInstance(ctx context.Context, instance *model.DeploymentInstance, stack *stack.Stack) error {
 	// only use ctx for values (logging) and not cancellation signals on cud operations for now. ctx
 	// cancellation can lead to rollbacks which we should decide individually.
 	ctx = context.WithoutCancel(ctx)
@@ -174,10 +209,92 @@ func (r repository) SaveDeployLog(ctx context.Context, instance *model.Deploymen
 	return nil
 }
 
+// maxDeployErrorLength keeps the error a summary. The whole output is on DeployLog, and this field
+// is serialised with every deployment a list returns.
+const maxDeployErrorLength = 2000
+
+func (r repository) SaveDeployState(ctx context.Context, instance *model.DeploymentInstance, status model.DeployStatus, deployError string) error {
+	// only use ctx for values (logging) and not cancellation signals on cud operations for now. ctx
+	// cancellation can lead to rollbacks which we should decide individually.
+	ctx = context.WithoutCancel(ctx)
+
+	if len(deployError) > maxDeployErrorLength {
+		deployError = strings.ToValidUTF8(deployError[:maxDeployErrorLength], "")
+	}
+
+	updates := map[string]any{"deploy_status": status, "deploy_error": deployError}
+	if status == model.DeployStatusDeployed {
+		now := time.Now()
+		updates["deployed_at"] = now
+		instance.DeployedAt = &now
+	}
+
+	err := r.db.WithContext(ctx).Model(&model.DeploymentInstance{}).Where("id = ?", instance.ID).Updates(updates).Error
+	if err != nil {
+		return fmt.Errorf("failed to save deploy state: %v", err)
+	}
+
+	instance.DeployStatus = status
+	instance.DeployError = deployError
+	return nil
+}
+
+// AcquireDeployLock takes the deployment's deploy lock, reporting whether it got it. A lock left
+// behind by a deploy that can no longer be running is taken over rather than blocking forever.
+func (r repository) AcquireDeployLock(ctx context.Context, deploymentId uint, staleAfter time.Duration) (bool, error) {
+	ctx = context.WithoutCancel(ctx)
+
+	result := r.db.WithContext(ctx).Model(&model.Deployment{}).
+		Where("id = ? AND (deploy_locked_at IS NULL OR deploy_locked_at < ?)", deploymentId, time.Now().Add(-staleAfter)).
+		Update("deploy_locked_at", time.Now())
+	if result.Error != nil {
+		return false, fmt.Errorf("failed to acquire deploy lock: %v", result.Error)
+	}
+
+	return result.RowsAffected == 1, nil
+}
+
+func (r repository) ReleaseDeployLock(ctx context.Context, deploymentId uint) error {
+	ctx = context.WithoutCancel(ctx)
+
+	err := r.db.WithContext(ctx).Model(&model.Deployment{}).
+		Where("id = ?", deploymentId).
+		Update("deploy_locked_at", nil).Error
+	if err != nil {
+		return fmt.Errorf("failed to release deploy lock: %v", err)
+	}
+	return nil
+}
+
+// AbandonDeploysInProgress settles the deploys that were running when the process died. Their
+// goroutines are gone, so the rows they left behind are the only trace of them. Pending counts as
+// in progress: an instance queued behind the one that was deploying is waiting for a goroutine that
+// no longer exists, and left alone it reads as deploying forever. Clearing every lock is only right
+// because instance manager runs a single replica; a second one would be releasing locks its peer
+// still holds.
+func (r repository) AbandonDeploysInProgress(ctx context.Context, reason string) (int64, error) {
+	ctx = context.WithoutCancel(ctx)
+
+	if err := r.db.WithContext(ctx).Model(&model.Deployment{}).
+		Where("deploy_locked_at IS NOT NULL").
+		Update("deploy_locked_at", nil).Error; err != nil {
+		return 0, fmt.Errorf("failed to clear deploy locks: %v", err)
+	}
+
+	result := r.db.WithContext(ctx).Model(&model.DeploymentInstance{}).
+		Where("deploy_status IN ?", []model.DeployStatus{model.DeployStatusDeploying, model.DeployStatusPending}).
+		Updates(map[string]any{"deploy_status": model.DeployStatusFailed, "deploy_error": reason})
+	if result.Error != nil {
+		return 0, fmt.Errorf("failed to abandon deploys in progress: %v", result.Error)
+	}
+
+	return result.RowsAffected, nil
+}
+
 const administratorGroupName = "administrators"
 
-func (r repository) FindDeployments(ctx context.Context, groupNames []string) ([]*model.Deployment, error) {
-	db := r.db.WithContext(ctx)
+func (r repository) FindDeployments(ctx context.Context, groupNames []string, preset bool) ([]*model.Deployment, error) {
+	db := r.db.WithContext(ctx).Where("deployments.preset = ?", preset)
 
 	isAdmin := slices.Contains(groupNames, administratorGroupName)
 	if !isAdmin {
@@ -230,6 +347,19 @@ func (r repository) RecordBackup(ctx context.Context, database *model.Database) 
 	return err
 }
 
+func (r repository) FindDatabaseById(ctx context.Context, id uint) (*model.Database, error) {
+	var database model.Database
+	err := r.db.WithContext(ctx).First(&database, id).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, errdef.NewNotFound("database %d not found", id)
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	return &database, nil
+}
+
 func (r repository) SaveDatabase(ctx context.Context, database *model.Database) error {
 	return r.db.WithContext(ctx).Save(&database).Error
 }
@@ -248,7 +378,7 @@ func (r repository) FindAllDeployments(ctx context.Context) ([]model.Deployment,
 	return deployments, err
 }
 
-func encryptParameters(key string, instance *model.DeploymentInstance, stack *model.Stack) error {
+func encryptParameters(key string, instance *model.DeploymentInstance, stack *stack.Stack) error {
 	for i, parameter := range instance.Parameters {
 		if !stack.Parameters[parameter.ParameterName].Sensitive {
 			continue
@@ -264,7 +394,7 @@ func encryptParameters(key string, instance *model.DeploymentInstance, stack *mo
 	return nil
 }
 
-func decryptParameters(key string, instance *model.DeploymentInstance, stack *model.Stack) error {
+func decryptParameters(key string, instance *model.DeploymentInstance, stack *stack.Stack) error {
 	for i, parameter := range instance.Parameters {
 		if !stack.Parameters[parameter.ParameterName].Sensitive {
 			continue

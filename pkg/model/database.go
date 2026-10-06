@@ -20,10 +20,15 @@ type Database struct {
 	Slug              string             `json:"slug" gorm:"uniqueIndex"`
 	Type              string             `json:"type"` // TODO: Strictly sql or fs?
 	FilestoreID       uint               `json:"filestoreId"`
-	Filestore         *Database          `json:"filestore" gorm:"foreignKey:ID"`
-	UserID            uint               `json:"userId"`
-	User              User               `json:"user"`
-	Size              int64              `json:"size"`
+	// Filestore is the file store saved alongside this database, resolved through FilestoreID.
+	// Naming the foreign key explicitly matters here: the association points at another row of this
+	// same table, and pointing it at ID instead resolves a database to itself. It is excluded from
+	// migration on purpose: FilestoreID is a plain uint where 0 means "no file store", so an
+	// enforced constraint would reject every database saved without one.
+	Filestore *Database `json:"filestore" gorm:"foreignKey:FilestoreID;-:migration"`
+	UserID    uint      `json:"userId"`
+	User      User      `json:"user"`
+	Size      int64     `json:"size"`
 }
 
 // swagger:model

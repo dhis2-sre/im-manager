@@ -8,10 +8,14 @@ import (
 	"os/exec"
 	"testing"
 
+	"github.com/dhis2-sre/im-manager/internal/errdef"
 	"github.com/dhis2-sre/im-manager/pkg/inttest"
+	"github.com/dhis2-sre/im-manager/pkg/kube"
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	"github.com/dhis2-sre/im-manager/pkg/stack"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gorm.io/gorm"
 )
 
 type failingDestroyHelmfile struct {
@@ -66,7 +70,7 @@ func TestDeleteDeploymentPreservesInstanceRecordWhenDestroyFails(t *testing.T) {
 	require.NoError(t, instanceRepo.SaveDeployment(context.Background(), deployment))
 
 	stackService := stack.NewService(stack.Stacks{"whoami-go": stack.WhoamiGo})
-	service := NewService(logger, instanceRepo, stubGroupService{group: &group}, stackService, failingDestroyHelmfile{failStack: "whoami-go"}, nil, "")
+	service := NewService(logger, instanceRepo, stubGroupService{group: &group}, stackService, failingDestroyHelmfile{failStack: "whoami-go"}, nil, "", kube.NewClients(slog.Default()))
 
 	err = service.DeleteDeployment(context.Background(), deployment)
 	require.Error(t, err)
@@ -113,4 +117,141 @@ func TestDeleteDeploymentInstanceReleasesDatabaseLock(t *testing.T) {
 	var remaining int64
 	require.NoError(t, db.Model(&model.Database{}).Where("id = ?", database.ID).Count(&remaining).Error)
 	require.EqualValues(t, 1, remaining, "releasing the lock must not delete the database itself")
+}
+
+// A destroy and a deploy of the same release run helm against each other, so a delete waits for the
+// deploy rather than racing it.
+func TestDeleteDeploymentIsRefusedWhileADeployHoldsTheLock(t *testing.T) {
+	db := inttest.SetupDB(t)
+
+	group := model.Group{Name: "group-name", Namespace: "group-name", Hostname: "some-host"}
+	user := &model.User{Email: "delete-lock@dhis2.org", Groups: []model.Group{group}}
+	require.NoError(t, db.Create(user).Error)
+	group = user.Groups[0]
+
+	instanceRepo, err := NewRepository(db, "01234567890123456789012345678901")
+	require.NoError(t, err)
+
+	deployment := &model.Deployment{
+		Name:      "dep",
+		GroupName: group.Name,
+		UserID:    user.ID,
+		Instances: []*model.DeploymentInstance{
+			{Name: "instance-a", GroupName: group.Name, StackName: "whoami-go"},
+		},
+	}
+	require.NoError(t, instanceRepo.SaveDeployment(context.Background(), deployment))
+
+	stackService := stack.NewService(stack.Stacks{"whoami-go": stack.WhoamiGo})
+	service := NewService(slog.New(slog.NewTextHandler(os.Stdout, nil)), instanceRepo, stubGroupService{group: &group}, stackService, failingDestroyHelmfile{failStack: "whoami-go"}, nil, "", kube.NewClients(slog.Default()))
+
+	acquired, err := service.AcquireDeployLock(context.Background(), deployment.ID)
+	require.NoError(t, err)
+	require.True(t, acquired)
+
+	err = service.DeleteDeployment(context.Background(), deployment)
+
+	require.Error(t, err)
+	assert.True(t, errdef.IsConflict(err))
+
+	_, err = instanceRepo.FindDeploymentInstanceById(context.Background(), deployment.Instances[0].ID)
+	require.NoError(t, err, "a refused delete must not have destroyed anything")
+}
+
+// A delete that fails partway has to give the lock back, or the deployment can never be deployed or
+// deleted again.
+func TestFailedDeleteDeploymentReleasesTheLock(t *testing.T) {
+	db := inttest.SetupDB(t)
+
+	group := model.Group{Name: "group-name", Namespace: "group-name", Hostname: "some-host"}
+	user := &model.User{Email: "delete-unlock@dhis2.org", Groups: []model.Group{group}}
+	require.NoError(t, db.Create(user).Error)
+	group = user.Groups[0]
+
+	instanceRepo, err := NewRepository(db, "01234567890123456789012345678901")
+	require.NoError(t, err)
+
+	deployment := &model.Deployment{
+		Name:      "dep",
+		GroupName: group.Name,
+		UserID:    user.ID,
+		Instances: []*model.DeploymentInstance{
+			{Name: "instance-a", GroupName: group.Name, StackName: "whoami-go"},
+		},
+	}
+	require.NoError(t, instanceRepo.SaveDeployment(context.Background(), deployment))
+
+	stackService := stack.NewService(stack.Stacks{"whoami-go": stack.WhoamiGo})
+	service := NewService(slog.New(slog.NewTextHandler(os.Stdout, nil)), instanceRepo, stubGroupService{group: &group}, stackService, failingDestroyHelmfile{failStack: "whoami-go"}, nil, "", kube.NewClients(slog.Default()))
+
+	require.Error(t, service.DeleteDeployment(context.Background(), deployment))
+
+	acquired, err := service.AcquireDeployLock(context.Background(), deployment.ID)
+	require.NoError(t, err)
+	assert.True(t, acquired, "the lock must be free again after a delete that could not finish")
+}
+
+// A delete that gets as far as removing the deployment itself and fails there has to give the lock
+// back too. The TTL handler retries a failed delete every couple of minutes and each retry that
+// leaks the lock starts the stale window again, so the deployment stays locked and the user's own
+// delete is refused with a conflict that names a deploy which is not running.
+func TestDeleteDeploymentReleasesTheLockWhenTheDeploymentCannotBeRemoved(t *testing.T) {
+	db := inttest.SetupDB(t)
+
+	group := model.Group{Name: "group-name", Namespace: "group-name", Hostname: "some-host"}
+	user := &model.User{Email: "delete-row-fails@dhis2.org", Groups: []model.Group{group}}
+	require.NoError(t, db.Create(user).Error)
+	group = user.Groups[0]
+
+	instanceRepo, err := NewRepository(db, "01234567890123456789012345678901")
+	require.NoError(t, err)
+
+	deployment := &model.Deployment{Name: "dep", GroupName: group.Name, UserID: user.ID}
+	require.NoError(t, instanceRepo.SaveDeployment(context.Background(), deployment))
+
+	require.NoError(t, db.Callback().Delete().Before("gorm:delete").Register("fail_deployment_delete", func(tx *gorm.DB) {
+		if tx.Statement.Table == "deployments" {
+			_ = tx.AddError(errors.New("simulated deployment delete failure"))
+		}
+	}))
+
+	stackService := stack.NewService(stack.Stacks{"whoami-go": stack.WhoamiGo})
+	service := NewService(slog.New(slog.NewTextHandler(os.Stdout, nil)), instanceRepo, stubGroupService{group: &group}, stackService, failingDestroyHelmfile{}, nil, "", kube.NewClients(slog.Default()))
+
+	require.Error(t, service.DeleteDeployment(context.Background(), deployment))
+
+	acquired, err := service.AcquireDeployLock(context.Background(), deployment.ID)
+	require.NoError(t, err)
+	assert.True(t, acquired, "the lock must be free again after a delete that could not remove the deployment")
+}
+
+// The success path, which is what says the lock may be kept: a delete that reports success has to
+// have removed the deployment row. Taking the deploy lock bumps the deployment's updated_at, so a
+// delete that matched on the caller's copy of the row matched nothing and reported success anyway,
+// leaving the deployment behind holding a lock nothing would release.
+func TestDeleteDeploymentRemovesTheDeploymentAndLeavesNoLock(t *testing.T) {
+	db := inttest.SetupDB(t)
+
+	group := model.Group{Name: "group-name", Namespace: "group-name", Hostname: "some-host"}
+	user := &model.User{Email: "delete-succeeds@dhis2.org", Groups: []model.Group{group}}
+	require.NoError(t, db.Create(user).Error)
+	group = user.Groups[0]
+
+	instanceRepo, err := NewRepository(db, "01234567890123456789012345678901")
+	require.NoError(t, err)
+
+	deployment := &model.Deployment{Name: "dep", GroupName: group.Name, UserID: user.ID}
+	require.NoError(t, instanceRepo.SaveDeployment(context.Background(), deployment))
+
+	loaded, err := instanceRepo.FindDeploymentById(context.Background(), deployment.ID)
+	require.NoError(t, err)
+
+	stackService := stack.NewService(stack.Stacks{"whoami-go": stack.WhoamiGo})
+	service := NewService(slog.New(slog.NewTextHandler(os.Stdout, nil)), instanceRepo, stubGroupService{group: &group}, stackService, failingDestroyHelmfile{}, nil, "", kube.NewClients(slog.Default()))
+
+	require.NoError(t, service.DeleteDeployment(context.Background(), loaded))
+
+	var remaining int64
+	require.NoError(t, db.Model(&model.Deployment{}).Where("id = ?", deployment.ID).Count(&remaining).Error)
+	assert.Zero(t, remaining, "a delete that reported success must have removed the deployment")
 }

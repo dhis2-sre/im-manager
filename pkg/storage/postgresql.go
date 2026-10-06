@@ -25,6 +25,22 @@ type PostgresqlConfig struct {
 }
 
 func NewDatabase(logger *slog.Logger, c PostgresqlConfig) (*gorm.DB, error) {
+	db, err := ConnectDatabase(logger, c)
+	if err != nil {
+		return nil, err
+	}
+	if err := migrateDatabase(db); err != nil {
+		if pool, poolErr := db.DB(); poolErr == nil {
+			_ = pool.Close()
+		}
+		return nil, err
+	}
+	return db, nil
+}
+
+// ConnectDatabase opens a pool without changing the schema. Production startup
+// uses NewDatabase; test fixtures use this after cloning a migrated template.
+func ConnectDatabase(logger *slog.Logger, c PostgresqlConfig) (*gorm.DB, error) {
 	gormLoggerOpts := []slogGorm.Option{
 		slogGorm.WithHandler(logger.Handler()),
 		slogGorm.WithRecordNotFoundError(),
@@ -57,13 +73,19 @@ func NewDatabase(logger *slog.Logger, c PostgresqlConfig) (*gorm.DB, error) {
 	sqlDB.SetConnMaxIdleTime(30 * time.Minute)
 
 	if err := sqlDB.Ping(); err != nil {
+		_ = sqlDB.Close()
 		return nil, fmt.Errorf("failed to ping database: %w", err)
 	}
 
 	if err := db.Use(otelgorm.NewPlugin()); err != nil {
+		_ = sqlDB.Close()
 		return nil, fmt.Errorf("failed to initialize otelgorm: %v", err)
 	}
-	err = db.AutoMigrate(
+	return db, nil
+}
+
+func migrateDatabase(db *gorm.DB) error {
+	err := db.AutoMigrate(
 		&model.Deployment{},
 		&model.DeploymentInstance{},
 		&model.DeploymentInstanceParameter{},
@@ -79,32 +101,25 @@ func NewDatabase(logger *slog.Logger, c PostgresqlConfig) (*gorm.DB, error) {
 		&model.Notification{},
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to open Gorm session: %v", err)
+		return fmt.Errorf("failed to open Gorm session: %v", err)
 	}
 
 	err = db.Exec("CREATE EXTENSION IF NOT EXISTS pg_trgm").Error
 	if err != nil {
-		return nil, fmt.Errorf("failed to create pg_trgm extension: %v", err)
+		return fmt.Errorf("failed to create pg_trgm extension: %v", err)
 	}
 
 	m := gormigrate.New(db, gormigrate.DefaultOptions, migrations.All())
 	if err := m.Migrate(); err != nil {
-		return nil, fmt.Errorf("failed to run migrations: %w", err)
+		return fmt.Errorf("failed to run migrations: %w", err)
 	}
 
-	// GORM Doesn't handle the creation of gin indexes very well so the index is created manually here
-	//dev-1           | [00] Starting service
-	//database-1      | 2025-09-21 19:29:19.904 UTC [98] ERROR:  operator class "gin_trgm_ops" does not exist for access method "btree"
-	//database-1      | 2025-09-21 19:29:19.904 UTC [98] STATEMENT:  CREATE INDEX IF NOT EXISTS "idx_databases_description" ON "databases" (description gin_trgm_ops)
-	//dev-1           | [00] {"time":"2025-09-21T19:29:19.905025751Z","level":"ERROR","msg":"ERROR: operator class \"gin_trgm_ops\" does not exist for access method \"btree\" (SQLSTATE 42704)","error":"ERROR: operator class \"gin_trgm_ops\" does not exist for access method \"btree\" (SQLSTATE 42704)","query":"CREATE INDEX IF NOT EXISTS \"idx_databases_description\" ON \"databases\" (description gin_trgm_ops)","duration":414270,"rows":0,"file":"/src/pkg/storage/postgresql.go:45"}
-	//dev-1           | [00] im-manager exited due to: failed to setup DB: failed to open Gorm session: ERROR: operator class "gin_trgm_ops" does not exist for access method "btree" (SQLSTATE 42704)exit status 1
-	//dev-1           | [00] (error exit: exit status 1)
-	//dev-1           | [00] Killing service
+	// GORM needs an explicit GIN index for the trigram operator class.
 	sql := "CREATE INDEX IF NOT EXISTS idx_databases_description ON databases USING gin (description gin_trgm_ops)"
 	err = db.Exec(sql).Error
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	return db, nil
+	return nil
 }

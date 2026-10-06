@@ -37,6 +37,7 @@ import (
 
 func TestUserHandler(t *testing.T) {
 	t.Parallel()
+	var userCount userCounter
 
 	db := inttest.SetupDB(t)
 	groupRepository := group.NewRepository(db)
@@ -147,7 +148,7 @@ func TestUserHandler(t *testing.T) {
 		})
 
 		t.Run("ValidToken", func(t *testing.T) {
-			_, email, password := createUser(t, client, userService)
+			_, email, password := userCount.createUser(t, client, userService)
 			accessToken, _ := client.SignIn(t, email, password)
 			request := client.NewRequest(t, http.MethodDelete, "/users", nil, inttest.WithAuthToken(accessToken.Value))
 
@@ -159,7 +160,7 @@ func TestUserHandler(t *testing.T) {
 		})
 
 		t.Run("ExpiredToken", func(t *testing.T) {
-			_, email, password := createUser(t, client, userService)
+			_, email, password := userCount.createUser(t, client, userService)
 			accessToken, _ := client.SignIn(t, email, password)
 			<-time.After(time.Duration(accessToken.Expires.Unix()) * time.Second)
 			request := client.NewRequest(t, http.MethodDelete, "/users", nil, inttest.WithAuthToken(accessToken.Value))
@@ -260,7 +261,7 @@ func TestUserHandler(t *testing.T) {
 			{
 				t.Log("SignIn")
 
-				_, email, password := createUser(t, client, userService)
+				_, email, password := userCount.createUser(t, client, userService)
 
 				accessToken, _ = client.SignIn(t, email, password)
 
@@ -282,7 +283,7 @@ func TestUserHandler(t *testing.T) {
 			{
 				t.Log("SignInCookies")
 
-				_, email, password := createUser(t, client, userService)
+				_, email, password := userCount.createUser(t, client, userService)
 				requestBody := jsonBody(`{}`)
 				request := client.NewRequest(t, http.MethodPost, "/tokens", requestBody, inttest.WithBasicAuth(email, password), inttest.WithHeader("Content-Type", "application/json"))
 
@@ -305,7 +306,7 @@ func TestUserHandler(t *testing.T) {
 			{
 				t.Log("SignInCookiesWithRememberMe")
 
-				_, email, password := createUser(t, client, userService)
+				_, email, password := userCount.createUser(t, client, userService)
 				requestBody := jsonBody(`{"rememberMe": true}`)
 				request := client.NewRequest(t, http.MethodPost, "/tokens", requestBody, inttest.WithBasicAuth(email, password), inttest.WithHeader("Content-Type", "application/json"))
 
@@ -332,7 +333,7 @@ func TestUserHandler(t *testing.T) {
 			{
 				t.Log("RefreshTokensUsingCookie")
 
-				_, email, password := createUser(t, client, userService)
+				_, email, password := userCount.createUser(t, client, userService)
 				_, refreshToken := client.SignIn(t, email, password)
 				request := client.NewRequest(t, http.MethodPost, "/refresh", jsonBody(`{}`), inttest.WithHeader("Content-Type", "application/json"))
 				cookie := &http.Cookie{Name: "refreshToken", Value: refreshToken.Value, Path: "/refresh"}
@@ -358,7 +359,7 @@ func TestUserHandler(t *testing.T) {
 			{
 				t.Log("RefreshAfterSignOut")
 
-				_, email, password := createUser(t, client, userService)
+				_, email, password := userCount.createUser(t, client, userService)
 				accessToken, refreshToken := client.SignIn(t, email, password)
 
 				signOutReq := client.NewRequest(t, http.MethodDelete, "/users", nil, inttest.WithAuthToken(accessToken.Value))
@@ -396,7 +397,7 @@ func TestUserHandler(t *testing.T) {
 			{
 				t.Log("RefreshTokensUsingCookieWithRememberMe")
 
-				_, email, password := createUser(t, client, userService)
+				_, email, password := userCount.createUser(t, client, userService)
 				signInReq := client.NewRequest(t, http.MethodPost, "/tokens", jsonBody(`{"rememberMe": true}`), inttest.WithBasicAuth(email, password), inttest.WithHeader("Content-Type", "application/json"))
 				signInResp, err := client.Client.Do(signInReq)
 				require.NoError(t, err)
@@ -433,7 +434,7 @@ func TestUserHandler(t *testing.T) {
 			{
 				t.Log("RefreshTokensRequestBody")
 
-				_, email, password := createUser(t, client, userService)
+				_, email, password := userCount.createUser(t, client, userService)
 				_, refreshToken := client.SignIn(t, email, password)
 				requestBody := jsonBody(`{"refreshToken": "%s"}`, refreshToken.Value)
 				request := client.NewRequest(t, http.MethodPost, "/refresh", requestBody, inttest.WithHeader("Content-Type", "application/json"))
@@ -473,7 +474,7 @@ func TestUserHandler(t *testing.T) {
 			{
 				t.Log("WrongPassword")
 
-				_, email, _ := createUser(t, client, userService)
+				_, email, _ := userCount.createUser(t, client, userService)
 				request := client.NewRequest(t, http.MethodPost, "/tokens", jsonBody(`{}`), inttest.WithBasicAuth(email, "wrongpassword"))
 
 				response, err := client.Client.Do(request)
@@ -510,7 +511,7 @@ func TestUserHandler(t *testing.T) {
 			t.Parallel()
 
 			t.Log("SignIn")
-			id, email, password := createUser(t, client, userService)
+			id, email, password := userCount.createUser(t, client, userService)
 			accessToken, _ := client.SignIn(t, email, password)
 
 			t.Log("Delete")
@@ -523,7 +524,7 @@ func TestUserHandler(t *testing.T) {
 			{
 				t.Log("RequestPasswordReset")
 
-				id, email, _ := createUser(t, client, userService)
+				id, email, _ := userCount.createUser(t, client, userService)
 				requestResetRequestBody := jsonBody(`{"email": "%s"}`, email)
 
 				client.Do(t, http.MethodPost, "/users/request-reset", requestResetRequestBody, http.StatusCreated, inttest.WithHeader("Content-Type", "application/json"))
@@ -560,7 +561,7 @@ func TestUserHandler(t *testing.T) {
 			{
 				t.Log("PasswordResetTokenExpired")
 
-				id, email, _ := createUser(t, client, userService)
+				id, email, _ := userCount.createUser(t, client, userService)
 
 				requestResetRequestBody := jsonBody(`{"email": "%s"}`, email)
 				client.Do(t, http.MethodPost, "/users/request-reset", requestResetRequestBody, http.StatusCreated, inttest.WithHeader("Content-Type", "application/json"))
@@ -607,7 +608,7 @@ func TestUserHandler(t *testing.T) {
 		{
 			t.Log("DeleteUser")
 
-			id, _, _ := createUser(t, client, userService)
+			id, _, _ := userCount.createUser(t, client, userService)
 			path := fmt.Sprintf("/users/%d", id)
 			client.Delete(t, path, inttest.WithAuthToken(adminAccessToken.Value))
 
@@ -642,8 +643,6 @@ type userService interface {
 	ValidateEmail(emailToken uuid.UUID) error
 }
 
-var userCount userCounter
-
 type userCounter struct {
 	wg    sync.WaitGroup
 	count atomic.Uint32
@@ -669,11 +668,11 @@ func (uc *userCounter) Value() int {
 	return int(uc.count.Load())
 }
 
-func createUser(t *testing.T, client *inttest.HTTPClient, userService *user.Service) (uint, string, string) {
+func (uc *userCounter) createUser(t *testing.T, client *inttest.HTTPClient, userService *user.Service) (uint, string, string) {
 	t.Helper()
 
-	number := userCount.Increment()
-	defer userCount.Done()
+	number := uc.Increment()
+	defer uc.Done()
 	email := fmt.Sprintf("user%d@dhis2.org", number)
 	password := uuid.NewString()
 	requestBody := jsonBody(`{"email": "%s", "password": "%s"}`, email, password)

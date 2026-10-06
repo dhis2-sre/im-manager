@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/dhis2-sre/im-manager/pkg/model"
+	"github.com/dhis2-sre/im-manager/pkg/stack"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -51,7 +53,7 @@ func TestExecPgDumpRejectsTruncatedPlainDump(t *testing.T) {
 	pr, pw := io.Pipe()
 	_, uploadErrCh := drainPipe(t, pr)
 
-	err := execPgDump(context.Background(), executor, "ns", "pod", []string{"pg_dump"}, pw, "plain", "db.gz")
+	err := execPgDump(context.Background(), executor, "ns", "pod", "postgresql", []string{"pg_dump"}, pw, "plain", "db.gz")
 
 	require.Error(t, err, "a truncated dump must not be reported as a successful save")
 	assert.Contains(t, err.Error(), "truncated")
@@ -64,7 +66,7 @@ func TestExecPgDumpAcceptsCompletePlainDump(t *testing.T) {
 	pr, pw := io.Pipe()
 	dataCh, uploadErrCh := drainPipe(t, pr)
 
-	err := execPgDump(context.Background(), executor, "ns", "pod", []string{"pg_dump"}, pw, "plain", "db.gz")
+	err := execPgDump(context.Background(), executor, "ns", "pod", "postgresql", []string{"pg_dump"}, pw, "plain", "db.gz")
 
 	require.NoError(t, err)
 	require.NoError(t, <-uploadErrCh)
@@ -82,7 +84,7 @@ func TestExecPgDumpPropagatesExecError(t *testing.T) {
 	pr, pw := io.Pipe()
 	_, uploadErrCh := drainPipe(t, pr)
 
-	err := execPgDump(context.Background(), executor, "ns", "pod", []string{"pg_dump"}, pw, "plain", "db.gz")
+	err := execPgDump(context.Background(), executor, "ns", "pod", "postgresql", []string{"pg_dump"}, pw, "plain", "db.gz")
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "connection lost")
@@ -96,7 +98,7 @@ func TestExecPgDumpSkipsTrailerCheckForArchiveFormat(t *testing.T) {
 	pr, pw := io.Pipe()
 	dataCh, uploadErrCh := drainPipe(t, pr)
 
-	err := execPgDump(context.Background(), executor, "ns", "pod", []string{"pg_dump"}, pw, "custom", "db")
+	err := execPgDump(context.Background(), executor, "ns", "pod", "postgresql", []string{"pg_dump"}, pw, "custom", "db")
 
 	require.NoError(t, err)
 	require.NoError(t, <-uploadErrCh)
@@ -117,4 +119,23 @@ func TestTailWriterRetainsOnlyTheLastMaxBytes(t *testing.T) {
 	assert.Equal(t, "bbbbcccc", string(tail.tail))
 	assert.True(t, tail.contains("cccc"))
 	assert.False(t, tail.contains("aaaa"))
+}
+
+func TestPodDumpDoesNotRequireHostPgDump(t *testing.T) {
+	t.Setenv("PATH", t.TempDir())
+	instance := &model.DeploymentInstance{
+		Parameters: model.DeploymentInstanceParameters{
+			"DATABASE_NAME":     {Value: "dhis2"},
+			"DATABASE_USERNAME": {Value: "dhis"},
+			"DATABASE_PASSWORD": {Value: "test-password"},
+		},
+		Group: &model.Group{Namespace: "test"},
+	}
+	dump, err := newPgDumpConfig(instance, &stack.Stack{HostnamePattern: "%s.%s"})
+	require.NoError(t, err)
+	command := buildPgDumpCommand(dump, "custom")
+	require.GreaterOrEqual(t, len(command), 3)
+	assert.Equal(t, []string{"env", "PGPASSWORD=test-password", "pg_dump"}, command[:3])
+	assert.Contains(t, command, "--dbname=dhis2")
+	assert.Contains(t, command, "--exclude-table=dhis2_chart_seed_complete")
 }
