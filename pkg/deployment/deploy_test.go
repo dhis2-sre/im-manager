@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"log/slog"
+	"slices"
 	"sync"
 	"testing"
 	"time"
@@ -195,6 +196,17 @@ func awaitUnlocked(t *testing.T, instanceService *fakeInstanceService) {
 	require.Eventually(t, func() bool { return !instanceService.isLocked() }, 2*time.Second, 5*time.Millisecond)
 }
 
+// awaitTerminalEvent waits for the event a deploy or an edit ends with and returns everything
+// recorded by then. The lock goes back before that event is published, so a released lock does not
+// mean the event has arrived.
+func awaitTerminalEvent(t *testing.T, publisher *recordingPublisher) []recordedEvent {
+	t.Helper()
+	require.Eventually(t, func() bool {
+		return slices.ContainsFunc(publisher.recorded(), func(event recordedEvent) bool { return !event.transient })
+	}, 2*time.Second, 5*time.Millisecond)
+	return publisher.recorded()
+}
+
 func TestStartDeploymentDeploysEveryInstanceAndReleasesTheLock(t *testing.T) {
 	deployment := newTestDeployment()
 	instanceService := &fakeInstanceService{deployment: deployment}
@@ -221,7 +233,7 @@ func TestStartDeploymentPersistsOnlyTheTerminalEvent(t *testing.T) {
 	awaitUnlocked(t, instanceService)
 
 	var persisted []recordedEvent
-	for _, event := range publisher.recorded() {
+	for _, event := range awaitTerminalEvent(t, publisher) {
 		assert.Equal(t, kindDeployment, event.kind)
 		if !event.transient {
 			persisted = append(persisted, event)
@@ -241,8 +253,7 @@ func TestStartDeploymentReportsAFailedInstance(t *testing.T) {
 	require.NoError(t, service.StartDeployment(context.Background(), "token", deployment.ID, 7))
 	awaitUnlocked(t, instanceService)
 
-	events := publisher.recorded()
-	require.NotEmpty(t, events)
+	events := awaitTerminalEvent(t, publisher)
 	last := events[len(events)-1]
 	assert.False(t, last.transient)
 	assert.Equal(t, "error", last.payload.Status)

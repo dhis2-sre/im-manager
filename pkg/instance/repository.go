@@ -87,6 +87,19 @@ func (r repository) SaveDeployment(ctx context.Context, deployment *model.Deploy
 	return nil
 }
 
+func (r repository) DeploymentNameExists(ctx context.Context, groupName, name string) (bool, error) {
+	var count int64
+	err := r.db.WithContext(ctx).
+		Model(&model.Deployment{}).
+		Where("group_name = ? AND name = ?", groupName, name).
+		Count(&count).Error
+	if err != nil {
+		return false, fmt.Errorf("failed to look up deployment %q in group %q: %v", name, groupName, err)
+	}
+
+	return count > 0, nil
+}
+
 // SaveDeploymentDetails writes the deployment's own columns and leaves its instances alone. Saving
 // the deployment itself cascades into the instances hanging off it, and an edit holds those
 // decrypted, so an instance the edit added would be inserted with its sensitive parameters in clear.

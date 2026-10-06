@@ -116,6 +116,10 @@ func (s Service) SaveDeployment(ctx context.Context, deployment *model.Deploymen
 	return s.instanceRepository.SaveDeployment(ctx, deployment)
 }
 
+func (s Service) DeploymentNameExists(ctx context.Context, groupName, name string) (bool, error) {
+	return s.instanceRepository.DeploymentNameExists(ctx, groupName, name)
+}
+
 func (s Service) FindDeploymentById(ctx context.Context, id uint) (*model.Deployment, error) {
 	return s.instanceRepository.FindDeploymentById(ctx, id)
 }

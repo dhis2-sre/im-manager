@@ -202,17 +202,21 @@ func TestInstanceHandler(t *testing.T) {
 		deployDeployment(t, client, deployment.ID, tokens.AccessToken)
 		k8sClient.AssertPodIsReady(t, deploymentInstance.Group.Namespace, deploymentInstance.Name, 60, deploymentInstance.Group.ID)
 
+		// Instance manager reads replicas from its own pod informer cache, which can trail the watch
+		// that saw the pod ready.
 		path := fmt.Sprintf("/instances/%d/components", deploymentInstance.ID)
 		var components []instance.ComponentStatus
-		client.GetJSON(t, path, &components, inttest.WithAuthToken(tokens.AccessToken))
+		require.EventuallyWithT(t, func(c *assert.CollectT) {
+			client.GetJSON(t, path, &components, inttest.WithAuthToken(tokens.AccessToken))
+			if assert.Len(c, components, 1) && assert.Len(c, components[0].Replicas, 1) {
+				assert.Equal(c, "Running", components[0].Replicas[0].Phase)
+				assert.True(c, components[0].Replicas[0].Ready)
+			}
+		}, 30*time.Second, time.Second)
 
-		require.Len(t, components, 1)
 		assert.Equal(t, "whoami", components[0].Name)
 		assert.Equal(t, []kube.Operation{kube.OperationRestart, kube.OperationRestartReplica, kube.OperationLogs}, components[0].SupportedOperations)
-		require.Len(t, components[0].Replicas, 1)
 		replica := components[0].Replicas[0]
-		assert.Equal(t, "Running", replica.Phase)
-		assert.True(t, replica.Ready)
 		assert.NotEmpty(t, replica.Containers)
 
 		path = fmt.Sprintf("/deployments/%d/components", deployment.ID)
@@ -479,6 +483,29 @@ func TestInstanceHandler(t *testing.T) {
 		assert.NotZero(t, saved.FilestoreID)
 
 		destroyDeployment(t, client, deployment.ID, tokens.AccessToken)
+	})
+
+	t.Run("DeploymentNameAvailability", func(t *testing.T) {
+		t.Parallel()
+		createDeployment(t, client, "taken-name", tokens.AccessToken)
+
+		var availability instance.DeploymentNameAvailability
+		client.GetJSON(t, "/deployments/availability?group=group-name&name=taken-name", &availability, inttest.WithAuthToken(tokens.AccessToken))
+		assert.False(t, availability.Available)
+		assert.Contains(t, availability.Reason, "already exists")
+
+		availability = instance.DeploymentNameAvailability{}
+		client.GetJSON(t, "/deployments/availability?group=group-name&name=free-name", &availability, inttest.WithAuthToken(tokens.AccessToken))
+		assert.True(t, availability.Available)
+		assert.Empty(t, availability.Reason)
+
+		availability = instance.DeploymentNameAvailability{}
+		client.GetJSON(t, "/deployments/availability?group=group-name&name=Not_Valid", &availability, inttest.WithAuthToken(tokens.AccessToken))
+		assert.False(t, availability.Available)
+		assert.Contains(t, availability.Reason, "lowercase")
+
+		client.Do(t, http.MethodGet, "/deployments/availability?group=group-name", nil, http.StatusBadRequest, inttest.WithAuthToken(tokens.AccessToken))
+		client.Do(t, http.MethodGet, "/deployments/availability?group=group-name&name=free-name&user=non-member", nil, http.StatusUnauthorized, inttest.WithAuthToken(tokens.AccessToken))
 	})
 
 	t.Run("UpdateDeployment", func(t *testing.T) {
