@@ -20,7 +20,7 @@ x-register: &k3s-register
   profiles: [k3s]
 
 x-register-env: &k3s-register-env
-  IM_HOSTNAME: "${IM_HOSTNAME:-prod:8080}"
+  IM_HOSTNAME: "${IM_HOSTNAME:-api:8080}"
   IM_ADMIN_EMAIL: ${ADMIN_USER_EMAIL}
   IM_ADMIN_PASSWORD: ${ADMIN_USER_PASSWORD}
 

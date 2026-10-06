@@ -133,7 +133,7 @@ profiles:
       - op: add
         path: /deploy/helm/releases/-
         value:
-          name: im-group-dev-dev
+          name: im-group-dev-{{ .ENVIRONMENT }}
           namespace: dev
           <<: *im-group-chart-config
           setValueTemplates:
