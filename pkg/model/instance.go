@@ -21,6 +21,8 @@ type Deployment struct {
 
 	TTL uint `json:"ttl"`
 
+	Preset bool `json:"preset" gorm:"not null;default:false"`
+
 	// DeployLockedAt is held for the duration of a deploy so a second one is refused rather than
 	// racing helm. A lock older than the deploy deadline is stale and may be taken over.
 	DeployLockedAt *time.Time `json:"-"`

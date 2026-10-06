@@ -142,6 +142,7 @@ type SaveDeploymentRequest struct {
 	Description string `json:"description"`
 	Group       string `json:"group" binding:"required"`
 	TTL         uint   `json:"ttl"`
+	Preset      bool   `json:"preset"`
 }
 
 func (h Handler) SaveDeployment(c *gin.Context) {
@@ -195,6 +196,7 @@ func (h Handler) SaveDeployment(c *gin.Context) {
 		Description: request.Description,
 		GroupName:   request.Group,
 		TTL:         request.TTL,
+		Preset:      request.Preset,
 	}
 
 	canWrite := handler.CanWriteDeployment(user, deployment)
@@ -1038,6 +1040,45 @@ func (h Handler) FindDeployments(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, groupsWithDeployments)
+}
+
+func (h Handler) FindPresets(c *gin.Context) {
+	// swagger:route GET /deployments/presets listPresets
+	//
+	// Find presets
+	//
+	// Find the presets in the groups the user belongs to. A preset is a deployment that is saved but never deployed, kept to start new deployments from.
+	//
+	// Security:
+	//	oauth2:
+	//
+	// responses:
+	//	200: Presets
+	//	401: Error
+	//	403: Error
+	//	415: Error
+	ctx := c.Request.Context()
+	user, err := handler.GetUserFromContext(ctx)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	presets, err := h.instanceService.FindPresets(ctx, user)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	for _, preset := range presets {
+		err := h.stripDeploymentSensitiveParameterValues(preset)
+		if err != nil {
+			_ = c.Error(err)
+			return
+		}
+	}
+
+	c.JSON(http.StatusOK, presets)
 }
 
 // FindPublicInstances list public available instances
