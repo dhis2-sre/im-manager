@@ -8,7 +8,7 @@ Postgres moves from the Bitnami StatefulSet to CloudNativePG, so the data is mov
 
 | Phase | Runs while | Does |
 |---|---|---|
-| `plan` | the old version serves | Lists what would be migrated, the database sizes and what blocks any deployment. Changes nothing, not even the schema. |
+| `plan` | any time | Lists what would be migrated, the database sizes and what blocks any deployment. Changes nothing, not even the schema, so it reads a database of either version. |
 | `migrate` | nothing serves | Runs the 3.0 schema migrations, then per deployment, largest database first: scales the old core to 0, dumps the database and archives the file store to S3, rewrites the rows to `dhis2-v2`, uninstalls the old core, MinIO and pgAdmin releases. The old database is only scaled to 0 and kept as a fallback. |
 | `deploy` | 3.0 serves | Deploys each deployment through the API, waits until the seed job has completed and the core is available (deploying a second time if helm timed out on the seed), restores the original `DATABASE_ID`, uninstalls the old database and pauses what was paused before. |
 | `cleanup` | 3.0 serves, after `--grace` | Deletes the snapshots through the API. |
@@ -34,17 +34,28 @@ migrate-v3 cleanup                      # after the grace period
 
 ### im-vm
 
-The binary ships in the image as `/app/migrate-v3`. Run it on the environment's compose network with the environment file, the AWS credentials the host mints and the image tag of version 3.0:
+The binary ships in the image as `/app/migrate-v3`. Run it on the environment's compose network with the environment file, the AWS credentials the host mints and the image the environment runs (`latest` for dev once version 3.0 is on master):
 
 ```sh
 . /opt/im/server.conf
-sudo docker run --rm --network im-dev_default \
+sudo docker run --rm --pull always --network im-dev_default \
   --env-file /opt/im/environments/dev.env \
   --volume /opt/im/credentials:/aws:ro --env AWS_CONFIG_FILE=/aws/config --env AWS_REGION="$AWS_REGION" \
-  --entrypoint /app/migrate-v3 dhis2/im-manager:<3.0 tag> plan
+  --entrypoint /app/migrate-v3 dhis2/im-manager:latest plan
 ```
 
-`docker compose --project-name im-dev stop api` opens the window and `im-environment up dev <3.0 tag>` closes it.
+#### Dev
+
+A successful build of master deploys dev on its own (`im-environment up dev latest`), so dev is migrated right after version 3.0 reaches master, and nothing else is merged into master until it is done.
+
+1. Delete or fix what `plan` reports as unsupported, and take a fresh backup: `sudo systemctl start im-backup-daily@dev.service`.
+2. Merge this command into `version-3.0`, then `version-3.0` into master, in im-manager and in im-web-client.
+3. Wait until the master build has deployed `latest` to dev. Until the migration runs, the deployments still made of the removed stacks fail to open or delete; nothing changes them.
+4. `sudo docker compose --project-name im-dev stop api` opens the window. Stopping before the auto-deploy lands would see it start the API again in the middle of `migrate`.
+5. `plan`, then `migrate`, which refuses to run while an API still answers.
+6. `sudo docker compose --project-name im-dev start api` closes the window. `deploy` drives the API, so it comes after.
+7. `deploy --deployments <one>`, check that deployment, then `deploy` for the rest.
+8. `cleanup` after the grace period.
 
 ### EKS
 
