@@ -237,6 +237,9 @@ definitions:
             name:
                 type: string
                 x-go-name: Name
+            preset:
+                type: boolean
+                x-go-name: Preset
             ttl:
                 format: uint64
                 type: integer
@@ -699,6 +702,9 @@ definitions:
             name:
                 type: string
                 x-go-name: Name
+            preset:
+                type: boolean
+                x-go-name: Preset
             ttl:
                 format: uint64
                 type: integer
@@ -1788,6 +1794,22 @@ paths:
             security:
                 - oauth2: []
             summary: Deployment name availability
+    /deployments/presets:
+        get:
+            description: Find the presets in the groups the user belongs to. A preset is a deployment that is saved but never deployed, kept to start new deployments from.
+            operationId: listPresets
+            responses:
+                "200":
+                    $ref: '#/responses/Presets'
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Find presets
     /deployments/public:
         get:
             description: Find all public deployments
@@ -2908,6 +2930,12 @@ responses:
         schema:
             items:
                 $ref: '#/definitions/Notification'
+            type: array
+    Presets:
+        description: ""
+        schema:
+            items:
+                $ref: '#/definitions/Deployment'
             type: array
     Stack:
         description: ""

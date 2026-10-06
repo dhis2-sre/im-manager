@@ -76,7 +76,7 @@ type Service struct {
 // its own copy is what keeps the caller free to serialise, and strip the sensitive values from, the
 // deployment it holds while the deploy is reading parameters out of its own.
 func (s Service) StartDeployment(ctx context.Context, token string, deploymentId uint, userID uint) error {
-	acquired, err := s.instanceService.AcquireDeployLock(ctx, deploymentId)
+	acquired, err := s.acquireDeployLock(ctx, deploymentId)
 	if err != nil {
 		return err
 	}
@@ -136,7 +136,7 @@ func (s Service) StartDeployment(ctx context.Context, token string, deploymentId
 // stream. An edit that changes nothing the cluster cares about, a TTL or a description, is finished
 // when it returns.
 func (s Service) EditDeployment(ctx context.Context, token string, deploymentId uint, edit instance.Edit, userID uint) (*model.Deployment, error) {
-	acquired, err := s.instanceService.AcquireDeployLock(ctx, deploymentId)
+	acquired, err := s.acquireDeployLock(ctx, deploymentId)
 	if err != nil {
 		return nil, err
 	}
@@ -245,6 +245,19 @@ func instanceIds(instances []*model.DeploymentInstance) []uint {
 	return ids
 }
 
+// acquireDeployLock takes the deployment's deploy lock unless the deployment is a preset, which is kept to start deployments from and is never deployed itself.
+func (s Service) acquireDeployLock(ctx context.Context, deploymentId uint) (bool, error) {
+	deployment, err := s.instanceService.FindDecryptedDeploymentById(ctx, deploymentId)
+	if err != nil {
+		return false, err
+	}
+	if deployment.Preset {
+		return false, errdef.NewBadRequest("deployment %d is a preset and can't be deployed", deploymentId)
+	}
+
+	return s.instanceService.AcquireDeployLock(ctx, deploymentId)
+}
+
 func (s Service) releaseDeployLock(ctx context.Context, deploymentId uint) {
 	if err := s.instanceService.ReleaseDeployLock(ctx, deploymentId); err != nil {
 		s.logger.ErrorContext(ctx, "failed to release deploy lock", "deploymentId", deploymentId, "error", err)
@@ -284,7 +297,7 @@ func (s Service) UpdateDeployment(ctx context.Context, token string, deploymentI
 // runs in the background under the deployment's deploy lock, on its own copy of the deployment, so
 // the caller gets an answer immediately and a reset cannot race a deploy of the same deployment.
 func (s Service) Reset(ctx context.Context, token string, deploymentId, instanceId uint, ttl uint, userID uint) error {
-	acquired, err := s.instanceService.AcquireDeployLock(ctx, deploymentId)
+	acquired, err := s.acquireDeployLock(ctx, deploymentId)
 	if err != nil {
 		return err
 	}
@@ -343,7 +356,7 @@ func (s Service) resetInstance(ctx context.Context, token string, instance *mode
 }
 
 func (s Service) UpdateInstance(ctx context.Context, token string, deploymentId, instanceId uint, parameters instance.Parameters, public *bool) (*model.DeploymentInstance, error) {
-	acquired, err := s.instanceService.AcquireDeployLock(ctx, deploymentId)
+	acquired, err := s.acquireDeployLock(ctx, deploymentId)
 	if err != nil {
 		return nil, err
 	}

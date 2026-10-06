@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -506,6 +507,29 @@ func TestInstanceHandler(t *testing.T) {
 
 		client.Do(t, http.MethodGet, "/deployments/availability?group=group-name", nil, http.StatusBadRequest, inttest.WithAuthToken(tokens.AccessToken))
 		client.Do(t, http.MethodGet, "/deployments/availability?group=group-name&name=free-name&user=non-member", nil, http.StatusUnauthorized, inttest.WithAuthToken(tokens.AccessToken))
+	})
+
+	t.Run("Preset", func(t *testing.T) {
+		t.Parallel()
+		preset := createDeployment(t, client, "test-preset", tokens.AccessToken, WithPreset())
+		require.True(t, preset.Preset)
+		createWhoamiInstance(t, client, preset.ID, tokens.AccessToken, WithParameter("IMAGE_TAG", "0.6.0"))
+
+		var presets []model.Deployment
+		client.GetJSON(t, "/deployments/presets", &presets, inttest.WithAuthToken(tokens.AccessToken))
+		assert.True(t, slices.ContainsFunc(presets, func(d model.Deployment) bool { return d.ID == preset.ID }))
+		assert.False(t, slices.ContainsFunc(presets, func(d model.Deployment) bool { return !d.Preset }))
+
+		var groupsWithDeployments []instance.GroupWithDeployments
+		client.GetJSON(t, "/deployments", &groupsWithDeployments, inttest.WithAuthToken(tokens.AccessToken))
+		for _, group := range groupsWithDeployments {
+			assert.False(t, slices.ContainsFunc(group.Deployments, func(d *model.Deployment) bool { return d.ID == preset.ID }))
+		}
+
+		client.Do(t, http.MethodPost, fmt.Sprintf("/deployments/%d/deploy", preset.ID), nil, http.StatusBadRequest, inttest.WithAuthToken(tokens.AccessToken))
+
+		client.Do(t, http.MethodDelete, fmt.Sprintf("/deployments/%d", preset.ID), nil, http.StatusAccepted, inttest.WithAuthToken(tokens.AccessToken))
+		client.Do(t, http.MethodGet, fmt.Sprintf("/deployments/%d", preset.ID), nil, http.StatusNotFound, inttest.WithAuthToken(tokens.AccessToken))
 	})
 
 	t.Run("UpdateDeployment", func(t *testing.T) {
