@@ -149,7 +149,7 @@ func parseIds(value string) ([]uint, error) {
 		if field = strings.TrimSpace(field); field == "" {
 			continue
 		}
-		id, err := strconv.ParseUint(field, 10, 64)
+		id, err := strconv.ParseUint(field, 10, strconv.IntSize)
 		if err != nil {
 			return nil, fmt.Errorf("invalid deployment id %q: %v", field, err)
 		}
