@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/rsa"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -519,6 +520,17 @@ func TestInstanceHandler(t *testing.T) {
 
 		duplicate := client.Do(t, http.MethodPost, "/deployments", strings.NewReader(`{"name":"test-preset","group":"group-name","preset":true}`), http.StatusConflict, inttest.WithAuthToken(tokens.AccessToken), inttest.WithHeader("Content-Type", "application/json"))
 		assert.Contains(t, string(duplicate), "a preset named")
+
+		var replaced model.Deployment
+		body := client.Do(t, http.MethodPost, "/deployments", strings.NewReader(`{"name":"test-preset","group":"group-name","description":"replaced","preset":true,"overwrite":true}`), http.StatusCreated, inttest.WithAuthToken(tokens.AccessToken), inttest.WithHeader("Content-Type", "application/json"))
+		require.NoError(t, json.Unmarshal(body, &replaced))
+		assert.NotEqual(t, preset.ID, replaced.ID)
+		assert.Equal(t, "replaced", replaced.Description)
+		client.Do(t, http.MethodGet, fmt.Sprintf("/deployments/%d", preset.ID), nil, http.StatusNotFound, inttest.WithAuthToken(tokens.AccessToken))
+		client.Do(t, http.MethodGet, fmt.Sprintf("/deployments/%d", deployment.ID), nil, http.StatusOK, inttest.WithAuthToken(tokens.AccessToken))
+		client.Do(t, http.MethodPost, "/deployments", strings.NewReader(`{"name":"test-preset","group":"group-name","overwrite":true}`), http.StatusBadRequest, inttest.WithAuthToken(tokens.AccessToken), inttest.WithHeader("Content-Type", "application/json"))
+		preset = replaced
+		createWhoamiInstance(t, client, preset.ID, tokens.AccessToken, WithParameter("IMAGE_TAG", "0.6.0"), WithPublic(true))
 
 		var availability instance.DeploymentNameAvailability
 		client.GetJSON(t, "/deployments/availability?group=group-name&name=test-preset&preset=true", &availability, inttest.WithAuthToken(tokens.AccessToken))

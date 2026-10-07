@@ -143,6 +143,8 @@ type SaveDeploymentRequest struct {
 	Group       string `json:"group" binding:"required"`
 	TTL         uint   `json:"ttl"`
 	Preset      bool   `json:"preset"`
+	// Overwrite replaces a preset of the same name instead of refusing it. It only applies to presets.
+	Overwrite bool `json:"overwrite"`
 }
 
 func (h Handler) SaveDeployment(c *gin.Context) {
@@ -206,7 +208,12 @@ func (h Handler) SaveDeployment(c *gin.Context) {
 		return
 	}
 
-	err = h.instanceService.SaveDeployment(ctx, deployment)
+	if request.Overwrite && !request.Preset {
+		_ = c.Error(errdef.NewBadRequest("overwrite only applies to presets"))
+		return
+	}
+
+	err = h.saveDeployment(ctx, user, deployment, request.Overwrite)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -219,6 +226,26 @@ func (h Handler) SaveDeployment(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusCreated, deployment)
+}
+
+func (h Handler) saveDeployment(ctx context.Context, user *model.User, deployment *model.Deployment, overwrite bool) error {
+	if !overwrite {
+		return h.instanceService.SaveDeployment(ctx, deployment)
+	}
+
+	existing, err := h.instanceService.FindPreset(ctx, deployment.GroupName, deployment.Name)
+	if errdef.IsNotFound(err) {
+		return h.instanceService.SaveDeployment(ctx, deployment)
+	}
+	if err != nil {
+		return err
+	}
+
+	if !handler.CanWriteDeployment(user, existing) {
+		return errdef.NewUnauthorized("write access to preset %q denied", existing.Name)
+	}
+
+	return h.instanceService.ReplacePreset(ctx, existing.ID, deployment)
 }
 
 // swagger:model DeploymentNameAvailability

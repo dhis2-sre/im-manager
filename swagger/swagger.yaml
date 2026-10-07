@@ -702,6 +702,10 @@ definitions:
             name:
                 type: string
                 x-go-name: Name
+            overwrite:
+                description: Overwrite replaces a preset of the same name instead of refusing it. It only applies to presets.
+                type: boolean
+                x-go-name: Overwrite
             preset:
                 type: boolean
                 x-go-name: Preset

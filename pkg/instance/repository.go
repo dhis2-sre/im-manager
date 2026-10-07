@@ -87,6 +87,43 @@ func (r repository) SaveDeployment(ctx context.Context, deployment *model.Deploy
 	return nil
 }
 
+// ReplacePreset swaps the preset with the given id for a new one in one transaction, so a failed save leaves the old preset in place.
+func (r repository) ReplacePreset(ctx context.Context, oldID uint, preset *model.Deployment) error {
+	// only use ctx for values (logging) and not cancellation signals on cud operations for now. ctx
+	// cancellation can lead to rollbacks which we should decide individually.
+	ctx = context.WithoutCancel(ctx)
+
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Unscoped().Where("preset = true").Delete(&model.Deployment{}, oldID).Error; err != nil {
+			return err
+		}
+		return tx.Create(preset).Error
+	})
+	if err != nil {
+		if errors.Is(err, gorm.ErrDuplicatedKey) {
+			return errdef.NewDuplicated("a preset named %q already exists in group %q", preset.Name, preset.GroupName)
+		}
+		return fmt.Errorf("failed to replace preset %d: %v", oldID, err)
+	}
+
+	return nil
+}
+
+func (r repository) FindPreset(ctx context.Context, groupName, name string) (*model.Deployment, error) {
+	var preset *model.Deployment
+	err := r.db.WithContext(ctx).
+		Where("group_name = ? AND name = ? AND preset = true", groupName, name).
+		First(&preset).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errdef.NewNotFound("preset %q not found in group %q", name, groupName)
+		}
+		return nil, fmt.Errorf("failed to find preset %q in group %q: %v", name, groupName, err)
+	}
+
+	return preset, nil
+}
+
 func deploymentKind(preset bool) string {
 	if preset {
 		return "preset"
