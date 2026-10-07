@@ -222,7 +222,7 @@ func MergedParameters(d LegacyDeployment) (map[string]string, error) {
 				errs = append(errs, fmt.Sprintf("%s parameter %s has no dhis2-v2 equivalent", instance.StackName, name))
 				continue
 			}
-			merged[targetName] = parameter.Value
+			merged[targetName] = trimmed(parameter.Value, legacySensitive[instance.StackName][name])
 		}
 	}
 	// The database instance goes last so its values win over the copies dhis2-core consumed.
@@ -249,6 +249,19 @@ func MergedParameters(d LegacyDeployment) (map[string]string, error) {
 		return nil, fmt.Errorf("%s", strings.Join(errs, "; "))
 	}
 	return merged, nil
+}
+
+// trimmed drops the whitespace around a single-line value: none of them means it, and around an image
+// tag it makes every pod invalid. A value of only whitespace stays, since " " is how an empty optional
+// parameter is stored, and sensitive or multi-line values, such as keys and custom config, are kept.
+func trimmed(value string, sensitive bool) string {
+	if sensitive || strings.Contains(value, "\n") {
+		return value
+	}
+	if trimmedValue := strings.TrimSpace(value); trimmedValue != "" {
+		return trimmedValue
+	}
+	return value
 }
 
 // PgAdminParameters builds the plaintext parameters of the pgadmin companion once its database is

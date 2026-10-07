@@ -156,6 +156,19 @@ func TestMergedParameters(t *testing.T) {
 		assert.Equal(t, "true", merged["ENABLE_PGADMIN"])
 	})
 
+	t.Run("trims stray whitespace but keeps the space an empty value is stored as", func(t *testing.T) {
+		d := legacyDeployment()
+		d.Core.Parameters["IMAGE_TAG"] = model.DeploymentInstanceParameter{Value: "2.43 "}
+		d.Core.Parameters["CUSTOM_DHIS2_CONFIG"] = model.DeploymentInstanceParameter{Value: "key = value \n"}
+
+		merged, err := MergedParameters(d)
+
+		require.NoError(t, err)
+		assert.Equal(t, "2.43", merged["IMAGE_TAG"])
+		assert.Equal(t, " ", merged["JAVA_OPTS"])
+		assert.Equal(t, "key = value \n", merged["CUSTOM_DHIS2_CONFIG"], "sensitive and multi-line values are kept as they are")
+	})
+
 	t.Run("refuses a parameter it does not know", func(t *testing.T) {
 		d := legacyDeployment()
 		d.Core.Parameters["SOMETHING_NEW"] = model.DeploymentInstanceParameter{Value: "x"}
