@@ -125,7 +125,8 @@ const minioHost = "MC_HOST_backup=http://dhisdhis:dhisdhis@127.0.0.1:9000"
 // ArchiveFilestore streams a gzipped tar of the deployment's file store to S3, in the layout the
 // dhis2-v2 seeds expect, and reports false for storage types whose files are not in the cluster.
 // MinIO keeps no plain objects on disk, so its bucket is mirrored to a temporary directory in the
-// pod first, which needs that much free ephemeral storage.
+// pod first, which needs that much free ephemeral storage. The directory is created up front because
+// mc mirror creates nothing for an empty bucket, which is then archived as an empty file store.
 func (s Snapshotter) ArchiveFilestore(ctx context.Context, cluster *Cluster, d LegacyDeployment, key string) (int64, bool, error) {
 	switch d.StorageType() {
 	case "minio":
@@ -139,6 +140,9 @@ func (s Snapshotter) ArchiveFilestore(ctx context.Context, cluster *Cluster, d L
 			defer cancel()
 			_ = cluster.exec(cleanup, pod, minioContainer, []string{"rm", "-rf", directory}, io.Discard)
 		}()
+		if err := cluster.exec(ctx, pod, minioContainer, []string{"mkdir", "-p", directory}, io.Discard); err != nil {
+			return 0, false, fmt.Errorf("failed to create %s: %v", directory, err)
+		}
 		mirror := []string{"env", minioHost, "MC_CONFIG_DIR=/tmp/.mc", "mc", "mirror", "--quiet", "--overwrite", "backup/dhis2", directory}
 		if err := cluster.exec(ctx, pod, minioContainer, mirror, io.Discard); err != nil {
 			return 0, false, fmt.Errorf("mc mirror failed: %v", err)
