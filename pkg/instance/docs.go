@@ -144,6 +144,10 @@ type _ struct {
 	// in: query
 	// required: true
 	Name string `json:"name"`
+
+	// Check the name of a preset rather than a deployment
+	// in: query
+	Preset bool `json:"preset"`
 }
 
 // swagger:response DeploymentNameAvailability

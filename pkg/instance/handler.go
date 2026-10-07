@@ -232,7 +232,7 @@ func (h Handler) DeploymentNameAvailability(c *gin.Context) {
 	//
 	// Deployment name availability
 	//
-	// Check whether a deployment name is free to use in a group
+	// Check whether a deployment name is free to use in a group. Presets have their own names, so pass preset=true to check the name of a preset.
 	//
 	// Security:
 	//	oauth2:
@@ -244,8 +244,9 @@ func (h Handler) DeploymentNameAvailability(c *gin.Context) {
 	//	403: Error
 	//	404: Error
 	var request struct {
-		Group string `form:"group" binding:"required"`
-		Name  string `form:"name" binding:"required"`
+		Group  string `form:"group" binding:"required"`
+		Name   string `form:"name" binding:"required"`
+		Preset bool   `form:"preset"`
 	}
 	if err := c.ShouldBindQuery(&request); err != nil {
 		_ = c.Error(errdef.NewBadRequest("group and name query parameters are required"))
@@ -280,14 +281,14 @@ func (h Handler) DeploymentNameAvailability(c *gin.Context) {
 		return
 	}
 
-	exists, err := h.instanceService.DeploymentNameExists(ctx, group.Name, request.Name)
+	exists, err := h.instanceService.DeploymentNameExists(ctx, group.Name, request.Name, request.Preset)
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
 
 	if exists {
-		c.JSON(http.StatusOK, DeploymentNameAvailability{Reason: fmt.Sprintf("a deployment named %q already exists in group %q", request.Name, group.Name)})
+		c.JSON(http.StatusOK, DeploymentNameAvailability{Reason: fmt.Sprintf("a %s named %q already exists in group %q", deploymentKind(request.Preset), request.Name, group.Name)})
 		return
 	}
 

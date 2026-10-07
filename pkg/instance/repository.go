@@ -79,7 +79,7 @@ func (r repository) SaveDeployment(ctx context.Context, deployment *model.Deploy
 	err := r.db.WithContext(ctx).Save(&deployment).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrDuplicatedKey) {
-			return errdef.NewDuplicated("a deployment named %q already exists in group %q", deployment.Name, deployment.GroupName)
+			return errdef.NewDuplicated("a %s named %q already exists in group %q", deploymentKind(deployment.Preset), deployment.Name, deployment.GroupName)
 		}
 		return fmt.Errorf("failed to save deployment: %v", err)
 	}
@@ -87,14 +87,21 @@ func (r repository) SaveDeployment(ctx context.Context, deployment *model.Deploy
 	return nil
 }
 
-func (r repository) DeploymentNameExists(ctx context.Context, groupName, name string) (bool, error) {
+func deploymentKind(preset bool) string {
+	if preset {
+		return "preset"
+	}
+	return "deployment"
+}
+
+func (r repository) DeploymentNameExists(ctx context.Context, groupName, name string, preset bool) (bool, error) {
 	var count int64
 	err := r.db.WithContext(ctx).
 		Model(&model.Deployment{}).
-		Where("group_name = ? AND name = ?", groupName, name).
+		Where("group_name = ? AND name = ? AND preset = ?", groupName, name, preset).
 		Count(&count).Error
 	if err != nil {
-		return false, fmt.Errorf("failed to look up deployment %q in group %q: %v", name, groupName, err)
+		return false, fmt.Errorf("failed to look up %s %q in group %q: %v", deploymentKind(preset), name, groupName, err)
 	}
 
 	return count > 0, nil
@@ -319,7 +326,7 @@ func (r repository) FindPublicInstances(ctx context.Context) ([]*model.Deploymen
 		WithContext(ctx).
 		Joins("Group").
 		Joins("Deployment").
-		Where("public = true").
+		Where("public = true AND \"Deployment\".preset = false").
 		Order("updated_at desc").
 		Find(&instances).Error
 	if err != nil {
