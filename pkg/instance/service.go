@@ -116,8 +116,16 @@ func (s Service) SaveDeployment(ctx context.Context, deployment *model.Deploymen
 	return s.instanceRepository.SaveDeployment(ctx, deployment)
 }
 
-func (s Service) DeploymentNameExists(ctx context.Context, groupName, name string) (bool, error) {
-	return s.instanceRepository.DeploymentNameExists(ctx, groupName, name)
+func (s Service) FindPreset(ctx context.Context, groupName, name string) (*model.Deployment, error) {
+	return s.instanceRepository.FindPreset(ctx, groupName, name)
+}
+
+func (s Service) ReplacePreset(ctx context.Context, oldID uint, preset *model.Deployment) error {
+	return s.instanceRepository.ReplacePreset(ctx, oldID, preset)
+}
+
+func (s Service) DeploymentNameExists(ctx context.Context, groupName, name string, preset bool) (bool, error) {
+	return s.instanceRepository.DeploymentNameExists(ctx, groupName, name, preset)
 }
 
 func (s Service) FindDeploymentById(ctx context.Context, id uint) (*model.Deployment, error) {

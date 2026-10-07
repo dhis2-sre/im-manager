@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/rsa"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -511,14 +512,53 @@ func TestInstanceHandler(t *testing.T) {
 
 	t.Run("Preset", func(t *testing.T) {
 		t.Parallel()
+		deployment := createDeployment(t, client, "test-preset", tokens.AccessToken)
+		createWhoamiInstance(t, client, deployment.ID, tokens.AccessToken, WithParameter("IMAGE_TAG", "0.6.0"))
 		preset := createDeployment(t, client, "test-preset", tokens.AccessToken, WithPreset())
 		require.True(t, preset.Preset)
-		createWhoamiInstance(t, client, preset.ID, tokens.AccessToken, WithParameter("IMAGE_TAG", "0.6.0"))
+		createWhoamiInstance(t, client, preset.ID, tokens.AccessToken, WithParameter("IMAGE_TAG", "0.6.0"), WithPublic(true))
+
+		duplicate := client.Do(t, http.MethodPost, "/deployments", strings.NewReader(`{"name":"test-preset","group":"group-name","preset":true}`), http.StatusConflict, inttest.WithAuthToken(tokens.AccessToken), inttest.WithHeader("Content-Type", "application/json"))
+		assert.Contains(t, string(duplicate), "a preset named")
+
+		var replaced model.Deployment
+		body := client.Do(t, http.MethodPost, "/deployments", strings.NewReader(`{"name":"test-preset","group":"group-name","description":"replaced","preset":true,"overwrite":true}`), http.StatusCreated, inttest.WithAuthToken(tokens.AccessToken), inttest.WithHeader("Content-Type", "application/json"))
+		require.NoError(t, json.Unmarshal(body, &replaced))
+		assert.NotEqual(t, preset.ID, replaced.ID)
+		assert.Equal(t, "replaced", replaced.Description)
+		client.Do(t, http.MethodGet, fmt.Sprintf("/deployments/%d", preset.ID), nil, http.StatusNotFound, inttest.WithAuthToken(tokens.AccessToken))
+		client.Do(t, http.MethodGet, fmt.Sprintf("/deployments/%d", deployment.ID), nil, http.StatusOK, inttest.WithAuthToken(tokens.AccessToken))
+		client.Do(t, http.MethodPost, "/deployments", strings.NewReader(`{"name":"test-preset","group":"group-name","overwrite":true}`), http.StatusBadRequest, inttest.WithAuthToken(tokens.AccessToken), inttest.WithHeader("Content-Type", "application/json"))
+		preset = replaced
+		createWhoamiInstance(t, client, preset.ID, tokens.AccessToken, WithParameter("IMAGE_TAG", "0.6.0"), WithPublic(true))
+
+		var availability instance.DeploymentNameAvailability
+		client.GetJSON(t, "/deployments/availability?group=group-name&name=test-preset&preset=true", &availability, inttest.WithAuthToken(tokens.AccessToken))
+		assert.False(t, availability.Available)
+		availability = instance.DeploymentNameAvailability{}
+		client.GetJSON(t, "/deployments/availability?group=group-name&name=test-preset-free&preset=true", &availability, inttest.WithAuthToken(tokens.AccessToken))
+		assert.True(t, availability.Available)
+
+		var outsiderPresets []model.Deployment
+		client.GetJSON(t, "/deployments/presets?user=non-member", &outsiderPresets, inttest.WithAuthToken(tokens.AccessToken))
+		assert.False(t, slices.ContainsFunc(outsiderPresets, func(d model.Deployment) bool { return d.ID == preset.ID }))
+		client.Do(t, http.MethodGet, fmt.Sprintf("/deployments/%d?user=non-member", preset.ID), nil, http.StatusUnauthorized, inttest.WithAuthToken(tokens.AccessToken))
+
+		var publicGroups []instance.GroupWithPublicInstances
+		client.GetJSON(t, "/instances/public", &publicGroups)
+		for _, group := range publicGroups {
+			for _, category := range group.Categories {
+				assert.False(t, slices.ContainsFunc(category.Instances, func(i instance.PublicInstance) bool { return i.Name == "test-preset" }))
+			}
+		}
 
 		var presets []model.Deployment
 		client.GetJSON(t, "/deployments/presets", &presets, inttest.WithAuthToken(tokens.AccessToken))
 		assert.True(t, slices.ContainsFunc(presets, func(d model.Deployment) bool { return d.ID == preset.ID }))
 		assert.False(t, slices.ContainsFunc(presets, func(d model.Deployment) bool { return !d.Preset }))
+		listed := presets[slices.IndexFunc(presets, func(d model.Deployment) bool { return d.ID == preset.ID })]
+		require.Len(t, listed.Instances, 1)
+		assert.Equal(t, "0.6.0", listed.Instances[0].Parameters["IMAGE_TAG"].Value)
 
 		var groupsWithDeployments []instance.GroupWithDeployments
 		client.GetJSON(t, "/deployments", &groupsWithDeployments, inttest.WithAuthToken(tokens.AccessToken))

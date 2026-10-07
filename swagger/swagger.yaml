@@ -702,6 +702,10 @@ definitions:
             name:
                 type: string
                 x-go-name: Name
+            overwrite:
+                description: Overwrite replaces a preset of the same name instead of refusing it. It only applies to presets.
+                type: boolean
+                x-go-name: Overwrite
             preset:
                 type: boolean
                 x-go-name: Preset
@@ -1767,7 +1771,7 @@ paths:
             summary: Update a Deployment Instance
     /deployments/availability:
         get:
-            description: Check whether a deployment name is free to use in a group
+            description: Check whether a deployment name is free to use in a group. Presets have their own names, so pass preset=true to check the name of a preset.
             operationId: deploymentNameAvailability
             parameters:
                 - in: query
@@ -1780,6 +1784,11 @@ paths:
                   required: true
                   type: string
                   x-go-name: Name
+                - description: Check the name of a preset rather than a deployment
+                  in: query
+                  name: preset
+                  type: boolean
+                  x-go-name: Preset
             responses:
                 "200":
                     $ref: '#/responses/DeploymentNameAvailability'
