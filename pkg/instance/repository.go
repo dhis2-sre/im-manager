@@ -345,6 +345,11 @@ func (r repository) FindDeployments(ctx context.Context, groupNames []string, pr
 		db = db.Where("group_name IN ?", groupNames)
 	}
 
+	// A preset is listed to be picked from, so its parameters come along to describe it.
+	if preset {
+		db = db.Preload("Instances.GormParameters")
+	}
+
 	var deployments []*model.Deployment
 	err := db.
 		Joins("Group").

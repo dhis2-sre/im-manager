@@ -556,6 +556,9 @@ func TestInstanceHandler(t *testing.T) {
 		client.GetJSON(t, "/deployments/presets", &presets, inttest.WithAuthToken(tokens.AccessToken))
 		assert.True(t, slices.ContainsFunc(presets, func(d model.Deployment) bool { return d.ID == preset.ID }))
 		assert.False(t, slices.ContainsFunc(presets, func(d model.Deployment) bool { return !d.Preset }))
+		listed := presets[slices.IndexFunc(presets, func(d model.Deployment) bool { return d.ID == preset.ID })]
+		require.Len(t, listed.Instances, 1)
+		assert.Equal(t, "0.6.0", listed.Instances[0].Parameters["IMAGE_TAG"].Value)
 
 		var groupsWithDeployments []instance.GroupWithDeployments
 		client.GetJSON(t, "/deployments", &groupsWithDeployments, inttest.WithAuthToken(tokens.AccessToken))
