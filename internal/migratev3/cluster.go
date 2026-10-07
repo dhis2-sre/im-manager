@@ -3,10 +3,13 @@ package migratev3
 import (
 	"bytes"
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"os/exec"
+	"slices"
 	"strings"
 	"time"
 
@@ -17,6 +20,9 @@ import (
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 )
 
@@ -182,6 +188,57 @@ func (c *Cluster) jobSucceeded(ctx context.Context, name string) (bool, error) {
 	return false, nil
 }
 
+var scaledObjects = schema.GroupVersionResource{Group: "keda.sh", Version: "v1alpha1", Resource: "scaledobjects"}
+
+const pausedReplicasAnnotation = "autoscaling.keda.sh/paused-replicas"
+
+// pauseAutoscaling holds every KEDA ScaledObject that scales one of the deployments at zero replicas
+// and returns the ones it paused. A core scaled to zero is otherwise woken by its next request, and
+// writes after the dump has started. A cluster without KEDA has nothing to pause.
+func (c *Cluster) pauseAutoscaling(ctx context.Context, deployments []string) ([]string, error) {
+	list, err := c.client.Dynamic.Resource(scaledObjects).Namespace(c.namespace).List(ctx, metav1.ListOptions{})
+	if apierrors.IsNotFound(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to list scaled objects: %v", err)
+	}
+	var paused []string
+	for _, item := range list.Items {
+		target, _, _ := unstructured.NestedString(item.Object, "spec", "scaleTargetRef", "name")
+		if !slices.Contains(deployments, target) {
+			continue
+		}
+		if err := c.annotateScaledObject(ctx, item.GetName(), "0"); err != nil {
+			return paused, err
+		}
+		paused = append(paused, item.GetName())
+	}
+	return paused, nil
+}
+
+// resumeAutoscaling hands the scaled objects back to KEDA.
+func (c *Cluster) resumeAutoscaling(ctx context.Context, names []string) error {
+	var errs []error
+	for _, name := range names {
+		errs = append(errs, c.annotateScaledObject(ctx, name, nil))
+	}
+	return errors.Join(errs...)
+}
+
+// annotateScaledObject sets the paused replicas annotation, or removes it when value is nil.
+func (c *Cluster) annotateScaledObject(ctx context.Context, name string, value any) error {
+	patch, err := json.Marshal(map[string]any{"metadata": map[string]any{"annotations": map[string]any{pausedReplicasAnnotation: value}}})
+	if err != nil {
+		return err
+	}
+	_, err = c.client.Dynamic.Resource(scaledObjects).Namespace(c.namespace).Patch(ctx, name, types.MergePatchType, patch, metav1.PatchOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to annotate scaled object %q: %v", name, err)
+	}
+	return nil
+}
+
 // deletePVCsBySelector deletes every claim matching the selector.
 func (c *Cluster) deletePVCsBySelector(ctx context.Context, selector string) error {
 	_, err := c.client.DeletePVCs(ctx, c.namespace, []string{selector})
@@ -212,8 +269,11 @@ func (c *Cluster) releaseExists(ctx context.Context, release string) (bool, erro
 	return false, err
 }
 
+// helm runs helm against the cluster with a temporary home. The image's user has /dev/null as its
+// home, and client-go stats a kubeconfig under it even when KUBECONFIG is set, which fails with
+// "not a directory" and reports the cluster unreachable. Instance manager's own helmfile runs set
+// HOME for the same reason.
 func (c *Cluster) helm(ctx context.Context, arguments ...string) error {
-	// The image runs as a user without a writable home, where helm keeps its configuration and cache.
 	home, err := os.MkdirTemp("", "migrate-v3-helm")
 	if err != nil {
 		return err
@@ -221,7 +281,7 @@ func (c *Cluster) helm(ctx context.Context, arguments ...string) error {
 	defer func() { _ = os.RemoveAll(home) }()
 
 	command := exec.CommandContext(ctx, "helm", arguments...)
-	command.Env = append(os.Environ(), "HELM_CONFIG_HOME="+home, "HELM_CACHE_HOME="+home, "HELM_DATA_HOME="+home)
+	command.Env = append(os.Environ(), "HOME="+home, "HELM_CONFIG_HOME="+home, "HELM_CACHE_HOME="+home, "HELM_DATA_HOME="+home)
 	if c.kubeconfig != nil {
 		file, err := os.CreateTemp("", "migrate-v3-kubeconfig")
 		if err != nil {
