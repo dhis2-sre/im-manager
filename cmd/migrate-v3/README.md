@@ -34,15 +34,17 @@ migrate-v3 cleanup                      # after the grace period
 
 ### im-vm
 
-The binary ships in the image as `/app/migrate-v3`. Run it on the environment's compose network with the environment file, the AWS credentials the host mints and the image the environment runs (`latest` for dev once version 3.0 is on master):
+The binary ships in the image as `/app/migrate-v3`. Run it as a one-off container of the environment's `api` service, with the same files and variables `im-environment` uses, so it gets the API's environment file, network and AWS credentials. Replace `dev` and the tag for another environment:
 
 ```sh
-. /opt/im/server.conf
-sudo docker run --rm --pull always --network im-dev_default \
-  --env-file /opt/im/environments/dev.env \
-  --volume /opt/im/credentials:/aws:ro --env AWS_CONFIG_FILE=/aws/config --env AWS_REGION="$AWS_REGION" \
-  --entrypoint /app/migrate-v3 dhis2/im-manager:latest plan
+sudo bash -c '. /opt/im/server.conf && ENVIRONMENT_FILE=/opt/im/environments/dev.env IM_ENVIRONMENT=dev AWS_REGION=$AWS_REGION IMAGE_TAG=latest \
+  docker compose --project-name im-dev --project-directory /opt/im/sources/im-manager/current \
+    --env-file /opt/im/environments/dev.env \
+    --file /opt/im/sources/im-manager/current/docker-compose.yml --file /opt/im/manager-overlay.yml \
+    run -T --rm --no-deps --entrypoint /app/migrate-v3 api plan'
 ```
+
+`docker run --env-file` does not work here: it keeps the quotes around the environment file's values, which compose strips.
 
 #### Dev
 

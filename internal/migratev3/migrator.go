@@ -257,7 +257,7 @@ func (m *Migrator) snapshot(ctx context.Context, d LegacyDeployment, state *Stat
 		}
 		if d.Minio != nil {
 			if err := m.scaleSelected(ctx, cluster, minioSelector(d), 1); err != nil {
-				return m.undoSnapshot(ctx, cluster, d, state, nil, err)
+				return m.undoSnapshot(ctx, cluster, d, state, stoppedCore{}, err)
 			}
 		}
 	}
@@ -269,21 +269,29 @@ func (m *Migrator) snapshot(ctx context.Context, d LegacyDeployment, state *Stat
 	if d.StorageType() == "filesystem" {
 		size, _, err := m.Snapshotter.ArchiveFilestore(ctx, cluster, d, key(".fs.tar.gz"))
 		if err != nil {
-			return m.undoSnapshot(ctx, cluster, d, state, nil, err)
+			return m.undoSnapshot(ctx, cluster, d, state, stoppedCore{}, err)
 		}
 		filestoreKey, filestoreSize = key(".fs.tar.gz"), size
 	}
 
 	cores, err := cluster.deploymentsBySelector(ctx, coreSelector(d))
 	if err != nil {
-		return m.undoSnapshot(ctx, cluster, d, state, nil, err)
+		return m.undoSnapshot(ctx, cluster, d, state, stoppedCore{}, err)
 	}
-	stopped := map[string]int32{}
+	names := make([]string, len(cores))
+	for i, core := range cores {
+		names[i] = core.Name
+	}
+	stopped := stoppedCore{replicas: map[string]int32{}}
+	stopped.autoscaled, err = cluster.pauseAutoscaling(ctx, names)
+	if err != nil {
+		return m.undoSnapshot(ctx, cluster, d, state, stopped, err)
+	}
 	for _, core := range cores {
 		// Kubernetes defaults unset replicas to one.
-		stopped[core.Name] = 1
+		stopped.replicas[core.Name] = 1
 		if core.Spec.Replicas != nil {
-			stopped[core.Name] = *core.Spec.Replicas
+			stopped.replicas[core.Name] = *core.Spec.Replicas
 		}
 		if err := cluster.scaleDeployment(ctx, core.Name, 0); err != nil {
 			return m.undoSnapshot(ctx, cluster, d, state, stopped, err)
@@ -314,12 +322,19 @@ func (m *Migrator) snapshot(ctx context.Context, d LegacyDeployment, state *Stat
 	return saveState(m.DB, state)
 }
 
-func (m *Migrator) undoSnapshot(ctx context.Context, cluster *Cluster, d LegacyDeployment, state *State, stopped map[string]int32, cause error) error {
+// stoppedCore is what stopping the old core changed, so a snapshot that fails can put it back.
+type stoppedCore struct {
+	replicas   map[string]int32
+	autoscaled []string
+}
+
+func (m *Migrator) undoSnapshot(ctx context.Context, cluster *Cluster, d LegacyDeployment, state *State, stopped stoppedCore, cause error) error {
 	ctx = context.WithoutCancel(ctx)
 	errs := []error{cause}
-	for name, replicas := range stopped {
+	for name, replicas := range stopped.replicas {
 		errs = append(errs, cluster.scaleDeployment(ctx, name, replicas))
 	}
+	errs = append(errs, cluster.resumeAutoscaling(ctx, stopped.autoscaled))
 	if state.WasPaused {
 		errs = append(errs, cluster.scaleStatefulSet(ctx, databaseStatefulSet(d), 0))
 		if d.Minio != nil {
