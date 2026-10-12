@@ -143,6 +143,8 @@ type SaveDeploymentRequest struct {
 	Group       string `json:"group" binding:"required"`
 	TTL         uint   `json:"ttl"`
 	Preset      bool   `json:"preset"`
+	// Overwrite replaces a preset of the same name instead of refusing it. It only applies to presets.
+	Overwrite bool `json:"overwrite"`
 }
 
 func (h Handler) SaveDeployment(c *gin.Context) {
@@ -206,7 +208,12 @@ func (h Handler) SaveDeployment(c *gin.Context) {
 		return
 	}
 
-	err = h.instanceService.SaveDeployment(ctx, deployment)
+	if request.Overwrite && !request.Preset {
+		_ = c.Error(errdef.NewBadRequest("overwrite only applies to presets"))
+		return
+	}
+
+	err = h.saveDeployment(ctx, user, deployment, request.Overwrite)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -221,6 +228,26 @@ func (h Handler) SaveDeployment(c *gin.Context) {
 	c.JSON(http.StatusCreated, deployment)
 }
 
+func (h Handler) saveDeployment(ctx context.Context, user *model.User, deployment *model.Deployment, overwrite bool) error {
+	if !overwrite {
+		return h.instanceService.SaveDeployment(ctx, deployment)
+	}
+
+	existing, err := h.instanceService.FindPreset(ctx, deployment.GroupName, deployment.Name)
+	if errdef.IsNotFound(err) {
+		return h.instanceService.SaveDeployment(ctx, deployment)
+	}
+	if err != nil {
+		return err
+	}
+
+	if !handler.CanWriteDeployment(user, existing) {
+		return errdef.NewUnauthorized("write access to preset %q denied", existing.Name)
+	}
+
+	return h.instanceService.ReplacePreset(ctx, existing.ID, deployment)
+}
+
 // swagger:model DeploymentNameAvailability
 type DeploymentNameAvailability struct {
 	Available bool   `json:"available"`
@@ -232,7 +259,7 @@ func (h Handler) DeploymentNameAvailability(c *gin.Context) {
 	//
 	// Deployment name availability
 	//
-	// Check whether a deployment name is free to use in a group
+	// Check whether a deployment name is free to use in a group. Presets have their own names, so pass preset=true to check the name of a preset.
 	//
 	// Security:
 	//	oauth2:
@@ -244,8 +271,9 @@ func (h Handler) DeploymentNameAvailability(c *gin.Context) {
 	//	403: Error
 	//	404: Error
 	var request struct {
-		Group string `form:"group" binding:"required"`
-		Name  string `form:"name" binding:"required"`
+		Group  string `form:"group" binding:"required"`
+		Name   string `form:"name" binding:"required"`
+		Preset bool   `form:"preset"`
 	}
 	if err := c.ShouldBindQuery(&request); err != nil {
 		_ = c.Error(errdef.NewBadRequest("group and name query parameters are required"))
@@ -280,14 +308,14 @@ func (h Handler) DeploymentNameAvailability(c *gin.Context) {
 		return
 	}
 
-	exists, err := h.instanceService.DeploymentNameExists(ctx, group.Name, request.Name)
+	exists, err := h.instanceService.DeploymentNameExists(ctx, group.Name, request.Name, request.Preset)
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
 
 	if exists {
-		c.JSON(http.StatusOK, DeploymentNameAvailability{Reason: fmt.Sprintf("a deployment named %q already exists in group %q", request.Name, group.Name)})
+		c.JSON(http.StatusOK, DeploymentNameAvailability{Reason: fmt.Sprintf("a %s named %q already exists in group %q", deploymentKind(request.Preset), request.Name, group.Name)})
 		return
 	}
 
