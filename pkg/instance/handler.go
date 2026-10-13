@@ -337,6 +337,13 @@ type BulkDeployRequest struct {
 }
 
 func bulkDeploymentNames(prefix string, count uint) []string {
+	if count == 0 {
+		return []string{}
+	}
+	if count > MaxBulkDeployments {
+		count = MaxBulkDeployments
+	}
+
 	names := make([]string, count)
 	for i := range names {
 		names[i] = fmt.Sprintf("%s-%d", prefix, i+1)
