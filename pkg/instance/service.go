@@ -732,8 +732,17 @@ func (s Service) DestroyInstance(ctx context.Context, instance *model.Deployment
 		s.logger.WarnContext(ctx, "Destroy matched no persistent volume claim, volumes may have been left behind", "instance", instance.Name, "stack", instance.StackName, "namespace", group.Namespace, "selectors", result.UnmatchedSelectors)
 	}
 
+	if len(result.Deleted) > 0 {
+		err = errors.Join(err, client.WaitForPVCDeletion(ctx, instance.Group.Namespace, result.Deleted, PVCDeletionTimeout))
+	}
+
 	return err
 }
+
+// PVCDeletionTimeout bounds how long a destroy waits for its claims to go, which takes as long as the
+// pods mounting them take to stop. A reset deploys right after the destroy, and must not find them
+// still terminating.
+const PVCDeletionTimeout = 5 * time.Minute
 
 func deploymentOrder(deployment *model.Deployment, g graph.Graph[string, *model.DeploymentInstance]) ([]*model.DeploymentInstance, error) {
 	instances, err := graph.TopologicalSort(g)

@@ -4,14 +4,17 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/dhis2-sre/im-manager/pkg/model"
 
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
 )
 
 func (c *Client) RestartStatefulSet(ctx context.Context, instance *model.DeploymentInstance, componentName string) error {
@@ -171,6 +174,36 @@ func (c *Client) DeletePVCs(ctx context.Context, namespace string, selectors []s
 	}
 
 	return result, errs
+}
+
+// pvcDeletionPollInterval is how often WaitForPVCDeletion checks, a variable so tests need not wait.
+var pvcDeletionPollInterval = 2 * time.Second
+
+// WaitForPVCDeletion waits until none of the named claims exists any more. Deleting a claim only
+// marks it: it stays, terminating, while a pod still mounts it, and a release installed meanwhile
+// finds the old claim instead of creating its own, then loses it once the deletion completes.
+func (c *Client) WaitForPVCDeletion(ctx context.Context, namespace string, names []string, timeout time.Duration) error {
+	pvcs := c.Clientset.CoreV1().PersistentVolumeClaims(namespace)
+	remaining := slices.Clone(names)
+	err := wait.PollUntilContextTimeout(ctx, pvcDeletionPollInterval, timeout, true, func(ctx context.Context) (bool, error) {
+		var stillThere []string
+		for _, name := range remaining {
+			_, err := pvcs.Get(ctx, name, metav1.GetOptions{})
+			if apierrors.IsNotFound(err) {
+				continue
+			}
+			if err != nil {
+				return false, fmt.Errorf("failed to check pvc %q: %v", name, err)
+			}
+			stillThere = append(stillThere, name)
+		}
+		remaining = stillThere
+		return len(remaining) == 0, nil
+	})
+	if err != nil {
+		return fmt.Errorf("persistent volume claims %v were not deleted within %s: %w", remaining, timeout, err)
+	}
+	return nil
 }
 
 func (c *Client) scale(ctx context.Context, instance *model.DeploymentInstance, replicas int32) error {
