@@ -156,6 +156,40 @@ type DeploymentNameAvailabilityBody struct {
 	Body DeploymentNameAvailability
 }
 
+// swagger:parameters bulkDeploymentNameAvailability
+type _ struct {
+	// in: query
+	// required: true
+	Group string `json:"group"`
+
+	// in: query
+	// required: true
+	Prefix string `json:"prefix"`
+
+	// in: query
+	// required: true
+	Count uint `json:"count"`
+}
+
+// swagger:response BulkDeploymentNameAvailability
+type BulkDeploymentNameAvailabilityBody struct {
+	// in: body
+	Body BulkDeploymentNameAvailability
+}
+
+// swagger:parameters bulkDeploy
+type _ struct {
+	// in: body
+	// required: true
+	Body BulkDeployRequest
+}
+
+// swagger:response BulkDeployResponse
+type BulkDeployResponseBody struct {
+	// in: body
+	Body BulkDeployResponse
+}
+
 // swagger:parameters saveDeployment
 type _ struct {
 	// Save deployment request body parameter

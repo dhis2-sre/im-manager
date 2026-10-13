@@ -1,6 +1,70 @@
 consumes:
     - application/json
 definitions:
+    BulkDeployRequest:
+        properties:
+            count:
+                format: uint64
+                type: integer
+                x-go-name: Count
+            description:
+                type: string
+                x-go-name: Description
+            group:
+                type: string
+                x-go-name: Group
+            instances:
+                items:
+                    $ref: '#/definitions/SaveInstanceRequest'
+                type: array
+                x-go-name: Instances
+            prefix:
+                description: Prefix names the deployments prefix-1 to prefix-count
+                type: string
+                x-go-name: Prefix
+            ttl:
+                format: uint64
+                type: integer
+                x-go-name: TTL
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
+    BulkDeployResponse:
+        properties:
+            deployments:
+                items:
+                    $ref: '#/definitions/BulkDeployment'
+                type: array
+                x-go-name: Deployments
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
+    BulkDeployment:
+        properties:
+            id:
+                format: uint64
+                type: integer
+                x-go-name: ID
+            name:
+                type: string
+                x-go-name: Name
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
+    BulkDeploymentNameAvailability:
+        properties:
+            names:
+                items:
+                    type: string
+                type: array
+                x-go-name: Names
+            reason:
+                type: string
+                x-go-name: Reason
+            taken:
+                items:
+                    type: string
+                type: array
+                x-go-name: Taken
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
     Category:
         properties:
             instances:
@@ -1803,6 +1867,69 @@ paths:
             security:
                 - oauth2: []
             summary: Deployment name availability
+    /deployments/bulk:
+        post:
+            description: 'Create count deployments named prefix-1 to prefix-count with the same instances and deploy them, a few at a time. Either every deployment is created or none is: if any name is taken the request fails with 409 and creates nothing.'
+            operationId: bulkDeploy
+            parameters:
+                - in: body
+                  name: Body
+                  required: true
+                  schema:
+                    $ref: '#/definitions/BulkDeployRequest'
+            responses:
+                "202":
+                    $ref: '#/responses/BulkDeployResponse'
+                "400":
+                    $ref: '#/responses/Error'
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+                "409":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Bulk deploy
+    /deployments/bulk/availability:
+        get:
+            description: List the names a bulk deploy with the given prefix and count would create and which of them are taken. The bulk deploy checks again when it creates them.
+            operationId: bulkDeploymentNameAvailability
+            parameters:
+                - in: query
+                  name: group
+                  required: true
+                  type: string
+                  x-go-name: Group
+                - in: query
+                  name: prefix
+                  required: true
+                  type: string
+                  x-go-name: Prefix
+                - format: uint64
+                  in: query
+                  name: count
+                  required: true
+                  type: integer
+                  x-go-name: Count
+            responses:
+                "200":
+                    $ref: '#/responses/BulkDeploymentNameAvailability'
+                "400":
+                    $ref: '#/responses/Error'
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Bulk deployment name availability
     /deployments/presets:
         get:
             description: Find the presets in the groups the user belongs to. A preset is a deployment that is saved but never deployed, kept to start new deployments from.
@@ -2853,6 +2980,14 @@ paths:
 produces:
     - application/json
 responses:
+    BulkDeployResponse:
+        description: ""
+        schema:
+            $ref: '#/definitions/BulkDeployResponse'
+    BulkDeploymentNameAvailability:
+        description: ""
+        schema:
+            $ref: '#/definitions/BulkDeploymentNameAvailability'
     ClusterResources:
         description: ""
         schema:

@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"slices"
+	"sync"
+	"time"
 
 	"github.com/dhis2-sre/im-manager/internal/errdef"
 
@@ -84,50 +87,215 @@ func (s Service) StartDeployment(ctx context.Context, token string, deploymentId
 		return errdef.NewConflict("deployment %d is already being deployed", deploymentId)
 	}
 
-	deployment, err := s.instanceService.FindDecryptedDeploymentById(ctx, deploymentId)
+	// The deploy outlives the request, so the token has to be minted while the caller's is still
+	// valid. Each instance then refreshes from the previous one, as a synchronous deploy did.
+	token, err = s.tokenService.RefreshAccessToken(token)
 	if err != nil {
 		s.releaseDeployLock(ctx, deploymentId)
 		return err
 	}
 
+	deployment, err := s.prepareDeploy(ctx, deploymentId)
+	if err != nil {
+		return err
+	}
+
+	ctx = context.WithoutCancel(ctx)
+	go s.runDeploy(ctx, token, deployment, userID)
+
+	return nil
+}
+
+// prepareDeploy loads a deployment whose deploy lock the caller holds, in deploy order, and marks its instances pending. It gives the lock back when it fails.
+func (s Service) prepareDeploy(ctx context.Context, deploymentId uint) (*model.Deployment, error) {
+	deployment, err := s.instanceService.FindDecryptedDeploymentById(ctx, deploymentId)
+	if err != nil {
+		s.releaseDeployLock(ctx, deploymentId)
+		return nil, err
+	}
+
 	instances, err := s.instanceService.DeploymentOrder(deployment)
 	if err != nil {
 		s.releaseDeployLock(ctx, deployment.ID)
-		return err
+		return nil, err
 	}
 	deployment.Instances = instances
-
-	// The deploy outlives the request, so the token has to be minted while the caller's is still
-	// valid. Each instance then refreshes from the previous one, as a synchronous deploy did.
-	token, err = s.tokenService.RefreshAccessToken(token)
-	if err != nil {
-		s.releaseDeployLock(ctx, deployment.ID)
-		return err
-	}
 
 	for _, deploymentInstance := range instances {
 		if err := s.instanceService.SetDeployStatus(ctx, deploymentInstance, model.DeployStatusPending); err != nil {
 			s.releaseDeployLock(ctx, deployment.ID)
-			return err
+			return nil, err
 		}
 	}
 
-	ctx = context.WithoutCancel(ctx)
-	go func() {
-		err := s.deployDeployment(ctx, token, deployment, userID)
-		// The lock goes back before the event goes out, so a client that acts on the event finds the
-		// deployment free rather than racing the release.
-		s.releaseDeployLock(ctx, deployment.ID)
+	return deployment, nil
+}
 
-		if err != nil {
-			s.logger.ErrorContext(ctx, "deploy failed", "deploymentId", deployment.ID, "deploymentName", deployment.Name, "error", err)
-			s.publisher.Publish(ctx, userID, deployment.GroupName, kindDeployment, newDeploymentEvent(deployment, "error", err.Error()))
-			return
-		}
-		s.publisher.Publish(ctx, userID, deployment.GroupName, kindDeployment, newDeploymentEvent(deployment, "success", ""))
-	}()
+func (s Service) runDeploy(ctx context.Context, token string, deployment *model.Deployment, userID uint) {
+	err := s.deployDeployment(ctx, token, deployment, userID)
+	// The lock goes back before the event goes out, so a client that acts on the event finds the
+	// deployment free rather than racing the release.
+	s.releaseDeployLock(ctx, deployment.ID)
+
+	if err != nil {
+		s.logger.ErrorContext(ctx, "deploy failed", "deploymentId", deployment.ID, "deploymentName", deployment.Name, "error", err)
+		s.publisher.Publish(ctx, userID, deployment.GroupName, kindDeployment, newDeploymentEvent(deployment, "error", err.Error()))
+		return
+	}
+	s.publisher.Publish(ctx, userID, deployment.GroupName, kindDeployment, newDeploymentEvent(deployment, "success", ""))
+}
+
+// BulkDeployConcurrency is how many deployments of a batch deploy at once, so a large batch doesn't run every helmfile sync against the cluster at the same time.
+const BulkDeployConcurrency = 3
+
+var (
+	// queuedLockRetry is how long a queued deployment waits before asking again for a deploy lock someone else holds.
+	queuedLockRetry = 10 * time.Second
+	// batchTokenRefresh keeps a batch's token alive while every slot is busy with a long deploy and no deployment starts to refresh it.
+	batchTokenRefresh = 5 * time.Minute
+)
+
+// StartDeployments deploys a batch of new deployments in the background, BulkDeployConcurrency at a time. The caller creates their instances pending, so nothing here touches the database before the batch is handed to the background and a lost request can't leave a batch that never starts.
+//
+// A deployment takes its deploy lock only when its turn comes, so the lock can't go stale while it waits behind the others. If the user deploys, edits or resets a queued deployment in the meantime, its turn waits for that to finish, and it is skipped when nothing is left pending; a deleted one is skipped.
+func (s Service) StartDeployments(ctx context.Context, token string, deploymentIds []uint, userID uint) error {
+	token, err := s.tokenService.RefreshAccessToken(token)
+	if err != nil {
+		return err
+	}
+
+	ctx = context.WithoutCancel(ctx)
+	go s.deployQueue(ctx, newTokenChain(s.tokenService, token), deploymentIds, userID)
 
 	return nil
+}
+
+func (s Service) deployQueue(ctx context.Context, tokens *tokenChain, deploymentIds []uint, userID uint) {
+	done := make(chan struct{})
+	defer close(done)
+	go func() {
+		ticker := time.NewTicker(batchTokenRefresh)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-done:
+				return
+			case <-ticker.C:
+				if _, err := tokens.next(); err != nil {
+					s.logger.ErrorContext(ctx, "failed to refresh the token of a bulk deploy", "error", err)
+				}
+			}
+		}
+	}()
+
+	slots := make(chan struct{}, BulkDeployConcurrency)
+	var wg sync.WaitGroup
+	for _, deploymentId := range deploymentIds {
+		slots <- struct{}{}
+		wg.Add(1)
+		go func() {
+			defer func() {
+				<-slots
+				wg.Done()
+			}()
+			s.deployQueued(ctx, tokens, deploymentId, userID)
+		}()
+	}
+	wg.Wait()
+}
+
+func (s Service) deployQueued(ctx context.Context, tokens *tokenChain, deploymentId uint, userID uint) {
+	for {
+		acquired, err := s.acquireDeployLock(ctx, deploymentId)
+		if errdef.IsNotFound(err) {
+			s.logger.InfoContext(ctx, "skipping queued deploy of a deleted deployment", "deploymentId", deploymentId)
+			return
+		}
+		if err != nil {
+			s.failQueuedById(ctx, deploymentId, userID, err)
+			return
+		}
+		if acquired {
+			break
+		}
+		time.Sleep(queuedLockRetry)
+	}
+
+	deployment, err := s.instanceService.FindDecryptedDeploymentById(ctx, deploymentId)
+	if err != nil {
+		s.releaseDeployLock(ctx, deploymentId)
+		s.failQueuedById(ctx, deploymentId, userID, err)
+		return
+	}
+
+	if !slices.ContainsFunc(deployment.Instances, func(deploymentInstance *model.DeploymentInstance) bool {
+		return deploymentInstance.DeployStatus == model.DeployStatusPending
+	}) {
+		s.releaseDeployLock(ctx, deploymentId)
+		s.logger.InfoContext(ctx, "skipping queued deploy, the deployment was deployed while it waited", "deploymentId", deploymentId)
+		return
+	}
+
+	instances, err := s.instanceService.DeploymentOrder(deployment)
+	if err != nil {
+		s.releaseDeployLock(ctx, deploymentId)
+		s.failQueued(ctx, deployment, userID, err)
+		return
+	}
+	deployment.Instances = instances
+
+	token, err := tokens.next()
+	if err != nil {
+		s.releaseDeployLock(ctx, deploymentId)
+		s.failQueued(ctx, deployment, userID, err)
+		return
+	}
+
+	s.runDeploy(ctx, token, deployment, userID)
+}
+
+func (s Service) failQueuedById(ctx context.Context, deploymentId uint, userID uint, err error) {
+	deployment, findErr := s.instanceService.FindDecryptedDeploymentById(ctx, deploymentId)
+	if findErr != nil {
+		s.logger.ErrorContext(ctx, "queued deploy failed", "deploymentId", deploymentId, "error", err, "findError", findErr)
+		return
+	}
+	s.failQueued(ctx, deployment, userID, err)
+}
+
+func (s Service) failQueued(ctx context.Context, deployment *model.Deployment, userID uint, err error) {
+	s.logger.ErrorContext(ctx, "queued deploy failed", "deploymentId", deployment.ID, "deploymentName", deployment.Name, "error", err)
+	for _, deploymentInstance := range deployment.Instances {
+		if deploymentInstance.DeployStatus != model.DeployStatusPending {
+			continue
+		}
+		if err := s.instanceService.SetDeployStatus(ctx, deploymentInstance, model.DeployStatusFailed); err != nil {
+			s.logger.ErrorContext(ctx, "failed to mark queued instance failed", "instanceId", deploymentInstance.ID, "error", err)
+		}
+	}
+	s.publisher.Publish(ctx, userID, deployment.GroupName, kindDeployment, newDeploymentEvent(deployment, "error", err.Error()))
+}
+
+// tokenChain is the token a batch carries from one deployment to the next. It is refreshed whenever a deployment starts and on a timer in between, so it stays valid however long the batch takes.
+type tokenChain struct {
+	mu           sync.Mutex
+	tokenService tokenService
+	token        string
+}
+
+func newTokenChain(tokenService tokenService, token string) *tokenChain {
+	return &tokenChain{tokenService: tokenService, token: token}
+}
+
+func (c *tokenChain) next() (string, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	token, err := c.tokenService.RefreshAccessToken(c.token)
+	if err != nil {
+		return "", err
+	}
+	c.token = token
+	return token, nil
 }
 
 // EditDeployment applies an edit to a deployment and runs whatever cluster work it implies in the

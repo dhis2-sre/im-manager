@@ -128,6 +128,38 @@ func (s Service) DeploymentNameExists(ctx context.Context, groupName, name strin
 	return s.instanceRepository.DeploymentNameExists(ctx, groupName, name, preset)
 }
 
+func (s Service) TakenDeploymentNames(ctx context.Context, groupName string, names []string) ([]string, error) {
+	return s.instanceRepository.TakenDeploymentNames(ctx, groupName, names)
+}
+
+// SaveDeployments validates the deployments' instances the way SaveInstance does and creates them all in one transaction.
+func (s Service) SaveDeployments(ctx context.Context, groupName string, deployments []*model.Deployment) error {
+	stacksByName := map[string]*stack.Stack{}
+	for _, deployment := range deployments {
+		for _, instance := range deployment.Instances {
+			stack, err := s.stackService.Find(instance.StackName)
+			if err != nil {
+				return err
+			}
+			stacksByName[instance.StackName] = stack
+
+			if err := s.rejectConsumedParameters(instance.StackName, maps.Keys(instance.Parameters)); err != nil {
+				return errdef.NewBadRequest("failed to validate instance: %v", err)
+			}
+		}
+
+		if _, err := s.validateNoCycles(deployment.Instances); err != nil {
+			return errdef.NewBadRequest("failed to validate instance: %v", err)
+		}
+
+		if err := s.resolveParameters(deployment); err != nil {
+			return errdef.NewBadRequest("failed to resolve parameters: %v", err)
+		}
+	}
+
+	return s.instanceRepository.SaveDeployments(ctx, groupName, deployments, stacksByName)
+}
+
 func (s Service) FindDeploymentById(ctx context.Context, id uint) (*model.Deployment, error) {
 	return s.instanceRepository.FindDeploymentById(ctx, id)
 }
