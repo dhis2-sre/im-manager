@@ -96,7 +96,35 @@ change_owner_routines() {
   done <<<"$statements"
 }
 
+# The restore runs as the superuser, so schemas created by extensions such as postgis_tiger_geocoder
+# end up unreadable for $DATABASE_USERNAME, which is the role IM dumps the database as.
+grant_read_on_unreadable_schemas() {
+  local query="
+    SELECT format(
+             'GRANT USAGE ON SCHEMA %I TO %I; GRANT SELECT ON ALL TABLES IN SCHEMA %I TO %I',
+             n.nspname,
+             '$DATABASE_USERNAME',
+             n.nspname,
+             '$DATABASE_USERNAME'
+           )
+    FROM pg_namespace n
+    WHERE n.nspname NOT LIKE 'pg\_%'
+      AND n.nspname <> 'information_schema'
+      AND NOT has_schema_privilege('$DATABASE_USERNAME', n.oid, 'USAGE')
+  "
+
+  local statements
+  statements=$(exec_psql "$query")
+
+  while IFS= read -r statement; do
+    [[ -z "$statement" ]] && continue
+    echo "$statement"
+    exec_psql "$statement"
+  done <<<"$statements"
+}
+
 change_owner "SELECT tablename FROM pg_tables WHERE schemaname = 'public'" "TABLE"
 change_owner "SELECT sequence_name FROM information_schema.sequences WHERE sequence_schema = 'public'" "SEQUENCE"
 change_owner "SELECT table_name FROM information_schema.views WHERE table_schema = 'public'" "VIEW"
 change_owner_routines
+grant_read_on_unreadable_schemas
