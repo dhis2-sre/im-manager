@@ -2,7 +2,9 @@ package kube
 
 import (
 	"context"
+	"math"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -10,6 +12,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/fake"
+	k8stesting "k8s.io/client-go/testing"
 )
 
 func TestDeletePVCs(t *testing.T) {
@@ -102,6 +105,48 @@ func TestDeletePVCs(t *testing.T) {
 			assert.Len(t, remaining.Items, tc.wantRemaining)
 		})
 	}
+}
+
+func TestWaitForPVCDeletion(t *testing.T) {
+	const namespace = "test-ns"
+	pvcDeletionPollInterval = time.Millisecond
+
+	// terminating answers the first gets of a claim as if it were still there, the way a claim whose
+	// pod is still stopping stays after its deletion.
+	terminating := func(client *fake.Clientset, gets int) *int {
+		calls := 0
+		client.PrependReactor("get", "persistentvolumeclaims", func(action k8stesting.Action) (bool, runtime.Object, error) {
+			calls++
+			if calls <= gets {
+				name := action.(k8stesting.GetAction).GetName()
+				return true, labeledPVC(namespace, name, "mydb-7-minio"), nil
+			}
+			return false, nil, nil
+		})
+		return &calls
+	}
+
+	t.Run("returns once the claims are gone", func(t *testing.T) {
+		client := fake.NewSimpleClientset()
+		calls := terminating(client, 3)
+		c := &Client{Clientset: client}
+
+		err := c.WaitForPVCDeletion(context.Background(), namespace, []string{"mydb-7-minio"}, time.Second)
+
+		require.NoError(t, err)
+		assert.Equal(t, 4, *calls, "polled while the claim was terminating, then saw it gone")
+	})
+
+	t.Run("names the claims still there when it times out", func(t *testing.T) {
+		client := fake.NewSimpleClientset()
+		terminating(client, math.MaxInt)
+		c := &Client{Clientset: client}
+
+		err := c.WaitForPVCDeletion(context.Background(), namespace, []string{"mydb-7-minio"}, 50*time.Millisecond)
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "mydb-7-minio")
+	})
 }
 
 func labeledPVC(namespace, name, instanceLabelValue string) *v1.PersistentVolumeClaim {
