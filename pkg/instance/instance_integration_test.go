@@ -510,6 +510,51 @@ func TestInstanceHandler(t *testing.T) {
 		client.Do(t, http.MethodGet, "/deployments/availability?group=group-name&name=free-name&user=non-member", nil, http.StatusUnauthorized, inttest.WithAuthToken(tokens.AccessToken))
 	})
 
+	t.Run("BulkDeploy", func(t *testing.T) {
+		t.Parallel()
+		post := func(body string, status int) []byte {
+			return client.Do(t, http.MethodPost, "/deployments/bulk", strings.NewReader(body), status, inttest.WithAuthToken(tokens.AccessToken), inttest.WithHeader("Content-Type", "application/json"))
+		}
+		whoami := `"instances":[{"stackName":"whoami-go","parameters":{"IMAGE_TAG":{"value":"0.6.0"}}}]`
+
+		var availability instance.BulkDeploymentNameAvailability
+		client.GetJSON(t, "/deployments/bulk/availability?group=group-name&prefix=bulk-taken&count=3", &availability, inttest.WithAuthToken(tokens.AccessToken))
+		assert.Equal(t, []string{"bulk-taken-1", "bulk-taken-2", "bulk-taken-3"}, availability.Names)
+		assert.Empty(t, availability.Taken)
+
+		createDeployment(t, client, "bulk-taken-2", tokens.AccessToken)
+		availability = instance.BulkDeploymentNameAvailability{}
+		client.GetJSON(t, "/deployments/bulk/availability?group=group-name&prefix=bulk-taken&count=3", &availability, inttest.WithAuthToken(tokens.AccessToken))
+		assert.Equal(t, []string{"bulk-taken-2"}, availability.Taken)
+
+		conflict := post(`{"prefix":"bulk-taken","count":3,"group":"group-name",`+whoami+`}`, http.StatusConflict)
+		assert.Contains(t, string(conflict), "bulk-taken-2")
+		var names instance.DeploymentNameAvailability
+		client.GetJSON(t, "/deployments/availability?group=group-name&name=bulk-taken-1", &names, inttest.WithAuthToken(tokens.AccessToken))
+		assert.True(t, names.Available, "a refused bulk deploy must create nothing")
+
+		post(`{"prefix":"Bulk","count":2,"group":"group-name",`+whoami+`}`, http.StatusBadRequest)
+		post(`{"prefix":"bulk","count":51,"group":"group-name",`+whoami+`}`, http.StatusBadRequest)
+		post(`{"prefix":"bulk","count":2,"group":"group-name","instances":[{"stackName":"whoami-go"},{"stackName":"whoami-go"}]}`, http.StatusBadRequest)
+
+		var response instance.BulkDeployResponse
+		require.NoError(t, json.Unmarshal(post(`{"prefix":"bulk","count":2,"group":"group-name","description":"bulk",`+whoami+`}`, http.StatusAccepted), &response))
+		require.Len(t, response.Deployments, 2)
+		assert.Equal(t, "bulk-1", response.Deployments[0].Name)
+		assert.Equal(t, "bulk-2", response.Deployments[1].Name)
+
+		for _, bulk := range response.Deployments {
+			awaitDeployed(t, client, bulk.ID, tokens.AccessToken)
+			var deployment model.Deployment
+			client.GetJSON(t, fmt.Sprintf("/deployments/%d", bulk.ID), &deployment, inttest.WithAuthToken(tokens.AccessToken))
+			assert.Equal(t, "bulk", deployment.Description)
+			require.Len(t, deployment.Instances, 1)
+			assert.Equal(t, "0.6.0", deployment.Instances[0].Parameters["IMAGE_TAG"].Value)
+			k8sClient.AssertPodIsReady(t, deployment.Instances[0].Group.Namespace, deployment.Instances[0].Name, 60, deployment.Instances[0].Group.ID)
+			destroyDeployment(t, client, bulk.ID, tokens.AccessToken)
+		}
+	})
+
 	t.Run("Preset", func(t *testing.T) {
 		t.Parallel()
 		deployment := createDeployment(t, client, "test-preset", tokens.AccessToken)

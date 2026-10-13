@@ -43,6 +43,7 @@ type groupServiceHandler interface {
 
 type deploymentService interface {
 	StartDeployment(ctx context.Context, token string, deploymentId uint, userID uint) error
+	StartDeployments(ctx context.Context, token string, deploymentIds []uint, userID uint) error
 	UpdateDeployment(ctx context.Context, token string, deploymentId uint, ttl uint, description string, userID uint) (*model.Deployment, error)
 	EditDeployment(ctx context.Context, token string, deploymentId uint, edit Edit, userID uint) (*model.Deployment, error)
 	UpdateInstance(ctx context.Context, token string, deploymentId, instanceId uint, parameters Parameters, public *bool) (*model.DeploymentInstance, error)
@@ -320,6 +321,245 @@ func (h Handler) DeploymentNameAvailability(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, DeploymentNameAvailability{Available: true})
+}
+
+// MaxBulkDeployments caps how many deployments one bulk deploy creates.
+const MaxBulkDeployments = 50
+
+type BulkDeployRequest struct {
+	// Prefix names the deployments prefix-1 to prefix-count
+	Prefix      string                `json:"prefix" binding:"required"`
+	Count       uint                  `json:"count" binding:"required,min=1,max=50"`
+	Group       string                `json:"group" binding:"required"`
+	Description string                `json:"description"`
+	TTL         uint                  `json:"ttl"`
+	Instances   []SaveInstanceRequest `json:"instances" binding:"required,min=1,dive"`
+}
+
+func bulkDeploymentNames(prefix string, count uint) []string {
+	names := make([]string, count)
+	for i := range names {
+		names[i] = fmt.Sprintf("%s-%d", prefix, i+1)
+	}
+	return names
+}
+
+func invalidBulkNamesReason(prefix string, count uint) string {
+	v, ok := binding.Validator.Engine().(*validator.Validate)
+	if !ok {
+		return ""
+	}
+	for _, name := range bulkDeploymentNames(prefix, count) {
+		if v.Var(name, "dns_rfc1035_label") != nil {
+			return fmt.Sprintf("%q isn't a valid name: names must be at most 63 characters of lowercase letters, digits and '-' and start with a letter", name)
+		}
+	}
+	return ""
+}
+
+func (h Handler) BulkDeploy(c *gin.Context) {
+	// swagger:route POST /deployments/bulk bulkDeploy
+	//
+	// Bulk deploy
+	//
+	// Create count deployments named prefix-1 to prefix-count with the same instances and deploy them, a few at a time. Either every deployment is created or none is: if any name is taken the request fails with 409 and creates nothing.
+	//
+	// Security:
+	//	oauth2:
+	//
+	// responses:
+	//	202: BulkDeployResponse
+	//	400: Error
+	//	401: Error
+	//	403: Error
+	//	404: Error
+	//	409: Error
+	//	415: Error
+	var request BulkDeployRequest
+	if err := handler.DataBinder(c, &request); err != nil {
+		if !errdef.IsBadRequest(err) {
+			err = errdef.NewBadRequest("prefix, group, a count between 1 and %d and at least one instance are required: %v", MaxBulkDeployments, err)
+		}
+		_ = c.Error(err)
+		return
+	}
+
+	if reason := invalidBulkNamesReason(request.Prefix, request.Count); reason != "" {
+		_ = c.Error(errdef.NewBadRequest("%s", reason))
+		return
+	}
+
+	stackNames := map[string]bool{}
+	for _, instance := range request.Instances {
+		if stackNames[instance.StackName] {
+			_ = c.Error(errdef.NewBadRequest("stack %q is listed more than once", instance.StackName))
+			return
+		}
+		stackNames[instance.StackName] = true
+	}
+
+	ctx := c.Request.Context()
+	group, err := h.groupService.Find(ctx, request.Group)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	if !group.Deployable {
+		_ = c.Error(errdef.NewForbidden("group isn't deployable: %s", group.Name))
+		return
+	}
+
+	user, err := handler.GetUserFromContext(ctx)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	if !handler.CanWriteDeployment(user, &model.Deployment{UserID: user.ID, GroupName: group.Name}) {
+		_ = c.Error(errdef.NewUnauthorized("write access denied"))
+		return
+	}
+
+	token, err := handler.GetTokenFromRequest(c)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	if request.TTL == 0 {
+		request.TTL = h.defaultTTL
+	}
+
+	names := bulkDeploymentNames(request.Prefix, request.Count)
+	deployments := make([]*model.Deployment, len(names))
+	ids := make([]uint, len(names))
+	for i, name := range names {
+		deployment := &model.Deployment{
+			UserID:      user.ID,
+			Name:        name,
+			Description: request.Description,
+			GroupName:   group.Name,
+			TTL:         request.TTL,
+		}
+		for _, instance := range request.Instances {
+			parameters := make(model.DeploymentInstanceParameters, len(instance.Parameters))
+			for parameterName, parameter := range instance.Parameters {
+				parameters[parameterName] = model.DeploymentInstanceParameter{ParameterName: parameterName, Value: parameter.Value}
+			}
+			deployment.Instances = append(deployment.Instances, &model.DeploymentInstance{
+				Name:         name,
+				Group:        group,
+				GroupName:    group.Name,
+				StackName:    instance.StackName,
+				Public:       instance.Public,
+				Parameters:   parameters,
+				DeployStatus: model.DeployStatusPending,
+			})
+		}
+		deployments[i] = deployment
+	}
+
+	err = h.instanceService.SaveDeployments(ctx, group.Name, deployments)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	response := BulkDeployResponse{Deployments: make([]BulkDeployment, len(deployments))}
+	for i, deployment := range deployments {
+		ids[i] = deployment.ID
+		response.Deployments[i] = BulkDeployment{ID: deployment.ID, Name: deployment.Name}
+	}
+
+	err = h.deploymentService.StartDeployments(ctx, token, ids, user.ID)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	c.JSON(http.StatusAccepted, response)
+}
+
+// swagger:model BulkDeployResponse
+type BulkDeployResponse struct {
+	Deployments []BulkDeployment `json:"deployments"`
+}
+
+type BulkDeployment struct {
+	ID   uint   `json:"id"`
+	Name string `json:"name"`
+}
+
+// swagger:model BulkDeploymentNameAvailability
+type BulkDeploymentNameAvailability struct {
+	Names  []string `json:"names"`
+	Taken  []string `json:"taken"`
+	Reason string   `json:"reason,omitempty"`
+}
+
+func (h Handler) BulkDeploymentNameAvailability(c *gin.Context) {
+	// swagger:route GET /deployments/bulk/availability bulkDeploymentNameAvailability
+	//
+	// Bulk deployment name availability
+	//
+	// List the names a bulk deploy with the given prefix and count would create and which of them are taken. The bulk deploy checks again when it creates them.
+	//
+	// Security:
+	//	oauth2:
+	//
+	// responses:
+	//	200: BulkDeploymentNameAvailability
+	//	400: Error
+	//	401: Error
+	//	403: Error
+	//	404: Error
+	var request struct {
+		Group  string `form:"group" binding:"required"`
+		Prefix string `form:"prefix" binding:"required"`
+		Count  uint   `form:"count" binding:"required,min=1,max=50"`
+	}
+	if err := c.ShouldBindQuery(&request); err != nil {
+		_ = c.Error(errdef.NewBadRequest("group, prefix and a count between 1 and %d are required", MaxBulkDeployments))
+		return
+	}
+
+	ctx := c.Request.Context()
+	group, err := h.groupService.Find(ctx, request.Group)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	user, err := handler.GetUserFromContext(ctx)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	if !handler.CanWriteDeployment(user, &model.Deployment{UserID: user.ID, GroupName: group.Name}) {
+		_ = c.Error(errdef.NewUnauthorized("write access denied"))
+		return
+	}
+
+	if !group.Deployable {
+		_ = c.Error(errdef.NewForbidden("group isn't deployable: %s", group.Name))
+		return
+	}
+
+	names := bulkDeploymentNames(request.Prefix, request.Count)
+	if reason := invalidBulkNamesReason(request.Prefix, request.Count); reason != "" {
+		c.JSON(http.StatusOK, BulkDeploymentNameAvailability{Names: names, Taken: []string{}, Reason: reason})
+		return
+	}
+
+	taken, err := h.instanceService.TakenDeploymentNames(ctx, group.Name, names)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	c.JSON(http.StatusOK, BulkDeploymentNameAvailability{Names: names, Taken: taken})
 }
 
 // FindDeploymentById deployment

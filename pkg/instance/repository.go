@@ -14,6 +14,7 @@ import (
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	"github.com/dhis2-sre/im-manager/pkg/stack"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 //goland:noinspection GoExportedFuncWithUnexportedType
@@ -142,6 +143,80 @@ func (r repository) DeploymentNameExists(ctx context.Context, groupName, name st
 	}
 
 	return count > 0, nil
+}
+
+// TakenDeploymentNames returns which of the names a deployment in the group already uses, in order.
+func (r repository) TakenDeploymentNames(ctx context.Context, groupName string, names []string) ([]string, error) {
+	return takenDeploymentNames(r.db.WithContext(ctx), groupName, names)
+}
+
+func takenDeploymentNames(db *gorm.DB, groupName string, names []string) ([]string, error) {
+	var existing []string
+	err := db.Model(&model.Deployment{}).
+		Where("group_name = ? AND preset = false AND name IN ?", groupName, names).
+		Pluck("name", &existing).Error
+	if err != nil {
+		return nil, fmt.Errorf("failed to look up deployment names in group %q: %v", groupName, err)
+	}
+
+	taken := []string{}
+	for _, name := range names {
+		if slices.Contains(existing, name) {
+			taken = append(taken, name)
+		}
+	}
+	return taken, nil
+}
+
+// SaveDeployments creates every deployment with its instances or none of them. The names are checked inside the transaction so the error can say which are taken, but the unique index is what refuses a name taken by someone else between that check and the insert.
+func (r repository) SaveDeployments(ctx context.Context, groupName string, deployments []*model.Deployment, stacksByName map[string]*stack.Stack) error {
+	// only use ctx for values (logging) and not cancellation signals on cud operations for now. ctx
+	// cancellation can lead to rollbacks which we should decide individually.
+	ctx = context.WithoutCancel(ctx)
+
+	names := make([]string, len(deployments))
+	for i, deployment := range deployments {
+		names[i] = deployment.Name
+		for _, instance := range deployment.Instances {
+			if err := encryptParameters(r.instanceParameterEncryptionKey, instance, stacksByName[instance.StackName]); err != nil {
+				return err
+			}
+		}
+	}
+
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		taken, err := takenDeploymentNames(tx, groupName, names)
+		if err != nil {
+			return err
+		}
+		if len(taken) > 0 {
+			return errdef.NewDuplicated("already taken in group %q: %s", groupName, strings.Join(taken, ", "))
+		}
+
+		for _, deployment := range deployments {
+			if err := tx.Omit(clause.Associations).Create(deployment).Error; err != nil {
+				return err
+			}
+			for _, instance := range deployment.Instances {
+				instance.DeploymentID = deployment.ID
+				if err := tx.Omit("Group", "Lock", "Deployment").Create(instance).Error; err != nil {
+					return err
+				}
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		if errdef.IsDuplicated(err) {
+			return err
+		}
+		if errors.Is(err, gorm.ErrDuplicatedKey) {
+			return errdef.NewDuplicated("one of the names was taken in group %q while the deployments were being created, check the names and try again", groupName)
+		}
+		return fmt.Errorf("failed to save deployments: %v", err)
+	}
+
+	return nil
 }
 
 // SaveDeploymentDetails writes the deployment's own columns and leaves its instances alone. Saving
