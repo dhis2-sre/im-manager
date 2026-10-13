@@ -1,4 +1,130 @@
 
+<a name="0.74.0"></a>
+## [0.74.0](https://github.com/dhis2-sre/im-manager/compare/0.73.0...0.74.0)
+
+> 2026-10-13
+
+### Chore
+
+* generate change log for v0.72.0
+* merge master into version-3.0
+* retire the stacks the component model replaces ([#1756](https://github.com/dhis2-sre/im-manager/issues/1756))
+* merge master into version-3.0 ([#1757](https://github.com/dhis2-sre/im-manager/issues/1757))
+* trim seed comments that explain the previous implementation ([#1745](https://github.com/dhis2-sre/im-manager/issues/1745)) ([#1746](https://github.com/dhis2-sre/im-manager/issues/1746))
+* merge master into version-3.0 ([#1744](https://github.com/dhis2-sre/im-manager/issues/1744))
+* bring master's changes onto version-3.0 ([#1737](https://github.com/dhis2-sre/im-manager/issues/1737))
+* default dhis2-v2 to chart 1.0.1 ([#1713](https://github.com/dhis2-sre/im-manager/issues/1713))
+
+### Ci
+
+* deploy releases to the im-vm prod server
+* pass the service name the workflow now requires ([#1788](https://github.com/dhis2-sre/im-manager/issues/1788))
+* run the web client specs from the branch matching the backend under test ([#1783](https://github.com/dhis2-sre/im-manager/issues/1783))
+
+### Docs
+
+* run migrate-v3 through docker compose
+
+### Feat
+
+* add a one-off command migrating legacy deployments to dhis2-v2 ([#1791](https://github.com/dhis2-sre/im-manager/issues/1791))
+* save a deployment as a preset instead of deploying it ([#1796](https://github.com/dhis2-sre/im-manager/issues/1796))
+* endpoint telling whether a deployment name is free ([#1795](https://github.com/dhis2-sre/im-manager/issues/1795))
+* report deployments whose workloads are gone and deployments outliving their TTL ([#1790](https://github.com/dhis2-sre/im-manager/issues/1790))
+* edit a deployment in one request
+* declare which stack parameters can't be edited
+* deploy a deployment asynchronously
+* stream the log of a named container
+* stream the logs of a single replica ([#1774](https://github.com/dhis2-sre/im-manager/issues/1774))
+* gate pgAdmin on ENABLE_PGADMIN rather than a form-only checkbox ([#1736](https://github.com/dhis2-sre/im-manager/issues/1736))
+* put pgAdmin on the component model ([#1719](https://github.com/dhis2-sre/im-manager/issues/1719))
+* track the chap DHIS 2 registration job as a component ([#1704](https://github.com/dhis2-sre/im-manager/issues/1704))
+* size and version the Doris tiers independently ([#1705](https://github.com/dhis2-sre/im-manager/issues/1705))
+* let dhis2-v2 deploy Doris as its analytics database ([#1703](https://github.com/dhis2-sre/im-manager/issues/1703))
+* name every chap parameter group after a component ([#1694](https://github.com/dhis2-sre/im-manager/issues/1694))
+* gate companion stacks on a declarative condition ([#1687](https://github.com/dhis2-sre/im-manager/issues/1687))
+* push component status over the event stream ([#1654](https://github.com/dhis2-sre/im-manager/issues/1654))
+* per-cluster pod informer cache ([#1652](https://github.com/dhis2-sre/im-manager/issues/1652))
+* cache kube clients per cluster ([#1650](https://github.com/dhis2-sre/im-manager/issues/1650))
+* database save as an advertised component capability ([#1648](https://github.com/dhis2-sre/im-manager/issues/1648))
+* locate the postgres pod through the stack's component for pg_dump ([#1647](https://github.com/dhis2-sre/im-manager/issues/1647))
+* resolve consumed parameters from any providing instance in the deployment ([#1645](https://github.com/dhis2-sre/im-manager/issues/1645))
+* parameter groups with declarative visibility conditions ([#1641](https://github.com/dhis2-sre/im-manager/issues/1641))
+* deployment components endpoint ([#1638](https://github.com/dhis2-sre/im-manager/issues/1638))
+* cnpg component restart through the cluster resource ([#1631](https://github.com/dhis2-sre/im-manager/issues/1631))
+* component presence predicates and the dhis2-v2 stack ([#1628](https://github.com/dhis2-sre/im-manager/issues/1628))
+* component listing endpoint and per-replica restart ([#1620](https://github.com/dhis2-sre/im-manager/issues/1620))
+* per-stack component operations ([#1601](https://github.com/dhis2-sre/im-manager/issues/1601))
+
+### Fix
+
+* wait for an instance's volumes to be deleted before destroy returns
+* grant the app role read access to schemas the restore leaves unreadable
+* trim stray whitespace from migrated parameters
+* archive an empty MinIO bucket as an empty file store
+* hold the old core's autoscaling at zero and give helm a writable home
+* CodeQL / Incorrect conversion between integer types
+* give the dhis2-v2 seed hook until shortly before the deploy timeout ([#1793](https://github.com/dhis2-sre/im-manager/issues/1793))
+* name dhis2-v2 resources after the release with the dhis2 suffix ([#1792](https://github.com/dhis2-sre/im-manager/issues/1792))
+* replace the minio images upstream stopped serving ([#1786](https://github.com/dhis2-sre/im-manager/issues/1786))
+* replace the minio images upstream stopped serving ([#1789](https://github.com/dhis2-sre/im-manager/issues/1789))
+* scope the dev group release to the environment ([#1787](https://github.com/dhis2-sre/im-manager/issues/1787))
+* remove the deployment on delete and give the deploy lock back when it fails ([#1785](https://github.com/dhis2-sre/im-manager/issues/1785))
+* keep a companion switch from rolling its host, and a delete from racing a deploy
+* serialise supported operations as an array when a component supports none ([#1778](https://github.com/dhis2-sre/im-manager/issues/1778))
+* stream the end of a log rather than its beginning ([#1775](https://github.com/dhis2-sre/im-manager/issues/1775))
+* offer the filestore backup on the component holding the files ([#1772](https://github.com/dhis2-sre/im-manager/issues/1772))
+* ignore an authorization header that is not a bearer token
+* drop the unused bitnami helm repository ([#1770](https://github.com/dhis2-sre/im-manager/issues/1770))
+* keep the deploy log when a deploy fails ([#1769](https://github.com/dhis2-sre/im-manager/issues/1769))
+* keep one file store per database across saves ([#1763](https://github.com/dhis2-sre/im-manager/issues/1763))
+* change owner of functions, procedures and aggregates when seeding a database ([#1754](https://github.com/dhis2-sre/im-manager/issues/1754))
+* size the Doris tiers individually and high enough to start ([#1712](https://github.com/dhis2-sre/im-manager/issues/1712))
+* backfill DEPLOY_CHAP on dhis2-v2 instances ([#1691](https://github.com/dhis2-sre/im-manager/issues/1691))
+* stop deduplicating notification stream events ([#1685](https://github.com/dhis2-sre/im-manager/issues/1685))
+* stream events for every group a user can read ([#1684](https://github.com/dhis2-sre/im-manager/issues/1684))
+* give feature environments their own helm values
+* retry a dump while postgres is mid-transition ([#1664](https://github.com/dhis2-sre/im-manager/issues/1664))
+* resolve and record the file store saved with a database ([#1659](https://github.com/dhis2-sre/im-manager/issues/1659))
+* give the async save tests a longer completion window ([#1651](https://github.com/dhis2-sre/im-manager/issues/1651))
+* isolate the helm repository config per helmfile invocation ([#1653](https://github.com/dhis2-sre/im-manager/issues/1653))
+* exclude the dhis2 chart seed marker table from database dumps ([#1649](https://github.com/dhis2-sre/im-manager/issues/1649))
+* prefix the conditional storage group titles with Storage ([#1644](https://github.com/dhis2-sre/im-manager/issues/1644))
+* move the storage type into the dhis2 core group ([#1643](https://github.com/dhis2-sre/im-manager/issues/1643))
+* pull bitnami infrastructure charts via oci instead of the chart index ([#1639](https://github.com/dhis2-sre/im-manager/issues/1639))
+* allow pod deletion and hook job watching for the service account ([#1630](https://github.com/dhis2-sre/im-manager/issues/1630))
+* grant the service account access to cloudnativepg clusters ([#1629](https://github.com/dhis2-sre/im-manager/issues/1629))
+
+### Refactor
+
+* rename the prod compose service to api ([#1784](https://github.com/dhis2-sre/im-manager/issues/1784))
+* split stack definitions into one file per stack ([#1642](https://github.com/dhis2-sre/im-manager/issues/1642))
+* move Stack out of pkg/model into pkg/stack ([#1602](https://github.com/dhis2-sre/im-manager/issues/1602))
+* extract pkg/kube from instance kubernetes.go ([#1598](https://github.com/dhis2-sre/im-manager/issues/1598))
+
+### Test
+
+* wait for the terminal deploy event instead of the released lock ([#1794](https://github.com/dhis2-sre/im-manager/issues/1794))
+* bound how long the minio container may take to start ([#1773](https://github.com/dhis2-sre/im-manager/issues/1773))
+* stop pinning the RabbitMQ stream port to 5552 ([#1711](https://github.com/dhis2-sre/im-manager/issues/1711))
+* cover the notification publisher, and correct why it is unnamed ([#1697](https://github.com/dhis2-sre/im-manager/issues/1697))
+* bound how many heavy deployments run at once ([#1665](https://github.com/dhis2-sre/im-manager/issues/1665))
+
+### Pull Requests
+
+* Merge pull request [#1803](https://github.com/dhis2-sre/im-manager/issues/1803) from dhis2-sre/fix/wait-for-pvc-deletion-on-destroy
+* Merge pull request [#1800](https://github.com/dhis2-sre/im-manager/issues/1800) from dhis2-sre/ci/deploy-releases-to-im-vm-prod
+* Merge pull request [#1798](https://github.com/dhis2-sre/im-manager/issues/1798) from dhis2-sre/fix/migrate-v3-dev-findings
+* Merge pull request [#1799](https://github.com/dhis2-sre/im-manager/issues/1799) from dhis2-sre/fix/grant-read-on-unreadable-schemas
+* Merge pull request [#1619](https://github.com/dhis2-sre/im-manager/issues/1619) from dhis2-sre/version-3.0
+* Merge pull request [#1771](https://github.com/dhis2-sre/im-manager/issues/1771) from dhis2-sre/fix/ignore-a-non-bearer-authorization-header
+* Merge pull request [#1782](https://github.com/dhis2-sre/im-manager/issues/1782) from dhis2-sre/feat/edit-deployment
+* Merge pull request [#1781](https://github.com/dhis2-sre/im-manager/issues/1781) from dhis2-sre/feat/immutable-parameters
+* Merge pull request [#1780](https://github.com/dhis2-sre/im-manager/issues/1780) from dhis2-sre/feat/async-deploys
+* Merge pull request [#1779](https://github.com/dhis2-sre/im-manager/issues/1779) from dhis2-sre/feat/log-container
+* Merge pull request [#1777](https://github.com/dhis2-sre/im-manager/issues/1777) from dhis2-sre/chore/merge-master-api
+
+
 <a name="0.73.0"></a>
 ## [0.73.0](https://github.com/dhis2-sre/im-manager/compare/0.72.0...0.73.0)
 
@@ -257,9 +383,14 @@
 
 
 <a name="0.66.0"></a>
-## [0.66.0](https://github.com/dhis2-sre/im-manager/compare/0.65.3...0.66.0)
+## [0.66.0](https://github.com/dhis2-sre/im-manager/compare/v0.65.3...0.66.0)
 
 > 2026-04-22
+
+### Chore
+
+* replace (Bitnami) Redis with Valkey ([#1444](https://github.com/dhis2-sre/im-manager/issues/1444))
+* generate change log
 
 ### Docs
 
@@ -272,27 +403,27 @@
 ### Fix
 
 * persist group namespace in findOrCreate ([#1465](https://github.com/dhis2-sre/im-manager/issues/1465))
+* use group-ID-qualified name in PVC label selector ([#1452](https://github.com/dhis2-sre/im-manager/issues/1452))
 
 
-<a name="0.65.3"></a>
-## [0.65.3](https://github.com/dhis2-sre/im-manager/compare/v0.65.3...0.65.3)
+<a name="v0.65.3"></a>
+## [v0.65.3](https://github.com/dhis2-sre/im-manager/compare/0.65.3...v0.65.3)
 
 > 2026-04-16
-
-### Chore
-
-* replace (Bitnami) Redis with Valkey ([#1444](https://github.com/dhis2-sre/im-manager/issues/1444))
-* generate change log
 
 ### Fix
 
 * use group-ID-qualified name in PVC label selector ([#1452](https://github.com/dhis2-sre/im-manager/issues/1452))
 
 
-<a name="v0.65.3"></a>
-## [v0.65.3](https://github.com/dhis2-sre/im-manager/compare/0.65.2...v0.65.3)
+<a name="0.65.3"></a>
+## [0.65.3](https://github.com/dhis2-sre/im-manager/compare/0.65.2...0.65.3)
 
 > 2026-04-16
+
+### Chore
+
+* replace (Bitnami) Redis with Valkey ([#1444](https://github.com/dhis2-sre/im-manager/issues/1444))
 
 ### Fix
 
@@ -849,7 +980,7 @@
 
 
 <a name="v0.45.0"></a>
-## [v0.45.0](https://github.com/dhis2-sre/im-manager/compare/v0.44.0...v0.45.0)
+## [v0.45.0](https://github.com/dhis2-sre/im-manager/compare/v0.43.0...v0.45.0)
 
 > 2024-11-27
 
@@ -859,14 +990,14 @@
 * order public instances as stable, development and nightly
 
 
-<a name="v0.44.0"></a>
-## [v0.44.0](https://github.com/dhis2-sre/im-manager/compare/v0.43.0...v0.44.0)
+<a name="v0.43.0"></a>
+## [v0.43.0](https://github.com/dhis2-sre/im-manager/compare/v0.44.0...v0.43.0)
 
 > 2024-11-27
 
 
-<a name="v0.43.0"></a>
-## [v0.43.0](https://github.com/dhis2-sre/im-manager/compare/v0.41.0...v0.43.0)
+<a name="v0.44.0"></a>
+## [v0.44.0](https://github.com/dhis2-sre/im-manager/compare/v0.41.0...v0.44.0)
 
 > 2024-11-27
 
@@ -2107,7 +2238,7 @@
 
 
 <a name="v0.5.10"></a>
-## [v0.5.10](https://github.com/dhis2-sre/im-manager/compare/v0.5.8...v0.5.10)
+## [v0.5.10](https://github.com/dhis2-sre/im-manager/compare/v0.5.6...v0.5.10)
 
 > 2022-04-11
 
@@ -2117,28 +2248,8 @@
 * Use func names with argument signatures to change ownership [DEVOPS-102]
 
 
-<a name="v0.5.8"></a>
-## [v0.5.8](https://github.com/dhis2-sre/im-manager/compare/v0.5.7...v0.5.8)
-
-> 2022-04-11
-
-### Fix
-
-* Use func names with argument signatures to change ownership [DEVOPS-102]
-
-
-<a name="v0.5.7"></a>
-## [v0.5.7](https://github.com/dhis2-sre/im-manager/compare/v0.5.6...v0.5.7)
-
-> 2022-04-11
-
-### Fix
-
-* Use func names with argument signatures to change ownership [DEVOPS-102]
-
-
 <a name="v0.5.6"></a>
-## [v0.5.6](https://github.com/dhis2-sre/im-manager/compare/v0.5.5...v0.5.6)
+## [v0.5.6](https://github.com/dhis2-sre/im-manager/compare/v0.5.8...v0.5.6)
 
 > 2022-04-11
 
@@ -2147,8 +2258,8 @@
 * Use func names with argument signatures to change ownership [DEVOPS-102]
 
 
-<a name="v0.5.5"></a>
-## [v0.5.5](https://github.com/dhis2-sre/im-manager/compare/v0.5.9...v0.5.5)
+<a name="v0.5.8"></a>
+## [v0.5.8](https://github.com/dhis2-sre/im-manager/compare/v0.5.9...v0.5.8)
 
 > 2022-04-11
 
@@ -2158,7 +2269,7 @@
 
 
 <a name="v0.5.9"></a>
-## [v0.5.9](https://github.com/dhis2-sre/im-manager/compare/v0.5.4...v0.5.9)
+## [v0.5.9](https://github.com/dhis2-sre/im-manager/compare/v0.5.7...v0.5.9)
 
 > 2022-04-11
 
@@ -2167,14 +2278,34 @@
 * Use func names with argument signatures to change ownership [DEVOPS-102]
 
 
-<a name="v0.5.4"></a>
-## [v0.5.4](https://github.com/dhis2-sre/im-manager/compare/v0.5.3...v0.5.4)
+<a name="v0.5.7"></a>
+## [v0.5.7](https://github.com/dhis2-sre/im-manager/compare/v0.5.5...v0.5.7)
+
+> 2022-04-11
+
+### Fix
+
+* Use func names with argument signatures to change ownership [DEVOPS-102]
+
+
+<a name="v0.5.5"></a>
+## [v0.5.5](https://github.com/dhis2-sre/im-manager/compare/v0.5.3...v0.5.5)
+
+> 2022-04-11
+
+### Fix
+
+* Use func names with argument signatures to change ownership [DEVOPS-102]
+
+
+<a name="v0.5.3"></a>
+## [v0.5.3](https://github.com/dhis2-sre/im-manager/compare/v0.5.4...v0.5.3)
 
 > 2022-04-08
 
 
-<a name="v0.5.3"></a>
-## [v0.5.3](https://github.com/dhis2-sre/im-manager/compare/v0.5.2...v0.5.3)
+<a name="v0.5.4"></a>
+## [v0.5.4](https://github.com/dhis2-sre/im-manager/compare/v0.5.2...v0.5.4)
 
 > 2022-04-08
 
