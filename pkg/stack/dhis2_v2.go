@@ -291,7 +291,7 @@ var dbDefaults = struct {
 	dbSize:                  "20Gi",
 	dbUsername:              "dhis",
 	resourcesRequestsCPU:    "250m",
-	resourcesRequestsMemory: "256Mi",
+	resourcesRequestsMemory: "1Gi",
 }
 
 var minioDefaults = struct {
