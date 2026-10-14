@@ -208,6 +208,8 @@ releases:
             im-type: "db"
             im-creation-timestamp: "{{ requiredEnv "INSTANCE_CREATION_TIMESTAMP" }}"
             im-ttl: "{{ requiredEnv "INSTANCE_TTL" }}"
+          # A single instance budget allows no evictions, so it would pin its node and block scale-down.
+          enablePDB: false
           storageSize: {{ requiredEnv "DATABASE_SIZE" }}
           resources:
             requests:
