@@ -1,4 +1,22 @@
 
+<a name="0.77.0"></a>
+## [0.77.0](https://github.com/dhis2-sre/im-manager/compare/0.76.0...0.77.0)
+
+> 2026-10-14
+
+### Chore
+
+* generate change log for v0.76.0
+
+### Fix
+
+* request the memory databases, minio and pgadmin use
+
+### Pull Requests
+
+* Merge pull request [#1808](https://github.com/dhis2-sre/im-manager/issues/1808) from dhis2-sre/fix/realistic-memory-requests
+
+
 <a name="0.76.0"></a>
 ## [0.76.0](https://github.com/dhis2-sre/im-manager/compare/0.75.0...0.76.0)
 
@@ -1035,7 +1053,7 @@
 
 
 <a name="v0.44.0"></a>
-## [v0.44.0](https://github.com/dhis2-sre/im-manager/compare/v0.41.0...v0.44.0)
+## [v0.44.0](https://github.com/dhis2-sre/im-manager/compare/v0.42.0...v0.44.0)
 
 > 2024-11-27
 
@@ -1045,14 +1063,14 @@
 * use PAT
 
 
-<a name="v0.41.0"></a>
-## [v0.41.0](https://github.com/dhis2-sre/im-manager/compare/v0.42.0...v0.41.0)
+<a name="v0.42.0"></a>
+## [v0.42.0](https://github.com/dhis2-sre/im-manager/compare/v0.41.0...v0.42.0)
 
 > 2024-11-20
 
 
-<a name="v0.42.0"></a>
-## [v0.42.0](https://github.com/dhis2-sre/im-manager/compare/v0.40.0...v0.42.0)
+<a name="v0.41.0"></a>
+## [v0.41.0](https://github.com/dhis2-sre/im-manager/compare/v0.40.0...v0.41.0)
 
 > 2024-11-20
 
