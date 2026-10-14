@@ -234,6 +234,11 @@ releases:
             im-type: "minio"
             im-creation-timestamp: "{{ requiredEnv "INSTANCE_CREATION_TIMESTAMP" }}"
             im-ttl: "{{ requiredEnv "INSTANCE_TTL" }}"
+          # The chart applies no resource preset, so without a request the scheduler counts MinIO as
+          # free and packs nodes past their memory. It uses about 230Mi.
+          resources:
+            requests:
+              memory: 256Mi
           persistence:
             size: {{ requiredEnv "MINIO_STORAGE_SIZE" }}
             annotations:

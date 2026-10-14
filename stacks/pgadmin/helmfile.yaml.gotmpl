@@ -19,6 +19,12 @@ releases:
           im-creation-timestamp: "{{ requiredEnv "INSTANCE_CREATION_TIMESTAMP" }}"
           im-ttl: "{{ requiredEnv "INSTANCE_TTL" }}"
 
+      # Without a request the scheduler counts pgAdmin as free and packs nodes past their memory. It
+      # uses about 150Mi.
+      - resources:
+          requests:
+            memory: 192Mi
+
       - ingress:
           enabled: true
           hosts:
