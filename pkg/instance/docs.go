@@ -23,6 +23,20 @@ type _ struct {
 	Replica string `json:"replica"`
 }
 
+// swagger:parameters resetInstance
+type _ struct {
+	// in: path
+	// required: true
+	ID uint `json:"id"`
+
+	// selector
+	// in: query
+	// required: false
+	// type: string
+	// description: reset only the data of the named component, for example db; it must support the reset operation
+	Selector string `json:"selector"`
+}
+
 // swagger:parameters instanceLogs
 type _ struct {
 	// in: path
@@ -58,7 +72,7 @@ type _ struct {
 	Tail int64 `json:"tail"`
 }
 
-// swagger:parameters deleteInstance findById findByIdDecrypted saveInstance pauseInstance resumeInstance resetInstance findDeploymentById deployDeployment deleteDeployment status instanceWithDetails filestoreBackup instanceComponents deploymentComponents
+// swagger:parameters deleteInstance findById findByIdDecrypted saveInstance pauseInstance resumeInstance findDeploymentById deployDeployment deleteDeployment status instanceWithDetails filestoreBackup instanceComponents deploymentComponents
 type _ struct {
 	// in: path
 	// required: true

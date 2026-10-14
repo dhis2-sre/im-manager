@@ -2326,7 +2326,10 @@ paths:
             summary: Pause instance
     /instances/{id}/reset:
         put:
-            description: Resetting an instance will completely destroy it and redeploy using the same parameters
+            description: |-
+                Resetting an instance will completely destroy it and redeploy using the same parameters. With a
+                selector only that component's data is reset, the database of a dhis2-v2 instance for example:
+                the redeploy seeds it again and the components reading it, such as DHIS 2, are restarted.
             operationId: resetInstance
             parameters:
                 - format: uint64
@@ -2335,6 +2338,14 @@ paths:
                   required: true
                   type: integer
                   x-go-name: ID
+                - description: |-
+                    selector
+                    type: string
+                    description: reset only the data of the named component, for example db; it must support the reset operation
+                  in: query
+                  name: selector
+                  type: string
+                  x-go-name: Selector
             responses:
                 "202":
                     description: ""

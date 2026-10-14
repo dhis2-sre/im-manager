@@ -112,8 +112,13 @@ var DHIS2V2 = withGroupedParameters(Stack{
 			PVCPatterns: []string{"cnpg.io/cluster=%s-dhis2-postgresql"},
 			Capabilities: []kube.Capability{
 				{Operation: kube.OperationDatabaseSave},
+				{Operation: kube.OperationReset},
 			},
-		}, ClusterPattern: "%s-dhis2-postgresql"},
+		},
+			ClusterPattern: "%s-dhis2-postgresql",
+			// DHIS 2 caches what it reads from the database and migrates it only when it starts.
+			RestartedAfterReset: []string{"dhis2"},
+		},
 		MinioComponent{BaseComponent: kube.BaseComponent{
 			Name:        "minio",
 			PVCPatterns: []string{"app.kubernetes.io/instance=%s,app.kubernetes.io/name=minio"},

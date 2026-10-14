@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"testing"
 
 	"github.com/dhis2-sre/im-manager/internal/errdef"
@@ -16,6 +17,7 @@ import (
 	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -110,6 +112,83 @@ func TestCNPGComponentRestartPatchesCluster(t *testing.T) {
 	require.NoError(t, err)
 	annotations := got.GetAnnotations()
 	assert.NotEmpty(t, annotations["kubectl.kubernetes.io/restartedAt"])
+}
+
+// The database reset throws away the cluster and its own volume only: the MinIO claim of the same
+// instance must survive it.
+func TestCNPGComponentResetDataDeletesClusterAndItsVolumes(t *testing.T) {
+	instance := &model.DeploymentInstance{ID: 1, Name: "myinstance", Group: &model.Group{ID: 7, Namespace: "ns"}}
+	gvr := schema.GroupVersionResource{Group: "postgresql.cnpg.io", Version: "v1", Resource: "clusters"}
+	cluster := &unstructured.Unstructured{Object: map[string]any{
+		"apiVersion": "postgresql.cnpg.io/v1",
+		"kind":       "Cluster",
+		"metadata":   map[string]any{"name": "myinstance-7-dhis2-postgresql", "namespace": "ns"},
+	}}
+	claim := func(name string, labels map[string]string) *v1.PersistentVolumeClaim {
+		return &v1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: "ns", Labels: labels}}
+	}
+	client := &kube.Client{
+		Dynamic: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(runtime.NewScheme(), map[schema.GroupVersionResource]string{gvr: "ClusterList"}, cluster),
+		Clientset: fake.NewSimpleClientset(
+			claim("myinstance-7-dhis2-postgresql-1", map[string]string{"cnpg.io/cluster": "myinstance-7-dhis2-postgresql"}),
+			claim("myinstance-7-minio", map[string]string{"app.kubernetes.io/instance": "myinstance-7", "app.kubernetes.io/name": "minio"}),
+		),
+	}
+	component := CNPGPostgresComponent{
+		BaseComponent:  kube.BaseComponent{Name: "db", PVCPatterns: []string{"cnpg.io/cluster=%s-dhis2-postgresql"}},
+		ClusterPattern: "%s-dhis2-postgresql",
+	}
+
+	require.NoError(t, component.ResetData(context.Background(), client, instance))
+
+	_, err := client.Dynamic.Resource(gvr).Namespace("ns").Get(context.Background(), "myinstance-7-dhis2-postgresql", metav1.GetOptions{})
+	assert.True(t, apierrors.IsNotFound(err), "cluster should be deleted, got %v", err)
+	claims, err := client.Clientset.CoreV1().PersistentVolumeClaims("ns").List(context.Background(), metav1.ListOptions{})
+	require.NoError(t, err)
+	require.Len(t, claims.Items, 1)
+	assert.Equal(t, "myinstance-7-minio", claims.Items[0].Name)
+}
+
+// A component only advertises the reset operation when it can reset its data, so a client never
+// offers a reset the API would refuse. On dhis2-v2 that is the database alone.
+func TestOnlyComponentsThatCanResetTheirDataAdvertiseReset(t *testing.T) {
+	params := model.DeploymentInstanceParameters{"STORAGE_TYPE": {Value: "minio"}}
+	for _, stack := range allStacks {
+		for _, component := range stack.Components {
+			if !slices.Contains(component.SupportedOperations(params), kube.OperationReset) {
+				continue
+			}
+			_, canReset := component.(kube.DataResetter)
+			assert.True(t, canReset, "%s/%s advertises reset without resetting its data", stack.Name, component.ComponentName())
+		}
+	}
+
+	for _, name := range []string{"dhis2", "db", "minio"} {
+		component, err := kube.FindComponent(DHIS2V2.Components, name)
+		require.NoError(t, err)
+		assert.Equal(t, name == "db", slices.Contains(component.SupportedOperations(params), kube.OperationReset), name)
+	}
+}
+
+// A reset restarts only the components holding state read from the reset data, and each of them
+// must exist in the stack, or the restart silently skips it. On dhis2-v2 that is DHIS 2 core alone.
+func TestComponentsRestartedAfterResetExistInTheirStack(t *testing.T) {
+	for _, stack := range allStacks {
+		for _, component := range stack.Components {
+			resetter, ok := component.(kube.DataResetter)
+			if !ok {
+				continue
+			}
+			for _, name := range resetter.ComponentsRestartedAfterReset() {
+				_, err := kube.FindComponent(stack.Components, name)
+				assert.NoError(t, err, "%s/%s restarts unknown component %q after a reset", stack.Name, component.ComponentName(), name)
+			}
+		}
+	}
+
+	database, err := kube.FindComponent(DHIS2V2.Components, "db")
+	require.NoError(t, err)
+	assert.Equal(t, []string{"dhis2"}, database.(kube.DataResetter).ComponentsRestartedAfterReset())
 }
 
 // TestDorisComponentRestartPatchesTier asserts each Doris component restarts through the
