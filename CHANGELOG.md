@@ -1,4 +1,60 @@
 
+<a name="0.77.0"></a>
+## [0.77.0](https://github.com/dhis2-sre/im-manager/compare/0.76.0...0.77.0)
+
+> 2026-10-14
+
+### Chore
+
+* generate change log for v0.76.0
+
+### Fix
+
+* request the memory databases, minio and pgadmin use
+
+### Pull Requests
+
+* Merge pull request [#1808](https://github.com/dhis2-sre/im-manager/issues/1808) from dhis2-sre/fix/realistic-memory-requests
+
+
+<a name="0.76.0"></a>
+## [0.76.0](https://github.com/dhis2-sre/im-manager/compare/0.75.0...0.76.0)
+
+> 2026-10-14
+
+### Fix
+
+* leave restarting dhis2 core after a database reset to the deploy
+
+### Pull Requests
+
+* Merge pull request [#1807](https://github.com/dhis2-sre/im-manager/issues/1807) from dhis2-sre/fix/drop-restart-after-reset
+
+
+<a name="0.75.0"></a>
+## [0.75.0](https://github.com/dhis2-sre/im-manager/compare/0.74.0...0.75.0)
+
+> 2026-10-14
+
+### Chore
+
+* generate change log for v0.74.0
+
+### Feat
+
+* reset the database of a dhis2-v2 instance on its own
+
+### Fix
+
+* count a volume claim already gone as deleted
+* reset a component without decrypting its parameters twice
+* restart only dhis2 core after resetting the database
+
+### Pull Requests
+
+* Merge pull request [#1806](https://github.com/dhis2-sre/im-manager/issues/1806) from dhis2-sre/feat/reset-database
+
+
 <a name="0.74.0"></a>
 ## [0.74.0](https://github.com/dhis2-sre/im-manager/compare/0.73.0...0.74.0)
 
@@ -997,7 +1053,7 @@
 
 
 <a name="v0.44.0"></a>
-## [v0.44.0](https://github.com/dhis2-sre/im-manager/compare/v0.41.0...v0.44.0)
+## [v0.44.0](https://github.com/dhis2-sre/im-manager/compare/v0.42.0...v0.44.0)
 
 > 2024-11-27
 
@@ -1007,14 +1063,14 @@
 * use PAT
 
 
-<a name="v0.41.0"></a>
-## [v0.41.0](https://github.com/dhis2-sre/im-manager/compare/v0.42.0...v0.41.0)
+<a name="v0.42.0"></a>
+## [v0.42.0](https://github.com/dhis2-sre/im-manager/compare/v0.41.0...v0.42.0)
 
 > 2024-11-20
 
 
-<a name="v0.42.0"></a>
-## [v0.42.0](https://github.com/dhis2-sre/im-manager/compare/v0.40.0...v0.42.0)
+<a name="v0.41.0"></a>
+## [v0.41.0](https://github.com/dhis2-sre/im-manager/compare/v0.40.0...v0.41.0)
 
 > 2024-11-20
 
@@ -2249,7 +2305,17 @@
 
 
 <a name="v0.5.6"></a>
-## [v0.5.6](https://github.com/dhis2-sre/im-manager/compare/v0.5.8...v0.5.6)
+## [v0.5.6](https://github.com/dhis2-sre/im-manager/compare/v0.5.7...v0.5.6)
+
+> 2022-04-11
+
+### Fix
+
+* Use func names with argument signatures to change ownership [DEVOPS-102]
+
+
+<a name="v0.5.7"></a>
+## [v0.5.7](https://github.com/dhis2-sre/im-manager/compare/v0.5.8...v0.5.7)
 
 > 2022-04-11
 
@@ -2269,17 +2335,7 @@
 
 
 <a name="v0.5.9"></a>
-## [v0.5.9](https://github.com/dhis2-sre/im-manager/compare/v0.5.7...v0.5.9)
-
-> 2022-04-11
-
-### Fix
-
-* Use func names with argument signatures to change ownership [DEVOPS-102]
-
-
-<a name="v0.5.7"></a>
-## [v0.5.7](https://github.com/dhis2-sre/im-manager/compare/v0.5.5...v0.5.7)
+## [v0.5.9](https://github.com/dhis2-sre/im-manager/compare/v0.5.5...v0.5.9)
 
 > 2022-04-11
 

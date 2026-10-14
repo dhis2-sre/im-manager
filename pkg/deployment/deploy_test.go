@@ -68,6 +68,9 @@ type fakeInstanceService struct {
 	deployHook func()
 	changes    *instance.DeploymentChanges
 	editErr    error
+	// steps records destroys, component resets, deploys and restarts in the order they ran.
+	steps          []string
+	componentReset error
 }
 
 func (f *fakeInstanceService) DeploymentOrder(deployment *model.Deployment) ([]*model.DeploymentInstance, error) {
@@ -84,6 +87,7 @@ func (f *fakeInstanceService) DeployInstance(_ context.Context, _ string, deploy
 		return f.deployErr
 	}
 	f.deployed = append(f.deployed, deploymentInstance.StackName)
+	f.steps = append(f.steps, "deploy "+deploymentInstance.StackName)
 	return nil
 }
 
@@ -91,6 +95,18 @@ func (f *fakeInstanceService) DestroyInstance(_ context.Context, deploymentInsta
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.destroyed = append(f.destroyed, deploymentInstance.StackName)
+	f.steps = append(f.steps, "destroy "+deploymentInstance.StackName)
+	return nil
+}
+
+func (f *fakeInstanceService) CheckComponentReset(_ *model.DeploymentInstance, _ string) error {
+	return f.componentReset
+}
+
+func (f *fakeInstanceService) ResetComponentData(_ context.Context, deploymentInstance *model.DeploymentInstance, componentName string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.steps = append(f.steps, "reset "+deploymentInstance.StackName+" "+componentName)
 	return nil
 }
 
@@ -153,6 +169,12 @@ func (f *fakeInstanceService) isLocked() bool {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	return f.locked
+}
+
+func (f *fakeInstanceService) recordedSteps() []string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]string(nil), f.steps...)
 }
 
 func (f *fakeInstanceService) deployedStacks() []string {
@@ -285,12 +307,49 @@ func TestResetRefusesWhileADeployIsRunning(t *testing.T) {
 
 	require.NoError(t, service.StartDeployment(context.Background(), "token", deployment.ID, 7))
 
-	err := service.Reset(context.Background(), "token", deployment.ID, deployment.Instances[0].ID, 60, 7)
+	err := service.Reset(context.Background(), "token", deployment.ID, deployment.Instances[0].ID, "", 60, 7)
 	require.Error(t, err)
 	assert.True(t, errdef.IsConflict(err), "expected a conflict, got %v", err)
 
 	close(release)
 	awaitUnlocked(t, instanceService)
+}
+
+func TestResetDestroysAndRedeploysTheInstance(t *testing.T) {
+	deployment := newTestDeployment()
+	instanceService := &fakeInstanceService{deployment: deployment}
+	service := newTestService(instanceService, &recordingPublisher{})
+
+	require.NoError(t, service.Reset(context.Background(), "token", deployment.ID, deployment.Instances[0].ID, "", 60, 7))
+	awaitUnlocked(t, instanceService)
+
+	assert.Equal(t, []string{"destroy dhis2-v2", "deploy dhis2-v2"}, instanceService.recordedSteps())
+}
+
+// A component reset keeps the instance: only that component's data goes, the deploy seeds it again,
+// and the components still holding on to the old data are restarted after it.
+func TestResetOfAComponentKeepsTheRestOfTheInstance(t *testing.T) {
+	deployment := newTestDeployment()
+	instanceService := &fakeInstanceService{deployment: deployment}
+	service := newTestService(instanceService, &recordingPublisher{})
+
+	require.NoError(t, service.Reset(context.Background(), "token", deployment.ID, deployment.Instances[0].ID, "db", 60, 7))
+	awaitUnlocked(t, instanceService)
+
+	assert.Equal(t, []string{"reset dhis2-v2 db", "deploy dhis2-v2"}, instanceService.recordedSteps())
+}
+
+func TestResetOfAComponentIsRefusedBeforeItStarts(t *testing.T) {
+	deployment := newTestDeployment()
+	instanceService := &fakeInstanceService{deployment: deployment, componentReset: errdef.NewBadRequest("component %q cannot be reset on its own", "minio")}
+	service := newTestService(instanceService, &recordingPublisher{})
+
+	err := service.Reset(context.Background(), "token", deployment.ID, deployment.Instances[0].ID, "minio", 60, 7)
+
+	require.Error(t, err)
+	assert.True(t, errdef.IsBadRequest(err), "expected a bad request, got %v", err)
+	assert.False(t, instanceService.isLocked())
+	assert.Empty(t, instanceService.recordedSteps())
 }
 
 func TestDeployPathsRefuseAPreset(t *testing.T) {
@@ -301,7 +360,7 @@ func TestDeployPathsRefuseAPreset(t *testing.T) {
 
 	errs := map[string]error{
 		"start": service.StartDeployment(context.Background(), "token", deployment.ID, 7),
-		"reset": service.Reset(context.Background(), "token", deployment.ID, deployment.Instances[0].ID, 60, 7),
+		"reset": service.Reset(context.Background(), "token", deployment.ID, deployment.Instances[0].ID, "", 60, 7),
 	}
 	_, errs["update"] = service.UpdateInstance(context.Background(), "token", deployment.ID, deployment.Instances[0].ID, instance.Parameters{}, nil)
 	_, errs["edit"] = service.EditDeployment(context.Background(), "token", deployment.ID, instance.Edit{}, 7)

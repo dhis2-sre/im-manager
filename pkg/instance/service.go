@@ -872,6 +872,55 @@ func (s Service) Restart(ctx context.Context, instance *model.DeploymentInstance
 	return component.Restart(ctx, client, instance)
 }
 
+// resettableComponent returns the named component of an instance whose parameters are already
+// decrypted, provided it supports resetting its data on its own.
+func (s Service) resettableComponent(instance *model.DeploymentInstance, componentName string) (kube.DataResetter, error) {
+	stack, err := s.stackService.Find(instance.StackName)
+	if err != nil {
+		return nil, err
+	}
+
+	component, err := kube.FindComponent(kube.PresentComponents(stack.Components, instance.Parameters), componentName)
+	if err != nil {
+		return nil, err
+	}
+
+	resetter, ok := component.(kube.DataResetter)
+	if !ok || !slices.Contains(component.SupportedOperations(instance.Parameters), kube.OperationReset) {
+		return nil, errdef.NewBadRequest("component %q of stack %q cannot be reset on its own", componentName, instance.StackName)
+	}
+	return resetter, nil
+}
+
+// CheckComponentReset reports why the named component of an instance with decrypted parameters
+// cannot be reset on its own, so a reset is refused before it starts rather than failing in the
+// background.
+func (s Service) CheckComponentReset(instance *model.DeploymentInstance, componentName string) error {
+	_, err := s.resettableComponent(instance, componentName)
+	return err
+}
+
+// ResetComponentData throws away the data of the named component only. The next deploy of the
+// instance seeds it again, and the instance's other components keep theirs.
+func (s Service) ResetComponentData(ctx context.Context, instance *model.DeploymentInstance, componentName string) error {
+	resetter, err := s.resettableComponent(instance, componentName)
+	if err != nil {
+		return err
+	}
+
+	group, err := s.groupService.Find(ctx, instance.GroupName)
+	if err != nil {
+		return err
+	}
+
+	client, err := s.kubeClients.For(group.Cluster)
+	if err != nil {
+		return err
+	}
+
+	return resetter.ResetData(ctx, client, instance)
+}
+
 type ComponentStatus struct {
 	Name                string           `json:"name"`
 	SupportedOperations []kube.Operation `json:"supportedOperations"`

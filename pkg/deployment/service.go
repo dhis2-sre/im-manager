@@ -30,6 +30,8 @@ type instanceService interface {
 	DeploymentOrder(deployment *model.Deployment) ([]*model.DeploymentInstance, error)
 	DeployInstance(ctx context.Context, token string, instance *model.DeploymentInstance, ttl uint, extraEnv map[string]string, filestoreBackup *model.Database) error
 	DestroyInstance(ctx context.Context, instance *model.DeploymentInstance) error
+	CheckComponentReset(instance *model.DeploymentInstance, componentName string) error
+	ResetComponentData(ctx context.Context, instance *model.DeploymentInstance, componentName string) error
 	FindDecryptedDeploymentById(ctx context.Context, id uint) (*model.Deployment, error)
 	SaveDeployment(ctx context.Context, deployment *model.Deployment) error
 	UpdateInstanceParameters(ctx context.Context, deploymentId, instanceId uint, parameters instance.Parameters, public *bool) (*model.DeploymentInstance, error)
@@ -461,10 +463,12 @@ func (s Service) UpdateDeployment(ctx context.Context, token string, deploymentI
 	return s.EditDeployment(ctx, token, deploymentId, instance.Edit{TTL: &ttl, Description: &description}, userID)
 }
 
-// Reset destroys the instance and deploys it again from the same parameters. Like StartDeployment it
-// runs in the background under the deployment's deploy lock, on its own copy of the deployment, so
-// the caller gets an answer immediately and a reset cannot race a deploy of the same deployment.
-func (s Service) Reset(ctx context.Context, token string, deploymentId, instanceId uint, ttl uint, userID uint) error {
+// Reset destroys the instance and deploys it again from the same parameters. Given a component, it
+// resets only that component's data instead, which the deploy seeds again while the other
+// components keep theirs. Like StartDeployment it runs in the background under the
+// deployment's deploy lock, on its own copy of the deployment, so the caller gets an answer
+// immediately and a reset cannot race a deploy of the same deployment.
+func (s Service) Reset(ctx context.Context, token string, deploymentId, instanceId uint, componentName string, ttl uint, userID uint) error {
 	acquired, err := s.acquireDeployLock(ctx, deploymentId)
 	if err != nil {
 		return err
@@ -485,6 +489,13 @@ func (s Service) Reset(ctx context.Context, token string, deploymentId, instance
 		return errdef.NewNotFound("%v", err)
 	}
 
+	if componentName != "" {
+		if err := s.instanceService.CheckComponentReset(deploymentInstance, componentName); err != nil {
+			s.releaseDeployLock(ctx, deploymentId)
+			return err
+		}
+	}
+
 	token, err = s.tokenService.RefreshAccessToken(token)
 	if err != nil {
 		s.releaseDeployLock(ctx, deploymentId)
@@ -501,7 +512,7 @@ func (s Service) Reset(ctx context.Context, token string, deploymentId, instance
 		defer s.releaseDeployLock(ctx, deployment.ID)
 
 		s.publisher.PublishTransient(ctx, deployment.GroupName, kindDeployment, newInstanceEvent(deployment, deploymentInstance, "started", ""))
-		err := s.resetInstance(ctx, token, deploymentInstance, ttl, deployment)
+		err := s.resetInstance(ctx, token, deploymentInstance, componentName, ttl, deployment)
 		if err != nil {
 			s.logger.ErrorContext(ctx, "reset failed", "deploymentId", deployment.ID, "instanceId", deploymentInstance.ID, "error", err)
 			s.publisher.PublishTransient(ctx, deployment.GroupName, kindDeployment, newInstanceEvent(deployment, deploymentInstance, "error", err.Error()))
@@ -515,11 +526,17 @@ func (s Service) Reset(ctx context.Context, token string, deploymentId, instance
 	return nil
 }
 
-func (s Service) resetInstance(ctx context.Context, token string, instance *model.DeploymentInstance, ttl uint, deployment *model.Deployment) error {
-	if err := s.instanceService.DestroyInstance(ctx, instance); err != nil {
-		return err
+func (s Service) resetInstance(ctx context.Context, token string, instance *model.DeploymentInstance, componentName string, ttl uint, deployment *model.Deployment) error {
+	if componentName == "" {
+		if err := s.instanceService.DestroyInstance(ctx, instance); err != nil {
+			return err
+		}
+		return s.deployInstance(ctx, token, instance, ttl, deployment.Instances)
 	}
 
+	if err := s.instanceService.ResetComponentData(ctx, instance, componentName); err != nil {
+		return err
+	}
 	return s.deployInstance(ctx, token, instance, ttl, deployment.Instances)
 }
 

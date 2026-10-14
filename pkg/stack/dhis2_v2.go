@@ -112,6 +112,7 @@ var DHIS2V2 = withGroupedParameters(Stack{
 			PVCPatterns: []string{"cnpg.io/cluster=%s-dhis2-postgresql"},
 			Capabilities: []kube.Capability{
 				{Operation: kube.OperationDatabaseSave},
+				{Operation: kube.OperationReset},
 			},
 		}, ClusterPattern: "%s-dhis2-postgresql"},
 		MinioComponent{BaseComponent: kube.BaseComponent{
@@ -290,7 +291,7 @@ var dbDefaults = struct {
 	dbSize:                  "20Gi",
 	dbUsername:              "dhis",
 	resourcesRequestsCPU:    "250m",
-	resourcesRequestsMemory: "256Mi",
+	resourcesRequestsMemory: "1Gi",
 }
 
 var minioDefaults = struct {

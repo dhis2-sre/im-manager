@@ -401,6 +401,14 @@ func (is instanceService) DestroyInstance(ctx context.Context, instance *model.D
 	panic("implement me")
 }
 
+func (is instanceService) CheckComponentReset(instance *model.DeploymentInstance, componentName string) error {
+	panic("implement me")
+}
+
+func (is instanceService) ResetComponentData(ctx context.Context, instance *model.DeploymentInstance, componentName string) error {
+	panic("implement me")
+}
+
 func (is instanceService) SaveDeployment(ctx context.Context, deployment *model.Deployment) error {
 	panic("implement me")
 }

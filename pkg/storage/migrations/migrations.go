@@ -10,5 +10,6 @@ func All() []*gormigrate.Migration {
 		backfillDeployStatus(),
 		decryptFilesystemVolumeSize(),
 		presetNames(),
+		raiseDatabaseMemoryRequest(),
 	}
 }

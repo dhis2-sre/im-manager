@@ -3,6 +3,7 @@ package stack
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/dhis2-sre/im-manager/internal/errdef"
 	"github.com/dhis2-sre/im-manager/pkg/kube"
@@ -45,6 +46,28 @@ type CNPGPostgresComponent struct {
 func (c CNPGPostgresComponent) Restart(ctx context.Context, client *kube.Client, instance *model.DeploymentInstance) error {
 	clusterName := fmt.Sprintf(c.ClusterPattern, fmt.Sprintf("%s-%d", instance.Name, instance.Group.ID))
 	return client.RestartCNPGCluster(ctx, instance.Group.Namespace, clusterName)
+}
+
+// resetDeletionTimeout bounds each wait of a data reset: for the cluster to go, then for its claims,
+// which go once the pods mounting them have stopped.
+const resetDeletionTimeout = 5 * time.Minute
+
+// ResetData deletes the cluster and its volumes, so the next deploy creates an empty database from
+// the release and the chart's seed job, finding no seed marker in it, restores the database again.
+func (c CNPGPostgresComponent) ResetData(ctx context.Context, client *kube.Client, instance *model.DeploymentInstance) error {
+	clusterName := fmt.Sprintf(c.ClusterPattern, fmt.Sprintf("%s-%d", instance.Name, instance.Group.ID))
+	if err := client.DeleteCNPGCluster(ctx, instance.Group.Namespace, clusterName, resetDeletionTimeout); err != nil {
+		return err
+	}
+
+	result, err := client.DeletePVCs(ctx, instance.Group.Namespace, c.PVCSelectors(instance))
+	if err != nil {
+		return err
+	}
+	if len(result.Deleted) == 0 {
+		return nil
+	}
+	return client.WaitForPVCDeletion(ctx, instance.Group.Namespace, result.Deleted, resetDeletionTimeout)
 }
 
 const cnpgPostgresContainer = "postgres"

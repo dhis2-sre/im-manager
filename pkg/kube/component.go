@@ -22,6 +22,7 @@ const (
 	OperationLogs            Operation = "logs"
 	OperationFilestoreBackup Operation = "filestoreBackup"
 	OperationDatabaseSave    Operation = "databaseSave"
+	OperationReset           Operation = "reset"
 )
 
 // CapabilityPredicate decides whether a capability applies given the instance's decrypted parameters.
@@ -69,6 +70,12 @@ type Component interface {
 	Replicas(ctx context.Context, client *Client, instance *model.DeploymentInstance) ([]Replica, error)
 	PVCSelectors(instance *model.DeploymentInstance) []string
 	SupportedOperations(params model.DeploymentInstanceParameters) []Operation
+}
+
+// DataResetter is a component whose data can be thrown away on its own, so the next deploy seeds it
+// again while the rest of the instance keeps its data.
+type DataResetter interface {
+	ResetData(ctx context.Context, client *Client, instance *model.DeploymentInstance) error
 }
 
 // BaseComponent supplies the shared name, capability evaluation, replica discovery and PVC-selector

@@ -47,7 +47,7 @@ type deploymentService interface {
 	UpdateDeployment(ctx context.Context, token string, deploymentId uint, ttl uint, description string, userID uint) (*model.Deployment, error)
 	EditDeployment(ctx context.Context, token string, deploymentId uint, edit Edit, userID uint) (*model.Deployment, error)
 	UpdateInstance(ctx context.Context, token string, deploymentId, instanceId uint, parameters Parameters, public *bool) (*model.DeploymentInstance, error)
-	Reset(ctx context.Context, token string, deploymentId, instanceId uint, ttl uint, userID uint) error
+	Reset(ctx context.Context, token string, deploymentId, instanceId uint, componentName string, ttl uint, userID uint) error
 }
 
 func (h Handler) DeployDeployment(c *gin.Context) {
@@ -823,7 +823,9 @@ func (h Handler) Reset(c *gin.Context) {
 	//
 	// Reset instance
 	//
-	// Resetting an instance will completely destroy it and redeploy using the same parameters
+	// Resetting an instance will completely destroy it and redeploy using the same parameters. With a
+	// selector only that component's data is reset, the database of a dhis2-v2 instance for example:
+	// the redeploy seeds it again while the other components keep their data.
 	//
 	// Security:
 	//	oauth2:
@@ -870,7 +872,7 @@ func (h Handler) Reset(c *gin.Context) {
 		return
 	}
 
-	err = h.deploymentService.Reset(ctx, token, deployment.ID, instance.ID, deployment.TTL, user.ID)
+	err = h.deploymentService.Reset(ctx, token, deployment.ID, instance.ID, c.Query("selector"), deployment.TTL, user.ID)
 	if err != nil {
 		_ = c.Error(err)
 		return
