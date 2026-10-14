@@ -2329,7 +2329,7 @@ paths:
             description: |-
                 Resetting an instance will completely destroy it and redeploy using the same parameters. With a
                 selector only that component's data is reset, the database of a dhis2-v2 instance for example:
-                the redeploy seeds it again and the components reading it, such as DHIS 2, are restarted.
+                the redeploy seeds it again while the other components keep their data.
             operationId: resetInstance
             parameters:
                 - format: uint64

@@ -110,13 +110,6 @@ func (f *fakeInstanceService) ResetComponentData(_ context.Context, deploymentIn
 	return nil
 }
 
-func (f *fakeInstanceService) RestartComponentsAfterReset(_ context.Context, deploymentInstance *model.DeploymentInstance, componentName string) error {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	f.steps = append(f.steps, "restart "+deploymentInstance.StackName+" after resetting "+componentName)
-	return nil
-}
-
 func (f *fakeInstanceService) EditDeployment(context.Context, uint, instance.Edit) (*instance.DeploymentChanges, error) {
 	if f.editErr != nil {
 		return nil, f.editErr
@@ -343,7 +336,7 @@ func TestResetOfAComponentKeepsTheRestOfTheInstance(t *testing.T) {
 	require.NoError(t, service.Reset(context.Background(), "token", deployment.ID, deployment.Instances[0].ID, "db", 60, 7))
 	awaitUnlocked(t, instanceService)
 
-	assert.Equal(t, []string{"reset dhis2-v2 db", "deploy dhis2-v2", "restart dhis2-v2 after resetting db"}, instanceService.recordedSteps())
+	assert.Equal(t, []string{"reset dhis2-v2 db", "deploy dhis2-v2"}, instanceService.recordedSteps())
 }
 
 func TestResetOfAComponentIsRefusedBeforeItStarts(t *testing.T) {

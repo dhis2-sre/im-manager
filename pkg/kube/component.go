@@ -76,9 +76,6 @@ type Component interface {
 // again while the rest of the instance keeps its data.
 type DataResetter interface {
 	ResetData(ctx context.Context, client *Client, instance *model.DeploymentInstance) error
-	// ComponentsRestartedAfterReset names the components holding state read from the data, which
-	// are restarted once the reset has restored it so they read it again.
-	ComponentsRestartedAfterReset() []string
 }
 
 // BaseComponent supplies the shared name, capability evaluation, replica discovery and PVC-selector
