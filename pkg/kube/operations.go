@@ -168,7 +168,8 @@ type PVCDeletionResult struct {
 // DeletePVCs deletes every persistent volume claim matching each label selector in the given
 // namespace. Selectors are pre-formatted by the caller (a component's PVCSelectors). A selector
 // matching several claims deletes all of them, which is what a StatefulSet scaled beyond one
-// replica leaves behind, and one failure does not stop the remaining selectors.
+// replica leaves behind, and one failure does not stop the remaining selectors. A claim gone by the
+// time it is deleted counts as deleted, as the garbage collector removes those of a deleted owner.
 func (c *Client) DeletePVCs(ctx context.Context, namespace string, selectors []string) (PVCDeletionResult, error) {
 	pvcs := c.Clientset.CoreV1().PersistentVolumeClaims(namespace)
 
@@ -188,7 +189,7 @@ func (c *Client) DeletePVCs(ctx context.Context, namespace string, selectors []s
 		}
 
 		for _, pvc := range list.Items {
-			if err := pvcs.Delete(ctx, pvc.Name, metav1.DeleteOptions{}); err != nil {
+			if err := pvcs.Delete(ctx, pvc.Name, metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
 				errs = errors.Join(errs, fmt.Errorf("failed to delete pvc %q matching selector %q: %v", pvc.Name, selector, err))
 				continue
 			}

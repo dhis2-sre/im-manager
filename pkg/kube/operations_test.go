@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/fake"
@@ -105,6 +106,23 @@ func TestDeletePVCs(t *testing.T) {
 			assert.Len(t, remaining.Items, tc.wantRemaining)
 		})
 	}
+}
+
+// The garbage collector deletes the claims of a deleted owner, such as a CloudNativePG cluster, in
+// the background, so a claim can go between being listed and being deleted.
+func TestDeletePVCsCountsAClaimGoneBeforeItsDeleteAsDeleted(t *testing.T) {
+	const namespace = "test-ns"
+	client := fake.NewSimpleClientset(labeledPVC(namespace, "mydb-7-postgresql-1", "mydb-7-database"))
+	client.PrependReactor("delete", "persistentvolumeclaims", func(action k8stesting.Action) (bool, runtime.Object, error) {
+		name := action.(k8stesting.DeleteAction).GetName()
+		return true, nil, apierrors.NewNotFound(v1.Resource("persistentvolumeclaims"), name)
+	})
+	c := &Client{Clientset: client}
+
+	result, err := c.DeletePVCs(context.Background(), namespace, []string{"app.kubernetes.io/instance=mydb-7-database"})
+
+	require.NoError(t, err)
+	assert.Equal(t, []string{"mydb-7-postgresql-1"}, result.Deleted)
 }
 
 func TestWaitForPVCDeletion(t *testing.T) {
