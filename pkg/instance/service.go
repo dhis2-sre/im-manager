@@ -833,36 +833,37 @@ func (s Service) Restart(ctx context.Context, instance *model.DeploymentInstance
 }
 
 // resettableComponent returns the named component of the instance, provided it supports resetting its
-// data on its own, along with the instance's decrypted copy its capabilities were evaluated on.
-func (s Service) resettableComponent(instance *model.DeploymentInstance, componentName string) (kube.DataResetter, *model.DeploymentInstance, error) {
+// data on its own, along with the instance's present components and the decrypted copy of the
+// instance they were evaluated on.
+func (s Service) resettableComponent(instance *model.DeploymentInstance, componentName string) (kube.DataResetter, []kube.Component, *model.DeploymentInstance, error) {
 	components, instance, err := s.presentComponents(instance)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	component, err := kube.FindComponent(components, componentName)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	resetter, ok := component.(kube.DataResetter)
 	if !ok || !slices.Contains(component.SupportedOperations(instance.Parameters), kube.OperationReset) {
-		return nil, nil, errdef.NewBadRequest("component %q of stack %q cannot be reset on its own", componentName, instance.StackName)
+		return nil, nil, nil, errdef.NewBadRequest("component %q of stack %q cannot be reset on its own", componentName, instance.StackName)
 	}
-	return resetter, instance, nil
+	return resetter, components, instance, nil
 }
 
 // CheckComponentReset reports why the named component cannot be reset on its own, so a reset is
 // refused before it starts rather than failing in the background.
 func (s Service) CheckComponentReset(instance *model.DeploymentInstance, componentName string) error {
-	_, _, err := s.resettableComponent(instance, componentName)
+	_, _, _, err := s.resettableComponent(instance, componentName)
 	return err
 }
 
 // ResetComponentData throws away the data of the named component only. The next deploy of the
 // instance seeds it again, and the instance's other components keep theirs.
 func (s Service) ResetComponentData(ctx context.Context, instance *model.DeploymentInstance, componentName string) error {
-	resetter, instance, err := s.resettableComponent(instance, componentName)
+	resetter, _, instance, err := s.resettableComponent(instance, componentName)
 	if err != nil {
 		return err
 	}
@@ -880,9 +881,14 @@ func (s Service) ResetComponentData(ctx context.Context, instance *model.Deploym
 	return resetter.ResetData(ctx, client, instance)
 }
 
-// RestartComponentsExcept restarts every present component of the instance but the named one, so
-// they let go of what they held of the data that component lost.
-func (s Service) RestartComponentsExcept(ctx context.Context, instance *model.DeploymentInstance, componentName string) error {
+// RestartComponentsAfterReset restarts the present components the named component lists as holding
+// state read from its data, so they read the data its reset restored.
+func (s Service) RestartComponentsAfterReset(ctx context.Context, instance *model.DeploymentInstance, componentName string) error {
+	resetter, components, instance, err := s.resettableComponent(instance, componentName)
+	if err != nil {
+		return err
+	}
+
 	group, err := s.groupService.Find(ctx, instance.GroupName)
 	if err != nil {
 		return err
@@ -893,14 +899,10 @@ func (s Service) RestartComponentsExcept(ctx context.Context, instance *model.De
 		return err
 	}
 
-	components, instance, err := s.presentComponents(instance)
-	if err != nil {
-		return err
-	}
-
+	restarted := resetter.ComponentsRestartedAfterReset()
 	var errs error
 	for _, component := range components {
-		if component.ComponentName() == componentName {
+		if !slices.Contains(restarted, component.ComponentName()) {
 			continue
 		}
 		if err := component.Restart(ctx, client, instance); err != nil {

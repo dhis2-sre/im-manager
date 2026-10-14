@@ -409,7 +409,7 @@ func (is instanceService) ResetComponentData(ctx context.Context, instance *mode
 	panic("implement me")
 }
 
-func (is instanceService) RestartComponentsExcept(ctx context.Context, instance *model.DeploymentInstance, componentName string) error {
+func (is instanceService) RestartComponentsAfterReset(ctx context.Context, instance *model.DeploymentInstance, componentName string) error {
 	panic("implement me")
 }
 

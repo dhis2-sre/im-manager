@@ -170,6 +170,27 @@ func TestOnlyComponentsThatCanResetTheirDataAdvertiseReset(t *testing.T) {
 	}
 }
 
+// A reset restarts only the components holding state read from the reset data, and each of them
+// must exist in the stack, or the restart silently skips it. On dhis2-v2 that is DHIS 2 core alone.
+func TestComponentsRestartedAfterResetExistInTheirStack(t *testing.T) {
+	for _, stack := range allStacks {
+		for _, component := range stack.Components {
+			resetter, ok := component.(kube.DataResetter)
+			if !ok {
+				continue
+			}
+			for _, name := range resetter.ComponentsRestartedAfterReset() {
+				_, err := kube.FindComponent(stack.Components, name)
+				assert.NoError(t, err, "%s/%s restarts unknown component %q after a reset", stack.Name, component.ComponentName(), name)
+			}
+		}
+	}
+
+	database, err := kube.FindComponent(DHIS2V2.Components, "db")
+	require.NoError(t, err)
+	assert.Equal(t, []string{"dhis2"}, database.(kube.DataResetter).ComponentsRestartedAfterReset())
+}
+
 // TestDorisComponentRestartPatchesTier asserts each Doris component restarts through the
 // DorisCluster custom resource and stamps only its own tier, so a frontend restart leaves the
 // backends alone.

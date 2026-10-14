@@ -41,6 +41,8 @@ type CNPGPostgresComponent struct {
 	// ClusterPattern names the Cluster resource, formatted with the instance's "<name>-<groupID>"
 	// unique name, e.g. "%s-dhis2-postgresql".
 	ClusterPattern string
+	// RestartedAfterReset names the components restarted once a reset has restored the database.
+	RestartedAfterReset []string
 }
 
 func (c CNPGPostgresComponent) Restart(ctx context.Context, client *kube.Client, instance *model.DeploymentInstance) error {
@@ -68,6 +70,10 @@ func (c CNPGPostgresComponent) ResetData(ctx context.Context, client *kube.Clien
 		return nil
 	}
 	return client.WaitForPVCDeletion(ctx, instance.Group.Namespace, result.Deleted, resetDeletionTimeout)
+}
+
+func (c CNPGPostgresComponent) ComponentsRestartedAfterReset() []string {
+	return c.RestartedAfterReset
 }
 
 const cnpgPostgresContainer = "postgres"
