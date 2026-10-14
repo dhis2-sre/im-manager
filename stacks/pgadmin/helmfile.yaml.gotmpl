@@ -25,6 +25,13 @@ releases:
           requests:
             memory: 192Mi
 
+      # The pgAdmin volume attaches to one node at a time, so a rolling update whose new pod lands on
+      # another node waits forever for the old pod to let go of it. rollingUpdate is cleared because
+      # the API server keeps its defaults on deployments created before this change.
+      - strategy:
+          type: Recreate
+          rollingUpdate: null
+
       - ingress:
           enabled: true
           hosts:
