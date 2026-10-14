@@ -832,6 +832,84 @@ func (s Service) Restart(ctx context.Context, instance *model.DeploymentInstance
 	return component.Restart(ctx, client, instance)
 }
 
+// resettableComponent returns the named component of the instance, provided it supports resetting its
+// data on its own, along with the instance's decrypted copy its capabilities were evaluated on.
+func (s Service) resettableComponent(instance *model.DeploymentInstance, componentName string) (kube.DataResetter, *model.DeploymentInstance, error) {
+	components, instance, err := s.presentComponents(instance)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	component, err := kube.FindComponent(components, componentName)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	resetter, ok := component.(kube.DataResetter)
+	if !ok || !slices.Contains(component.SupportedOperations(instance.Parameters), kube.OperationReset) {
+		return nil, nil, errdef.NewBadRequest("component %q of stack %q cannot be reset on its own", componentName, instance.StackName)
+	}
+	return resetter, instance, nil
+}
+
+// CheckComponentReset reports why the named component cannot be reset on its own, so a reset is
+// refused before it starts rather than failing in the background.
+func (s Service) CheckComponentReset(instance *model.DeploymentInstance, componentName string) error {
+	_, _, err := s.resettableComponent(instance, componentName)
+	return err
+}
+
+// ResetComponentData throws away the data of the named component only. The next deploy of the
+// instance seeds it again, and the instance's other components keep theirs.
+func (s Service) ResetComponentData(ctx context.Context, instance *model.DeploymentInstance, componentName string) error {
+	resetter, instance, err := s.resettableComponent(instance, componentName)
+	if err != nil {
+		return err
+	}
+
+	group, err := s.groupService.Find(ctx, instance.GroupName)
+	if err != nil {
+		return err
+	}
+
+	client, err := s.kubeClients.For(group.Cluster)
+	if err != nil {
+		return err
+	}
+
+	return resetter.ResetData(ctx, client, instance)
+}
+
+// RestartComponentsExcept restarts every present component of the instance but the named one, so
+// they let go of what they held of the data that component lost.
+func (s Service) RestartComponentsExcept(ctx context.Context, instance *model.DeploymentInstance, componentName string) error {
+	group, err := s.groupService.Find(ctx, instance.GroupName)
+	if err != nil {
+		return err
+	}
+
+	client, err := s.kubeClients.For(group.Cluster)
+	if err != nil {
+		return err
+	}
+
+	components, instance, err := s.presentComponents(instance)
+	if err != nil {
+		return err
+	}
+
+	var errs error
+	for _, component := range components {
+		if component.ComponentName() == componentName {
+			continue
+		}
+		if err := component.Restart(ctx, client, instance); err != nil {
+			errs = errors.Join(errs, fmt.Errorf("restarting component %q: %w", component.ComponentName(), err))
+		}
+	}
+	return errs
+}
+
 type ComponentStatus struct {
 	Name                string           `json:"name"`
 	SupportedOperations []kube.Operation `json:"supportedOperations"`

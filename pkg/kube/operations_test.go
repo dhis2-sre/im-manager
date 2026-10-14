@@ -109,7 +109,7 @@ func TestDeletePVCs(t *testing.T) {
 
 func TestWaitForPVCDeletion(t *testing.T) {
 	const namespace = "test-ns"
-	pvcDeletionPollInterval = time.Millisecond
+	deletionPollInterval = time.Millisecond
 
 	// terminating answers the first gets of a claim as if it were still there, the way a claim whose
 	// pod is still stopping stays after its deletion.

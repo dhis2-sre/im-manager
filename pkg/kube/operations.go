@@ -103,6 +103,29 @@ func (c *Client) Resume(ctx context.Context, instance *model.DeploymentInstance)
 
 var cnpgClusterResource = schema.GroupVersionResource{Group: "postgresql.cnpg.io", Version: "v1", Resource: "clusters"}
 
+// DeleteCNPGCluster deletes a CloudNativePG cluster and waits until it is gone, so a deploy right
+// after creates a new one rather than finding the old one terminating. A cluster already gone is not
+// an error.
+func (c *Client) DeleteCNPGCluster(ctx context.Context, namespace, name string, timeout time.Duration) error {
+	clusters := c.Dynamic.Resource(cnpgClusterResource).Namespace(namespace)
+	err := clusters.Delete(ctx, name, metav1.DeleteOptions{})
+	if err != nil && !apierrors.IsNotFound(err) {
+		return fmt.Errorf("failed to delete cluster %q: %v", name, err)
+	}
+
+	err = wait.PollUntilContextTimeout(ctx, deletionPollInterval, timeout, true, func(ctx context.Context) (bool, error) {
+		_, err := clusters.Get(ctx, name, metav1.GetOptions{})
+		if apierrors.IsNotFound(err) {
+			return true, nil
+		}
+		return false, err
+	})
+	if err != nil {
+		return fmt.Errorf("cluster %q was not deleted within %s: %w", name, timeout, err)
+	}
+	return nil
+}
+
 // RestartCNPGCluster triggers a rolling restart of a CloudNativePG cluster by stamping the
 // standard restartedAt annotation on the Cluster resource, the same mechanism as the cnpg kubectl
 // plugin's restart command. Patching the operator-managed pods directly would fight the operator.
@@ -176,8 +199,8 @@ func (c *Client) DeletePVCs(ctx context.Context, namespace string, selectors []s
 	return result, errs
 }
 
-// pvcDeletionPollInterval is how often WaitForPVCDeletion checks, a variable so tests need not wait.
-var pvcDeletionPollInterval = 2 * time.Second
+// deletionPollInterval is how often a wait for a deletion checks, a variable so tests need not wait.
+var deletionPollInterval = 2 * time.Second
 
 // WaitForPVCDeletion waits until none of the named claims exists any more. Deleting a claim only
 // marks it: it stays, terminating, while a pod still mounts it, and a release installed meanwhile
@@ -185,7 +208,7 @@ var pvcDeletionPollInterval = 2 * time.Second
 func (c *Client) WaitForPVCDeletion(ctx context.Context, namespace string, names []string, timeout time.Duration) error {
 	pvcs := c.Clientset.CoreV1().PersistentVolumeClaims(namespace)
 	remaining := slices.Clone(names)
-	err := wait.PollUntilContextTimeout(ctx, pvcDeletionPollInterval, timeout, true, func(ctx context.Context) (bool, error) {
+	err := wait.PollUntilContextTimeout(ctx, deletionPollInterval, timeout, true, func(ctx context.Context) (bool, error) {
 		var stillThere []string
 		for _, name := range remaining {
 			_, err := pvcs.Get(ctx, name, metav1.GetOptions{})
