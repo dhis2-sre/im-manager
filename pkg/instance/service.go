@@ -832,38 +832,40 @@ func (s Service) Restart(ctx context.Context, instance *model.DeploymentInstance
 	return component.Restart(ctx, client, instance)
 }
 
-// resettableComponent returns the named component of the instance, provided it supports resetting its
-// data on its own, along with the instance's present components and the decrypted copy of the
-// instance they were evaluated on.
-func (s Service) resettableComponent(instance *model.DeploymentInstance, componentName string) (kube.DataResetter, []kube.Component, *model.DeploymentInstance, error) {
-	components, instance, err := s.presentComponents(instance)
+// resettableComponent returns the named component of an instance whose parameters are already
+// decrypted, provided it supports resetting its data on its own, along with the instance's present
+// components.
+func (s Service) resettableComponent(instance *model.DeploymentInstance, componentName string) (kube.DataResetter, []kube.Component, error) {
+	stack, err := s.stackService.Find(instance.StackName)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
 
+	components := kube.PresentComponents(stack.Components, instance.Parameters)
 	component, err := kube.FindComponent(components, componentName)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
 
 	resetter, ok := component.(kube.DataResetter)
 	if !ok || !slices.Contains(component.SupportedOperations(instance.Parameters), kube.OperationReset) {
-		return nil, nil, nil, errdef.NewBadRequest("component %q of stack %q cannot be reset on its own", componentName, instance.StackName)
+		return nil, nil, errdef.NewBadRequest("component %q of stack %q cannot be reset on its own", componentName, instance.StackName)
 	}
-	return resetter, components, instance, nil
+	return resetter, components, nil
 }
 
-// CheckComponentReset reports why the named component cannot be reset on its own, so a reset is
-// refused before it starts rather than failing in the background.
+// CheckComponentReset reports why the named component of an instance with decrypted parameters
+// cannot be reset on its own, so a reset is refused before it starts rather than failing in the
+// background.
 func (s Service) CheckComponentReset(instance *model.DeploymentInstance, componentName string) error {
-	_, _, _, err := s.resettableComponent(instance, componentName)
+	_, _, err := s.resettableComponent(instance, componentName)
 	return err
 }
 
 // ResetComponentData throws away the data of the named component only. The next deploy of the
 // instance seeds it again, and the instance's other components keep theirs.
 func (s Service) ResetComponentData(ctx context.Context, instance *model.DeploymentInstance, componentName string) error {
-	resetter, _, instance, err := s.resettableComponent(instance, componentName)
+	resetter, _, err := s.resettableComponent(instance, componentName)
 	if err != nil {
 		return err
 	}
@@ -884,7 +886,7 @@ func (s Service) ResetComponentData(ctx context.Context, instance *model.Deploym
 // RestartComponentsAfterReset restarts the present components the named component lists as holding
 // state read from its data, so they read the data its reset restored.
 func (s Service) RestartComponentsAfterReset(ctx context.Context, instance *model.DeploymentInstance, componentName string) error {
-	resetter, components, instance, err := s.resettableComponent(instance, componentName)
+	resetter, components, err := s.resettableComponent(instance, componentName)
 	if err != nil {
 		return err
 	}
