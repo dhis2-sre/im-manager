@@ -9,6 +9,7 @@ func All() []*gormigrate.Migration {
 		backfillDeployChapDHIS2V2(),
 		backfillDeployStatus(),
 		decryptFilesystemVolumeSize(),
+		presetNames(),
 		raiseDatabaseMemoryRequest(),
 	}
 }
