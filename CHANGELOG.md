@@ -1,4 +1,27 @@
 
+<a name="0.78.1"></a>
+## [0.78.1](https://github.com/dhis2-sre/im-manager/compare/0.78.0...0.78.1)
+
+> 2026-10-15
+
+### Fix
+
+* deploy dhis2 chart 1.3.0
+* disable the postgresql pod disruption budget
+* restore the Google service account for dhis2-v2 instances
+* recreate pgadmin instead of rolling it onto another node
+
+
+<a name="0.78.0"></a>
+## [0.78.0](https://github.com/dhis2-sre/im-manager/compare/0.77.0...0.78.0)
+
+> 2026-10-14
+
+### Chore
+
+* generate change log for v0.77.0
+
+
 <a name="0.77.0"></a>
 ## [0.77.0](https://github.com/dhis2-sre/im-manager/compare/0.76.0...0.77.0)
 
@@ -407,7 +430,7 @@
 
 
 <a name="v0.67.0"></a>
-## [v0.67.0](https://github.com/dhis2-sre/im-manager/compare/v0.66.0...v0.67.0)
+## [v0.67.0](https://github.com/dhis2-sre/im-manager/compare/0.66.0...v0.67.0)
 
 > 2026-05-07
 
@@ -432,14 +455,14 @@
 * add SaveAs and BackupService integration tests ([#1375](https://github.com/dhis2-sre/im-manager/issues/1375))
 
 
-<a name="v0.66.0"></a>
-## [v0.66.0](https://github.com/dhis2-sre/im-manager/compare/0.66.0...v0.66.0)
+<a name="0.66.0"></a>
+## [0.66.0](https://github.com/dhis2-sre/im-manager/compare/v0.66.0...0.66.0)
 
 > 2026-04-22
 
 
-<a name="0.66.0"></a>
-## [0.66.0](https://github.com/dhis2-sre/im-manager/compare/v0.65.3...0.66.0)
+<a name="v0.66.0"></a>
+## [v0.66.0](https://github.com/dhis2-sre/im-manager/compare/v0.65.3...v0.66.0)
 
 > 2026-04-22
 
@@ -2305,7 +2328,27 @@
 
 
 <a name="v0.5.6"></a>
-## [v0.5.6](https://github.com/dhis2-sre/im-manager/compare/v0.5.7...v0.5.6)
+## [v0.5.6](https://github.com/dhis2-sre/im-manager/compare/v0.5.5...v0.5.6)
+
+> 2022-04-11
+
+### Fix
+
+* Use func names with argument signatures to change ownership [DEVOPS-102]
+
+
+<a name="v0.5.5"></a>
+## [v0.5.5](https://github.com/dhis2-sre/im-manager/compare/v0.5.9...v0.5.5)
+
+> 2022-04-11
+
+### Fix
+
+* Use func names with argument signatures to change ownership [DEVOPS-102]
+
+
+<a name="v0.5.9"></a>
+## [v0.5.9](https://github.com/dhis2-sre/im-manager/compare/v0.5.7...v0.5.9)
 
 > 2022-04-11
 
@@ -2325,27 +2368,7 @@
 
 
 <a name="v0.5.8"></a>
-## [v0.5.8](https://github.com/dhis2-sre/im-manager/compare/v0.5.9...v0.5.8)
-
-> 2022-04-11
-
-### Fix
-
-* Use func names with argument signatures to change ownership [DEVOPS-102]
-
-
-<a name="v0.5.9"></a>
-## [v0.5.9](https://github.com/dhis2-sre/im-manager/compare/v0.5.5...v0.5.9)
-
-> 2022-04-11
-
-### Fix
-
-* Use func names with argument signatures to change ownership [DEVOPS-102]
-
-
-<a name="v0.5.5"></a>
-## [v0.5.5](https://github.com/dhis2-sre/im-manager/compare/v0.5.3...v0.5.5)
+## [v0.5.8](https://github.com/dhis2-sre/im-manager/compare/v0.5.3...v0.5.8)
 
 > 2022-04-11
 
