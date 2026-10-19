@@ -50,6 +50,9 @@ jobs:
             sed -n '/^Unhealthy certificates/,/^$/p' /tmp/find-expiring-certificates-output | sed '$d'
             echo "CERTS_EOF"
           } >> $GITHUB_OUTPUT
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
       - name: Send Slack notification
         if: steps.find-expiring-certificates.outputs.unhealthy_count > '0'
