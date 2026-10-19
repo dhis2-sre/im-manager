@@ -11,5 +11,6 @@ func All() []*gormigrate.Migration {
 		decryptFilesystemVolumeSize(),
 		presetNames(),
 		raiseDatabaseMemoryRequest(),
+		dropLegacyDeploymentNameIndex(),
 	}
 }
