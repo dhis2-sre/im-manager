@@ -394,7 +394,7 @@ func TestValidatorOneOf(t *testing.T) {
 func TestDHIS2ImageRepositoryValidator(t *testing.T) {
 	validator := stack.DHIS2V2.Parameters["IMAGE_REPOSITORY"].Validator
 
-	for _, valid := range []string{"core", "core-dev", "core-pr", "ghcr.io/dhis2/core-private"} {
+	for _, valid := range []string{"core", "core-dev", "core-pr", "ghcr.io/dhis2/example"} {
 		assert.NoError(t, validator(valid), valid)
 	}
 	for _, invalid := range []string{"", "Core", "other/core", "ghcr.io/other/core", "docker.io/dhis2/core", "ghcr.io/dhis2/a/b"} {
