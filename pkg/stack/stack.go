@@ -9,6 +9,7 @@ package stack
 import (
 	"errors"
 	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -252,6 +253,16 @@ const (
 
 // sameSiteCookies validates the value is one of our same site cookie types.
 var sameSiteCookies = OneOf(strict, lax, none)
+
+var imageRepositoryPattern = regexp.MustCompile(`^(ghcr\.io/dhis2/)?[a-z0-9]+([._-][a-z0-9]+)*$`)
+
+// imageRepository validates the value is a dhis2 Docker Hub repository or a ghcr.io/dhis2 repository.
+func imageRepository(value string) error {
+	if !imageRepositoryPattern.MatchString(value) {
+		return fmt.Errorf("%q is not valid, only a dhis2 Docker Hub repository or ghcr.io/dhis2/<repository> is allowed", value)
+	}
+	return nil
+}
 
 // OneOf creates a function returning an error when called with a value that is not any of the given
 // validValues.

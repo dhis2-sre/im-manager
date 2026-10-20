@@ -99,6 +99,15 @@ How to add a migration:
 * Update the profiles section of the [skaffold file](https://github.com/dhis2-sre/im-manager/blob/8cb9a5959e334b835188fa07e801996ff2410b7c/skaffold.yaml#L96) to include the group
 * Update backup schedule to include the group for either [dev](https://github.com/dhis2-sre/dhis2-infrastructure/blob/b9f53752ca9cb16883f2f78cae5fca42b4087b1f/modules/k8s/helm-backup-dev.tf#L1) or [prod](https://github.com/dhis2-sre/dhis2-infrastructure/blob/b9f53752ca9cb16883f2f78cae5fca42b4087b1f/modules/k8s/helm-backup-prod.tf#L1)
 
+# Private images
+
+`IMAGE_REPOSITORY` for the dhis2-v2 stack also accepts `ghcr.io/dhis2/<repository>`. Such images are pulled with the
+`image-pull-secret` secret, so a private one can only be deployed into groups whose namespace has it:
+
+```
+kubectl -n <group namespace> create secret docker-registry image-pull-secret --docker-server=ghcr.io --docker-username=<user> --docker-password=<token with read:packages>
+```
+
 # Tracing
 
 Tracing is implemented using [OpenTelemetry](https://opentelemetry.io/) and [Jaeger](https://www.jaegertracing.io/).
