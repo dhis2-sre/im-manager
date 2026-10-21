@@ -19,12 +19,13 @@ releases:
       # <release>-dhis2-postgresql.
       - fullnameOverride: "{{ requiredEnv "INSTANCE_NAME" }}-dhis2"
       {{- $imageRepository := requiredEnv "IMAGE_REPOSITORY" }}
-      # Images outside Docker Hub may be private, pulled with a secret created in the group's namespace
+      {{- $ghcrImage := hasPrefix "ghcr.io/" $imageRepository }}
+      # Short names are dhis2 images on Docker Hub; ghcr.io images may be private and are pulled with ghcr-image-pull-secret
       - image:
-          repository: {{ if contains "/" $imageRepository }}{{ $imageRepository }}{{ else }}dhis2/{{ $imageRepository }}{{ end }}
+          repository: {{ if $ghcrImage }}{{ $imageRepository }}{{ else }}dhis2/{{ $imageRepository }}{{ end }}
           tag: "{{ requiredEnv "IMAGE_TAG" }}"
           pullPolicy: {{ requiredEnv "IMAGE_PULL_POLICY" }}
-      {{- if contains "/" $imageRepository }}
+      {{- if $ghcrImage }}
       - imagePullSecrets:
           - name: ghcr-image-pull-secret
       {{- end }}
