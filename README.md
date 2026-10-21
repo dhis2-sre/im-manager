@@ -103,8 +103,8 @@ How to add a migration:
 
 `IMAGE_REPOSITORY` for the dhis2-v2 stack also accepts `ghcr.io/dhis2/<repository>`. Such images are pulled with the
 `image-pull-secret` secret of the group's namespace, so a private one can only be deployed into groups whose namespace
-has it. They are always pulled, whatever `IMAGE_PULL_POLICY` says, so a copy cached on a node can't be started without
-the secret.
+has it. Set `GHCR_USERNAME` and `GHCR_PASSWORD` (a token with `read:packages`) to list and check the tags of private
+packages.
 
 # Tracing
 
