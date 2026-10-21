@@ -18,10 +18,17 @@ releases:
       # "dhis2", while the stack definition derives the database hostname and cluster as
       # <release>-dhis2-postgresql.
       - fullnameOverride: "{{ requiredEnv "INSTANCE_NAME" }}-dhis2"
+      {{- $imageRepository := requiredEnv "IMAGE_REPOSITORY" }}
+      {{- $ghcrImage := hasPrefix "ghcr.io/" $imageRepository }}
+      # Short names are dhis2 images on Docker Hub; ghcr.io images may be private and are pulled with ghcr-image-pull-secret
       - image:
-          repository: dhis2/{{ requiredEnv "IMAGE_REPOSITORY" }}
+          repository: {{ if $ghcrImage }}{{ $imageRepository }}{{ else }}dhis2/{{ $imageRepository }}{{ end }}
           tag: "{{ requiredEnv "IMAGE_TAG" }}"
           pullPolicy: {{ requiredEnv "IMAGE_PULL_POLICY" }}
+      {{- if $ghcrImage }}
+      - imagePullSecrets:
+          - name: ghcr-image-pull-secret
+      {{- end }}
       - ingress:
           enabled: true
           hostname: {{ requiredEnv "INSTANCE_HOSTNAME" }}

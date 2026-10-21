@@ -14,7 +14,7 @@ var DHIS2V2 = withGroupedParameters(Stack{
 	ParameterGroups: []ParameterGroup{
 		{Name: "dhis2", Title: "DHIS 2 Core", Parameters: StackParameters{
 			"IMAGE_TAG":                       {Priority: 1, DisplayName: "Image Tag", DefaultValue: &coreDefaults.imageTag},
-			"IMAGE_REPOSITORY":                {Priority: 2, DisplayName: "Image Repository", DefaultValue: &coreDefaults.imageRepository},
+			"IMAGE_REPOSITORY":                {Priority: 2, DisplayName: "Image Repository", DefaultValue: &coreDefaults.imageRepository, Validator: imageRepository},
 			"IMAGE_PULL_POLICY":               {Priority: 3, DisplayName: "Image Pull Policy", DefaultValue: &coreDefaults.imagePullPolicy, Validator: imagePullPolicy},
 			"STORAGE_TYPE":                    {Priority: 10, DisplayName: "Storage type", DefaultValue: &coreDefaults.storageType, Validator: storage, ImmutableReason: "the file store is built at first deploy and its volume is kept when the release that owns it goes away, so switching backend strands the files the instance already has"},
 			"DHIS2_HOME":                      {Priority: 17, DisplayName: "DHIS2 Home Directory", DefaultValue: &coreDefaults.dhis2Home},

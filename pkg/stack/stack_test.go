@@ -391,6 +391,17 @@ func TestValidatorOneOf(t *testing.T) {
 	assert.ErrorContains(t, validator("maybe"), `"maybe" is not valid, only "ok", "not_ok" are allowed`)
 }
 
+func TestDHIS2ImageRepositoryValidator(t *testing.T) {
+	validator := stack.DHIS2V2.Parameters["IMAGE_REPOSITORY"].Validator
+
+	for _, valid := range []string{"core", "core-dev", "core-pr", "ghcr.io/dhis2/example"} {
+		assert.NoError(t, validator(valid), valid)
+	}
+	for _, invalid := range []string{"", "Core", "other/core", "ghcr.io/other/core", "docker.io/dhis2/core", "ghcr.io/dhis2/a/b"} {
+		assert.Error(t, validator(invalid), invalid)
+	}
+}
+
 func TestValidateCompanionConditions(t *testing.T) {
 	t.Run("ConditionOnAnExistingParameter", func(t *testing.T) {
 		offered := stack.Stack{Name: "offered"}
