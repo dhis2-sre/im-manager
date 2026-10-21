@@ -26,7 +26,7 @@ releases:
           pullPolicy: {{ requiredEnv "IMAGE_PULL_POLICY" }}
       {{- if contains "/" $imageRepository }}
       - imagePullSecrets:
-          - name: image-pull-secret
+          - name: ghcr-image-pull-secret
       {{- end }}
       - ingress:
           enabled: true
