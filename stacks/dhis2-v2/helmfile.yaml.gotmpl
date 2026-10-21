@@ -19,11 +19,12 @@ releases:
       # <release>-dhis2-postgresql.
       - fullnameOverride: "{{ requiredEnv "INSTANCE_NAME" }}-dhis2"
       {{- $imageRepository := requiredEnv "IMAGE_REPOSITORY" }}
+      # Images outside Docker Hub may be private: they are pulled with a secret created in the group's namespace, and
+      # always pulled so a node's cached copy can't be started without that secret
       - image:
           repository: {{ if contains "/" $imageRepository }}{{ $imageRepository }}{{ else }}dhis2/{{ $imageRepository }}{{ end }}
           tag: "{{ requiredEnv "IMAGE_TAG" }}"
-          pullPolicy: {{ requiredEnv "IMAGE_PULL_POLICY" }}
-      # Images outside Docker Hub may be private, pulled with a secret created in the group's namespace
+          pullPolicy: {{ if contains "/" $imageRepository }}Always{{ else }}{{ requiredEnv "IMAGE_PULL_POLICY" }}{{ end }}
       {{- if contains "/" $imageRepository }}
       - imagePullSecrets:
           - name: image-pull-secret
