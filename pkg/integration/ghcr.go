@@ -9,31 +9,18 @@ import (
 	"strings"
 )
 
-// NewGhcrClient creates a GHCR client. Without credentials it only sees public packages; with a username and a
-// token that can read packages it also sees the private packages that user has access to.
-//
 //goland:noinspection GoExportedFuncWithUnexportedType
-func NewGhcrClient(username, password string) *ghcrClient {
-	return &ghcrClient{client: &http.Client{}, username: username, password: password}
+func NewGhcrClient() *ghcrClient {
+	return &ghcrClient{client: &http.Client{}}
 }
 
 type ghcrClient struct {
-	client   *http.Client
-	username string
-	password string
+	client *http.Client
 }
 
 func (g *ghcrClient) getToken(organization, repository string) (string, error) {
 	url := fmt.Sprintf("https://ghcr.io/token?scope=repository:%s/%s:pull", organization, repository)
-	req, err := http.NewRequest(http.MethodGet, url, nil)
-	if err != nil {
-		return "", err
-	}
-	if g.username != "" && g.password != "" {
-		req.SetBasicAuth(g.username, g.password)
-	}
-
-	response, err := g.client.Do(req)
+	response, err := g.client.Get(url)
 	if err != nil {
 		return "", err
 	}

@@ -699,7 +699,7 @@ func newIntegrationHandler() (integration.Handler, error) {
 			Password: password,
 		})
 
-	ghcrClient := integration.NewGhcrClient(os.Getenv("GHCR_USERNAME"), os.Getenv("GHCR_PASSWORD"))
+	ghcrClient := integration.NewGhcrClient()
 
 	instanceServiceHost, err := requireEnv("INSTANCE_SERVICE_HOST")
 	if err != nil {
