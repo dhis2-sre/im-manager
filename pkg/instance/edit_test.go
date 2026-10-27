@@ -123,6 +123,7 @@ func TestPlanEdit(t *testing.T) {
 		require.NoError(t, err)
 		assert.Empty(t, changes.Redeploy)
 		assert.Empty(t, changes.Destroy)
+		assert.Empty(t, changes.Save)
 	})
 
 	t.Run("ResubmittingTheStoredValuesPlansNothing", func(t *testing.T) {
@@ -134,6 +135,7 @@ func TestPlanEdit(t *testing.T) {
 
 		require.NoError(t, err)
 		assert.Empty(t, changes.Redeploy)
+		assert.Empty(t, changes.Save)
 	})
 
 	t.Run("AParameterChangeRedeploysOnlyThatInstance", func(t *testing.T) {
@@ -179,6 +181,7 @@ func TestPlanEdit(t *testing.T) {
 
 		require.NoError(t, err)
 		assert.Empty(t, changes.Redeploy)
+		assert.Equal(t, []string{"host"}, stackNames(changes.Save))
 		assert.True(t, deployment.Instances[0].Public)
 	})
 
@@ -193,6 +196,7 @@ func TestPlanEdit(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, []string{"sidecar"}, stackNames(changes.Redeploy))
 		assert.Empty(t, changes.Destroy)
+		assert.ElementsMatch(t, []string{"host", "sidecar"}, stackNames(changes.Save), "the host is saved with its switch on")
 
 		added := changes.Redeploy[0]
 		assert.Equal(t, "2.0.0", added.Parameters["SIDECAR_TAG"].Value)
@@ -232,6 +236,7 @@ func TestPlanEdit(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, []string{"sidecar"}, stackNames(changes.Destroy))
 		assert.Empty(t, changes.Redeploy, "the host does not render the switch, so nothing is redeployed")
+		assert.Equal(t, []string{"host"}, stackNames(changes.Save), "the host is saved with its switch off")
 		assert.Equal(t, []string{"host"}, stackNames(deployment.Instances), "the answer leaves out the instance on its way out")
 	})
 
@@ -274,6 +279,20 @@ func TestPlanEdit(t *testing.T) {
 
 		require.NoError(t, err)
 		assert.Equal(t, []string{"host"}, stackNames(changes.Redeploy))
+	})
+
+	t.Run("SupplyingAStoredCompanionsRequiredParametersRedeploysOnlyTheCompanion", func(t *testing.T) {
+		edit := Edit{Instances: map[string]InstanceEdit{
+			"host":    {Parameters: Parameters{"ENABLE_SECURED": {Value: "true"}}},
+			"secured": {Parameters: Parameters{"SECURED_PASSWORD": {Value: "secret"}}},
+		}}
+
+		changes, err := editTestService().planEdit(withBlankSecured(editTestDeployment(false)), edit)
+
+		require.NoError(t, err)
+		assert.Equal(t, []string{"secured"}, stackNames(changes.Redeploy))
+		assert.ElementsMatch(t, []string{"host", "secured"}, stackNames(changes.Save))
+		assert.Empty(t, changes.Destroy)
 	})
 
 	t.Run("AnImmutableParameterIsRejected", func(t *testing.T) {
