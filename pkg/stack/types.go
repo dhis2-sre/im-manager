@@ -65,6 +65,9 @@ type StackParameter struct {
 	// Priority determines the order in which the parameter is shown.
 	Priority  uint `json:"priority"`
 	Sensitive bool `json:"sensitive"`
+	// Required says the stack's helmfile cannot render without a value for this parameter, so an
+	// instance is rejected while it is blank rather than failing in helmfile after it was accepted.
+	Required bool `json:"required"`
 	// ImmutableReason says why the parameter cannot be changed once the instance has been deployed;
 	// empty means it can. The update path rejects a change to such a parameter and a client renders
 	// it read only with this as the explanation, so the two cannot disagree about what is editable.

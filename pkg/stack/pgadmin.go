@@ -11,8 +11,8 @@ var PgAdmin = withGroupedParameters(Stack{
 	Name: "pgadmin",
 	ParameterGroups: []ParameterGroup{
 		{Name: "pgadmin", Title: "pgAdmin", Parameters: StackParameters{
-			"PGADMIN_USERNAME":  {Priority: 1, DisplayName: "pgAdmin Username", Sensitive: true},
-			"PGADMIN_PASSWORD":  {Priority: 2, DisplayName: "pgAdmin Password", Sensitive: true},
+			"PGADMIN_USERNAME":  {Priority: 1, DisplayName: "pgAdmin Username", Sensitive: true, Required: true},
+			"PGADMIN_PASSWORD":  {Priority: 2, DisplayName: "pgAdmin Password", Sensitive: true, Required: true},
 			"CHART_VERSION":     {Priority: 3, DisplayName: "Chart Version", DefaultValue: &pgAdminDefaults.chartVersion},
 			"DATABASE_HOSTNAME": {Priority: 0, DisplayName: "Database Hostname", Consumed: true},
 			"DATABASE_NAME":     {Priority: 0, DisplayName: "Database Name", Consumed: true},

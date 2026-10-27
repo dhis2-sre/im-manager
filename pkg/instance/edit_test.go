@@ -21,6 +21,7 @@ func editTestService() *Service {
 			// ENABLE_SIDECAR only decides whether the companion belongs to the deployment, like
 			// ENABLE_PGADMIN; DEPLOY_EXTRA also reaches the host's own template, like DEPLOY_CHAP.
 			"ENABLE_SIDECAR":  {DefaultValue: ptr("false"), NotRendered: true},
+			"ENABLE_SECURED":  {DefaultValue: ptr("false"), NotRendered: true},
 			"DEPLOY_EXTRA":    {DefaultValue: ptr("false")},
 			"DATABASE_ID":     {ImmutableReason: "it is seeded once"},
 			"SHARED_PASSWORD": {DefaultValue: ptr("secret")},
@@ -39,12 +40,20 @@ func editTestService() *Service {
 			"SHARED_PASSWORD": {Consumed: true},
 		},
 	}
+	// secured stands in for pgAdmin, whose helmfile cannot render without its credentials.
+	secured := stack.Stack{
+		Name: "secured",
+		Parameters: map[string]stack.StackParameter{
+			"SECURED_PASSWORD": {Sensitive: true, Required: true},
+		},
+	}
 	host.Companions = []stack.Companion{
 		{Stack: sidecar, When: &kube.Condition{Parameter: "ENABLE_SIDECAR", Equals: "true"}},
 		{Stack: extra, When: &kube.Condition{Parameter: "DEPLOY_EXTRA", Equals: "true"}},
+		{Stack: secured, When: &kube.Condition{Parameter: "ENABLE_SECURED", Equals: "true"}},
 	}
 
-	stackService := stack.NewService(stack.Stacks{"host": host, "sidecar": sidecar, "extra": extra})
+	stackService := stack.NewService(stack.Stacks{"host": host, "sidecar": sidecar, "extra": extra, "secured": secured})
 	return NewService(slog.Default(), nil, nil, stackService, nil, nil, "", kube.NewClients(slog.Default()))
 }
 
@@ -65,6 +74,7 @@ func editTestDeployment(withSidecar bool) *model.Deployment {
 				Parameters: model.DeploymentInstanceParameters{
 					"IMAGE_TAG":       {ParameterName: "IMAGE_TAG", Value: "2.42.0"},
 					"ENABLE_SIDECAR":  {ParameterName: "ENABLE_SIDECAR", Value: sidecarEnabled},
+					"ENABLE_SECURED":  {ParameterName: "ENABLE_SECURED", Value: "false"},
 					"DATABASE_ID":     {ParameterName: "DATABASE_ID", Value: "7"},
 					"SHARED_PASSWORD": {ParameterName: "SHARED_PASSWORD", Value: "secret"},
 				},
@@ -82,6 +92,19 @@ func editTestDeployment(withSidecar bool) *model.Deployment {
 		})
 	}
 
+	return deployment
+}
+
+// withBlankSecured adds the state a deployment was left in when pgAdmin was added by an edit that
+// sent no credentials: the companion stored with a blank required parameter while the host still
+// holds its switch off.
+func withBlankSecured(deployment *model.Deployment) *model.Deployment {
+	deployment.Instances = append(deployment.Instances, &model.DeploymentInstance{
+		ID: 12, Name: "whoami", GroupName: "group", StackName: "secured", DeploymentID: 1,
+		Parameters: model.DeploymentInstanceParameters{
+			"SECURED_PASSWORD": {ParameterName: "SECURED_PASSWORD", Value: ""},
+		},
+	})
 	return deployment
 }
 
@@ -210,6 +233,47 @@ func TestPlanEdit(t *testing.T) {
 		assert.Equal(t, []string{"sidecar"}, stackNames(changes.Destroy))
 		assert.Empty(t, changes.Redeploy, "the host does not render the switch, so nothing is redeployed")
 		assert.Equal(t, []string{"host"}, stackNames(deployment.Instances), "the answer leaves out the instance on its way out")
+	})
+
+	t.Run("AnAddedCompanionWithoutItsRequiredParametersIsRejected", func(t *testing.T) {
+		for name, password := range map[string]string{"Absent": "", "Blank": "   "} {
+			t.Run(name, func(t *testing.T) {
+				edit := Edit{Instances: map[string]InstanceEdit{
+					"host": {Parameters: Parameters{"ENABLE_SECURED": {Value: "true"}}},
+				}}
+				if password != "" {
+					edit.Instances["secured"] = InstanceEdit{Parameters: Parameters{"SECURED_PASSWORD": {Value: password}}}
+				}
+
+				_, err := editTestService().planEdit(editTestDeployment(false), edit)
+
+				require.ErrorContains(t, err, `instance "whoami" of stack "secured" is missing required parameters: SECURED_PASSWORD`)
+				assert.True(t, errdef.IsBadRequest(err))
+			})
+		}
+	})
+
+	t.Run("AnAddedCompanionWithItsRequiredParametersIsAccepted", func(t *testing.T) {
+		edit := Edit{Instances: map[string]InstanceEdit{
+			"host":    {Parameters: Parameters{"ENABLE_SECURED": {Value: "true"}}},
+			"secured": {Parameters: Parameters{"SECURED_PASSWORD": {Value: "secret"}}},
+		}}
+
+		changes, err := editTestService().planEdit(editTestDeployment(false), edit)
+
+		require.NoError(t, err)
+		assert.Equal(t, []string{"secured"}, stackNames(changes.Redeploy))
+	})
+
+	t.Run("AStoredCompanionMissingARequiredParameterDoesNotBlockAnUnrelatedEdit", func(t *testing.T) {
+		edit := Edit{Instances: map[string]InstanceEdit{
+			"host": {Parameters: Parameters{"ENABLE_SECURED": {Value: "true"}, "IMAGE_TAG": {Value: "2.43.0"}}},
+		}}
+
+		changes, err := editTestService().planEdit(withBlankSecured(editTestDeployment(false)), edit)
+
+		require.NoError(t, err)
+		assert.Equal(t, []string{"host"}, stackNames(changes.Redeploy))
 	})
 
 	t.Run("AnImmutableParameterIsRejected", func(t *testing.T) {

@@ -154,6 +154,16 @@ func (s Service) planEdit(deployment *model.Deployment, edit Edit) (*DeploymentC
 		changes.Redeploy = append(changes.Redeploy, deploymentInstance)
 	}
 
+	for _, deploymentInstance := range changes.Redeploy {
+		instanceStack, err := s.stackService.Find(deploymentInstance.StackName)
+		if err != nil {
+			return nil, err
+		}
+		if err := rejectMissingRequiredParameters(deploymentInstance, instanceStack); err != nil {
+			return nil, err
+		}
+	}
+
 	return changes, nil
 }
 

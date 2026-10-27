@@ -155,6 +155,12 @@ func (s Service) SaveDeployments(ctx context.Context, groupName string, deployme
 		if err := s.resolveParameters(deployment); err != nil {
 			return errdef.NewBadRequest("failed to resolve parameters: %v", err)
 		}
+
+		for _, instance := range deployment.Instances {
+			if err := rejectMissingRequiredParameters(instance, stacksByName[instance.StackName]); err != nil {
+				return err
+			}
+		}
 	}
 
 	return s.instanceRepository.SaveDeployments(ctx, groupName, deployments, stacksByName)
@@ -232,6 +238,10 @@ func (s Service) SaveInstance(ctx context.Context, instance *model.DeploymentIns
 
 	stack, err := s.stackService.Find(instance.StackName)
 	if err != nil {
+		return err
+	}
+
+	if err := rejectMissingRequiredParameters(instance, stack); err != nil {
 		return err
 	}
 
@@ -451,6 +461,23 @@ func validateParameters(instanceParameters model.DeploymentInstanceParameters, s
 		}
 	}
 	return errors.Join(errs...)
+}
+
+// rejectMissingRequiredParameters refuses an instance that leaves a required parameter blank, which
+// its helmfile would only refuse after the request had been accepted.
+func rejectMissingRequiredParameters(instance *model.DeploymentInstance, stack *stack.Stack) error {
+	var missing []string
+	for name, stackParameter := range stack.Parameters {
+		if stackParameter.Required && strings.TrimSpace(instance.Parameters[name].Value) == "" {
+			missing = append(missing, name)
+		}
+	}
+	if len(missing) == 0 {
+		return nil
+	}
+
+	slices.Sort(missing)
+	return errdef.NewBadRequest("instance %q of stack %q is missing required parameters: %s", instance.Name, instance.StackName, strings.Join(missing, ", "))
 }
 
 func (s Service) resolveConsumedParameters(deployment *model.Deployment, instance *model.DeploymentInstance, stack *stack.Stack) error {
@@ -1431,6 +1458,10 @@ func (s Service) UpdateInstanceParameters(ctx context.Context, deploymentId, ins
 
 	stack, err := s.stackService.Find(instance.StackName)
 	if err != nil {
+		return nil, err
+	}
+
+	if err := rejectMissingRequiredParameters(instance, stack); err != nil {
 		return nil, err
 	}
 
