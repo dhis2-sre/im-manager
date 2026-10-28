@@ -126,8 +126,13 @@ const (
 )
 
 func createDHIS2V2Instance(t *testing.T, client *inttest.HTTPClient, deploymentID uint, databaseID, authToken string, opts ...InstanceOption) model.DeploymentInstance {
-	// Prepended, so a caller that wants a different heap or seed can still override them.
-	opts = append([]InstanceOption{WithParameter("DATABASE_ID", databaseID), WithParameter("JAVA_OPTS", testCoreJavaOpts)}, opts...)
+	// Prepended, so a caller that wants a different heap or seed can still override them. Suspension is
+	// off because the test cluster has no KEDA HTTP add-on to serve the HTTPScaledObject it renders.
+	opts = append([]InstanceOption{
+		WithParameter("DATABASE_ID", databaseID),
+		WithParameter("JAVA_OPTS", testCoreJavaOpts),
+		WithParameter("ALLOW_SUSPEND", "false"),
+	}, opts...)
 	return createInstance(t, client, deploymentID, "dhis2-v2", authToken, opts...)
 }
 

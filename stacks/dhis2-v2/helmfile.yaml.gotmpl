@@ -197,6 +197,18 @@ releases:
             cpu: {{ requiredEnv "CORE_RESOURCES_REQUESTS_CPU" }}
             memory: {{ requiredEnv "CORE_RESOURCES_REQUESTS_MEMORY" }}
 
+      - keda:
+          enabled: {{ requiredEnv "ALLOW_SUSPEND" }}
+          scaledownPeriod: 3600
+
+      - glowroot:
+          enabled: {{ requiredEnv "DEPLOY_GLOWROOT" }}
+          ingress:
+            path: /{{ requiredEnv "INSTANCE_PATH_NAME" }}-glowroot
+          config:
+            web:
+              contextPath: /{{ requiredEnv "INSTANCE_PATH_NAME" }}-glowroot
+
       # Database credentials are set once; the PostgreSQL subchart and core's connection settings
       # both read them from here.
       - global:
