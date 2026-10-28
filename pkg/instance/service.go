@@ -699,6 +699,11 @@ func (s Service) Delete(ctx context.Context, deploymentInstanceId uint) error {
 // other: a destroy that landed mid-deploy used to leave both operations timing out. A delete that
 // finishes has nothing left to unlock, the deployment being gone, but one that fails anywhere has to
 // give the lock back, or the deployment can never be deployed or deleted again.
+//
+// Dependents go before the instances they consume parameters from, and the first instance that
+// cannot be destroyed stops the delete, so a retry still finds every provider a dependent needs. A
+// deployment that has lost a provider anyway cannot be ordered by its dependencies, and is taken
+// apart in the reverse of the order its instances were created in.
 func (s Service) DeleteDeployment(ctx context.Context, deployment *model.Deployment) error {
 	acquired, err := s.AcquireDeployLock(ctx, deployment.ID)
 	if err != nil {
@@ -717,27 +722,21 @@ func (s Service) DeleteDeployment(ctx context.Context, deployment *model.Deploym
 
 	instances, err := s.DeploymentOrder(deployment)
 	if err != nil {
-		return err
+		instances = slices.Clone(deployment.Instances)
+		slices.SortFunc(instances, func(a, b *model.DeploymentInstance) int { return cmp.Compare(a.ID, b.ID) })
 	}
 	slices.Reverse(instances)
 
-	var errs error
 	for _, instance := range instances {
 		if !deployment.Preset {
-			err := s.DestroyInstance(ctx, instance)
-			if err != nil {
-				errs = errors.Join(errs, fmt.Errorf("failed to destroy instance(%s) %q: %v", instance.StackName, instance.Name, err))
-				continue
+			if err := s.DestroyInstance(ctx, instance); err != nil {
+				return fmt.Errorf("failed to destroy instance(%s) %q: %v", instance.StackName, instance.Name, err)
 			}
 		}
 
-		err = s.instanceRepository.DeleteDeploymentInstance(ctx, instance)
-		if err != nil {
-			errs = errors.Join(errs, fmt.Errorf("failed to delete instance(%s) %q: %v", instance.StackName, instance.Name, err))
+		if err := s.instanceRepository.DeleteDeploymentInstance(ctx, instance); err != nil {
+			return fmt.Errorf("failed to delete instance(%s) %q: %v", instance.StackName, instance.Name, err)
 		}
-	}
-	if errs != nil {
-		return errs
 	}
 
 	if err := s.instanceRepository.DeleteDeployment(ctx, deployment); err != nil {
