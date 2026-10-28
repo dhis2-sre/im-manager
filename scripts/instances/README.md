@@ -4,27 +4,17 @@ Please see https://github.com/dhis2-sre/im-doc/tree/master/api#getting-started f
 
 # Examples
 
-## Login
+## Deploy DHIS2
 ```sh
-export ACCESS_TOKEN="" && eval $(./login.sh) && echo $ACCESS_TOKEN | jwt
+./deploy-dhis2.sh my-group my-instance
 ```
 
-## Hello, World!
+## Find a deployment
 ```sh
-./hello.sh whoami hello
+./findByName.sh my-group my-instance
 ```
 
-## WhoAmI
+## Destroy all deployments starting with "my-"
 ```sh
-export MYID=who-1 && ./whoami-create.sh whoami $MYID; read && ./whoami-deploy-existing.sh whoami $MYID && read && ./destroy.sh whoami $MYID
-```
-
-## Spawn 5 "your-instances"
-```sh
-./stress.sh whoami 5 your-instances
-```
-
-## Destroy all "your-instances"
-```sh
-./destroy.sh whoami $(./list.sh | jq -r '.[].Instances[].Name' | grep your-instances)
+./destroy-deployment.sh $(./findDeployments.sh | jq -r '.[] | select(.name=="my-group") | .deployments[] | select(.name | startswith("my-")) | .id')
 ```
