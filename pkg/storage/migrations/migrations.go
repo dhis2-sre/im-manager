@@ -12,5 +12,6 @@ func All() []*gormigrate.Migration {
 		presetNames(),
 		raiseDatabaseMemoryRequest(),
 		dropLegacyDeploymentNameIndex(),
+		raiseDHIS2V2ChartVersion(),
 	}
 }
