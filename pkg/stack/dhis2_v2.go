@@ -39,6 +39,8 @@ var DHIS2V2 = withGroupedParameters(Stack{
 			"GOOGLE_AUTH_CLIENT_ID":           {Priority: 38, DisplayName: "Google auth client id", DefaultValue: &coreDefaults.googleAuthClientId, Sensitive: true},
 			"DEPLOY_CHAP":                     {Priority: 39, DisplayName: "Deploy CHAP", DefaultValue: &coreDefaults.deployChap},
 			"ENABLE_DORIS":                    {Priority: 40, DisplayName: "Use Doris as the analytics database", DefaultValue: &dhis2V2Defaults.enableDoris},
+			"ALLOW_SUSPEND":                   {Priority: 57, DisplayName: "Allow the application to be suspended", DefaultValue: &coreDefaults.allowSuspend},
+			"DEPLOY_GLOWROOT":                 {Priority: 58, DisplayName: "Deploy Glowroot", DefaultValue: &coreDefaults.deployGlowroot},
 			"ENABLE_PGADMIN":                  {Priority: 56, DisplayName: "Deploy pgAdmin", DefaultValue: &pgAdminDefaults.enabled, NotRendered: true},
 		}},
 		{Name: "db", Title: "PostgreSQL", Parameters: StackParameters{
@@ -241,6 +243,8 @@ var coreDefaults = struct {
 	startupProbePeriodSeconds    string
 	customDhis2Config            string
 	deployChap                   string
+	allowSuspend                 string
+	deployGlowroot               string
 	googleAuthProjectId          string
 	googleAuthPrivateKey         string
 	googleAuthPrivateKeyId       string
@@ -271,6 +275,8 @@ var coreDefaults = struct {
 	startupProbePeriodSeconds:    "5",
 	customDhis2Config:            " ",
 	deployChap:                   "false",
+	allowSuspend:                 "true",
+	deployGlowroot:               "false",
 	googleAuthProjectId:          " ",
 	googleAuthPrivateKey:         " ",
 	googleAuthPrivateKeyId:       " ",
