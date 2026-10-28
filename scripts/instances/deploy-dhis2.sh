@@ -16,12 +16,12 @@ PUBLIC=${PUBLIC:-false}
 DATABASE_ID=${DATABASE_ID:-whoami-2-42-sql-gz}
 DATABASE_SIZE=${DATABASE_SIZE:-20Gi}
 DB_RESOURCES_REQUESTS_CPU=${DB_RESOURCES_REQUESTS_CPU:-250m}
-DB_RESOURCES_REQUESTS_MEMORY=${DB_RESOURCES_REQUESTS_MEMORY:-256Mi}
+DB_RESOURCES_REQUESTS_MEMORY=${DB_RESOURCES_REQUESTS_MEMORY:-}
 
 STORAGE_TYPE=${STORAGE_TYPE:-minio}
 MINIO_STORAGE_SIZE=${MINIO_STORAGE_SIZE:-8Gi}
 
-CHART_VERSION=${CHART_VERSION:-1.0.1}
+CHART_VERSION=${CHART_VERSION:-}
 MIN_READY_SECONDS=${MIN_READY_SECONDS:-120}
 # container(s) in dhis2 pod will be restarted after that due to restartPolicy
 # 5*26=130s
@@ -110,6 +110,6 @@ echo "{
       \"value\": \"$ENABLE_QUERY_LOGGING\"
     }
   }
-}" | $HTTP post "$IM_HOST/deployments/$DEPLOYMENT_ID/instance" "Authorization: Bearer $ACCESS_TOKEN"
+}" | jq '.parameters |= with_entries(select(.value.value != ""))' | $HTTP post "$IM_HOST/deployments/$DEPLOYMENT_ID/instance" "Authorization: Bearer $ACCESS_TOKEN"
 
 $HTTP post "$IM_HOST/deployments/$DEPLOYMENT_ID/deploy" "Authorization: Bearer $ACCESS_TOKEN"
