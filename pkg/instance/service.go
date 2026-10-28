@@ -632,6 +632,11 @@ func (s Service) SetDeployStatus(ctx context.Context, instance *model.Deployment
 	return s.instanceRepository.SaveDeployState(ctx, instance, status, "")
 }
 
+// SetDeployFailed records a deploy that failed outside a helm run, with the reason it failed.
+func (s Service) SetDeployFailed(ctx context.Context, instance *model.DeploymentInstance, reason string) error {
+	return s.instanceRepository.SaveDeployState(ctx, instance, model.DeployStatusFailed, reason)
+}
+
 // AbandonDeploysInProgress settles the deploys that were running when the process last stopped.
 // Their goroutines did not survive, so reporting them as still deploying would be a lie that never
 // resolves.

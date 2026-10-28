@@ -429,6 +429,10 @@ func (is instanceService) SetDeployStatus(ctx context.Context, instance *model.D
 	panic("implement me")
 }
 
+func (is instanceService) SetDeployFailed(ctx context.Context, instance *model.DeploymentInstance, reason string) error {
+	panic("implement me")
+}
+
 func (is instanceService) EditDeployment(ctx context.Context, deploymentId uint, edit instance.Edit) (*instance.DeploymentChanges, error) {
 	panic("implement me")
 }

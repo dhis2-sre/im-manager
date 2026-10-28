@@ -41,6 +41,7 @@ type instanceService interface {
 	AcquireDeployLock(ctx context.Context, deploymentId uint) (bool, error)
 	ReleaseDeployLock(ctx context.Context, deploymentId uint) error
 	SetDeployStatus(ctx context.Context, instance *model.DeploymentInstance, status model.DeployStatus) error
+	SetDeployFailed(ctx context.Context, instance *model.DeploymentInstance, reason string) error
 }
 
 type databaseService interface {
@@ -135,6 +136,9 @@ func (s Service) prepareDeploy(ctx context.Context, deploymentId uint) (*model.D
 
 func (s Service) runDeploy(ctx context.Context, token string, deployment *model.Deployment, userID uint) {
 	err := s.deployDeployment(ctx, token, deployment, userID)
+	if err != nil {
+		s.failPending(ctx, deployment.Instances, err)
+	}
 	// The lock goes back before the event goes out, so a client that acts on the event finds the
 	// deployment free rather than racing the release.
 	s.releaseDeployLock(ctx, deployment.ID)
@@ -267,15 +271,22 @@ func (s Service) failQueuedById(ctx context.Context, deploymentId uint, userID u
 
 func (s Service) failQueued(ctx context.Context, deployment *model.Deployment, userID uint, err error) {
 	s.logger.ErrorContext(ctx, "queued deploy failed", "deploymentId", deployment.ID, "deploymentName", deployment.Name, "error", err)
-	for _, deploymentInstance := range deployment.Instances {
-		if deploymentInstance.DeployStatus != model.DeployStatusPending {
+	s.failPending(ctx, deployment.Instances, err)
+	s.publisher.Publish(ctx, userID, deployment.GroupName, kindDeployment, newDeploymentEvent(deployment, "error", err.Error()))
+}
+
+// failPending settles the instances a failed deploy, edit or reset left pending or deploying. Only a
+// failed helm run records its own failure, so an instance that failed before one, or whose turn never
+// came, would otherwise read as deploying for good, and a deploying instance cannot be deleted.
+func (s Service) failPending(ctx context.Context, instances []*model.DeploymentInstance, err error) {
+	for _, deploymentInstance := range instances {
+		if deploymentInstance.DeployStatus != model.DeployStatusPending && deploymentInstance.DeployStatus != model.DeployStatusDeploying {
 			continue
 		}
-		if err := s.instanceService.SetDeployStatus(ctx, deploymentInstance, model.DeployStatusFailed); err != nil {
-			s.logger.ErrorContext(ctx, "failed to mark queued instance failed", "instanceId", deploymentInstance.ID, "error", err)
+		if saveErr := s.instanceService.SetDeployFailed(ctx, deploymentInstance, err.Error()); saveErr != nil {
+			s.logger.ErrorContext(ctx, "failed to mark instance failed", "instanceId", deploymentInstance.ID, "error", saveErr)
 		}
 	}
-	s.publisher.Publish(ctx, userID, deployment.GroupName, kindDeployment, newDeploymentEvent(deployment, "error", err.Error()))
 }
 
 // tokenChain is the token a batch carries from one deployment to the next. It is refreshed whenever a deployment starts and on a timer in between, so it stays valid however long the batch takes.
@@ -365,6 +376,14 @@ func (s Service) applyDeploymentChanges(ctx context.Context, token string, deplo
 		return err
 	}
 
+	if err := s.applyChanges(ctx, token, deployment, redeploy, destroy); err != nil {
+		s.failPending(ctx, deployment.Instances, err)
+		return err
+	}
+	return nil
+}
+
+func (s Service) applyChanges(ctx context.Context, token string, deployment *model.Deployment, redeploy, destroy []uint) error {
 	for _, instanceId := range destroy {
 		deploymentInstance, err := findInstanceById(deployment.Instances, instanceId)
 		if err != nil {
@@ -515,6 +534,7 @@ func (s Service) Reset(ctx context.Context, token string, deploymentId, instance
 		err := s.resetInstance(ctx, token, deploymentInstance, componentName, ttl, deployment)
 		if err != nil {
 			s.logger.ErrorContext(ctx, "reset failed", "deploymentId", deployment.ID, "instanceId", deploymentInstance.ID, "error", err)
+			s.failPending(ctx, []*model.DeploymentInstance{deploymentInstance}, err)
 			s.publisher.PublishTransient(ctx, deployment.GroupName, kindDeployment, newInstanceEvent(deployment, deploymentInstance, "error", err.Error()))
 			s.publisher.Publish(ctx, userID, deployment.GroupName, kindDeployment, newDeploymentEvent(deployment, "error", err.Error()))
 			return
