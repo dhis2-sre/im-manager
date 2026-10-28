@@ -774,9 +774,9 @@ func (s Service) DestroyInstance(ctx context.Context, instance *model.Deployment
 
 	destroyLog, destroyErrorLog, err := commandExecutor(destroyCmd, group.Cluster)
 	// In recent versions of helmfile most of the command output is sent to stderr https://github.com/roboll/helmfile/pull/583
-	s.logger.InfoContext(ctx, "Destroy log", "log", destroyLog, "errorLog", destroyErrorLog)
+	s.logger.InfoContext(ctx, "Destroy log", "log", string(destroyLog), "errorLog", string(destroyErrorLog))
 	if err != nil {
-		return err
+		return fmt.Errorf("%w: %s", err, destroyErrorLog)
 	}
 
 	client, err := s.kubeClients.For(group.Cluster)
