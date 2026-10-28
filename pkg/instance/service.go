@@ -628,13 +628,9 @@ func (s Service) ReleaseDeployLock(ctx context.Context, deploymentId uint) error
 	return s.instanceRepository.ReleaseDeployLock(ctx, deploymentId)
 }
 
-func (s Service) SetDeployStatus(ctx context.Context, instance *model.DeploymentInstance, status model.DeployStatus) error {
-	return s.instanceRepository.SaveDeployState(ctx, instance, status, "")
-}
-
-// SetDeployFailed records a deploy that failed outside a helm run, with the reason it failed.
-func (s Service) SetDeployFailed(ctx context.Context, instance *model.DeploymentInstance, reason string) error {
-	return s.instanceRepository.SaveDeployState(ctx, instance, model.DeployStatusFailed, reason)
+// SetDeployStatus records where the instance's deploy stands, and for a failed one why it failed.
+func (s Service) SetDeployStatus(ctx context.Context, instance *model.DeploymentInstance, status model.DeployStatus, reason string) error {
+	return s.instanceRepository.SaveDeployState(ctx, instance, status, reason)
 }
 
 // AbandonDeploysInProgress settles the deploys that were running when the process last stopped.

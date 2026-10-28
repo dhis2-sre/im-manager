@@ -425,11 +425,7 @@ func (is instanceService) ReleaseDeployLock(ctx context.Context, deploymentId ui
 	panic("implement me")
 }
 
-func (is instanceService) SetDeployStatus(ctx context.Context, instance *model.DeploymentInstance, status model.DeployStatus) error {
-	panic("implement me")
-}
-
-func (is instanceService) SetDeployFailed(ctx context.Context, instance *model.DeploymentInstance, reason string) error {
+func (is instanceService) SetDeployStatus(ctx context.Context, instance *model.DeploymentInstance, status model.DeployStatus, reason string) error {
 	panic("implement me")
 }
 

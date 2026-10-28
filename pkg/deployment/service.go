@@ -40,8 +40,7 @@ type instanceService interface {
 	FilestoreBackup(ctx context.Context, instance *model.DeploymentInstance, name string, database *model.Database) error
 	AcquireDeployLock(ctx context.Context, deploymentId uint) (bool, error)
 	ReleaseDeployLock(ctx context.Context, deploymentId uint) error
-	SetDeployStatus(ctx context.Context, instance *model.DeploymentInstance, status model.DeployStatus) error
-	SetDeployFailed(ctx context.Context, instance *model.DeploymentInstance, reason string) error
+	SetDeployStatus(ctx context.Context, instance *model.DeploymentInstance, status model.DeployStatus, reason string) error
 }
 
 type databaseService interface {
@@ -125,7 +124,7 @@ func (s Service) prepareDeploy(ctx context.Context, deploymentId uint) (*model.D
 	deployment.Instances = instances
 
 	for _, deploymentInstance := range instances {
-		if err := s.instanceService.SetDeployStatus(ctx, deploymentInstance, model.DeployStatusPending); err != nil {
+		if err := s.instanceService.SetDeployStatus(ctx, deploymentInstance, model.DeployStatusPending, ""); err != nil {
 			s.releaseDeployLock(ctx, deployment.ID)
 			return nil, err
 		}
@@ -283,7 +282,7 @@ func (s Service) failPending(ctx context.Context, instances []*model.DeploymentI
 		if deploymentInstance.DeployStatus != model.DeployStatusPending && deploymentInstance.DeployStatus != model.DeployStatusDeploying {
 			continue
 		}
-		if saveErr := s.instanceService.SetDeployFailed(ctx, deploymentInstance, err.Error()); saveErr != nil {
+		if saveErr := s.instanceService.SetDeployStatus(ctx, deploymentInstance, model.DeployStatusFailed, err.Error()); saveErr != nil {
 			s.logger.ErrorContext(ctx, "failed to mark instance failed", "instanceId", deploymentInstance.ID, "error", saveErr)
 		}
 	}
@@ -343,7 +342,7 @@ func (s Service) EditDeployment(ctx context.Context, token string, deploymentId 
 	}
 
 	for _, deploymentInstance := range changes.Redeploy {
-		if err := s.instanceService.SetDeployStatus(ctx, deploymentInstance, model.DeployStatusPending); err != nil {
+		if err := s.instanceService.SetDeployStatus(ctx, deploymentInstance, model.DeployStatusPending, ""); err != nil {
 			s.releaseDeployLock(ctx, deploymentId)
 			return nil, err
 		}
@@ -521,7 +520,7 @@ func (s Service) Reset(ctx context.Context, token string, deploymentId, instance
 		return err
 	}
 
-	if err := s.instanceService.SetDeployStatus(ctx, deploymentInstance, model.DeployStatusPending); err != nil {
+	if err := s.instanceService.SetDeployStatus(ctx, deploymentInstance, model.DeployStatusPending, ""); err != nil {
 		s.releaseDeployLock(ctx, deploymentId)
 		return err
 	}
