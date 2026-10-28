@@ -8,7 +8,8 @@ import "github.com/dhis2-sre/im-manager/pkg/kube"
 // Declaring it as a companion the other way round is also what lets these stacks initialise: a
 // Requires back onto a stack that lists PgAdmin as a companion is an initialisation cycle.
 var PgAdmin = withGroupedParameters(Stack{
-	Name: "pgadmin",
+	Name:          "pgadmin",
+	ReleaseSuffix: "-pgadmin",
 	ParameterGroups: []ParameterGroup{
 		{Name: "pgadmin", Title: "pgAdmin", Parameters: StackParameters{
 			"PGADMIN_USERNAME":  {Priority: 1, DisplayName: "pgAdmin Username", Sensitive: true, Required: true},

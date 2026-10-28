@@ -19,16 +19,20 @@ import (
 )
 
 type failingDestroyHelmfile struct {
-	failStack string
+	failStack   string
+	uninstalled *[]string
 }
 
 func (failingDestroyHelmfile) sync(context.Context, string, *model.DeploymentInstance, *model.Group, uint, map[string]string) (*exec.Cmd, error) {
 	return exec.Command("true"), nil
 }
 
-func (f failingDestroyHelmfile) destroy(_ context.Context, instance *model.DeploymentInstance, _ *model.Group) (*exec.Cmd, error) {
+func (f failingDestroyHelmfile) uninstall(_ context.Context, instance *model.DeploymentInstance, _ *model.Group) (*exec.Cmd, error) {
+	if f.uninstalled != nil {
+		*f.uninstalled = append(*f.uninstalled, instance.StackName)
+	}
 	if instance.StackName == f.failStack {
-		return nil, errors.New("simulated helmfile destroy failure")
+		return nil, errors.New("simulated helm uninstall failure")
 	}
 	return exec.Command("true"), nil
 }

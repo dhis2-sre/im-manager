@@ -48,7 +48,7 @@ type groupService interface {
 
 type helmfile interface {
 	sync(ctx context.Context, token string, instance *model.DeploymentInstance, group *model.Group, ttl uint, extraEnv map[string]string) (*exec.Cmd, error)
-	destroy(ctx context.Context, instance *model.DeploymentInstance, group *model.Group) (*exec.Cmd, error)
+	uninstall(ctx context.Context, instance *model.DeploymentInstance, group *model.Group) (*exec.Cmd, error)
 }
 
 type Service struct {
@@ -767,7 +767,7 @@ func (s Service) DestroyInstance(ctx context.Context, instance *model.Deployment
 	destroyCtx, cancel := context.WithTimeout(ctx, DeployTimeout)
 	defer cancel()
 
-	destroyCmd, err := s.helmfileService.destroy(destroyCtx, instance, group)
+	destroyCmd, err := s.helmfileService.uninstall(destroyCtx, instance, group)
 	if err != nil {
 		return err
 	}

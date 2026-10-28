@@ -13,7 +13,8 @@ import (
 // below the components instead, so release-wide settings live with the api, the component a CHAP
 // deployment is built around, rather than in a group of their own.
 var Chap = withGroupedParameters(Stack{
-	Name: "chap",
+	Name:          "chap",
+	ReleaseSuffix: "-chap",
 	ParameterGroups: []ParameterGroup{
 		{Name: "api", Title: "CHAP API", Parameters: StackParameters{
 			"IMAGE_TAG":         {Priority: 1, DisplayName: "Image Tag", DefaultValue: &chapDefaults.imageTag},
