@@ -76,6 +76,23 @@ func TestStackReleaseNamesAreInSyncWithHelmfile(t *testing.T) {
 	}
 }
 
+// A parameter a helmfile reads with requiredEnv cannot render blank, so IM has to refuse a blank one
+// before helm does, and every other parameter may be left blank.
+func TestRequiredParametersAreInSyncWithHelmfile(t *testing.T) {
+	for _, s := range All {
+		file, err := os.ReadFile(fmt.Sprintf("../../stacks/%s/helmfile.yaml.gotmpl", s.Name)) // #nosec
+		require.NoError(t, err)
+		readWithRequiredEnv := extractRequiredParameters(file, nil)
+
+		for name, parameter := range s.Parameters {
+			if parameter.Consumed {
+				continue
+			}
+			assert.Equalf(t, inSlice(name, readWithRequiredEnv), parameter.Required, "stack %q parameter %q: Required has to match whether its helmfile reads it with requiredEnv", s.Name, name)
+		}
+	}
+}
+
 func TestIsSystemParameterPositive(t *testing.T) {
 	const instanceId = "INSTANCE_ID"
 
