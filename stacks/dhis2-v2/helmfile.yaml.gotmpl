@@ -1,4 +1,4 @@
-# stackParameters: GOOGLE_AUTH_PROJECT_ID,GOOGLE_AUTH_PRIVATE_KEY_ID,GOOGLE_AUTH_PRIVATE_KEY,GOOGLE_AUTH_CLIENT_EMAIL,GOOGLE_AUTH_CLIENT_ID,ENABLE_PGADMIN
+# stackParameters: JAVA_OPTS,CUSTOM_DHIS2_CONFIG,GOOGLE_AUTH_PROJECT_ID,GOOGLE_AUTH_PRIVATE_KEY_ID,GOOGLE_AUTH_PRIVATE_KEY,GOOGLE_AUTH_CLIENT_EMAIL,GOOGLE_AUTH_CLIENT_ID,ENABLE_PGADMIN
 {{ $_ := requiredEnv "DATABASE_ID" }}
 helmDefaults:
   createNamespace: false
@@ -41,7 +41,7 @@ releases:
       - dhis2Home: "{{ requiredEnv "DHIS2_HOME" }}"
       - catalinaOpts: "-Dcontext.path=/{{ requiredEnv "INSTANCE_PATH_NAME" }} -Dcontext.sameSiteCookies={{ requiredEnv "SAME_SITE_COOKIES" }}"
       - contextPath: /{{ requiredEnv "INSTANCE_PATH_NAME" }}
-      - javaOpts: "{{ requiredEnv "JAVA_OPTS" }}"
+      - javaOpts: "{{ env "JAVA_OPTS" }}"
       - minReadySeconds: {{ requiredEnv "MIN_READY_SECONDS" }}
       - startupProbe:
           failureThreshold: {{ requiredEnv "STARTUP_PROBE_FAILURE_THRESHOLD" }}
@@ -106,7 +106,7 @@ releases:
           {{- if eq (requiredEnv "DEPLOY_CHAP") "true" }}
           route.remote_servers_allowed = http://*
           {{- end }}
-          {{- with (requiredEnv "CUSTOM_DHIS2_CONFIG" | trim) }}
+          {{- with (env "CUSTOM_DHIS2_CONFIG" | trim) }}
           {{- . | nindent 10 }}
           {{- end }}
 
@@ -186,11 +186,11 @@ releases:
       - enableQueryLogging: {{ requiredEnv "ENABLE_QUERY_LOGGING" }}
 
       - googleAuth:
-          projectId: "{{ requiredEnv "GOOGLE_AUTH_PROJECT_ID" }}"
-          privateKeyId: "{{ requiredEnv "GOOGLE_AUTH_PRIVATE_KEY_ID" }}"
-          privateKey: '{{ requiredEnv "GOOGLE_AUTH_PRIVATE_KEY" }}'
-          clientEmail: "{{ requiredEnv "GOOGLE_AUTH_CLIENT_EMAIL" }}"
-          clientId: "{{ requiredEnv "GOOGLE_AUTH_CLIENT_ID" }}"
+          projectId: "{{ env "GOOGLE_AUTH_PROJECT_ID" }}"
+          privateKeyId: "{{ env "GOOGLE_AUTH_PRIVATE_KEY_ID" }}"
+          privateKey: '{{ env "GOOGLE_AUTH_PRIVATE_KEY" }}'
+          clientEmail: "{{ env "GOOGLE_AUTH_CLIENT_EMAIL" }}"
+          clientId: "{{ env "GOOGLE_AUTH_CLIENT_ID" }}"
 
       - resources:
           requests:
