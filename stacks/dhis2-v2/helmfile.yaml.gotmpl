@@ -229,6 +229,10 @@ releases:
             im-ttl: "{{ requiredEnv "INSTANCE_TTL" }}"
           # A single instance budget allows no evictions, so it would pin its node and block scale-down.
           enablePDB: false
+          # Read by the admin and district password lock triggers in the demo databases, which only
+          # act on instance manager.
+          parameters:
+            dhis2.environment: instance-manager
           storageSize: {{ requiredEnv "DATABASE_SIZE" }}
           resources:
             requests:
