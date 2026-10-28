@@ -860,6 +860,10 @@ definitions:
                 format: uint64
                 type: integer
                 x-go-name: Priority
+            required:
+                description: Required says the parameter must have a value for the stack to deploy.
+                type: boolean
+                x-go-name: Required
             sensitive:
                 type: boolean
                 x-go-name: Sensitive

@@ -2,6 +2,7 @@ package deployment
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/dhis2-sre/im-manager/internal/errdef"
 	"github.com/dhis2-sre/im-manager/pkg/instance"
+	"github.com/dhis2-sre/im-manager/pkg/model"
 )
 
 func TestEditRedeploysOnlyWhatChanged(t *testing.T) {
@@ -106,3 +108,20 @@ func TestEditReleasesTheLockWhenTheEditIsRejected(t *testing.T) {
 }
 
 func ptrTo[T any](v T) *T { return &v }
+
+func TestEditThatFailsFailsTheInstancesItLeftPending(t *testing.T) {
+	deployment := newTestDeployment()
+	instanceService := &fakeInstanceService{
+		deployment: deployment,
+		changes:    &instance.DeploymentChanges{Deployment: deployment, Redeploy: deployment.Instances},
+		deployErr:  errors.New("helmfile exploded"),
+	}
+
+	_, err := newTestService(instanceService, &recordingPublisher{}).EditDeployment(context.Background(), "token", deployment.ID, instance.Edit{}, 1)
+
+	require.NoError(t, err)
+	awaitUnlocked(t, instanceService)
+	status, reason := instanceService.failure(11)
+	assert.Equal(t, model.DeployStatusFailed, status)
+	assert.Contains(t, reason, "helmfile exploded")
+}

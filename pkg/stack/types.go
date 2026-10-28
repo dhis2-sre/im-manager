@@ -7,8 +7,11 @@ import (
 
 // swagger:model StackDetail
 type Stack struct {
-	Name       string          `json:"name"`
-	Parameters StackParameters `json:"parameters"`
+	Name string `json:"name"`
+	// ReleaseSuffix follows the instance name in the name of the one helm release the stack's helmfile
+	// installs, so the release can be removed without rendering the helmfile.
+	ReleaseSuffix string          `json:"-"`
+	Parameters    StackParameters `json:"parameters"`
 	// ParameterGroups are the sections a client renders the parameters in, in order. A group's
 	// condition decides its visibility as the user edits the enabling parameter; component
 	// presence predicates reference the same conditions so form and backend cannot disagree.
@@ -24,6 +27,11 @@ type Stack struct {
 	// Components are the addressable parts a deployed instance of this stack consists of. Their
 	// names equal the im-type label values the stack's helmfile applies.
 	Components []kube.Component `json:"-"`
+}
+
+// ReleaseName is the name of the helm release the stack's helmfile installs for an instance.
+func (s Stack) ReleaseName(instanceName string) string {
+	return instanceName + s.ReleaseSuffix
 }
 
 // Companion is a stack that can be deployed alongside the stack declaring it, optionally only when
@@ -65,6 +73,9 @@ type StackParameter struct {
 	// Priority determines the order in which the parameter is shown.
 	Priority  uint `json:"priority"`
 	Sensitive bool `json:"sensitive"`
+	// Required says the stack's helmfile cannot render without a value for this parameter, so an
+	// instance is rejected while it is blank rather than failing in helmfile after it was accepted.
+	Required bool `json:"required"`
 	// ImmutableReason says why the parameter cannot be changed once the instance has been deployed;
 	// empty means it can. The update path rejects a change to such a parameter and a client renders
 	// it read only with this as the explanation, so the two cannot disagree about what is editable.

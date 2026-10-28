@@ -48,7 +48,7 @@ type groupService interface {
 
 type helmfile interface {
 	sync(ctx context.Context, token string, instance *model.DeploymentInstance, group *model.Group, ttl uint, extraEnv map[string]string) (*exec.Cmd, error)
-	destroy(ctx context.Context, instance *model.DeploymentInstance, group *model.Group) (*exec.Cmd, error)
+	uninstall(ctx context.Context, instance *model.DeploymentInstance, group *model.Group) (*exec.Cmd, error)
 }
 
 type Service struct {
@@ -155,6 +155,12 @@ func (s Service) SaveDeployments(ctx context.Context, groupName string, deployme
 		if err := s.resolveParameters(deployment); err != nil {
 			return errdef.NewBadRequest("failed to resolve parameters: %v", err)
 		}
+
+		for _, instance := range deployment.Instances {
+			if err := rejectMissingRequiredParameters(instance, stacksByName[instance.StackName]); err != nil {
+				return err
+			}
+		}
 	}
 
 	return s.instanceRepository.SaveDeployments(ctx, groupName, deployments, stacksByName)
@@ -232,6 +238,10 @@ func (s Service) SaveInstance(ctx context.Context, instance *model.DeploymentIns
 
 	stack, err := s.stackService.Find(instance.StackName)
 	if err != nil {
+		return err
+	}
+
+	if err := rejectMissingRequiredParameters(instance, stack); err != nil {
 		return err
 	}
 
@@ -453,6 +463,23 @@ func validateParameters(instanceParameters model.DeploymentInstanceParameters, s
 	return errors.Join(errs...)
 }
 
+// rejectMissingRequiredParameters refuses an instance that leaves a required parameter blank, which
+// its helmfile would only refuse after the request had been accepted.
+func rejectMissingRequiredParameters(instance *model.DeploymentInstance, stack *stack.Stack) error {
+	var missing []string
+	for name, stackParameter := range stack.Parameters {
+		if stackParameter.Required && strings.TrimSpace(instance.Parameters[name].Value) == "" {
+			missing = append(missing, name)
+		}
+	}
+	if len(missing) == 0 {
+		return nil
+	}
+
+	slices.Sort(missing)
+	return errdef.NewBadRequest("instance %q of stack %q is missing required parameters: %s", instance.Name, instance.StackName, strings.Join(missing, ", "))
+}
+
 func (s Service) resolveConsumedParameters(deployment *model.Deployment, instance *model.DeploymentInstance, stack *stack.Stack) error {
 	for name, parameter := range instance.Parameters {
 		stackParameter := stack.Parameters[name]
@@ -601,8 +628,9 @@ func (s Service) ReleaseDeployLock(ctx context.Context, deploymentId uint) error
 	return s.instanceRepository.ReleaseDeployLock(ctx, deploymentId)
 }
 
-func (s Service) SetDeployStatus(ctx context.Context, instance *model.DeploymentInstance, status model.DeployStatus) error {
-	return s.instanceRepository.SaveDeployState(ctx, instance, status, "")
+// SetDeployStatus records where the instance's deploy stands, and for a failed one why it failed.
+func (s Service) SetDeployStatus(ctx context.Context, instance *model.DeploymentInstance, status model.DeployStatus, reason string) error {
+	return s.instanceRepository.SaveDeployState(ctx, instance, status, reason)
 }
 
 // AbandonDeploysInProgress settles the deploys that were running when the process last stopped.
@@ -667,6 +695,11 @@ func (s Service) Delete(ctx context.Context, deploymentInstanceId uint) error {
 // other: a destroy that landed mid-deploy used to leave both operations timing out. A delete that
 // finishes has nothing left to unlock, the deployment being gone, but one that fails anywhere has to
 // give the lock back, or the deployment can never be deployed or deleted again.
+//
+// Dependents go before the instances they consume parameters from, and the first instance that
+// cannot be destroyed stops the delete, so a retry still finds every provider a dependent needs. A
+// deployment that has lost a provider anyway cannot be ordered by its dependencies, and is taken
+// apart in the reverse of the order its instances were created in.
 func (s Service) DeleteDeployment(ctx context.Context, deployment *model.Deployment) error {
 	acquired, err := s.AcquireDeployLock(ctx, deployment.ID)
 	if err != nil {
@@ -685,27 +718,21 @@ func (s Service) DeleteDeployment(ctx context.Context, deployment *model.Deploym
 
 	instances, err := s.DeploymentOrder(deployment)
 	if err != nil {
-		return err
+		instances = slices.Clone(deployment.Instances)
+		slices.SortFunc(instances, func(a, b *model.DeploymentInstance) int { return cmp.Compare(a.ID, b.ID) })
 	}
 	slices.Reverse(instances)
 
-	var errs error
 	for _, instance := range instances {
 		if !deployment.Preset {
-			err := s.DestroyInstance(ctx, instance)
-			if err != nil {
-				errs = errors.Join(errs, fmt.Errorf("failed to destroy instance(%s) %q: %v", instance.StackName, instance.Name, err))
-				continue
+			if err := s.DestroyInstance(ctx, instance); err != nil {
+				return fmt.Errorf("failed to destroy instance(%s) %q: %v", instance.StackName, instance.Name, err)
 			}
 		}
 
-		err = s.instanceRepository.DeleteDeploymentInstance(ctx, instance)
-		if err != nil {
-			errs = errors.Join(errs, fmt.Errorf("failed to delete instance(%s) %q: %v", instance.StackName, instance.Name, err))
+		if err := s.instanceRepository.DeleteDeploymentInstance(ctx, instance); err != nil {
+			return fmt.Errorf("failed to delete instance(%s) %q: %v", instance.StackName, instance.Name, err)
 		}
-	}
-	if errs != nil {
-		return errs
 	}
 
 	if err := s.instanceRepository.DeleteDeployment(ctx, deployment); err != nil {
@@ -735,16 +762,16 @@ func (s Service) DestroyInstance(ctx context.Context, instance *model.Deployment
 	destroyCtx, cancel := context.WithTimeout(ctx, DeployTimeout)
 	defer cancel()
 
-	destroyCmd, err := s.helmfileService.destroy(destroyCtx, instance, group)
+	destroyCmd, err := s.helmfileService.uninstall(destroyCtx, instance, group)
 	if err != nil {
 		return err
 	}
 
 	destroyLog, destroyErrorLog, err := commandExecutor(destroyCmd, group.Cluster)
 	// In recent versions of helmfile most of the command output is sent to stderr https://github.com/roboll/helmfile/pull/583
-	s.logger.InfoContext(ctx, "Destroy log", "log", destroyLog, "errorLog", destroyErrorLog)
+	s.logger.InfoContext(ctx, "Destroy log", "log", string(destroyLog), "errorLog", string(destroyErrorLog))
 	if err != nil {
-		return err
+		return fmt.Errorf("%w: %s", err, destroyErrorLog)
 	}
 
 	client, err := s.kubeClients.For(group.Cluster)
@@ -1431,6 +1458,10 @@ func (s Service) UpdateInstanceParameters(ctx context.Context, deploymentId, ins
 
 	stack, err := s.stackService.Find(instance.StackName)
 	if err != nil {
+		return nil, err
+	}
+
+	if err := rejectMissingRequiredParameters(instance, stack); err != nil {
 		return nil, err
 	}
 

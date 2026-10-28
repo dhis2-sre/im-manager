@@ -61,6 +61,21 @@ func TestStackDefinitionsAreInSyncWithHelmfile(t *testing.T) {
 	assert.Empty(t, stackDefinitions, "all stack definitions should have a helmfile, these don't")
 }
 
+// A destroy uninstalls the release by the name ReleaseName gives it, so every helmfile has to install
+// exactly that one release.
+func TestStackReleaseNamesAreInSyncWithHelmfile(t *testing.T) {
+	releaseName := regexp.MustCompile(`(?m)^  - name: "?\{\{ requiredEnv "INSTANCE_NAME" \}\}([^"\s]*)"?\s*$`)
+
+	for _, s := range All {
+		file, err := os.ReadFile(fmt.Sprintf("../../stacks/%s/helmfile.yaml.gotmpl", s.Name)) // #nosec
+		require.NoError(t, err)
+
+		matches := releaseName.FindAllStringSubmatch(string(file), -1)
+		require.Lenf(t, matches, 1, "stack %q should install exactly one release named after the instance", s.Name)
+		assert.Equalf(t, s.ReleaseName("instance"), "instance"+matches[0][1], "stack %q", s.Name)
+	}
+}
+
 func TestIsSystemParameterPositive(t *testing.T) {
 	const instanceId = "INSTANCE_ID"
 

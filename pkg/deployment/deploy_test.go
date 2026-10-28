@@ -64,7 +64,9 @@ type fakeInstanceService struct {
 	destroyed  []string
 	deleted    []string
 	statuses   map[uint]model.DeployStatus
+	failures   map[uint]string
 	deployErr  error
+	destroyErr error
 	deployHook func()
 	changes    *instance.DeploymentChanges
 	editErr    error
@@ -84,16 +86,21 @@ func (f *fakeInstanceService) DeployInstance(_ context.Context, _ string, deploy
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if f.deployErr != nil {
+		deploymentInstance.DeployStatus = model.DeployStatusFailed
 		return f.deployErr
 	}
 	f.deployed = append(f.deployed, deploymentInstance.StackName)
 	f.steps = append(f.steps, "deploy "+deploymentInstance.StackName)
+	deploymentInstance.DeployStatus = model.DeployStatusDeployed
 	return nil
 }
 
 func (f *fakeInstanceService) DestroyInstance(_ context.Context, deploymentInstance *model.DeploymentInstance) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	if f.destroyErr != nil {
+		return f.destroyErr
+	}
 	f.destroyed = append(f.destroyed, deploymentInstance.StackName)
 	f.steps = append(f.steps, "destroy "+deploymentInstance.StackName)
 	return nil
@@ -155,14 +162,23 @@ func (f *fakeInstanceService) ReleaseDeployLock(context.Context, uint) error {
 	return nil
 }
 
-func (f *fakeInstanceService) SetDeployStatus(_ context.Context, deploymentInstance *model.DeploymentInstance, status model.DeployStatus) error {
+func (f *fakeInstanceService) SetDeployStatus(_ context.Context, deploymentInstance *model.DeploymentInstance, status model.DeployStatus, reason string) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if f.statuses == nil {
 		f.statuses = map[uint]model.DeployStatus{}
+		f.failures = map[uint]string{}
 	}
 	f.statuses[deploymentInstance.ID] = status
+	f.failures[deploymentInstance.ID] = reason
+	deploymentInstance.DeployStatus = status
 	return nil
+}
+
+func (f *fakeInstanceService) failure(instanceId uint) (model.DeployStatus, string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.statuses[instanceId], f.failures[instanceId]
 }
 
 func (f *fakeInstanceService) isLocked() bool {
@@ -282,6 +298,21 @@ func TestStartDeploymentReportsAFailedInstance(t *testing.T) {
 	assert.Contains(t, last.payload.Error, "helmfile exploded")
 }
 
+// Only a failed helm run records its own failure, so the instances after it would read as deploying
+// for good, which also refuses their deletion.
+func TestStartDeploymentFailsTheInstancesItNeverReached(t *testing.T) {
+	deployment := newTestDeployment()
+	instanceService := &fakeInstanceService{deployment: deployment, deployErr: errors.New("helmfile exploded")}
+	service := newTestService(instanceService, &recordingPublisher{})
+
+	require.NoError(t, service.StartDeployment(context.Background(), "token", deployment.ID, 7))
+	awaitUnlocked(t, instanceService)
+
+	status, reason := instanceService.failure(11)
+	assert.Equal(t, model.DeployStatusFailed, status)
+	assert.Contains(t, reason, "helmfile exploded")
+}
+
 // A second deploy is refused rather than left to race helm for the same releases.
 func TestStartDeploymentRefusesASecondDeploy(t *testing.T) {
 	deployment := newTestDeployment()
@@ -324,6 +355,19 @@ func TestResetDestroysAndRedeploysTheInstance(t *testing.T) {
 	awaitUnlocked(t, instanceService)
 
 	assert.Equal(t, []string{"destroy dhis2-v2", "deploy dhis2-v2"}, instanceService.recordedSteps())
+}
+
+func TestResetThatCannotDestroyTheInstanceFailsIt(t *testing.T) {
+	deployment := newTestDeployment()
+	instanceService := &fakeInstanceService{deployment: deployment, destroyErr: errors.New("required env var `PGADMIN_USERNAME` is not set")}
+	service := newTestService(instanceService, &recordingPublisher{})
+
+	require.NoError(t, service.Reset(context.Background(), "token", deployment.ID, deployment.Instances[1].ID, "", 60, 7))
+	awaitUnlocked(t, instanceService)
+
+	status, reason := instanceService.failure(11)
+	assert.Equal(t, model.DeployStatusFailed, status)
+	assert.Contains(t, reason, "PGADMIN_USERNAME")
 }
 
 // A component reset keeps the instance: only that component's data goes, the deploy seeds it again,
