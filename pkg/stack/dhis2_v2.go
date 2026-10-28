@@ -265,7 +265,7 @@ var coreDefaults = struct {
 	imagePullPolicy:              ifNotPresent,
 	imageRepository:              "core",
 	imageTag:                     "2.42",
-	javaOpts:                     " ", // " " is used here since an empty string would be interpreted by helmfile as the environment variable not being set. And since all variables are required an empty string would result in an error
+	javaOpts:                     "",
 	minReadySeconds:              "5",
 	livenessProbeTimeoutSeconds:  "1",
 	readinessProbeTimeoutSeconds: "1",
@@ -273,15 +273,15 @@ var coreDefaults = struct {
 	resourcesRequestsMemory:      "1500Mi",
 	startupProbeFailureThreshold: "26",
 	startupProbePeriodSeconds:    "5",
-	customDhis2Config:            " ",
+	customDhis2Config:            "",
 	deployChap:                   "false",
 	allowSuspend:                 "true",
 	deployGlowroot:               "false",
-	googleAuthProjectId:          " ",
-	googleAuthPrivateKey:         " ",
-	googleAuthPrivateKeyId:       " ",
-	googleAuthClientEmail:        " ",
-	googleAuthClientId:           " ",
+	googleAuthProjectId:          "",
+	googleAuthPrivateKey:         "",
+	googleAuthPrivateKeyId:       "",
+	googleAuthClientEmail:        "",
+	googleAuthClientId:           "",
 }
 
 var dbDefaults = struct {

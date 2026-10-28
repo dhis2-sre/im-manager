@@ -29,6 +29,23 @@ func TestEncryptDecryptRoundtrip(t *testing.T) {
 	}
 }
 
+// Optional sensitive parameters default to an empty value, which has to survive being stored.
+func TestEncryptDecryptRoundtripOfAnEmptyValue(t *testing.T) {
+	encrypted, err := encryptText(testKey, "")
+	if err != nil {
+		t.Fatalf("encryptText: %v", err)
+	}
+
+	decrypted, err := decryptText(testKey, encrypted)
+	if err != nil {
+		t.Fatalf("decryptText: %v", err)
+	}
+
+	if decrypted != "" {
+		t.Fatalf("want an empty value, got %q", decrypted)
+	}
+}
+
 func TestEncryptProducesUniqueOutputs(t *testing.T) {
 	plaintext := "same-value"
 
