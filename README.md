@@ -64,19 +64,15 @@ Set the KMS key ARN via `SOPS_KMS_ARN`. AWS credentials are provided automatical
 
 # Release
 
-Releasing is done by creating a new release tag.
+Pushing a version tag releases. Its Build, test and deploy run pushes `dhis2/im-manager:<version>`, and Deploy to im-vm then deploys that image to prod.
 
-It's advised to generate the release log before doing so.
-
-Example
+From an up to date master whose Build, test and deploy run succeeded:
 
 ```shell
-git tag --sort=-creatordate | head --lines=1              # Get the latest tag
-git tag 0.53.0                                            # Use whichever tag you want to release
-make change-log
-git commit CHANGELOG.md -m "chore: generate change log"
-git push
+make release version=0.79.0
 ```
+
+It tags master, generates the change log for the new version, commits it and pushes both after a confirmation. Take a database dump first when the release carries migrations, since a rollback to the previous version does not undo them.
 
 # Migrations
 

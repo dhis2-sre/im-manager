@@ -14,6 +14,9 @@ check:
 change-log:
 	git-chglog -o CHANGELOG.md
 
+release:
+	scripts/release.sh $(version)
+
 smoke-test:
 	IMAGE_TAG=$(tag) docker compose --profile prod up --detach api
 
@@ -63,6 +66,6 @@ swagger-spec:
 
 swagger: swagger-clean swagger-spec
 
-.PHONY: keys init check smoke-test docker-image push-docker-image dev cluster-dev test test-coverage clean-dev clean-cluster-dev swagger-clean swagger-spec swagger
+.PHONY: keys init check change-log release smoke-test docker-image push-docker-image dev cluster-dev test test-coverage clean-dev clean-cluster-dev swagger-clean swagger-spec swagger
 
 .PHONY: test-integration test-e2e
