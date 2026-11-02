@@ -162,25 +162,17 @@ func (f *fakeInstanceService) ReleaseDeployLock(context.Context, uint) error {
 	return nil
 }
 
-func (f *fakeInstanceService) SetDeployStatus(_ context.Context, deploymentInstance *model.DeploymentInstance, status model.DeployStatus) error {
+func (f *fakeInstanceService) SetDeployStatus(_ context.Context, deploymentInstance *model.DeploymentInstance, status model.DeployStatus, reason string) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if f.statuses == nil {
 		f.statuses = map[uint]model.DeployStatus{}
-	}
-	f.statuses[deploymentInstance.ID] = status
-	deploymentInstance.DeployStatus = status
-	return nil
-}
-
-func (f *fakeInstanceService) SetDeployFailed(ctx context.Context, deploymentInstance *model.DeploymentInstance, reason string) error {
-	f.mu.Lock()
-	if f.failures == nil {
 		f.failures = map[uint]string{}
 	}
+	f.statuses[deploymentInstance.ID] = status
 	f.failures[deploymentInstance.ID] = reason
-	f.mu.Unlock()
-	return f.SetDeployStatus(ctx, deploymentInstance, model.DeployStatusFailed)
+	deploymentInstance.DeployStatus = status
+	return nil
 }
 
 func (f *fakeInstanceService) failure(instanceId uint) (model.DeployStatus, string) {
