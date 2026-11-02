@@ -158,7 +158,7 @@ var dhis2V2Defaults = struct {
 	dorisBackendLimitsCPU      string
 	dorisBackendLimitsMemory   string
 }{
-	chartVersion: "1.3.0",
+	chartVersion: "1.4.0",
 	enableDoris:  "false",
 	// The tag suffix is dhis2/apache-doris, upstream Doris with the PostgreSQL JDBC driver already in
 	// its jdbc_drivers directory, so the chart refers to the driver by name instead of downloading it.
@@ -264,7 +264,7 @@ var coreDefaults = struct {
 	enableQueryLogging:           "false",
 	imagePullPolicy:              ifNotPresent,
 	imageRepository:              "core",
-	imageTag:                     "2.40.2",
+	imageTag:                     "2.42",
 	javaOpts:                     " ", // " " is used here since an empty string would be interpreted by helmfile as the environment variable not being set. And since all variables are required an empty string would result in an error
 	minReadySeconds:              "5",
 	livenessProbeTimeoutSeconds:  "1",
