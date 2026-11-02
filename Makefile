@@ -14,6 +14,14 @@ check:
 change-log:
 	git-chglog -o CHANGELOG.md
 
+release:
+	@test -n "$(version)" || (echo "usage: make release version=<version>" && exit 1)
+	@test "$$(git branch --show-current)" = master || (echo "check out master first" && exit 1)
+	git tag $(version)
+	$(MAKE) change-log
+	git commit CHANGELOG.md --message "chore: generate change log for v$(version)"
+	git push --atomic origin master $(version)
+
 smoke-test:
 	IMAGE_TAG=$(tag) docker compose --profile prod up --detach api
 
@@ -63,6 +71,6 @@ swagger-spec:
 
 swagger: swagger-clean swagger-spec
 
-.PHONY: keys init check smoke-test docker-image push-docker-image dev cluster-dev test test-coverage clean-dev clean-cluster-dev swagger-clean swagger-spec swagger
+.PHONY: keys init check change-log release smoke-test docker-image push-docker-image dev cluster-dev test test-coverage clean-dev clean-cluster-dev swagger-clean swagger-spec swagger
 
 .PHONY: test-integration test-e2e
