@@ -2,6 +2,7 @@ package instance
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -50,9 +51,8 @@ func commandExecutor(cmd *exec.Cmd, cluster model.Cluster) (stdout []byte, stder
 
 		errC := file.Close()
 		errR := os.Remove(file.Name())
-		errMsg := joinErrors(err, errC, errR)
-		if errMsg != "" {
-			err = fmt.Errorf("error handling kube config %q: %s", file.Name(), errMsg)
+		if errMsg := joinErrors(errC, errR); errMsg != "" {
+			err = errors.Join(err, fmt.Errorf("error handling kube config %q: %s", file.Name(), errMsg))
 		}
 	}()
 

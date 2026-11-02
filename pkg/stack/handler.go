@@ -76,6 +76,7 @@ func toResponseStack(stack Stack) StackResponse {
 			Consumed:        parameter.Consumed,
 			Priority:        parameter.Priority,
 			Sensitive:       parameter.Sensitive,
+			Required:        parameter.Required,
 			ImmutableReason: parameter.ImmutableReason,
 			Group:           parameter.Group,
 		})
@@ -92,6 +93,8 @@ type StackParameterResponse struct {
 	Consumed      bool    `json:"consumed"`
 	Priority      uint    `json:"priority"`
 	Sensitive     bool    `json:"sensitive"`
+	// Required says the parameter must have a value for the stack to deploy.
+	Required bool `json:"required"`
 	// ImmutableReason says why the parameter cannot be changed once the instance has been deployed;
 	// empty means it can.
 	ImmutableReason string `json:"immutableReason,omitempty"`

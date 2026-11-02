@@ -16,6 +16,38 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestRejectMissingRequiredParameters(t *testing.T) {
+	s3Secret := &stack.Stack{
+		Name: "storage",
+		Parameters: map[string]stack.StackParameter{
+			"STORAGE_TYPE": {Required: true},
+			"S3_SECRET":    {Required: true, Group: "s3"},
+		},
+		ParameterGroups: []stack.ParameterGroup{{Name: "s3", When: &kube.Condition{Parameter: "STORAGE_TYPE", Equals: "s3"}}},
+	}
+	instanceWith := func(storageType, secret string) *model.DeploymentInstance {
+		return &model.DeploymentInstance{Name: "instance", StackName: "storage", Parameters: model.DeploymentInstanceParameters{
+			"STORAGE_TYPE": {ParameterName: "STORAGE_TYPE", Value: storageType},
+			"S3_SECRET":    {ParameterName: "S3_SECRET", Value: secret},
+		}}
+	}
+
+	t.Run("ABlankParameterOfAShownGroupIsRejected", func(t *testing.T) {
+		err := rejectMissingRequiredParameters(instanceWith("s3", ""), s3Secret)
+
+		require.ErrorContains(t, err, "missing required parameters: S3_SECRET")
+		assert.True(t, errdef.IsBadRequest(err))
+	})
+
+	t.Run("ABlankParameterOfAHiddenGroupIsAccepted", func(t *testing.T) {
+		require.NoError(t, rejectMissingRequiredParameters(instanceWith("minio", ""), s3Secret))
+	})
+
+	t.Run("AnUngroupedParameterIsAlwaysRequired", func(t *testing.T) {
+		require.ErrorContains(t, rejectMissingRequiredParameters(instanceWith("", "secret"), s3Secret), "missing required parameters: STORAGE_TYPE")
+	})
+}
+
 func TestResolveParameters(t *testing.T) {
 	t.Run("PreventUserFromOverwritingConsumedParameters", func(t *testing.T) {
 		s := stack.Stack{

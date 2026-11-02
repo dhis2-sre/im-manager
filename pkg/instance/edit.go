@@ -36,6 +36,10 @@ type DeploymentChanges struct {
 	// deploy order. An instance the edit left alone is not in here, so editing pgAdmin does not roll
 	// DHIS 2 core.
 	Redeploy []*model.DeploymentInstance
+	// Save are the instances whose stored state the edit changed, the ones in Redeploy and also those
+	// it changed without touching what they render, such as the host of a companion switched on or
+	// off, or an instance made public.
+	Save []*model.DeploymentInstance
 	// Destroy are the companions whose gating parameter went false. Their rows outlive the edit
 	// because destroying them needs the parameters they hold; the caller deletes them once the
 	// cluster is rid of them.
@@ -62,7 +66,7 @@ func (s Service) EditDeployment(ctx context.Context, deploymentId uint, edit Edi
 
 	// Saving encrypts an instance's sensitive parameters in place, so it is the last thing done with
 	// one here and the cluster work reloads its own decrypted copy.
-	for _, deploymentInstance := range changes.Redeploy {
+	for _, deploymentInstance := range changes.Save {
 		deploymentStack, err := s.stackService.Find(deploymentInstance.StackName)
 		if err != nil {
 			return nil, err
@@ -103,6 +107,10 @@ func (s Service) planEdit(deployment *model.Deployment, edit Edit) (*DeploymentC
 	}
 
 	before := s.resolvedParameterValues(deployment)
+	stored, err := s.storedStates(deployment.Instances)
+	if err != nil {
+		return nil, err
+	}
 
 	if err := s.applyInstanceEdits(byStack, edit.Instances); err != nil {
 		return nil, err
@@ -154,7 +162,61 @@ func (s Service) planEdit(deployment *model.Deployment, edit Edit) (*DeploymentC
 		changes.Redeploy = append(changes.Redeploy, deploymentInstance)
 	}
 
+	for _, deploymentInstance := range changes.Redeploy {
+		instanceStack, err := s.stackService.Find(deploymentInstance.StackName)
+		if err != nil {
+			return nil, err
+		}
+		if err := rejectMissingRequiredParameters(deploymentInstance, instanceStack); err != nil {
+			return nil, err
+		}
+	}
+
+	for _, deploymentInstance := range order {
+		state, exists := stored[deploymentInstance]
+		if exists && !slices.Contains(changes.Redeploy, deploymentInstance) && state.equals(deploymentInstance) {
+			continue
+		}
+		changes.Save = append(changes.Save, deploymentInstance)
+	}
+
 	return changes, nil
+}
+
+// storedState is what the database holds for an instance before an edit is applied to it, with the
+// stack defaults resolving fills in, so an instance stored before its stack gained a parameter is not
+// saved by every edit.
+type storedState struct {
+	parameters map[string]string
+	public     bool
+}
+
+func (s Service) storedStates(instances []*model.DeploymentInstance) (map[*model.DeploymentInstance]storedState, error) {
+	states := make(map[*model.DeploymentInstance]storedState, len(instances))
+	for _, deploymentInstance := range instances {
+		instanceStack, err := s.stackService.Find(deploymentInstance.StackName)
+		if err != nil {
+			return nil, err
+		}
+
+		clone := *deploymentInstance
+		clone.Parameters = maps.Clone(deploymentInstance.Parameters)
+		addDefaultParameterValues(clone.Parameters, instanceStack)
+		states[deploymentInstance] = storedState{parameters: parameterValues(&clone), public: deploymentInstance.Public}
+	}
+	return states, nil
+}
+
+func (state storedState) equals(instance *model.DeploymentInstance) bool {
+	return state.public == instance.Public && maps.Equal(state.parameters, parameterValues(instance))
+}
+
+func parameterValues(instance *model.DeploymentInstance) map[string]string {
+	values := make(map[string]string, len(instance.Parameters))
+	for name, parameter := range instance.Parameters {
+		values[name] = parameter.Value
+	}
+	return values
 }
 
 // applyInstanceEdits merges the requested parameters into the instances that already exist.
