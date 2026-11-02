@@ -464,11 +464,20 @@ func validateParameters(instanceParameters model.DeploymentInstanceParameters, s
 }
 
 // rejectMissingRequiredParameters refuses an instance that leaves a required parameter blank, which
-// its helmfile would only refuse after the request had been accepted.
+// its helmfile would only refuse after the request had been accepted. A parameter in a group whose
+// condition does not hold is not rendered, so it may be blank.
 func rejectMissingRequiredParameters(instance *model.DeploymentInstance, stack *stack.Stack) error {
+	conditions := make(map[string]*kube.Condition, len(stack.ParameterGroups))
+	for _, group := range stack.ParameterGroups {
+		conditions[group.Name] = group.When
+	}
+
 	var missing []string
 	for name, stackParameter := range stack.Parameters {
-		if stackParameter.Required && strings.TrimSpace(instance.Parameters[name].Value) == "" {
+		if !stackParameter.Required || !conditions[stackParameter.Group].Matches(instance.Parameters) {
+			continue
+		}
+		if strings.TrimSpace(instance.Parameters[name].Value) == "" {
 			missing = append(missing, name)
 		}
 	}

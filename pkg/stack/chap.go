@@ -17,28 +17,28 @@ var Chap = withGroupedParameters(Stack{
 	ReleaseSuffix: "-chap",
 	ParameterGroups: []ParameterGroup{
 		{Name: "api", Title: "CHAP API", Parameters: StackParameters{
-			"IMAGE_TAG":         {Priority: 1, DisplayName: "Image Tag", DefaultValue: &chapDefaults.imageTag},
-			"IMAGE_PULL_POLICY": {Priority: 2, DisplayName: "Image Pull Policy", DefaultValue: &chapDefaults.imagePullPolicy, Validator: imagePullPolicy},
-			"CHART_VERSION":     {Priority: 3, DisplayName: "Chart Version", DefaultValue: &chapDefaults.chartVersion},
-			"DHIS2_REGISTER":    {Priority: 4, DisplayName: "Register as a route in DHIS 2", DefaultValue: &chapDefaults.dhis2Register},
+			"IMAGE_TAG":         {Priority: 1, DisplayName: "Image Tag", DefaultValue: &chapDefaults.imageTag, Required: true},
+			"IMAGE_PULL_POLICY": {Priority: 2, DisplayName: "Image Pull Policy", DefaultValue: &chapDefaults.imagePullPolicy, Validator: imagePullPolicy, Required: true},
+			"CHART_VERSION":     {Priority: 3, DisplayName: "Chart Version", DefaultValue: &chapDefaults.chartVersion, Required: true},
+			"DHIS2_REGISTER":    {Priority: 4, DisplayName: "Register as a route in DHIS 2", DefaultValue: &chapDefaults.dhis2Register, Required: true},
 		}},
 		{Name: "worker", Title: "CHAP Worker", Parameters: StackParameters{
-			"WORKER_IMAGE_TAG":         {Priority: 13, DisplayName: "Image Tag", DefaultValue: &chapDefaults.imageTag},
-			"WORKER_IMAGE_PULL_POLICY": {Priority: 14, DisplayName: "Image Pull Policy", DefaultValue: &chapDefaults.imagePullPolicy, Validator: imagePullPolicy},
+			"WORKER_IMAGE_TAG":         {Priority: 13, DisplayName: "Image Tag", DefaultValue: &chapDefaults.imageTag, Required: true},
+			"WORKER_IMAGE_PULL_POLICY": {Priority: 14, DisplayName: "Image Pull Policy", DefaultValue: &chapDefaults.imagePullPolicy, Validator: imagePullPolicy, Required: true},
 		}},
 		{Name: "register", Title: "DHIS 2 registration", When: whenDhis2RegisterIsEnabled, Parameters: StackParameters{
-			"DHIS2_USERNAME": {Priority: 5, DisplayName: "DHIS2 Username", DefaultValue: &chapDefaults.dhis2Username},
-			"DHIS2_PASSWORD": {Priority: 6, DisplayName: "DHIS2 Password", DefaultValue: &chapDefaults.dhis2Password, Sensitive: true},
+			"DHIS2_USERNAME": {Priority: 5, DisplayName: "DHIS2 Username", DefaultValue: &chapDefaults.dhis2Username, Required: true},
+			"DHIS2_PASSWORD": {Priority: 6, DisplayName: "DHIS2 Password", DefaultValue: &chapDefaults.dhis2Password, Sensitive: true, Required: true},
 		}},
 		{Name: "db", Title: "PostgreSQL", Parameters: StackParameters{
-			"DATABASE_NAME":     {Priority: 7, DisplayName: "Database Name", DefaultValue: &chapDefaults.dbName},
-			"DATABASE_PASSWORD": {Priority: 8, DisplayName: "Database Password", DefaultValue: &chapDefaults.dbPassword, Sensitive: true},
-			"DATABASE_SIZE":     {Priority: 9, DisplayName: "Database Size", DefaultValue: &chapDefaults.dbSize},
-			"DATABASE_VERSION":  {Priority: 10, DisplayName: "Database Version", DefaultValue: &chapDefaults.dbVersion},
+			"DATABASE_NAME":     {Priority: 7, DisplayName: "Database Name", DefaultValue: &chapDefaults.dbName, Required: true},
+			"DATABASE_PASSWORD": {Priority: 8, DisplayName: "Database Password", DefaultValue: &chapDefaults.dbPassword, Sensitive: true, Required: true},
+			"DATABASE_SIZE":     {Priority: 9, DisplayName: "Database Size", DefaultValue: &chapDefaults.dbSize, Required: true},
+			"DATABASE_VERSION":  {Priority: 10, DisplayName: "Database Version", DefaultValue: &chapDefaults.dbVersion, Required: true},
 		}},
 		{Name: "valkey", Title: "Valkey", Parameters: StackParameters{
-			"REDIS_PASSWORD":     {Priority: 11, DisplayName: "Valkey Password", DefaultValue: &chapDefaults.redisPassword, Sensitive: true},
-			"REDIS_STORAGE_SIZE": {Priority: 12, DisplayName: "Valkey Storage Size", DefaultValue: &chapDefaults.redisStorageSize},
+			"REDIS_PASSWORD":     {Priority: 11, DisplayName: "Valkey Password", DefaultValue: &chapDefaults.redisPassword, Sensitive: true, Required: true},
+			"REDIS_STORAGE_SIZE": {Priority: 12, DisplayName: "Valkey Storage Size", DefaultValue: &chapDefaults.redisStorageSize, Required: true},
 		}},
 	},
 	Components: []kube.Component{
