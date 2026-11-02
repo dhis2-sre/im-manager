@@ -2,6 +2,8 @@ module github.com/dhis2-sre/im-manager
 
 go 1.26.2
 
+godebug multipathtcp=0
+
 require (
 	filippo.io/age v1.3.2
 	github.com/aws/aws-sdk-go-v2 v1.43.7
