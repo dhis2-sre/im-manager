@@ -1,4 +1,43 @@
 
+<a name="0.79.0"></a>
+## [0.79.0](https://github.com/dhis2-sre/im-manager/compare/0.78.1...0.79.0)
+
+> 2026-11-02
+
+### Chore
+
+* add a make release target ([#1826](https://github.com/dhis2-sre/im-manager/issues/1826))
+* delete scripts calling removed endpoints ([#1819](https://github.com/dhis2-sre/im-manager/issues/1819))
+* generate change log for v0.78.1
+
+### Feat
+
+* restart selected instance components ([#1824](https://github.com/dhis2-sre/im-manager/issues/1824))
+* allow private ghcr.io/dhis2 images for the dhis2 stack ([#1814](https://github.com/dhis2-sre/im-manager/issues/1814))
+* version 3 features ([#1802](https://github.com/dhis2-sre/im-manager/issues/1802))
+
+### Fix
+
+* recover from companions, deploys and deletes that fail partway ([#1820](https://github.com/dhis2-sre/im-manager/issues/1820))
+* disable multipath tcp listeners ([#1825](https://github.com/dhis2-sre/im-manager/issues/1825))
+* let deploy-dhis2.sh rely on the dhis2-v2 stack defaults ([#1818](https://github.com/dhis2-sre/im-manager/issues/1818))
+* set the dhis2.environment postgresql setting on dhis2-v2 ([#1816](https://github.com/dhis2-sre/im-manager/issues/1816))
+* restore suspend and glowroot options on dhis2-v2 ([#1815](https://github.com/dhis2-sre/im-manager/issues/1815))
+* drop the pre-[#706](https://github.com/dhis2-sre/im-manager/issues/706) deployment name index that blocks presets ([#1813](https://github.com/dhis2-sre/im-manager/issues/1813))
+* pass AWS credentials to expiring certificates check
+* deploy dhis2 chart 1.3.0
+* restore the Google service account for dhis2-v2 instances
+* disable the postgresql pod disruption budget
+* recreate pgadmin instead of rolling it onto another node
+
+### Pull Requests
+
+* Merge pull request [#1812](https://github.com/dhis2-sre/im-manager/issues/1812) from dhis2-sre/fix/expiring-certificates-aws-credentials
+* Merge pull request [#1810](https://github.com/dhis2-sre/im-manager/issues/1810) from dhis2-sre/fix/cnpg-disable-pdb
+* Merge pull request [#1811](https://github.com/dhis2-sre/im-manager/issues/1811) from dhis2-sre/fix/dhis2-v2-google-auth
+* Merge pull request [#1809](https://github.com/dhis2-sre/im-manager/issues/1809) from dhis2-sre/fix/pgadmin-recreate-strategy
+
+
 <a name="0.78.1"></a>
 ## [0.78.1](https://github.com/dhis2-sre/im-manager/compare/0.78.0...0.78.1)
 
@@ -462,14 +501,9 @@
 
 
 <a name="v0.66.0"></a>
-## [v0.66.0](https://github.com/dhis2-sre/im-manager/compare/v0.65.3...v0.66.0)
+## [v0.66.0](https://github.com/dhis2-sre/im-manager/compare/0.65.3...v0.66.0)
 
 > 2026-04-22
-
-### Chore
-
-* replace (Bitnami) Redis with Valkey ([#1444](https://github.com/dhis2-sre/im-manager/issues/1444))
-* generate change log
 
 ### Docs
 
@@ -482,27 +516,27 @@
 ### Fix
 
 * persist group namespace in findOrCreate ([#1465](https://github.com/dhis2-sre/im-manager/issues/1465))
-* use group-ID-qualified name in PVC label selector ([#1452](https://github.com/dhis2-sre/im-manager/issues/1452))
-
-
-<a name="v0.65.3"></a>
-## [v0.65.3](https://github.com/dhis2-sre/im-manager/compare/0.65.3...v0.65.3)
-
-> 2026-04-16
-
-### Fix
-
-* use group-ID-qualified name in PVC label selector ([#1452](https://github.com/dhis2-sre/im-manager/issues/1452))
 
 
 <a name="0.65.3"></a>
-## [0.65.3](https://github.com/dhis2-sre/im-manager/compare/0.65.2...0.65.3)
+## [0.65.3](https://github.com/dhis2-sre/im-manager/compare/v0.65.3...0.65.3)
 
 > 2026-04-16
 
 ### Chore
 
 * replace (Bitnami) Redis with Valkey ([#1444](https://github.com/dhis2-sre/im-manager/issues/1444))
+* generate change log
+
+### Fix
+
+* use group-ID-qualified name in PVC label selector ([#1452](https://github.com/dhis2-sre/im-manager/issues/1452))
+
+
+<a name="v0.65.3"></a>
+## [v0.65.3](https://github.com/dhis2-sre/im-manager/compare/0.65.2...v0.65.3)
+
+> 2026-04-16
 
 ### Fix
 
@@ -1076,7 +1110,7 @@
 
 
 <a name="v0.44.0"></a>
-## [v0.44.0](https://github.com/dhis2-sre/im-manager/compare/v0.42.0...v0.44.0)
+## [v0.44.0](https://github.com/dhis2-sre/im-manager/compare/v0.41.0...v0.44.0)
 
 > 2024-11-27
 
@@ -1086,14 +1120,14 @@
 * use PAT
 
 
-<a name="v0.42.0"></a>
-## [v0.42.0](https://github.com/dhis2-sre/im-manager/compare/v0.41.0...v0.42.0)
+<a name="v0.41.0"></a>
+## [v0.41.0](https://github.com/dhis2-sre/im-manager/compare/v0.42.0...v0.41.0)
 
 > 2024-11-20
 
 
-<a name="v0.41.0"></a>
-## [v0.41.0](https://github.com/dhis2-sre/im-manager/compare/v0.40.0...v0.41.0)
+<a name="v0.42.0"></a>
+## [v0.42.0](https://github.com/dhis2-sre/im-manager/compare/v0.40.0...v0.42.0)
 
 > 2024-11-20
 
