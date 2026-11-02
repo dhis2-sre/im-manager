@@ -64,15 +64,13 @@ Set the KMS key ARN via `SOPS_KMS_ARN`. AWS credentials are provided automatical
 
 # Release
 
-Pushing a version tag releases. Its Build, test and deploy run pushes `dhis2/im-manager:<version>`, and Deploy to im-vm then deploys that image to prod.
-
-From an up to date master whose Build, test and deploy run succeeded:
+From an up to date master, pick the version and run:
 
 ```shell
 make release version=0.79.0
 ```
 
-It tags master, generates the change log for the new version, commits it and pushes both after a confirmation. Take a database dump first when the release carries migrations, since a rollback to the previous version does not undo them.
+It tags master, commits the change log and pushes both. The pushed tag builds `dhis2/im-manager:<version>` and deploys it to prod.
 
 # Migrations
 
