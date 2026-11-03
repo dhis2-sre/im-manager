@@ -72,7 +72,7 @@ type _ struct {
 	Tail int64 `json:"tail"`
 }
 
-// swagger:parameters deleteInstance findById findByIdDecrypted saveInstance pauseInstance resumeInstance findDeploymentById deployDeployment deleteDeployment status instanceWithDetails filestoreBackup instanceComponents deploymentComponents
+// swagger:parameters deleteInstance findById findByIdDecrypted saveInstance pauseInstance resumeInstance findDeploymentById deployDeployment deleteDeployment status instanceWithDetails filestoreBackup instanceComponents deploymentComponents findPresetById deletePreset
 type _ struct {
 	// in: path
 	// required: true
@@ -251,7 +251,7 @@ type _ struct {
 	Payload UpdateDeploymentRequest
 }
 
-// swagger:parameters editDeployment
+// swagger:parameters editDeployment editPreset
 type _ struct {
 	// in: path
 	// required: true
@@ -260,4 +260,23 @@ type _ struct {
 	// in: body
 	// required: true
 	Payload EditDeploymentRequest
+}
+
+// swagger:parameters savePreset
+type _ struct {
+	// Save preset request body parameter
+	// in: body
+	// required: true
+	Payload SavePresetRequest
+}
+
+// swagger:parameters createDeploymentFromPreset
+type _ struct {
+	// in: path
+	// required: true
+	ID uint `json:"id"`
+	// Create deployment from preset request body parameter
+	// in: body
+	// required: true
+	Payload CreateDeploymentFromPresetRequest
 }

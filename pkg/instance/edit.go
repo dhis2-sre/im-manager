@@ -92,18 +92,8 @@ func (s Service) planEdit(deployment *model.Deployment, edit Edit) (*DeploymentC
 		byStack[deploymentInstance.StackName] = deploymentInstance
 	}
 
-	offered, err := s.offeredCompanions(deployment.Instances)
-	if err != nil {
+	if err := s.rejectUnofferedStacks(deployment, edit.Instances); err != nil {
 		return nil, err
-	}
-	for stackName := range edit.Instances {
-		if _, ok := byStack[stackName]; ok {
-			continue
-		}
-		if _, ok := offered[stackName]; ok {
-			continue
-		}
-		return nil, errdef.NewBadRequest("deployment %d has no instance of stack %q and none of its stacks offers it as a companion", deployment.ID, stackName)
 	}
 
 	before := s.resolvedParameterValues(deployment)
@@ -181,6 +171,24 @@ func (s Service) planEdit(deployment *model.Deployment, edit Edit) (*DeploymentC
 	}
 
 	return changes, nil
+}
+
+// rejectUnofferedStacks refuses edits for a stack the deployment neither holds nor offers as a companion.
+func (s Service) rejectUnofferedStacks(deployment *model.Deployment, edits map[string]InstanceEdit) error {
+	offered, err := s.offeredCompanions(deployment.Instances)
+	if err != nil {
+		return err
+	}
+	for stackName := range edits {
+		if findInstanceByStackName(stackName, deployment) != nil {
+			continue
+		}
+		if _, ok := offered[stackName]; ok {
+			continue
+		}
+		return errdef.NewBadRequest("deployment %d has no instance of stack %q and none of its stacks offers it as a companion", deployment.ID, stackName)
+	}
+	return nil
 }
 
 // storedState is what the database holds for an instance before an edit is applied to it, with the

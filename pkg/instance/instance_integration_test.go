@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"maps"
 	"net/http"
 	"os"
 	"slices"
@@ -615,6 +616,93 @@ func TestInstanceHandler(t *testing.T) {
 
 		client.Do(t, http.MethodDelete, fmt.Sprintf("/deployments/%d", preset.ID), nil, http.StatusAccepted, inttest.WithAuthToken(tokens.AccessToken))
 		client.Do(t, http.MethodGet, fmt.Sprintf("/deployments/%d", preset.ID), nil, http.StatusNotFound, inttest.WithAuthToken(tokens.AccessToken))
+	})
+
+	t.Run("PresetResource", func(t *testing.T) {
+		t.Parallel()
+		send := func(method, path string, payload any, status int, response any) {
+			t.Helper()
+			jsonData, err := json.Marshal(payload)
+			require.NoError(t, err)
+			body := client.Do(t, method, path, strings.NewReader(string(jsonData)), status, inttest.WithAuthToken(tokens.AccessToken), inttest.WithHeader("Content-Type", "application/json"))
+			if response != nil {
+				require.NoError(t, json.Unmarshal(body, response))
+			}
+		}
+		parameters := func(values map[string]string) map[string]any {
+			result := map[string]any{}
+			for name, value := range values {
+				result[name] = map[string]any{"value": value}
+			}
+			return result
+		}
+		presetPayload := func(name string, instanceParameters map[string]string) map[string]any {
+			instanceParameters = maps.Clone(instanceParameters)
+			if instanceParameters == nil {
+				instanceParameters = map[string]string{}
+			}
+			instanceParameters["DATABASE_ID"] = "1"
+			return map[string]any{
+				"name":        name,
+				"group":       "group-name",
+				"description": "initial",
+				"instances":   []any{map[string]any{"stackName": "dhis2-v2", "parameters": parameters(instanceParameters)}},
+			}
+		}
+
+		var preset model.Deployment
+		send(http.MethodPost, "/presets", presetPayload("test-preset-resource", map[string]string{"IMAGE_TAG": "2.41.0", "GOOGLE_AUTH_PROJECT_ID": "secret-project"}), http.StatusCreated, &preset)
+		assert.True(t, preset.Preset)
+		require.Len(t, preset.Instances, 1)
+		assert.NotEqual(t, "secret-project", preset.Instances[0].Parameters["GOOGLE_AUTH_PROJECT_ID"].Value)
+
+		send(http.MethodPost, "/presets", presetPayload("test-preset-resource", nil), http.StatusConflict, nil)
+		send(http.MethodPost, "/presets", presetPayload("test-preset-atomic", map[string]string{"IMAGE_PULL_POLICY": "Sometimes"}), http.StatusBadRequest, nil)
+		var availability instance.DeploymentNameAvailability
+		client.GetJSON(t, "/deployments/availability?group=group-name&name=test-preset-atomic&preset=true", &availability, inttest.WithAuthToken(tokens.AccessToken))
+		assert.True(t, availability.Available, "a refused preset leaves nothing behind")
+
+		deployment := createDeployment(t, client, "test-preset-resource-plain", tokens.AccessToken)
+		client.Do(t, http.MethodGet, fmt.Sprintf("/presets/%d", deployment.ID), nil, http.StatusNotFound, inttest.WithAuthToken(tokens.AccessToken))
+		client.Do(t, http.MethodGet, fmt.Sprintf("/presets/%d?user=non-member", preset.ID), nil, http.StatusUnauthorized, inttest.WithAuthToken(tokens.AccessToken))
+
+		var presets []model.Deployment
+		client.GetJSON(t, "/presets", &presets, inttest.WithAuthToken(tokens.AccessToken))
+		assert.True(t, slices.ContainsFunc(presets, func(d model.Deployment) bool { return d.ID == preset.ID }))
+
+		var edited model.Deployment
+		send(http.MethodPatch, fmt.Sprintf("/presets/%d", preset.ID), map[string]any{
+			"description": "edited",
+			"instances":   map[string]any{"dhis2-v2": map[string]any{"parameters": parameters(map[string]string{"IMAGE_TAG": "2.42.0"})}},
+		}, http.StatusOK, &edited)
+		assert.Equal(t, preset.ID, edited.ID)
+		assert.Equal(t, "edited", edited.Description)
+		assert.Equal(t, "2.42.0", findInstanceByStack(edited, "dhis2-v2").Parameters["IMAGE_TAG"].Value)
+
+		var created model.Deployment
+		send(http.MethodPost, fmt.Sprintf("/presets/%d/deployments", preset.ID), map[string]any{
+			"name":      "test-from-preset",
+			"instances": map[string]any{"dhis2-v2": map[string]any{"parameters": parameters(map[string]string{"IMAGE_TAG": "2.42.1"})}},
+		}, http.StatusCreated, &created)
+		assert.False(t, created.Preset)
+		assert.Equal(t, "edited", created.Description)
+		assert.Equal(t, "group-name", created.GroupName)
+
+		decrypted, err := instanceService.FindDecryptedDeploymentById(context.Background(), created.ID)
+		require.NoError(t, err)
+		core := findInstanceByStack(*decrypted, "dhis2-v2")
+		require.NotNil(t, core)
+		assert.Equal(t, "test-from-preset", core.Name)
+		assert.Equal(t, "2.42.1", core.Parameters["IMAGE_TAG"].Value)
+		assert.Equal(t, "secret-project", core.Parameters["GOOGLE_AUTH_PROJECT_ID"].Value, "a sensitive value the client only sees masked carries over")
+
+		send(http.MethodPost, fmt.Sprintf("/presets/%d/deployments", preset.ID), map[string]any{"name": "test-from-preset"}, http.StatusConflict, nil)
+		send(http.MethodPost, fmt.Sprintf("/presets/%d/deployments", deployment.ID), map[string]any{"name": "test-from-plain"}, http.StatusNotFound, nil)
+
+		destroyDeployment(t, client, created.ID, tokens.AccessToken)
+		destroyDeployment(t, client, deployment.ID, tokens.AccessToken)
+		client.Do(t, http.MethodDelete, fmt.Sprintf("/presets/%d", preset.ID), nil, http.StatusNoContent, inttest.WithAuthToken(tokens.AccessToken))
+		client.Do(t, http.MethodGet, fmt.Sprintf("/presets/%d", preset.ID), nil, http.StatusNotFound, inttest.WithAuthToken(tokens.AccessToken))
 	})
 
 	t.Run("UpdateDeployment", func(t *testing.T) {

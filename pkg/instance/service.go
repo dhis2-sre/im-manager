@@ -136,34 +136,42 @@ func (s Service) TakenDeploymentNames(ctx context.Context, groupName string, nam
 func (s Service) SaveDeployments(ctx context.Context, groupName string, deployments []*model.Deployment) error {
 	stacksByName := map[string]*stack.Stack{}
 	for _, deployment := range deployments {
-		for _, instance := range deployment.Instances {
-			stack, err := s.stackService.Find(instance.StackName)
-			if err != nil {
-				return err
-			}
-			stacksByName[instance.StackName] = stack
-
-			if err := s.rejectConsumedParameters(instance.StackName, maps.Keys(instance.Parameters)); err != nil {
-				return errdef.NewBadRequest("failed to validate instance: %v", err)
-			}
-		}
-
-		if _, err := s.validateNoCycles(deployment.Instances); err != nil {
-			return errdef.NewBadRequest("failed to validate instance: %v", err)
-		}
-
-		if err := s.resolveParameters(deployment); err != nil {
-			return errdef.NewBadRequest("failed to resolve parameters: %v", err)
-		}
-
-		for _, instance := range deployment.Instances {
-			if err := rejectMissingRequiredParameters(instance, stacksByName[instance.StackName]); err != nil {
-				return err
-			}
+		if err := s.validateNewDeployment(deployment, stacksByName); err != nil {
+			return err
 		}
 	}
 
 	return s.instanceRepository.SaveDeployments(ctx, groupName, deployments, stacksByName)
+}
+
+// validateNewDeployment validates the instances of a deployment that is not saved yet and adds their stacks to stacksByName.
+func (s Service) validateNewDeployment(deployment *model.Deployment, stacksByName map[string]*stack.Stack) error {
+	for _, instance := range deployment.Instances {
+		stack, err := s.stackService.Find(instance.StackName)
+		if err != nil {
+			return err
+		}
+		stacksByName[instance.StackName] = stack
+
+		if err := s.rejectConsumedParameters(instance.StackName, maps.Keys(instance.Parameters)); err != nil {
+			return errdef.NewBadRequest("failed to validate instance: %v", err)
+		}
+	}
+
+	if _, err := s.validateNoCycles(deployment.Instances); err != nil {
+		return errdef.NewBadRequest("failed to validate instance: %v", err)
+	}
+
+	if err := s.resolveParameters(deployment); err != nil {
+		return errdef.NewBadRequest("failed to resolve parameters: %v", err)
+	}
+
+	for _, instance := range deployment.Instances {
+		if err := rejectMissingRequiredParameters(instance, stacksByName[instance.StackName]); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (s Service) FindDeploymentById(ctx context.Context, id uint) (*model.Deployment, error) {

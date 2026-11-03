@@ -194,14 +194,8 @@ func (r repository) SaveDeployments(ctx context.Context, groupName string, deplo
 		}
 
 		for _, deployment := range deployments {
-			if err := tx.Omit(clause.Associations).Create(deployment).Error; err != nil {
+			if err := createDeploymentWithInstances(tx, deployment); err != nil {
 				return err
-			}
-			for _, instance := range deployment.Instances {
-				instance.DeploymentID = deployment.ID
-				if err := tx.Omit("Group", "Lock", "Deployment").Create(instance).Error; err != nil {
-					return err
-				}
 			}
 		}
 		return nil
@@ -216,6 +210,44 @@ func (r repository) SaveDeployments(ctx context.Context, groupName string, deplo
 		return fmt.Errorf("failed to save deployments: %v", err)
 	}
 
+	return nil
+}
+
+// SavePreset creates the preset with its instances or not at all.
+func (r repository) SavePreset(ctx context.Context, preset *model.Deployment, stacksByName map[string]*stack.Stack) error {
+	// only use ctx for values (logging) and not cancellation signals on cud operations for now. ctx
+	// cancellation can lead to rollbacks which we should decide individually.
+	ctx = context.WithoutCancel(ctx)
+
+	for _, instance := range preset.Instances {
+		if err := encryptParameters(r.instanceParameterEncryptionKey, instance, stacksByName[instance.StackName]); err != nil {
+			return err
+		}
+	}
+
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		return createDeploymentWithInstances(tx, preset)
+	})
+	if err != nil {
+		if errors.Is(err, gorm.ErrDuplicatedKey) {
+			return errdef.NewDuplicated("a preset named %q already exists in group %q", preset.Name, preset.GroupName)
+		}
+		return fmt.Errorf("failed to save preset: %v", err)
+	}
+
+	return nil
+}
+
+func createDeploymentWithInstances(tx *gorm.DB, deployment *model.Deployment) error {
+	if err := tx.Omit(clause.Associations).Create(deployment).Error; err != nil {
+		return err
+	}
+	for _, instance := range deployment.Instances {
+		instance.DeploymentID = deployment.ID
+		if err := tx.Omit("Group", "Lock", "Deployment").Create(instance).Error; err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
