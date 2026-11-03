@@ -31,7 +31,7 @@ var DHIS2V2 = withGroupedParameters(Stack{
 			"JAVA_OPTS":                       {Priority: 30, DisplayName: "JAVA Options", DefaultValue: &coreDefaults.javaOpts},
 			"ENABLE_QUERY_LOGGING":            {Priority: 31, DisplayName: "Enable Query Logging", DefaultValue: &coreDefaults.enableQueryLogging, Required: true},
 			"SAME_SITE_COOKIES":               {Priority: 32, DisplayName: "Same site cookies", DefaultValue: &coreDefaults.sameSiteCookies, Validator: sameSiteCookies, Required: true},
-			"CUSTOM_DHIS2_CONFIG":             {Priority: 33, DisplayName: "Custom DHIS2 config (applied to top of dhis.conf)", DefaultValue: &coreDefaults.customDhis2Config, Sensitive: true},
+			"CUSTOM_DHIS2_CONFIG":             {Priority: 33, DisplayName: "Custom DHIS2 config (applied to top of dhis.conf)", DefaultValue: &coreDefaults.customDhis2Config, Sensitive: true, Multiline: true},
 			"GOOGLE_AUTH_PROJECT_ID":          {Priority: 34, DisplayName: "Google auth project id", DefaultValue: &coreDefaults.googleAuthProjectId, Sensitive: true},
 			"GOOGLE_AUTH_PRIVATE_KEY":         {Priority: 35, DisplayName: "Google auth private key", DefaultValue: &coreDefaults.googleAuthPrivateKey, Sensitive: true},
 			"GOOGLE_AUTH_PRIVATE_KEY_ID":      {Priority: 36, DisplayName: "Google auth private key id", DefaultValue: &coreDefaults.googleAuthPrivateKeyId, Sensitive: true},
