@@ -36,6 +36,7 @@ CORE_RESOURCES_REQUESTS_MEMORY=${CORE_RESOURCES_REQUESTS_MEMORY:-}
 FLYWAY_MIGRATE_OUT_OF_ORDER=${FLYWAY_MIGRATE_OUT_OF_ORDER:-}
 FLYWAY_REPAIR_BEFORE_MIGRATION=${FLYWAY_REPAIR_BEFORE_MIGRATION:-}
 ENABLE_QUERY_LOGGING=${ENABLE_QUERY_LOGGING:-}
+ALLOW_SUSPEND=${ALLOW_SUSPEND:-}
 
 DEPLOYMENT_ID=$(echo "{
   \"name\": \"$NAME\",
@@ -107,6 +108,9 @@ echo "{
     },
     \"ENABLE_QUERY_LOGGING\": {
       \"value\": \"$ENABLE_QUERY_LOGGING\"
+    },
+    \"ALLOW_SUSPEND\": {
+      \"value\": \"$ALLOW_SUSPEND\"
     }
   }
 }" | jq '.parameters |= with_entries(select(.value.value != ""))' | $HTTP post "$IM_HOST/deployments/$DEPLOYMENT_ID/instance" "Authorization: Bearer $ACCESS_TOKEN"
