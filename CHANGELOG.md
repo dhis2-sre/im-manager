@@ -1,4 +1,18 @@
 
+<a name="0.79.1"></a>
+## [0.79.1](https://github.com/dhis2-sre/im-manager/compare/0.79.0...0.79.1)
+
+> 2026-11-03
+
+### Chore
+
+* generate change log for v0.79.0
+
+### Fix
+
+* forward ALLOW_SUSPEND from deploy-dhis2.sh ([#1827](https://github.com/dhis2-sre/im-manager/issues/1827))
+
+
 <a name="0.79.0"></a>
 ## [0.79.0](https://github.com/dhis2-sre/im-manager/compare/0.78.1...0.79.0)
 
@@ -469,7 +483,7 @@
 
 
 <a name="v0.67.0"></a>
-## [v0.67.0](https://github.com/dhis2-sre/im-manager/compare/0.66.0...v0.67.0)
+## [v0.67.0](https://github.com/dhis2-sre/im-manager/compare/v0.66.0...v0.67.0)
 
 > 2026-05-07
 
@@ -494,16 +508,21 @@
 * add SaveAs and BackupService integration tests ([#1375](https://github.com/dhis2-sre/im-manager/issues/1375))
 
 
-<a name="0.66.0"></a>
-## [0.66.0](https://github.com/dhis2-sre/im-manager/compare/v0.66.0...0.66.0)
-
-> 2026-04-22
-
-
 <a name="v0.66.0"></a>
-## [v0.66.0](https://github.com/dhis2-sre/im-manager/compare/0.65.3...v0.66.0)
+## [v0.66.0](https://github.com/dhis2-sre/im-manager/compare/0.66.0...v0.66.0)
 
 > 2026-04-22
+
+
+<a name="0.66.0"></a>
+## [0.66.0](https://github.com/dhis2-sre/im-manager/compare/v0.65.3...0.66.0)
+
+> 2026-04-22
+
+### Chore
+
+* replace (Bitnami) Redis with Valkey ([#1444](https://github.com/dhis2-sre/im-manager/issues/1444))
+* generate change log
 
 ### Docs
 
@@ -516,27 +535,27 @@
 ### Fix
 
 * persist group namespace in findOrCreate ([#1465](https://github.com/dhis2-sre/im-manager/issues/1465))
+* use group-ID-qualified name in PVC label selector ([#1452](https://github.com/dhis2-sre/im-manager/issues/1452))
 
 
-<a name="0.65.3"></a>
-## [0.65.3](https://github.com/dhis2-sre/im-manager/compare/v0.65.3...0.65.3)
+<a name="v0.65.3"></a>
+## [v0.65.3](https://github.com/dhis2-sre/im-manager/compare/0.65.3...v0.65.3)
 
 > 2026-04-16
-
-### Chore
-
-* replace (Bitnami) Redis with Valkey ([#1444](https://github.com/dhis2-sre/im-manager/issues/1444))
-* generate change log
 
 ### Fix
 
 * use group-ID-qualified name in PVC label selector ([#1452](https://github.com/dhis2-sre/im-manager/issues/1452))
 
 
-<a name="v0.65.3"></a>
-## [v0.65.3](https://github.com/dhis2-sre/im-manager/compare/0.65.2...v0.65.3)
+<a name="0.65.3"></a>
+## [0.65.3](https://github.com/dhis2-sre/im-manager/compare/0.65.2...0.65.3)
 
 > 2026-04-16
+
+### Chore
+
+* replace (Bitnami) Redis with Valkey ([#1444](https://github.com/dhis2-sre/im-manager/issues/1444))
 
 ### Fix
 
@@ -1110,7 +1129,7 @@
 
 
 <a name="v0.44.0"></a>
-## [v0.44.0](https://github.com/dhis2-sre/im-manager/compare/v0.41.0...v0.44.0)
+## [v0.44.0](https://github.com/dhis2-sre/im-manager/compare/v0.42.0...v0.44.0)
 
 > 2024-11-27
 
@@ -1120,14 +1139,14 @@
 * use PAT
 
 
-<a name="v0.41.0"></a>
-## [v0.41.0](https://github.com/dhis2-sre/im-manager/compare/v0.42.0...v0.41.0)
+<a name="v0.42.0"></a>
+## [v0.42.0](https://github.com/dhis2-sre/im-manager/compare/v0.41.0...v0.42.0)
 
 > 2024-11-20
 
 
-<a name="v0.42.0"></a>
-## [v0.42.0](https://github.com/dhis2-sre/im-manager/compare/v0.40.0...v0.42.0)
+<a name="v0.41.0"></a>
+## [v0.41.0](https://github.com/dhis2-sre/im-manager/compare/v0.40.0...v0.41.0)
 
 > 2024-11-20
 
@@ -2351,13 +2370,42 @@
 
 
 <a name="v0.5.10"></a>
-## [v0.5.10](https://github.com/dhis2-sre/im-manager/compare/v0.5.6...v0.5.10)
+## [v0.5.10](https://github.com/dhis2-sre/im-manager/compare/v0.5.9...v0.5.10)
 
 > 2022-04-11
 
 ### Fix
 
 * Only change the ownership of generate_uid() func [DEVOPS-102]
+
+
+<a name="v0.5.9"></a>
+## [v0.5.9](https://github.com/dhis2-sre/im-manager/compare/v0.5.8...v0.5.9)
+
+> 2022-04-11
+
+### Fix
+
+* Use func names with argument signatures to change ownership [DEVOPS-102]
+
+
+<a name="v0.5.8"></a>
+## [v0.5.8](https://github.com/dhis2-sre/im-manager/compare/v0.5.7...v0.5.8)
+
+> 2022-04-11
+
+### Fix
+
+* Use func names with argument signatures to change ownership [DEVOPS-102]
+
+
+<a name="v0.5.7"></a>
+## [v0.5.7](https://github.com/dhis2-sre/im-manager/compare/v0.5.6...v0.5.7)
+
+> 2022-04-11
+
+### Fix
+
 * Use func names with argument signatures to change ownership [DEVOPS-102]
 
 
@@ -2372,7 +2420,7 @@
 
 
 <a name="v0.5.5"></a>
-## [v0.5.5](https://github.com/dhis2-sre/im-manager/compare/v0.5.9...v0.5.5)
+## [v0.5.5](https://github.com/dhis2-sre/im-manager/compare/v0.5.4...v0.5.5)
 
 > 2022-04-11
 
@@ -2381,44 +2429,14 @@
 * Use func names with argument signatures to change ownership [DEVOPS-102]
 
 
-<a name="v0.5.9"></a>
-## [v0.5.9](https://github.com/dhis2-sre/im-manager/compare/v0.5.7...v0.5.9)
-
-> 2022-04-11
-
-### Fix
-
-* Use func names with argument signatures to change ownership [DEVOPS-102]
-
-
-<a name="v0.5.7"></a>
-## [v0.5.7](https://github.com/dhis2-sre/im-manager/compare/v0.5.8...v0.5.7)
-
-> 2022-04-11
-
-### Fix
-
-* Use func names with argument signatures to change ownership [DEVOPS-102]
-
-
-<a name="v0.5.8"></a>
-## [v0.5.8](https://github.com/dhis2-sre/im-manager/compare/v0.5.3...v0.5.8)
-
-> 2022-04-11
-
-### Fix
-
-* Use func names with argument signatures to change ownership [DEVOPS-102]
-
-
-<a name="v0.5.3"></a>
-## [v0.5.3](https://github.com/dhis2-sre/im-manager/compare/v0.5.4...v0.5.3)
+<a name="v0.5.4"></a>
+## [v0.5.4](https://github.com/dhis2-sre/im-manager/compare/v0.5.3...v0.5.4)
 
 > 2022-04-08
 
 
-<a name="v0.5.4"></a>
-## [v0.5.4](https://github.com/dhis2-sre/im-manager/compare/v0.5.2...v0.5.4)
+<a name="v0.5.3"></a>
+## [v0.5.3](https://github.com/dhis2-sre/im-manager/compare/v0.5.2...v0.5.3)
 
 > 2022-04-08
 
