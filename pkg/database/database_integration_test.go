@@ -150,6 +150,7 @@ func TestDatabaseHandler(t *testing.T) {
 
 			require.Equal(t, "path/copy.extension", actualDB.Name)
 			require.Equal(t, "packages", actualDB.GroupName)
+			require.Equal(t, int64(13), actualDB.Size)
 			assert.Equal(t, userID, actualDB.UserID)
 
 			actualContent := s3.GetObject(t, "packages/path/copy.extension")
