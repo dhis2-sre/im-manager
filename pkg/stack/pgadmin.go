@@ -12,12 +12,12 @@ var PgAdmin = withGroupedParameters(Stack{
 	ReleaseSuffix: "-pgadmin",
 	ParameterGroups: []ParameterGroup{
 		{Name: "pgadmin", Title: "pgAdmin", Parameters: StackParameters{
-			"PGADMIN_USERNAME":  {Priority: 1, DisplayName: "pgAdmin Username", Sensitive: true, Required: true},
-			"PGADMIN_PASSWORD":  {Priority: 2, DisplayName: "pgAdmin Password", Sensitive: true, Required: true},
-			"CHART_VERSION":     {Priority: 3, DisplayName: "Chart Version", DefaultValue: &pgAdminDefaults.chartVersion, Required: true},
-			"DATABASE_HOSTNAME": {Priority: 0, DisplayName: "Database Hostname", Consumed: true},
-			"DATABASE_NAME":     {Priority: 0, DisplayName: "Database Name", Consumed: true},
-			"DATABASE_USERNAME": {Priority: 0, DisplayName: "Database Username", Consumed: true, Sensitive: true},
+			"PGADMIN_USERNAME":  {Priority: 1, DisplayName: "Login email", Sensitive: true, Required: true},
+			"PGADMIN_PASSWORD":  {Priority: 2, DisplayName: "Login password", Sensitive: true, Required: true},
+			"CHART_VERSION":     {Priority: 3, DisplayName: "Helm chart version", DefaultValue: &pgAdminDefaults.chartVersion, Required: true},
+			"DATABASE_HOSTNAME": {Priority: 0, DisplayName: "Database hostname", Consumed: true},
+			"DATABASE_NAME":     {Priority: 0, DisplayName: "Database name", Consumed: true},
+			"DATABASE_USERNAME": {Priority: 0, DisplayName: "Database username", Consumed: true, Sensitive: true},
 		}},
 	},
 	Components: []kube.Component{
