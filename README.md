@@ -93,6 +93,17 @@ How to add a migration:
 * Update the profiles section of the [skaffold file](https://github.com/dhis2-sre/im-manager/blob/8cb9a5959e334b835188fa07e801996ff2410b7c/skaffold.yaml#L96) to include the group
 * Update backup schedule to include the group for either [dev](https://github.com/dhis2-sre/dhis2-infrastructure/blob/b9f53752ca9cb16883f2f78cae5fca42b4087b1f/modules/k8s/helm-backup-dev.tf#L1) or [prod](https://github.com/dhis2-sre/dhis2-infrastructure/blob/b9f53752ca9cb16883f2f78cae5fca42b4087b1f/modules/k8s/helm-backup-prod.tf#L1)
 
+# Clusters
+
+A group deploys to the cluster assigned to it, reached through the kubeconfig uploaded with the cluster
+(see [scripts/clusters](scripts/clusters)).
+
+Run inside a Kubernetes cluster, instance manager can also deploy to that cluster itself. It then
+creates a `default` cluster without a kubeconfig at startup, and both that cluster and a group without
+a cluster use its in-cluster configuration. `IN_CLUSTER` decides when that applies: `auto`, the default,
+when instance manager runs inside a cluster, `true` always, and `false` never. Outside a cluster,
+creating a cluster requires a kubeconfig, and deploying to a group without a cluster is a bad request.
+
 # Private images
 
 `IMAGE_REPOSITORY` for the dhis2-v2 stack also accepts `ghcr.io/dhis2/<repository>`. Such images are pulled with the

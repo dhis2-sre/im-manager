@@ -1,9 +1,11 @@
 package cluster_test
 
 import (
+	"bytes"
 	"context"
-	"encoding/base64"
 	"fmt"
+	"mime/multipart"
+	"net/http"
 	"strings"
 	"testing"
 
@@ -50,14 +52,18 @@ func TestClusterHandler(t *testing.T) {
 
 	var createdClusterID uint
 
-	t.Run("Create", func(t *testing.T) {
+	t.Run("Create without configuration outside a cluster", func(t *testing.T) {
+		t.Setenv("IN_CLUSTER", "false")
 		requestBody := strings.NewReader(`{
 				"name": "name",
 				"description": "description"
 			}`)
 
-		var cluster model.Cluster
-		client.PostJSON(t, "/clusters", requestBody, &cluster)
+		client.Do(t, http.MethodPost, "/clusters", requestBody, http.StatusBadRequest, inttest.WithHeader("Content-Type", "application/json"))
+	})
+
+	t.Run("Create", func(t *testing.T) {
+		cluster := createCluster(t, client, "name", "description")
 
 		assert.Equal(t, "name", cluster.Name)
 		assert.Equal(t, "description", cluster.Description)
@@ -65,31 +71,7 @@ func TestClusterHandler(t *testing.T) {
 	})
 
 	t.Run("Create with configuration", func(t *testing.T) {
-		k8sConfig := []byte(`apiVersion: v1
-kind: Config
-clusters:
-- name: test
-  cluster:
-    server: https://localhost:6443
-contexts:
-- name: test
-  context:
-    cluster: test
-    user: test
-current-context: test
-users:
-- name: test
-  user:
-    token: test-token`)
-
-		requestBody := strings.NewReader(fmt.Sprintf(`{
-			"name": "name-with-config",
-			"description": "description-with-config",
-			"rawConfig": %q
-		}`, base64.StdEncoding.EncodeToString(k8sConfig)))
-
-		var cluster model.Cluster
-		client.PostJSON(t, "/clusters", requestBody, &cluster)
+		cluster := createCluster(t, client, "name-with-config", "description-with-config")
 
 		assert.Equal(t, "name-with-config", cluster.Name)
 		assert.Equal(t, "description-with-config", cluster.Description)
@@ -126,6 +108,41 @@ users:
 
 		assert.Len(t, clusters, 1)
 	})
+}
+
+func createCluster(t *testing.T, client *inttest.HTTPClient, name, description string) model.Cluster {
+	t.Helper()
+
+	k8sConfig := []byte(`apiVersion: v1
+kind: Config
+clusters:
+- name: test
+  cluster:
+    server: https://localhost:6443
+contexts:
+- name: test
+  context:
+    cluster: test
+    user: test
+current-context: test
+users:
+- name: test
+  user:
+    token: test-token`)
+
+	var body bytes.Buffer
+	form := multipart.NewWriter(&body)
+	require.NoError(t, form.WriteField("name", name))
+	require.NoError(t, form.WriteField("description", description))
+	file, err := form.CreateFormFile("kubernetesConfiguration", "kubeconfig.yaml")
+	require.NoError(t, err)
+	_, err = file.Write(k8sConfig)
+	require.NoError(t, err)
+	require.NoError(t, form.Close())
+
+	var cluster model.Cluster
+	client.PostForm(t, "/clusters", form, &body, &cluster)
+	return cluster
 }
 
 type fakeDialer struct{}

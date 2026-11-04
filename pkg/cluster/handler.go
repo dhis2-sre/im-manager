@@ -8,6 +8,8 @@ import (
 
 	"github.com/dhis2-sre/im-manager/internal/errdef"
 	"github.com/dhis2-sre/im-manager/internal/handler"
+	"github.com/dhis2-sre/im-manager/pkg/kube"
+	"github.com/dhis2-sre/im-manager/pkg/model"
 	"github.com/gin-gonic/gin"
 )
 
@@ -52,6 +54,11 @@ func (h Handler) Create(c *gin.Context) {
 	kubernetesConfiguration, err := h.getBytes(request.KubernetesConfiguration)
 	if err != nil {
 		_ = c.Error(err)
+		return
+	}
+
+	if err := kube.Reachable(model.Cluster{Name: request.Name, Configuration: kubernetesConfiguration}); err != nil {
+		_ = c.Error(errdef.NewBadRequest("kubernetesConfiguration is required: %v", err))
 		return
 	}
 
