@@ -98,11 +98,12 @@ How to add a migration:
 A group deploys to the cluster assigned to it, reached through the kubeconfig uploaded with the cluster
 (see [scripts/clusters](scripts/clusters)).
 
-Run inside a Kubernetes cluster, instance manager can also deploy to that cluster itself. It then
-creates a `default` cluster without a kubeconfig at startup, and both that cluster and a group without
-a cluster use its in-cluster configuration. `IN_CLUSTER` decides when that applies: `auto`, the default,
-when instance manager runs inside a cluster, `true` always, and `false` never. Outside a cluster,
-creating a cluster requires a kubeconfig, and deploying to a group without a cluster is a bad request.
+When instance manager runs inside a Kubernetes cluster, it can also deploy to that cluster. In that
+case it creates a `default` cluster without a kubeconfig at startup. That cluster, and any group
+without a cluster, then use the in-cluster configuration. The `IN_CLUSTER` setting controls this. With
+`auto`, the default, it applies only when instance manager is running inside a cluster. With `true` it
+always applies, and with `false` it never does. When it does not apply, creating a cluster requires a
+kubeconfig, and deploying to a group without a cluster is a bad request.
 
 # Private images
 

@@ -72,7 +72,7 @@ func TestReachable(t *testing.T) {
 
 		require.Error(t, err)
 		assert.True(t, errdef.IsBadRequest(err))
-		assert.EqualError(t, err, `cluster "default" has no kubernetes configuration, and instance manager does not deploy to the cluster it runs in`)
+		assert.EqualError(t, err, `cluster "default" has no kubernetes configuration, and instance manager is not set up to deploy to the cluster it is running in`)
 	})
 
 	t.Run("outside a cluster, an unassigned group is a bad request", func(t *testing.T) {
@@ -80,7 +80,7 @@ func TestReachable(t *testing.T) {
 
 		require.Error(t, err)
 		assert.True(t, errdef.IsBadRequest(err))
-		assert.EqualError(t, err, "no cluster is assigned, and instance manager does not deploy to the cluster it runs in")
+		assert.EqualError(t, err, "no cluster is assigned, and instance manager is not set up to deploy to the cluster it is running in")
 	})
 }
 
