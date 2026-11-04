@@ -41,7 +41,6 @@ jobs:
 
       - name: Create kubeconfig files
         run: |
-          echo "${{ secrets.KUBECONFIG }}" > /tmp/eks-kubeconfig
           echo "${{ secrets.HETZNER_KUBECONFIG }}" > /tmp/hetzner-kubeconfig
 
       - name: Find orphaned Helm Releases
@@ -49,7 +48,6 @@ jobs:
         run: |
           set -o pipefail
           venv/bin/python scripts/util/find-orphaned-helm-releases.py \
-            --kubeconfig /tmp/eks-kubeconfig \
             --kubeconfig /tmp/hetzner-kubeconfig |
             tee /tmp/find-helm-releases-output
 
@@ -61,9 +59,6 @@ jobs:
             sed -n '/^Orphaned Deployments only in Helm/,/^$/p' /tmp/find-helm-releases-output | sed '$d'
             echo "ORPHANS_EOF"
           } >> $GITHUB_OUTPUT
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
       - name: Send Slack notification
         if: steps.find-orphaned-releases.outputs.orphaned_count > '0'
