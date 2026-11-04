@@ -24,7 +24,6 @@ func Routes(r *gin.Engine, authenticator gin.HandlerFunc, handler Handler) {
 	tokenAuthenticationRouter.GET("/deployments/availability", handler.DeploymentNameAvailability)
 	tokenAuthenticationRouter.POST("/deployments/bulk", handler.BulkDeploy)
 	tokenAuthenticationRouter.GET("/deployments/bulk/availability", handler.BulkDeploymentNameAvailability)
-	tokenAuthenticationRouter.GET("/deployments/presets", handler.FindPresets)
 	tokenAuthenticationRouter.GET("/deployments/:id", handler.FindDeploymentById)
 	tokenAuthenticationRouter.GET("/deployments/:id/components", handler.DeploymentComponents)
 	tokenAuthenticationRouter.DELETE("/deployments/:id", handler.DeleteDeployment)
@@ -34,4 +33,11 @@ func Routes(r *gin.Engine, authenticator gin.HandlerFunc, handler Handler) {
 	tokenAuthenticationRouter.POST("/deployments/:id/deploy", handler.DeployDeployment)
 	tokenAuthenticationRouter.PUT("/deployments/:id", handler.UpdateDeployment)
 	tokenAuthenticationRouter.PATCH("/deployments/:id", handler.EditDeployment)
+
+	tokenAuthenticationRouter.GET("/presets", handler.FindPresets)
+	tokenAuthenticationRouter.POST("/presets", handler.SavePreset)
+	tokenAuthenticationRouter.GET("/presets/:id", handler.FindPresetById)
+	tokenAuthenticationRouter.PATCH("/presets/:id", handler.EditPreset)
+	tokenAuthenticationRouter.DELETE("/presets/:id", handler.DeletePreset)
+	tokenAuthenticationRouter.POST("/presets/:id/deployments", handler.CreateDeploymentFromPreset)
 }

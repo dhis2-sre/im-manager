@@ -182,6 +182,30 @@ definitions:
                 x-go-name: Name
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/cluster
+    CreateDeploymentFromPresetRequest:
+        properties:
+            description:
+                type: string
+                x-go-name: Description
+            group:
+                description: Group defaults to the group of the preset
+                type: string
+                x-go-name: Group
+            instances:
+                additionalProperties:
+                    $ref: '#/definitions/EditInstanceRequest'
+                description: Instances change the preset's instances the way an edit does, keyed by stack name
+                type: object
+                x-go-name: Instances
+            name:
+                type: string
+                x-go-name: Name
+            ttl:
+                format: uint64
+                type: integer
+                x-go-name: TTL
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
     CreateExternalDatabaseRequest:
         properties:
             expiration:
@@ -766,13 +790,6 @@ definitions:
             name:
                 type: string
                 x-go-name: Name
-            overwrite:
-                description: Overwrite replaces a preset of the same name instead of refusing it. It only applies to presets.
-                type: boolean
-                x-go-name: Overwrite
-            preset:
-                type: boolean
-                x-go-name: Preset
             ttl:
                 format: uint64
                 type: integer
@@ -789,6 +806,28 @@ definitions:
             stackName:
                 type: string
                 x-go-name: StackName
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
+    SavePresetRequest:
+        properties:
+            description:
+                type: string
+                x-go-name: Description
+            group:
+                type: string
+                x-go-name: Group
+            instances:
+                items:
+                    $ref: '#/definitions/SaveInstanceRequest'
+                type: array
+                x-go-name: Instances
+            name:
+                type: string
+                x-go-name: Name
+            ttl:
+                format: uint64
+                type: integer
+                x-go-name: TTL
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
     Stack:
@@ -1839,7 +1878,7 @@ paths:
             summary: Update a Deployment Instance
     /deployments/availability:
         get:
-            description: Check whether a deployment name is free to use in a group. Presets have their own names, so pass preset=true to check the name of a preset.
+            description: Check whether a deployment name is free to use in a group.
             operationId: deploymentNameAvailability
             parameters:
                 - in: query
@@ -1852,11 +1891,6 @@ paths:
                   required: true
                   type: string
                   x-go-name: Name
-                - description: Check the name of a preset rather than a deployment
-                  in: query
-                  name: preset
-                  type: boolean
-                  x-go-name: Preset
             responses:
                 "200":
                     $ref: '#/responses/DeploymentNameAvailability'
@@ -1934,22 +1968,6 @@ paths:
             security:
                 - oauth2: []
             summary: Bulk deployment name availability
-    /deployments/presets:
-        get:
-            description: Find the presets in the groups the user belongs to. A preset is a deployment that is saved but never deployed, kept to start new deployments from.
-            operationId: listPresets
-            responses:
-                "200":
-                    $ref: '#/responses/Presets'
-                "401":
-                    $ref: '#/responses/Error'
-                "403":
-                    $ref: '#/responses/Error'
-                "415":
-                    $ref: '#/responses/Error'
-            security:
-                - oauth2: []
-            summary: Find presets
     /deployments/public:
         get:
             description: Find all public deployments
@@ -2719,6 +2737,176 @@ paths:
             security:
                 - oauth2: []
             summary: Mark all notifications as read
+    /presets:
+        get:
+            description: Find the presets in the groups the user belongs to. A preset is a deployment that is saved but never deployed, kept to start new deployments from.
+            operationId: listPresets
+            responses:
+                "200":
+                    $ref: '#/responses/Presets'
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Find presets
+        post:
+            description: Save a preset with all its instances in one request. Either the preset is created with every instance or nothing is.
+            operationId: savePreset
+            parameters:
+                - description: Save preset request body parameter
+                  in: body
+                  name: Payload
+                  required: true
+                  schema:
+                    $ref: '#/definitions/SavePresetRequest'
+            responses:
+                "201":
+                    description: Created
+                    schema:
+                        $ref: '#/definitions/Deployment'
+                "400":
+                    $ref: '#/responses/Error'
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+                "409":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Save a preset
+    /presets/{id}:
+        delete:
+            description: Delete a preset by id
+            operationId: deletePreset
+            parameters:
+                - format: uint64
+                  in: path
+                  name: id
+                  required: true
+                  type: integer
+                  x-go-name: ID
+            responses:
+                "204":
+                    description: ""
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+                "409":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Delete a preset
+        get:
+            description: Find a preset by id
+            operationId: findPresetById
+            parameters:
+                - format: uint64
+                  in: path
+                  name: id
+                  required: true
+                  type: integer
+                  x-go-name: ID
+            responses:
+                "200":
+                    description: OK
+                    schema:
+                        $ref: '#/definitions/Deployment'
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Find a preset
+        patch:
+            description: Edit a preset and everything in it in one request. Like a deployment edit, whatever the request leaves out stays unchanged, so masked sensitive values are kept by not sending them.
+            operationId: editPreset
+            parameters:
+                - format: uint64
+                  in: path
+                  name: id
+                  required: true
+                  type: integer
+                  x-go-name: ID
+                - description: Edit deployment request body parameter
+                  in: body
+                  name: Payload
+                  required: true
+                  schema:
+                    $ref: '#/definitions/EditDeploymentRequest'
+            responses:
+                "200":
+                    description: OK
+                    schema:
+                        $ref: '#/definitions/Deployment'
+                "400":
+                    $ref: '#/responses/Error'
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Edit a preset
+    /presets/{id}/deployments:
+        post:
+            description: Create a deployment holding the preset's instances, including the sensitive values a client only sees masked. Anything the request leaves out comes from the preset. The deployment is created, not deployed.
+            operationId: createDeploymentFromPreset
+            parameters:
+                - format: uint64
+                  in: path
+                  name: id
+                  required: true
+                  type: integer
+                  x-go-name: ID
+                - description: Create deployment from preset request body parameter
+                  in: body
+                  name: Payload
+                  required: true
+                  schema:
+                    $ref: '#/definitions/CreateDeploymentFromPresetRequest'
+            responses:
+                "201":
+                    description: Created
+                    schema:
+                        $ref: '#/definitions/Deployment'
+                "400":
+                    $ref: '#/responses/Error'
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+                "409":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Create a deployment from a preset
     /refresh:
         post:
             description: Refresh user tokens
