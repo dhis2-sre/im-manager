@@ -1450,6 +1450,34 @@ func (h Handler) SavePreset(c *gin.Context) {
 	c.JSON(http.StatusCreated, preset)
 }
 
+// findAuthorizedPreset finds the preset named by the id path parameter that the user may access, and reports a failure on the context.
+func (h Handler) findAuthorizedPreset(c *gin.Context, mayAccess func(*model.User, *model.Deployment) bool) (*model.Deployment, *model.User, bool) {
+	id, ok := handler.GetPathParameter(c, "id")
+	if !ok {
+		return nil, nil, false
+	}
+
+	ctx := c.Request.Context()
+	user, err := handler.GetUserFromContext(ctx)
+	if err != nil {
+		_ = c.Error(err)
+		return nil, nil, false
+	}
+
+	preset, err := h.instanceService.FindPresetById(ctx, id)
+	if err != nil {
+		_ = c.Error(err)
+		return nil, nil, false
+	}
+
+	if !mayAccess(user, preset) {
+		_ = c.Error(errdef.NewUnauthorized("access to preset %d denied", id))
+		return nil, nil, false
+	}
+
+	return preset, user, true
+}
+
 func (h Handler) FindPresetById(c *gin.Context) {
 	// swagger:route GET /presets/{id} findPresetById
 	//
@@ -1466,26 +1494,8 @@ func (h Handler) FindPresetById(c *gin.Context) {
 	//	403: Error
 	//	404: Error
 	//	415: Error
-	id, ok := handler.GetPathParameter(c, "id")
+	preset, _, ok := h.findAuthorizedPreset(c, handler.CanReadDeployment)
 	if !ok {
-		return
-	}
-
-	ctx := c.Request.Context()
-	user, err := handler.GetUserFromContext(ctx)
-	if err != nil {
-		_ = c.Error(err)
-		return
-	}
-
-	preset, err := h.instanceService.FindPresetById(ctx, id)
-	if err != nil {
-		_ = c.Error(err)
-		return
-	}
-
-	if !handler.CanReadDeployment(user, preset) {
-		_ = c.Error(errdef.NewUnauthorized("read access denied"))
 		return
 	}
 
@@ -1514,7 +1524,7 @@ func (h Handler) EditPreset(c *gin.Context) {
 	//	403: Error
 	//	404: Error
 	//	415: Error
-	id, ok := handler.GetPathParameter(c, "id")
+	preset, _, ok := h.findAuthorizedPreset(c, handler.CanWriteDeployment)
 	if !ok {
 		return
 	}
@@ -1525,25 +1535,7 @@ func (h Handler) EditPreset(c *gin.Context) {
 		return
 	}
 
-	ctx := c.Request.Context()
-	user, err := handler.GetUserFromContext(ctx)
-	if err != nil {
-		_ = c.Error(err)
-		return
-	}
-
-	preset, err := h.instanceService.FindPresetById(ctx, id)
-	if err != nil {
-		_ = c.Error(err)
-		return
-	}
-
-	if !handler.CanWriteDeployment(user, preset) {
-		_ = c.Error(errdef.NewUnauthorized("write access denied"))
-		return
-	}
-
-	edited, err := h.instanceService.EditPreset(ctx, id, request.edit())
+	edited, err := h.instanceService.EditPreset(c.Request.Context(), preset.ID, request.edit())
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -1574,30 +1566,12 @@ func (h Handler) DeletePreset(c *gin.Context) {
 	//	404: Error
 	//	409: Error
 	//	415: Error
-	id, ok := handler.GetPathParameter(c, "id")
+	preset, _, ok := h.findAuthorizedPreset(c, handler.CanWriteDeployment)
 	if !ok {
 		return
 	}
 
-	ctx := c.Request.Context()
-	user, err := handler.GetUserFromContext(ctx)
-	if err != nil {
-		_ = c.Error(err)
-		return
-	}
-
-	preset, err := h.instanceService.FindPresetById(ctx, id)
-	if err != nil {
-		_ = c.Error(err)
-		return
-	}
-
-	if !handler.CanWriteDeployment(user, preset) {
-		_ = c.Error(errdef.NewUnauthorized("write access denied"))
-		return
-	}
-
-	if err := h.instanceService.DeleteDeployment(ctx, preset); err != nil {
+	if err := h.instanceService.DeleteDeployment(c.Request.Context(), preset); err != nil {
 		_ = c.Error(fmt.Errorf("unable to delete preset: %w", err))
 		return
 	}
@@ -1633,7 +1607,7 @@ func (h Handler) CreateDeploymentFromPreset(c *gin.Context) {
 	//	404: Error
 	//	409: Error
 	//	415: Error
-	id, ok := handler.GetPathParameter(c, "id")
+	preset, user, ok := h.findAuthorizedPreset(c, handler.CanReadDeployment)
 	if !ok {
 		return
 	}
@@ -1644,27 +1618,11 @@ func (h Handler) CreateDeploymentFromPreset(c *gin.Context) {
 		return
 	}
 
-	ctx := c.Request.Context()
-	user, err := handler.GetUserFromContext(ctx)
-	if err != nil {
-		_ = c.Error(err)
-		return
-	}
-
-	preset, err := h.instanceService.FindPresetById(ctx, id)
-	if err != nil {
-		_ = c.Error(err)
-		return
-	}
-
-	if !handler.CanReadDeployment(user, preset) {
-		_ = c.Error(errdef.NewUnauthorized("read access denied"))
-		return
-	}
-
 	if request.Group == "" {
 		request.Group = preset.GroupName
 	}
+
+	ctx := c.Request.Context()
 	group, err := h.groupService.Find(ctx, request.Group)
 	if err != nil {
 		_ = c.Error(err)
@@ -1676,30 +1634,20 @@ func (h Handler) CreateDeploymentFromPreset(c *gin.Context) {
 		return
 	}
 
-	deployment := &model.Deployment{
-		UserID:      user.ID,
-		Name:        request.Name,
-		Description: preset.Description,
-		GroupName:   group.Name,
-		Group:       group,
-		TTL:         preset.TTL,
-	}
-	if request.Description != nil {
-		deployment.Description = *request.Description
-	}
-	if request.TTL != nil {
-		deployment.TTL = *request.TTL
-	}
-	if deployment.TTL == 0 {
-		deployment.TTL = h.defaultTTL
-	}
-
-	if !handler.CanWriteDeployment(user, deployment) {
+	if !handler.CanWriteDeployment(user, &model.Deployment{UserID: user.ID, GroupName: group.Name}) {
 		_ = c.Error(errdef.NewUnauthorized("write access denied"))
 		return
 	}
 
-	if err := h.instanceService.CreateDeploymentFromPreset(ctx, preset, deployment, instanceEdits(request.Instances)); err != nil {
+	deployment, err := h.instanceService.CreateDeploymentFromPreset(ctx, preset.ID, DeploymentFromPreset{
+		UserID:      user.ID,
+		Name:        request.Name,
+		Group:       group,
+		Description: request.Description,
+		TTL:         request.TTL,
+		Instances:   instanceEdits(request.Instances),
+	})
+	if err != nil {
 		_ = c.Error(err)
 		return
 	}

@@ -21,11 +21,14 @@ func (s Service) SavePreset(ctx context.Context, preset *model.Deployment) error
 
 func (s Service) FindPresetById(ctx context.Context, id uint) (*model.Deployment, error) {
 	preset, err := s.instanceRepository.FindDeploymentById(ctx, id)
-	if errdef.IsNotFound(err) || (err == nil && !preset.Preset) {
+	if errdef.IsNotFound(err) {
 		return nil, errdef.NewNotFound("preset not found by id: %d", id)
 	}
 	if err != nil {
 		return nil, err
+	}
+	if !preset.Preset {
+		return nil, errdef.NewNotFound("preset not found by id: %d", id)
 	}
 
 	return preset, nil
@@ -47,26 +50,61 @@ func (s Service) EditPreset(ctx context.Context, presetId uint, edit Edit) (*mod
 	return changes.Deployment, nil
 }
 
-// CreateDeploymentFromPreset saves a new deployment holding the preset's instances with the edits applied. The preset's sensitive values carry over, which a client only ever sees masked.
-func (s Service) CreateDeploymentFromPreset(ctx context.Context, preset, deployment *model.Deployment, edits map[string]InstanceEdit) error {
-	decryptedPreset, err := s.decryptDeployment(preset)
-	if err != nil {
-		return err
-	}
-
-	if err := s.copyPresetInstances(decryptedPreset, deployment, edits); err != nil {
-		return err
-	}
-
-	return s.SaveDeployments(ctx, deployment.GroupName, []*model.Deployment{deployment})
+// DeploymentFromPreset is what a deployment started from a preset takes in place of the preset's own values. A nil field keeps the preset's.
+type DeploymentFromPreset struct {
+	UserID      uint
+	Name        string
+	Group       *model.Group
+	Description *string
+	TTL         *uint
+	Instances   map[string]InstanceEdit
 }
 
-// copyPresetInstances gives the deployment the preset's instances with the edits applied. Consumed parameters are resolved again for the new name and group, and parameters the stack no longer declares are dropped.
-func (s Service) copyPresetInstances(preset, deployment *model.Deployment, edits map[string]InstanceEdit) error {
+// CreateDeploymentFromPreset saves a new deployment holding the preset's instances with the request applied. The preset's sensitive values carry over, which a client only ever sees masked.
+func (s Service) CreateDeploymentFromPreset(ctx context.Context, presetId uint, request DeploymentFromPreset) (*model.Deployment, error) {
+	preset, err := s.FindPresetById(ctx, presetId)
+	if err != nil {
+		return nil, err
+	}
+
+	decryptedPreset, err := s.decryptDeployment(preset)
+	if err != nil {
+		return nil, err
+	}
+
+	deployment, err := s.newDeploymentFromPreset(decryptedPreset, request)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := s.SaveDeployments(ctx, deployment.GroupName, []*model.Deployment{deployment}); err != nil {
+		return nil, err
+	}
+
+	return deployment, nil
+}
+
+// newDeploymentFromPreset builds the deployment a preset starts. Consumed parameters are resolved again for the new name and group, and parameters the stack no longer declares are dropped.
+func (s Service) newDeploymentFromPreset(preset *model.Deployment, request DeploymentFromPreset) (*model.Deployment, error) {
+	deployment := &model.Deployment{
+		UserID:      request.UserID,
+		Name:        request.Name,
+		GroupName:   request.Group.Name,
+		Group:       request.Group,
+		Description: preset.Description,
+		TTL:         preset.TTL,
+	}
+	if request.Description != nil {
+		deployment.Description = *request.Description
+	}
+	if request.TTL != nil {
+		deployment.TTL = *request.TTL
+	}
+
 	for _, presetInstance := range preset.Instances {
 		instanceStack, err := s.stackService.Find(presetInstance.StackName)
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		parameters := make(model.DeploymentInstanceParameters, len(presetInstance.Parameters))
@@ -87,26 +125,14 @@ func (s Service) copyPresetInstances(preset, deployment *model.Deployment, edits
 		})
 	}
 
-	if err := s.rejectUnofferedStacks(deployment, edits); err != nil {
-		return err
-	}
-
-	byStack := make(map[string]*model.DeploymentInstance, len(deployment.Instances))
-	for _, deploymentInstance := range deployment.Instances {
-		byStack[deploymentInstance.StackName] = deploymentInstance
-	}
-	if err := s.applyInstanceEdits(byStack, edits); err != nil {
-		return err
-	}
-
-	added, switchedOff, err := s.reconcileCompanions(deployment, edits)
+	added, switchedOff, err := s.applyEdits(deployment, request.Instances)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	deployment.Instances = slices.DeleteFunc(deployment.Instances, func(deploymentInstance *model.DeploymentInstance) bool {
 		return slices.Contains(switchedOff, deploymentInstance)
 	})
 	deployment.Instances = append(deployment.Instances, added...)
 
-	return nil
+	return deployment, nil
 }

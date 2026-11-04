@@ -9,17 +9,19 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func presetTestDeployment() *model.Deployment {
-	return &model.Deployment{Name: "copy", GroupName: "other", Group: &model.Group{Name: "other"}}
+func presetTestRequest(edits map[string]InstanceEdit) DeploymentFromPreset {
+	return DeploymentFromPreset{UserID: 2, Name: "copy", Group: &model.Group{Name: "other"}, Instances: edits}
 }
 
-func TestCopyPresetInstances(t *testing.T) {
+func TestNewDeploymentFromPreset(t *testing.T) {
 	t.Run("CopiesTheInstancesUnderTheNewNameAndGroup", func(t *testing.T) {
-		deployment := presetTestDeployment()
-
-		err := editTestService().copyPresetInstances(editTestDeployment(true), deployment, nil)
+		deployment, err := editTestService().newDeploymentFromPreset(editTestDeployment(true), presetTestRequest(nil))
 
 		require.NoError(t, err)
+		assert.Equal(t, "copy", deployment.Name)
+		assert.Equal(t, "other", deployment.GroupName)
+		assert.Equal(t, uint(2), deployment.UserID)
+		assert.False(t, deployment.Preset)
 		assert.Equal(t, []string{"host", "sidecar"}, stackNames(deployment.Instances))
 		for _, deploymentInstance := range deployment.Instances {
 			assert.Equal(t, "copy", deploymentInstance.Name)
@@ -32,10 +34,26 @@ func TestCopyPresetInstances(t *testing.T) {
 		assert.Equal(t, "secret", host.Parameters["SHARED_PASSWORD"].Value)
 	})
 
-	t.Run("LeavesOutConsumedParameters", func(t *testing.T) {
-		deployment := presetTestDeployment()
+	t.Run("TakesTheDescriptionAndTTLOfThePresetUnlessGiven", func(t *testing.T) {
+		preset := editTestDeployment(false)
+		preset.Description = "from the preset"
 
-		err := editTestService().copyPresetInstances(editTestDeployment(true), deployment, nil)
+		kept, err := editTestService().newDeploymentFromPreset(preset, presetTestRequest(nil))
+		require.NoError(t, err)
+		assert.Equal(t, "from the preset", kept.Description)
+		assert.Equal(t, uint(86400), kept.TTL)
+
+		request := presetTestRequest(nil)
+		request.Description = ptr("given")
+		request.TTL = ptr(uint(3600))
+		given, err := editTestService().newDeploymentFromPreset(preset, request)
+		require.NoError(t, err)
+		assert.Equal(t, "given", given.Description)
+		assert.Equal(t, uint(3600), given.TTL)
+	})
+
+	t.Run("LeavesOutConsumedParameters", func(t *testing.T) {
+		deployment, err := editTestService().newDeploymentFromPreset(editTestDeployment(true), presetTestRequest(nil))
 
 		require.NoError(t, err)
 		sidecar := findInstanceByStackName("sidecar", deployment)
@@ -46,21 +64,19 @@ func TestCopyPresetInstances(t *testing.T) {
 	t.Run("LeavesOutParametersTheStackNoLongerDeclares", func(t *testing.T) {
 		preset := editTestDeployment(false)
 		preset.Instances[0].Parameters["RETIRED"] = model.DeploymentInstanceParameter{ParameterName: "RETIRED", Value: "x"}
-		deployment := presetTestDeployment()
 
-		err := editTestService().copyPresetInstances(preset, deployment, nil)
+		deployment, err := editTestService().newDeploymentFromPreset(preset, presetTestRequest(nil))
 
 		require.NoError(t, err)
 		assert.NotContains(t, deployment.Instances[0].Parameters, "RETIRED")
 	})
 
 	t.Run("AppliesTheEditsOnTopOfThePreset", func(t *testing.T) {
-		deployment := presetTestDeployment()
 		edits := map[string]InstanceEdit{
 			"host": {Parameters: Parameters{"IMAGE_TAG": {Value: "2.43.0"}}, Public: ptr(true)},
 		}
 
-		err := editTestService().copyPresetInstances(editTestDeployment(false), deployment, edits)
+		deployment, err := editTestService().newDeploymentFromPreset(editTestDeployment(false), presetTestRequest(edits))
 
 		require.NoError(t, err)
 		host := findInstanceByStackName("host", deployment)
@@ -70,13 +86,12 @@ func TestCopyPresetInstances(t *testing.T) {
 	})
 
 	t.Run("SwitchingACompanionOnAddsIt", func(t *testing.T) {
-		deployment := presetTestDeployment()
 		edits := map[string]InstanceEdit{
 			"host":    {Parameters: Parameters{"ENABLE_SIDECAR": {Value: "true"}}},
 			"sidecar": {Parameters: Parameters{"SIDECAR_TAG": {Value: "2.0.0"}}},
 		}
 
-		err := editTestService().copyPresetInstances(editTestDeployment(false), deployment, edits)
+		deployment, err := editTestService().newDeploymentFromPreset(editTestDeployment(false), presetTestRequest(edits))
 
 		require.NoError(t, err)
 		assert.Equal(t, []string{"host", "sidecar"}, stackNames(deployment.Instances))
@@ -86,12 +101,11 @@ func TestCopyPresetInstances(t *testing.T) {
 	})
 
 	t.Run("SwitchingACompanionOffLeavesItOut", func(t *testing.T) {
-		deployment := presetTestDeployment()
 		edits := map[string]InstanceEdit{
 			"host": {Parameters: Parameters{"ENABLE_SIDECAR": {Value: "false"}}},
 		}
 
-		err := editTestService().copyPresetInstances(editTestDeployment(true), deployment, edits)
+		deployment, err := editTestService().newDeploymentFromPreset(editTestDeployment(true), presetTestRequest(edits))
 
 		require.NoError(t, err)
 		assert.Equal(t, []string{"host"}, stackNames(deployment.Instances))
@@ -102,17 +116,17 @@ func TestCopyPresetInstances(t *testing.T) {
 			"unknown": {Parameters: Parameters{"IMAGE_TAG": {Value: "1"}}},
 		}
 
-		err := editTestService().copyPresetInstances(editTestDeployment(false), presetTestDeployment(), edits)
+		_, err := editTestService().newDeploymentFromPreset(editTestDeployment(false), presetTestRequest(edits))
 
 		assert.ErrorContains(t, err, `has no instance of stack "unknown"`)
 	})
 
-	t.Run("TheCopyValidatesAsANewDeployment", func(t *testing.T) {
+	t.Run("TheResultValidatesAsANewDeployment", func(t *testing.T) {
 		service := editTestService()
-		deployment := presetTestDeployment()
-		require.NoError(t, service.copyPresetInstances(editTestDeployment(true), deployment, nil))
+		deployment, err := service.newDeploymentFromPreset(editTestDeployment(true), presetTestRequest(nil))
+		require.NoError(t, err)
 
-		err := service.validateNewDeployment(deployment, map[string]*stack.Stack{})
+		err = service.validateNewDeployment(deployment, map[string]*stack.Stack{})
 
 		require.NoError(t, err)
 		sidecar := findInstanceByStackName("sidecar", deployment)

@@ -87,26 +87,13 @@ func (s Service) EditDeployment(ctx context.Context, deploymentId uint, edit Edi
 // TTL out of the database and the public flag only decides whether an instance is listed publicly,
 // so neither is worth rolling DHIS 2 core for.
 func (s Service) planEdit(deployment *model.Deployment, edit Edit) (*DeploymentChanges, error) {
-	byStack := make(map[string]*model.DeploymentInstance, len(deployment.Instances))
-	for _, deploymentInstance := range deployment.Instances {
-		byStack[deploymentInstance.StackName] = deploymentInstance
-	}
-
-	if err := s.rejectUnofferedStacks(deployment, edit.Instances); err != nil {
-		return nil, err
-	}
-
 	before := s.resolvedParameterValues(deployment)
 	stored, err := s.storedStates(deployment.Instances)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := s.applyInstanceEdits(byStack, edit.Instances); err != nil {
-		return nil, err
-	}
-
-	added, destroy, err := s.reconcileCompanions(deployment, edit.Instances)
+	added, destroy, err := s.applyEdits(deployment, edit.Instances)
 	if err != nil {
 		return nil, err
 	}
@@ -171,6 +158,23 @@ func (s Service) planEdit(deployment *model.Deployment, edit Edit) (*DeploymentC
 	}
 
 	return changes, nil
+}
+
+// applyEdits merges the edits into the deployment's instances and returns the companions they switch on and off, leaving the list of instances itself to the caller.
+func (s Service) applyEdits(deployment *model.Deployment, edits map[string]InstanceEdit) (added, switchedOff []*model.DeploymentInstance, err error) {
+	if err := s.rejectUnofferedStacks(deployment, edits); err != nil {
+		return nil, nil, err
+	}
+
+	byStack := make(map[string]*model.DeploymentInstance, len(deployment.Instances))
+	for _, deploymentInstance := range deployment.Instances {
+		byStack[deploymentInstance.StackName] = deploymentInstance
+	}
+	if err := s.applyInstanceEdits(byStack, edits); err != nil {
+		return nil, nil, err
+	}
+
+	return s.reconcileCompanions(deployment, edits)
 }
 
 // rejectUnofferedStacks refuses edits for a stack the deployment neither holds nor offers as a companion.
