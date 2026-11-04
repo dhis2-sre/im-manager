@@ -120,6 +120,7 @@ func (s Service) Copy(ctx context.Context, id uint, d *model.Database, group *mo
 	}
 
 	d.Url = fmt.Sprintf("s3://%s/%s", s.s3Bucket, destinationKey)
+	d.Size = source.Size
 
 	updateSlug(d)
 
@@ -162,6 +163,7 @@ func (s Service) copyFS(ctx context.Context, d *model.Database, group *model.Gro
 		GroupName: group.Name,
 		Url:       url,
 		Type:      "fs",
+		Size:      fs.Size,
 	}
 
 	updateSlug(fsNewDatabase)
