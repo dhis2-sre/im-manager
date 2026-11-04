@@ -4,7 +4,6 @@ import (
 	"context"
 	"slices"
 
-	"github.com/dhis2-sre/im-manager/internal/errdef"
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	"github.com/dhis2-sre/im-manager/pkg/stack"
 )
@@ -20,23 +19,22 @@ func (s Service) SavePreset(ctx context.Context, preset *model.Deployment) error
 }
 
 func (s Service) FindPresetById(ctx context.Context, id uint) (*model.Deployment, error) {
-	preset, err := s.instanceRepository.FindDeploymentById(ctx, id)
-	if errdef.IsNotFound(err) {
-		return nil, errdef.NewNotFound("preset not found by id: %d", id)
-	}
-	if err != nil {
-		return nil, err
-	}
-	if !preset.Preset {
-		return nil, errdef.NewNotFound("preset not found by id: %d", id)
-	}
-
-	return preset, nil
+	return s.instanceRepository.FindDeploymentById(ctx, id, true)
 }
 
 // EditPreset applies an edit to a preset. Nothing of a preset runs in the cluster, so a companion the edit switches off is deleted right away.
 func (s Service) EditPreset(ctx context.Context, presetId uint, edit Edit) (*model.Deployment, error) {
-	changes, err := s.EditDeployment(ctx, presetId, edit)
+	preset, err := s.FindPresetById(ctx, presetId)
+	if err != nil {
+		return nil, err
+	}
+
+	decryptedPreset, err := s.decryptDeployment(preset)
+	if err != nil {
+		return nil, err
+	}
+
+	changes, err := s.saveEdit(ctx, decryptedPreset, edit)
 	if err != nil {
 		return nil, err
 	}

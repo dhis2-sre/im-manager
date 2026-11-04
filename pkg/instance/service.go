@@ -116,16 +116,8 @@ func (s Service) SaveDeployment(ctx context.Context, deployment *model.Deploymen
 	return s.instanceRepository.SaveDeployment(ctx, deployment)
 }
 
-func (s Service) FindPreset(ctx context.Context, groupName, name string) (*model.Deployment, error) {
-	return s.instanceRepository.FindPreset(ctx, groupName, name)
-}
-
-func (s Service) ReplacePreset(ctx context.Context, oldID uint, preset *model.Deployment) error {
-	return s.instanceRepository.ReplacePreset(ctx, oldID, preset)
-}
-
-func (s Service) DeploymentNameExists(ctx context.Context, groupName, name string, preset bool) (bool, error) {
-	return s.instanceRepository.DeploymentNameExists(ctx, groupName, name, preset)
+func (s Service) DeploymentNameExists(ctx context.Context, groupName, name string) (bool, error) {
+	return s.instanceRepository.DeploymentNameExists(ctx, groupName, name)
 }
 
 func (s Service) TakenDeploymentNames(ctx context.Context, groupName string, names []string) ([]string, error) {
@@ -175,11 +167,11 @@ func (s Service) validateNewDeployment(deployment *model.Deployment, stacksByNam
 }
 
 func (s Service) FindDeploymentById(ctx context.Context, id uint) (*model.Deployment, error) {
-	return s.instanceRepository.FindDeploymentById(ctx, id)
+	return s.instanceRepository.FindDeploymentById(ctx, id, false)
 }
 
 func (s Service) FindDecryptedDeploymentById(ctx context.Context, id uint) (*model.Deployment, error) {
-	deployment, err := s.instanceRepository.FindDeploymentById(ctx, id)
+	deployment, err := s.FindDeploymentById(ctx, id)
 	if err != nil {
 		return nil, err
 	}

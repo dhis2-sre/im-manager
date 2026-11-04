@@ -55,6 +55,11 @@ func (s Service) EditDeployment(ctx context.Context, deploymentId uint, edit Edi
 		return nil, err
 	}
 
+	return s.saveEdit(ctx, deployment, edit)
+}
+
+// saveEdit plans an edit to the decrypted deployment and writes what it changes.
+func (s Service) saveEdit(ctx context.Context, deployment *model.Deployment, edit Edit) (*DeploymentChanges, error) {
 	changes, err := s.planEdit(deployment, edit)
 	if err != nil {
 		return nil, err

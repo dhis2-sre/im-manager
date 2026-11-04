@@ -558,68 +558,6 @@ func TestInstanceHandler(t *testing.T) {
 
 	t.Run("Preset", func(t *testing.T) {
 		t.Parallel()
-		deployment := createDeployment(t, client, "test-preset", tokens.AccessToken)
-		createWhoamiInstance(t, client, deployment.ID, tokens.AccessToken, WithParameter("IMAGE_TAG", "0.6.0"))
-		preset := createDeployment(t, client, "test-preset", tokens.AccessToken, WithPreset())
-		require.True(t, preset.Preset)
-		createWhoamiInstance(t, client, preset.ID, tokens.AccessToken, WithParameter("IMAGE_TAG", "0.6.0"), WithPublic(true))
-
-		duplicate := client.Do(t, http.MethodPost, "/deployments", strings.NewReader(`{"name":"test-preset","group":"group-name","preset":true}`), http.StatusConflict, inttest.WithAuthToken(tokens.AccessToken), inttest.WithHeader("Content-Type", "application/json"))
-		assert.Contains(t, string(duplicate), "a preset named")
-
-		var replaced model.Deployment
-		body := client.Do(t, http.MethodPost, "/deployments", strings.NewReader(`{"name":"test-preset","group":"group-name","description":"replaced","preset":true,"overwrite":true}`), http.StatusCreated, inttest.WithAuthToken(tokens.AccessToken), inttest.WithHeader("Content-Type", "application/json"))
-		require.NoError(t, json.Unmarshal(body, &replaced))
-		assert.NotEqual(t, preset.ID, replaced.ID)
-		assert.Equal(t, "replaced", replaced.Description)
-		client.Do(t, http.MethodGet, fmt.Sprintf("/deployments/%d", preset.ID), nil, http.StatusNotFound, inttest.WithAuthToken(tokens.AccessToken))
-		client.Do(t, http.MethodGet, fmt.Sprintf("/deployments/%d", deployment.ID), nil, http.StatusOK, inttest.WithAuthToken(tokens.AccessToken))
-		client.Do(t, http.MethodPost, "/deployments", strings.NewReader(`{"name":"test-preset","group":"group-name","overwrite":true}`), http.StatusBadRequest, inttest.WithAuthToken(tokens.AccessToken), inttest.WithHeader("Content-Type", "application/json"))
-		preset = replaced
-		createWhoamiInstance(t, client, preset.ID, tokens.AccessToken, WithParameter("IMAGE_TAG", "0.6.0"), WithPublic(true))
-
-		var availability instance.DeploymentNameAvailability
-		client.GetJSON(t, "/deployments/availability?group=group-name&name=test-preset&preset=true", &availability, inttest.WithAuthToken(tokens.AccessToken))
-		assert.False(t, availability.Available)
-		availability = instance.DeploymentNameAvailability{}
-		client.GetJSON(t, "/deployments/availability?group=group-name&name=test-preset-free&preset=true", &availability, inttest.WithAuthToken(tokens.AccessToken))
-		assert.True(t, availability.Available)
-
-		var outsiderPresets []model.Deployment
-		client.GetJSON(t, "/deployments/presets?user=non-member", &outsiderPresets, inttest.WithAuthToken(tokens.AccessToken))
-		assert.False(t, slices.ContainsFunc(outsiderPresets, func(d model.Deployment) bool { return d.ID == preset.ID }))
-		client.Do(t, http.MethodGet, fmt.Sprintf("/deployments/%d?user=non-member", preset.ID), nil, http.StatusUnauthorized, inttest.WithAuthToken(tokens.AccessToken))
-
-		var publicGroups []instance.GroupWithPublicInstances
-		client.GetJSON(t, "/instances/public", &publicGroups)
-		for _, group := range publicGroups {
-			for _, category := range group.Categories {
-				assert.False(t, slices.ContainsFunc(category.Instances, func(i instance.PublicInstance) bool { return i.Name == "test-preset" }))
-			}
-		}
-
-		var presets []model.Deployment
-		client.GetJSON(t, "/deployments/presets", &presets, inttest.WithAuthToken(tokens.AccessToken))
-		assert.True(t, slices.ContainsFunc(presets, func(d model.Deployment) bool { return d.ID == preset.ID }))
-		assert.False(t, slices.ContainsFunc(presets, func(d model.Deployment) bool { return !d.Preset }))
-		listed := presets[slices.IndexFunc(presets, func(d model.Deployment) bool { return d.ID == preset.ID })]
-		require.Len(t, listed.Instances, 1)
-		assert.Equal(t, "0.6.0", listed.Instances[0].Parameters["IMAGE_TAG"].Value)
-
-		var groupsWithDeployments []instance.GroupWithDeployments
-		client.GetJSON(t, "/deployments", &groupsWithDeployments, inttest.WithAuthToken(tokens.AccessToken))
-		for _, group := range groupsWithDeployments {
-			assert.False(t, slices.ContainsFunc(group.Deployments, func(d *model.Deployment) bool { return d.ID == preset.ID }))
-		}
-
-		client.Do(t, http.MethodPost, fmt.Sprintf("/deployments/%d/deploy", preset.ID), nil, http.StatusBadRequest, inttest.WithAuthToken(tokens.AccessToken))
-
-		client.Do(t, http.MethodDelete, fmt.Sprintf("/deployments/%d", preset.ID), nil, http.StatusAccepted, inttest.WithAuthToken(tokens.AccessToken))
-		client.Do(t, http.MethodGet, fmt.Sprintf("/deployments/%d", preset.ID), nil, http.StatusNotFound, inttest.WithAuthToken(tokens.AccessToken))
-	})
-
-	t.Run("PresetResource", func(t *testing.T) {
-		t.Parallel()
 		send := func(method, path string, payload any, status int, response any) {
 			t.Helper()
 			jsonData, err := json.Marshal(payload)
@@ -646,29 +584,50 @@ func TestInstanceHandler(t *testing.T) {
 				"name":        name,
 				"group":       "group-name",
 				"description": "initial",
-				"instances":   []any{map[string]any{"stackName": "dhis2-v2", "parameters": parameters(instanceParameters)}},
+				"instances":   []any{map[string]any{"stackName": "dhis2-v2", "public": true, "parameters": parameters(instanceParameters)}},
 			}
 		}
 
 		var preset model.Deployment
-		send(http.MethodPost, "/presets", presetPayload("test-preset-resource", map[string]string{"IMAGE_TAG": "2.41.0", "GOOGLE_AUTH_PROJECT_ID": "secret-project"}), http.StatusCreated, &preset)
+		send(http.MethodPost, "/presets", presetPayload("test-preset", map[string]string{"IMAGE_TAG": "2.41.0", "GOOGLE_AUTH_PROJECT_ID": "secret-project"}), http.StatusCreated, &preset)
 		assert.True(t, preset.Preset)
 		require.Len(t, preset.Instances, 1)
 		assert.NotEqual(t, "secret-project", preset.Instances[0].Parameters["GOOGLE_AUTH_PROJECT_ID"].Value)
 
-		send(http.MethodPost, "/presets", presetPayload("test-preset-resource", nil), http.StatusConflict, nil)
-		send(http.MethodPost, "/presets", presetPayload("test-preset-atomic", map[string]string{"IMAGE_PULL_POLICY": "Sometimes"}), http.StatusBadRequest, nil)
-		var availability instance.DeploymentNameAvailability
-		client.GetJSON(t, "/deployments/availability?group=group-name&name=test-preset-atomic&preset=true", &availability, inttest.WithAuthToken(tokens.AccessToken))
-		assert.True(t, availability.Available, "a refused preset leaves nothing behind")
-
-		deployment := createDeployment(t, client, "test-preset-resource-plain", tokens.AccessToken)
-		client.Do(t, http.MethodGet, fmt.Sprintf("/presets/%d", deployment.ID), nil, http.StatusNotFound, inttest.WithAuthToken(tokens.AccessToken))
-		client.Do(t, http.MethodGet, fmt.Sprintf("/presets/%d?user=non-member", preset.ID), nil, http.StatusUnauthorized, inttest.WithAuthToken(tokens.AccessToken))
+		send(http.MethodPost, "/presets", presetPayload("test-preset", nil), http.StatusConflict, nil)
+		send(http.MethodPost, "/presets", presetPayload("test-preset-refused", map[string]string{"IMAGE_PULL_POLICY": "Sometimes"}), http.StatusBadRequest, nil)
 
 		var presets []model.Deployment
 		client.GetJSON(t, "/presets", &presets, inttest.WithAuthToken(tokens.AccessToken))
 		assert.True(t, slices.ContainsFunc(presets, func(d model.Deployment) bool { return d.ID == preset.ID }))
+		assert.False(t, slices.ContainsFunc(presets, func(d model.Deployment) bool { return d.Name == "test-preset-refused" }), "a refused preset leaves nothing behind")
+
+		var outsiderPresets []model.Deployment
+		client.GetJSON(t, "/presets?user=non-member", &outsiderPresets, inttest.WithAuthToken(tokens.AccessToken))
+		assert.False(t, slices.ContainsFunc(outsiderPresets, func(d model.Deployment) bool { return d.ID == preset.ID }))
+		client.Do(t, http.MethodGet, fmt.Sprintf("/presets/%d?user=non-member", preset.ID), nil, http.StatusUnauthorized, inttest.WithAuthToken(tokens.AccessToken))
+
+		deployment := createDeployment(t, client, "test-preset", tokens.AccessToken)
+		client.Do(t, http.MethodGet, fmt.Sprintf("/presets/%d", deployment.ID), nil, http.StatusNotFound, inttest.WithAuthToken(tokens.AccessToken))
+
+		client.Do(t, http.MethodGet, fmt.Sprintf("/deployments/%d", preset.ID), nil, http.StatusNotFound, inttest.WithAuthToken(tokens.AccessToken))
+		client.Do(t, http.MethodPost, fmt.Sprintf("/deployments/%d/deploy", preset.ID), nil, http.StatusNotFound, inttest.WithAuthToken(tokens.AccessToken))
+		client.Do(t, http.MethodGet, fmt.Sprintf("/instances/%d/details", preset.Instances[0].ID), nil, http.StatusNotFound, inttest.WithAuthToken(tokens.AccessToken))
+		client.Do(t, http.MethodDelete, fmt.Sprintf("/deployments/%d", preset.ID), nil, http.StatusNotFound, inttest.WithAuthToken(tokens.AccessToken))
+
+		var groupsWithDeployments []instance.GroupWithDeployments
+		client.GetJSON(t, "/deployments", &groupsWithDeployments, inttest.WithAuthToken(tokens.AccessToken))
+		for _, group := range groupsWithDeployments {
+			assert.False(t, slices.ContainsFunc(group.Deployments, func(d *model.Deployment) bool { return d.ID == preset.ID }))
+		}
+
+		var publicGroups []instance.GroupWithPublicInstances
+		client.GetJSON(t, "/instances/public", &publicGroups)
+		for _, group := range publicGroups {
+			for _, category := range group.Categories {
+				assert.False(t, slices.ContainsFunc(category.Instances, func(i instance.PublicInstance) bool { return i.Name == "test-preset" }))
+			}
+		}
 
 		var edited model.Deployment
 		send(http.MethodPatch, fmt.Sprintf("/presets/%d", preset.ID), map[string]any{
@@ -697,7 +656,7 @@ func TestInstanceHandler(t *testing.T) {
 		assert.Equal(t, "secret-project", core.Parameters["GOOGLE_AUTH_PROJECT_ID"].Value, "a sensitive value the client only sees masked carries over")
 
 		send(http.MethodPost, fmt.Sprintf("/presets/%d/deployments", preset.ID), map[string]any{"name": "test-from-preset"}, http.StatusConflict, nil)
-		send(http.MethodPost, fmt.Sprintf("/presets/%d/deployments", deployment.ID), map[string]any{"name": "test-from-plain"}, http.StatusNotFound, nil)
+		send(http.MethodPost, fmt.Sprintf("/presets/%d/deployments", deployment.ID), map[string]any{"name": "test-from-deployment"}, http.StatusNotFound, nil)
 
 		destroyDeployment(t, client, created.ID, tokens.AccessToken)
 		destroyDeployment(t, client, deployment.ID, tokens.AccessToken)
