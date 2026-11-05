@@ -573,6 +573,10 @@ func (s Service) DeployInstance(ctx context.Context, token string, instance *mod
 		return err
 	}
 
+	if err := kube.Reachable(group.Cluster); err != nil {
+		return fmt.Errorf("group %q can't be deployed to: %w", group.Name, err)
+	}
+
 	if storageType(instance) == "s3" && filestoreBackup != nil {
 		// A filestore restore can push the deploy past the client/load-balancer
 		// timeout. Detach from the request context so the restore and the

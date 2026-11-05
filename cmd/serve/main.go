@@ -249,9 +249,15 @@ func run() (err error) {
 
 	eventHandler := event.NewHandler(logger, streamEnv, streamName, groupService)
 
-	_, err = createDefaultCluster(ctx, clusterService)
+	inCluster, err := kube.InCluster()
 	if err != nil {
 		return err
+	}
+	if inCluster {
+		_, err = createDefaultCluster(ctx, clusterService)
+		if err != nil {
+			return err
+		}
 	}
 
 	err = createAdminUser(ctx, userService, groupService)
