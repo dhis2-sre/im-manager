@@ -316,7 +316,7 @@ func (h Handler) DeploymentNameAvailability(c *gin.Context) {
 	}
 
 	if exists {
-		c.JSON(http.StatusOK, DeploymentNameAvailability{Reason: fmt.Sprintf("a %s named %q already exists in group %q", deploymentKind(request.Preset), request.Name, group.Name)})
+		c.JSON(http.StatusOK, DeploymentNameAvailability{Reason: fmt.Sprintf("%s named %q already exists in group %q", deploymentKind(request.Preset), request.Name, group.Name)})
 		return
 	}
 

@@ -80,7 +80,7 @@ func (r repository) SaveDeployment(ctx context.Context, deployment *model.Deploy
 	err := r.db.WithContext(ctx).Save(&deployment).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrDuplicatedKey) {
-			return errdef.NewDuplicated("a %s named %q already exists in group %q", deploymentKind(deployment.Preset), deployment.Name, deployment.GroupName)
+			return errdef.NewDuplicated("%s named %q already exists in group %q", deploymentKind(deployment.Preset), deployment.Name, deployment.GroupName)
 		}
 		return fmt.Errorf("failed to save deployment: %v", err)
 	}
@@ -127,9 +127,9 @@ func (r repository) FindPreset(ctx context.Context, groupName, name string) (*mo
 
 func deploymentKind(preset bool) string {
 	if preset {
-		return "preset"
+		return "a preset"
 	}
-	return "deployment"
+	return "an instance"
 }
 
 func (r repository) DeploymentNameExists(ctx context.Context, groupName, name string, preset bool) (bool, error) {
