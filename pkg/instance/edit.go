@@ -104,12 +104,7 @@ func (s Service) planEdit(deployment *model.Deployment, edit Edit) (*DeploymentC
 	}
 
 	target := &model.Deployment{ID: deployment.ID, Name: deployment.Name, GroupName: deployment.GroupName, Group: deployment.Group}
-	for _, deploymentInstance := range deployment.Instances {
-		if !slices.Contains(destroy, deploymentInstance) {
-			target.Instances = append(target.Instances, deploymentInstance)
-		}
-	}
-	target.Instances = append(target.Instances, added...)
+	target.Instances = instancesAfterEdits(deployment.Instances, added, destroy)
 
 	order, err := s.DeploymentOrder(target)
 	if err != nil {
@@ -180,6 +175,17 @@ func (s Service) applyEdits(deployment *model.Deployment, edits map[string]Insta
 	}
 
 	return s.reconcileCompanions(deployment, edits)
+}
+
+// instancesAfterEdits returns the instances without the companions the edits switched off, followed by the ones they added.
+func instancesAfterEdits(instances, added, switchedOff []*model.DeploymentInstance) []*model.DeploymentInstance {
+	remaining := make([]*model.DeploymentInstance, 0, len(instances)+len(added))
+	for _, deploymentInstance := range instances {
+		if !slices.Contains(switchedOff, deploymentInstance) {
+			remaining = append(remaining, deploymentInstance)
+		}
+	}
+	return append(remaining, added...)
 }
 
 // rejectUnofferedStacks refuses edits for a stack the deployment neither holds nor offers as a companion.
@@ -311,14 +317,15 @@ func (s Service) newCompanionInstance(deployment *model.Deployment, host *model.
 		parameters[name] = model.DeploymentInstanceParameter{ParameterName: name, Value: parameter.Value}
 	}
 
-	return &model.DeploymentInstance{
+	companion := &model.DeploymentInstance{
 		DeploymentID: deployment.ID,
 		Name:         deployment.Name,
 		Group:        host.Group,
 		GroupName:    deployment.GroupName,
 		StackName:    stackName,
 		Parameters:   parameters,
-	}, nil
+	}
+	return companion, nil
 }
 
 // offeredCompanions names every stack the deployment's instances offer as a companion, whether or

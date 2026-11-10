@@ -2,7 +2,6 @@ package instance
 
 import (
 	"context"
-	"slices"
 
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	"github.com/dhis2-sre/im-manager/pkg/stack"
@@ -127,10 +126,7 @@ func (s Service) newDeploymentFromPreset(preset *model.Deployment, request Deplo
 	if err != nil {
 		return nil, err
 	}
-	deployment.Instances = slices.DeleteFunc(deployment.Instances, func(deploymentInstance *model.DeploymentInstance) bool {
-		return slices.Contains(switchedOff, deploymentInstance)
-	})
-	deployment.Instances = append(deployment.Instances, added...)
+	deployment.Instances = instancesAfterEdits(deployment.Instances, added, switchedOff)
 
 	return deployment, nil
 }
