@@ -140,8 +140,8 @@ func TestInstanceHandler(t *testing.T) {
 		ctx := model.NewContextWithUser(c.Request.Context(), authenticatedUser)
 		c.Request = c.Request.WithContext(ctx)
 	}
+	var twoDayTTL uint = 172800
 	client := inttest.SetupHTTPServer(t, func(engine *gin.Engine) {
-		var twoDayTTL uint = 172800
 		instanceHandler := instance.NewHandler(stackService, groupService, instanceService, deploymentService, twoDayTTL)
 		instance.Routes(engine, authenticator, instanceHandler)
 
@@ -656,6 +656,12 @@ func TestInstanceHandler(t *testing.T) {
 		assert.Equal(t, "secret-project", core.Parameters["GOOGLE_AUTH_PROJECT_ID"].Value, "a sensitive value the client only sees masked carries over")
 
 		send(http.MethodPost, fmt.Sprintf("/presets/%d/deployments", preset.ID), map[string]any{"name": "test-from-preset"}, http.StatusConflict, nil)
+
+		var withoutTTL model.Deployment
+		send(http.MethodPost, fmt.Sprintf("/presets/%d/deployments", preset.ID), map[string]any{"name": "test-from-preset-zero-ttl", "ttl": 0}, http.StatusCreated, &withoutTTL)
+		assert.Equal(t, twoDayTTL, withoutTTL.TTL, "a TTL of 0 falls back to the default the way it does for a new deployment")
+		destroyDeployment(t, client, withoutTTL.ID, tokens.AccessToken)
+
 		send(http.MethodPost, fmt.Sprintf("/presets/%d/deployments", deployment.ID), map[string]any{"name": "test-from-deployment"}, http.StatusNotFound, nil)
 
 		destroyDeployment(t, client, created.ID, tokens.AccessToken)

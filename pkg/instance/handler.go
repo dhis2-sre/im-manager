@@ -1592,6 +1592,10 @@ func (h Handler) CreateDeploymentFromPreset(c *gin.Context) {
 		request.Group = preset.GroupName
 	}
 
+	if request.TTL != nil && *request.TTL == 0 {
+		request.TTL = &h.defaultTTL
+	}
+
 	ctx := c.Request.Context()
 	group, err := h.groupService.Find(ctx, request.Group)
 	if err != nil {
