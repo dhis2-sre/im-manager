@@ -325,6 +325,9 @@ func (s Service) newCompanionInstance(deployment *model.Deployment, host *model.
 		StackName:    stackName,
 		Parameters:   parameters,
 	}
+	if edit.Public != nil {
+		companion.Public = *edit.Public
+	}
 	return companion, nil
 }
 
