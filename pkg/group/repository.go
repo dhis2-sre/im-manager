@@ -88,7 +88,32 @@ func (r repository) findAll(ctx context.Context, user *model.User, deployable bo
 		return groups, err
 	}
 
-	return findAllFromUser(user, deployable), nil
+	var groups []model.Group
+	err := r.db.
+		WithContext(ctx).
+		Joins("Cluster").
+		Where("groups.name IN ?", groupNamesOf(findAllFromUser(user, deployable))).
+		Find(&groups).Error
+	return groups, err
+}
+
+func groupNamesOf(groups []model.Group) []string {
+	names := make([]string, len(groups))
+	for i, group := range groups {
+		names[i] = group.Name
+	}
+	return names
+}
+
+func (r repository) findDeployable(ctx context.Context) ([]model.Group, error) {
+	var groups []model.Group
+	err := r.db.
+		WithContext(ctx).
+		Joins("Cluster").
+		Where("deployable = true").
+		Order("groups.name").
+		Find(&groups).Error
+	return groups, err
 }
 
 func findAllFromUser(user *model.User, deployable bool) []model.Group {

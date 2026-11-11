@@ -105,6 +105,11 @@ without a cluster, then use the in-cluster configuration. The `IN_CLUSTER` setti
 always applies, and with `false` it never does. When it does not apply, creating a cluster requires a
 kubeconfig, and deploying to a group without a cluster is a bad request.
 
+A group that instance manager cannot deploy to says why in `clusterUnreachableReason`, and
+`GET /deployments/{id}/components` repeats that reason instead of failing. Instance manager also logs a
+warning for each such deployable group at startup. Assign a cluster with a kubeconfig to the group to
+make it usable.
+
 # Private images
 
 `IMAGE_REPOSITORY` for the dhis2-v2 stack also accepts `ghcr.io/dhis2/<repository>`. Such images are pulled with the
