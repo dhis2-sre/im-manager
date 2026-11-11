@@ -16,6 +16,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dhis2-sre/im-manager/internal/errdef"
 	"github.com/dhis2-sre/im-manager/pkg/token"
 	"github.com/getsops/sops/v3"
 
@@ -81,11 +82,23 @@ func TestInstanceHandler(t *testing.T) {
 			Configuration: k8sConfig,
 		},
 	}
+	otherGroup := &model.Group{
+		ID:         2,
+		Name:       "other-group-name",
+		Namespace:  "other-group-name",
+		Hostname:   "other",
+		Deployable: true,
+		Cluster: model.Cluster{
+			Name:          "other-cluster-name",
+			Configuration: k8sConfig,
+		},
+	}
 	user := &model.User{
 		Email:      "user1@dhis2.org",
 		EmailToken: uuid.New(),
 		Groups: []model.Group{
 			*group,
+			*otherGroup,
 		},
 	}
 	err = db.Create(user).Error
@@ -102,7 +115,7 @@ func TestInstanceHandler(t *testing.T) {
 	encryptionKey := strings.Repeat("a", 32)
 	instanceRepo, err := instance.NewRepository(db, encryptionKey)
 	require.NoError(t, err)
-	groupService := groupService{group: group}
+	groupService := groupService{groups: []*model.Group{group, &user.Groups[1]}}
 	stacks := stack.Stacks{
 		"whoami-go": stack.WhoamiGo,
 		"dhis2-v2":  stack.DHIS2V2,
@@ -638,6 +651,41 @@ func TestInstanceHandler(t *testing.T) {
 		assert.Equal(t, "edited", edited.Description)
 		assert.Equal(t, "2.42.0", findInstanceByStack(edited, "dhis2-v2").Parameters["IMAGE_TAG"].Value)
 
+		availability := func(path string) instance.DeploymentNameAvailability {
+			t.Helper()
+			var availability instance.DeploymentNameAvailability
+			client.GetJSON(t, path, &availability, inttest.WithAuthToken(tokens.AccessToken))
+			return availability
+		}
+		taken := availability("/presets/availability?group=group-name&name=test-preset")
+		assert.False(t, taken.Available)
+		assert.Contains(t, taken.Reason, `a preset named "test-preset"`)
+		assert.True(t, availability("/presets/availability?group=group-name&name=test-preset-free").Available)
+
+		var other model.Deployment
+		send(http.MethodPost, "/presets", presetPayload("test-preset-other", nil), http.StatusCreated, &other)
+		send(http.MethodPatch, fmt.Sprintf("/presets/%d", other.ID), map[string]any{"name": "test-preset"}, http.StatusConflict, nil)
+		send(http.MethodPatch, fmt.Sprintf("/presets/%d", other.ID), map[string]any{"name": "Not A Name"}, http.StatusBadRequest, nil)
+
+		var moved model.Deployment
+		send(http.MethodPatch, fmt.Sprintf("/presets/%d", other.ID), map[string]any{"name": "test-preset-moved", "group": "other-group-name"}, http.StatusOK, &moved)
+		assert.Equal(t, other.ID, moved.ID)
+		assert.Equal(t, "test-preset-moved", moved.Name)
+		assert.Equal(t, "other-group-name", moved.GroupName)
+
+		var reloaded model.Deployment
+		client.GetJSON(t, fmt.Sprintf("/presets/%d", other.ID), &reloaded, inttest.WithAuthToken(tokens.AccessToken))
+		assert.Equal(t, "test-preset-moved", reloaded.Name)
+		assert.Equal(t, "other-group-name", reloaded.GroupName)
+		require.Len(t, reloaded.Instances, 1)
+		assert.Equal(t, "test-preset-moved", reloaded.Instances[0].Name)
+		assert.Equal(t, "other-group-name", reloaded.Instances[0].GroupName)
+
+		assert.True(t, availability("/presets/availability?group=group-name&name=test-preset-other").Available, "renaming frees the old name")
+		assert.False(t, availability("/presets/availability?group=other-group-name&name=test-preset-moved").Available)
+		assert.True(t, availability("/deployments/availability?group=other-group-name&name=test-preset-moved").Available, "a preset's name does not take a deployment name")
+		client.Do(t, http.MethodDelete, fmt.Sprintf("/presets/%d", other.ID), nil, http.StatusNoContent, inttest.WithAuthToken(tokens.AccessToken))
+
 		var created model.Deployment
 		send(http.MethodPost, fmt.Sprintf("/presets/%d/deployments", preset.ID), map[string]any{
 			"name":      "test-from-preset",
@@ -801,15 +849,26 @@ func createNamespace(t *testing.T, k8sClient *inttest.K8sClient, namespace strin
 }
 
 type groupService struct {
-	group *model.Group
+	groups []*model.Group
 }
 
 func (gs groupService) FindByGroupNames(ctx context.Context, groupNames []string) ([]model.Group, error) {
-	return []model.Group{*gs.group}, nil
+	var found []model.Group
+	for _, group := range gs.groups {
+		if slices.Contains(groupNames, group.Name) {
+			found = append(found, *group)
+		}
+	}
+	return found, nil
 }
 
 func (gs groupService) Find(ctx context.Context, name string) (*model.Group, error) {
-	return gs.group, nil
+	for _, group := range gs.groups {
+		if group.Name == name {
+			return group, nil
+		}
+	}
+	return nil, errdef.NewNotFound("group not found by name: %s", name)
 }
 
 type noopPublisher struct{}

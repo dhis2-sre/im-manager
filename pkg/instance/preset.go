@@ -21,8 +21,15 @@ func (s Service) FindPresetById(ctx context.Context, id uint) (*model.Deployment
 	return s.instanceRepository.FindDeploymentById(ctx, id, true)
 }
 
+// PresetEdit is an edit to a preset, which unlike a deployment can also be renamed and moved to another group. A nil field keeps the preset's.
+type PresetEdit struct {
+	Edit
+	Name  *string
+	Group *model.Group
+}
+
 // EditPreset applies an edit to a preset. Nothing of a preset runs in the cluster, so a companion the edit switches off is deleted right away.
-func (s Service) EditPreset(ctx context.Context, presetId uint, edit Edit) (*model.Deployment, error) {
+func (s Service) EditPreset(ctx context.Context, presetId uint, edit PresetEdit) (*model.Deployment, error) {
 	preset, err := s.FindPresetById(ctx, presetId)
 	if err != nil {
 		return nil, err
@@ -33,7 +40,20 @@ func (s Service) EditPreset(ctx context.Context, presetId uint, edit Edit) (*mod
 		return nil, err
 	}
 
-	changes, err := s.saveEdit(ctx, decryptedPreset, edit)
+	if edit.Name != nil {
+		decryptedPreset.Name = *edit.Name
+	}
+	if edit.Group != nil {
+		decryptedPreset.GroupName = edit.Group.Name
+		decryptedPreset.Group = edit.Group
+	}
+	for _, deploymentInstance := range decryptedPreset.Instances {
+		deploymentInstance.Name = decryptedPreset.Name
+		deploymentInstance.GroupName = decryptedPreset.GroupName
+		deploymentInstance.Group = decryptedPreset.Group
+	}
+
+	changes, err := s.saveEdit(ctx, decryptedPreset, edit.Edit)
 	if err != nil {
 		return nil, err
 	}

@@ -95,14 +95,15 @@ func deploymentKind(preset bool) string {
 	return "deployment"
 }
 
-func (r repository) DeploymentNameExists(ctx context.Context, groupName, name string) (bool, error) {
+// DeploymentNameExists reports whether a deployment, or a preset when preset is true, already uses the name in the group.
+func (r repository) DeploymentNameExists(ctx context.Context, groupName, name string, preset bool) (bool, error) {
 	var count int64
 	err := r.db.WithContext(ctx).
 		Model(&model.Deployment{}).
-		Where("group_name = ? AND name = ? AND preset = false", groupName, name).
+		Where("group_name = ? AND name = ? AND preset = ?", groupName, name, preset).
 		Count(&count).Error
 	if err != nil {
-		return false, fmt.Errorf("failed to look up deployment %q in group %q: %v", name, groupName, err)
+		return false, fmt.Errorf("failed to look up %s %q in group %q: %v", deploymentKind(preset), name, groupName, err)
 	}
 
 	return count > 0, nil
@@ -214,19 +215,30 @@ func createDeploymentWithInstances(tx *gorm.DB, deployment *model.Deployment) er
 	return nil
 }
 
-// SaveDeploymentDetails writes the deployment's own columns and leaves its instances alone. Saving
-// the deployment itself cascades into the instances hanging off it, and an edit holds those
-// decrypted, so an instance the edit added would be inserted with its sensitive parameters in clear.
+// SaveDeploymentDetails writes the deployment's own columns, and the name and group its instances
+// repeat, but leaves the instances otherwise alone. Saving the deployment itself cascades into the
+// instances hanging off it, and an edit holds those decrypted, so an instance the edit added would be
+// inserted with its sensitive parameters in clear.
 func (r repository) SaveDeploymentDetails(ctx context.Context, deployment *model.Deployment) error {
 	// only use ctx for values (logging) and not cancellation signals on cud operations for now. ctx
 	// cancellation can lead to rollbacks which we should decide individually.
 	ctx = context.WithoutCancel(ctx)
 
-	err := r.db.WithContext(ctx).
-		Model(&model.Deployment{}).
-		Where("id = ?", deployment.ID).
-		Updates(map[string]any{"description": deployment.Description, "ttl": deployment.TTL}).Error
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		err := tx.Model(&model.Deployment{}).
+			Where("id = ?", deployment.ID).
+			Updates(map[string]any{"name": deployment.Name, "group_name": deployment.GroupName, "description": deployment.Description, "ttl": deployment.TTL}).Error
+		if err != nil {
+			return err
+		}
+		return tx.Model(&model.DeploymentInstance{}).
+			Where("deployment_id = ?", deployment.ID).
+			Updates(map[string]any{"name": deployment.Name, "group_name": deployment.GroupName}).Error
+	})
 	if err != nil {
+		if errors.Is(err, gorm.ErrDuplicatedKey) {
+			return errdef.NewDuplicated("a %s named %q already exists in group %q", deploymentKind(deployment.Preset), deployment.Name, deployment.GroupName)
+		}
 		return fmt.Errorf("failed to save deployment %d: %v", deployment.ID, err)
 	}
 

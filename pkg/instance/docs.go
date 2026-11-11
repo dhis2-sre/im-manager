@@ -149,7 +149,7 @@ type GroupsWithPublicInstancesBody struct {
 	Body []GroupWithPublicInstances
 }
 
-// swagger:parameters deploymentNameAvailability
+// swagger:parameters deploymentNameAvailability presetNameAvailability
 type _ struct {
 	// in: query
 	// required: true
@@ -247,7 +247,7 @@ type _ struct {
 	Payload UpdateDeploymentRequest
 }
 
-// swagger:parameters editDeployment editPreset
+// swagger:parameters editDeployment
 type _ struct {
 	// in: path
 	// required: true
@@ -256,6 +256,17 @@ type _ struct {
 	// in: body
 	// required: true
 	Payload EditDeploymentRequest
+}
+
+// swagger:parameters editPreset
+type _ struct {
+	// in: path
+	// required: true
+	ID uint `json:"id"`
+	// Edit preset request body parameter
+	// in: body
+	// required: true
+	Payload EditPresetRequest
 }
 
 // swagger:parameters savePreset

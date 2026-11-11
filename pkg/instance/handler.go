@@ -242,6 +242,30 @@ func (h Handler) DeploymentNameAvailability(c *gin.Context) {
 	//	401: Error
 	//	403: Error
 	//	404: Error
+	h.nameAvailability(c, false)
+}
+
+func (h Handler) PresetNameAvailability(c *gin.Context) {
+	// swagger:route GET /presets/availability presetNameAvailability
+	//
+	// Preset name availability
+	//
+	// Check whether a preset name is free to use in a group. Presets and deployments have separate names, so a deployment's name does not make it taken.
+	//
+	// Security:
+	//	oauth2:
+	//
+	// responses:
+	//	200: DeploymentNameAvailability
+	//	400: Error
+	//	401: Error
+	//	403: Error
+	//	404: Error
+	h.nameAvailability(c, true)
+}
+
+// nameAvailability answers whether a deployment, or a preset when preset is true, may take the name in the group.
+func (h Handler) nameAvailability(c *gin.Context, preset bool) {
 	var request struct {
 		Group string `form:"group" binding:"required"`
 		Name  string `form:"name" binding:"required"`
@@ -279,14 +303,14 @@ func (h Handler) DeploymentNameAvailability(c *gin.Context) {
 		return
 	}
 
-	exists, err := h.instanceService.DeploymentNameExists(ctx, group.Name, request.Name)
+	exists, err := h.instanceService.DeploymentNameExists(ctx, group.Name, request.Name, preset)
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
 
 	if exists {
-		c.JSON(http.StatusOK, DeploymentNameAvailability{Reason: fmt.Sprintf("a deployment named %q already exists in group %q", request.Name, group.Name)})
+		c.JSON(http.StatusOK, DeploymentNameAvailability{Reason: fmt.Sprintf("a %s named %q already exists in group %q", deploymentKind(preset), request.Name, group.Name)})
 		return
 	}
 
@@ -430,6 +454,15 @@ func (h Handler) BulkDeploy(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusAccepted, response)
+}
+
+// bindRequest binds the request body and reports a body that fails validation as a bad request rather than as an internal error.
+func bindRequest(c *gin.Context, request any) error {
+	err := handler.DataBinder(c, request)
+	if err != nil && !errdef.IsBadRequest(err) {
+		return errdef.NewBadRequest("invalid request body: %v", err)
+	}
+	return err
 }
 
 func rejectRepeatedStacks(requests []SaveInstanceRequest) error {
@@ -1360,7 +1393,7 @@ func (h Handler) SavePreset(c *gin.Context) {
 	//	409: Error
 	//	415: Error
 	var request SavePresetRequest
-	if err := handler.DataBinder(c, &request); err != nil {
+	if err := bindRequest(c, &request); err != nil {
 		_ = c.Error(err)
 		return
 	}
@@ -1477,12 +1510,24 @@ func (h Handler) FindPresetById(c *gin.Context) {
 	c.JSON(http.StatusOK, preset)
 }
 
+// EditPresetRequest is a deployment edit that can also rename the preset and move it to another group.
+//
+// swagger:model EditPresetRequest
+type EditPresetRequest struct {
+	Name *string `json:"name" binding:"omitempty,dns_rfc1035_label"`
+	// Group moves the preset to the named group
+	Group       *string                        `json:"group"`
+	Description *string                        `json:"description"`
+	TTL         *uint                          `json:"ttl"`
+	Instances   map[string]EditInstanceRequest `json:"instances"`
+}
+
 func (h Handler) EditPreset(c *gin.Context) {
 	// swagger:route PATCH /presets/{id} editPreset
 	//
 	// Edit a preset
 	//
-	// Edit a preset and everything in it in one request. Like a deployment edit, whatever the request leaves out stays unchanged, so masked sensitive values are kept by not sending them.
+	// Edit a preset and everything in it in one request, including its name and group. Like a deployment edit, whatever the request leaves out stays unchanged, so masked sensitive values are kept by not sending them.
 	//
 	// Security:
 	//	oauth2:
@@ -1494,18 +1539,44 @@ func (h Handler) EditPreset(c *gin.Context) {
 	//	403: Error
 	//	404: Error
 	//	415: Error
-	preset, _, ok := h.findAuthorizedPreset(c, handler.CanWriteDeployment)
+	preset, user, ok := h.findAuthorizedPreset(c, handler.CanWriteDeployment)
 	if !ok {
 		return
 	}
 
-	var request EditDeploymentRequest
-	if err := handler.DataBinder(c, &request); err != nil {
+	var request EditPresetRequest
+	if err := bindRequest(c, &request); err != nil {
 		_ = c.Error(err)
 		return
 	}
 
-	edited, err := h.instanceService.EditPreset(c.Request.Context(), preset.ID, request.edit())
+	edit := PresetEdit{
+		Edit: Edit{Description: request.Description, TTL: request.TTL, Instances: instanceEdits(request.Instances)},
+		Name: request.Name,
+	}
+
+	ctx := c.Request.Context()
+	if request.Group != nil && *request.Group != preset.GroupName {
+		group, err := h.groupService.Find(ctx, *request.Group)
+		if err != nil {
+			_ = c.Error(err)
+			return
+		}
+
+		if !group.Deployable {
+			_ = c.Error(errdef.NewForbidden("group isn't deployable: %s", group.Name))
+			return
+		}
+
+		if !handler.CanWriteDeployment(user, &model.Deployment{UserID: user.ID, GroupName: group.Name}) {
+			_ = c.Error(errdef.NewUnauthorized("write access denied"))
+			return
+		}
+
+		edit.Group = group
+	}
+
+	edited, err := h.instanceService.EditPreset(ctx, preset.ID, edit)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -1583,7 +1654,7 @@ func (h Handler) CreateDeploymentFromPreset(c *gin.Context) {
 	}
 
 	var request CreateDeploymentFromPresetRequest
-	if err := handler.DataBinder(c, &request); err != nil {
+	if err := bindRequest(c, &request); err != nil {
 		_ = c.Error(err)
 		return
 	}

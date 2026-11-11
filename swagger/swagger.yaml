@@ -452,6 +452,30 @@ definitions:
                 x-go-name: Public
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
+    EditPresetRequest:
+        properties:
+            description:
+                type: string
+                x-go-name: Description
+            group:
+                description: Group moves the preset to the named group
+                type: string
+                x-go-name: Group
+            instances:
+                additionalProperties:
+                    $ref: '#/definitions/EditInstanceRequest'
+                type: object
+                x-go-name: Instances
+            name:
+                type: string
+                x-go-name: Name
+            ttl:
+                format: uint64
+                type: integer
+                x-go-name: TTL
+        title: EditPresetRequest is a deployment edit that can also rename the preset and move it to another group.
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
     Event:
         properties:
             Data: {}
@@ -2837,7 +2861,7 @@ paths:
                 - oauth2: []
             summary: Find a preset
         patch:
-            description: Edit a preset and everything in it in one request. Like a deployment edit, whatever the request leaves out stays unchanged, so masked sensitive values are kept by not sending them.
+            description: Edit a preset and everything in it in one request, including its name and group. Like a deployment edit, whatever the request leaves out stays unchanged, so masked sensitive values are kept by not sending them.
             operationId: editPreset
             parameters:
                 - format: uint64
@@ -2846,12 +2870,12 @@ paths:
                   required: true
                   type: integer
                   x-go-name: ID
-                - description: Edit deployment request body parameter
+                - description: Edit preset request body parameter
                   in: body
                   name: Payload
                   required: true
                   schema:
-                    $ref: '#/definitions/EditDeploymentRequest'
+                    $ref: '#/definitions/EditPresetRequest'
             responses:
                 "200":
                     description: OK
@@ -2907,6 +2931,35 @@ paths:
             security:
                 - oauth2: []
             summary: Create a deployment from a preset
+    /presets/availability:
+        get:
+            description: Check whether a preset name is free to use in a group. Presets and deployments have separate names, so a deployment's name does not make it taken.
+            operationId: presetNameAvailability
+            parameters:
+                - in: query
+                  name: group
+                  required: true
+                  type: string
+                  x-go-name: Group
+                - in: query
+                  name: name
+                  required: true
+                  type: string
+                  x-go-name: Name
+            responses:
+                "200":
+                    $ref: '#/responses/DeploymentNameAvailability'
+                "400":
+                    $ref: '#/responses/Error'
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Preset name availability
     /refresh:
         post:
             description: Refresh user tokens

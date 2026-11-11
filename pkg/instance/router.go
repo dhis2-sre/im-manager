@@ -36,6 +36,7 @@ func Routes(r *gin.Engine, authenticator gin.HandlerFunc, handler Handler) {
 
 	tokenAuthenticationRouter.GET("/presets", handler.FindPresets)
 	tokenAuthenticationRouter.POST("/presets", handler.SavePreset)
+	tokenAuthenticationRouter.GET("/presets/availability", handler.PresetNameAvailability)
 	tokenAuthenticationRouter.GET("/presets/:id", handler.FindPresetById)
 	tokenAuthenticationRouter.PATCH("/presets/:id", handler.EditPreset)
 	tokenAuthenticationRouter.DELETE("/presets/:id", handler.DeletePreset)
