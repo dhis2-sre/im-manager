@@ -143,9 +143,6 @@ type SaveDeploymentRequest struct {
 	Description string `json:"description"`
 	Group       string `json:"group" binding:"required"`
 	TTL         uint   `json:"ttl"`
-	Preset      bool   `json:"preset"`
-	// Overwrite replaces a preset of the same name instead of refusing it. It only applies to presets.
-	Overwrite bool `json:"overwrite"`
 }
 
 func (h Handler) SaveDeployment(c *gin.Context) {
@@ -199,7 +196,6 @@ func (h Handler) SaveDeployment(c *gin.Context) {
 		Description: request.Description,
 		GroupName:   request.Group,
 		TTL:         request.TTL,
-		Preset:      request.Preset,
 	}
 
 	canWrite := handler.CanWriteDeployment(user, deployment)
@@ -209,12 +205,7 @@ func (h Handler) SaveDeployment(c *gin.Context) {
 		return
 	}
 
-	if request.Overwrite && !request.Preset {
-		_ = c.Error(errdef.NewBadRequest("overwrite only applies to presets"))
-		return
-	}
-
-	err = h.saveDeployment(ctx, user, deployment, request.Overwrite)
+	err = h.instanceService.SaveDeployment(ctx, deployment)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -229,26 +220,6 @@ func (h Handler) SaveDeployment(c *gin.Context) {
 	c.JSON(http.StatusCreated, deployment)
 }
 
-func (h Handler) saveDeployment(ctx context.Context, user *model.User, deployment *model.Deployment, overwrite bool) error {
-	if !overwrite {
-		return h.instanceService.SaveDeployment(ctx, deployment)
-	}
-
-	existing, err := h.instanceService.FindPreset(ctx, deployment.GroupName, deployment.Name)
-	if errdef.IsNotFound(err) {
-		return h.instanceService.SaveDeployment(ctx, deployment)
-	}
-	if err != nil {
-		return err
-	}
-
-	if !handler.CanWriteDeployment(user, existing) {
-		return errdef.NewUnauthorized("write access to preset %q denied", existing.Name)
-	}
-
-	return h.instanceService.ReplacePreset(ctx, existing.ID, deployment)
-}
-
 // swagger:model DeploymentNameAvailability
 type DeploymentNameAvailability struct {
 	Available bool   `json:"available"`
@@ -260,7 +231,7 @@ func (h Handler) DeploymentNameAvailability(c *gin.Context) {
 	//
 	// Deployment name availability
 	//
-	// Check whether a deployment name is free to use in a group. Presets have their own names, so pass preset=true to check the name of a preset.
+	// Check whether a deployment name is free to use in a group.
 	//
 	// Security:
 	//	oauth2:
@@ -271,10 +242,33 @@ func (h Handler) DeploymentNameAvailability(c *gin.Context) {
 	//	401: Error
 	//	403: Error
 	//	404: Error
+	h.nameAvailability(c, false)
+}
+
+func (h Handler) PresetNameAvailability(c *gin.Context) {
+	// swagger:route GET /presets/availability presetNameAvailability
+	//
+	// Preset name availability
+	//
+	// Check whether a preset name is free to use in a group. Presets and deployments have separate names, so a deployment's name does not make it taken.
+	//
+	// Security:
+	//	oauth2:
+	//
+	// responses:
+	//	200: DeploymentNameAvailability
+	//	400: Error
+	//	401: Error
+	//	403: Error
+	//	404: Error
+	h.nameAvailability(c, true)
+}
+
+// nameAvailability answers whether a deployment, or a preset when preset is true, may take the name in the group.
+func (h Handler) nameAvailability(c *gin.Context, preset bool) {
 	var request struct {
-		Group  string `form:"group" binding:"required"`
-		Name   string `form:"name" binding:"required"`
-		Preset bool   `form:"preset"`
+		Group string `form:"group" binding:"required"`
+		Name  string `form:"name" binding:"required"`
 	}
 	if err := c.ShouldBindQuery(&request); err != nil {
 		_ = c.Error(errdef.NewBadRequest("group and name query parameters are required"))
@@ -309,14 +303,14 @@ func (h Handler) DeploymentNameAvailability(c *gin.Context) {
 		return
 	}
 
-	exists, err := h.instanceService.DeploymentNameExists(ctx, group.Name, request.Name, request.Preset)
+	exists, err := h.instanceService.DeploymentNameExists(ctx, group.Name, request.Name, preset)
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
 
 	if exists {
-		c.JSON(http.StatusOK, DeploymentNameAvailability{Reason: fmt.Sprintf("a %s named %q already exists in group %q", deploymentKind(request.Preset), request.Name, group.Name)})
+		c.JSON(http.StatusOK, DeploymentNameAvailability{Reason: fmt.Sprintf("a %s named %q already exists in group %q", deploymentKind(preset), request.Name, group.Name)})
 		return
 	}
 
@@ -389,13 +383,9 @@ func (h Handler) BulkDeploy(c *gin.Context) {
 		return
 	}
 
-	stackNames := map[string]bool{}
-	for _, instance := range request.Instances {
-		if stackNames[instance.StackName] {
-			_ = c.Error(errdef.NewBadRequest("stack %q is listed more than once", instance.StackName))
-			return
-		}
-		stackNames[instance.StackName] = true
+	if err := rejectRepeatedStacks(request.Instances); err != nil {
+		_ = c.Error(err)
+		return
 	}
 
 	ctx := c.Request.Context()
@@ -435,29 +425,14 @@ func (h Handler) BulkDeploy(c *gin.Context) {
 	deployments := make([]*model.Deployment, len(names))
 	ids := make([]uint, len(names))
 	for i, name := range names {
-		deployment := &model.Deployment{
+		deployments[i] = &model.Deployment{
 			UserID:      user.ID,
 			Name:        name,
 			Description: request.Description,
 			GroupName:   group.Name,
 			TTL:         request.TTL,
+			Instances:   newInstances(name, group, request.Instances, model.DeployStatusPending),
 		}
-		for _, instance := range request.Instances {
-			parameters := make(model.DeploymentInstanceParameters, len(instance.Parameters))
-			for parameterName, parameter := range instance.Parameters {
-				parameters[parameterName] = model.DeploymentInstanceParameter{ParameterName: parameterName, Value: parameter.Value}
-			}
-			deployment.Instances = append(deployment.Instances, &model.DeploymentInstance{
-				Name:         name,
-				Group:        group,
-				GroupName:    group.Name,
-				StackName:    instance.StackName,
-				Public:       instance.Public,
-				Parameters:   parameters,
-				DeployStatus: model.DeployStatusPending,
-			})
-		}
-		deployments[i] = deployment
 	}
 
 	err = h.instanceService.SaveDeployments(ctx, group.Name, deployments)
@@ -479,6 +454,46 @@ func (h Handler) BulkDeploy(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusAccepted, response)
+}
+
+// bindRequest binds the request body and reports a body that fails validation as a bad request rather than as an internal error.
+func bindRequest(c *gin.Context, request any) error {
+	err := handler.DataBinder(c, request)
+	if err != nil && !errdef.IsBadRequest(err) {
+		return errdef.NewBadRequest("invalid request body: %v", err)
+	}
+	return err
+}
+
+func rejectRepeatedStacks(requests []SaveInstanceRequest) error {
+	stackNames := map[string]bool{}
+	for _, request := range requests {
+		if stackNames[request.StackName] {
+			return errdef.NewBadRequest("stack %q is listed more than once", request.StackName)
+		}
+		stackNames[request.StackName] = true
+	}
+	return nil
+}
+
+func newInstances(name string, group *model.Group, requests []SaveInstanceRequest, status model.DeployStatus) []*model.DeploymentInstance {
+	instances := make([]*model.DeploymentInstance, len(requests))
+	for i, request := range requests {
+		parameters := make(model.DeploymentInstanceParameters, len(request.Parameters))
+		for parameterName, parameter := range request.Parameters {
+			parameters[parameterName] = model.DeploymentInstanceParameter{ParameterName: parameterName, Value: parameter.Value}
+		}
+		instances[i] = &model.DeploymentInstance{
+			Name:         name,
+			Group:        group,
+			GroupName:    group.Name,
+			StackName:    request.StackName,
+			Public:       request.Public,
+			Parameters:   parameters,
+			DeployStatus: status,
+		}
+	}
+	return instances
 }
 
 // swagger:model BulkDeployResponse
@@ -1313,7 +1328,7 @@ func (h Handler) FindDeployments(c *gin.Context) {
 }
 
 func (h Handler) FindPresets(c *gin.Context) {
-	// swagger:route GET /deployments/presets listPresets
+	// swagger:route GET /presets listPresets
 	//
 	// Find presets
 	//
@@ -1349,6 +1364,345 @@ func (h Handler) FindPresets(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, presets)
+}
+
+type SavePresetRequest struct {
+	Name        string                `json:"name" binding:"required,dns_rfc1035_label"`
+	Description string                `json:"description"`
+	Group       string                `json:"group" binding:"required"`
+	TTL         uint                  `json:"ttl"`
+	Instances   []SaveInstanceRequest `json:"instances" binding:"required,min=1,dive"`
+}
+
+func (h Handler) SavePreset(c *gin.Context) {
+	// swagger:route POST /presets savePreset
+	//
+	// Save a preset
+	//
+	// Save a preset with all its instances in one request. Either the preset is created with every instance or nothing is.
+	//
+	// Security:
+	//	oauth2:
+	//
+	// responses:
+	//	201: Deployment
+	//	400: Error
+	//	401: Error
+	//	403: Error
+	//	404: Error
+	//	409: Error
+	//	415: Error
+	var request SavePresetRequest
+	if err := bindRequest(c, &request); err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	if err := rejectRepeatedStacks(request.Instances); err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	ctx := c.Request.Context()
+	group, err := h.groupService.Find(ctx, request.Group)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	if !group.Deployable {
+		_ = c.Error(errdef.NewForbidden("group isn't deployable: %s", group.Name))
+		return
+	}
+
+	user, err := handler.GetUserFromContext(ctx)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	if request.TTL == 0 {
+		request.TTL = h.defaultTTL
+	}
+
+	preset := &model.Deployment{
+		UserID:      user.ID,
+		Name:        request.Name,
+		Description: request.Description,
+		GroupName:   group.Name,
+		TTL:         request.TTL,
+		Preset:      true,
+		Instances:   newInstances(request.Name, group, request.Instances, ""),
+	}
+
+	if !handler.CanWriteDeployment(user, preset) {
+		_ = c.Error(errdef.NewUnauthorized("write access denied"))
+		return
+	}
+
+	if err := h.instanceService.SavePreset(ctx, preset); err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	if err := h.stripDeploymentSensitiveParameterValues(preset); err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	c.JSON(http.StatusCreated, preset)
+}
+
+// findAuthorizedPreset finds the preset named by the id path parameter that the user may access, and reports a failure on the context.
+func (h Handler) findAuthorizedPreset(c *gin.Context, mayAccess func(*model.User, *model.Deployment) bool) (*model.Deployment, *model.User, bool) {
+	id, ok := handler.GetPathParameter(c, "id")
+	if !ok {
+		return nil, nil, false
+	}
+
+	ctx := c.Request.Context()
+	user, err := handler.GetUserFromContext(ctx)
+	if err != nil {
+		_ = c.Error(err)
+		return nil, nil, false
+	}
+
+	preset, err := h.instanceService.FindPresetById(ctx, id)
+	if err != nil {
+		_ = c.Error(err)
+		return nil, nil, false
+	}
+
+	if !mayAccess(user, preset) {
+		_ = c.Error(errdef.NewUnauthorized("access to preset %d denied", id))
+		return nil, nil, false
+	}
+
+	return preset, user, true
+}
+
+func (h Handler) FindPresetById(c *gin.Context) {
+	// swagger:route GET /presets/{id} findPresetById
+	//
+	// Find a preset
+	//
+	// Find a preset by id
+	//
+	// Security:
+	//	oauth2:
+	//
+	// responses:
+	//	200: Deployment
+	//	401: Error
+	//	403: Error
+	//	404: Error
+	//	415: Error
+	preset, _, ok := h.findAuthorizedPreset(c, handler.CanReadDeployment)
+	if !ok {
+		return
+	}
+
+	if err := h.stripDeploymentSensitiveParameterValues(preset); err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	c.JSON(http.StatusOK, preset)
+}
+
+// EditPresetRequest is a deployment edit that can also rename the preset and move it to another group.
+//
+// swagger:model EditPresetRequest
+type EditPresetRequest struct {
+	Name *string `json:"name" binding:"omitempty,dns_rfc1035_label"`
+	// Group moves the preset to the named group
+	Group       *string                        `json:"group"`
+	Description *string                        `json:"description"`
+	TTL         *uint                          `json:"ttl"`
+	Instances   map[string]EditInstanceRequest `json:"instances"`
+}
+
+func (h Handler) EditPreset(c *gin.Context) {
+	// swagger:route PATCH /presets/{id} editPreset
+	//
+	// Edit a preset
+	//
+	// Edit a preset and everything in it in one request, including its name and group. Like a deployment edit, whatever the request leaves out stays unchanged, so masked sensitive values are kept by not sending them.
+	//
+	// Security:
+	//	oauth2:
+	//
+	// responses:
+	//	200: Deployment
+	//	400: Error
+	//	401: Error
+	//	403: Error
+	//	404: Error
+	//	415: Error
+	preset, user, ok := h.findAuthorizedPreset(c, handler.CanWriteDeployment)
+	if !ok {
+		return
+	}
+
+	var request EditPresetRequest
+	if err := bindRequest(c, &request); err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	edit := PresetEdit{
+		Edit: Edit{Description: request.Description, TTL: request.TTL, Instances: instanceEdits(request.Instances)},
+		Name: request.Name,
+	}
+
+	ctx := c.Request.Context()
+	if request.Group != nil && *request.Group != preset.GroupName {
+		group, err := h.groupService.Find(ctx, *request.Group)
+		if err != nil {
+			_ = c.Error(err)
+			return
+		}
+
+		if !group.Deployable {
+			_ = c.Error(errdef.NewForbidden("group isn't deployable: %s", group.Name))
+			return
+		}
+
+		if !handler.CanWriteDeployment(user, &model.Deployment{UserID: user.ID, GroupName: group.Name}) {
+			_ = c.Error(errdef.NewUnauthorized("write access denied"))
+			return
+		}
+
+		edit.Group = group
+	}
+
+	edited, err := h.instanceService.EditPreset(ctx, preset.ID, edit)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	if err := h.stripDeploymentSensitiveParameterValues(edited); err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	c.JSON(http.StatusOK, edited)
+}
+
+func (h Handler) DeletePreset(c *gin.Context) {
+	// swagger:route DELETE /presets/{id} deletePreset
+	//
+	// Delete a preset
+	//
+	// Delete a preset by id
+	//
+	// Security:
+	//	oauth2:
+	//
+	// responses:
+	//	204:
+	//	401: Error
+	//	403: Error
+	//	404: Error
+	//	409: Error
+	//	415: Error
+	preset, _, ok := h.findAuthorizedPreset(c, handler.CanWriteDeployment)
+	if !ok {
+		return
+	}
+
+	if err := h.instanceService.DeleteDeployment(c.Request.Context(), preset); err != nil {
+		_ = c.Error(fmt.Errorf("unable to delete preset: %w", err))
+		return
+	}
+
+	c.Status(http.StatusNoContent)
+}
+
+type CreateDeploymentFromPresetRequest struct {
+	Name string `json:"name" binding:"required,dns_rfc1035_label"`
+	// Group defaults to the group of the preset
+	Group       string  `json:"group"`
+	Description *string `json:"description"`
+	TTL         *uint   `json:"ttl"`
+	// Instances change the preset's instances the way an edit does, keyed by stack name
+	Instances map[string]EditInstanceRequest `json:"instances"`
+}
+
+func (h Handler) CreateDeploymentFromPreset(c *gin.Context) {
+	// swagger:route POST /presets/{id}/deployments createDeploymentFromPreset
+	//
+	// Create a deployment from a preset
+	//
+	// Create a deployment holding the preset's instances, including the sensitive values a client only sees masked. Anything the request leaves out comes from the preset. The deployment is created, not deployed.
+	//
+	// Security:
+	//	oauth2:
+	//
+	// responses:
+	//	201: Deployment
+	//	400: Error
+	//	401: Error
+	//	403: Error
+	//	404: Error
+	//	409: Error
+	//	415: Error
+	preset, user, ok := h.findAuthorizedPreset(c, handler.CanReadDeployment)
+	if !ok {
+		return
+	}
+
+	var request CreateDeploymentFromPresetRequest
+	if err := bindRequest(c, &request); err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	if request.Group == "" {
+		request.Group = preset.GroupName
+	}
+
+	if request.TTL != nil && *request.TTL == 0 {
+		request.TTL = &h.defaultTTL
+	}
+
+	ctx := c.Request.Context()
+	group, err := h.groupService.Find(ctx, request.Group)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	if !group.Deployable {
+		_ = c.Error(errdef.NewForbidden("group isn't deployable: %s", group.Name))
+		return
+	}
+
+	if !handler.CanWriteDeployment(user, &model.Deployment{UserID: user.ID, GroupName: group.Name}) {
+		_ = c.Error(errdef.NewUnauthorized("write access denied"))
+		return
+	}
+
+	deployment, err := h.instanceService.CreateDeploymentFromPreset(ctx, preset.ID, DeploymentFromPreset{
+		UserID:      user.ID,
+		Name:        request.Name,
+		Group:       group,
+		Description: request.Description,
+		TTL:         request.TTL,
+		Instances:   instanceEdits(request.Instances),
+	})
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	if err := h.stripDeploymentSensitiveParameterValues(deployment); err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	c.JSON(http.StatusCreated, deployment)
 }
 
 // FindPublicInstances list public available instances
@@ -1571,10 +1925,25 @@ type EditDeploymentRequest struct {
 	Instances map[string]EditInstanceRequest `json:"instances"`
 }
 
+func (request EditDeploymentRequest) edit() Edit {
+	return Edit{Description: request.Description, TTL: request.TTL, Instances: instanceEdits(request.Instances)}
+}
+
 // swagger:model EditInstanceRequest
 type EditInstanceRequest struct {
 	Parameters Parameters `json:"parameters"`
 	Public     *bool      `json:"public"`
+}
+
+func instanceEdits(requests map[string]EditInstanceRequest) map[string]InstanceEdit {
+	if len(requests) == 0 {
+		return nil
+	}
+	edits := make(map[string]InstanceEdit, len(requests))
+	for stackName, request := range requests {
+		edits[stackName] = InstanceEdit(request)
+	}
+	return edits
 }
 
 // EditDeployment edits a deployment
@@ -1632,15 +2001,7 @@ func (h Handler) EditDeployment(c *gin.Context) {
 		return
 	}
 
-	edit := Edit{Description: request.Description, TTL: request.TTL}
-	if len(request.Instances) > 0 {
-		edit.Instances = make(map[string]InstanceEdit, len(request.Instances))
-		for stackName, instanceRequest := range request.Instances {
-			edit.Instances[stackName] = InstanceEdit(instanceRequest)
-		}
-	}
-
-	edited, err := h.deploymentService.EditDeployment(ctx, token, id, edit, user.ID)
+	edited, err := h.deploymentService.EditDeployment(ctx, token, id, request.edit(), user.ID)
 	if err != nil {
 		_ = c.Error(err)
 		return

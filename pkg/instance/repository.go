@@ -80,49 +80,12 @@ func (r repository) SaveDeployment(ctx context.Context, deployment *model.Deploy
 	err := r.db.WithContext(ctx).Save(&deployment).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrDuplicatedKey) {
-			return errdef.NewDuplicated("a %s named %q already exists in group %q", deploymentKind(deployment.Preset), deployment.Name, deployment.GroupName)
+			return errdef.NewDuplicated("a deployment named %q already exists in group %q", deployment.Name, deployment.GroupName)
 		}
 		return fmt.Errorf("failed to save deployment: %v", err)
 	}
 
 	return nil
-}
-
-// ReplacePreset swaps the preset with the given id for a new one in one transaction, so a failed save leaves the old preset in place.
-func (r repository) ReplacePreset(ctx context.Context, oldID uint, preset *model.Deployment) error {
-	// only use ctx for values (logging) and not cancellation signals on cud operations for now. ctx
-	// cancellation can lead to rollbacks which we should decide individually.
-	ctx = context.WithoutCancel(ctx)
-
-	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		if err := tx.Unscoped().Where("preset = true").Delete(&model.Deployment{}, oldID).Error; err != nil {
-			return err
-		}
-		return tx.Create(preset).Error
-	})
-	if err != nil {
-		if errors.Is(err, gorm.ErrDuplicatedKey) {
-			return errdef.NewDuplicated("a preset named %q already exists in group %q", preset.Name, preset.GroupName)
-		}
-		return fmt.Errorf("failed to replace preset %d: %v", oldID, err)
-	}
-
-	return nil
-}
-
-func (r repository) FindPreset(ctx context.Context, groupName, name string) (*model.Deployment, error) {
-	var preset *model.Deployment
-	err := r.db.WithContext(ctx).
-		Where("group_name = ? AND name = ? AND preset = true", groupName, name).
-		First(&preset).Error
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, errdef.NewNotFound("preset %q not found in group %q", name, groupName)
-		}
-		return nil, fmt.Errorf("failed to find preset %q in group %q: %v", name, groupName, err)
-	}
-
-	return preset, nil
 }
 
 func deploymentKind(preset bool) string {
@@ -132,6 +95,7 @@ func deploymentKind(preset bool) string {
 	return "deployment"
 }
 
+// DeploymentNameExists reports whether a deployment, or a preset when preset is true, already uses the name in the group.
 func (r repository) DeploymentNameExists(ctx context.Context, groupName, name string, preset bool) (bool, error) {
 	var count int64
 	err := r.db.WithContext(ctx).
@@ -194,14 +158,8 @@ func (r repository) SaveDeployments(ctx context.Context, groupName string, deplo
 		}
 
 		for _, deployment := range deployments {
-			if err := tx.Omit(clause.Associations).Create(deployment).Error; err != nil {
+			if err := createDeploymentWithInstances(tx, deployment); err != nil {
 				return err
-			}
-			for _, instance := range deployment.Instances {
-				instance.DeploymentID = deployment.ID
-				if err := tx.Omit("Group", "Lock", "Deployment").Create(instance).Error; err != nil {
-					return err
-				}
 			}
 		}
 		return nil
@@ -219,26 +177,76 @@ func (r repository) SaveDeployments(ctx context.Context, groupName string, deplo
 	return nil
 }
 
-// SaveDeploymentDetails writes the deployment's own columns and leaves its instances alone. Saving
-// the deployment itself cascades into the instances hanging off it, and an edit holds those
-// decrypted, so an instance the edit added would be inserted with its sensitive parameters in clear.
+// SavePreset creates the preset with its instances or not at all.
+func (r repository) SavePreset(ctx context.Context, preset *model.Deployment, stacksByName map[string]*stack.Stack) error {
+	// only use ctx for values (logging) and not cancellation signals on cud operations for now. ctx
+	// cancellation can lead to rollbacks which we should decide individually.
+	ctx = context.WithoutCancel(ctx)
+
+	for _, instance := range preset.Instances {
+		if err := encryptParameters(r.instanceParameterEncryptionKey, instance, stacksByName[instance.StackName]); err != nil {
+			return err
+		}
+	}
+
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		return createDeploymentWithInstances(tx, preset)
+	})
+	if err != nil {
+		if errors.Is(err, gorm.ErrDuplicatedKey) {
+			return errdef.NewDuplicated("a preset named %q already exists in group %q", preset.Name, preset.GroupName)
+		}
+		return fmt.Errorf("failed to save preset: %v", err)
+	}
+
+	return nil
+}
+
+func createDeploymentWithInstances(tx *gorm.DB, deployment *model.Deployment) error {
+	if err := tx.Omit(clause.Associations).Create(deployment).Error; err != nil {
+		return err
+	}
+	for _, instance := range deployment.Instances {
+		instance.DeploymentID = deployment.ID
+		if err := tx.Omit("Group", "Lock", "Deployment").Create(instance).Error; err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// SaveDeploymentDetails writes the deployment's own columns, and the name and group its instances
+// repeat, but leaves the instances otherwise alone. Saving the deployment itself cascades into the
+// instances hanging off it, and an edit holds those decrypted, so an instance the edit added would be
+// inserted with its sensitive parameters in clear.
 func (r repository) SaveDeploymentDetails(ctx context.Context, deployment *model.Deployment) error {
 	// only use ctx for values (logging) and not cancellation signals on cud operations for now. ctx
 	// cancellation can lead to rollbacks which we should decide individually.
 	ctx = context.WithoutCancel(ctx)
 
-	err := r.db.WithContext(ctx).
-		Model(&model.Deployment{}).
-		Where("id = ?", deployment.ID).
-		Updates(map[string]any{"description": deployment.Description, "ttl": deployment.TTL}).Error
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		err := tx.Model(&model.Deployment{}).
+			Where("id = ?", deployment.ID).
+			Updates(map[string]any{"name": deployment.Name, "group_name": deployment.GroupName, "description": deployment.Description, "ttl": deployment.TTL}).Error
+		if err != nil {
+			return err
+		}
+		return tx.Model(&model.DeploymentInstance{}).
+			Where("deployment_id = ?", deployment.ID).
+			Updates(map[string]any{"name": deployment.Name, "group_name": deployment.GroupName}).Error
+	})
 	if err != nil {
+		if errors.Is(err, gorm.ErrDuplicatedKey) {
+			return errdef.NewDuplicated("a %s named %q already exists in group %q", deploymentKind(deployment.Preset), deployment.Name, deployment.GroupName)
+		}
 		return fmt.Errorf("failed to save deployment %d: %v", deployment.ID, err)
 	}
 
 	return nil
 }
 
-func (r repository) FindDeploymentById(ctx context.Context, id uint) (*model.Deployment, error) {
+// FindDeploymentById finds a deployment, or a preset when preset is true. Neither is found by the id of the other.
+func (r repository) FindDeploymentById(ctx context.Context, id uint, preset bool) (*model.Deployment, error) {
 	var deployment *model.Deployment
 	err := r.db.
 		WithContext(ctx).
@@ -246,12 +254,13 @@ func (r repository) FindDeploymentById(ctx context.Context, id uint) (*model.Dep
 		Joins("User").
 		Preload("Instances.GormParameters").
 		Preload("Instances.Group").
+		Where("deployments.preset = ?", preset).
 		First(&deployment, id).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, errdef.NewNotFound("deployment not found by id: %d", id)
+			return nil, errdef.NewNotFound("%s not found by id: %d", deploymentKind(preset), id)
 		}
-		return nil, fmt.Errorf("failed to find deployment: %v", err)
+		return nil, fmt.Errorf("failed to find %s: %v", deploymentKind(preset), err)
 	}
 
 	return deployment, nil

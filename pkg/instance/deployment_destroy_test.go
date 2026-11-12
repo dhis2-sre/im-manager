@@ -247,7 +247,7 @@ func TestDeleteDeploymentRemovesTheDeploymentAndLeavesNoLock(t *testing.T) {
 	deployment := &model.Deployment{Name: "dep", GroupName: group.Name, UserID: user.ID}
 	require.NoError(t, instanceRepo.SaveDeployment(context.Background(), deployment))
 
-	loaded, err := instanceRepo.FindDeploymentById(context.Background(), deployment.ID)
+	loaded, err := instanceRepo.FindDeploymentById(context.Background(), deployment.ID, false)
 	require.NoError(t, err)
 
 	stackService := stack.NewService(stack.Stacks{"whoami-go": stack.WhoamiGo})
@@ -282,7 +282,7 @@ func saveDeploymentOf(t *testing.T, stacks ...string) (*repository, model.Group,
 	}
 	require.NoError(t, instanceRepo.SaveDeployment(context.Background(), deployment))
 
-	loaded, err := instanceRepo.FindDeploymentById(context.Background(), deployment.ID)
+	loaded, err := instanceRepo.FindDeploymentById(context.Background(), deployment.ID, false)
 	require.NoError(t, err)
 	return instanceRepo, group, loaded
 }
@@ -300,7 +300,7 @@ func TestDeleteDeploymentStopsAtTheFirstInstanceItCannotDestroy(t *testing.T) {
 
 	require.ErrorContains(t, err, "simulated helm uninstall failure")
 	assert.Equal(t, []string{stack.PgAdmin.Name}, uninstalled, "the instance pgAdmin consumes from is kept")
-	remaining, err := instanceRepo.FindDeploymentById(context.Background(), deployment.ID)
+	remaining, err := instanceRepo.FindDeploymentById(context.Background(), deployment.ID, false)
 	require.NoError(t, err)
 	assert.Len(t, remaining.Instances, 2)
 }
