@@ -13,6 +13,7 @@ import (
 	"github.com/dhis2-sre/im-manager/internal/errdef"
 
 	"github.com/dhis2-sre/im-manager/internal/handler"
+	"github.com/dhis2-sre/im-manager/pkg/kube"
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
@@ -177,6 +178,11 @@ func (h Handler) SaveDeployment(c *gin.Context) {
 	if !group.Deployable {
 		forbidden := errdef.NewForbidden("group isn't deployable: %s", group.Name)
 		_ = c.Error(forbidden)
+		return
+	}
+
+	if err := kube.Reachable(group.Cluster); err != nil {
+		_ = c.Error(errdef.NewBadRequest("group %q can't be deployed to: %v", group.Name, err))
 		return
 	}
 
@@ -397,6 +403,11 @@ func (h Handler) BulkDeploy(c *gin.Context) {
 
 	if !group.Deployable {
 		_ = c.Error(errdef.NewForbidden("group isn't deployable: %s", group.Name))
+		return
+	}
+
+	if err := kube.Reachable(group.Cluster); err != nil {
+		_ = c.Error(errdef.NewBadRequest("group %q can't be deployed to: %v", group.Name, err))
 		return
 	}
 

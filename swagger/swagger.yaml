@@ -530,6 +530,12 @@ definitions:
                 format: uint64
                 type: integer
                 x-go-name: ClusterID
+            clusterUnreachableReason:
+                description: |-
+                    ClusterUnreachableReason says why instance manager cannot deploy to the group. It is empty when
+                    the cluster of the group can be reached.
+                type: string
+                x-go-name: ClusterUnreachableReason
             createdAt:
                 format: date-time
                 type: string
@@ -615,6 +621,12 @@ definitions:
         x-go-package: github.com/dhis2-sre/im-manager/pkg/health
     InstanceComponents:
         properties:
+            clusterUnreachableReason:
+                description: |-
+                    ClusterUnreachableReason says why the components could not be listed. It is empty when the
+                    cluster of the instance's group can be reached.
+                type: string
+                x-go-name: ClusterUnreachableReason
             components:
                 items:
                     $ref: '#/definitions/ComponentStatus'
