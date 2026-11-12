@@ -29,7 +29,6 @@ jobs:
 
       - name: Create kubeconfig files
         run: |
-          echo "${{ secrets.KUBECONFIG }}" > /tmp/eks-kubeconfig
           echo "${{ secrets.HETZNER_KUBECONFIG_RO }}" > /tmp/hetzner-kubeconfig
 
       - name: Find orphaned PVCs
@@ -38,7 +37,6 @@ jobs:
           set -o pipefail
           python scripts/util/find-orphaned-pvcs.py \
             --quota-gb ${{ github.event.inputs.quota_gb || '10240' }} \
-            --kubeconfig /tmp/eks-kubeconfig \
             --kubeconfig /tmp/hetzner-kubeconfig |
             tee /tmp/find-orphaned-pvcs-output
 
@@ -73,8 +71,6 @@ jobs:
             echo "UNREACHABLE_EOF"
           } >> $GITHUB_OUTPUT
         env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           HCLOUD_TOKEN: ${{ secrets.HCLOUD_TOKEN }}
 
       - name: Send Slack notification

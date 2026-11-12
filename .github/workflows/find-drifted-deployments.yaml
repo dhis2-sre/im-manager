@@ -96,8 +96,6 @@ jobs:
           # input cannot inject shell.
           IGNORE_CLUSTER_IDS: ${{ github.event.inputs.ignore_cluster_ids }}
           TTL_GRACE_HOURS: ${{ github.event.inputs.ttl_grace_hours }}
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
       - name: Send Slack notification
         if: steps.find-drifted-deployments.outputs.missing_count > '0' || steps.find-drifted-deployments.outputs.expired_count > '0' || steps.find-drifted-deployments.outputs.unchecked != ''

@@ -29,7 +29,6 @@ jobs:
 
       - name: Create kubeconfig files
         run: |
-          echo "${{ secrets.KUBECONFIG }}" > /tmp/eks-kubeconfig
           echo "${{ secrets.HETZNER_KUBECONFIG }}" > /tmp/hetzner-kubeconfig
 
       - name: Find expiring certificates
@@ -38,7 +37,6 @@ jobs:
           set -o pipefail
           python scripts/util/find-expiring-certificates.py \
             --days ${{ github.event.inputs.days || '14' }} \
-            --kubeconfig /tmp/eks-kubeconfig \
             --kubeconfig /tmp/hetzner-kubeconfig |
             tee /tmp/find-expiring-certificates-output
 
@@ -50,9 +48,6 @@ jobs:
             sed -n '/^Unhealthy certificates/,/^$/p' /tmp/find-expiring-certificates-output | sed '$d'
             echo "CERTS_EOF"
           } >> $GITHUB_OUTPUT
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
       - name: Send Slack notification
         if: steps.find-expiring-certificates.outputs.unhealthy_count > '0'
