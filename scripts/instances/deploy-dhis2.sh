@@ -37,6 +37,8 @@ FLYWAY_MIGRATE_OUT_OF_ORDER=${FLYWAY_MIGRATE_OUT_OF_ORDER:-}
 FLYWAY_REPAIR_BEFORE_MIGRATION=${FLYWAY_REPAIR_BEFORE_MIGRATION:-}
 ENABLE_QUERY_LOGGING=${ENABLE_QUERY_LOGGING:-}
 ALLOW_SUSPEND=${ALLOW_SUSPEND:-}
+# Lines applied to the top of dhis.conf; may span several lines
+CUSTOM_DHIS2_CONFIG=${CUSTOM_DHIS2_CONFIG:-}
 
 DEPLOYMENT_ID=$(echo "{
   \"name\": \"$NAME\",
@@ -113,6 +115,6 @@ echo "{
       \"value\": \"$ALLOW_SUSPEND\"
     }
   }
-}" | jq '.parameters |= with_entries(select(.value.value != ""))' | $HTTP post "$IM_HOST/deployments/$DEPLOYMENT_ID/instance" "Authorization: Bearer $ACCESS_TOKEN"
+}" | jq --arg customDhis2Config "$CUSTOM_DHIS2_CONFIG" '.parameters.CUSTOM_DHIS2_CONFIG.value = $customDhis2Config | .parameters |= with_entries(select(.value.value != ""))' | $HTTP post "$IM_HOST/deployments/$DEPLOYMENT_ID/instance" "Authorization: Bearer $ACCESS_TOKEN"
 
 $HTTP post "$IM_HOST/deployments/$DEPLOYMENT_ID/deploy" "Authorization: Bearer $ACCESS_TOKEN"
