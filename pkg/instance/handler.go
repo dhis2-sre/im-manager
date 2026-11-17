@@ -1668,19 +1668,18 @@ func (h Handler) CreateDeploymentFromPreset(c *gin.Context) {
 		return
 	}
 
-	deployments, err := h.instanceService.CreateDeploymentsFromPreset(c.Request.Context(), preset.ID, []string{request.Name}, DeploymentFromPreset{
+	deployment, err := h.instanceService.CreateDeploymentFromPreset(c.Request.Context(), preset.ID, request.Name, DeploymentFromPreset{
 		UserID:      user.ID,
 		Group:       group,
 		Description: request.Description,
 		TTL:         h.ttlOrDefault(request.TTL),
 		Instances:   instanceEdits(request.Instances),
-	}, "")
+	})
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
 
-	deployment := deployments[0]
 	if err := h.stripDeploymentSensitiveParameterValues(deployment); err != nil {
 		_ = c.Error(err)
 		return
@@ -1746,13 +1745,13 @@ func (h Handler) BulkDeployFromPreset(c *gin.Context) {
 		return
 	}
 
-	deployments, err := h.instanceService.CreateDeploymentsFromPreset(c.Request.Context(), preset.ID, bulkDeploymentNames(request.Prefix, request.Count), DeploymentFromPreset{
+	deployments, err := h.instanceService.CreatePendingDeploymentsFromPreset(c.Request.Context(), preset.ID, bulkDeploymentNames(request.Prefix, request.Count), DeploymentFromPreset{
 		UserID:      user.ID,
 		Group:       group,
 		Description: request.Description,
 		TTL:         h.ttlOrDefault(request.TTL),
 		Instances:   instanceEdits(request.Instances),
-	}, model.DeployStatusPending)
+	})
 	if err != nil {
 		_ = c.Error(err)
 		return

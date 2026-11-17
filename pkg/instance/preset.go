@@ -76,8 +76,21 @@ type DeploymentFromPreset struct {
 	Instances   map[string]InstanceEdit
 }
 
-// CreateDeploymentsFromPreset saves one deployment per name in one transaction, each holding the preset's instances with the request applied and in the given deploy status. The preset's sensitive values carry over, which a client only ever sees masked.
-func (s Service) CreateDeploymentsFromPreset(ctx context.Context, presetId uint, names []string, request DeploymentFromPreset, status model.DeployStatus) ([]*model.Deployment, error) {
+// CreateDeploymentFromPreset saves a deployment holding the preset's instances with the request applied, without deploying it. The preset's sensitive values carry over, which a client only ever sees masked.
+func (s Service) CreateDeploymentFromPreset(ctx context.Context, presetId uint, name string, request DeploymentFromPreset) (*model.Deployment, error) {
+	deployments, err := s.createDeploymentsFromPreset(ctx, presetId, []string{name}, request, "")
+	if err != nil {
+		return nil, err
+	}
+	return deployments[0], nil
+}
+
+// CreatePendingDeploymentsFromPreset saves one deployment per name in one transaction, each holding the preset's instances with the request applied and waiting to be deployed. The preset's sensitive values carry over, which a client only ever sees masked.
+func (s Service) CreatePendingDeploymentsFromPreset(ctx context.Context, presetId uint, names []string, request DeploymentFromPreset) ([]*model.Deployment, error) {
+	return s.createDeploymentsFromPreset(ctx, presetId, names, request, model.DeployStatusPending)
+}
+
+func (s Service) createDeploymentsFromPreset(ctx context.Context, presetId uint, names []string, request DeploymentFromPreset, status model.DeployStatus) ([]*model.Deployment, error) {
 	preset, err := s.FindPresetById(ctx, presetId)
 	if err != nil {
 		return nil, err
