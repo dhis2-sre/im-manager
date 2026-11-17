@@ -1639,7 +1639,7 @@ func (h Handler) CreateDeploymentFromPreset(c *gin.Context) {
 	//
 	// Create a deployment from a preset
 	//
-	// Create a deployment holding the preset's instances, including the sensitive values a client only sees masked. Anything the request leaves out comes from the preset. The deployment is created, not deployed.
+	// Create a deployment holding the preset's instances, including the sensitive values a client only sees masked. Anything the request leaves out comes from the preset. The deployment is created, not deployed. Only the owner of the preset or an administrator of its group can create it in another group.
 	//
 	// Security:
 	//	oauth2:
@@ -1705,7 +1705,7 @@ func (h Handler) BulkDeployFromPreset(c *gin.Context) {
 	//
 	// Bulk deploy from a preset
 	//
-	// Create count deployments named prefix-1 to prefix-count holding the preset's instances, including the sensitive values a client only sees masked, and deploy them, a few at a time. Anything the request leaves out comes from the preset. Either every deployment is created or none is: if any name is taken the request fails with 409 and creates nothing.
+	// Create count deployments named prefix-1 to prefix-count holding the preset's instances, including the sensitive values a client only sees masked, and deploy them, a few at a time. Anything the request leaves out comes from the preset. Either every deployment is created or none is: if any name is taken the request fails with 409 and creates nothing. Only the owner of the preset or an administrator of its group can deploy it to another group.
 	//
 	// Security:
 	//	oauth2:
@@ -1760,7 +1760,7 @@ func (h Handler) BulkDeployFromPreset(c *gin.Context) {
 	h.startDeployments(c, token, user.ID, deployments)
 }
 
-// presetDeploymentGroup finds the group deployments from the preset go to, the preset's own unless named, and reports on the context when the user may not deploy there.
+// presetDeploymentGroup finds the group deployments from the preset go to, the preset's own unless named, and reports on the context when the user may not deploy there. Another group takes the access a move of the preset there takes, since the preset's sensitive values go with it.
 func (h Handler) presetDeploymentGroup(c *gin.Context, preset *model.Deployment, user *model.User, groupName string) (*model.Group, bool) {
 	if groupName == "" {
 		groupName = preset.GroupName
@@ -1779,6 +1779,11 @@ func (h Handler) presetDeploymentGroup(c *gin.Context, preset *model.Deployment,
 
 	if !handler.CanWriteDeployment(user, &model.Deployment{UserID: user.ID, GroupName: group.Name}) {
 		_ = c.Error(errdef.NewUnauthorized("write access denied"))
+		return nil, false
+	}
+
+	if group.Name != preset.GroupName && !handler.CanWriteDeployment(user, preset) {
+		_ = c.Error(errdef.NewForbidden("only the owner of the preset or an administrator of group %s can deploy it to another group", preset.GroupName))
 		return nil, false
 	}
 
