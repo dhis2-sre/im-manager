@@ -10,12 +10,12 @@ import (
 )
 
 func presetTestRequest(edits map[string]InstanceEdit) DeploymentFromPreset {
-	return DeploymentFromPreset{UserID: 2, Name: "copy", Group: &model.Group{Name: "other"}, Instances: edits}
+	return DeploymentFromPreset{UserID: 2, Group: &model.Group{Name: "other"}, Instances: edits}
 }
 
 func TestNewDeploymentFromPreset(t *testing.T) {
 	t.Run("CopiesTheInstancesUnderTheNewNameAndGroup", func(t *testing.T) {
-		deployment, err := editTestService().newDeploymentFromPreset(editTestDeployment(true), presetTestRequest(nil))
+		deployment, err := editTestService().newDeploymentFromPreset(editTestDeployment(true), "copy", presetTestRequest(nil))
 
 		require.NoError(t, err)
 		assert.Equal(t, "copy", deployment.Name)
@@ -38,7 +38,7 @@ func TestNewDeploymentFromPreset(t *testing.T) {
 		preset := editTestDeployment(false)
 		preset.Description = "from the preset"
 
-		kept, err := editTestService().newDeploymentFromPreset(preset, presetTestRequest(nil))
+		kept, err := editTestService().newDeploymentFromPreset(preset, "copy", presetTestRequest(nil))
 		require.NoError(t, err)
 		assert.Equal(t, "from the preset", kept.Description)
 		assert.Equal(t, uint(86400), kept.TTL)
@@ -46,14 +46,14 @@ func TestNewDeploymentFromPreset(t *testing.T) {
 		request := presetTestRequest(nil)
 		request.Description = ptr("given")
 		request.TTL = ptr(uint(3600))
-		given, err := editTestService().newDeploymentFromPreset(preset, request)
+		given, err := editTestService().newDeploymentFromPreset(preset, "copy", request)
 		require.NoError(t, err)
 		assert.Equal(t, "given", given.Description)
 		assert.Equal(t, uint(3600), given.TTL)
 	})
 
 	t.Run("LeavesOutConsumedParameters", func(t *testing.T) {
-		deployment, err := editTestService().newDeploymentFromPreset(editTestDeployment(true), presetTestRequest(nil))
+		deployment, err := editTestService().newDeploymentFromPreset(editTestDeployment(true), "copy", presetTestRequest(nil))
 
 		require.NoError(t, err)
 		sidecar := findInstanceByStackName("sidecar", deployment)
@@ -65,7 +65,7 @@ func TestNewDeploymentFromPreset(t *testing.T) {
 		preset := editTestDeployment(false)
 		preset.Instances[0].Parameters["RETIRED"] = model.DeploymentInstanceParameter{ParameterName: "RETIRED", Value: "x"}
 
-		deployment, err := editTestService().newDeploymentFromPreset(preset, presetTestRequest(nil))
+		deployment, err := editTestService().newDeploymentFromPreset(preset, "copy", presetTestRequest(nil))
 
 		require.NoError(t, err)
 		assert.NotContains(t, deployment.Instances[0].Parameters, "RETIRED")
@@ -76,7 +76,7 @@ func TestNewDeploymentFromPreset(t *testing.T) {
 			"host": {Parameters: Parameters{"IMAGE_TAG": {Value: "2.43.0"}}, Public: ptr(true)},
 		}
 
-		deployment, err := editTestService().newDeploymentFromPreset(editTestDeployment(false), presetTestRequest(edits))
+		deployment, err := editTestService().newDeploymentFromPreset(editTestDeployment(false), "copy", presetTestRequest(edits))
 
 		require.NoError(t, err)
 		host := findInstanceByStackName("host", deployment)
@@ -91,7 +91,7 @@ func TestNewDeploymentFromPreset(t *testing.T) {
 			"sidecar": {Parameters: Parameters{"SIDECAR_TAG": {Value: "2.0.0"}}},
 		}
 
-		deployment, err := editTestService().newDeploymentFromPreset(editTestDeployment(false), presetTestRequest(edits))
+		deployment, err := editTestService().newDeploymentFromPreset(editTestDeployment(false), "copy", presetTestRequest(edits))
 
 		require.NoError(t, err)
 		assert.Equal(t, []string{"host", "sidecar"}, stackNames(deployment.Instances))
@@ -105,7 +105,7 @@ func TestNewDeploymentFromPreset(t *testing.T) {
 			"host": {Parameters: Parameters{"ENABLE_SIDECAR": {Value: "false"}}},
 		}
 
-		deployment, err := editTestService().newDeploymentFromPreset(editTestDeployment(true), presetTestRequest(edits))
+		deployment, err := editTestService().newDeploymentFromPreset(editTestDeployment(true), "copy", presetTestRequest(edits))
 
 		require.NoError(t, err)
 		assert.Equal(t, []string{"host"}, stackNames(deployment.Instances))
@@ -116,14 +116,14 @@ func TestNewDeploymentFromPreset(t *testing.T) {
 			"unknown": {Parameters: Parameters{"IMAGE_TAG": {Value: "1"}}},
 		}
 
-		_, err := editTestService().newDeploymentFromPreset(editTestDeployment(false), presetTestRequest(edits))
+		_, err := editTestService().newDeploymentFromPreset(editTestDeployment(false), "copy", presetTestRequest(edits))
 
 		assert.ErrorContains(t, err, `has no instance of stack "unknown"`)
 	})
 
 	t.Run("TheResultValidatesAsANewDeployment", func(t *testing.T) {
 		service := editTestService()
-		deployment, err := service.newDeploymentFromPreset(editTestDeployment(true), presetTestRequest(nil))
+		deployment, err := service.newDeploymentFromPreset(editTestDeployment(true), "copy", presetTestRequest(nil))
 		require.NoError(t, err)
 
 		err = service.validateNewDeployment(deployment, map[string]*stack.Stack{})
@@ -131,5 +131,37 @@ func TestNewDeploymentFromPreset(t *testing.T) {
 		require.NoError(t, err)
 		sidecar := findInstanceByStackName("sidecar", deployment)
 		assert.Equal(t, "secret", sidecar.Parameters["SHARED_PASSWORD"].Value)
+	})
+}
+
+func TestNewDeploymentsFromPreset(t *testing.T) {
+	t.Run("BuildsOneDeploymentPerNameInTheGivenStatus", func(t *testing.T) {
+		names := []string{"copy-1", "copy-2"}
+		edits := map[string]InstanceEdit{
+			"host": {Parameters: Parameters{"ENABLE_SIDECAR": {Value: "true"}}},
+		}
+
+		deployments, err := editTestService().newDeploymentsFromPreset(editTestDeployment(false), names, presetTestRequest(edits), model.DeployStatusPending)
+
+		require.NoError(t, err)
+		require.Len(t, deployments, 2)
+		for i, deployment := range deployments {
+			assert.Equal(t, names[i], deployment.Name)
+			assert.Equal(t, []string{"host", "sidecar"}, stackNames(deployment.Instances))
+			for _, deploymentInstance := range deployment.Instances {
+				assert.Equal(t, names[i], deploymentInstance.Name)
+				assert.Equal(t, model.DeployStatusPending, deploymentInstance.DeployStatus)
+			}
+			assert.Equal(t, "secret", findInstanceByStackName("host", deployment).Parameters["SHARED_PASSWORD"].Value)
+		}
+	})
+
+	t.Run("GivesEveryDeploymentItsOwnParameters", func(t *testing.T) {
+		deployments, err := editTestService().newDeploymentsFromPreset(editTestDeployment(true), []string{"copy-1", "copy-2"}, presetTestRequest(nil), model.DeployStatusPending)
+		require.NoError(t, err)
+
+		findInstanceByStackName("host", deployments[0]).Parameters["IMAGE_TAG"] = model.DeploymentInstanceParameter{ParameterName: "IMAGE_TAG", Value: "2.43.0"}
+
+		assert.Equal(t, "2.42.0", findInstanceByStackName("host", deployments[1]).Parameters["IMAGE_TAG"].Value)
 	})
 }

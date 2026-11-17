@@ -67,18 +67,17 @@ func (s Service) EditPreset(ctx context.Context, presetId uint, edit PresetEdit)
 	return changes.Deployment, nil
 }
 
-// DeploymentFromPreset is what a deployment started from a preset takes in place of the preset's own values. A nil field keeps the preset's.
+// DeploymentFromPreset is what the deployments started from a preset take in place of the preset's own values. A nil field keeps the preset's.
 type DeploymentFromPreset struct {
 	UserID      uint
-	Name        string
 	Group       *model.Group
 	Description *string
 	TTL         *uint
 	Instances   map[string]InstanceEdit
 }
 
-// CreateDeploymentFromPreset saves a new deployment holding the preset's instances with the request applied. The preset's sensitive values carry over, which a client only ever sees masked.
-func (s Service) CreateDeploymentFromPreset(ctx context.Context, presetId uint, request DeploymentFromPreset) (*model.Deployment, error) {
+// CreateDeploymentsFromPreset saves one deployment per name in one transaction, each holding the preset's instances with the request applied and in the given deploy status. The preset's sensitive values carry over, which a client only ever sees masked.
+func (s Service) CreateDeploymentsFromPreset(ctx context.Context, presetId uint, names []string, request DeploymentFromPreset, status model.DeployStatus) ([]*model.Deployment, error) {
 	preset, err := s.FindPresetById(ctx, presetId)
 	if err != nil {
 		return nil, err
@@ -89,23 +88,38 @@ func (s Service) CreateDeploymentFromPreset(ctx context.Context, presetId uint, 
 		return nil, err
 	}
 
-	deployment, err := s.newDeploymentFromPreset(decryptedPreset, request)
+	deployments, err := s.newDeploymentsFromPreset(decryptedPreset, names, request, status)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := s.SaveDeployments(ctx, deployment.GroupName, []*model.Deployment{deployment}); err != nil {
+	if err := s.SaveDeployments(ctx, request.Group.Name, deployments); err != nil {
 		return nil, err
 	}
 
-	return deployment, nil
+	return deployments, nil
+}
+
+func (s Service) newDeploymentsFromPreset(preset *model.Deployment, names []string, request DeploymentFromPreset, status model.DeployStatus) ([]*model.Deployment, error) {
+	deployments := make([]*model.Deployment, len(names))
+	for i, name := range names {
+		deployment, err := s.newDeploymentFromPreset(preset, name, request)
+		if err != nil {
+			return nil, err
+		}
+		for _, deploymentInstance := range deployment.Instances {
+			deploymentInstance.DeployStatus = status
+		}
+		deployments[i] = deployment
+	}
+	return deployments, nil
 }
 
 // newDeploymentFromPreset builds the deployment a preset starts. Consumed parameters are resolved again for the new name and group, and parameters the stack no longer declares are dropped.
-func (s Service) newDeploymentFromPreset(preset *model.Deployment, request DeploymentFromPreset) (*model.Deployment, error) {
+func (s Service) newDeploymentFromPreset(preset *model.Deployment, name string, request DeploymentFromPreset) (*model.Deployment, error) {
 	deployment := &model.Deployment{
 		UserID:      request.UserID,
-		Name:        request.Name,
+		Name:        name,
 		GroupName:   request.Group.Name,
 		Group:       request.Group,
 		Description: preset.Description,
