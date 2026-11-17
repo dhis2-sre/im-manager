@@ -323,19 +323,23 @@ const MaxBulkDeployments = 50
 type BulkDeployRequest struct {
 	// Prefix names the deployments prefix-1 to prefix-count
 	Prefix      string                `json:"prefix" binding:"required"`
-	Count       uint                  `json:"count" binding:"required,min=1,max=50"`
+	Count       uint                  `json:"count" binding:"required,min=1"`
 	Group       string                `json:"group" binding:"required"`
 	Description string                `json:"description"`
 	TTL         uint                  `json:"ttl"`
 	Instances   []SaveInstanceRequest `json:"instances" binding:"required,min=1,dive"`
 }
 
-func bulkDeploymentNames(prefix string, count uint) []string {
-	names := []string{}
-	for i := uint(1); i <= count && i <= MaxBulkDeployments; i++ {
-		names = append(names, fmt.Sprintf("%s-%d", prefix, i))
+// bulkDeploymentNames names the deployments prefix-1 to prefix-count, refusing a count above MaxBulkDeployments.
+func bulkDeploymentNames(prefix string, count uint) ([]string, error) {
+	if count > MaxBulkDeployments {
+		return nil, errdef.NewBadRequest("count must be at most %d", MaxBulkDeployments)
 	}
-	return names
+	names := make([]string, count)
+	for i := range names {
+		names[i] = fmt.Sprintf("%s-%d", prefix, i+1)
+	}
+	return names, nil
 }
 
 func invalidBulkNamesReason(names []string) string {
@@ -378,7 +382,12 @@ func (h Handler) BulkDeploy(c *gin.Context) {
 		return
 	}
 
-	names := bulkDeploymentNames(request.Prefix, request.Count)
+	names, err := bulkDeploymentNames(request.Prefix, request.Count)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
 	if reason := invalidBulkNamesReason(names); reason != "" {
 		_ = c.Error(errdef.NewBadRequest("%s", reason))
 		return
@@ -536,10 +545,16 @@ func (h Handler) BulkDeploymentNameAvailability(c *gin.Context) {
 	var request struct {
 		Group  string `form:"group" binding:"required"`
 		Prefix string `form:"prefix" binding:"required"`
-		Count  uint   `form:"count" binding:"required,min=1,max=50"`
+		Count  uint   `form:"count" binding:"required,min=1"`
 	}
 	if err := c.ShouldBindQuery(&request); err != nil {
 		_ = c.Error(errdef.NewBadRequest("group, prefix and a count between 1 and %d are required", MaxBulkDeployments))
+		return
+	}
+
+	names, err := bulkDeploymentNames(request.Prefix, request.Count)
+	if err != nil {
+		_ = c.Error(err)
 		return
 	}
 
@@ -566,7 +581,6 @@ func (h Handler) BulkDeploymentNameAvailability(c *gin.Context) {
 		return
 	}
 
-	names := bulkDeploymentNames(request.Prefix, request.Count)
 	if reason := invalidBulkNamesReason(names); reason != "" {
 		c.JSON(http.StatusOK, BulkDeploymentNameAvailability{Names: names, Taken: []string{}, Reason: reason})
 		return
@@ -1691,7 +1705,7 @@ func (h Handler) CreateDeploymentFromPreset(c *gin.Context) {
 type BulkDeployFromPresetRequest struct {
 	// Prefix names the deployments prefix-1 to prefix-count
 	Prefix string `json:"prefix" binding:"required"`
-	Count  uint   `json:"count" binding:"required,min=1,max=50"`
+	Count  uint   `json:"count" binding:"required,min=1"`
 	// Group defaults to the group of the preset
 	Group       string  `json:"group"`
 	Description *string `json:"description"`
@@ -1729,7 +1743,12 @@ func (h Handler) BulkDeployFromPreset(c *gin.Context) {
 		return
 	}
 
-	names := bulkDeploymentNames(request.Prefix, request.Count)
+	names, err := bulkDeploymentNames(request.Prefix, request.Count)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
 	if reason := invalidBulkNamesReason(names); reason != "" {
 		_ = c.Error(errdef.NewBadRequest("%s", reason))
 		return
