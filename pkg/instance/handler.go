@@ -338,12 +338,12 @@ func bulkDeploymentNames(prefix string, count uint) []string {
 	return names
 }
 
-func invalidBulkNamesReason(prefix string, count uint) string {
+func invalidBulkNamesReason(names []string) string {
 	v, ok := binding.Validator.Engine().(*validator.Validate)
 	if !ok {
 		return ""
 	}
-	for _, name := range bulkDeploymentNames(prefix, count) {
+	for _, name := range names {
 		if v.Var(name, "dns_rfc1035_label") != nil {
 			return fmt.Sprintf("%q isn't a valid name: names must be at most 63 characters of lowercase letters, digits and '-' and start with a letter", name)
 		}
@@ -378,7 +378,8 @@ func (h Handler) BulkDeploy(c *gin.Context) {
 		return
 	}
 
-	if reason := invalidBulkNamesReason(request.Prefix, request.Count); reason != "" {
+	names := bulkDeploymentNames(request.Prefix, request.Count)
+	if reason := invalidBulkNamesReason(names); reason != "" {
 		_ = c.Error(errdef.NewBadRequest("%s", reason))
 		return
 	}
@@ -421,7 +422,6 @@ func (h Handler) BulkDeploy(c *gin.Context) {
 		request.TTL = h.defaultTTL
 	}
 
-	names := bulkDeploymentNames(request.Prefix, request.Count)
 	deployments := make([]*model.Deployment, len(names))
 	for i, name := range names {
 		deployments[i] = &model.Deployment{
@@ -567,7 +567,7 @@ func (h Handler) BulkDeploymentNameAvailability(c *gin.Context) {
 	}
 
 	names := bulkDeploymentNames(request.Prefix, request.Count)
-	if reason := invalidBulkNamesReason(request.Prefix, request.Count); reason != "" {
+	if reason := invalidBulkNamesReason(names); reason != "" {
 		c.JSON(http.StatusOK, BulkDeploymentNameAvailability{Names: names, Taken: []string{}, Reason: reason})
 		return
 	}
@@ -1729,7 +1729,8 @@ func (h Handler) BulkDeployFromPreset(c *gin.Context) {
 		return
 	}
 
-	if reason := invalidBulkNamesReason(request.Prefix, request.Count); reason != "" {
+	names := bulkDeploymentNames(request.Prefix, request.Count)
+	if reason := invalidBulkNamesReason(names); reason != "" {
 		_ = c.Error(errdef.NewBadRequest("%s", reason))
 		return
 	}
@@ -1745,7 +1746,7 @@ func (h Handler) BulkDeployFromPreset(c *gin.Context) {
 		return
 	}
 
-	deployments, err := h.instanceService.CreatePendingDeploymentsFromPreset(c.Request.Context(), preset.ID, bulkDeploymentNames(request.Prefix, request.Count), DeploymentFromPreset{
+	deployments, err := h.instanceService.CreatePendingDeploymentsFromPreset(c.Request.Context(), preset.ID, names, DeploymentFromPreset{
 		UserID:      user.ID,
 		Group:       group,
 		Description: request.Description,
