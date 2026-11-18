@@ -111,6 +111,17 @@ func TestInstanceHandler(t *testing.T) {
 	err = db.Create(nonMember).Error
 	require.NoError(t, err, "failed to save non-member user")
 
+	otherMember := &model.User{
+		Email:      "user3@dhis2.org",
+		EmailToken: uuid.New(),
+		Groups: []model.Group{
+			*group,
+			*otherGroup,
+		},
+	}
+	err = db.Create(otherMember).Error
+	require.NoError(t, err, "failed to save other member user")
+
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	encryptionKey := strings.Repeat("a", 32)
 	instanceRepo, err := instance.NewRepository(db, encryptionKey)
@@ -147,8 +158,11 @@ func TestInstanceHandler(t *testing.T) {
 	// this is only to allow testing using multiple users without bringing in all our auth stack
 	authenticator := func(c *gin.Context) {
 		authenticatedUser := user
-		if c.Query("user") == "non-member" {
+		switch c.Query("user") {
+		case "non-member":
 			authenticatedUser = nonMember
+		case "other-member":
+			authenticatedUser = otherMember
 		}
 		ctx := model.NewContextWithUser(c.Request.Context(), authenticatedUser)
 		c.Request = c.Request.WithContext(ctx)
@@ -569,6 +583,50 @@ func TestInstanceHandler(t *testing.T) {
 		}
 	})
 
+	t.Run("BulkDeployFromPreset", func(t *testing.T) {
+		t.Parallel()
+		post := func(path, body string, status int) []byte {
+			return client.Do(t, http.MethodPost, path, strings.NewReader(body), status, inttest.WithAuthToken(tokens.AccessToken), inttest.WithHeader("Content-Type", "application/json"))
+		}
+
+		var preset model.Deployment
+		require.NoError(t, json.Unmarshal(post("/presets", `{"name":"preset-bulk","group":"group-name","description":"from the preset","instances":[{"stackName":"whoami-go","parameters":{"IMAGE_TAG":{"value":"0.6.0"},"IMAGE_PULL_POLICY":{"value":"Always"}}}]}`, http.StatusCreated), &preset))
+		bulkPath := fmt.Sprintf("/presets/%d/deployments/bulk", preset.ID)
+
+		taken := createDeployment(t, client, "preset-bulk-taken-2", tokens.AccessToken)
+		conflict := post(bulkPath, `{"prefix":"preset-bulk-taken","count":3}`, http.StatusConflict)
+		assert.Contains(t, string(conflict), "preset-bulk-taken-2")
+		var names instance.DeploymentNameAvailability
+		client.GetJSON(t, "/deployments/availability?group=group-name&name=preset-bulk-taken-1", &names, inttest.WithAuthToken(tokens.AccessToken))
+		assert.True(t, names.Available, "a refused bulk deploy must create nothing")
+
+		post(bulkPath, `{"prefix":"Preset-bulk","count":2}`, http.StatusBadRequest)
+		post(bulkPath, `{"prefix":"preset-bulk","count":51}`, http.StatusBadRequest)
+		post(bulkPath+"?user=other-member", `{"prefix":"preset-bulk-elsewhere","count":2,"group":"other-group-name"}`, http.StatusForbidden)
+		post(fmt.Sprintf("/presets/%d/deployments/bulk", taken.ID), `{"prefix":"preset-bulk","count":2}`, http.StatusNotFound)
+		destroyDeployment(t, client, taken.ID, tokens.AccessToken)
+
+		var response instance.BulkDeployResponse
+		require.NoError(t, json.Unmarshal(post(bulkPath, `{"prefix":"preset-bulk","count":2,"description":"bulk","instances":{"whoami-go":{"parameters":{"IMAGE_PULL_POLICY":{"value":"IfNotPresent"}}}}}`, http.StatusAccepted), &response))
+		require.Len(t, response.Deployments, 2)
+		assert.Equal(t, "preset-bulk-1", response.Deployments[0].Name)
+		assert.Equal(t, "preset-bulk-2", response.Deployments[1].Name)
+
+		for _, bulk := range response.Deployments {
+			awaitDeployed(t, client, bulk.ID, tokens.AccessToken)
+			var deployment model.Deployment
+			client.GetJSON(t, fmt.Sprintf("/deployments/%d", bulk.ID), &deployment, inttest.WithAuthToken(tokens.AccessToken))
+			assert.Equal(t, "bulk", deployment.Description)
+			require.Len(t, deployment.Instances, 1)
+			assert.Equal(t, "0.6.0", deployment.Instances[0].Parameters["IMAGE_TAG"].Value)
+			assert.Equal(t, "IfNotPresent", deployment.Instances[0].Parameters["IMAGE_PULL_POLICY"].Value)
+			k8sClient.AssertPodIsReady(t, deployment.Instances[0].Group.Namespace, deployment.Instances[0].Name, 60, deployment.Instances[0].Group.ID)
+			destroyDeployment(t, client, bulk.ID, tokens.AccessToken)
+		}
+
+		client.Do(t, http.MethodDelete, fmt.Sprintf("/presets/%d", preset.ID), nil, http.StatusNoContent, inttest.WithAuthToken(tokens.AccessToken))
+	})
+
 	t.Run("Preset", func(t *testing.T) {
 		t.Parallel()
 		send := func(method, path string, payload any, status int, response any) {
@@ -709,6 +767,17 @@ func TestInstanceHandler(t *testing.T) {
 		send(http.MethodPost, fmt.Sprintf("/presets/%d/deployments", preset.ID), map[string]any{"name": "test-from-preset-zero-ttl", "ttl": 0}, http.StatusCreated, &withoutTTL)
 		assert.Equal(t, twoDayTTL, withoutTTL.TTL, "a TTL of 0 falls back to the default the way it does for a new deployment")
 		destroyDeployment(t, client, withoutTTL.ID, tokens.AccessToken)
+
+		send(http.MethodPost, fmt.Sprintf("/presets/%d/deployments?user=other-member", preset.ID), map[string]any{"name": "test-from-preset-elsewhere", "group": "other-group-name"}, http.StatusForbidden, nil)
+		var byOtherMember model.Deployment
+		send(http.MethodPost, fmt.Sprintf("/presets/%d/deployments?user=other-member", preset.ID), map[string]any{"name": "test-from-preset-by-other-member"}, http.StatusCreated, &byOtherMember)
+		assert.Equal(t, "group-name", byOtherMember.GroupName, "a member who doesn't own the preset still deploys it in its own group")
+		client.Do(t, http.MethodDelete, fmt.Sprintf("/deployments/%d?user=other-member", byOtherMember.ID), nil, http.StatusAccepted, inttest.WithAuthToken(tokens.AccessToken))
+
+		var elsewhere model.Deployment
+		send(http.MethodPost, fmt.Sprintf("/presets/%d/deployments", preset.ID), map[string]any{"name": "test-from-preset-elsewhere", "group": "other-group-name"}, http.StatusCreated, &elsewhere)
+		assert.Equal(t, "other-group-name", elsewhere.GroupName, "the owner of the preset deploys it to another group")
+		destroyDeployment(t, client, elsewhere.ID, tokens.AccessToken)
 
 		send(http.MethodPost, fmt.Sprintf("/presets/%d/deployments", deployment.ID), map[string]any{"name": "test-from-deployment"}, http.StatusNotFound, nil)
 

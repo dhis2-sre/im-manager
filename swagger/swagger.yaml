@@ -1,6 +1,35 @@
 consumes:
     - application/json
 definitions:
+    BulkDeployFromPresetRequest:
+        properties:
+            count:
+                format: uint64
+                type: integer
+                x-go-name: Count
+            description:
+                type: string
+                x-go-name: Description
+            group:
+                description: Group defaults to the group of the preset
+                type: string
+                x-go-name: Group
+            instances:
+                additionalProperties:
+                    $ref: '#/definitions/EditInstanceRequest'
+                description: Instances change the preset's instances the way an edit does, keyed by stack name
+                type: object
+                x-go-name: Instances
+            prefix:
+                description: Prefix names the deployments prefix-1 to prefix-count
+                type: string
+                x-go-name: Prefix
+            ttl:
+                format: uint64
+                type: integer
+                x-go-name: TTL
+        type: object
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
     BulkDeployRequest:
         properties:
             count:
@@ -2896,7 +2925,7 @@ paths:
             summary: Edit a preset
     /presets/{id}/deployments:
         post:
-            description: Create a deployment holding the preset's instances, including the sensitive values a client only sees masked. Anything the request leaves out comes from the preset. The deployment is created, not deployed.
+            description: Create a deployment holding the preset's instances, including the sensitive values a client only sees masked. Anything the request leaves out comes from the preset. The deployment is created, not deployed. Only the owner of the preset or an administrator of its group can create it in another group.
             operationId: createDeploymentFromPreset
             parameters:
                 - format: uint64
@@ -2931,6 +2960,41 @@ paths:
             security:
                 - oauth2: []
             summary: Create a deployment from a preset
+    /presets/{id}/deployments/bulk:
+        post:
+            description: 'Create count deployments named prefix-1 to prefix-count holding the preset''s instances, including the sensitive values a client only sees masked, and deploy them, a few at a time. Anything the request leaves out comes from the preset. Either every deployment is created or none is: if any name is taken the request fails with 409 and creates nothing. Only the owner of the preset or an administrator of its group can deploy it to another group.'
+            operationId: bulkDeployFromPreset
+            parameters:
+                - format: uint64
+                  in: path
+                  name: id
+                  required: true
+                  type: integer
+                  x-go-name: ID
+                - description: Bulk deploy from preset request body parameter
+                  in: body
+                  name: Payload
+                  required: true
+                  schema:
+                    $ref: '#/definitions/BulkDeployFromPresetRequest'
+            responses:
+                "202":
+                    $ref: '#/responses/BulkDeployResponse'
+                "400":
+                    $ref: '#/responses/Error'
+                "401":
+                    $ref: '#/responses/Error'
+                "403":
+                    $ref: '#/responses/Error'
+                "404":
+                    $ref: '#/responses/Error'
+                "409":
+                    $ref: '#/responses/Error'
+                "415":
+                    $ref: '#/responses/Error'
+            security:
+                - oauth2: []
+            summary: Bulk deploy from a preset
     /presets/availability:
         get:
             description: Check whether a preset name is free to use in a group. Presets and deployments have separate names, so a deployment's name does not make it taken.

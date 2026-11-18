@@ -323,27 +323,31 @@ const MaxBulkDeployments = 50
 type BulkDeployRequest struct {
 	// Prefix names the deployments prefix-1 to prefix-count
 	Prefix      string                `json:"prefix" binding:"required"`
-	Count       uint                  `json:"count" binding:"required,min=1,max=50"`
+	Count       uint                  `json:"count" binding:"required,min=1"`
 	Group       string                `json:"group" binding:"required"`
 	Description string                `json:"description"`
 	TTL         uint                  `json:"ttl"`
 	Instances   []SaveInstanceRequest `json:"instances" binding:"required,min=1,dive"`
 }
 
-func bulkDeploymentNames(prefix string, count uint) []string {
-	names := []string{}
-	for i := uint(1); i <= count && i <= MaxBulkDeployments; i++ {
-		names = append(names, fmt.Sprintf("%s-%d", prefix, i))
+// bulkDeploymentNames names the deployments prefix-1 to prefix-count, refusing a count above MaxBulkDeployments.
+func bulkDeploymentNames(prefix string, count uint) ([]string, error) {
+	if count > MaxBulkDeployments {
+		return nil, errdef.NewBadRequest("count must be at most %d", MaxBulkDeployments)
 	}
-	return names
+	names := make([]string, count)
+	for i := range names {
+		names[i] = fmt.Sprintf("%s-%d", prefix, i+1)
+	}
+	return names, nil
 }
 
-func invalidBulkNamesReason(prefix string, count uint) string {
+func invalidBulkNamesReason(names []string) string {
 	v, ok := binding.Validator.Engine().(*validator.Validate)
 	if !ok {
 		return ""
 	}
-	for _, name := range bulkDeploymentNames(prefix, count) {
+	for _, name := range names {
 		if v.Var(name, "dns_rfc1035_label") != nil {
 			return fmt.Sprintf("%q isn't a valid name: names must be at most 63 characters of lowercase letters, digits and '-' and start with a letter", name)
 		}
@@ -378,7 +382,13 @@ func (h Handler) BulkDeploy(c *gin.Context) {
 		return
 	}
 
-	if reason := invalidBulkNamesReason(request.Prefix, request.Count); reason != "" {
+	names, err := bulkDeploymentNames(request.Prefix, request.Count)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	if reason := invalidBulkNamesReason(names); reason != "" {
 		_ = c.Error(errdef.NewBadRequest("%s", reason))
 		return
 	}
@@ -421,9 +431,7 @@ func (h Handler) BulkDeploy(c *gin.Context) {
 		request.TTL = h.defaultTTL
 	}
 
-	names := bulkDeploymentNames(request.Prefix, request.Count)
 	deployments := make([]*model.Deployment, len(names))
-	ids := make([]uint, len(names))
 	for i, name := range names {
 		deployments[i] = &model.Deployment{
 			UserID:      user.ID,
@@ -441,14 +449,19 @@ func (h Handler) BulkDeploy(c *gin.Context) {
 		return
 	}
 
+	h.startDeployments(c, token, user.ID, deployments)
+}
+
+// startDeployments deploys the saved deployments in the background and answers with their ids and names.
+func (h Handler) startDeployments(c *gin.Context, token string, userID uint, deployments []*model.Deployment) {
+	ids := make([]uint, len(deployments))
 	response := BulkDeployResponse{Deployments: make([]BulkDeployment, len(deployments))}
 	for i, deployment := range deployments {
 		ids[i] = deployment.ID
 		response.Deployments[i] = BulkDeployment{ID: deployment.ID, Name: deployment.Name}
 	}
 
-	err = h.deploymentService.StartDeployments(ctx, token, ids, user.ID)
-	if err != nil {
+	if err := h.deploymentService.StartDeployments(c.Request.Context(), token, ids, userID); err != nil {
 		_ = c.Error(err)
 		return
 	}
@@ -532,10 +545,16 @@ func (h Handler) BulkDeploymentNameAvailability(c *gin.Context) {
 	var request struct {
 		Group  string `form:"group" binding:"required"`
 		Prefix string `form:"prefix" binding:"required"`
-		Count  uint   `form:"count" binding:"required,min=1,max=50"`
+		Count  uint   `form:"count" binding:"required,min=1"`
 	}
 	if err := c.ShouldBindQuery(&request); err != nil {
 		_ = c.Error(errdef.NewBadRequest("group, prefix and a count between 1 and %d are required", MaxBulkDeployments))
+		return
+	}
+
+	names, err := bulkDeploymentNames(request.Prefix, request.Count)
+	if err != nil {
+		_ = c.Error(err)
 		return
 	}
 
@@ -562,8 +581,7 @@ func (h Handler) BulkDeploymentNameAvailability(c *gin.Context) {
 		return
 	}
 
-	names := bulkDeploymentNames(request.Prefix, request.Count)
-	if reason := invalidBulkNamesReason(request.Prefix, request.Count); reason != "" {
+	if reason := invalidBulkNamesReason(names); reason != "" {
 		c.JSON(http.StatusOK, BulkDeploymentNameAvailability{Names: names, Taken: []string{}, Reason: reason})
 		return
 	}
@@ -1635,7 +1653,7 @@ func (h Handler) CreateDeploymentFromPreset(c *gin.Context) {
 	//
 	// Create a deployment from a preset
 	//
-	// Create a deployment holding the preset's instances, including the sensitive values a client only sees masked. Anything the request leaves out comes from the preset. The deployment is created, not deployed.
+	// Create a deployment holding the preset's instances, including the sensitive values a client only sees masked. Anything the request leaves out comes from the preset. The deployment is created, not deployed. Only the owner of the preset or an administrator of its group can create it in another group.
 	//
 	// Security:
 	//	oauth2:
@@ -1659,37 +1677,16 @@ func (h Handler) CreateDeploymentFromPreset(c *gin.Context) {
 		return
 	}
 
-	if request.Group == "" {
-		request.Group = preset.GroupName
-	}
-
-	if request.TTL != nil && *request.TTL == 0 {
-		request.TTL = &h.defaultTTL
-	}
-
-	ctx := c.Request.Context()
-	group, err := h.groupService.Find(ctx, request.Group)
-	if err != nil {
-		_ = c.Error(err)
+	group, ok := h.presetDeploymentGroup(c, preset, user, request.Group)
+	if !ok {
 		return
 	}
 
-	if !group.Deployable {
-		_ = c.Error(errdef.NewForbidden("group isn't deployable: %s", group.Name))
-		return
-	}
-
-	if !handler.CanWriteDeployment(user, &model.Deployment{UserID: user.ID, GroupName: group.Name}) {
-		_ = c.Error(errdef.NewUnauthorized("write access denied"))
-		return
-	}
-
-	deployment, err := h.instanceService.CreateDeploymentFromPreset(ctx, preset.ID, DeploymentFromPreset{
+	deployment, err := h.instanceService.CreateDeploymentFromPreset(c.Request.Context(), preset.ID, request.Name, DeploymentFromPreset{
 		UserID:      user.ID,
-		Name:        request.Name,
 		Group:       group,
 		Description: request.Description,
-		TTL:         request.TTL,
+		TTL:         h.ttlOrDefault(request.TTL),
 		Instances:   instanceEdits(request.Instances),
 	})
 	if err != nil {
@@ -1703,6 +1700,122 @@ func (h Handler) CreateDeploymentFromPreset(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusCreated, deployment)
+}
+
+type BulkDeployFromPresetRequest struct {
+	// Prefix names the deployments prefix-1 to prefix-count
+	Prefix string `json:"prefix" binding:"required"`
+	Count  uint   `json:"count" binding:"required,min=1"`
+	// Group defaults to the group of the preset
+	Group       string  `json:"group"`
+	Description *string `json:"description"`
+	TTL         *uint   `json:"ttl"`
+	// Instances change the preset's instances the way an edit does, keyed by stack name
+	Instances map[string]EditInstanceRequest `json:"instances"`
+}
+
+func (h Handler) BulkDeployFromPreset(c *gin.Context) {
+	// swagger:route POST /presets/{id}/deployments/bulk bulkDeployFromPreset
+	//
+	// Bulk deploy from a preset
+	//
+	// Create count deployments named prefix-1 to prefix-count holding the preset's instances, including the sensitive values a client only sees masked, and deploy them, a few at a time. Anything the request leaves out comes from the preset. Either every deployment is created or none is: if any name is taken the request fails with 409 and creates nothing. Only the owner of the preset or an administrator of its group can deploy it to another group.
+	//
+	// Security:
+	//	oauth2:
+	//
+	// responses:
+	//	202: BulkDeployResponse
+	//	400: Error
+	//	401: Error
+	//	403: Error
+	//	404: Error
+	//	409: Error
+	//	415: Error
+	preset, user, ok := h.findAuthorizedPreset(c, handler.CanReadDeployment)
+	if !ok {
+		return
+	}
+
+	var request BulkDeployFromPresetRequest
+	if err := bindRequest(c, &request); err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	names, err := bulkDeploymentNames(request.Prefix, request.Count)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	if reason := invalidBulkNamesReason(names); reason != "" {
+		_ = c.Error(errdef.NewBadRequest("%s", reason))
+		return
+	}
+
+	group, ok := h.presetDeploymentGroup(c, preset, user, request.Group)
+	if !ok {
+		return
+	}
+
+	token, err := handler.GetTokenFromRequest(c)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	deployments, err := h.instanceService.CreatePendingDeploymentsFromPreset(c.Request.Context(), preset.ID, names, DeploymentFromPreset{
+		UserID:      user.ID,
+		Group:       group,
+		Description: request.Description,
+		TTL:         h.ttlOrDefault(request.TTL),
+		Instances:   instanceEdits(request.Instances),
+	})
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	h.startDeployments(c, token, user.ID, deployments)
+}
+
+// presetDeploymentGroup finds the group deployments from the preset go to, the preset's own unless named, and reports on the context when the user may not deploy there. Another group takes the access a move of the preset there takes, since the preset's sensitive values go with it.
+func (h Handler) presetDeploymentGroup(c *gin.Context, preset *model.Deployment, user *model.User, groupName string) (*model.Group, bool) {
+	if groupName == "" {
+		groupName = preset.GroupName
+	}
+
+	group, err := h.groupService.Find(c.Request.Context(), groupName)
+	if err != nil {
+		_ = c.Error(err)
+		return nil, false
+	}
+
+	if !group.Deployable {
+		_ = c.Error(errdef.NewForbidden("group isn't deployable: %s", group.Name))
+		return nil, false
+	}
+
+	if !handler.CanWriteDeployment(user, &model.Deployment{UserID: user.ID, GroupName: group.Name}) {
+		_ = c.Error(errdef.NewUnauthorized("write access denied"))
+		return nil, false
+	}
+
+	if group.Name != preset.GroupName && !handler.CanWriteDeployment(user, preset) {
+		_ = c.Error(errdef.NewForbidden("only the owner of the preset or an administrator of group %s can deploy it to another group", preset.GroupName))
+		return nil, false
+	}
+
+	return group, true
+}
+
+// ttlOrDefault gives a TTL of 0 the default, the way a new deployment gets it.
+func (h Handler) ttlOrDefault(ttl *uint) *uint {
+	if ttl != nil && *ttl == 0 {
+		return &h.defaultTTL
+	}
+	return ttl
 }
 
 // FindPublicInstances list public available instances

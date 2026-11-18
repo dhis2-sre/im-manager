@@ -41,4 +41,5 @@ func Routes(r *gin.Engine, authenticator gin.HandlerFunc, handler Handler) {
 	tokenAuthenticationRouter.PATCH("/presets/:id", handler.EditPreset)
 	tokenAuthenticationRouter.DELETE("/presets/:id", handler.DeletePreset)
 	tokenAuthenticationRouter.POST("/presets/:id/deployments", handler.CreateDeploymentFromPreset)
+	tokenAuthenticationRouter.POST("/presets/:id/deployments/bulk", handler.BulkDeployFromPreset)
 }

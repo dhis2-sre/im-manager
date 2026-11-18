@@ -287,3 +287,14 @@ type _ struct {
 	// required: true
 	Payload CreateDeploymentFromPresetRequest
 }
+
+// swagger:parameters bulkDeployFromPreset
+type _ struct {
+	// in: path
+	// required: true
+	ID uint `json:"id"`
+	// Bulk deploy from preset request body parameter
+	// in: body
+	// required: true
+	Payload BulkDeployFromPresetRequest
+}
