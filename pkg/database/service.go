@@ -163,6 +163,7 @@ func (s Service) copyFS(ctx context.Context, d *model.Database, group *model.Gro
 		GroupName: group.Name,
 		Url:       url,
 		Type:      "fs",
+		UserID:    d.UserID,
 		Size:      fs.Size,
 	}
 
