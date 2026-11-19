@@ -70,6 +70,7 @@ type fakeInstanceService struct {
 	deployHook func()
 	changes    *instance.DeploymentChanges
 	editErr    error
+	findErr    error
 	// steps records destroys, component resets, deploys and restarts in the order they ran.
 	steps          []string
 	componentReset error
@@ -132,6 +133,9 @@ func (f *fakeInstanceService) DeleteDestroyedInstance(_ context.Context, deploym
 }
 
 func (f *fakeInstanceService) FindDecryptedDeploymentById(context.Context, uint) (*model.Deployment, error) {
+	if f.findErr != nil {
+		return nil, f.findErr
+	}
 	return f.deployment, nil
 }
 
@@ -396,10 +400,9 @@ func TestResetOfAComponentIsRefusedBeforeItStarts(t *testing.T) {
 	assert.Empty(t, instanceService.recordedSteps())
 }
 
-func TestDeployPathsRefuseAPreset(t *testing.T) {
+func TestDeployPathsRefuseAnIdThatIsNotADeployment(t *testing.T) {
 	deployment := newTestDeployment()
-	deployment.Preset = true
-	instanceService := &fakeInstanceService{deployment: deployment}
+	instanceService := &fakeInstanceService{deployment: deployment, findErr: errdef.NewNotFound("deployment not found by id: %d", deployment.ID)}
 	service := newTestService(instanceService, &recordingPublisher{})
 
 	errs := map[string]error{
@@ -411,7 +414,7 @@ func TestDeployPathsRefuseAPreset(t *testing.T) {
 
 	for path, err := range errs {
 		require.Error(t, err, path)
-		assert.True(t, errdef.IsBadRequest(err), "%s: expected a bad request, got %v", path, err)
+		assert.True(t, errdef.IsNotFound(err), "%s: expected not found, got %v", path, err)
 	}
 	assert.False(t, instanceService.isLocked())
 	assert.Empty(t, instanceService.deployedStacks())

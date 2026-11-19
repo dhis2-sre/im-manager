@@ -225,6 +225,18 @@ func TestPlanEdit(t *testing.T) {
 		assert.Equal(t, "1.0.0", changes.Redeploy[0].Parameters["SIDECAR_TAG"].Value)
 	})
 
+	t.Run("AnAddedCompanionTakesThePublicFlagOfItsEdit", func(t *testing.T) {
+		edit := Edit{Instances: map[string]InstanceEdit{
+			"host":    {Parameters: Parameters{"ENABLE_SIDECAR": {Value: "true"}}},
+			"sidecar": {Public: ptr(true)},
+		}}
+
+		changes, err := editTestService().planEdit(editTestDeployment(false), edit)
+
+		require.NoError(t, err)
+		assert.True(t, findInstanceByStackName("sidecar", changes.Deployment).Public)
+	})
+
 	t.Run("TheGatingParameterGoingFalseDestroysTheCompanion", func(t *testing.T) {
 		deployment := editTestDeployment(true)
 		edit := Edit{Instances: map[string]InstanceEdit{

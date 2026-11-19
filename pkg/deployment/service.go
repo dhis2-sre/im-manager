@@ -433,14 +433,10 @@ func instanceIds(instances []*model.DeploymentInstance) []uint {
 	return ids
 }
 
-// acquireDeployLock takes the deployment's deploy lock unless the deployment is a preset, which is kept to start deployments from and is never deployed itself.
+// acquireDeployLock takes the deployment's deploy lock once it is known to exist, so an id naming a preset or nothing is not found rather than locked.
 func (s Service) acquireDeployLock(ctx context.Context, deploymentId uint) (bool, error) {
-	deployment, err := s.instanceService.FindDecryptedDeploymentById(ctx, deploymentId)
-	if err != nil {
+	if _, err := s.instanceService.FindDecryptedDeploymentById(ctx, deploymentId); err != nil {
 		return false, err
-	}
-	if deployment.Preset {
-		return false, errdef.NewBadRequest("deployment %d is a preset and can't be deployed", deploymentId)
 	}
 
 	return s.instanceService.AcquireDeployLock(ctx, deploymentId)

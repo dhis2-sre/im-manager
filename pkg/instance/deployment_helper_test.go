@@ -20,7 +20,6 @@ type deploymentBuilder struct {
 	description string
 	ttl         *uint
 	public      *bool
-	preset      bool
 }
 
 type DeploymentOption func(*deploymentBuilder)
@@ -34,12 +33,6 @@ func WithDescription(description string) DeploymentOption {
 func WithTTL(ttl uint) DeploymentOption {
 	return func(db *deploymentBuilder) {
 		db.ttl = &ttl
-	}
-}
-
-func WithPreset() DeploymentOption {
-	return func(db *deploymentBuilder) {
-		db.preset = true
 	}
 }
 
@@ -70,10 +63,6 @@ func createDeployment(t *testing.T, client *inttest.HTTPClient, name string, aut
 
 	if builder.public != nil {
 		payload["public"] = *builder.public
-	}
-
-	if builder.preset {
-		payload["preset"] = true
 	}
 
 	jsonData, err := json.Marshal(payload)

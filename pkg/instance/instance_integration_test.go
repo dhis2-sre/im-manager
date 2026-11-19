@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"maps"
 	"net/http"
 	"os"
 	"slices"
@@ -15,6 +16,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dhis2-sre/im-manager/internal/errdef"
 	"github.com/dhis2-sre/im-manager/pkg/token"
 	"github.com/getsops/sops/v3"
 
@@ -80,11 +82,23 @@ func TestInstanceHandler(t *testing.T) {
 			Configuration: k8sConfig,
 		},
 	}
+	otherGroup := &model.Group{
+		ID:         2,
+		Name:       "other-group-name",
+		Namespace:  "other-group-name",
+		Hostname:   "other",
+		Deployable: true,
+		Cluster: model.Cluster{
+			Name:          "other-cluster-name",
+			Configuration: k8sConfig,
+		},
+	}
 	user := &model.User{
 		Email:      "user1@dhis2.org",
 		EmailToken: uuid.New(),
 		Groups: []model.Group{
 			*group,
+			*otherGroup,
 		},
 	}
 	err = db.Create(user).Error
@@ -97,11 +111,22 @@ func TestInstanceHandler(t *testing.T) {
 	err = db.Create(nonMember).Error
 	require.NoError(t, err, "failed to save non-member user")
 
+	otherMember := &model.User{
+		Email:      "user3@dhis2.org",
+		EmailToken: uuid.New(),
+		Groups: []model.Group{
+			*group,
+			*otherGroup,
+		},
+	}
+	err = db.Create(otherMember).Error
+	require.NoError(t, err, "failed to save other member user")
+
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	encryptionKey := strings.Repeat("a", 32)
 	instanceRepo, err := instance.NewRepository(db, encryptionKey)
 	require.NoError(t, err)
-	groupService := groupService{group: group}
+	groupService := groupService{groups: []*model.Group{group, &user.Groups[1]}}
 	stacks := stack.Stacks{
 		"whoami-go": stack.WhoamiGo,
 		"dhis2-v2":  stack.DHIS2V2,
@@ -133,14 +158,17 @@ func TestInstanceHandler(t *testing.T) {
 	// this is only to allow testing using multiple users without bringing in all our auth stack
 	authenticator := func(c *gin.Context) {
 		authenticatedUser := user
-		if c.Query("user") == "non-member" {
+		switch c.Query("user") {
+		case "non-member":
 			authenticatedUser = nonMember
+		case "other-member":
+			authenticatedUser = otherMember
 		}
 		ctx := model.NewContextWithUser(c.Request.Context(), authenticatedUser)
 		c.Request = c.Request.WithContext(ctx)
 	}
+	var twoDayTTL uint = 172800
 	client := inttest.SetupHTTPServer(t, func(engine *gin.Engine) {
-		var twoDayTTL uint = 172800
 		instanceHandler := instance.NewHandler(stackService, groupService, instanceService, deploymentService, twoDayTTL)
 		instance.Routes(engine, authenticator, instanceHandler)
 
@@ -555,39 +583,114 @@ func TestInstanceHandler(t *testing.T) {
 		}
 	})
 
+	t.Run("BulkDeployFromPreset", func(t *testing.T) {
+		t.Parallel()
+		post := func(path, body string, status int) []byte {
+			return client.Do(t, http.MethodPost, path, strings.NewReader(body), status, inttest.WithAuthToken(tokens.AccessToken), inttest.WithHeader("Content-Type", "application/json"))
+		}
+
+		var preset model.Deployment
+		require.NoError(t, json.Unmarshal(post("/presets", `{"name":"preset-bulk","group":"group-name","description":"from the preset","instances":[{"stackName":"whoami-go","parameters":{"IMAGE_TAG":{"value":"0.6.0"},"IMAGE_PULL_POLICY":{"value":"Always"}}}]}`, http.StatusCreated), &preset))
+		bulkPath := fmt.Sprintf("/presets/%d/deployments/bulk", preset.ID)
+
+		taken := createDeployment(t, client, "preset-bulk-taken-2", tokens.AccessToken)
+		conflict := post(bulkPath, `{"prefix":"preset-bulk-taken","count":3}`, http.StatusConflict)
+		assert.Contains(t, string(conflict), "preset-bulk-taken-2")
+		var names instance.DeploymentNameAvailability
+		client.GetJSON(t, "/deployments/availability?group=group-name&name=preset-bulk-taken-1", &names, inttest.WithAuthToken(tokens.AccessToken))
+		assert.True(t, names.Available, "a refused bulk deploy must create nothing")
+
+		post(bulkPath, `{"prefix":"Preset-bulk","count":2}`, http.StatusBadRequest)
+		post(bulkPath, `{"prefix":"preset-bulk","count":51}`, http.StatusBadRequest)
+		post(bulkPath+"?user=other-member", `{"prefix":"preset-bulk-elsewhere","count":2,"group":"other-group-name"}`, http.StatusForbidden)
+		post(fmt.Sprintf("/presets/%d/deployments/bulk", taken.ID), `{"prefix":"preset-bulk","count":2}`, http.StatusNotFound)
+		destroyDeployment(t, client, taken.ID, tokens.AccessToken)
+
+		var response instance.BulkDeployResponse
+		require.NoError(t, json.Unmarshal(post(bulkPath, `{"prefix":"preset-bulk","count":2,"description":"bulk","instances":{"whoami-go":{"parameters":{"IMAGE_PULL_POLICY":{"value":"IfNotPresent"}}}}}`, http.StatusAccepted), &response))
+		require.Len(t, response.Deployments, 2)
+		assert.Equal(t, "preset-bulk-1", response.Deployments[0].Name)
+		assert.Equal(t, "preset-bulk-2", response.Deployments[1].Name)
+
+		for _, bulk := range response.Deployments {
+			awaitDeployed(t, client, bulk.ID, tokens.AccessToken)
+			var deployment model.Deployment
+			client.GetJSON(t, fmt.Sprintf("/deployments/%d", bulk.ID), &deployment, inttest.WithAuthToken(tokens.AccessToken))
+			assert.Equal(t, "bulk", deployment.Description)
+			require.Len(t, deployment.Instances, 1)
+			assert.Equal(t, "0.6.0", deployment.Instances[0].Parameters["IMAGE_TAG"].Value)
+			assert.Equal(t, "IfNotPresent", deployment.Instances[0].Parameters["IMAGE_PULL_POLICY"].Value)
+			k8sClient.AssertPodIsReady(t, deployment.Instances[0].Group.Namespace, deployment.Instances[0].Name, 60, deployment.Instances[0].Group.ID)
+			destroyDeployment(t, client, bulk.ID, tokens.AccessToken)
+		}
+
+		client.Do(t, http.MethodDelete, fmt.Sprintf("/presets/%d", preset.ID), nil, http.StatusNoContent, inttest.WithAuthToken(tokens.AccessToken))
+	})
+
 	t.Run("Preset", func(t *testing.T) {
 		t.Parallel()
-		deployment := createDeployment(t, client, "test-preset", tokens.AccessToken)
-		createWhoamiInstance(t, client, deployment.ID, tokens.AccessToken, WithParameter("IMAGE_TAG", "0.6.0"))
-		preset := createDeployment(t, client, "test-preset", tokens.AccessToken, WithPreset())
-		require.True(t, preset.Preset)
-		createWhoamiInstance(t, client, preset.ID, tokens.AccessToken, WithParameter("IMAGE_TAG", "0.6.0"), WithPublic(true))
+		send := func(method, path string, payload any, status int, response any) {
+			t.Helper()
+			jsonData, err := json.Marshal(payload)
+			require.NoError(t, err)
+			body := client.Do(t, method, path, strings.NewReader(string(jsonData)), status, inttest.WithAuthToken(tokens.AccessToken), inttest.WithHeader("Content-Type", "application/json"))
+			if response != nil {
+				require.NoError(t, json.Unmarshal(body, response))
+			}
+		}
+		parameters := func(values map[string]string) map[string]any {
+			result := map[string]any{}
+			for name, value := range values {
+				result[name] = map[string]any{"value": value}
+			}
+			return result
+		}
+		presetPayload := func(name string, instanceParameters map[string]string) map[string]any {
+			instanceParameters = maps.Clone(instanceParameters)
+			if instanceParameters == nil {
+				instanceParameters = map[string]string{}
+			}
+			instanceParameters["DATABASE_ID"] = "1"
+			return map[string]any{
+				"name":        name,
+				"group":       "group-name",
+				"description": "initial",
+				"instances":   []any{map[string]any{"stackName": "dhis2-v2", "public": true, "parameters": parameters(instanceParameters)}},
+			}
+		}
 
-		duplicate := client.Do(t, http.MethodPost, "/deployments", strings.NewReader(`{"name":"test-preset","group":"group-name","preset":true}`), http.StatusConflict, inttest.WithAuthToken(tokens.AccessToken), inttest.WithHeader("Content-Type", "application/json"))
-		assert.Contains(t, string(duplicate), "a preset named")
+		var preset model.Deployment
+		send(http.MethodPost, "/presets", presetPayload("test-preset", map[string]string{"IMAGE_TAG": "2.41.0", "GOOGLE_AUTH_PROJECT_ID": "secret-project"}), http.StatusCreated, &preset)
+		assert.True(t, preset.Preset)
+		require.Len(t, preset.Instances, 1)
+		assert.NotEqual(t, "secret-project", preset.Instances[0].Parameters["GOOGLE_AUTH_PROJECT_ID"].Value)
 
-		var replaced model.Deployment
-		body := client.Do(t, http.MethodPost, "/deployments", strings.NewReader(`{"name":"test-preset","group":"group-name","description":"replaced","preset":true,"overwrite":true}`), http.StatusCreated, inttest.WithAuthToken(tokens.AccessToken), inttest.WithHeader("Content-Type", "application/json"))
-		require.NoError(t, json.Unmarshal(body, &replaced))
-		assert.NotEqual(t, preset.ID, replaced.ID)
-		assert.Equal(t, "replaced", replaced.Description)
-		client.Do(t, http.MethodGet, fmt.Sprintf("/deployments/%d", preset.ID), nil, http.StatusNotFound, inttest.WithAuthToken(tokens.AccessToken))
-		client.Do(t, http.MethodGet, fmt.Sprintf("/deployments/%d", deployment.ID), nil, http.StatusOK, inttest.WithAuthToken(tokens.AccessToken))
-		client.Do(t, http.MethodPost, "/deployments", strings.NewReader(`{"name":"test-preset","group":"group-name","overwrite":true}`), http.StatusBadRequest, inttest.WithAuthToken(tokens.AccessToken), inttest.WithHeader("Content-Type", "application/json"))
-		preset = replaced
-		createWhoamiInstance(t, client, preset.ID, tokens.AccessToken, WithParameter("IMAGE_TAG", "0.6.0"), WithPublic(true))
+		send(http.MethodPost, "/presets", presetPayload("test-preset", nil), http.StatusConflict, nil)
+		send(http.MethodPost, "/presets", presetPayload("test-preset-refused", map[string]string{"IMAGE_PULL_POLICY": "Sometimes"}), http.StatusBadRequest, nil)
 
-		var availability instance.DeploymentNameAvailability
-		client.GetJSON(t, "/deployments/availability?group=group-name&name=test-preset&preset=true", &availability, inttest.WithAuthToken(tokens.AccessToken))
-		assert.False(t, availability.Available)
-		availability = instance.DeploymentNameAvailability{}
-		client.GetJSON(t, "/deployments/availability?group=group-name&name=test-preset-free&preset=true", &availability, inttest.WithAuthToken(tokens.AccessToken))
-		assert.True(t, availability.Available)
+		var presets []model.Deployment
+		client.GetJSON(t, "/presets", &presets, inttest.WithAuthToken(tokens.AccessToken))
+		assert.True(t, slices.ContainsFunc(presets, func(d model.Deployment) bool { return d.ID == preset.ID }))
+		assert.False(t, slices.ContainsFunc(presets, func(d model.Deployment) bool { return d.Name == "test-preset-refused" }), "a refused preset leaves nothing behind")
 
 		var outsiderPresets []model.Deployment
-		client.GetJSON(t, "/deployments/presets?user=non-member", &outsiderPresets, inttest.WithAuthToken(tokens.AccessToken))
+		client.GetJSON(t, "/presets?user=non-member", &outsiderPresets, inttest.WithAuthToken(tokens.AccessToken))
 		assert.False(t, slices.ContainsFunc(outsiderPresets, func(d model.Deployment) bool { return d.ID == preset.ID }))
-		client.Do(t, http.MethodGet, fmt.Sprintf("/deployments/%d?user=non-member", preset.ID), nil, http.StatusUnauthorized, inttest.WithAuthToken(tokens.AccessToken))
+		client.Do(t, http.MethodGet, fmt.Sprintf("/presets/%d?user=non-member", preset.ID), nil, http.StatusUnauthorized, inttest.WithAuthToken(tokens.AccessToken))
+
+		deployment := createDeployment(t, client, "test-preset", tokens.AccessToken)
+		client.Do(t, http.MethodGet, fmt.Sprintf("/presets/%d", deployment.ID), nil, http.StatusNotFound, inttest.WithAuthToken(tokens.AccessToken))
+
+		client.Do(t, http.MethodGet, fmt.Sprintf("/deployments/%d", preset.ID), nil, http.StatusNotFound, inttest.WithAuthToken(tokens.AccessToken))
+		client.Do(t, http.MethodPost, fmt.Sprintf("/deployments/%d/deploy", preset.ID), nil, http.StatusNotFound, inttest.WithAuthToken(tokens.AccessToken))
+		client.Do(t, http.MethodGet, fmt.Sprintf("/instances/%d/details", preset.Instances[0].ID), nil, http.StatusNotFound, inttest.WithAuthToken(tokens.AccessToken))
+		client.Do(t, http.MethodDelete, fmt.Sprintf("/deployments/%d", preset.ID), nil, http.StatusNotFound, inttest.WithAuthToken(tokens.AccessToken))
+
+		var groupsWithDeployments []instance.GroupWithDeployments
+		client.GetJSON(t, "/deployments", &groupsWithDeployments, inttest.WithAuthToken(tokens.AccessToken))
+		for _, group := range groupsWithDeployments {
+			assert.False(t, slices.ContainsFunc(group.Deployments, func(d *model.Deployment) bool { return d.ID == preset.ID }))
+		}
 
 		var publicGroups []instance.GroupWithPublicInstances
 		client.GetJSON(t, "/instances/public", &publicGroups)
@@ -597,24 +700,91 @@ func TestInstanceHandler(t *testing.T) {
 			}
 		}
 
-		var presets []model.Deployment
-		client.GetJSON(t, "/deployments/presets", &presets, inttest.WithAuthToken(tokens.AccessToken))
-		assert.True(t, slices.ContainsFunc(presets, func(d model.Deployment) bool { return d.ID == preset.ID }))
-		assert.False(t, slices.ContainsFunc(presets, func(d model.Deployment) bool { return !d.Preset }))
-		listed := presets[slices.IndexFunc(presets, func(d model.Deployment) bool { return d.ID == preset.ID })]
-		require.Len(t, listed.Instances, 1)
-		assert.Equal(t, "0.6.0", listed.Instances[0].Parameters["IMAGE_TAG"].Value)
+		var edited model.Deployment
+		send(http.MethodPatch, fmt.Sprintf("/presets/%d", preset.ID), map[string]any{
+			"description": "edited",
+			"instances":   map[string]any{"dhis2-v2": map[string]any{"parameters": parameters(map[string]string{"IMAGE_TAG": "2.42.0"})}},
+		}, http.StatusOK, &edited)
+		assert.Equal(t, preset.ID, edited.ID)
+		assert.Equal(t, "edited", edited.Description)
+		assert.Equal(t, "2.42.0", findInstanceByStack(edited, "dhis2-v2").Parameters["IMAGE_TAG"].Value)
 
-		var groupsWithDeployments []instance.GroupWithDeployments
-		client.GetJSON(t, "/deployments", &groupsWithDeployments, inttest.WithAuthToken(tokens.AccessToken))
-		for _, group := range groupsWithDeployments {
-			assert.False(t, slices.ContainsFunc(group.Deployments, func(d *model.Deployment) bool { return d.ID == preset.ID }))
+		availability := func(path string) instance.DeploymentNameAvailability {
+			t.Helper()
+			var availability instance.DeploymentNameAvailability
+			client.GetJSON(t, path, &availability, inttest.WithAuthToken(tokens.AccessToken))
+			return availability
 		}
+		taken := availability("/presets/availability?group=group-name&name=test-preset")
+		assert.False(t, taken.Available)
+		assert.Contains(t, taken.Reason, `a preset named "test-preset"`)
+		assert.True(t, availability("/presets/availability?group=group-name&name=test-preset-free").Available)
 
-		client.Do(t, http.MethodPost, fmt.Sprintf("/deployments/%d/deploy", preset.ID), nil, http.StatusBadRequest, inttest.WithAuthToken(tokens.AccessToken))
+		var other model.Deployment
+		send(http.MethodPost, "/presets", presetPayload("test-preset-other", nil), http.StatusCreated, &other)
+		send(http.MethodPatch, fmt.Sprintf("/presets/%d", other.ID), map[string]any{"name": "test-preset"}, http.StatusConflict, nil)
+		send(http.MethodPatch, fmt.Sprintf("/presets/%d", other.ID), map[string]any{"name": "Not A Name"}, http.StatusBadRequest, nil)
 
-		client.Do(t, http.MethodDelete, fmt.Sprintf("/deployments/%d", preset.ID), nil, http.StatusAccepted, inttest.WithAuthToken(tokens.AccessToken))
-		client.Do(t, http.MethodGet, fmt.Sprintf("/deployments/%d", preset.ID), nil, http.StatusNotFound, inttest.WithAuthToken(tokens.AccessToken))
+		var moved model.Deployment
+		send(http.MethodPatch, fmt.Sprintf("/presets/%d", other.ID), map[string]any{"name": "test-preset-moved", "group": "other-group-name"}, http.StatusOK, &moved)
+		assert.Equal(t, other.ID, moved.ID)
+		assert.Equal(t, "test-preset-moved", moved.Name)
+		assert.Equal(t, "other-group-name", moved.GroupName)
+
+		var reloaded model.Deployment
+		client.GetJSON(t, fmt.Sprintf("/presets/%d", other.ID), &reloaded, inttest.WithAuthToken(tokens.AccessToken))
+		assert.Equal(t, "test-preset-moved", reloaded.Name)
+		assert.Equal(t, "other-group-name", reloaded.GroupName)
+		require.Len(t, reloaded.Instances, 1)
+		assert.Equal(t, "test-preset-moved", reloaded.Instances[0].Name)
+		assert.Equal(t, "other-group-name", reloaded.Instances[0].GroupName)
+
+		assert.True(t, availability("/presets/availability?group=group-name&name=test-preset-other").Available, "renaming frees the old name")
+		assert.False(t, availability("/presets/availability?group=other-group-name&name=test-preset-moved").Available)
+		assert.True(t, availability("/deployments/availability?group=other-group-name&name=test-preset-moved").Available, "a preset's name does not take a deployment name")
+		client.Do(t, http.MethodDelete, fmt.Sprintf("/presets/%d", other.ID), nil, http.StatusNoContent, inttest.WithAuthToken(tokens.AccessToken))
+
+		var created model.Deployment
+		send(http.MethodPost, fmt.Sprintf("/presets/%d/deployments", preset.ID), map[string]any{
+			"name":      "test-from-preset",
+			"instances": map[string]any{"dhis2-v2": map[string]any{"parameters": parameters(map[string]string{"IMAGE_TAG": "2.42.1"})}},
+		}, http.StatusCreated, &created)
+		assert.False(t, created.Preset)
+		assert.Equal(t, "edited", created.Description)
+		assert.Equal(t, "group-name", created.GroupName)
+
+		decrypted, err := instanceService.FindDecryptedDeploymentById(context.Background(), created.ID)
+		require.NoError(t, err)
+		core := findInstanceByStack(*decrypted, "dhis2-v2")
+		require.NotNil(t, core)
+		assert.Equal(t, "test-from-preset", core.Name)
+		assert.Equal(t, "2.42.1", core.Parameters["IMAGE_TAG"].Value)
+		assert.Equal(t, "secret-project", core.Parameters["GOOGLE_AUTH_PROJECT_ID"].Value, "a sensitive value the client only sees masked carries over")
+
+		send(http.MethodPost, fmt.Sprintf("/presets/%d/deployments", preset.ID), map[string]any{"name": "test-from-preset"}, http.StatusConflict, nil)
+
+		var withoutTTL model.Deployment
+		send(http.MethodPost, fmt.Sprintf("/presets/%d/deployments", preset.ID), map[string]any{"name": "test-from-preset-zero-ttl", "ttl": 0}, http.StatusCreated, &withoutTTL)
+		assert.Equal(t, twoDayTTL, withoutTTL.TTL, "a TTL of 0 falls back to the default the way it does for a new deployment")
+		destroyDeployment(t, client, withoutTTL.ID, tokens.AccessToken)
+
+		send(http.MethodPost, fmt.Sprintf("/presets/%d/deployments?user=other-member", preset.ID), map[string]any{"name": "test-from-preset-elsewhere", "group": "other-group-name"}, http.StatusForbidden, nil)
+		var byOtherMember model.Deployment
+		send(http.MethodPost, fmt.Sprintf("/presets/%d/deployments?user=other-member", preset.ID), map[string]any{"name": "test-from-preset-by-other-member"}, http.StatusCreated, &byOtherMember)
+		assert.Equal(t, "group-name", byOtherMember.GroupName, "a member who doesn't own the preset still deploys it in its own group")
+		client.Do(t, http.MethodDelete, fmt.Sprintf("/deployments/%d?user=other-member", byOtherMember.ID), nil, http.StatusAccepted, inttest.WithAuthToken(tokens.AccessToken))
+
+		var elsewhere model.Deployment
+		send(http.MethodPost, fmt.Sprintf("/presets/%d/deployments", preset.ID), map[string]any{"name": "test-from-preset-elsewhere", "group": "other-group-name"}, http.StatusCreated, &elsewhere)
+		assert.Equal(t, "other-group-name", elsewhere.GroupName, "the owner of the preset deploys it to another group")
+		destroyDeployment(t, client, elsewhere.ID, tokens.AccessToken)
+
+		send(http.MethodPost, fmt.Sprintf("/presets/%d/deployments", deployment.ID), map[string]any{"name": "test-from-deployment"}, http.StatusNotFound, nil)
+
+		destroyDeployment(t, client, created.ID, tokens.AccessToken)
+		destroyDeployment(t, client, deployment.ID, tokens.AccessToken)
+		client.Do(t, http.MethodDelete, fmt.Sprintf("/presets/%d", preset.ID), nil, http.StatusNoContent, inttest.WithAuthToken(tokens.AccessToken))
+		client.Do(t, http.MethodGet, fmt.Sprintf("/presets/%d", preset.ID), nil, http.StatusNotFound, inttest.WithAuthToken(tokens.AccessToken))
 	})
 
 	t.Run("UpdateDeployment", func(t *testing.T) {
@@ -748,15 +918,26 @@ func createNamespace(t *testing.T, k8sClient *inttest.K8sClient, namespace strin
 }
 
 type groupService struct {
-	group *model.Group
+	groups []*model.Group
 }
 
 func (gs groupService) FindByGroupNames(ctx context.Context, groupNames []string) ([]model.Group, error) {
-	return []model.Group{*gs.group}, nil
+	var found []model.Group
+	for _, group := range gs.groups {
+		if slices.Contains(groupNames, group.Name) {
+			found = append(found, *group)
+		}
+	}
+	return found, nil
 }
 
 func (gs groupService) Find(ctx context.Context, name string) (*model.Group, error) {
-	return gs.group, nil
+	for _, group := range gs.groups {
+		if group.Name == name {
+			return group, nil
+		}
+	}
+	return nil, errdef.NewNotFound("group not found by name: %s", name)
 }
 
 type noopPublisher struct{}
