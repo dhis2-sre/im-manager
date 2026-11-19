@@ -69,8 +69,8 @@ spins real Postgres/RabbitMQ/Redis/Minio/localstack containers via testcontainer
 
 ### Stacks (the deployable units)
 
-`stacks/<name>/helmfile.yaml.gotmpl` + optional `seed.sh` define each stack (e.g. `dhis2-core`, `dhis2-db`, `minio`,
-`pgadmin`, `chap-*`). Stacks are loaded from disk at startup and exposed via `pkg/stack`. Comment headers in each
+`stacks/<name>/helmfile.yaml.gotmpl` + optional `seed.sh` define each stack (`dhis2-v2`, `pgadmin`, `chap`,
+`whoami-go`). Stacks are loaded from disk at startup and exposed via `pkg/stack`. Comment headers in each
 helmfile carry metadata parsed by tests:
 
 - `# consumedParameters:` — params required from upstream stacks in the same deployment
@@ -84,9 +84,9 @@ which shells out to `helmfile` with a long list of injected env vars (`INSTANCE_
 
 ### Database seed pattern (important — easy to break)
 
-Both `stacks/dhis2-db/seed.sh` (mounted as `initdb.scripts.seed.sh` under Bitnami postgres) and
-`stacks/minio/seed-minio.sh` (a sidecar) curl `${HOSTNAME}/databases/${DATABASE_ID}` using `IM_ACCESS_TOKEN` and write
-an idempotency marker only on success. **First-attempt failure → no marker → every restart retries with a now-expired
+Both `stacks/dhis2-v2/seed.sh` (run by the chart's marker-guarded hook Job against the CloudNativePG cluster) and
+`stacks/dhis2-v2/seed-minio.sh` (a sidecar) curl `${HOSTNAME}/databases/${DATABASE_ID}` using `IM_ACCESS_TOKEN` and
+write an idempotency marker only on success. **First-attempt failure → no marker → every restart retries with a now-expired
 token → permanent CrashLoopBackOff.** When changing token TTLs or seed logic, keep this in mind: the marker is the
 recovery mechanism.
 

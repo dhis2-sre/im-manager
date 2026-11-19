@@ -10,11 +10,11 @@ type _ struct {
 // swagger:response Stack
 type StackBody struct {
 	//in: body
-	Body Stack
+	Body StackResponse
 }
 
 // swagger:response Stacks
 type StacksBody struct {
 	//in: body
-	Body []Stack
+	Body []StackResponse
 }

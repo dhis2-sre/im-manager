@@ -12,7 +12,9 @@ import (
 
 	"gopkg.in/yaml.v3"
 
+	"github.com/dhis2-sre/im-manager/pkg/kube"
 	"github.com/dhis2-sre/im-manager/pkg/model"
+	"github.com/dhis2-sre/im-manager/pkg/stack"
 )
 
 //goland:noinspection GoExportedFuncWithUnexportedType
@@ -56,15 +58,35 @@ type helmfileService struct {
 }
 
 type stackService interface {
-	Find(name string) (*model.Stack, error)
+	Find(name string) (*stack.Stack, error)
 }
 
 func (h helmfileService) sync(ctx context.Context, token string, instance *model.DeploymentInstance, group *model.Group, ttl uint, extraEnv map[string]string) (*exec.Cmd, error) {
 	return h.executeHelmfileCommand(ctx, token, instance, group, ttl, extraEnv, "sync")
 }
 
-func (h helmfileService) destroy(ctx context.Context, instance *model.DeploymentInstance, group *model.Group) (*exec.Cmd, error) {
-	return h.executeHelmfileCommand(ctx, "token", instance, group, 0, nil, "destroy")
+// uninstall removes the instance's release by name. Unlike a helmfile destroy it renders nothing,
+// so an instance whose parameters no longer render, or whose release was never installed, can still
+// be destroyed.
+func (h helmfileService) uninstall(ctx context.Context, instance *model.DeploymentInstance, group *model.Group) (*exec.Cmd, error) {
+	//goland:noinspection GoImportUsedAsName
+	stack, err := h.stackService.Find(instance.StackName)
+	if err != nil {
+		return nil, err
+	}
+
+	release := stack.ReleaseName(instanceName(instance, group))
+	cmd := exec.CommandContext(ctx, h.helmBinary, "uninstall", release, "--namespace", group.Namespace, "--ignore-not-found") // #nosec
+	cmd.WaitDelay = 10 * time.Second
+	h.logger.InfoContext(ctx, "Executing helm command", "command", cmd.String())
+	cmd.Env = h.clusterEnvironment(ctx, cmd.Env)
+
+	return cmd, nil
+}
+
+// instanceName is the name the instance's kubernetes resources and helm release are named after.
+func instanceName(instance *model.DeploymentInstance, group *model.Group) string {
+	return fmt.Sprintf("%s-%d", instance.Name, group.ID)
 }
 
 // **Security considerations**
@@ -90,11 +112,34 @@ func (h helmfileService) executeHelmfileCommand(ctx context.Context, token strin
 		return nil, err
 	}
 
-	cmd := exec.Command(h.helmfileBinary, "--helm-binary", h.helmBinary, "-f", stackPath, operation) // #nosec
+	cmd := exec.CommandContext(ctx, h.helmfileBinary, "--helm-binary", h.helmBinary, "-f", stackPath, operation) // #nosec
+	// Output is collected through pipes, so Wait blocks until every writer closes them. A helm hook
+	// job that outlives the kill would otherwise hold the deadline open indefinitely.
+	cmd.WaitDelay = 10 * time.Second
 	h.logger.InfoContext(ctx, "Executing helmfile command", "command", cmd.String())
 	h.configureInstanceEnvironment(ctx, token, instance, group, ttl, stackParameters, extraEnv, cmd)
 
 	return cmd, nil
+}
+
+// clusterEnvironment is what helm needs to reach a cluster: a writable home, the AWS credentials an
+// EKS kubeconfig authenticates with, and the service address of the cluster IM runs in.
+func (h helmfileService) clusterEnvironment(ctx context.Context, env []string) []string {
+	env = append(env, fmt.Sprintf("%s=%s", "HOME", "/tmp"))
+
+	env = h.injectEnv(ctx, env, "AWS_ACCESS_KEY_ID")
+	env = h.injectEnv(ctx, env, "AWS_SECRET_ACCESS_KEY")
+	env = h.injectEnv(ctx, env, "AWS_DEFAULT_REGION")
+	env = h.injectEnv(ctx, env, "AWS_REGION")
+	env = h.injectEnv(ctx, env, "AWS_ROLE_ARN")
+	env = h.injectEnv(ctx, env, "AWS_WEB_IDENTITY_TOKEN_FILE")
+
+	env = h.injectEnv(ctx, env, "KUBERNETES_SERVICE_PORT")
+	env = h.injectEnv(ctx, env, "KUBERNETES_PORT")
+	env = h.injectEnv(ctx, env, "KUBERNETES_SERVICE_PORT_HTTPS")
+	env = h.injectEnv(ctx, env, "KUBERNETES_SERVICE_HOST")
+
+	return env
 }
 
 type stackParameters map[string]string
@@ -110,7 +155,7 @@ func (h helmfileService) loadStackParameters(stackName string) (stackParameters,
 		return nil, err
 	}
 
-	b, err := decryptYaml(data)
+	b, err := kube.DecryptYaml(data)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decrypt stack parameters: %v", err)
 	}
@@ -127,7 +172,7 @@ func (h helmfileService) loadStackParameters(stackName string) (stackParameters,
 func (h helmfileService) configureInstanceEnvironment(ctx context.Context, accessToken string, instance *model.DeploymentInstance, group *model.Group, ttl uint, stackParameters stackParameters, extraEnv map[string]string, cmd *exec.Cmd) {
 	// INSTANCE_NAME: unique name for K8s/Helm (release names, services). INSTANCE_PATH_NAME: deployment name for URL path/context (group-based subdomain already makes URL unique).
 	// IM_ACCESS_TOKEN is kept for stacks that need IM API access (e.g. im-job-runner). Seed stacks use per-deployment signed URLs via extraEnv instead.
-	instanceNameEnv := fmt.Sprintf("%s=%s-%d", "INSTANCE_NAME", instance.Name, group.ID)
+	instanceNameEnv := fmt.Sprintf("%s=%s", "INSTANCE_NAME", instanceName(instance, group))
 	instancePathNameEnv := fmt.Sprintf("%s=%s", "INSTANCE_PATH_NAME", instance.Name)
 	instanceNamespaceEnv := fmt.Sprintf("%s=%s", "INSTANCE_NAMESPACE", group.Namespace)
 	instanceIdEnv := fmt.Sprintf("%s=%d", "INSTANCE_ID", instance.ID)
@@ -135,30 +180,19 @@ func (h helmfileService) configureInstanceEnvironment(ctx context.Context, acces
 	instanceTTLEnv := fmt.Sprintf("%s=%d", "INSTANCE_TTL", ttl)
 	instanceHostnameEnv := fmt.Sprintf("%s=%s", "INSTANCE_HOSTNAME", group.Hostname)
 	imTokenEnv := fmt.Sprintf("%s=%s", "IM_ACCESS_TOKEN", accessToken)
-	homeEnv := fmt.Sprintf("%s=%s", "HOME", "/tmp")
 	imCreationTimestamp := fmt.Sprintf("%s=%d", "INSTANCE_CREATION_TIMESTAMP", time.Now().Unix())
-	cmd.Env = append(cmd.Env, instanceNameEnv, instancePathNameEnv, instanceNamespaceEnv, instanceIdEnv, deploymentIdEnv, instanceTTLEnv, instanceHostnameEnv, imTokenEnv, homeEnv, imCreationTimestamp)
+	cmd.Env = append(cmd.Env, instanceNameEnv, instancePathNameEnv, instanceNamespaceEnv, instanceIdEnv, deploymentIdEnv, instanceTTLEnv, instanceHostnameEnv, imTokenEnv, imCreationTimestamp)
 
 	cmd.Env = h.injectEnv(ctx, cmd.Env, "HOSTNAME")
-	cmd.Env = h.injectEnv(ctx, cmd.Env, "AWS_ACCESS_KEY_ID")
-	cmd.Env = h.injectEnv(ctx, cmd.Env, "AWS_SECRET_ACCESS_KEY")
-	cmd.Env = h.injectEnv(ctx, cmd.Env, "AWS_DEFAULT_REGION")
-	cmd.Env = h.injectEnv(ctx, cmd.Env, "AWS_REGION")
-	cmd.Env = h.injectEnv(ctx, cmd.Env, "AWS_ROLE_ARN")
-	cmd.Env = h.injectEnv(ctx, cmd.Env, "AWS_WEB_IDENTITY_TOKEN_FILE")
+	cmd.Env = h.clusterEnvironment(ctx, cmd.Env)
 
-	cmd.Env = h.injectEnv(ctx, cmd.Env, "KUBERNETES_SERVICE_PORT")
-	cmd.Env = h.injectEnv(ctx, cmd.Env, "KUBERNETES_PORT")
-	cmd.Env = h.injectEnv(ctx, cmd.Env, "KUBERNETES_SERVICE_PORT_HTTPS")
-	cmd.Env = h.injectEnv(ctx, cmd.Env, "KUBERNETES_SERVICE_HOST")
-
-	ingressClass, err := discoverIngressClass(ctx, group.Cluster)
+	ingressClass, err := kube.DiscoverIngressClass(ctx, group.Cluster)
 	if err != nil {
 		h.logger.WarnContext(ctx, "Failed to discover ingress class", "error", err)
 	}
 	cmd.Env = append(cmd.Env, fmt.Sprintf("INGRESS_CLASS=%s", ingressClass))
 
-	certIssuer, err := discoverCertIssuer(ctx, group.Cluster)
+	certIssuer, err := kube.DiscoverCertIssuer(ctx, group.Cluster)
 	if err != nil {
 		h.logger.WarnContext(ctx, "Failed to discover cert issuer", "error", err)
 	}

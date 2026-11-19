@@ -7,3 +7,11 @@ nodeSelector:
   im-dedicated: "true"
 auth:
   enabled: false
+dataStorage:
+  enabled: true
+  requestedSize: 1Gi
+  keepPvc: true
+valkeyConfig: |
+  appendonly yes
+# A RWO volume cannot be attached to the old and the new pod at once
+deploymentStrategy: Recreate

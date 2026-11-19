@@ -60,6 +60,7 @@ func (r repository) FindById(ctx context.Context, id uint) (*model.Database, err
 	err := r.db.
 		WithContext(ctx).
 		Preload("Lock").
+		Preload("Filestore").
 		Joins("User").
 		First(&d, id).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -82,6 +83,7 @@ func (r repository) FindBySlug(ctx context.Context, slug string) (*model.Databas
 	err := r.db.
 		WithContext(ctx).
 		Preload("Lock").
+		Preload("Filestore").
 		Where("slug = ?", slug).
 		First(&d).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {

@@ -14,15 +14,31 @@ type Deployment struct {
 	UserID uint  `json:"userId"`
 	User   *User `json:"user,omitempty"`
 
-	Name        string `json:"name" gorm:"index:deployment_name_group_idx,unique"`
+	Name        string `json:"name" gorm:"index:deployment_name_group_preset_idx,unique"`
 	Description string `json:"description"`
-	GroupName   string `json:"groupName" gorm:"index:deployment_name_group_idx,unique; references:Name"`
+	GroupName   string `json:"groupName" gorm:"index:deployment_name_group_preset_idx,unique; references:Name"`
 	Group       *Group `json:"group,omitempty"`
 
 	TTL uint `json:"ttl"`
 
+	Preset bool `json:"preset" gorm:"not null;default:false;index:deployment_name_group_preset_idx,unique"`
+
+	// DeployLockedAt is held for the duration of a deploy so a second one is refused rather than
+	// racing helm. A lock older than the deploy deadline is stale and may be taken over.
+	DeployLockedAt *time.Time `json:"-"`
+
 	Instances []*DeploymentInstance `json:"instances" gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
 }
+
+// DeployStatus is how far an instance got the last time it was deployed.
+type DeployStatus string
+
+const (
+	DeployStatusPending   DeployStatus = "pending"
+	DeployStatusDeploying DeployStatus = "deploying"
+	DeployStatusDeployed  DeployStatus = "deployed"
+	DeployStatusFailed    DeployStatus = "failed"
+)
 
 type DeploymentInstanceParameters map[string]DeploymentInstanceParameter
 
@@ -32,21 +48,25 @@ type DeploymentInstance struct {
 	UpdatedAt time.Time `json:"updatedAt"`
 
 	// TODO: FK to name of Deployment?
-	Name      string `json:"name" gorm:"index:deployment_instance_name_group_stack_idx,unique"`
+	Name      string `json:"name"`
 	Group     *Group `json:"group,omitempty"`
-	GroupName string `json:"groupName" gorm:"index:deployment_instance_name_group_stack_idx,unique; references:Name"`
+	GroupName string `json:"groupName" gorm:"references:Name"`
 	//	Stack     *Stack `json:"stack,omitempty"`
-	StackName string `json:"stackName" gorm:"index:deployment_instance_name_group_stack_idx,unique"`
+	StackName string `json:"stackName" gorm:"index:deployment_instance_deployment_stack_idx,unique,priority:2"`
 
 	Lock *Lock `gorm:"foreignKey:InstanceID"`
 
-	DeploymentID uint        `json:"deploymentId"`
+	DeploymentID uint        `json:"deploymentId" gorm:"index:deployment_instance_deployment_stack_idx,unique,priority:1"`
 	Deployment   *Deployment `json:"deployment,omitempty"`
 
 	GormParameters []DeploymentInstanceParameter `json:"-" gorm:"foreignKey:DeploymentInstanceID; constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
 	Parameters     DeploymentInstanceParameters  `json:"parameters" gorm:"-:all"`
 
 	Public bool `json:"public"`
+
+	DeployStatus DeployStatus `json:"deployStatus"`
+	DeployedAt   *time.Time   `json:"deployedAt,omitempty"`
+	DeployError  string       `json:"deployError,omitempty" gorm:"type:text"`
 
 	DeployLog string `json:"deployLog" gorm:"type:text"`
 }

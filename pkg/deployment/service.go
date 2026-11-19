@@ -5,14 +5,18 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
-	"strconv"
+	"slices"
+	"sync"
+	"time"
+
+	"github.com/dhis2-sre/im-manager/internal/errdef"
 
 	"github.com/dhis2-sre/im-manager/pkg/instance"
 	"github.com/dhis2-sre/im-manager/pkg/model"
-	"github.com/dhis2-sre/im-manager/pkg/token"
+	"github.com/dhis2-sre/im-manager/pkg/stack"
 )
 
-func NewService(logger *slog.Logger, instanceService instanceService, databaseService databaseService, tokenService *token.TokenService, publisher Publisher) *Service {
+func NewService(logger *slog.Logger, instanceService instanceService, databaseService databaseService, tokenService tokenService, publisher Publisher) *Service {
 	return &Service{
 		logger:          logger,
 		instanceService: instanceService,
@@ -26,98 +30,541 @@ type instanceService interface {
 	DeploymentOrder(deployment *model.Deployment) ([]*model.DeploymentInstance, error)
 	DeployInstance(ctx context.Context, token string, instance *model.DeploymentInstance, ttl uint, extraEnv map[string]string, filestoreBackup *model.Database) error
 	DestroyInstance(ctx context.Context, instance *model.DeploymentInstance) error
+	CheckComponentReset(instance *model.DeploymentInstance, componentName string) error
+	ResetComponentData(ctx context.Context, instance *model.DeploymentInstance, componentName string) error
 	FindDecryptedDeploymentById(ctx context.Context, id uint) (*model.Deployment, error)
 	SaveDeployment(ctx context.Context, deployment *model.Deployment) error
 	UpdateInstanceParameters(ctx context.Context, deploymentId, instanceId uint, parameters instance.Parameters, public *bool) (*model.DeploymentInstance, error)
+	EditDeployment(ctx context.Context, deploymentId uint, edit instance.Edit) (*instance.DeploymentChanges, error)
+	DeleteDestroyedInstance(ctx context.Context, deploymentInstance *model.DeploymentInstance) error
 	FilestoreBackup(ctx context.Context, instance *model.DeploymentInstance, name string, database *model.Database) error
+	AcquireDeployLock(ctx context.Context, deploymentId uint) (bool, error)
+	ReleaseDeployLock(ctx context.Context, deploymentId uint) error
+	SetDeployStatus(ctx context.Context, instance *model.DeploymentInstance, status model.DeployStatus, reason string) error
 }
 
 type databaseService interface {
 	FindById(ctx context.Context, id uint) (*model.Database, error)
+	FindByIdentifier(ctx context.Context, identifier string) (*model.Database, error)
 	CreateExternalDownload(ctx context.Context, databaseID uint, expiration uint) (*model.ExternalDownload, error)
 	CreateDatabase(ctx context.Context, userId uint, groupName, name string) (*model.Database, error)
-	Dump(ctx context.Context, userId uint, database *model.Database, instance *model.DeploymentInstance, stack *model.Stack, format string) (*model.Database, error)
+	Dump(ctx context.Context, userId uint, database *model.Database, instance *model.DeploymentInstance, stack *stack.Stack, format string) (*model.Database, error)
 	EnsureLocked(ctx context.Context, database *model.Database, instanceId, userId uint) (*model.Database, bool, error)
-	SaveLocked(ctx context.Context, database *model.Database, instance *model.DeploymentInstance, stack *model.Stack, wasLocked bool) (*model.Database, error)
+	SaveLocked(ctx context.Context, database *model.Database, instance *model.DeploymentInstance, stack *stack.Stack, wasLocked bool) (*model.Database, error)
+}
+
+// tokenService mints the access token a deploy carries into the cluster. A deploy refreshes it
+// between instances so it outlives the request that started it.
+type tokenService interface {
+	RefreshAccessToken(accessToken string) (string, error)
 }
 
 // Publisher publishes notifications for async cross-service operations.
 type Publisher interface {
 	Publish(ctx context.Context, userID uint, groupName, kind string, payload any)
+	PublishTransient(ctx context.Context, groupName, kind string, payload any)
 }
 
 type Service struct {
 	logger          *slog.Logger
 	instanceService instanceService
 	databaseService databaseService
-	tokenService    *token.TokenService
+	tokenService    tokenService
 	publisher       Publisher
 }
 
-func (s Service) DeployDeployment(ctx context.Context, token string, deployment *model.Deployment) error {
-	instances, err := s.instanceService.DeploymentOrder(deployment)
+// StartDeployment accepts a deploy and runs it in the background. The deployment's deploy lock is
+// taken before returning, so a caller that gets no error knows the work is theirs and a second
+// caller is refused rather than racing helm. Progress arrives as events.
+//
+// It takes an id rather than a deployment because the background run outlives the request: loading
+// its own copy is what keeps the caller free to serialise, and strip the sensitive values from, the
+// deployment it holds while the deploy is reading parameters out of its own.
+func (s Service) StartDeployment(ctx context.Context, token string, deploymentId uint, userID uint) error {
+	acquired, err := s.acquireDeployLock(ctx, deploymentId)
+	if err != nil {
+		return err
+	}
+	if !acquired {
+		return errdef.NewConflict("deployment %d is already being deployed", deploymentId)
+	}
+
+	// The deploy outlives the request, so the token has to be minted while the caller's is still
+	// valid. Each instance then refreshes from the previous one, as a synchronous deploy did.
+	token, err = s.tokenService.RefreshAccessToken(token)
+	if err != nil {
+		s.releaseDeployLock(ctx, deploymentId)
+		return err
+	}
+
+	deployment, err := s.prepareDeploy(ctx, deploymentId)
 	if err != nil {
 		return err
 	}
 
-	deployment.Instances = instances
-
-	for _, instance := range instances {
-		var err error
-		token, err = s.tokenService.RefreshAccessToken(token)
-		if err != nil {
-			return err
-		}
-		err = s.deployInstance(ctx, token, instance, deployment.TTL, deployment.Instances)
-		if err != nil {
-			return fmt.Errorf("failed to deploy instance(%s) %q: %w", instance.StackName, instance.Name, err)
-		}
-	}
+	ctx = context.WithoutCancel(ctx)
+	go s.runDeploy(ctx, token, deployment, userID)
 
 	return nil
 }
 
-func (s Service) UpdateDeployment(ctx context.Context, token string, deploymentId uint, ttl uint, description string) (*model.Deployment, error) {
+// prepareDeploy loads a deployment whose deploy lock the caller holds, in deploy order, and marks its instances pending. It gives the lock back when it fails.
+func (s Service) prepareDeploy(ctx context.Context, deploymentId uint) (*model.Deployment, error) {
 	deployment, err := s.instanceService.FindDecryptedDeploymentById(ctx, deploymentId)
 	if err != nil {
+		s.releaseDeployLock(ctx, deploymentId)
 		return nil, err
 	}
 
-	ttlChanged := deployment.TTL != ttl
-
-	deployment.TTL = ttl
-	deployment.Description = description
-
-	err = s.instanceService.SaveDeployment(ctx, deployment)
+	instances, err := s.instanceService.DeploymentOrder(deployment)
 	if err != nil {
+		s.releaseDeployLock(ctx, deployment.ID)
 		return nil, err
 	}
+	deployment.Instances = instances
 
-	if ttlChanged {
-		err = s.DeployDeployment(ctx, token, deployment)
-		if err != nil {
-			return nil, fmt.Errorf("failed to redeploy instances: %v", err)
+	for _, deploymentInstance := range instances {
+		if err := s.instanceService.SetDeployStatus(ctx, deploymentInstance, model.DeployStatusPending, ""); err != nil {
+			s.releaseDeployLock(ctx, deployment.ID)
+			return nil, err
 		}
 	}
 
 	return deployment, nil
 }
 
-func (s Service) Reset(ctx context.Context, token string, instance *model.DeploymentInstance, ttl uint) error {
-	err := s.instanceService.DestroyInstance(ctx, instance)
+func (s Service) runDeploy(ctx context.Context, token string, deployment *model.Deployment, userID uint) {
+	err := s.deployDeployment(ctx, token, deployment, userID)
+	if err != nil {
+		s.failPending(ctx, deployment.Instances, err)
+	}
+	// The lock goes back before the event goes out, so a client that acts on the event finds the
+	// deployment free rather than racing the release.
+	s.releaseDeployLock(ctx, deployment.ID)
+
+	if err != nil {
+		s.logger.ErrorContext(ctx, "deploy failed", "deploymentId", deployment.ID, "deploymentName", deployment.Name, "error", err)
+		s.publisher.Publish(ctx, userID, deployment.GroupName, kindDeployment, newDeploymentEvent(deployment, "error", err.Error()))
+		return
+	}
+	s.publisher.Publish(ctx, userID, deployment.GroupName, kindDeployment, newDeploymentEvent(deployment, "success", ""))
+}
+
+// BulkDeployConcurrency is how many deployments of a batch deploy at once, so a large batch doesn't run every helmfile sync against the cluster at the same time.
+const BulkDeployConcurrency = 3
+
+var (
+	// queuedLockRetry is how long a queued deployment waits before asking again for a deploy lock someone else holds.
+	queuedLockRetry = 10 * time.Second
+	// batchTokenRefresh keeps a batch's token alive while every slot is busy with a long deploy and no deployment starts to refresh it.
+	batchTokenRefresh = 5 * time.Minute
+)
+
+// StartDeployments deploys a batch of new deployments in the background, BulkDeployConcurrency at a time. The caller creates their instances pending, so nothing here touches the database before the batch is handed to the background and a lost request can't leave a batch that never starts.
+//
+// A deployment takes its deploy lock only when its turn comes, so the lock can't go stale while it waits behind the others. If the user deploys, edits or resets a queued deployment in the meantime, its turn waits for that to finish, and it is skipped when nothing is left pending; a deleted one is skipped.
+func (s Service) StartDeployments(ctx context.Context, token string, deploymentIds []uint, userID uint) error {
+	token, err := s.tokenService.RefreshAccessToken(token)
 	if err != nil {
 		return err
 	}
 
-	deployment, err := s.instanceService.FindDecryptedDeploymentById(ctx, instance.DeploymentID)
+	ctx = context.WithoutCancel(ctx)
+	go s.deployQueue(ctx, newTokenChain(s.tokenService, token), deploymentIds, userID)
+
+	return nil
+}
+
+func (s Service) deployQueue(ctx context.Context, tokens *tokenChain, deploymentIds []uint, userID uint) {
+	done := make(chan struct{})
+	defer close(done)
+	go func() {
+		ticker := time.NewTicker(batchTokenRefresh)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-done:
+				return
+			case <-ticker.C:
+				if _, err := tokens.next(); err != nil {
+					s.logger.ErrorContext(ctx, "failed to refresh the token of a bulk deploy", "error", err)
+				}
+			}
+		}
+	}()
+
+	slots := make(chan struct{}, BulkDeployConcurrency)
+	var wg sync.WaitGroup
+	for _, deploymentId := range deploymentIds {
+		slots <- struct{}{}
+		wg.Add(1)
+		go func() {
+			defer func() {
+				<-slots
+				wg.Done()
+			}()
+			s.deployQueued(ctx, tokens, deploymentId, userID)
+		}()
+	}
+	wg.Wait()
+}
+
+func (s Service) deployQueued(ctx context.Context, tokens *tokenChain, deploymentId uint, userID uint) {
+	for {
+		acquired, err := s.acquireDeployLock(ctx, deploymentId)
+		if errdef.IsNotFound(err) {
+			s.logger.InfoContext(ctx, "skipping queued deploy of a deleted deployment", "deploymentId", deploymentId)
+			return
+		}
+		if err != nil {
+			s.failQueuedById(ctx, deploymentId, userID, err)
+			return
+		}
+		if acquired {
+			break
+		}
+		time.Sleep(queuedLockRetry)
+	}
+
+	deployment, err := s.instanceService.FindDecryptedDeploymentById(ctx, deploymentId)
+	if err != nil {
+		s.releaseDeployLock(ctx, deploymentId)
+		s.failQueuedById(ctx, deploymentId, userID, err)
+		return
+	}
+
+	if !slices.ContainsFunc(deployment.Instances, func(deploymentInstance *model.DeploymentInstance) bool {
+		return deploymentInstance.DeployStatus == model.DeployStatusPending
+	}) {
+		s.releaseDeployLock(ctx, deploymentId)
+		s.logger.InfoContext(ctx, "skipping queued deploy, the deployment was deployed while it waited", "deploymentId", deploymentId)
+		return
+	}
+
+	instances, err := s.instanceService.DeploymentOrder(deployment)
+	if err != nil {
+		s.releaseDeployLock(ctx, deploymentId)
+		s.failQueued(ctx, deployment, userID, err)
+		return
+	}
+	deployment.Instances = instances
+
+	token, err := tokens.next()
+	if err != nil {
+		s.releaseDeployLock(ctx, deploymentId)
+		s.failQueued(ctx, deployment, userID, err)
+		return
+	}
+
+	s.runDeploy(ctx, token, deployment, userID)
+}
+
+func (s Service) failQueuedById(ctx context.Context, deploymentId uint, userID uint, err error) {
+	deployment, findErr := s.instanceService.FindDecryptedDeploymentById(ctx, deploymentId)
+	if findErr != nil {
+		s.logger.ErrorContext(ctx, "queued deploy failed", "deploymentId", deploymentId, "error", err, "findError", findErr)
+		return
+	}
+	s.failQueued(ctx, deployment, userID, err)
+}
+
+func (s Service) failQueued(ctx context.Context, deployment *model.Deployment, userID uint, err error) {
+	s.logger.ErrorContext(ctx, "queued deploy failed", "deploymentId", deployment.ID, "deploymentName", deployment.Name, "error", err)
+	s.failPending(ctx, deployment.Instances, err)
+	s.publisher.Publish(ctx, userID, deployment.GroupName, kindDeployment, newDeploymentEvent(deployment, "error", err.Error()))
+}
+
+// failPending settles the instances a failed deploy, edit or reset left pending or deploying. Only a
+// failed helm run records its own failure, so an instance that failed before one, or whose turn never
+// came, would otherwise read as deploying for good, and a deploying instance cannot be deleted.
+func (s Service) failPending(ctx context.Context, instances []*model.DeploymentInstance, err error) {
+	for _, deploymentInstance := range instances {
+		if deploymentInstance.DeployStatus != model.DeployStatusPending && deploymentInstance.DeployStatus != model.DeployStatusDeploying {
+			continue
+		}
+		if saveErr := s.instanceService.SetDeployStatus(ctx, deploymentInstance, model.DeployStatusFailed, err.Error()); saveErr != nil {
+			s.logger.ErrorContext(ctx, "failed to mark instance failed", "instanceId", deploymentInstance.ID, "error", saveErr)
+		}
+	}
+}
+
+// tokenChain is the token a batch carries from one deployment to the next. It is refreshed whenever a deployment starts and on a timer in between, so it stays valid however long the batch takes.
+type tokenChain struct {
+	mu           sync.Mutex
+	tokenService tokenService
+	token        string
+}
+
+func newTokenChain(tokenService tokenService, token string) *tokenChain {
+	return &tokenChain{tokenService: tokenService, token: token}
+}
+
+func (c *tokenChain) next() (string, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	token, err := c.tokenService.RefreshAccessToken(c.token)
+	if err != nil {
+		return "", err
+	}
+	c.token = token
+	return token, nil
+}
+
+// EditDeployment applies an edit to a deployment and runs whatever cluster work it implies in the
+// background, under the same deploy lock a deploy takes. The database is up to date by the time it
+// returns, so the caller answers with the edited deployment; the cluster catches up on the event
+// stream. An edit that changes nothing the cluster cares about, a TTL or a description, is finished
+// when it returns.
+func (s Service) EditDeployment(ctx context.Context, token string, deploymentId uint, edit instance.Edit, userID uint) (*model.Deployment, error) {
+	acquired, err := s.acquireDeployLock(ctx, deploymentId)
+	if err != nil {
+		return nil, err
+	}
+	if !acquired {
+		return nil, errdef.NewConflict("deployment %d is already being deployed", deploymentId)
+	}
+
+	changes, err := s.instanceService.EditDeployment(ctx, deploymentId, edit)
+	if err != nil {
+		s.releaseDeployLock(ctx, deploymentId)
+		return nil, err
+	}
+
+	if len(changes.Redeploy) == 0 && len(changes.Destroy) == 0 {
+		s.releaseDeployLock(ctx, deploymentId)
+		return changes.Deployment, nil
+	}
+
+	token, err = s.tokenService.RefreshAccessToken(token)
+	if err != nil {
+		s.releaseDeployLock(ctx, deploymentId)
+		return nil, err
+	}
+
+	for _, deploymentInstance := range changes.Redeploy {
+		if err := s.instanceService.SetDeployStatus(ctx, deploymentInstance, model.DeployStatusPending, ""); err != nil {
+			s.releaseDeployLock(ctx, deploymentId)
+			return nil, err
+		}
+	}
+
+	redeploy := instanceIds(changes.Redeploy)
+	destroy := instanceIds(changes.Destroy)
+
+	ctx = context.WithoutCancel(ctx)
+	go func() {
+		err := s.applyDeploymentChanges(ctx, token, deploymentId, redeploy, destroy)
+		s.releaseDeployLock(ctx, deploymentId)
+
+		if err != nil {
+			s.logger.ErrorContext(ctx, "edit failed", "deploymentId", deploymentId, "error", err)
+			s.publisher.Publish(ctx, userID, changes.Deployment.GroupName, kindDeployment, newDeploymentEvent(changes.Deployment, "error", err.Error()))
+			return
+		}
+		s.publisher.Publish(ctx, userID, changes.Deployment.GroupName, kindDeployment, newDeploymentEvent(changes.Deployment, "success", ""))
+	}()
+
+	return changes.Deployment, nil
+}
+
+// applyDeploymentChanges works from ids on its own copy of the deployment, so the caller stays free
+// to serialise, and strip the sensitive values from, the one it answers with.
+func (s Service) applyDeploymentChanges(ctx context.Context, token string, deploymentId uint, redeploy, destroy []uint) error {
+	deployment, err := s.instanceService.FindDecryptedDeploymentById(ctx, deploymentId)
 	if err != nil {
 		return err
 	}
 
+	if err := s.applyChanges(ctx, token, deployment, redeploy, destroy); err != nil {
+		s.failPending(ctx, deployment.Instances, err)
+		return err
+	}
+	return nil
+}
+
+func (s Service) applyChanges(ctx context.Context, token string, deployment *model.Deployment, redeploy, destroy []uint) error {
+	for _, instanceId := range destroy {
+		deploymentInstance, err := findInstanceById(deployment.Instances, instanceId)
+		if err != nil {
+			return err
+		}
+
+		s.publisher.PublishTransient(ctx, deployment.GroupName, kindDeployment, newInstanceEvent(deployment, deploymentInstance, "started", ""))
+		if err := s.instanceService.DestroyInstance(ctx, deploymentInstance); err != nil {
+			err = fmt.Errorf("failed to destroy instance(%s) %q: %w", deploymentInstance.StackName, deploymentInstance.Name, err)
+			s.publisher.PublishTransient(ctx, deployment.GroupName, kindDeployment, newInstanceEvent(deployment, deploymentInstance, "error", err.Error()))
+			return err
+		}
+		if err := s.instanceService.DeleteDestroyedInstance(ctx, deploymentInstance); err != nil {
+			s.publisher.PublishTransient(ctx, deployment.GroupName, kindDeployment, newInstanceEvent(deployment, deploymentInstance, "error", err.Error()))
+			return err
+		}
+		s.publisher.PublishTransient(ctx, deployment.GroupName, kindDeployment, newInstanceEvent(deployment, deploymentInstance, "success", ""))
+	}
+
+	for _, instanceId := range redeploy {
+		deploymentInstance, err := findInstanceById(deployment.Instances, instanceId)
+		if err != nil {
+			return err
+		}
+
+		token, err = s.tokenService.RefreshAccessToken(token)
+		if err != nil {
+			return err
+		}
+
+		s.publisher.PublishTransient(ctx, deployment.GroupName, kindDeployment, newInstanceEvent(deployment, deploymentInstance, "started", ""))
+		if err := s.deployInstance(ctx, token, deploymentInstance, deployment.TTL, deployment.Instances); err != nil {
+			err = fmt.Errorf("failed to deploy instance(%s) %q: %w", deploymentInstance.StackName, deploymentInstance.Name, err)
+			s.publisher.PublishTransient(ctx, deployment.GroupName, kindDeployment, newInstanceEvent(deployment, deploymentInstance, "error", err.Error()))
+			return err
+		}
+		s.publisher.PublishTransient(ctx, deployment.GroupName, kindDeployment, newInstanceEvent(deployment, deploymentInstance, "success", ""))
+	}
+
+	return nil
+}
+
+func instanceIds(instances []*model.DeploymentInstance) []uint {
+	ids := make([]uint, len(instances))
+	for i, deploymentInstance := range instances {
+		ids[i] = deploymentInstance.ID
+	}
+	return ids
+}
+
+// acquireDeployLock takes the deployment's deploy lock once it is known to exist, so an id naming a preset or nothing is not found rather than locked.
+func (s Service) acquireDeployLock(ctx context.Context, deploymentId uint) (bool, error) {
+	if _, err := s.instanceService.FindDecryptedDeploymentById(ctx, deploymentId); err != nil {
+		return false, err
+	}
+
+	return s.instanceService.AcquireDeployLock(ctx, deploymentId)
+}
+
+func (s Service) releaseDeployLock(ctx context.Context, deploymentId uint) {
+	if err := s.instanceService.ReleaseDeployLock(ctx, deploymentId); err != nil {
+		s.logger.ErrorContext(ctx, "failed to release deploy lock", "deploymentId", deploymentId, "error", err)
+	}
+}
+
+func (s Service) deployDeployment(ctx context.Context, token string, deployment *model.Deployment, userID uint) error {
+	for _, deploymentInstance := range deployment.Instances {
+		var err error
+		token, err = s.tokenService.RefreshAccessToken(token)
+		if err != nil {
+			return err
+		}
+
+		s.publisher.PublishTransient(ctx, deployment.GroupName, kindDeployment, newInstanceEvent(deployment, deploymentInstance, "started", ""))
+		err = s.deployInstance(ctx, token, deploymentInstance, deployment.TTL, deployment.Instances)
+		if err != nil {
+			err = fmt.Errorf("failed to deploy instance(%s) %q: %w", deploymentInstance.StackName, deploymentInstance.Name, err)
+			s.publisher.PublishTransient(ctx, deployment.GroupName, kindDeployment, newInstanceEvent(deployment, deploymentInstance, "error", err.Error()))
+			return err
+		}
+		s.publisher.PublishTransient(ctx, deployment.GroupName, kindDeployment, newInstanceEvent(deployment, deploymentInstance, "success", ""))
+	}
+
+	return nil
+}
+
+// UpdateDeployment is the deployment-level edit restricted to the two fields PUT has always carried.
+// It is kept so the scripts that use it keep working, and it redeploys nothing: the inspector reads
+// the TTL out of the database, and the im-ttl label it also templates into the pod is read by no one,
+// so rolling DHIS 2 core to refresh a label was work done for nobody.
+func (s Service) UpdateDeployment(ctx context.Context, token string, deploymentId uint, ttl uint, description string, userID uint) (*model.Deployment, error) {
+	return s.EditDeployment(ctx, token, deploymentId, instance.Edit{TTL: &ttl, Description: &description}, userID)
+}
+
+// Reset destroys the instance and deploys it again from the same parameters. Given a component, it
+// resets only that component's data instead, which the deploy seeds again while the other
+// components keep theirs. Like StartDeployment it runs in the background under the
+// deployment's deploy lock, on its own copy of the deployment, so the caller gets an answer
+// immediately and a reset cannot race a deploy of the same deployment.
+func (s Service) Reset(ctx context.Context, token string, deploymentId, instanceId uint, componentName string, ttl uint, userID uint) error {
+	acquired, err := s.acquireDeployLock(ctx, deploymentId)
+	if err != nil {
+		return err
+	}
+	if !acquired {
+		return errdef.NewConflict("deployment %d is already being deployed", deploymentId)
+	}
+
+	deployment, err := s.instanceService.FindDecryptedDeploymentById(ctx, deploymentId)
+	if err != nil {
+		s.releaseDeployLock(ctx, deploymentId)
+		return err
+	}
+
+	deploymentInstance, err := findInstanceById(deployment.Instances, instanceId)
+	if err != nil {
+		s.releaseDeployLock(ctx, deploymentId)
+		return errdef.NewNotFound("%v", err)
+	}
+
+	if componentName != "" {
+		if err := s.instanceService.CheckComponentReset(deploymentInstance, componentName); err != nil {
+			s.releaseDeployLock(ctx, deploymentId)
+			return err
+		}
+	}
+
+	token, err = s.tokenService.RefreshAccessToken(token)
+	if err != nil {
+		s.releaseDeployLock(ctx, deploymentId)
+		return err
+	}
+
+	if err := s.instanceService.SetDeployStatus(ctx, deploymentInstance, model.DeployStatusPending, ""); err != nil {
+		s.releaseDeployLock(ctx, deploymentId)
+		return err
+	}
+
+	ctx = context.WithoutCancel(ctx)
+	go func() {
+		defer s.releaseDeployLock(ctx, deployment.ID)
+
+		s.publisher.PublishTransient(ctx, deployment.GroupName, kindDeployment, newInstanceEvent(deployment, deploymentInstance, "started", ""))
+		err := s.resetInstance(ctx, token, deploymentInstance, componentName, ttl, deployment)
+		if err != nil {
+			s.logger.ErrorContext(ctx, "reset failed", "deploymentId", deployment.ID, "instanceId", deploymentInstance.ID, "error", err)
+			s.failPending(ctx, []*model.DeploymentInstance{deploymentInstance}, err)
+			s.publisher.PublishTransient(ctx, deployment.GroupName, kindDeployment, newInstanceEvent(deployment, deploymentInstance, "error", err.Error()))
+			s.publisher.Publish(ctx, userID, deployment.GroupName, kindDeployment, newDeploymentEvent(deployment, "error", err.Error()))
+			return
+		}
+		s.publisher.PublishTransient(ctx, deployment.GroupName, kindDeployment, newInstanceEvent(deployment, deploymentInstance, "success", ""))
+		s.publisher.Publish(ctx, userID, deployment.GroupName, kindDeployment, newDeploymentEvent(deployment, "success", ""))
+	}()
+
+	return nil
+}
+
+func (s Service) resetInstance(ctx context.Context, token string, instance *model.DeploymentInstance, componentName string, ttl uint, deployment *model.Deployment) error {
+	if componentName == "" {
+		if err := s.instanceService.DestroyInstance(ctx, instance); err != nil {
+			return err
+		}
+		return s.deployInstance(ctx, token, instance, ttl, deployment.Instances)
+	}
+
+	if err := s.instanceService.ResetComponentData(ctx, instance, componentName); err != nil {
+		return err
+	}
 	return s.deployInstance(ctx, token, instance, ttl, deployment.Instances)
 }
 
 func (s Service) UpdateInstance(ctx context.Context, token string, deploymentId, instanceId uint, parameters instance.Parameters, public *bool) (*model.DeploymentInstance, error) {
+	acquired, err := s.acquireDeployLock(ctx, deploymentId)
+	if err != nil {
+		return nil, err
+	}
+	if !acquired {
+		return nil, errdef.NewConflict("deployment %d is already being deployed", deploymentId)
+	}
+	defer s.releaseDeployLock(ctx, deploymentId)
+
 	updated, err := s.instanceService.UpdateInstanceParameters(ctx, deploymentId, instanceId, parameters, public)
 	if err != nil {
 		return nil, err
@@ -156,8 +603,9 @@ func findInstanceById(instances []*model.DeploymentInstance, id uint) (*model.De
 }
 
 // SaveAs dumps the instance's database into a new record. The record is returned right away
-// while the dump and the filestore backup of the dhis2-core sibling run in the background.
-func (s Service) SaveAs(ctx context.Context, userId uint, instance *model.DeploymentInstance, stack *model.Stack, coreInstance *model.DeploymentInstance, name string, format string) (*model.Database, error) {
+// while the dump and the filestore backup run in the background against whichever instance
+// advertises the filestoreBackup capability.
+func (s Service) SaveAs(ctx context.Context, userId uint, instance *model.DeploymentInstance, stack *stack.Stack, filestoreInstance *model.DeploymentInstance, name string, format string) (*model.Database, error) {
 	created, err := s.databaseService.CreateDatabase(ctx, userId, instance.GroupName, name)
 	if err != nil {
 		return nil, err
@@ -171,7 +619,7 @@ func (s Service) SaveAs(ctx context.Context, userId uint, instance *model.Deploy
 		if err != nil {
 			return
 		}
-		s.saveFilestore(ctx, userId, coreInstance, dumped)
+		s.saveFilestore(ctx, userId, filestoreInstance, dumped)
 	}()
 
 	return created, nil
@@ -179,7 +627,7 @@ func (s Service) SaveAs(ctx context.Context, userId uint, instance *model.Deploy
 
 // Save overwrites the instance's source database with a fresh dump. The lock check runs before
 // returning; the dump, finalization and filestore backup run in the background.
-func (s Service) Save(ctx context.Context, userId uint, database *model.Database, instance *model.DeploymentInstance, stack *model.Stack, coreInstance *model.DeploymentInstance) error {
+func (s Service) Save(ctx context.Context, userId uint, database *model.Database, instance *model.DeploymentInstance, stack *stack.Stack, filestoreInstance *model.DeploymentInstance) error {
 	locked, wasLocked, err := s.databaseService.EnsureLocked(ctx, database, instance.ID, userId)
 	if err != nil {
 		return err
@@ -194,19 +642,19 @@ func (s Service) Save(ctx context.Context, userId uint, database *model.Database
 			s.logger.ErrorContext(ctx, "save database failed", "databaseName", locked.Name, "error", err)
 			return
 		}
-		s.saveFilestore(ctx, locked.UserID, coreInstance, saved)
+		s.saveFilestore(ctx, locked.UserID, filestoreInstance, saved)
 	}()
 
 	return nil
 }
 
-func (s Service) saveFilestore(ctx context.Context, userId uint, coreInstance *model.DeploymentInstance, database *model.Database) {
-	if coreInstance == nil {
+func (s Service) saveFilestore(ctx context.Context, userId uint, filestoreInstance *model.DeploymentInstance, database *model.Database) {
+	if filestoreInstance == nil {
 		return
 	}
 
 	s.publisher.Publish(ctx, userId, database.GroupName, kindFilestoreBackup, newFilestoreEvent(database, "started", ""))
-	if err := s.instanceService.FilestoreBackup(ctx, coreInstance, database.Name, database); err != nil {
+	if err := s.instanceService.FilestoreBackup(ctx, filestoreInstance, database.Name, database); err != nil {
 		s.logger.ErrorContext(ctx, "filestore backup failed", "groupName", database.GroupName, "databaseName", database.Name, "error", err)
 		s.publisher.Publish(ctx, userId, database.GroupName, kindFilestoreBackup, newFilestoreEvent(database, "error", err.Error()))
 		return
@@ -225,30 +673,31 @@ func (s Service) deployInstance(ctx context.Context, token string, instance *mod
 
 const seedDownloadTTLSeconds uint = 1800
 
-// databaseIDFromInstances resolves the DATABASE_ID parameter from whichever instance in the
-// deployment carries it. DATABASE_ID lives on the db instance, while storage parameters live on
-// the core instance, so callers operating on the core must look across siblings to find it.
-func databaseIDFromInstances(instances []*model.DeploymentInstance) (uint, bool) {
+// databaseIdentifierFromInstances resolves the DATABASE_ID parameter from whichever instance in
+// the deployment carries it. DATABASE_ID lives on the db instance, while storage parameters live
+// on the core instance, so callers operating on the core must look across siblings to find it.
+// The value is either a numeric id or a slug, so it is returned unparsed for the database service
+// to resolve; "0" is the sentinel for a deployment that has no database to seed from.
+func databaseIdentifierFromInstances(instances []*model.DeploymentInstance) (string, bool) {
 	for _, instance := range instances {
 		param, ok := instance.Parameters["DATABASE_ID"]
 		if !ok {
 			continue
 		}
 
-		databaseID, err := strconv.ParseUint(param.Value, 10, strconv.IntSize)
-		if err != nil || databaseID == 0 {
+		if param.Value == "" || param.Value == "0" {
 			continue
 		}
 
-		return uint(databaseID), true
+		return param.Value, true
 	}
-	return 0, false
+	return "", false
 }
 
 // buildSeed resolves the database referenced by the deployment's DATABASE_ID parameter into the
 // environment variables and filestore backup record needed to seed an instance at deploy time.
 func (s Service) buildSeed(ctx context.Context, instances []*model.DeploymentInstance) (map[string]string, *model.Database, error) {
-	databaseID, ok := databaseIDFromInstances(instances)
+	identifier, ok := databaseIdentifierFromInstances(instances)
 	if !ok {
 		return nil, nil, nil
 	}
@@ -256,9 +705,9 @@ func (s Service) buildSeed(ctx context.Context, instances []*model.DeploymentIns
 	hostname := os.Getenv("HOSTNAME")
 	extraEnv := make(map[string]string)
 
-	db, err := s.databaseService.FindById(ctx, databaseID)
+	db, err := s.databaseService.FindByIdentifier(ctx, identifier)
 	if err != nil {
-		return nil, nil, fmt.Errorf("database %d not found: %w", databaseID, err)
+		return nil, nil, fmt.Errorf("database %q not found: %w", identifier, err)
 	}
 
 	dbDownload, err := s.databaseService.CreateExternalDownload(ctx, db.ID, seedDownloadTTLSeconds)

@@ -49,7 +49,7 @@ for ((i = START_NUM; i < END_NUM + 1; i++)); do
 
   instance_data=$(./findByName.sh "$GROUP" "$instance_name")
 
-  instance_id=$(echo "$instance_data" | jq -r '.instances[] | select(.stackName=="dhis2-core") | .id')
+  instance_id=$(echo "$instance_data" | jq -r '.instances[] | select(.stackName=="dhis2-v2") | .id')
 
   if [ -z "$instance_id" ]; then
     echo "Error: Could not find core instance ID for $instance_name" >&2

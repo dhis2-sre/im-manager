@@ -25,6 +25,10 @@ type ttlDestroyHandler struct {
 func (t ttlDestroyHandler) Handle(ctx context.Context, deployment model.Deployment) error {
 	t.logger.Info("TTL handler invoked", "deploymentId", deployment.ID)
 
+	if deployment.Preset {
+		return nil
+	}
+
 	if t.ttlBeforeNow(deployment.CreatedAt, deployment.TTL) {
 		decryptedDeployment, err := t.instanceService.FindDecryptedDeploymentById(ctx, deployment.ID)
 		if err != nil {

@@ -53,6 +53,17 @@ jobs:
             echo "TARGET_URL=https://api.im-dev.dhis2.org" >> $GITHUB_ENV
           fi
 
+      - name: Resolve the web client ref
+        env:
+          GH_TOKEN: ${{ secrets.DHIS2_SRE_BOT_GITHUB_TOKEN }}
+          CANDIDATE: ${{ github.head_ref || github.ref_name }}
+        run: |
+          if gh api "repos/dhis2-sre/im-web-client/branches/$CANDIDATE" >/dev/null 2>&1; then
+            echo "CLIENT_REF=$CANDIDATE" >> $GITHUB_ENV
+          else
+            echo "CLIENT_REF=master" >> $GITHUB_ENV
+          fi
+
       # Don't set environment variable "API_URL" in this workflow with the action below.
       # See https://github.com/convictional/trigger-workflow-and-wait/issues/62#issuecomment-1843267732
       - name: Trigger E2E Playwright tests
@@ -63,7 +74,7 @@ jobs:
           repo: im-web-client
           github_token: ${{ secrets.DHIS2_SRE_BOT_GITHUB_TOKEN }}
           workflow_file_name: playwright.yml
-          ref: master
+          ref: ${{ env.CLIENT_REF }}
           client_payload: '{"api_url": "${{ env.TARGET_URL }}"}'
 
   send-slack-message:

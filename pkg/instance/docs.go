@@ -12,7 +12,28 @@ type _ struct {
 	// in: query
 	// required: false
 	// type: string
-	// description: restart a specific deployment labeled with im-type=<selector>
+	// description: restart a specific component labeled with im-type=<selector>
+	Selector string `json:"selector"`
+
+	// replica
+	// in: query
+	// required: false
+	// type: string
+	// description: restart a single replica (pod) of the component given by selector
+	Replica string `json:"replica"`
+}
+
+// swagger:parameters resetInstance
+type _ struct {
+	// in: path
+	// required: true
+	ID uint `json:"id"`
+
+	// selector
+	// in: query
+	// required: false
+	// type: string
+	// description: reset only the data of the named component, for example db; it must support the reset operation
 	Selector string `json:"selector"`
 }
 
@@ -28,9 +49,30 @@ type _ struct {
 	// type: string
 	// description: stream logs of a specific pod labeled with im-type=<selector>
 	Selector string `json:"selector"`
+
+	// replica
+	// in: query
+	// required: false
+	// type: string
+	// description: stream logs of a single replica (pod) of the component given by selector
+	Replica string `json:"replica"`
+
+	// container
+	// in: query
+	// required: false
+	// type: string
+	// description: stream the log of a single container of the pod, defaulting to the first container the pod declares
+	Container string `json:"container"`
+
+	// tail
+	// in: query
+	// required: false
+	// type: integer
+	// description: number of lines to stream from the end of the log, 0 for the whole log (default 1000)
+	Tail int64 `json:"tail"`
 }
 
-// swagger:parameters deleteInstance findById findByIdDecrypted saveInstance pauseInstance resumeInstance resetInstance findDeploymentById deployDeployment deleteDeployment status instanceWithDetails filestoreBackup
+// swagger:parameters deleteInstance findById findByIdDecrypted saveInstance pauseInstance resumeInstance findDeploymentById deployDeployment deleteDeployment status instanceWithDetails filestoreBackup instanceComponents deploymentComponents findPresetById deletePreset
 type _ struct {
 	// in: path
 	// required: true
@@ -59,6 +101,18 @@ type StatusBody struct {
 	Body InstanceStatus
 }
 
+// swagger:response Components
+type ComponentsBody struct {
+	// in: body
+	Body []ComponentStatus
+}
+
+// swagger:response DeploymentComponents
+type DeploymentComponentsBody struct {
+	// in: body
+	Body []InstanceComponents
+}
+
 // swagger:parameters instanceNameToId
 type _ struct {
 	// in: path
@@ -83,10 +137,67 @@ type GroupsWithDeploymentsBody struct {
 	Body []GroupWithDeployments
 }
 
+// swagger:response Presets
+type PresetsBody struct {
+	// in: body
+	Body []model.Deployment
+}
+
 // swagger:response GroupsWithPublicInstances
 type GroupsWithPublicInstancesBody struct {
 	// in: body
 	Body []GroupWithPublicInstances
+}
+
+// swagger:parameters deploymentNameAvailability presetNameAvailability
+type _ struct {
+	// in: query
+	// required: true
+	Group string `json:"group"`
+
+	// in: query
+	// required: true
+	Name string `json:"name"`
+}
+
+// swagger:response DeploymentNameAvailability
+type DeploymentNameAvailabilityBody struct {
+	// in: body
+	Body DeploymentNameAvailability
+}
+
+// swagger:parameters bulkDeploymentNameAvailability
+type _ struct {
+	// in: query
+	// required: true
+	Group string `json:"group"`
+
+	// in: query
+	// required: true
+	Prefix string `json:"prefix"`
+
+	// in: query
+	// required: true
+	Count uint `json:"count"`
+}
+
+// swagger:response BulkDeploymentNameAvailability
+type BulkDeploymentNameAvailabilityBody struct {
+	// in: body
+	Body BulkDeploymentNameAvailability
+}
+
+// swagger:parameters bulkDeploy
+type _ struct {
+	// in: body
+	// required: true
+	Body BulkDeployRequest
+}
+
+// swagger:response BulkDeployResponse
+type BulkDeployResponseBody struct {
+	// in: body
+	Body BulkDeployResponse
 }
 
 // swagger:parameters saveDeployment
@@ -134,4 +245,56 @@ type _ struct {
 	// in: body
 	// required: true
 	Payload UpdateDeploymentRequest
+}
+
+// swagger:parameters editDeployment
+type _ struct {
+	// in: path
+	// required: true
+	ID uint `json:"id"`
+	// Edit deployment request body parameter
+	// in: body
+	// required: true
+	Payload EditDeploymentRequest
+}
+
+// swagger:parameters editPreset
+type _ struct {
+	// in: path
+	// required: true
+	ID uint `json:"id"`
+	// Edit preset request body parameter
+	// in: body
+	// required: true
+	Payload EditPresetRequest
+}
+
+// swagger:parameters savePreset
+type _ struct {
+	// Save preset request body parameter
+	// in: body
+	// required: true
+	Payload SavePresetRequest
+}
+
+// swagger:parameters createDeploymentFromPreset
+type _ struct {
+	// in: path
+	// required: true
+	ID uint `json:"id"`
+	// Create deployment from preset request body parameter
+	// in: body
+	// required: true
+	Payload CreateDeploymentFromPresetRequest
+}
+
+// swagger:parameters bulkDeployFromPreset
+type _ struct {
+	// in: path
+	// required: true
+	ID uint `json:"id"`
+	// Bulk deploy from preset request body parameter
+	// in: body
+	// required: true
+	Payload BulkDeployFromPresetRequest
 }

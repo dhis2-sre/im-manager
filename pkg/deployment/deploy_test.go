@@ -1,0 +1,421 @@
+package deployment
+
+import (
+	"context"
+	"errors"
+	"io"
+	"log/slog"
+	"slices"
+	"sync"
+	"testing"
+	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/dhis2-sre/im-manager/internal/errdef"
+	"github.com/dhis2-sre/im-manager/pkg/instance"
+	"github.com/dhis2-sre/im-manager/pkg/model"
+)
+
+type fakeTokenService struct{}
+
+func (fakeTokenService) RefreshAccessToken(string) (string, error) { return "refreshed", nil }
+
+type recordedEvent struct {
+	kind      string
+	transient bool
+	payload   deploymentEvent
+}
+
+type recordingPublisher struct {
+	mu     sync.Mutex
+	events []recordedEvent
+}
+
+func (p *recordingPublisher) Publish(_ context.Context, _ uint, _, kind string, payload any) {
+	p.record(kind, false, payload)
+}
+
+func (p *recordingPublisher) PublishTransient(_ context.Context, _, kind string, payload any) {
+	p.record(kind, true, payload)
+}
+
+func (p *recordingPublisher) record(kind string, transient bool, payload any) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	event, _ := payload.(deploymentEvent)
+	p.events = append(p.events, recordedEvent{kind: kind, transient: transient, payload: event})
+}
+
+func (p *recordingPublisher) recorded() []recordedEvent {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return append([]recordedEvent(nil), p.events...)
+}
+
+// fakeInstanceService is a deployment whose instances deploy without a cluster, with a deploy lock
+// that behaves like the real one: one holder at a time.
+type fakeInstanceService struct {
+	mu         sync.Mutex
+	deployment *model.Deployment
+	locked     bool
+	deployed   []string
+	destroyed  []string
+	deleted    []string
+	statuses   map[uint]model.DeployStatus
+	failures   map[uint]string
+	deployErr  error
+	destroyErr error
+	deployHook func()
+	changes    *instance.DeploymentChanges
+	editErr    error
+	findErr    error
+	// steps records destroys, component resets, deploys and restarts in the order they ran.
+	steps          []string
+	componentReset error
+}
+
+func (f *fakeInstanceService) DeploymentOrder(deployment *model.Deployment) ([]*model.DeploymentInstance, error) {
+	return deployment.Instances, nil
+}
+
+func (f *fakeInstanceService) DeployInstance(_ context.Context, _ string, deploymentInstance *model.DeploymentInstance, _ uint, _ map[string]string, _ *model.Database) error {
+	if f.deployHook != nil {
+		f.deployHook()
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.deployErr != nil {
+		deploymentInstance.DeployStatus = model.DeployStatusFailed
+		return f.deployErr
+	}
+	f.deployed = append(f.deployed, deploymentInstance.StackName)
+	f.steps = append(f.steps, "deploy "+deploymentInstance.StackName)
+	deploymentInstance.DeployStatus = model.DeployStatusDeployed
+	return nil
+}
+
+func (f *fakeInstanceService) DestroyInstance(_ context.Context, deploymentInstance *model.DeploymentInstance) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.destroyErr != nil {
+		return f.destroyErr
+	}
+	f.destroyed = append(f.destroyed, deploymentInstance.StackName)
+	f.steps = append(f.steps, "destroy "+deploymentInstance.StackName)
+	return nil
+}
+
+func (f *fakeInstanceService) CheckComponentReset(_ *model.DeploymentInstance, _ string) error {
+	return f.componentReset
+}
+
+func (f *fakeInstanceService) ResetComponentData(_ context.Context, deploymentInstance *model.DeploymentInstance, componentName string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.steps = append(f.steps, "reset "+deploymentInstance.StackName+" "+componentName)
+	return nil
+}
+
+func (f *fakeInstanceService) EditDeployment(context.Context, uint, instance.Edit) (*instance.DeploymentChanges, error) {
+	if f.editErr != nil {
+		return nil, f.editErr
+	}
+	return f.changes, nil
+}
+
+func (f *fakeInstanceService) DeleteDestroyedInstance(_ context.Context, deploymentInstance *model.DeploymentInstance) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.deleted = append(f.deleted, deploymentInstance.StackName)
+	return nil
+}
+
+func (f *fakeInstanceService) FindDecryptedDeploymentById(context.Context, uint) (*model.Deployment, error) {
+	if f.findErr != nil {
+		return nil, f.findErr
+	}
+	return f.deployment, nil
+}
+
+func (f *fakeInstanceService) SaveDeployment(context.Context, *model.Deployment) error { return nil }
+
+func (f *fakeInstanceService) UpdateInstanceParameters(context.Context, uint, uint, instance.Parameters, *bool) (*model.DeploymentInstance, error) {
+	panic("not used")
+}
+
+func (f *fakeInstanceService) FilestoreBackup(context.Context, *model.DeploymentInstance, string, *model.Database) error {
+	panic("not used")
+}
+
+func (f *fakeInstanceService) AcquireDeployLock(context.Context, uint) (bool, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.locked {
+		return false, nil
+	}
+	f.locked = true
+	return true, nil
+}
+
+func (f *fakeInstanceService) ReleaseDeployLock(context.Context, uint) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.locked = false
+	return nil
+}
+
+func (f *fakeInstanceService) SetDeployStatus(_ context.Context, deploymentInstance *model.DeploymentInstance, status model.DeployStatus, reason string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.statuses == nil {
+		f.statuses = map[uint]model.DeployStatus{}
+		f.failures = map[uint]string{}
+	}
+	f.statuses[deploymentInstance.ID] = status
+	f.failures[deploymentInstance.ID] = reason
+	deploymentInstance.DeployStatus = status
+	return nil
+}
+
+func (f *fakeInstanceService) failure(instanceId uint) (model.DeployStatus, string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.statuses[instanceId], f.failures[instanceId]
+}
+
+func (f *fakeInstanceService) isLocked() bool {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.locked
+}
+
+func (f *fakeInstanceService) recordedSteps() []string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]string(nil), f.steps...)
+}
+
+func (f *fakeInstanceService) deployedStacks() []string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]string(nil), f.deployed...)
+}
+
+func (f *fakeInstanceService) destroyedStacks() []string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]string(nil), f.destroyed...)
+}
+
+func (f *fakeInstanceService) deletedStacks() []string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]string(nil), f.deleted...)
+}
+
+func newTestDeployment() *model.Deployment {
+	deployment := &model.Deployment{ID: 1, Name: "whoami", GroupName: "packages"}
+	deployment.Instances = []*model.DeploymentInstance{
+		{ID: 10, Name: "whoami", StackName: "dhis2-v2", DeploymentID: 1},
+		{ID: 11, Name: "whoami", StackName: "pgadmin", DeploymentID: 1},
+	}
+	return deployment
+}
+
+func newTestService(instanceService *fakeInstanceService, publisher Publisher) Service {
+	return Service{
+		logger:          slog.New(slog.NewTextHandler(io.Discard, nil)),
+		instanceService: instanceService,
+		tokenService:    fakeTokenService{},
+		publisher:       publisher,
+	}
+}
+
+func awaitUnlocked(t *testing.T, instanceService *fakeInstanceService) {
+	t.Helper()
+	require.Eventually(t, func() bool { return !instanceService.isLocked() }, 2*time.Second, 5*time.Millisecond)
+}
+
+// awaitTerminalEvent waits for the event a deploy or an edit ends with and returns everything
+// recorded by then. The lock goes back before that event is published, so a released lock does not
+// mean the event has arrived.
+func awaitTerminalEvent(t *testing.T, publisher *recordingPublisher) []recordedEvent {
+	t.Helper()
+	require.Eventually(t, func() bool {
+		return slices.ContainsFunc(publisher.recorded(), func(event recordedEvent) bool { return !event.transient })
+	}, 2*time.Second, 5*time.Millisecond)
+	return publisher.recorded()
+}
+
+func TestStartDeploymentDeploysEveryInstanceAndReleasesTheLock(t *testing.T) {
+	deployment := newTestDeployment()
+	instanceService := &fakeInstanceService{deployment: deployment}
+	publisher := &recordingPublisher{}
+	service := newTestService(instanceService, publisher)
+
+	require.NoError(t, service.StartDeployment(context.Background(), "token", deployment.ID, 7))
+	awaitUnlocked(t, instanceService)
+
+	assert.Equal(t, []string{"dhis2-v2", "pgadmin"}, instanceService.deployedStacks())
+	assert.Equal(t, model.DeployStatusPending, instanceService.statuses[10])
+	assert.Equal(t, model.DeployStatusPending, instanceService.statuses[11])
+}
+
+// Progress is per instance and streamed only; the bell gets the outcome of the deploy and nothing
+// else, so a deployment of any size leaves exactly one notification behind.
+func TestStartDeploymentPersistsOnlyTheTerminalEvent(t *testing.T) {
+	deployment := newTestDeployment()
+	instanceService := &fakeInstanceService{deployment: deployment}
+	publisher := &recordingPublisher{}
+	service := newTestService(instanceService, publisher)
+
+	require.NoError(t, service.StartDeployment(context.Background(), "token", deployment.ID, 7))
+	awaitUnlocked(t, instanceService)
+
+	var persisted []recordedEvent
+	for _, event := range awaitTerminalEvent(t, publisher) {
+		assert.Equal(t, kindDeployment, event.kind)
+		if !event.transient {
+			persisted = append(persisted, event)
+		}
+	}
+	require.Len(t, persisted, 1)
+	assert.Equal(t, "success", persisted[0].payload.Status)
+	assert.Zero(t, persisted[0].payload.InstanceID)
+}
+
+func TestStartDeploymentReportsAFailedInstance(t *testing.T) {
+	deployment := newTestDeployment()
+	instanceService := &fakeInstanceService{deployment: deployment, deployErr: errors.New("helmfile exploded")}
+	publisher := &recordingPublisher{}
+	service := newTestService(instanceService, publisher)
+
+	require.NoError(t, service.StartDeployment(context.Background(), "token", deployment.ID, 7))
+	awaitUnlocked(t, instanceService)
+
+	events := awaitTerminalEvent(t, publisher)
+	last := events[len(events)-1]
+	assert.False(t, last.transient)
+	assert.Equal(t, "error", last.payload.Status)
+	assert.Contains(t, last.payload.Error, "helmfile exploded")
+}
+
+// Only a failed helm run records its own failure, so the instances after it would read as deploying
+// for good, which also refuses their deletion.
+func TestStartDeploymentFailsTheInstancesItNeverReached(t *testing.T) {
+	deployment := newTestDeployment()
+	instanceService := &fakeInstanceService{deployment: deployment, deployErr: errors.New("helmfile exploded")}
+	service := newTestService(instanceService, &recordingPublisher{})
+
+	require.NoError(t, service.StartDeployment(context.Background(), "token", deployment.ID, 7))
+	awaitUnlocked(t, instanceService)
+
+	status, reason := instanceService.failure(11)
+	assert.Equal(t, model.DeployStatusFailed, status)
+	assert.Contains(t, reason, "helmfile exploded")
+}
+
+// A second deploy is refused rather than left to race helm for the same releases.
+func TestStartDeploymentRefusesASecondDeploy(t *testing.T) {
+	deployment := newTestDeployment()
+	release := make(chan struct{})
+	instanceService := &fakeInstanceService{deployment: deployment, deployHook: func() { <-release }}
+	service := newTestService(instanceService, &recordingPublisher{})
+
+	require.NoError(t, service.StartDeployment(context.Background(), "token", deployment.ID, 7))
+
+	err := service.StartDeployment(context.Background(), "token", deployment.ID, 7)
+	require.Error(t, err)
+	assert.True(t, errdef.IsConflict(err), "expected a conflict, got %v", err)
+
+	close(release)
+	awaitUnlocked(t, instanceService)
+}
+
+func TestResetRefusesWhileADeployIsRunning(t *testing.T) {
+	deployment := newTestDeployment()
+	release := make(chan struct{})
+	instanceService := &fakeInstanceService{deployment: deployment, deployHook: func() { <-release }}
+	service := newTestService(instanceService, &recordingPublisher{})
+
+	require.NoError(t, service.StartDeployment(context.Background(), "token", deployment.ID, 7))
+
+	err := service.Reset(context.Background(), "token", deployment.ID, deployment.Instances[0].ID, "", 60, 7)
+	require.Error(t, err)
+	assert.True(t, errdef.IsConflict(err), "expected a conflict, got %v", err)
+
+	close(release)
+	awaitUnlocked(t, instanceService)
+}
+
+func TestResetDestroysAndRedeploysTheInstance(t *testing.T) {
+	deployment := newTestDeployment()
+	instanceService := &fakeInstanceService{deployment: deployment}
+	service := newTestService(instanceService, &recordingPublisher{})
+
+	require.NoError(t, service.Reset(context.Background(), "token", deployment.ID, deployment.Instances[0].ID, "", 60, 7))
+	awaitUnlocked(t, instanceService)
+
+	assert.Equal(t, []string{"destroy dhis2-v2", "deploy dhis2-v2"}, instanceService.recordedSteps())
+}
+
+func TestResetThatCannotDestroyTheInstanceFailsIt(t *testing.T) {
+	deployment := newTestDeployment()
+	instanceService := &fakeInstanceService{deployment: deployment, destroyErr: errors.New("required env var `PGADMIN_USERNAME` is not set")}
+	service := newTestService(instanceService, &recordingPublisher{})
+
+	require.NoError(t, service.Reset(context.Background(), "token", deployment.ID, deployment.Instances[1].ID, "", 60, 7))
+	awaitUnlocked(t, instanceService)
+
+	status, reason := instanceService.failure(11)
+	assert.Equal(t, model.DeployStatusFailed, status)
+	assert.Contains(t, reason, "PGADMIN_USERNAME")
+}
+
+// A component reset keeps the instance: only that component's data goes, the deploy seeds it again,
+// and the components still holding on to the old data are restarted after it.
+func TestResetOfAComponentKeepsTheRestOfTheInstance(t *testing.T) {
+	deployment := newTestDeployment()
+	instanceService := &fakeInstanceService{deployment: deployment}
+	service := newTestService(instanceService, &recordingPublisher{})
+
+	require.NoError(t, service.Reset(context.Background(), "token", deployment.ID, deployment.Instances[0].ID, "db", 60, 7))
+	awaitUnlocked(t, instanceService)
+
+	assert.Equal(t, []string{"reset dhis2-v2 db", "deploy dhis2-v2"}, instanceService.recordedSteps())
+}
+
+func TestResetOfAComponentIsRefusedBeforeItStarts(t *testing.T) {
+	deployment := newTestDeployment()
+	instanceService := &fakeInstanceService{deployment: deployment, componentReset: errdef.NewBadRequest("component %q cannot be reset on its own", "minio")}
+	service := newTestService(instanceService, &recordingPublisher{})
+
+	err := service.Reset(context.Background(), "token", deployment.ID, deployment.Instances[0].ID, "minio", 60, 7)
+
+	require.Error(t, err)
+	assert.True(t, errdef.IsBadRequest(err), "expected a bad request, got %v", err)
+	assert.False(t, instanceService.isLocked())
+	assert.Empty(t, instanceService.recordedSteps())
+}
+
+func TestDeployPathsRefuseAnIdThatIsNotADeployment(t *testing.T) {
+	deployment := newTestDeployment()
+	instanceService := &fakeInstanceService{deployment: deployment, findErr: errdef.NewNotFound("deployment not found by id: %d", deployment.ID)}
+	service := newTestService(instanceService, &recordingPublisher{})
+
+	errs := map[string]error{
+		"start": service.StartDeployment(context.Background(), "token", deployment.ID, 7),
+		"reset": service.Reset(context.Background(), "token", deployment.ID, deployment.Instances[0].ID, "", 60, 7),
+	}
+	_, errs["update"] = service.UpdateInstance(context.Background(), "token", deployment.ID, deployment.Instances[0].ID, instance.Parameters{}, nil)
+	_, errs["edit"] = service.EditDeployment(context.Background(), "token", deployment.ID, instance.Edit{}, 7)
+
+	for path, err := range errs {
+		require.Error(t, err, path)
+		assert.True(t, errdef.IsNotFound(err), "%s: expected not found, got %v", path, err)
+	}
+	assert.False(t, instanceService.isLocked())
+	assert.Empty(t, instanceService.deployedStacks())
+}

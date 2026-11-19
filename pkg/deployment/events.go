@@ -21,3 +21,37 @@ func newFilestoreEvent(db *model.Database, status, errMsg string) filestoreEvent
 		Error:        errMsg,
 	}
 }
+
+const kindDeployment = "deployment"
+
+// deploymentEvent is the JSON payload published while a deployment deploys. Per-instance events are
+// progress and are streamed without being persisted; the deployment-level terminal event is the one
+// worth keeping, so it is the only one that reaches the notification bell.
+type deploymentEvent struct {
+	Status         string `json:"status"`
+	DeploymentID   uint   `json:"deploymentId"`
+	DeploymentName string `json:"deploymentName"`
+	InstanceID     uint   `json:"instanceId,omitempty"`
+	StackName      string `json:"stackName,omitempty"`
+	Error          string `json:"error,omitempty"`
+}
+
+func newInstanceEvent(deployment *model.Deployment, instance *model.DeploymentInstance, status, errMsg string) deploymentEvent {
+	return deploymentEvent{
+		Status:         status,
+		DeploymentID:   deployment.ID,
+		DeploymentName: deployment.Name,
+		InstanceID:     instance.ID,
+		StackName:      instance.StackName,
+		Error:          errMsg,
+	}
+}
+
+func newDeploymentEvent(deployment *model.Deployment, status, errMsg string) deploymentEvent {
+	return deploymentEvent{
+		Status:         status,
+		DeploymentID:   deployment.ID,
+		DeploymentName: deployment.Name,
+		Error:          errMsg,
+	}
+}

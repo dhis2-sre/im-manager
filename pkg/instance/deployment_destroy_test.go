@@ -8,23 +8,31 @@ import (
 	"os/exec"
 	"testing"
 
+	"github.com/dhis2-sre/im-manager/internal/errdef"
 	"github.com/dhis2-sre/im-manager/pkg/inttest"
+	"github.com/dhis2-sre/im-manager/pkg/kube"
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	"github.com/dhis2-sre/im-manager/pkg/stack"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gorm.io/gorm"
 )
 
 type failingDestroyHelmfile struct {
-	failStack string
+	failStack   string
+	uninstalled *[]string
 }
 
 func (failingDestroyHelmfile) sync(context.Context, string, *model.DeploymentInstance, *model.Group, uint, map[string]string) (*exec.Cmd, error) {
 	return exec.Command("true"), nil
 }
 
-func (f failingDestroyHelmfile) destroy(_ context.Context, instance *model.DeploymentInstance, _ *model.Group) (*exec.Cmd, error) {
+func (f failingDestroyHelmfile) uninstall(_ context.Context, instance *model.DeploymentInstance, _ *model.Group) (*exec.Cmd, error) {
+	if f.uninstalled != nil {
+		*f.uninstalled = append(*f.uninstalled, instance.StackName)
+	}
 	if instance.StackName == f.failStack {
-		return nil, errors.New("simulated helmfile destroy failure")
+		return nil, errors.New("simulated helm uninstall failure")
 	}
 	return exec.Command("true"), nil
 }
@@ -66,7 +74,7 @@ func TestDeleteDeploymentPreservesInstanceRecordWhenDestroyFails(t *testing.T) {
 	require.NoError(t, instanceRepo.SaveDeployment(context.Background(), deployment))
 
 	stackService := stack.NewService(stack.Stacks{"whoami-go": stack.WhoamiGo})
-	service := NewService(logger, instanceRepo, stubGroupService{group: &group}, stackService, failingDestroyHelmfile{failStack: "whoami-go"}, nil, "")
+	service := NewService(logger, instanceRepo, stubGroupService{group: &group}, stackService, failingDestroyHelmfile{failStack: "whoami-go"}, nil, "", kube.NewClients(slog.Default()))
 
 	err = service.DeleteDeployment(context.Background(), deployment)
 	require.Error(t, err)
@@ -113,4 +121,199 @@ func TestDeleteDeploymentInstanceReleasesDatabaseLock(t *testing.T) {
 	var remaining int64
 	require.NoError(t, db.Model(&model.Database{}).Where("id = ?", database.ID).Count(&remaining).Error)
 	require.EqualValues(t, 1, remaining, "releasing the lock must not delete the database itself")
+}
+
+// A destroy and a deploy of the same release run helm against each other, so a delete waits for the
+// deploy rather than racing it.
+func TestDeleteDeploymentIsRefusedWhileADeployHoldsTheLock(t *testing.T) {
+	db := inttest.SetupDB(t)
+
+	group := model.Group{Name: "group-name", Namespace: "group-name", Hostname: "some-host"}
+	user := &model.User{Email: "delete-lock@dhis2.org", Groups: []model.Group{group}}
+	require.NoError(t, db.Create(user).Error)
+	group = user.Groups[0]
+
+	instanceRepo, err := NewRepository(db, "01234567890123456789012345678901")
+	require.NoError(t, err)
+
+	deployment := &model.Deployment{
+		Name:      "dep",
+		GroupName: group.Name,
+		UserID:    user.ID,
+		Instances: []*model.DeploymentInstance{
+			{Name: "instance-a", GroupName: group.Name, StackName: "whoami-go"},
+		},
+	}
+	require.NoError(t, instanceRepo.SaveDeployment(context.Background(), deployment))
+
+	stackService := stack.NewService(stack.Stacks{"whoami-go": stack.WhoamiGo})
+	service := NewService(slog.New(slog.NewTextHandler(os.Stdout, nil)), instanceRepo, stubGroupService{group: &group}, stackService, failingDestroyHelmfile{failStack: "whoami-go"}, nil, "", kube.NewClients(slog.Default()))
+
+	acquired, err := service.AcquireDeployLock(context.Background(), deployment.ID)
+	require.NoError(t, err)
+	require.True(t, acquired)
+
+	err = service.DeleteDeployment(context.Background(), deployment)
+
+	require.Error(t, err)
+	assert.True(t, errdef.IsConflict(err))
+
+	_, err = instanceRepo.FindDeploymentInstanceById(context.Background(), deployment.Instances[0].ID)
+	require.NoError(t, err, "a refused delete must not have destroyed anything")
+}
+
+// A delete that fails partway has to give the lock back, or the deployment can never be deployed or
+// deleted again.
+func TestFailedDeleteDeploymentReleasesTheLock(t *testing.T) {
+	db := inttest.SetupDB(t)
+
+	group := model.Group{Name: "group-name", Namespace: "group-name", Hostname: "some-host"}
+	user := &model.User{Email: "delete-unlock@dhis2.org", Groups: []model.Group{group}}
+	require.NoError(t, db.Create(user).Error)
+	group = user.Groups[0]
+
+	instanceRepo, err := NewRepository(db, "01234567890123456789012345678901")
+	require.NoError(t, err)
+
+	deployment := &model.Deployment{
+		Name:      "dep",
+		GroupName: group.Name,
+		UserID:    user.ID,
+		Instances: []*model.DeploymentInstance{
+			{Name: "instance-a", GroupName: group.Name, StackName: "whoami-go"},
+		},
+	}
+	require.NoError(t, instanceRepo.SaveDeployment(context.Background(), deployment))
+
+	stackService := stack.NewService(stack.Stacks{"whoami-go": stack.WhoamiGo})
+	service := NewService(slog.New(slog.NewTextHandler(os.Stdout, nil)), instanceRepo, stubGroupService{group: &group}, stackService, failingDestroyHelmfile{failStack: "whoami-go"}, nil, "", kube.NewClients(slog.Default()))
+
+	require.Error(t, service.DeleteDeployment(context.Background(), deployment))
+
+	acquired, err := service.AcquireDeployLock(context.Background(), deployment.ID)
+	require.NoError(t, err)
+	assert.True(t, acquired, "the lock must be free again after a delete that could not finish")
+}
+
+// A delete that gets as far as removing the deployment itself and fails there has to give the lock
+// back too. The TTL handler retries a failed delete every couple of minutes and each retry that
+// leaks the lock starts the stale window again, so the deployment stays locked and the user's own
+// delete is refused with a conflict that names a deploy which is not running.
+func TestDeleteDeploymentReleasesTheLockWhenTheDeploymentCannotBeRemoved(t *testing.T) {
+	db := inttest.SetupDB(t)
+
+	group := model.Group{Name: "group-name", Namespace: "group-name", Hostname: "some-host"}
+	user := &model.User{Email: "delete-row-fails@dhis2.org", Groups: []model.Group{group}}
+	require.NoError(t, db.Create(user).Error)
+	group = user.Groups[0]
+
+	instanceRepo, err := NewRepository(db, "01234567890123456789012345678901")
+	require.NoError(t, err)
+
+	deployment := &model.Deployment{Name: "dep", GroupName: group.Name, UserID: user.ID}
+	require.NoError(t, instanceRepo.SaveDeployment(context.Background(), deployment))
+
+	require.NoError(t, db.Callback().Delete().Before("gorm:delete").Register("fail_deployment_delete", func(tx *gorm.DB) {
+		if tx.Statement.Table == "deployments" {
+			_ = tx.AddError(errors.New("simulated deployment delete failure"))
+		}
+	}))
+
+	stackService := stack.NewService(stack.Stacks{"whoami-go": stack.WhoamiGo})
+	service := NewService(slog.New(slog.NewTextHandler(os.Stdout, nil)), instanceRepo, stubGroupService{group: &group}, stackService, failingDestroyHelmfile{}, nil, "", kube.NewClients(slog.Default()))
+
+	require.Error(t, service.DeleteDeployment(context.Background(), deployment))
+
+	acquired, err := service.AcquireDeployLock(context.Background(), deployment.ID)
+	require.NoError(t, err)
+	assert.True(t, acquired, "the lock must be free again after a delete that could not remove the deployment")
+}
+
+// The success path, which is what says the lock may be kept: a delete that reports success has to
+// have removed the deployment row. Taking the deploy lock bumps the deployment's updated_at, so a
+// delete that matched on the caller's copy of the row matched nothing and reported success anyway,
+// leaving the deployment behind holding a lock nothing would release.
+func TestDeleteDeploymentRemovesTheDeploymentAndLeavesNoLock(t *testing.T) {
+	db := inttest.SetupDB(t)
+
+	group := model.Group{Name: "group-name", Namespace: "group-name", Hostname: "some-host"}
+	user := &model.User{Email: "delete-succeeds@dhis2.org", Groups: []model.Group{group}}
+	require.NoError(t, db.Create(user).Error)
+	group = user.Groups[0]
+
+	instanceRepo, err := NewRepository(db, "01234567890123456789012345678901")
+	require.NoError(t, err)
+
+	deployment := &model.Deployment{Name: "dep", GroupName: group.Name, UserID: user.ID}
+	require.NoError(t, instanceRepo.SaveDeployment(context.Background(), deployment))
+
+	loaded, err := instanceRepo.FindDeploymentById(context.Background(), deployment.ID, false)
+	require.NoError(t, err)
+
+	stackService := stack.NewService(stack.Stacks{"whoami-go": stack.WhoamiGo})
+	service := NewService(slog.New(slog.NewTextHandler(os.Stdout, nil)), instanceRepo, stubGroupService{group: &group}, stackService, failingDestroyHelmfile{}, nil, "", kube.NewClients(slog.Default()))
+
+	require.NoError(t, service.DeleteDeployment(context.Background(), loaded))
+
+	var remaining int64
+	require.NoError(t, db.Model(&model.Deployment{}).Where("id = ?", deployment.ID).Count(&remaining).Error)
+	assert.Zero(t, remaining, "a delete that reported success must have removed the deployment")
+}
+
+func saveDeploymentOf(t *testing.T, stacks ...string) (*repository, model.Group, *model.Deployment) {
+	t.Helper()
+	db := inttest.SetupDB(t)
+
+	group := model.Group{Name: "group-name", Namespace: "group-name", Hostname: "some-host"}
+	user := &model.User{Email: "delete-order@dhis2.org", Groups: []model.Group{group}}
+	require.NoError(t, db.Create(user).Error)
+	group = user.Groups[0]
+
+	instanceRepo, err := NewRepository(db, "01234567890123456789012345678901")
+	require.NoError(t, err)
+
+	deployment := &model.Deployment{Name: "dep", GroupName: group.Name, UserID: user.ID}
+	for _, stackName := range stacks {
+		parameters := model.DeploymentInstanceParameters{}
+		if stackName == stack.PgAdmin.Name {
+			parameters["DATABASE_HOSTNAME"] = model.DeploymentInstanceParameter{ParameterName: "DATABASE_HOSTNAME", Value: "dep-1-dhis2-postgresql-rw"}
+		}
+		deployment.Instances = append(deployment.Instances, &model.DeploymentInstance{Name: "dep", GroupName: group.Name, StackName: stackName, Parameters: parameters})
+	}
+	require.NoError(t, instanceRepo.SaveDeployment(context.Background(), deployment))
+
+	loaded, err := instanceRepo.FindDeploymentById(context.Background(), deployment.ID, false)
+	require.NoError(t, err)
+	return instanceRepo, group, loaded
+}
+
+// Deployment 8989 lost dhis2-v2 to a delete that went on past pgAdmin failing to uninstall, and every
+// later delete was refused because nothing provided the parameters pgAdmin consumes.
+func TestDeleteDeploymentStopsAtTheFirstInstanceItCannotDestroy(t *testing.T) {
+	instanceRepo, group, deployment := saveDeploymentOf(t, stack.DHIS2V2.Name, stack.PgAdmin.Name)
+
+	var uninstalled []string
+	stackService := stack.NewService(stack.Stacks{stack.DHIS2V2.Name: stack.DHIS2V2, stack.PgAdmin.Name: stack.PgAdmin})
+	service := NewService(slog.New(slog.NewTextHandler(os.Stdout, nil)), instanceRepo, stubGroupService{group: &group}, stackService, failingDestroyHelmfile{failStack: stack.PgAdmin.Name, uninstalled: &uninstalled}, nil, "", kube.NewClients(slog.Default()))
+
+	err := service.DeleteDeployment(context.Background(), deployment)
+
+	require.ErrorContains(t, err, "simulated helm uninstall failure")
+	assert.Equal(t, []string{stack.PgAdmin.Name}, uninstalled, "the instance pgAdmin consumes from is kept")
+	remaining, err := instanceRepo.FindDeploymentById(context.Background(), deployment.ID, false)
+	require.NoError(t, err)
+	assert.Len(t, remaining.Instances, 2)
+}
+
+func TestDeleteDeploymentGetsPastAnInstanceWhoseProviderIsGone(t *testing.T) {
+	instanceRepo, group, deployment := saveDeploymentOf(t, stack.PgAdmin.Name)
+
+	var uninstalled []string
+	stackService := stack.NewService(stack.Stacks{stack.DHIS2V2.Name: stack.DHIS2V2, stack.PgAdmin.Name: stack.PgAdmin})
+	service := NewService(slog.New(slog.NewTextHandler(os.Stdout, nil)), instanceRepo, stubGroupService{group: &group}, stackService, failingDestroyHelmfile{failStack: stack.PgAdmin.Name, uninstalled: &uninstalled}, nil, "", kube.NewClients(slog.Default()))
+
+	err := service.DeleteDeployment(context.Background(), deployment)
+
+	require.ErrorContains(t, err, "simulated helm uninstall failure", "the delete reaches the uninstall instead of refusing to order the deployment")
+	assert.Equal(t, []string{stack.PgAdmin.Name}, uninstalled)
 }

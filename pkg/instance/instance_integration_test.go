@@ -4,15 +4,19 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/rsa"
+	"encoding/json"
 	"fmt"
 	"log/slog"
+	"maps"
 	"net/http"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/dhis2-sre/im-manager/internal/errdef"
 	"github.com/dhis2-sre/im-manager/pkg/token"
 	"github.com/getsops/sops/v3"
 
@@ -28,6 +32,7 @@ import (
 
 	"github.com/dhis2-sre/im-manager/pkg/instance"
 	"github.com/dhis2-sre/im-manager/pkg/inttest"
+	"github.com/dhis2-sre/im-manager/pkg/kube"
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	"github.com/dhis2-sre/im-manager/pkg/stack"
 	"github.com/gin-gonic/gin"
@@ -35,11 +40,13 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func TestInstanceHandler(t *testing.T) {
 	k8sClient := inttest.SetupK8s(t)
+	k8sClient.InstallCNPG(t)
 
 	err := createNamespace(t, k8sClient, "group-name")
 	require.NoError(t, err, "failed to create test namespace")
@@ -75,11 +82,23 @@ func TestInstanceHandler(t *testing.T) {
 			Configuration: k8sConfig,
 		},
 	}
+	otherGroup := &model.Group{
+		ID:         2,
+		Name:       "other-group-name",
+		Namespace:  "other-group-name",
+		Hostname:   "other",
+		Deployable: true,
+		Cluster: model.Cluster{
+			Name:          "other-cluster-name",
+			Configuration: k8sConfig,
+		},
+	}
 	user := &model.User{
 		Email:      "user1@dhis2.org",
 		EmailToken: uuid.New(),
 		Groups: []model.Group{
 			*group,
+			*otherGroup,
 		},
 	}
 	err = db.Create(user).Error
@@ -92,17 +111,28 @@ func TestInstanceHandler(t *testing.T) {
 	err = db.Create(nonMember).Error
 	require.NoError(t, err, "failed to save non-member user")
 
+	otherMember := &model.User{
+		Email:      "user3@dhis2.org",
+		EmailToken: uuid.New(),
+		Groups: []model.Group{
+			*group,
+			*otherGroup,
+		},
+	}
+	err = db.Create(otherMember).Error
+	require.NoError(t, err, "failed to save other member user")
+
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	encryptionKey := strings.Repeat("a", 32)
 	instanceRepo, err := instance.NewRepository(db, encryptionKey)
 	require.NoError(t, err)
-	groupService := groupService{group: group}
+	groupService := groupService{groups: []*model.Group{group, &user.Groups[1]}}
 	stacks := stack.Stacks{
-		"minio":      stack.MINIO,
-		"whoami-go":  stack.WhoamiGo,
-		"dhis2-db":   stack.DHIS2DB,
-		"dhis2-core": stack.DHIS2Core,
-		"dhis2":      stack.DHIS2,
+		"whoami-go": stack.WhoamiGo,
+		"dhis2-v2":  stack.DHIS2V2,
+		// dhis2-v2 offers pgadmin as a companion, and a companion has to be registered like any
+		// other stack for the deployment holding it to resolve.
+		"pgadmin": stack.PgAdmin,
 	}
 	stackService := stack.NewService(stacks)
 	// classification 'test' does not actually exist, this is used to decrypt the stack parameters
@@ -111,34 +141,34 @@ func TestInstanceHandler(t *testing.T) {
 	tokenRepository := token.NewRepository(redis)
 	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	require.NoError(t, err, "failed to generate RSA private key")
-	tokenService, err := token.NewService(logger, tokenRepository, privateKey, 100, 60, "secret", 100, 100)
+	// The access token must outlive the whole suite: it is minted once up front and the deploy
+	// paths refresh it, which fails with "exp" not satisfied once it expires. Slow CI runners
+	// blew through the previous 100 seconds.
+	tokenService, err := token.NewService(logger, tokenRepository, privateKey, 3600, 60, "secret", 3600, 3600)
 	require.NoError(t, err, "failed to create token service")
-	instanceService := instance.NewService(logger, instanceRepo, groupService, stackService, helmfileService, nil, "")
-
-	s3Dir := t.TempDir()
-	s3Bucket := "database-bucket"
-	err = os.Mkdir(s3Dir+"/"+s3Bucket, 0o755)
-	require.NoError(t, err, "failed to create S3 output bucket")
-	s3 := inttest.SetupS3(t, s3Dir)
+	s3 := inttest.SetupS3(t)
+	s3Bucket := s3.Bucket
 	uploader := manager.NewUploader(s3.Client)
 	s3Client := storage.NewS3Client(logger, s3.Client, uploader)
+	instanceService := instance.NewService(logger, instanceRepo, groupService, stackService, helmfileService, s3Client, s3Bucket, kube.NewClients(slog.Default()))
 	databaseRepository := database.NewRepository(db)
-	databaseService := database.NewService(logger, s3Bucket, s3Client, groupService, databaseRepository, func(c model.Cluster) (database.PodExecutor, error) {
-		return instance.NewKubernetesService(c)
-	}, noopPublisher{})
+	databaseService := database.NewService(logger, s3Bucket, s3Client, groupService, databaseRepository, kube.NewClient, noopPublisher{})
 	deploymentService := deployment.NewService(logger, instanceService, databaseService, tokenService, noopPublisher{})
 
 	// this is only to allow testing using multiple users without bringing in all our auth stack
 	authenticator := func(c *gin.Context) {
 		authenticatedUser := user
-		if c.Query("user") == "non-member" {
+		switch c.Query("user") {
+		case "non-member":
 			authenticatedUser = nonMember
+		case "other-member":
+			authenticatedUser = otherMember
 		}
 		ctx := model.NewContextWithUser(c.Request.Context(), authenticatedUser)
 		c.Request = c.Request.WithContext(ctx)
 	}
+	var twoDayTTL uint = 172800
 	client := inttest.SetupHTTPServer(t, func(engine *gin.Engine) {
-		var twoDayTTL uint = 172800
 		instanceHandler := instance.NewHandler(stackService, groupService, instanceService, deploymentService, twoDayTTL)
 		instance.Routes(engine, authenticator, instanceHandler)
 
@@ -153,7 +183,7 @@ func TestInstanceHandler(t *testing.T) {
 	tokens, err := tokenService.GetTokens(user, "", false)
 	require.NoError(t, err, "failed to get tokens")
 
-	databaseID := database.UploadTestDatabase(t, client, "path/name.extension", "select now();", "group-name", inttest.WithAuthToken(tokens.AccessToken))
+	databaseID := inttest.UploadTestDatabase(t, client, "path/name.extension", "select now();", "group-name", inttest.WithAuthToken(tokens.AccessToken))
 
 	t.Run("DeployDeploymentWithoutInstances", func(t *testing.T) {
 		t.Parallel()
@@ -194,6 +224,75 @@ func TestInstanceHandler(t *testing.T) {
 		k8sClient.AssertPodIsNotRunning(t, deploymentInstance.Group.Namespace, deploymentInstance.Name, 10, deploymentInstance.Group.ID)
 	})
 
+	t.Run("ComponentsAndReplicaRestart", func(t *testing.T) {
+		t.Parallel()
+		deployment := createDeployment(t, client, "components-deployment", tokens.AccessToken)
+		deploymentInstance := createWhoamiInstance(t, client, deployment.ID, tokens.AccessToken)
+
+		deployDeployment(t, client, deployment.ID, tokens.AccessToken)
+		k8sClient.AssertPodIsReady(t, deploymentInstance.Group.Namespace, deploymentInstance.Name, 60, deploymentInstance.Group.ID)
+
+		// Instance manager reads replicas from its own pod informer cache, which can trail the watch
+		// that saw the pod ready.
+		path := fmt.Sprintf("/instances/%d/components", deploymentInstance.ID)
+		var components []instance.ComponentStatus
+		require.EventuallyWithT(t, func(c *assert.CollectT) {
+			client.GetJSON(t, path, &components, inttest.WithAuthToken(tokens.AccessToken))
+			if assert.Len(c, components, 1) && assert.Len(c, components[0].Replicas, 1) {
+				assert.Equal(c, "Running", components[0].Replicas[0].Phase)
+				assert.True(c, components[0].Replicas[0].Ready)
+			}
+		}, 30*time.Second, time.Second)
+
+		assert.Equal(t, "whoami", components[0].Name)
+		assert.Equal(t, []kube.Operation{kube.OperationRestart, kube.OperationRestartReplica, kube.OperationLogs}, components[0].SupportedOperations)
+		replica := components[0].Replicas[0]
+		assert.NotEmpty(t, replica.Containers)
+
+		path = fmt.Sprintf("/deployments/%d/components", deployment.ID)
+		var deploymentComponents []instance.InstanceComponents
+		client.GetJSON(t, path, &deploymentComponents, inttest.WithAuthToken(tokens.AccessToken))
+
+		require.Len(t, deploymentComponents, 1)
+		assert.Equal(t, deploymentInstance.ID, deploymentComponents[0].InstanceID)
+		assert.Equal(t, "whoami-go", deploymentComponents[0].StackName)
+		require.Len(t, deploymentComponents[0].Components, 1)
+		assert.Equal(t, "whoami", deploymentComponents[0].Components[0].Name)
+		require.Len(t, deploymentComponents[0].Components[0].Replicas, 1)
+
+		path = fmt.Sprintf("/instances/%d/logs?replica=%s", deploymentInstance.ID, replica.Name)
+		response := client.Do(t, http.MethodGet, path, nil, http.StatusBadRequest, inttest.WithAuthToken(tokens.AccessToken))
+		assert.Contains(t, string(response), "replica requires a component selector")
+
+		path = fmt.Sprintf("/instances/%d/logs?selector=whoami&replica=no-such-pod", deploymentInstance.ID)
+		client.Do(t, http.MethodGet, path, nil, http.StatusNotFound, inttest.WithAuthToken(tokens.AccessToken))
+
+		path = fmt.Sprintf("/instances/%d/logs?selector=whoami&container=no-such-container", deploymentInstance.ID)
+		client.Do(t, http.MethodGet, path, nil, http.StatusNotFound, inttest.WithAuthToken(tokens.AccessToken))
+
+		path = fmt.Sprintf("/instances/%d/logs?selector=whoami&tail=-1", deploymentInstance.ID)
+		response = client.Do(t, http.MethodGet, path, nil, http.StatusBadRequest, inttest.WithAuthToken(tokens.AccessToken))
+		assert.Contains(t, string(response), "tail must be a positive number of lines")
+
+		path = fmt.Sprintf("/instances/%d/restart?replica=%s", deploymentInstance.ID, replica.Name)
+		response = client.Do(t, http.MethodPut, path, nil, http.StatusBadRequest, inttest.WithAuthToken(tokens.AccessToken))
+		assert.Contains(t, string(response), "replica requires a component selector")
+
+		path = fmt.Sprintf("/instances/%d/restart?selector=whoami&replica=no-such-pod", deploymentInstance.ID)
+		client.Do(t, http.MethodPut, path, nil, http.StatusNotFound, inttest.WithAuthToken(tokens.AccessToken))
+
+		path = fmt.Sprintf("/instances/%d/restart?selector=whoami&replica=%s", deploymentInstance.ID, replica.Name)
+		client.Do(t, http.MethodPut, path, nil, http.StatusAccepted, inttest.WithAuthToken(tokens.AccessToken))
+
+		require.EventuallyWithT(t, func(c *assert.CollectT) {
+			_, err := k8sClient.Client.CoreV1().Pods(deploymentInstance.Group.Namespace).Get(context.Background(), replica.Name, metav1.GetOptions{})
+			assert.Truef(c, k8serrors.IsNotFound(err), "pod %q should be replaced after replica restart, err: %v", replica.Name, err)
+		}, 60*time.Second, 2*time.Second)
+		k8sClient.AssertPodIsReady(t, deploymentInstance.Group.Namespace, deploymentInstance.Name, 60, deploymentInstance.Group.ID)
+
+		destroyDeployment(t, client, deployment.ID, tokens.AccessToken)
+	})
+
 	t.Run("InstanceWithDetailsDeniedForNonMember", func(t *testing.T) {
 		t.Parallel()
 		deployment := createDeployment(t, client, "details-auth-deployment", tokens.AccessToken)
@@ -208,11 +307,9 @@ func TestInstanceHandler(t *testing.T) {
 	t.Run("GetPublicDeployments", func(t *testing.T) {
 		t.Parallel()
 		privateDeployment := createDeployment(t, client, "private-deployment", tokens.AccessToken)
-		createDHIS2DBInstance(t, client, privateDeployment.ID, databaseID, tokens.AccessToken)
-		createDHIS2CoreInstance(t, client, privateDeployment.ID, tokens.AccessToken)
+		createDHIS2V2Instance(t, client, privateDeployment.ID, databaseID, tokens.AccessToken)
 		publicDeployment := createDeployment(t, client, "dev-public-deployment", tokens.AccessToken)
-		createDHIS2DBInstance(t, client, publicDeployment.ID, databaseID, tokens.AccessToken)
-		createDHIS2CoreInstance(t, client, publicDeployment.ID, tokens.AccessToken, WithPublic(true))
+		createDHIS2V2Instance(t, client, publicDeployment.ID, databaseID, tokens.AccessToken, WithPublic(true))
 
 		var groupsWithInstances []instance.GroupWithPublicInstances
 		client.GetJSON(t, "/instances/public", &groupsWithInstances)
@@ -225,85 +322,175 @@ func TestInstanceHandler(t *testing.T) {
 		assert.Equal(t, "https://some/dev-public-deployment", instances[0].Hostname)
 	})
 
-	t.Run("DeploymentWithCompanionStack", func(t *testing.T) {
-		t.Parallel()
-		deployment := createDeployment(t, client, "companion-deployment", tokens.AccessToken, WithDescription("some description"))
-		deploymentInstance := createDHIS2DBInstance(t, client, deployment.ID, databaseID, tokens.AccessToken)
-		deploymentInstance = createMinioInstance(t, client, deployment.ID, tokens.AccessToken)
-		deploymentInstance = createDHIS2CoreInstance(t, client, deployment.ID, tokens.AccessToken, WithParameter("ALLOW_SUSPEND", "false"))
-		groupedName := fmt.Sprintf("%s-%d", deploymentInstance.Name, deploymentInstance.Group.ID)
+	t.Run("DHIS2V2Deployment", func(t *testing.T) {
+		// not parallel: one dhis2-v2 deploy carries core, a CloudNativePG cluster and minio, so it
+		// is shared by every assertion below rather than repeated per subtest.
+		seedID := inttest.UploadTestDatabase(t, client, "v2-save-test.sql.gz", "select now();", "group-name", inttest.WithAuthToken(tokens.AccessToken))
 
-		deployDeployment(t, client, deployment.ID, tokens.AccessToken)
-		k8sClient.AssertPodIsReady(t, deploymentInstance.Group.Namespace, groupedName+"-database", 30)
-		k8sClient.AssertPodIsReady(t, deploymentInstance.Group.Namespace, groupedName+"-minio", 30)
-		k8sClient.AssertPodIsReady(t, deploymentInstance.Group.Namespace, deploymentInstance.Name, 90, deploymentInstance.Group.ID)
-
-		destroyDeployment(t, client, deployment.ID, tokens.AccessToken)
-		k8sClient.AssertPodIsNotRunning(t, deploymentInstance.Group.Namespace, deploymentInstance.Name, 10, deploymentInstance.Group.ID)
-		k8sClient.AssertPodIsNotRunning(t, deploymentInstance.Group.Namespace, groupedName+"-minio", 30)
-		k8sClient.AssertPodIsNotRunning(t, deploymentInstance.Group.Namespace, groupedName+"-database", 10)
-	})
-
-	t.Run("FilestoreBackupMinioViaExec", func(t *testing.T) {
-		t.Parallel()
-
-		deployment := createDeployment(t, client, "fs-backup-deployment", tokens.AccessToken)
-		createDHIS2DBInstance(t, client, deployment.ID, databaseID, tokens.AccessToken)
-		createMinioInstance(t, client, deployment.ID, tokens.AccessToken)
-		coreInstance := createDHIS2CoreInstance(t, client, deployment.ID, tokens.AccessToken, WithParameter("ALLOW_SUSPEND", "false"))
+		deployment := createDeployment(t, client, "v2-deployment", tokens.AccessToken, WithDescription("some description"))
+		coreInstance := createDHIS2V2Instance(t, client, deployment.ID, seedID, tokens.AccessToken)
 
 		deployDeployment(t, client, deployment.ID, tokens.AccessToken)
 
-		groupedName := fmt.Sprintf("%s-%d", coreInstance.Name, coreInstance.Group.ID)
-		k8sClient.AssertPodIsReady(t, coreInstance.Group.Namespace, groupedName+"-minio", 120)
-
-		// seed an object into the minio bucket via exec
-		ks, err := instance.NewKubernetesService(group.Cluster)
+		ks, err := kube.NewClient(group.Cluster)
 		require.NoError(t, err)
+		corePod, coreContainer := waitForCorePodRunning(t, k8sClient, coreInstance.Group.Namespace, coreInstance.ID, 300*time.Second)
+		assertCoreHeapBounded(t, ks, coreInstance.Group.Namespace, corePod, coreContainer, testCoreMaxHeapSize)
 		minioPod := minioPodName(t, k8sClient, coreInstance.Group.Namespace, deployment.ID)
-		// create the bucket; the stack creates it asynchronously and we'd otherwise race it
-		seedScript := `mc alias set local http://127.0.0.1:9000 dhisdhis dhisdhis >/dev/null 2>&1; mc mb --ignore-existing local/dhis2 >/dev/null 2>&1; printf 'hello-filestore' > /tmp/marker.txt; mc cp --quiet /tmp/marker.txt local/dhis2/seeded/marker.txt`
-		var seedOut, seedErr strings.Builder
-		require.NoError(t, ks.Exec(context.Background(), coreInstance.Group.Namespace, minioPod, "minio", []string{"sh", "-c", seedScript}, &seedOut, &seedErr), "seed failed: %s", seedErr.String())
 
-		// FilestoreBackup links the filestore to an existing (SaveAs target) database row.
-		target := &model.Database{Name: "fs-backup-target.sql.gz", GroupName: "group-name", Type: "database", Slug: "group-name/fs-backup-target", UserID: user.ID}
-		require.NoError(t, db.Create(target).Error)
+		t.Run("FilestoreBackupMinioViaExec", func(t *testing.T) {
+			// create the bucket; the chart creates it asynchronously and we would otherwise race it
+			seedScript := `mc alias set local http://127.0.0.1:9000 dhisdhis dhisdhis >/dev/null 2>&1; mc mb --ignore-existing local/dhis2 >/dev/null 2>&1; printf 'hello-filestore' > /tmp/marker.txt; mc cp --quiet /tmp/marker.txt local/dhis2/seeded/marker.txt`
+			var seedOut, seedErr strings.Builder
+			require.NoError(t, ks.Exec(context.Background(), coreInstance.Group.Namespace, minioPod, "minio", []string{"sh", "-c", seedScript}, &seedOut, &seedErr), "seed failed: %s", seedErr.String())
 
-		// The shared instanceService is wired with a nil S3 client; build one with the real client.
-		fsService := instance.NewService(logger, instanceRepo, groupService, stackService, helmfileService, s3Client, s3Bucket)
-		require.NoError(t, fsService.FilestoreBackup(context.Background(), &coreInstance, target.Name, target))
+			// FilestoreBackup links the filestore to an existing (SaveAs target) database row.
+			target := &model.Database{Name: "fs-backup-target.sql.gz", GroupName: "group-name", Type: "database", Slug: "group-name/fs-backup-target", UserID: user.ID}
+			require.NoError(t, db.Create(target).Error)
 
-		content := s3.GetObject(t, s3Bucket, "group-name/fs-backup-target-fs.tar.gz")
-		require.NotEmpty(t, content)
-		entries := extractTarGzEntries(t, content)
-		assert.Equal(t, "hello-filestore", string(entries["seeded/marker.txt"]))
-		assert.Contains(t, rawTarGzNames(t, content), "./seeded/marker.txt",
-			"backup must tar with ./-relative keys so restore reproduces the original object key")
+			// minio can briefly refuse connections right after its pod reports ready (the server
+			// restarts during first-run setup), so retry until it is serving. FilestoreBackup returns
+			// before recording anything when the mirror fails, so retries are side-effect free.
+			require.EventuallyWithT(t, func(c *assert.CollectT) {
+				assert.NoError(c, instanceService.FilestoreBackup(context.Background(), &coreInstance, target.Name, target))
+			}, 90*time.Second, 3*time.Second, "filestore backup should succeed once minio is serving")
 
-		var saved model.Database
-		require.NoError(t, db.First(&saved, target.ID).Error)
-		assert.NotZero(t, saved.FilestoreID)
+			content := s3.GetObject(t, "group-name/fs-backup-target-fs.tar.gz")
+			require.NotEmpty(t, content)
+			entries := extractTarGzEntries(t, content)
+			assert.Equal(t, "hello-filestore", string(entries["seeded/marker.txt"]))
+			assert.Contains(t, rawTarGzNames(t, content), "./seeded/marker.txt",
+				"backup must tar with ./-relative keys so restore reproduces the original object key")
+
+			var saved model.Database
+			require.NoError(t, db.First(&saved, target.ID).Error)
+			assert.NotZero(t, saved.FilestoreID)
+
+			// A second backup of the same database keeps the one file store it already has: the
+			// tarball overwrites the same key, so a second row would both leak and collide on the
+			// unique name, which used to report every repeated save as "already exists".
+			require.NoError(t, instanceService.FilestoreBackup(context.Background(), &coreInstance, target.Name, &saved))
+
+			var resaved model.Database
+			require.NoError(t, db.First(&resaved, target.ID).Error)
+			assert.Equal(t, saved.FilestoreID, resaved.FilestoreID, "the database keeps the file store it already had")
+
+			var filestores []model.Database
+			require.NoError(t, db.Where("type = ? AND group_name = ?", "fs", "group-name").Find(&filestores).Error)
+			var matching int
+			for _, filestore := range filestores {
+				if filestore.Name == "fs-backup-target-fs.tar.gz" {
+					matching++
+				}
+			}
+			assert.Equal(t, 1, matching, "a repeated save must not leave a second file store row behind")
+		})
+
+		t.Run("SaveAsDatabase", func(t *testing.T) {
+			body := strings.NewReader(`{"name": "saved-copy.sql.gz", "format": "plain"}`)
+			var savedDB model.Database
+			instanceIDStr := strconv.FormatUint(uint64(coreInstance.ID), 10)
+			client.PostJSON(t, "/databases/save-as/"+instanceIDStr, body, &savedDB, inttest.WithAuthToken(tokens.AccessToken))
+
+			assert.Equal(t, "saved-copy.sql.gz", savedDB.Name)
+			assert.Equal(t, "group-name", savedDB.GroupName)
+
+			require.Eventually(t, func() bool {
+				var d model.Database
+				if err := db.First(&d, savedDB.ID).Error; err != nil {
+					return false
+				}
+				return d.Url != ""
+			}, 180*time.Second, 500*time.Millisecond, "database URL should be set by async goroutine")
+
+			var finalDB model.Database
+			require.NoError(t, db.First(&finalDB, savedDB.ID).Error)
+			assert.Equal(t, fmt.Sprintf("s3://%s/group-name/saved-copy.sql.gz", s3Bucket), finalDB.Url)
+			assert.Greater(t, finalDB.Size, int64(0))
+
+			s3Content := s3.GetObject(t, "group-name/saved-copy.sql.gz")
+			assert.Greater(t, len(s3Content), 0, "S3 object should have content")
+		})
+
+		t.Run("SaveDatabase", func(t *testing.T) {
+			originalSize := len(s3.GetObject(t, "group-name/v2-save-test.sql.gz"))
+
+			instanceIDStr := strconv.FormatUint(uint64(coreInstance.ID), 10)
+			client.Do(t, http.MethodPost, "/databases/save/"+instanceIDStr, nil, http.StatusAccepted, inttest.WithAuthToken(tokens.AccessToken))
+
+			require.Eventually(t, func() bool {
+				content, err := s3.TryGetObject("group-name/v2-save-test.sql.gz")
+				return err == nil && len(content) > originalSize
+			}, 180*time.Second, 500*time.Millisecond, "saved database in S3 should grow beyond the uploaded placeholder")
+		})
+
+		t.Run("EditRejectsAnImmutableParameter", func(t *testing.T) {
+			response := editDeploymentExpecting(t, client, deployment.ID, tokens.AccessToken, map[string]any{
+				"instances": map[string]any{
+					"dhis2-v2": map[string]any{"parameters": map[string]any{"DATABASE_ID": map[string]any{"value": "999"}}},
+				},
+			}, http.StatusBadRequest)
+
+			assert.Contains(t, string(response), "DATABASE_ID can't be changed once the instance has been deployed")
+
+			var unchanged model.DeploymentInstance
+			client.GetJSON(t, fmt.Sprintf("/instances/%d/details", coreInstance.ID), &unchanged, inttest.WithAuthToken(tokens.AccessToken))
+			assert.Equal(t, seedID, unchanged.Parameters["DATABASE_ID"].Value)
+		})
+
+		t.Run("EditAddsAndRemovesACompanion", func(t *testing.T) {
+			edited := editDeployment(t, client, deployment.ID, tokens.AccessToken, map[string]any{
+				"instances": map[string]any{
+					"dhis2-v2": map[string]any{"parameters": map[string]any{"ENABLE_PGADMIN": map[string]any{"value": "true"}}},
+					"pgadmin": map[string]any{"parameters": map[string]any{
+						"PGADMIN_USERNAME": map[string]any{"value": "admin@dhis2.org"},
+						"PGADMIN_PASSWORD": map[string]any{"value": "district"},
+					}},
+				},
+			})
+
+			pgAdmin := findInstanceByStack(edited, "pgadmin")
+			require.NotNil(t, pgAdmin, "turning ENABLE_PGADMIN on adds the companion")
+			awaitDeployed(t, client, deployment.ID, tokens.AccessToken)
+			requirePodsMatching(t, k8sClient, coreInstance.Group.Namespace, fmt.Sprintf("im-id=%d", pgAdmin.ID), 180*time.Second)
+
+			edited = editDeployment(t, client, deployment.ID, tokens.AccessToken, map[string]any{
+				"instances": map[string]any{
+					"dhis2-v2": map[string]any{"parameters": map[string]any{"ENABLE_PGADMIN": map[string]any{"value": "false"}}},
+				},
+			})
+
+			assert.Nil(t, findInstanceByStack(edited, "pgadmin"), "turning it off takes the companion out of the deployment")
+			requireNoPodsMatching(t, k8sClient, coreInstance.Group.Namespace, fmt.Sprintf("im-id=%d", pgAdmin.ID), 180*time.Second)
+
+			var afterRemoval model.Deployment
+			require.Eventually(t, func() bool {
+				client.GetJSON(t, fmt.Sprintf("/deployments/%d", deployment.ID), &afterRemoval, inttest.WithAuthToken(tokens.AccessToken))
+				return findInstanceByStack(afterRemoval, "pgadmin") == nil
+			}, 180*time.Second, time.Second, "the pgadmin row should be gone once the release is")
+		})
 
 		destroyDeployment(t, client, deployment.ID, tokens.AccessToken)
+		requireNoPodsMatching(t, k8sClient, coreInstance.Group.Namespace, fmt.Sprintf("im-id=%d,im-default=true", coreInstance.ID), 120*time.Second)
+		requireNoPodsMatching(t, k8sClient, coreInstance.Group.Namespace, fmt.Sprintf("im-type=minio,im-deployment-id=%d", deployment.ID), 120*time.Second)
 	})
 
 	t.Run("FilestoreBackupFilesystemViaExec", func(t *testing.T) {
-		// not parallel: a full dhis2-core deploy is heavy; running it outside the parallel batch avoids starving the runner
-
-		// STORAGE_TYPE=filesystem: no minio stack; the filestore lives on a PVC in the core pod
+		// not parallel: another full dhis2-v2 deploy, and STORAGE_TYPE is fixed at deploy time, so
+		// the filesystem backend cannot share the deployment above
 		deployment := createDeployment(t, client, "fsstore-backup-deployment", tokens.AccessToken)
-		createDHIS2DBInstance(t, client, deployment.ID, databaseID, tokens.AccessToken)
-		coreInstance := createDHIS2CoreInstance(t, client, deployment.ID, tokens.AccessToken,
-			WithParameter("STORAGE_TYPE", "filesystem"),
-			WithParameter("ALLOW_SUSPEND", "false"))
+		coreInstance := createDHIS2V2Instance(t, client, deployment.ID, databaseID, tokens.AccessToken,
+			WithParameter("STORAGE_TYPE", "filesystem"))
 
 		deployDeployment(t, client, deployment.ID, tokens.AccessToken)
 
 		// the backup execs into the core pod, so wait for Running, not Ready
-		ks, err := instance.NewKubernetesService(group.Cluster)
+		ks, err := kube.NewClient(group.Cluster)
 		require.NoError(t, err)
-		corePod, coreContainer := waitForCorePodRunning(t, k8sClient, coreInstance.Group.Namespace, coreInstance.ID, 120*time.Second)
+		corePod, coreContainer := waitForCorePodRunning(t, k8sClient, coreInstance.Group.Namespace, coreInstance.ID, 300*time.Second)
+
+		assertCoreHeapBounded(t, ks, coreInstance.Group.Namespace, corePod, coreContainer, testCoreMaxHeapSize)
+
 		seedScript := `mkdir -p /opt/dhis2/files/seeded && printf 'hello-filestore' > /opt/dhis2/files/seeded/marker.txt`
 		var seedOut, seedErr strings.Builder
 		require.NoError(t, ks.Exec(context.Background(), coreInstance.Group.Namespace, corePod, coreContainer, []string{"sh", "-c", seedScript}, &seedOut, &seedErr), "seed failed: %s", seedErr.String())
@@ -312,11 +499,9 @@ func TestInstanceHandler(t *testing.T) {
 		target := &model.Database{Name: "fsstore-backup-target.sql.gz", GroupName: "group-name", Type: "database", Slug: "group-name/fsstore-backup-target", UserID: user.ID}
 		require.NoError(t, db.Create(target).Error)
 
-		// The shared instanceService is wired with a nil S3 client; build one with the real client.
-		fsService := instance.NewService(logger, instanceRepo, groupService, stackService, helmfileService, s3Client, s3Bucket)
-		require.NoError(t, fsService.FilestoreBackup(context.Background(), &coreInstance, target.Name, target))
+		require.NoError(t, instanceService.FilestoreBackup(context.Background(), &coreInstance, target.Name, target))
 
-		content := s3.GetObject(t, s3Bucket, "group-name/fsstore-backup-target-fs.tar.gz")
+		content := s3.GetObject(t, "group-name/fsstore-backup-target-fs.tar.gz")
 		require.NotEmpty(t, content)
 		entries := extractTarGzEntries(t, content)
 		assert.Equal(t, "hello-filestore", string(entries["seeded/marker.txt"]))
@@ -330,66 +515,276 @@ func TestInstanceHandler(t *testing.T) {
 		destroyDeployment(t, client, deployment.ID, tokens.AccessToken)
 	})
 
-	t.Run("SaveAsDatabase", func(t *testing.T) {
+	t.Run("DeploymentNameAvailability", func(t *testing.T) {
 		t.Parallel()
-		deployment := createDeployment(t, client, "save-as-deployment", tokens.AccessToken)
-		dbInstance := createDHIS2DBInstance(t, client, deployment.ID, databaseID, tokens.AccessToken)
+		createDeployment(t, client, "taken-name", tokens.AccessToken)
 
-		deployDeployment(t, client, deployment.ID, tokens.AccessToken)
-		groupedName := fmt.Sprintf("%s-%d", dbInstance.Name, dbInstance.Group.ID)
-		k8sClient.AssertPodIsReady(t, dbInstance.Group.Namespace, groupedName+"-database", 60)
+		var availability instance.DeploymentNameAvailability
+		client.GetJSON(t, "/deployments/availability?group=group-name&name=taken-name", &availability, inttest.WithAuthToken(tokens.AccessToken))
+		assert.False(t, availability.Available)
+		assert.Contains(t, availability.Reason, "already exists")
 
-		body := strings.NewReader(`{"name": "saved-copy.sql.gz", "format": "plain"}`)
-		var savedDB model.Database
-		instanceIDStr := strconv.FormatUint(uint64(dbInstance.ID), 10)
-		client.PostJSON(t, "/databases/save-as/"+instanceIDStr, body, &savedDB, inttest.WithAuthToken(tokens.AccessToken))
+		availability = instance.DeploymentNameAvailability{}
+		client.GetJSON(t, "/deployments/availability?group=group-name&name=free-name", &availability, inttest.WithAuthToken(tokens.AccessToken))
+		assert.True(t, availability.Available)
+		assert.Empty(t, availability.Reason)
 
-		assert.Equal(t, "saved-copy.sql.gz", savedDB.Name)
-		assert.Equal(t, "group-name", savedDB.GroupName)
+		availability = instance.DeploymentNameAvailability{}
+		client.GetJSON(t, "/deployments/availability?group=group-name&name=Not_Valid", &availability, inttest.WithAuthToken(tokens.AccessToken))
+		assert.False(t, availability.Available)
+		assert.Contains(t, availability.Reason, "lowercase")
 
-		require.Eventually(t, func() bool {
-			var d model.Database
-			if err := db.First(&d, savedDB.ID).Error; err != nil {
-				return false
-			}
-			return d.Url != ""
-		}, 60*time.Second, 500*time.Millisecond, "database URL should be set by async goroutine")
-
-		var finalDB model.Database
-		err := db.First(&finalDB, savedDB.ID).Error
-		require.NoError(t, err)
-		assert.Equal(t, fmt.Sprintf("s3://%s/group-name/saved-copy.sql.gz", s3Bucket), finalDB.Url)
-		assert.Greater(t, finalDB.Size, int64(0))
-
-		s3Content := s3.GetObject(t, s3Bucket, "group-name/saved-copy.sql.gz")
-		assert.Greater(t, len(s3Content), 0, "S3 object should have content")
-
-		destroyDeployment(t, client, deployment.ID, tokens.AccessToken)
+		client.Do(t, http.MethodGet, "/deployments/availability?group=group-name", nil, http.StatusBadRequest, inttest.WithAuthToken(tokens.AccessToken))
+		client.Do(t, http.MethodGet, "/deployments/availability?group=group-name&name=free-name&user=non-member", nil, http.StatusUnauthorized, inttest.WithAuthToken(tokens.AccessToken))
 	})
 
-	t.Run("SaveDatabase", func(t *testing.T) {
+	t.Run("BulkDeploy", func(t *testing.T) {
 		t.Parallel()
+		post := func(body string, status int) []byte {
+			return client.Do(t, http.MethodPost, "/deployments/bulk", strings.NewReader(body), status, inttest.WithAuthToken(tokens.AccessToken), inttest.WithHeader("Content-Type", "application/json"))
+		}
+		whoami := `"instances":[{"stackName":"whoami-go","parameters":{"IMAGE_TAG":{"value":"0.6.0"}}}]`
 
-		dbID := database.UploadTestDatabase(t, client, "save-test.sql.gz", "select now();", "group-name", inttest.WithAuthToken(tokens.AccessToken))
+		var availability instance.BulkDeploymentNameAvailability
+		client.GetJSON(t, "/deployments/bulk/availability?group=group-name&prefix=bulk-taken&count=3", &availability, inttest.WithAuthToken(tokens.AccessToken))
+		assert.Equal(t, []string{"bulk-taken-1", "bulk-taken-2", "bulk-taken-3"}, availability.Names)
+		assert.Empty(t, availability.Taken)
 
-		deployment := createDeployment(t, client, "save-deployment", tokens.AccessToken)
-		dbInstance := createDHIS2DBInstance(t, client, deployment.ID, dbID, tokens.AccessToken)
+		createDeployment(t, client, "bulk-taken-2", tokens.AccessToken)
+		availability = instance.BulkDeploymentNameAvailability{}
+		client.GetJSON(t, "/deployments/bulk/availability?group=group-name&prefix=bulk-taken&count=3", &availability, inttest.WithAuthToken(tokens.AccessToken))
+		assert.Equal(t, []string{"bulk-taken-2"}, availability.Taken)
 
-		deployDeployment(t, client, deployment.ID, tokens.AccessToken)
-		groupedName := fmt.Sprintf("%s-%d", dbInstance.Name, dbInstance.Group.ID)
-		k8sClient.AssertPodIsReady(t, dbInstance.Group.Namespace, groupedName+"-database", 60)
+		conflict := post(`{"prefix":"bulk-taken","count":3,"group":"group-name",`+whoami+`}`, http.StatusConflict)
+		assert.Contains(t, string(conflict), "bulk-taken-2")
+		var names instance.DeploymentNameAvailability
+		client.GetJSON(t, "/deployments/availability?group=group-name&name=bulk-taken-1", &names, inttest.WithAuthToken(tokens.AccessToken))
+		assert.True(t, names.Available, "a refused bulk deploy must create nothing")
 
-		originalSize := len(s3.GetObject(t, s3Bucket, "group-name/save-test.sql.gz"))
+		post(`{"prefix":"Bulk","count":2,"group":"group-name",`+whoami+`}`, http.StatusBadRequest)
+		post(`{"prefix":"bulk","count":51,"group":"group-name",`+whoami+`}`, http.StatusBadRequest)
+		post(`{"prefix":"bulk","count":2,"group":"group-name","instances":[{"stackName":"whoami-go"},{"stackName":"whoami-go"}]}`, http.StatusBadRequest)
 
-		instanceIDStr := strconv.FormatUint(uint64(dbInstance.ID), 10)
-		client.Do(t, http.MethodPost, "/databases/save/"+instanceIDStr, nil, http.StatusAccepted, inttest.WithAuthToken(tokens.AccessToken))
+		var response instance.BulkDeployResponse
+		require.NoError(t, json.Unmarshal(post(`{"prefix":"bulk","count":2,"group":"group-name","description":"bulk",`+whoami+`}`, http.StatusAccepted), &response))
+		require.Len(t, response.Deployments, 2)
+		assert.Equal(t, "bulk-1", response.Deployments[0].Name)
+		assert.Equal(t, "bulk-2", response.Deployments[1].Name)
 
-		require.Eventually(t, func() bool {
-			content, err := s3.TryGetObject(s3Bucket, "group-name/save-test.sql.gz")
-			return err == nil && len(content) > originalSize
-		}, 60*time.Second, 500*time.Millisecond, "saved database in S3 should grow beyond the uploaded placeholder")
+		for _, bulk := range response.Deployments {
+			awaitDeployed(t, client, bulk.ID, tokens.AccessToken)
+			var deployment model.Deployment
+			client.GetJSON(t, fmt.Sprintf("/deployments/%d", bulk.ID), &deployment, inttest.WithAuthToken(tokens.AccessToken))
+			assert.Equal(t, "bulk", deployment.Description)
+			require.Len(t, deployment.Instances, 1)
+			assert.Equal(t, "0.6.0", deployment.Instances[0].Parameters["IMAGE_TAG"].Value)
+			k8sClient.AssertPodIsReady(t, deployment.Instances[0].Group.Namespace, deployment.Instances[0].Name, 60, deployment.Instances[0].Group.ID)
+			destroyDeployment(t, client, bulk.ID, tokens.AccessToken)
+		}
+	})
 
+	t.Run("BulkDeployFromPreset", func(t *testing.T) {
+		t.Parallel()
+		post := func(path, body string, status int) []byte {
+			return client.Do(t, http.MethodPost, path, strings.NewReader(body), status, inttest.WithAuthToken(tokens.AccessToken), inttest.WithHeader("Content-Type", "application/json"))
+		}
+
+		var preset model.Deployment
+		require.NoError(t, json.Unmarshal(post("/presets", `{"name":"preset-bulk","group":"group-name","description":"from the preset","instances":[{"stackName":"whoami-go","parameters":{"IMAGE_TAG":{"value":"0.6.0"},"IMAGE_PULL_POLICY":{"value":"Always"}}}]}`, http.StatusCreated), &preset))
+		bulkPath := fmt.Sprintf("/presets/%d/deployments/bulk", preset.ID)
+
+		taken := createDeployment(t, client, "preset-bulk-taken-2", tokens.AccessToken)
+		conflict := post(bulkPath, `{"prefix":"preset-bulk-taken","count":3}`, http.StatusConflict)
+		assert.Contains(t, string(conflict), "preset-bulk-taken-2")
+		var names instance.DeploymentNameAvailability
+		client.GetJSON(t, "/deployments/availability?group=group-name&name=preset-bulk-taken-1", &names, inttest.WithAuthToken(tokens.AccessToken))
+		assert.True(t, names.Available, "a refused bulk deploy must create nothing")
+
+		post(bulkPath, `{"prefix":"Preset-bulk","count":2}`, http.StatusBadRequest)
+		post(bulkPath, `{"prefix":"preset-bulk","count":51}`, http.StatusBadRequest)
+		post(bulkPath+"?user=other-member", `{"prefix":"preset-bulk-elsewhere","count":2,"group":"other-group-name"}`, http.StatusForbidden)
+		post(fmt.Sprintf("/presets/%d/deployments/bulk", taken.ID), `{"prefix":"preset-bulk","count":2}`, http.StatusNotFound)
+		destroyDeployment(t, client, taken.ID, tokens.AccessToken)
+
+		var response instance.BulkDeployResponse
+		require.NoError(t, json.Unmarshal(post(bulkPath, `{"prefix":"preset-bulk","count":2,"description":"bulk","instances":{"whoami-go":{"parameters":{"IMAGE_PULL_POLICY":{"value":"IfNotPresent"}}}}}`, http.StatusAccepted), &response))
+		require.Len(t, response.Deployments, 2)
+		assert.Equal(t, "preset-bulk-1", response.Deployments[0].Name)
+		assert.Equal(t, "preset-bulk-2", response.Deployments[1].Name)
+
+		for _, bulk := range response.Deployments {
+			awaitDeployed(t, client, bulk.ID, tokens.AccessToken)
+			var deployment model.Deployment
+			client.GetJSON(t, fmt.Sprintf("/deployments/%d", bulk.ID), &deployment, inttest.WithAuthToken(tokens.AccessToken))
+			assert.Equal(t, "bulk", deployment.Description)
+			require.Len(t, deployment.Instances, 1)
+			assert.Equal(t, "0.6.0", deployment.Instances[0].Parameters["IMAGE_TAG"].Value)
+			assert.Equal(t, "IfNotPresent", deployment.Instances[0].Parameters["IMAGE_PULL_POLICY"].Value)
+			k8sClient.AssertPodIsReady(t, deployment.Instances[0].Group.Namespace, deployment.Instances[0].Name, 60, deployment.Instances[0].Group.ID)
+			destroyDeployment(t, client, bulk.ID, tokens.AccessToken)
+		}
+
+		client.Do(t, http.MethodDelete, fmt.Sprintf("/presets/%d", preset.ID), nil, http.StatusNoContent, inttest.WithAuthToken(tokens.AccessToken))
+	})
+
+	t.Run("Preset", func(t *testing.T) {
+		t.Parallel()
+		send := func(method, path string, payload any, status int, response any) {
+			t.Helper()
+			jsonData, err := json.Marshal(payload)
+			require.NoError(t, err)
+			body := client.Do(t, method, path, strings.NewReader(string(jsonData)), status, inttest.WithAuthToken(tokens.AccessToken), inttest.WithHeader("Content-Type", "application/json"))
+			if response != nil {
+				require.NoError(t, json.Unmarshal(body, response))
+			}
+		}
+		parameters := func(values map[string]string) map[string]any {
+			result := map[string]any{}
+			for name, value := range values {
+				result[name] = map[string]any{"value": value}
+			}
+			return result
+		}
+		presetPayload := func(name string, instanceParameters map[string]string) map[string]any {
+			instanceParameters = maps.Clone(instanceParameters)
+			if instanceParameters == nil {
+				instanceParameters = map[string]string{}
+			}
+			instanceParameters["DATABASE_ID"] = "1"
+			return map[string]any{
+				"name":        name,
+				"group":       "group-name",
+				"description": "initial",
+				"instances":   []any{map[string]any{"stackName": "dhis2-v2", "public": true, "parameters": parameters(instanceParameters)}},
+			}
+		}
+
+		var preset model.Deployment
+		send(http.MethodPost, "/presets", presetPayload("test-preset", map[string]string{"IMAGE_TAG": "2.41.0", "GOOGLE_AUTH_PROJECT_ID": "secret-project"}), http.StatusCreated, &preset)
+		assert.True(t, preset.Preset)
+		require.Len(t, preset.Instances, 1)
+		assert.NotEqual(t, "secret-project", preset.Instances[0].Parameters["GOOGLE_AUTH_PROJECT_ID"].Value)
+
+		send(http.MethodPost, "/presets", presetPayload("test-preset", nil), http.StatusConflict, nil)
+		send(http.MethodPost, "/presets", presetPayload("test-preset-refused", map[string]string{"IMAGE_PULL_POLICY": "Sometimes"}), http.StatusBadRequest, nil)
+
+		var presets []model.Deployment
+		client.GetJSON(t, "/presets", &presets, inttest.WithAuthToken(tokens.AccessToken))
+		assert.True(t, slices.ContainsFunc(presets, func(d model.Deployment) bool { return d.ID == preset.ID }))
+		assert.False(t, slices.ContainsFunc(presets, func(d model.Deployment) bool { return d.Name == "test-preset-refused" }), "a refused preset leaves nothing behind")
+
+		var outsiderPresets []model.Deployment
+		client.GetJSON(t, "/presets?user=non-member", &outsiderPresets, inttest.WithAuthToken(tokens.AccessToken))
+		assert.False(t, slices.ContainsFunc(outsiderPresets, func(d model.Deployment) bool { return d.ID == preset.ID }))
+		client.Do(t, http.MethodGet, fmt.Sprintf("/presets/%d?user=non-member", preset.ID), nil, http.StatusUnauthorized, inttest.WithAuthToken(tokens.AccessToken))
+
+		deployment := createDeployment(t, client, "test-preset", tokens.AccessToken)
+		client.Do(t, http.MethodGet, fmt.Sprintf("/presets/%d", deployment.ID), nil, http.StatusNotFound, inttest.WithAuthToken(tokens.AccessToken))
+
+		client.Do(t, http.MethodGet, fmt.Sprintf("/deployments/%d", preset.ID), nil, http.StatusNotFound, inttest.WithAuthToken(tokens.AccessToken))
+		client.Do(t, http.MethodPost, fmt.Sprintf("/deployments/%d/deploy", preset.ID), nil, http.StatusNotFound, inttest.WithAuthToken(tokens.AccessToken))
+		client.Do(t, http.MethodGet, fmt.Sprintf("/instances/%d/details", preset.Instances[0].ID), nil, http.StatusNotFound, inttest.WithAuthToken(tokens.AccessToken))
+		client.Do(t, http.MethodDelete, fmt.Sprintf("/deployments/%d", preset.ID), nil, http.StatusNotFound, inttest.WithAuthToken(tokens.AccessToken))
+
+		var groupsWithDeployments []instance.GroupWithDeployments
+		client.GetJSON(t, "/deployments", &groupsWithDeployments, inttest.WithAuthToken(tokens.AccessToken))
+		for _, group := range groupsWithDeployments {
+			assert.False(t, slices.ContainsFunc(group.Deployments, func(d *model.Deployment) bool { return d.ID == preset.ID }))
+		}
+
+		var publicGroups []instance.GroupWithPublicInstances
+		client.GetJSON(t, "/instances/public", &publicGroups)
+		for _, group := range publicGroups {
+			for _, category := range group.Categories {
+				assert.False(t, slices.ContainsFunc(category.Instances, func(i instance.PublicInstance) bool { return i.Name == "test-preset" }))
+			}
+		}
+
+		var edited model.Deployment
+		send(http.MethodPatch, fmt.Sprintf("/presets/%d", preset.ID), map[string]any{
+			"description": "edited",
+			"instances":   map[string]any{"dhis2-v2": map[string]any{"parameters": parameters(map[string]string{"IMAGE_TAG": "2.42.0"})}},
+		}, http.StatusOK, &edited)
+		assert.Equal(t, preset.ID, edited.ID)
+		assert.Equal(t, "edited", edited.Description)
+		assert.Equal(t, "2.42.0", findInstanceByStack(edited, "dhis2-v2").Parameters["IMAGE_TAG"].Value)
+
+		availability := func(path string) instance.DeploymentNameAvailability {
+			t.Helper()
+			var availability instance.DeploymentNameAvailability
+			client.GetJSON(t, path, &availability, inttest.WithAuthToken(tokens.AccessToken))
+			return availability
+		}
+		taken := availability("/presets/availability?group=group-name&name=test-preset")
+		assert.False(t, taken.Available)
+		assert.Contains(t, taken.Reason, `a preset named "test-preset"`)
+		assert.True(t, availability("/presets/availability?group=group-name&name=test-preset-free").Available)
+
+		var other model.Deployment
+		send(http.MethodPost, "/presets", presetPayload("test-preset-other", nil), http.StatusCreated, &other)
+		send(http.MethodPatch, fmt.Sprintf("/presets/%d", other.ID), map[string]any{"name": "test-preset"}, http.StatusConflict, nil)
+		send(http.MethodPatch, fmt.Sprintf("/presets/%d", other.ID), map[string]any{"name": "Not A Name"}, http.StatusBadRequest, nil)
+
+		var moved model.Deployment
+		send(http.MethodPatch, fmt.Sprintf("/presets/%d", other.ID), map[string]any{"name": "test-preset-moved", "group": "other-group-name"}, http.StatusOK, &moved)
+		assert.Equal(t, other.ID, moved.ID)
+		assert.Equal(t, "test-preset-moved", moved.Name)
+		assert.Equal(t, "other-group-name", moved.GroupName)
+
+		var reloaded model.Deployment
+		client.GetJSON(t, fmt.Sprintf("/presets/%d", other.ID), &reloaded, inttest.WithAuthToken(tokens.AccessToken))
+		assert.Equal(t, "test-preset-moved", reloaded.Name)
+		assert.Equal(t, "other-group-name", reloaded.GroupName)
+		require.Len(t, reloaded.Instances, 1)
+		assert.Equal(t, "test-preset-moved", reloaded.Instances[0].Name)
+		assert.Equal(t, "other-group-name", reloaded.Instances[0].GroupName)
+
+		assert.True(t, availability("/presets/availability?group=group-name&name=test-preset-other").Available, "renaming frees the old name")
+		assert.False(t, availability("/presets/availability?group=other-group-name&name=test-preset-moved").Available)
+		assert.True(t, availability("/deployments/availability?group=other-group-name&name=test-preset-moved").Available, "a preset's name does not take a deployment name")
+		client.Do(t, http.MethodDelete, fmt.Sprintf("/presets/%d", other.ID), nil, http.StatusNoContent, inttest.WithAuthToken(tokens.AccessToken))
+
+		var created model.Deployment
+		send(http.MethodPost, fmt.Sprintf("/presets/%d/deployments", preset.ID), map[string]any{
+			"name":      "test-from-preset",
+			"instances": map[string]any{"dhis2-v2": map[string]any{"parameters": parameters(map[string]string{"IMAGE_TAG": "2.42.1"})}},
+		}, http.StatusCreated, &created)
+		assert.False(t, created.Preset)
+		assert.Equal(t, "edited", created.Description)
+		assert.Equal(t, "group-name", created.GroupName)
+
+		decrypted, err := instanceService.FindDecryptedDeploymentById(context.Background(), created.ID)
+		require.NoError(t, err)
+		core := findInstanceByStack(*decrypted, "dhis2-v2")
+		require.NotNil(t, core)
+		assert.Equal(t, "test-from-preset", core.Name)
+		assert.Equal(t, "2.42.1", core.Parameters["IMAGE_TAG"].Value)
+		assert.Equal(t, "secret-project", core.Parameters["GOOGLE_AUTH_PROJECT_ID"].Value, "a sensitive value the client only sees masked carries over")
+
+		send(http.MethodPost, fmt.Sprintf("/presets/%d/deployments", preset.ID), map[string]any{"name": "test-from-preset"}, http.StatusConflict, nil)
+
+		var withoutTTL model.Deployment
+		send(http.MethodPost, fmt.Sprintf("/presets/%d/deployments", preset.ID), map[string]any{"name": "test-from-preset-zero-ttl", "ttl": 0}, http.StatusCreated, &withoutTTL)
+		assert.Equal(t, twoDayTTL, withoutTTL.TTL, "a TTL of 0 falls back to the default the way it does for a new deployment")
+		destroyDeployment(t, client, withoutTTL.ID, tokens.AccessToken)
+
+		send(http.MethodPost, fmt.Sprintf("/presets/%d/deployments?user=other-member", preset.ID), map[string]any{"name": "test-from-preset-elsewhere", "group": "other-group-name"}, http.StatusForbidden, nil)
+		var byOtherMember model.Deployment
+		send(http.MethodPost, fmt.Sprintf("/presets/%d/deployments?user=other-member", preset.ID), map[string]any{"name": "test-from-preset-by-other-member"}, http.StatusCreated, &byOtherMember)
+		assert.Equal(t, "group-name", byOtherMember.GroupName, "a member who doesn't own the preset still deploys it in its own group")
+		client.Do(t, http.MethodDelete, fmt.Sprintf("/deployments/%d?user=other-member", byOtherMember.ID), nil, http.StatusAccepted, inttest.WithAuthToken(tokens.AccessToken))
+
+		var elsewhere model.Deployment
+		send(http.MethodPost, fmt.Sprintf("/presets/%d/deployments", preset.ID), map[string]any{"name": "test-from-preset-elsewhere", "group": "other-group-name"}, http.StatusCreated, &elsewhere)
+		assert.Equal(t, "other-group-name", elsewhere.GroupName, "the owner of the preset deploys it to another group")
+		destroyDeployment(t, client, elsewhere.ID, tokens.AccessToken)
+
+		send(http.MethodPost, fmt.Sprintf("/presets/%d/deployments", deployment.ID), map[string]any{"name": "test-from-deployment"}, http.StatusNotFound, nil)
+
+		destroyDeployment(t, client, created.ID, tokens.AccessToken)
 		destroyDeployment(t, client, deployment.ID, tokens.AccessToken)
+		client.Do(t, http.MethodDelete, fmt.Sprintf("/presets/%d", preset.ID), nil, http.StatusNoContent, inttest.WithAuthToken(tokens.AccessToken))
+		client.Do(t, http.MethodGet, fmt.Sprintf("/presets/%d", preset.ID), nil, http.StatusNotFound, inttest.WithAuthToken(tokens.AccessToken))
 	})
 
 	t.Run("UpdateDeployment", func(t *testing.T) {
@@ -406,19 +801,16 @@ func TestInstanceHandler(t *testing.T) {
 		t.Parallel()
 		deployment := createDeployment(t, client, "test-deployment-instance-update", tokens.AccessToken, WithDescription("some description"))
 
-		createDHIS2DBInstance(t, client, deployment.ID, databaseID, tokens.AccessToken)
-		createMinioInstance(t, client, deployment.ID, tokens.AccessToken)
-		deploymentInstance := createDHIS2CoreInstance(t, client, deployment.ID, tokens.AccessToken,
-			WithParameter("IMAGE_TAG", "2.42.0"),
-			WithParameter("ALLOW_SUSPEND", "false"),
+		deploymentInstance := createWhoamiInstance(t, client, deployment.ID, tokens.AccessToken,
+			WithParameter("IMAGE_TAG", "0.6.0"),
 			WithPublic(false))
 
 		updatedInstance := updateInstance(t, client, deploymentInstance, tokens.AccessToken,
-			WithParameter("IMAGE_TAG", "2.43.0"),
+			WithParameter("IMAGE_TAG", "0.7.0"),
 			WithPublic(true))
 
 		assert.Equal(t, deploymentInstance.ID, updatedInstance.ID)
-		assert.Equal(t, "2.43.0", updatedInstance.Parameters["IMAGE_TAG"].Value)
+		assert.Equal(t, "0.7.0", updatedInstance.Parameters["IMAGE_TAG"].Value)
 		assert.True(t, updatedInstance.Public)
 	})
 
@@ -436,6 +828,66 @@ func TestInstanceHandler(t *testing.T) {
 		assert.Equal(t, "Always", updatedInstance.Parameters["IMAGE_PULL_POLICY"].Value)
 		assert.Equal(t, "0.6.0", updatedInstance.Parameters["IMAGE_TAG"].Value,
 			"IMAGE_TAG should be preserved when omitted from the patch body")
+	})
+
+	t.Run("EditDeploymentTTLAndDescription", func(t *testing.T) {
+		t.Parallel()
+		deployment := createDeployment(t, client, "test-deployment-edit-ttl", tokens.AccessToken, WithDescription("initial description"), WithTTL(86400))
+		deploymentInstance := createWhoamiInstance(t, client, deployment.ID, tokens.AccessToken, WithParameter("IMAGE_TAG", "0.6.0"))
+		deployDeployment(t, client, deployment.ID, tokens.AccessToken)
+
+		var beforeEdit model.DeploymentInstance
+		client.GetJSON(t, fmt.Sprintf("/instances/%d/details", deploymentInstance.ID), &beforeEdit, inttest.WithAuthToken(tokens.AccessToken))
+
+		edited := editDeployment(t, client, deployment.ID, tokens.AccessToken, map[string]any{
+			"ttl":         172800,
+			"description": "edited description",
+		})
+
+		assert.Equal(t, uint(172800), edited.TTL)
+		assert.Equal(t, "edited description", edited.Description)
+
+		var afterEdit model.DeploymentInstance
+		client.GetJSON(t, fmt.Sprintf("/instances/%d/details", deploymentInstance.ID), &afterEdit, inttest.WithAuthToken(tokens.AccessToken))
+		assert.Equal(t, beforeEdit.DeployedAt, afterEdit.DeployedAt, "a TTL change must not redeploy anything")
+
+		destroyDeployment(t, client, deployment.ID, tokens.AccessToken)
+	})
+
+	t.Run("EditDeploymentParameter", func(t *testing.T) {
+		t.Parallel()
+		deployment := createDeployment(t, client, "test-deployment-edit-parameter", tokens.AccessToken)
+		deploymentInstance := createWhoamiInstance(t, client, deployment.ID, tokens.AccessToken, WithParameter("IMAGE_TAG", "0.6.0"))
+		deployDeployment(t, client, deployment.ID, tokens.AccessToken)
+
+		edited := editDeployment(t, client, deployment.ID, tokens.AccessToken, map[string]any{
+			"instances": map[string]any{
+				"whoami-go": map[string]any{"parameters": map[string]any{"IMAGE_TAG": map[string]any{"value": "0.7.0"}}},
+			},
+		})
+
+		require.NotNil(t, findInstanceByStack(edited, "whoami-go"))
+		awaitDeployed(t, client, deployment.ID, tokens.AccessToken)
+
+		var afterEdit model.DeploymentInstance
+		client.GetJSON(t, fmt.Sprintf("/instances/%d/details", deploymentInstance.ID), &afterEdit, inttest.WithAuthToken(tokens.AccessToken))
+		assert.Equal(t, "0.7.0", afterEdit.Parameters["IMAGE_TAG"].Value)
+
+		destroyDeployment(t, client, deployment.ID, tokens.AccessToken)
+	})
+
+	t.Run("EditDeploymentRejectsAnUnknownStack", func(t *testing.T) {
+		t.Parallel()
+		deployment := createDeployment(t, client, "test-deployment-edit-unknown", tokens.AccessToken)
+		createWhoamiInstance(t, client, deployment.ID, tokens.AccessToken)
+
+		response := editDeploymentExpecting(t, client, deployment.ID, tokens.AccessToken, map[string]any{
+			"instances": map[string]any{
+				"pgadmin": map[string]any{"parameters": map[string]any{"PGADMIN_PASSWORD": map[string]any{"value": "x"}}},
+			},
+		}, http.StatusBadRequest)
+
+		assert.Contains(t, string(response), `has no instance of stack "pgadmin"`)
 	})
 
 	t.Run("UpdateDeploymentInstancePublicOnly", func(t *testing.T) {
@@ -466,17 +918,30 @@ func createNamespace(t *testing.T, k8sClient *inttest.K8sClient, namespace strin
 }
 
 type groupService struct {
-	group *model.Group
+	groups []*model.Group
 }
 
 func (gs groupService) FindByGroupNames(ctx context.Context, groupNames []string) ([]model.Group, error) {
-	return []model.Group{*gs.group}, nil
+	var found []model.Group
+	for _, group := range gs.groups {
+		if slices.Contains(groupNames, group.Name) {
+			found = append(found, *group)
+		}
+	}
+	return found, nil
 }
 
 func (gs groupService) Find(ctx context.Context, name string) (*model.Group, error) {
-	return gs.group, nil
+	for _, group := range gs.groups {
+		if group.Name == name {
+			return group, nil
+		}
+	}
+	return nil, errdef.NewNotFound("group not found by name: %s", name)
 }
 
 type noopPublisher struct{}
 
 func (noopPublisher) Publish(context.Context, uint, string, string, any) {}
+
+func (noopPublisher) PublishTransient(context.Context, string, string, any) {}

@@ -3,6 +3,9 @@ package inttest
 import (
 	"context"
 	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"slices"
 	"testing"
 	"time"
@@ -22,6 +25,8 @@ import (
 func SetupK8s(t *testing.T) *K8sClient {
 	t.Helper()
 
+	// Keep Docker auto-removal enabled: Gnomock debug mode disables it and
+	// leaves the k3s image's anonymous volumes behind after Stop.
 	container, err := gnomock.Start(
 		k3s.Preset(
 			k3s.WithVersion("v1.31.0-k3s1"),
@@ -29,7 +34,9 @@ func SetupK8s(t *testing.T) *K8sClient {
 				p.K3sServerFlags = []string{"--debug"}
 			},
 		),
-		gnomock.WithDebugMode(),
+		// t.Cleanup owns the lifecycle. The k3s preset expects a plain Docker ID,
+		// while the optional cleaner sidecar produces a compound container ID.
+		gnomock.WithDisableAutoCleanup(),
 	)
 	require.NoError(t, err, "failed to start k3s")
 	t.Cleanup(func() { require.NoError(t, gnomock.Stop(container), "failed to stop k3s") })
@@ -46,6 +53,29 @@ func SetupK8s(t *testing.T) *K8sClient {
 		Client: k8sClient,
 		Config: k3sConfigBytes,
 	}
+}
+
+// cnpgChartVersion pins the CloudNativePG operator installed by InstallCNPG.
+const cnpgChartVersion = "0.29.0"
+
+// InstallCNPG installs the CloudNativePG operator. The dhis2 chart declares a postgresql.cnpg.io
+// Cluster, so without its CRD helm cannot build the release manifest at all and every dhis2-v2
+// deploy fails with "no matches for kind Cluster".
+func (k K8sClient) InstallCNPG(t *testing.T) {
+	t.Helper()
+
+	kubeconfig := filepath.Join(t.TempDir(), "kubeconfig.yaml")
+	require.NoError(t, os.WriteFile(kubeconfig, k.Config, 0o600), "failed to write kubeconfig")
+
+	cmd := exec.Command("helm", "upgrade", "--install", "cnpg", "cloudnative-pg",
+		"--repo", "https://cloudnative-pg.github.io/charts",
+		"--version", cnpgChartVersion,
+		"--namespace", "cnpg-system", "--create-namespace",
+		"--wait", "--timeout", "5m")
+	cmd.Env = append(os.Environ(), "KUBECONFIG="+kubeconfig)
+
+	out, err := cmd.CombinedOutput()
+	require.NoErrorf(t, err, "failed to install the cloudnative-pg operator: %s", out)
 }
 
 // K8sClient allows making requests to K8s. It does so by wrapping a kubernetes.Clientset. Access

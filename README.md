@@ -64,19 +64,13 @@ Set the KMS key ARN via `SOPS_KMS_ARN`. AWS credentials are provided automatical
 
 # Release
 
-Releasing is done by creating a new release tag.
-
-It's advised to generate the release log before doing so.
-
-Example
+From an up to date master, pick the version and run:
 
 ```shell
-git tag --sort=-creatordate | head --lines=1              # Get the latest tag
-git tag 0.53.0                                            # Use whichever tag you want to release
-make change-log
-git commit CHANGELOG.md -m "chore: generate change log"
-git push
+make release version=0.79.0
 ```
+
+It tags master, commits the change log and pushes both. The pushed tag builds `dhis2/im-manager:<version>` and deploys it to prod.
 
 # Migrations
 
@@ -98,6 +92,12 @@ How to add a migration:
 * Update [values file](https://github.com/dhis2-sre/im-manager/blob/8cb9a5959e334b835188fa07e801996ff2410b7c/helm/chart/values.yaml#L12) or for an individual environment such as [prod](https://github.com/dhis2-sre/im-manager/blob/8cb9a5959e334b835188fa07e801996ff2410b7c/helm/data/values/prod/values.yaml#L1)
 * Update the profiles section of the [skaffold file](https://github.com/dhis2-sre/im-manager/blob/8cb9a5959e334b835188fa07e801996ff2410b7c/skaffold.yaml#L96) to include the group
 * Update backup schedule to include the group for either [dev](https://github.com/dhis2-sre/dhis2-infrastructure/blob/b9f53752ca9cb16883f2f78cae5fca42b4087b1f/modules/k8s/helm-backup-dev.tf#L1) or [prod](https://github.com/dhis2-sre/dhis2-infrastructure/blob/b9f53752ca9cb16883f2f78cae5fca42b4087b1f/modules/k8s/helm-backup-prod.tf#L1)
+
+# Private images
+
+`IMAGE_REPOSITORY` for the dhis2-v2 stack also accepts `ghcr.io/dhis2/<repository>`. Such images are pulled with the
+`ghcr-image-pull-secret` secret of the group's namespace, so a private one can only be deployed into groups whose namespace
+has it.
 
 # Tracing
 
