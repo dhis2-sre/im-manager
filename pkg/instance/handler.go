@@ -1444,6 +1444,11 @@ func (h Handler) SavePreset(c *gin.Context) {
 		return
 	}
 
+	if err := kube.Reachable(group.Cluster); err != nil {
+		_ = c.Error(errdef.NewBadRequest("group %q can't be deployed to: %v", group.Name, err))
+		return
+	}
+
 	user, err := handler.GetUserFromContext(ctx)
 	if err != nil {
 		_ = c.Error(err)
@@ -1594,6 +1599,11 @@ func (h Handler) EditPreset(c *gin.Context) {
 
 		if !group.Deployable {
 			_ = c.Error(errdef.NewForbidden("group isn't deployable: %s", group.Name))
+			return
+		}
+
+		if err := kube.Reachable(group.Cluster); err != nil {
+			_ = c.Error(errdef.NewBadRequest("group %q can't be deployed to: %v", group.Name, err))
 			return
 		}
 
@@ -1805,6 +1815,11 @@ func (h Handler) presetDeploymentGroup(c *gin.Context, preset *model.Deployment,
 
 	if !group.Deployable {
 		_ = c.Error(errdef.NewForbidden("group isn't deployable: %s", group.Name))
+		return nil, false
+	}
+
+	if err := kube.Reachable(group.Cluster); err != nil {
+		_ = c.Error(errdef.NewBadRequest("group %q can't be deployed to: %v", group.Name, err))
 		return nil, false
 	}
 
