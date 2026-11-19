@@ -242,6 +242,25 @@ func TestDatabaseHandler(t *testing.T) {
 		}
 	})
 
+	t.Run("CopyWithFilestore", func(t *testing.T) {
+		var actualDB model.Database
+		client.PostJSON(t, "/databases/"+databaseID+"/copy", strings.NewReader(`{
+			"name":  "path/copy-with-filestore.extension",
+			"group": "packages"
+		}`), &actualDB)
+
+		require.NotZero(t, actualDB.FilestoreID, "the copy should get a file store of its own")
+
+		var filestore model.Database
+		require.NoError(t, db.First(&filestore, actualDB.FilestoreID).Error)
+		assert.Equal(t, "fs", filestore.Type)
+		assert.Equal(t, "packages", filestore.GroupName)
+		assert.Equal(t, userID, filestore.UserID)
+
+		actualContent := s3.GetObject(t, "packages/path/copy-with-filestore.extension.fs.tar.gz")
+		assert.Equal(t, "filestore contents", string(actualContent))
+	})
+
 	t.Run("Lock/Unlock", func(t *testing.T) {
 		{
 			t.Log("Lock")
