@@ -249,9 +249,15 @@ func run() (err error) {
 
 	eventHandler := event.NewHandler(logger, streamEnv, streamName, groupService)
 
-	_, err = createDefaultCluster(ctx, clusterService)
+	inCluster, err := kube.InCluster()
 	if err != nil {
 		return err
+	}
+	if inCluster {
+		_, err = createDefaultCluster(ctx, clusterService)
+		if err != nil {
+			return err
+		}
 	}
 
 	err = createAdminUser(ctx, userService, groupService)
@@ -260,6 +266,11 @@ func run() (err error) {
 	}
 
 	err = createGroups(ctx, logger, groupService)
+	if err != nil {
+		return err
+	}
+
+	err = warnAboutUnreachableGroups(ctx, logger, groupService)
 	if err != nil {
 		return err
 	}
@@ -786,6 +797,17 @@ func createGroups(ctx context.Context, logger *slog.Logger, groupService groupSe
 		}
 	}
 
+	return nil
+}
+
+func warnAboutUnreachableGroups(ctx context.Context, logger *slog.Logger, groupService *group.Service) error {
+	groups, err := groupService.FindUnreachable(ctx)
+	if err != nil {
+		return fmt.Errorf("error finding the groups that cannot be deployed to: %v", err)
+	}
+	for _, group := range groups {
+		logger.WarnContext(ctx, "Group cannot be deployed to until a reachable cluster is assigned", "group", group.Name, "reason", group.ClusterUnreachableReason)
+	}
 	return nil
 }
 

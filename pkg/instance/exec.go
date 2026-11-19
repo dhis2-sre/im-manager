@@ -29,7 +29,10 @@ func commandExecutor(cmd *exec.Cmd, cluster model.Cluster) (stdout []byte, stder
 	}()
 	cmd.Env = append(cmd.Env, fmt.Sprintf("HELM_REPOSITORY_CONFIG=%s", filepath.Join(repoConfigDir, "repositories.yaml")))
 
-	if cluster.Configuration == nil {
+	if len(cluster.Configuration) == 0 {
+		if err := kube.Reachable(cluster); err != nil {
+			return nil, nil, err
+		}
 		return runCommand(cmd)
 	}
 

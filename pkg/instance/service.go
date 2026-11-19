@@ -573,6 +573,10 @@ func (s Service) DeployInstance(ctx context.Context, token string, instance *mod
 		return err
 	}
 
+	if err := kube.Reachable(group.Cluster); err != nil {
+		return fmt.Errorf("group %q can't be deployed to: %w", group.Name, err)
+	}
+
 	if storageType(instance) == "s3" && filestoreBackup != nil {
 		// A filestore restore can push the deploy past the client/load-balancer
 		// timeout. Detach from the request context so the restore and the
@@ -971,7 +975,10 @@ func (s Service) Components(ctx context.Context, instance *model.DeploymentInsta
 	if err != nil {
 		return nil, err
 	}
+	return s.componentsIn(ctx, instance, group)
+}
 
+func (s Service) componentsIn(ctx context.Context, instance *model.DeploymentInstance, group *model.Group) ([]ComponentStatus, error) {
 	client, err := s.kubeClients.For(group.Cluster)
 	if err != nil {
 		return nil, err
@@ -1008,6 +1015,9 @@ type InstanceComponents struct {
 	InstanceName string            `json:"instanceName"`
 	StackName    string            `json:"stackName"`
 	Components   []ComponentStatus `json:"components"`
+	// ClusterUnreachableReason says why the components could not be listed. It is empty when the
+	// cluster of the instance's group can be reached.
+	ClusterUnreachableReason string `json:"clusterUnreachableReason,omitempty"`
 }
 
 // DeploymentComponents lists every instance's components with live replicas for a whole
@@ -1018,16 +1028,27 @@ func (s Service) DeploymentComponents(ctx context.Context, deployment *model.Dep
 	group, groupCtx := errgroup.WithContext(ctx)
 	for i, instance := range deployment.Instances {
 		group.Go(func() error {
-			components, err := s.Components(groupCtx, instance)
-			if err != nil {
-				return fmt.Errorf("listing components of instance %q: %w", instance.Name, err)
-			}
 			result[i] = InstanceComponents{
 				InstanceID:   instance.ID,
 				InstanceName: instance.Name,
 				StackName:    instance.StackName,
-				Components:   components,
+				Components:   []ComponentStatus{},
 			}
+
+			instanceGroup, err := s.groupService.Find(groupCtx, instance.GroupName)
+			if err != nil {
+				return err
+			}
+			if err := kube.Reachable(instanceGroup.Cluster); err != nil {
+				result[i].ClusterUnreachableReason = err.Error()
+				return nil
+			}
+
+			components, err := s.componentsIn(groupCtx, instance, instanceGroup)
+			if err != nil {
+				return fmt.Errorf("listing components of instance %q: %w", instance.Name, err)
+			}
+			result[i].Components = components
 			return nil
 		})
 	}

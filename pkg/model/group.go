@@ -20,4 +20,7 @@ type Group struct {
 	AdminUsers  []User    `json:"adminUsers" gorm:"many2many:user_groups_admin;constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
 	ClusterID   *uint     `json:"clusterId"`
 	Cluster     Cluster   `json:"cluster" gorm:"constraint:OnUpdate:CASCADE,OnDelete:SET NULL"`
+	// ClusterUnreachableReason says why instance manager cannot deploy to the group. It is empty when
+	// the cluster of the group can be reached.
+	ClusterUnreachableReason string `json:"clusterUnreachableReason,omitempty" gorm:"-"`
 }

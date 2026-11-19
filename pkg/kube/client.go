@@ -33,7 +33,7 @@ type Client struct {
 func NewClient(config model.Cluster) (*Client, error) {
 	restConfig, err := NewRestConfig(config)
 	if err != nil {
-		return nil, fmt.Errorf("error creating kube rest config: %v", err)
+		return nil, fmt.Errorf("error creating kube rest config: %w", err)
 	}
 
 	client, err := kubernetes.NewForConfig(restConfig)
@@ -78,31 +78,24 @@ func newClient(configuration model.Cluster) (*kubernetes.Clientset, error) {
 }
 
 func NewRestConfig(cluster model.Cluster) (*rest.Config, error) {
-	var restClientConfig *rest.Config
-	if cluster.Configuration != nil {
-		kubeCfg, err := DecryptYaml(cluster.Configuration)
-		if err != nil {
+	if len(cluster.Configuration) == 0 {
+		if err := Reachable(cluster); err != nil {
 			return nil, err
 		}
-
-		config, err := clientcmd.NewClientConfigFromBytes(kubeCfg)
-		if err != nil {
-			return nil, err
-		}
-
-		restClientConfig, err = config.ClientConfig()
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		var err error
-		restClientConfig, err = clientcmd.BuildConfigFromFlags("", "")
-		if err != nil {
-			return nil, err
-		}
+		return rest.InClusterConfig()
 	}
 
-	return restClientConfig, nil
+	kubeCfg, err := DecryptYaml(cluster.Configuration)
+	if err != nil {
+		return nil, err
+	}
+
+	config, err := clientcmd.NewClientConfigFromBytes(kubeCfg)
+	if err != nil {
+		return nil, err
+	}
+
+	return config.ClientConfig()
 }
 
 func DecryptYaml(data []byte) ([]byte, error) {

@@ -29,11 +29,44 @@ type Service struct {
 }
 
 func (s *Service) Find(ctx context.Context, name string) (*model.Group, error) {
-	return s.groupRepository.find(ctx, name)
+	group, err := s.groupRepository.find(ctx, name)
+	if err != nil {
+		return nil, err
+	}
+	setClusterUnreachableReason(group)
+	return group, nil
 }
 
 func (s *Service) FindWithDetails(ctx context.Context, name string) (*model.Group, error) {
-	return s.groupRepository.findWithDetails(ctx, name)
+	group, err := s.groupRepository.findWithDetails(ctx, name)
+	if err != nil {
+		return nil, err
+	}
+	setClusterUnreachableReason(group)
+	return group, nil
+}
+
+func setClusterUnreachableReason(group *model.Group) {
+	if err := kube.Reachable(group.Cluster); err != nil {
+		group.ClusterUnreachableReason = err.Error()
+	}
+}
+
+// FindUnreachable returns the deployable groups that instance manager cannot deploy to.
+func (s *Service) FindUnreachable(ctx context.Context) ([]model.Group, error) {
+	groups, err := s.groupRepository.findDeployable(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	var unreachable []model.Group
+	for _, group := range groups {
+		setClusterUnreachableReason(&group)
+		if group.ClusterUnreachableReason != "" {
+			unreachable = append(unreachable, group)
+		}
+	}
+	return unreachable, nil
 }
 
 func (s *Service) Create(ctx context.Context, name, namespace, description, hostname string, deployable bool, clusterID *uint) (*model.Group, error) {
@@ -153,7 +186,14 @@ func (s *Service) Update(ctx context.Context, name, namespace, description, host
 }
 
 func (s *Service) FindAll(ctx context.Context, user *model.User, deployable bool) ([]model.Group, error) {
-	return s.groupRepository.findAll(ctx, user, deployable)
+	groups, err := s.groupRepository.findAll(ctx, user, deployable)
+	if err != nil {
+		return nil, err
+	}
+	for i := range groups {
+		setClusterUnreachableReason(&groups[i])
+	}
+	return groups, nil
 }
 
 func (s *Service) FindByGroupNames(ctx context.Context, groupNames []string) ([]model.Group, error) {

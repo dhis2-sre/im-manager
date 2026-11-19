@@ -93,6 +93,23 @@ How to add a migration:
 * Update the profiles section of the [skaffold file](https://github.com/dhis2-sre/im-manager/blob/8cb9a5959e334b835188fa07e801996ff2410b7c/skaffold.yaml#L96) to include the group
 * Update backup schedule to include the group for either [dev](https://github.com/dhis2-sre/dhis2-infrastructure/blob/b9f53752ca9cb16883f2f78cae5fca42b4087b1f/modules/k8s/helm-backup-dev.tf#L1) or [prod](https://github.com/dhis2-sre/dhis2-infrastructure/blob/b9f53752ca9cb16883f2f78cae5fca42b4087b1f/modules/k8s/helm-backup-prod.tf#L1)
 
+# Clusters
+
+A group deploys to the cluster assigned to it, reached through the kubeconfig uploaded with the cluster
+(see [scripts/clusters](scripts/clusters)).
+
+When instance manager runs inside a Kubernetes cluster, it can also deploy to that cluster. In that
+case it creates a `default` cluster without a kubeconfig at startup. That cluster, and any group
+without a cluster, then use the in-cluster configuration. The `IN_CLUSTER` setting controls this. With
+`auto`, the default, it applies only when instance manager is running inside a cluster. With `true` it
+always applies, and with `false` it never does. When it does not apply, creating a cluster requires a
+kubeconfig, and deploying to a group without a cluster is a bad request.
+
+A group that instance manager cannot deploy to says why in `clusterUnreachableReason`, and
+`GET /deployments/{id}/components` repeats that reason instead of failing. Instance manager also logs a
+warning for each such deployable group at startup. Assign a cluster with a kubeconfig to the group to
+make it usable.
+
 # Private images
 
 `IMAGE_REPOSITORY` for the dhis2-v2 stack also accepts `ghcr.io/dhis2/<repository>`. Such images are pulled with the
