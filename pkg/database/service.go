@@ -490,7 +490,8 @@ func (s Service) SaveLocked(ctx context.Context, database *model.Database, insta
 }
 
 // finalizeSave moves the freshly dumped temporary record over the original database: S3 move,
-// delete the original row, rename the new row and swap its id back to the original's.
+// delete the original row, rename the new row and swap its id back to the original's. The new row
+// takes over what a dump does not produce, the description and the file store link among it.
 func (s Service) finalizeSave(ctx context.Context, database *model.Database, saved *model.Database) (*model.Database, error) {
 	u, err := url.Parse(saved.Url)
 	if err != nil {
@@ -519,6 +520,8 @@ func (s Service) finalizeSave(ctx context.Context, database *model.Database, sav
 	saved.Url = database.Url
 	saved.Slug = database.Slug
 	saved.CreatedAt = database.CreatedAt
+	saved.Description = database.Description
+	saved.FilestoreID = database.FilestoreID
 
 	// Use the repository Update method, since the service Update method also performs an S3 move.
 	err = s.repository.Update(ctx, saved)

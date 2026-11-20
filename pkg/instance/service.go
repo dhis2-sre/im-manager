@@ -1393,21 +1393,19 @@ func (s Service) FilestoreBackup(ctx context.Context, instance *model.Deployment
 // pointing at that same key and fail the unique name, which is what made every repeated save report
 // the file store half as "already exists" while the tarball itself was written fine.
 func (s Service) recordBackup(ctx context.Context, groupName, s3uri, name string, userID uint, size int64, existingID uint) (*model.Database, error) {
-	if existingID != 0 {
-		existing, err := s.instanceRepository.FindDatabaseById(ctx, existingID)
-		if err != nil && !errdef.IsNotFound(err) {
+	existing, err := s.filestoreToOverwrite(ctx, groupName, name, existingID)
+	if err != nil && !errdef.IsNotFound(err) {
+		return nil, err
+	}
+	if err == nil {
+		existing.Name = name
+		existing.GroupName = groupName
+		existing.Url = s3uri
+		existing.Size = size
+		if err := s.instanceRepository.SaveDatabase(ctx, existing); err != nil {
 			return nil, err
 		}
-		if err == nil {
-			existing.Name = name
-			existing.GroupName = groupName
-			existing.Url = s3uri
-			existing.Size = size
-			if err := s.instanceRepository.SaveDatabase(ctx, existing); err != nil {
-				return nil, err
-			}
-			return existing, nil
-		}
+		return existing, nil
 	}
 
 	database := &model.Database{
@@ -1418,12 +1416,28 @@ func (s Service) recordBackup(ctx context.Context, groupName, s3uri, name string
 		UserID:    userID,
 		Size:      size,
 	}
-	err := s.instanceRepository.RecordBackup(ctx, database)
+	err = s.instanceRepository.RecordBackup(ctx, database)
 	if err != nil {
 		return nil, err
 	}
 
 	return database, nil
+}
+
+// filestoreToOverwrite finds the row describing the tarball the save just overwrote: the file store
+// the database points at, or else one of that name no database points at. The second case takes
+// back a file store whose database lost its link to it, which would otherwise collide on the unique
+// name at every save. A file store another database points at is never shared, since deleting
+// either database would remove it for both.
+func (s Service) filestoreToOverwrite(ctx context.Context, groupName, name string, existingID uint) (*model.Database, error) {
+	if existingID != 0 {
+		existing, err := s.instanceRepository.FindDatabaseById(ctx, existingID)
+		if !errdef.IsNotFound(err) {
+			return existing, err
+		}
+	}
+
+	return s.instanceRepository.FindUnlinkedFilestore(ctx, groupName, name)
 }
 
 func (s Service) FindAllDeployments(ctx context.Context) ([]model.Deployment, error) {
