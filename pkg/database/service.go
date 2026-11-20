@@ -273,6 +273,7 @@ func (s Service) Delete(ctx context.Context, id uint) error {
 	return s.deleteFS(ctx, d)
 }
 
+// deleteFS removes the file store of a deleted database, unless another database still points at it.
 func (s Service) deleteFS(ctx context.Context, d *model.Database) error {
 	fs, err := s.repository.FindById(ctx, d.FilestoreID)
 	if err != nil {
@@ -280,6 +281,14 @@ func (s Service) deleteFS(ctx context.Context, d *model.Database) error {
 			return nil
 		}
 		return err
+	}
+
+	inUse, err := s.repository.FilestoreInUse(ctx, fs.ID)
+	if err != nil {
+		return err
+	}
+	if inUse {
+		return nil
 	}
 
 	fsUrl, err := url.Parse(fs.Url)
