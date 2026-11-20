@@ -484,6 +484,23 @@ func (r repository) FindDatabaseById(ctx context.Context, id uint) (*model.Datab
 	return &database, nil
 }
 
+// FindUnlinkedFilestore finds the file store of the given name that no database points at.
+func (r repository) FindUnlinkedFilestore(ctx context.Context, groupName, name string) (*model.Database, error) {
+	var filestore model.Database
+	err := r.db.WithContext(ctx).
+		Where("type = ? AND group_name = ? AND name = ?", "fs", groupName, name).
+		Where("NOT EXISTS (SELECT 1 FROM databases AS linked WHERE linked.filestore_id = databases.id)").
+		First(&filestore).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, errdef.NewNotFound("no unlinked file store named %q in group %q", name, groupName)
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	return &filestore, nil
+}
+
 func (r repository) SaveDatabase(ctx context.Context, database *model.Database) error {
 	return r.db.WithContext(ctx).Save(&database).Error
 }
