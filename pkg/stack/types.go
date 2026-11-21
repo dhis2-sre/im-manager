@@ -73,6 +73,10 @@ type StackParameter struct {
 	// Priority determines the order in which the parameter is shown.
 	Priority  uint `json:"priority"`
 	Sensitive bool `json:"sensitive"`
+	// Multiline allows the value to contain line breaks. Only set it when the helmfile inserts the
+	// value as an indented block scalar, which keeps every line inside it; anywhere else a line
+	// break lets the value escape its key and set arbitrary helmfile values.
+	Multiline bool `json:"-"`
 	// Required says the stack's helmfile cannot render without a value for this parameter, so an
 	// instance is rejected while it is blank rather than failing in helmfile after it was accepted.
 	Required bool `json:"required"`

@@ -449,10 +449,18 @@ func (s Service) resolveParameters(deployment *model.Deployment) error {
 	return nil
 }
 
+// yamlLineBreaks are the characters YAML parsers treat as line breaks. Parameter values are
+// rendered into helmfile YAML as is, so a value containing one could add keys of its own.
+const yamlLineBreaks = "\r\n\u0085\u2028\u2029"
+
 func validateParameters(instanceParameters model.DeploymentInstanceParameters, stack *stack.Stack) error {
 	var errs []error
 	for name, parameter := range instanceParameters {
 		stackParameter := stack.Parameters[name]
+		if !stackParameter.Multiline && strings.ContainsAny(parameter.Value, yamlLineBreaks) {
+			errs = append(errs, fmt.Errorf("validation failed for parameter %s: must not contain line breaks", name))
+			continue
+		}
 		if stackParameter.Validator != nil {
 			err := stackParameter.Validator(parameter.Value)
 			if err != nil {

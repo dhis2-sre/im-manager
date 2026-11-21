@@ -106,6 +106,50 @@ func TestResolveParameters(t *testing.T) {
 		require.ErrorContains(t, err, "parameter not found on stack: parameter")
 	})
 
+	t.Run("RejectLineBreaks", func(t *testing.T) {
+		for _, value := range []string{"-Xmx1g\"\n- initContainers: []", "a\rb", "a\u2028b"} {
+			stacks := stack.Stacks{
+				"stack": {Name: "stack", Parameters: map[string]stack.StackParameter{"parameter": {}}},
+			}
+			service := NewService(nil, nil, nil, stack.NewService(stacks), nil, nil, "", kube.NewClients(slog.Default()))
+			deployment := &model.Deployment{
+				Instances: []*model.DeploymentInstance{
+					{
+						StackName: "stack",
+						Parameters: map[string]model.DeploymentInstanceParameter{
+							"parameter": {ParameterName: "parameter", Value: value},
+						},
+					},
+				},
+			}
+
+			err := service.resolveParameters(deployment)
+
+			require.ErrorContains(t, err, "validation failed for parameter parameter: must not contain line breaks")
+		}
+	})
+
+	t.Run("AllowLineBreaksInMultilineParameter", func(t *testing.T) {
+		stacks := stack.Stacks{
+			"stack": {Name: "stack", Parameters: map[string]stack.StackParameter{"parameter": {Multiline: true}}},
+		}
+		service := NewService(nil, nil, nil, stack.NewService(stacks), nil, nil, "", kube.NewClients(slog.Default()))
+		deployment := &model.Deployment{
+			Instances: []*model.DeploymentInstance{
+				{
+					StackName: "stack",
+					Parameters: map[string]model.DeploymentInstanceParameter{
+						"parameter": {ParameterName: "parameter", Value: "a = 1\nb = 2"},
+					},
+				},
+			},
+		}
+
+		err := service.resolveParameters(deployment)
+
+		require.NoError(t, err)
+	})
+
 	t.Run("ResolveParameters", func(t *testing.T) {
 		defaultValue1 := "default value used"
 		defaultValue2 := "default value not user"
