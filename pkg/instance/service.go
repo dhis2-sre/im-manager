@@ -1361,17 +1361,12 @@ func (s Service) FilestoreBackup(ctx context.Context, instance *model.Deployment
 		return err
 	}
 
-	baseName := name
-	baseName = strings.TrimSuffix(baseName, ".sql.gz")
-	baseName = strings.TrimSuffix(baseName, ".pgc")
-	baseName = strings.TrimSuffix(baseName, ".tar.gz")
-
 	streamer, err := s.filestoreStreamerFor(ctx, core, group.Cluster)
 	if err != nil {
 		return err
 	}
 
-	return s.backupFilestore(ctx, streamer, baseName+"-fs.tar.gz", database)
+	return s.backupFilestore(ctx, streamer, model.FilestoreName(name), database)
 }
 
 // backupFilestore uploads the tarball of the streamer over the file store of the database and

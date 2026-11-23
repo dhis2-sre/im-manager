@@ -63,22 +63,24 @@ func TestUpdate(t *testing.T) {
 		require.NoError(t, f.service.Update(context.Background(), database))
 
 		assert.Equal(t, "content of before.sql.gz", string(f.s3.GetObject(t, "group-name/after.sql.gz")))
-		assert.Equal(t, "content of before-fs.tar.gz", string(f.s3.GetObject(t, "group-name/after-fs.tar.gz")))
+		assert.Equal(t, "content of before-fs.tar.gz", string(f.s3.GetObject(t, "group-name/after.sql.gz-fs.tar.gz")))
 		renamed, err := f.repository.FindById(context.Background(), filestore.ID)
 		require.NoError(t, err)
-		assert.Equal(t, "after-fs.tar.gz", renamed.Name)
-		assert.Equal(t, fmt.Sprintf("s3://%s/group-name/after-fs.tar.gz", f.s3.Bucket), renamed.Url)
+		assert.Equal(t, "after.sql.gz-fs.tar.gz", renamed.Name)
+		assert.Equal(t, fmt.Sprintf("s3://%s/group-name/after.sql.gz-fs.tar.gz", f.s3.Bucket), renamed.Url)
 	})
 
-	t.Run("KeepsTheFileWhenOnlyTheDescriptionChanges", func(t *testing.T) {
+	t.Run("KeepsTheFilesWhenOnlyTheDescriptionChanges", func(t *testing.T) {
 		t.Parallel()
 		f := setup(t)
-		database := f.create("described.sql.gz", "database", 0)
+		filestore := f.create("described-fs.tar.gz", "fs", 0)
+		database := f.create("described.sql.gz", "database", filestore.ID)
 
 		database.Description = "only the description changes"
 		require.NoError(t, f.service.Update(context.Background(), database))
 
 		assert.Equal(t, "content of described.sql.gz", string(f.s3.GetObject(t, "group-name/described.sql.gz")))
+		assert.Equal(t, "content of described-fs.tar.gz", string(f.s3.GetObject(t, "group-name/described-fs.tar.gz")), "a file store named before the extension became part of the name stays where it is")
 		stored, err := f.repository.FindById(context.Background(), database.ID)
 		require.NoError(t, err)
 		assert.Equal(t, "only the description changes", stored.Description)
@@ -99,13 +101,27 @@ func TestUpdate(t *testing.T) {
 		assert.Equal(t, "content of ours.sql.gz", string(f.s3.GetObject(t, "group-name/ours.sql.gz")))
 	})
 
-	// Two databases whose names differ only in their extension map to the same file store name.
-	t.Run("RefusesTheFilestoreNameOfAnotherDatabaseWithoutMovingAnything", func(t *testing.T) {
+	t.Run("GivesDatabasesThatDifferOnlyInTheirExtensionSeparateFilestores", func(t *testing.T) {
 		t.Parallel()
 		f := setup(t)
-		theirFilestore := f.create("training-fs.tar.gz", "fs", 0)
+		theirFilestore := f.create("training.pgc-fs.tar.gz", "fs", 0)
 		f.create("training.pgc", "database", theirFilestore.ID)
-		ourFilestore := f.create("ours-fs.tar.gz", "fs", 0)
+		ourFilestore := f.create("ours.sql.gz-fs.tar.gz", "fs", 0)
+		database := f.create("ours.sql.gz", "database", ourFilestore.ID)
+
+		database.Name = "training.sql.gz"
+		require.NoError(t, f.service.Update(context.Background(), database))
+
+		assert.Equal(t, "content of training.pgc-fs.tar.gz", string(f.s3.GetObject(t, "group-name/training.pgc-fs.tar.gz")))
+		assert.Equal(t, "content of ours.sql.gz-fs.tar.gz", string(f.s3.GetObject(t, "group-name/training.sql.gz-fs.tar.gz")))
+	})
+
+	t.Run("RefusesATakenFilestoreNameWithoutMovingAnything", func(t *testing.T) {
+		t.Parallel()
+		f := setup(t)
+		theirFilestore := f.create("training.sql.gz-fs.tar.gz", "fs", 0)
+		f.create("linked-by-hand.sql.gz", "database", theirFilestore.ID)
+		ourFilestore := f.create("ours.sql.gz-fs.tar.gz", "fs", 0)
 		database := f.create("ours.sql.gz", "database", ourFilestore.ID)
 
 		database.Name = "training.sql.gz"
@@ -113,8 +129,8 @@ func TestUpdate(t *testing.T) {
 
 		require.Error(t, err)
 		assert.True(t, errdef.IsDuplicated(err), "got: %v", err)
-		assert.Equal(t, "content of training-fs.tar.gz", string(f.s3.GetObject(t, "group-name/training-fs.tar.gz")))
-		assert.Equal(t, "content of ours-fs.tar.gz", string(f.s3.GetObject(t, "group-name/ours-fs.tar.gz")))
+		assert.Equal(t, "content of training.sql.gz-fs.tar.gz", string(f.s3.GetObject(t, "group-name/training.sql.gz-fs.tar.gz")))
+		assert.Equal(t, "content of ours.sql.gz-fs.tar.gz", string(f.s3.GetObject(t, "group-name/ours.sql.gz-fs.tar.gz")))
 		assert.Equal(t, "content of ours.sql.gz", string(f.s3.GetObject(t, "group-name/ours.sql.gz")))
 		stored, err := f.repository.FindById(context.Background(), database.ID)
 		require.NoError(t, err)
