@@ -94,6 +94,8 @@ func (s Service) FindByIdentifier(ctx context.Context, identifier string) (*mode
 	return database, nil
 }
 
+// Copy copies the database and its file store under a new name. Both names are checked before any
+// file is copied, since a copy onto a taken name overwrites the file of the record holding it.
 func (s Service) Copy(ctx context.Context, id uint, d *model.Database, group *model.Group) error {
 	source, err := s.FindById(ctx, id)
 	if err != nil {
@@ -105,6 +107,17 @@ func (s Service) Copy(ctx context.Context, id uint, d *model.Database, group *mo
 	}
 	if strings.HasSuffix(source.Name, ".sql.gz") && !strings.HasSuffix(d.Name, ".sql.gz") {
 		d.Name += ".sql.gz"
+	}
+
+	err = s.refuseTakenName(ctx, d)
+	if err != nil {
+		return err
+	}
+	if source.FilestoreID != 0 {
+		err = s.refuseTakenName(ctx, &model.Database{Name: model.FilestoreName(d.Name), GroupName: group.Name})
+		if err != nil {
+			return err
+		}
 	}
 
 	u, err := url.Parse(source.Url)
