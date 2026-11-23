@@ -564,30 +564,37 @@ func (s Service) CreateDatabase(ctx context.Context, userId uint, groupName, nam
 }
 
 // Dump streams a pg_dump of the instance's database into the file of the given record, which
-// CreateDatabase made for it, and records the url and size. It blocks until the dump completes and
-// publishes database-save events along the way.
+// CreateDatabase made for it, and records the url and size. A record whose dump fails has no file
+// and is removed. It blocks until the dump completes and publishes database-save events.
 func (s Service) Dump(ctx context.Context, userId uint, database *model.Database, instance *model.DeploymentInstance, stack *stack.Stack, format string) (*model.Database, error) {
 	s.publishSave(ctx, userId, database, "started", "", 0)
 
+	saved, err := s.dumpIntoRecord(ctx, database, instance, stack, format)
+	if err != nil {
+		if deleteErr := s.repository.Delete(ctx, database.ID); deleteErr != nil {
+			s.logger.ErrorContext(ctx, "failed to remove the record of a failed dump", "databaseId", database.ID, "error", deleteErr)
+		}
+		return nil, s.failSave(ctx, userId, database, err)
+	}
+
+	s.publishSave(ctx, userId, database, "success", "", saved.Size)
+
+	return saved, nil
+}
+
+func (s Service) dumpIntoRecord(ctx context.Context, database *model.Database, instance *model.DeploymentInstance, stack *stack.Stack, format string) (*model.Database, error) {
 	key := fmt.Sprintf("%s/%s", database.GroupName, database.Name)
 	size, err := s.dumpToKey(ctx, instance, stack, format, database.Name, key)
 	if err != nil {
-		return nil, s.failSave(ctx, userId, database, err)
+		return nil, err
 	}
 
 	err = s.repository.UpdateFile(ctx, database.ID, fmt.Sprintf("s3://%s/%s", s.s3Bucket, key), size)
 	if err != nil {
-		return nil, s.failSave(ctx, userId, database, err)
+		return nil, err
 	}
 
-	saved, err := s.repository.FindById(ctx, database.ID)
-	if err != nil {
-		return nil, s.failSave(ctx, userId, database, err)
-	}
-
-	s.publishSave(ctx, userId, database, "success", "", size)
-
-	return saved, nil
+	return s.repository.FindById(ctx, database.ID)
 }
 
 func (s Service) publishSave(ctx context.Context, userId uint, database *model.Database, status, errorMessage string, size int64) {

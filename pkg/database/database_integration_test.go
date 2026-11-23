@@ -15,6 +15,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
 	awss3 "github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
+	"github.com/dhis2-sre/im-manager/internal/errdef"
 	"github.com/dhis2-sre/im-manager/pkg/database"
 	"github.com/dhis2-sre/im-manager/pkg/deployment"
 	"github.com/dhis2-sre/im-manager/pkg/instance"
@@ -382,6 +383,32 @@ func TestSaveLockedUnlocksOnDumpFailure(t *testing.T) {
 	var databases int64
 	require.NoError(t, db.Model(&model.Database{}).Count(&databases).Error)
 	require.Equal(t, int64(1), databases, "a failed save must leave no record behind")
+}
+
+// A record whose dump failed has no file behind it: it cannot be deployed from and it holds the
+// name the user picked, so a retry under that name would be refused.
+func TestDumpRemovesTheRecordOfAFailedDump(t *testing.T) {
+	t.Parallel()
+
+	db := inttest.SetupDB(t)
+	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
+	databaseService := database.NewService(logger, "database-bucket", nil, groupService{groupName: "packages"}, database.NewRepository(db), nil, noopPublisher{})
+
+	user, _ := userpkg.CreateUserWithGroup(t, db, "group-name", "some", "", "user1@dhis2.org")
+
+	ctx := context.Background()
+	created, err := databaseService.CreateDatabase(ctx, user.ID, "packages", "save-as.pgc")
+	require.NoError(t, err)
+
+	// The instance has no database parameters, so the dump fails before touching pods or S3.
+	_, err = databaseService.Dump(ctx, user.ID, created, &model.DeploymentInstance{GroupName: "packages"}, &stack.Stack{}, "custom")
+	require.Error(t, err)
+
+	_, err = databaseService.FindById(ctx, created.ID)
+	require.True(t, errdef.IsNotFound(err), "the record of a failed dump must be removed, got: %v", err)
+
+	_, err = databaseService.CreateDatabase(ctx, user.ID, "packages", "save-as.pgc")
+	require.NoError(t, err, "the name must be free for a retry")
 }
 
 type groupService struct {
