@@ -461,14 +461,14 @@ func (r repository) FindPublicInstances(ctx context.Context) ([]*model.Deploymen
 	return instances, nil
 }
 
-// SaveFilestoreBackup stores the file store and points the database at it in one transaction. Done
-// as two separate writes, a failure of the second left a file store no database pointed at, and
-// every later save of that database then failed on its name as "already exists".
+// SaveFilestoreBackup stores the file store and points the database at it in one transaction, so
+// no file store is left without a database. Only the link is written to the database, since the
+// backup can run for minutes and the database may have changed meanwhile.
 //
 // TODO: This code is duplicated from https://github.com/dhis2-sre/im-manager/blob/5581b4765fd6878138f4741d4c82607ed4ce0998/pkg/database/repository.go#L41
 // A significant difference is that here we include the database.Type in the slug
 // Ideally we should rewrite the database service to a storage service and use that in both the database and instance handlers (and/or services)
-func (r repository) SaveFilestoreBackup(ctx context.Context, database, filestore *model.Database) error {
+func (r repository) SaveFilestoreBackup(ctx context.Context, databaseID uint, filestore *model.Database) error {
 	// only use ctx for values (logging) and not cancellation signals on cud operations for now. ctx
 	// cancellation can lead to rollbacks which we should decide individually.
 	ctx = context.WithoutCancel(ctx)
@@ -487,9 +487,15 @@ func (r repository) SaveFilestoreBackup(ctx context.Context, database, filestore
 			return err
 		}
 
-		database.FilestoreID = filestore.ID
+		link := tx.Model(&model.Database{}).Where("id = ?", databaseID).Update("filestore_id", filestore.ID)
+		if link.Error != nil {
+			return link.Error
+		}
+		if link.RowsAffected == 0 {
+			return errdef.NewNotFound("database %d not found", databaseID)
+		}
 
-		return tx.Save(database).Error
+		return nil
 	})
 }
 
@@ -504,6 +510,16 @@ func (r repository) FindDatabaseById(ctx context.Context, id uint) (*model.Datab
 	}
 
 	return &database, nil
+}
+
+func (r repository) DatabaseNameTaken(ctx context.Context, groupName, name string) (bool, error) {
+	var count int64
+	err := r.db.WithContext(ctx).
+		Model(&model.Database{}).
+		Where("group_name = ? AND name = ?", groupName, name).
+		Count(&count).Error
+
+	return count > 0, err
 }
 
 func (r repository) FindAllDeployments(ctx context.Context) ([]model.Deployment, error) {

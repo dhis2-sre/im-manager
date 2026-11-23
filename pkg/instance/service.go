@@ -9,6 +9,7 @@ import (
 	"iter"
 	"log/slog"
 	"maps"
+	"net/url"
 	"os/exec"
 	"slices"
 	"strings"
@@ -1370,48 +1371,62 @@ func (s Service) FilestoreBackup(ctx context.Context, instance *model.Deployment
 		return err
 	}
 
-	key := fmt.Sprintf("%s/%s-%s.tar.gz", instance.GroupName, baseName, "fs")
-	backupService := NewBackupService(s.logger, s.s3Client)
-	size, err := backupService.PerformBackup(ctx, streamer, s.s3Bucket, key)
-	if err != nil {
-		return err
-	}
-
-	s3Uri := fmt.Sprintf("s3://%s/%s", s.s3Bucket, key)
-	filestore, err := s.filestoreRecord(ctx, instance.GroupName, s3Uri, baseName+"-fs.tar.gz", database.UserID, size, database.FilestoreID)
-	if err != nil {
-		return err
-	}
-
-	return s.instanceRepository.SaveFilestoreBackup(ctx, database, filestore)
+	return s.backupFilestore(ctx, streamer, baseName+"-fs.tar.gz", database)
 }
 
-// filestoreRecord describes the file store the save just wrote. A database keeps one file store
-// across saves: the artifact overwrites the same key, so inserting a second row would both leak a
-// row pointing at that same key and fail the unique name, which is what made every repeated save
-// report the file store half as "already exists" while the tarball itself was written fine.
-func (s Service) filestoreRecord(ctx context.Context, groupName, s3uri, name string, userID uint, size int64, existingID uint) (*model.Database, error) {
-	if existingID != 0 {
-		existing, err := s.instanceRepository.FindDatabaseById(ctx, existingID)
-		if err != nil && !errdef.IsNotFound(err) {
-			return nil, err
+// backupFilestore uploads the tarball of the streamer over the file store of the database and
+// links the two. The file store is resolved before the upload, so a refused backup overwrites nothing.
+func (s Service) backupFilestore(ctx context.Context, streamer filestoreStreamer, name string, database *model.Database) error {
+	filestore, err := s.filestoreToWrite(ctx, name, database)
+	if err != nil {
+		return err
+	}
+
+	location, err := url.Parse(filestore.Url)
+	if err != nil {
+		return err
+	}
+	key := strings.TrimPrefix(location.Path, "/")
+
+	filestore.Size, err = NewBackupService(s.logger, s.s3Client).PerformBackup(ctx, streamer, s.s3Bucket, key)
+	if err != nil {
+		return err
+	}
+
+	err = s.instanceRepository.SaveFilestoreBackup(ctx, database.ID, filestore)
+	if err != nil {
+		return err
+	}
+	database.FilestoreID = filestore.ID
+
+	return nil
+}
+
+// filestoreToWrite resolves the file store a backup of the database writes to: the one the database
+// has, where it is, or else a new one of the given name in the group of the database. A name that
+// is taken is refused, since the tarball behind it belongs to another database.
+func (s Service) filestoreToWrite(ctx context.Context, name string, database *model.Database) (*model.Database, error) {
+	if database.FilestoreID != 0 {
+		linked, err := s.instanceRepository.FindDatabaseById(ctx, database.FilestoreID)
+		if !errdef.IsNotFound(err) {
+			return linked, err
 		}
-		if err == nil {
-			existing.Name = name
-			existing.GroupName = groupName
-			existing.Url = s3uri
-			existing.Size = size
-			return existing, nil
-		}
+	}
+
+	taken, err := s.instanceRepository.DatabaseNameTaken(ctx, database.GroupName, name)
+	if err != nil {
+		return nil, err
+	}
+	if taken {
+		return nil, errdef.NewDuplicated("file store %q is already in use by another database", name)
 	}
 
 	return &model.Database{
 		Name:      name,
-		GroupName: groupName,
-		Url:       s3uri,
+		GroupName: database.GroupName,
+		Url:       fmt.Sprintf("s3://%s/%s/%s", s.s3Bucket, database.GroupName, name),
 		Type:      "fs",
-		UserID:    userID,
-		Size:      size,
+		UserID:    database.UserID,
 	}, nil
 }
 

@@ -37,7 +37,7 @@ func TestSaveFilestoreBackup(t *testing.T) {
 		instanceRepository, db, database := setup(t)
 
 		filestore := newFilestore(database)
-		require.NoError(t, instanceRepository.SaveFilestoreBackup(context.Background(), database, filestore))
+		require.NoError(t, instanceRepository.SaveFilestoreBackup(context.Background(), database.ID, filestore))
 
 		var stored model.Database
 		require.NoError(t, db.First(&stored, database.ID).Error)
@@ -45,17 +45,14 @@ func TestSaveFilestoreBackup(t *testing.T) {
 		assert.Equal(t, filestore.ID, stored.FilestoreID)
 	})
 
-	// A file store row that no database points at blocks every later save of that database, since
-	// the next save inserts a row of the same name. Nothing may be left behind when the database
-	// cannot be pointed at the file store, here because saving it collides with another name.
+	// A file store no database points at holds its name against every later save. Nothing may be
+	// left behind when the database cannot be pointed at it, here because it was deleted meanwhile.
 	t.Run("LeavesNoFilestoreBehindWhenTheDatabaseCannotPointAtIt", func(t *testing.T) {
 		t.Parallel()
 		instanceRepository, db, database := setup(t)
-		taken := &model.Database{Name: "taken.sql.gz", GroupName: "group-name", Type: "database", Slug: "group-name-taken-sql-gz", UserID: database.UserID}
-		require.NoError(t, db.Create(taken).Error)
-		database.Name = taken.Name
+		require.NoError(t, db.Delete(&model.Database{}, database.ID).Error)
 
-		err := instanceRepository.SaveFilestoreBackup(context.Background(), database, newFilestore(database))
+		err := instanceRepository.SaveFilestoreBackup(context.Background(), database.ID, newFilestore(database))
 
 		require.Error(t, err)
 		var filestores int64
