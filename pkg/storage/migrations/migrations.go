@@ -15,5 +15,6 @@ func All() []*gormigrate.Migration {
 		backfillSuspendAndGlowrootDHIS2V2(),
 		raiseDHIS2V2ChartVersion(),
 		relinkFileStores(),
+		removeLeftoversOfFailedSaves(),
 	}
 }
