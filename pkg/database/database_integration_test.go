@@ -378,6 +378,10 @@ func TestSaveLockedUnlocksOnDumpFailure(t *testing.T) {
 	reloaded, err := databaseService.FindById(ctx, locked.ID)
 	require.NoError(t, err)
 	require.Nil(t, reloaded.Lock, "a failed save must release the lock it acquired")
+
+	var databases int64
+	require.NoError(t, db.Model(&model.Database{}).Count(&databases).Error)
+	require.Equal(t, int64(1), databases, "a failed save must leave no record behind")
 }
 
 type groupService struct {
