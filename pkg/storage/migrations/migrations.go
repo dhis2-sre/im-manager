@@ -14,5 +14,6 @@ func All() []*gormigrate.Migration {
 		dropLegacyDeploymentNameIndex(),
 		backfillSuspendAndGlowrootDHIS2V2(),
 		raiseDHIS2V2ChartVersion(),
+		relinkFileStores(),
 	}
 }
