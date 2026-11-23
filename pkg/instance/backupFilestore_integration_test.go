@@ -150,13 +150,13 @@ func TestBackupFilestore(t *testing.T) {
 		assert.Equal(t, filestore.ID, f.reload(t, database.ID).FilestoreID)
 	})
 
-	// Two databases whose names differ only in their extension map to the same file store name.
+	// Older file stores are named without the extension of their database, so a name can be taken.
 	t.Run("RefusesTheFilestoreOfAnotherDatabaseWithoutOverwritingIt", func(t *testing.T) {
 		t.Parallel()
 		f := setupBackupFixture(t)
 		theirs := f.createFilestore(t, "training-fs.tar.gz", "their files")
 		f.createDatabase(t, "training.sql.gz", theirs.ID)
-		database := f.createDatabase(t, "training.pgc", 0)
+		database := f.createDatabase(t, "training", 0)
 
 		err := f.service.backupFilestore(context.Background(), tarballOf("our files"), "training-fs.tar.gz", database)
 

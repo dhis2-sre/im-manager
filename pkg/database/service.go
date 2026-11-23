@@ -141,9 +141,7 @@ func (s Service) copyFS(ctx context.Context, d *model.Database, group *model.Gro
 		return err
 	}
 
-	newName := strings.TrimSuffix(d.Name, ".pgc")
-	newName = strings.TrimSuffix(newName, ".sql.gz")
-	newName += ".fs.tar.gz"
+	newName := model.FilestoreName(d.Name)
 
 	fsUrl, err := url.Parse(fs.Url)
 	if err != nil {
@@ -369,8 +367,16 @@ func filterDatabases(databases []model.Database, test func(database *model.Datab
 
 // Update renames the database, and its file store with it, and stores its description. Both names
 // are checked before any file is moved, since a move onto a taken name overwrites the file of the
-// record holding it.
+// record holding it. A database that keeps its name keeps its file store as it is.
 func (s Service) Update(ctx context.Context, d *model.Database) error {
+	key, err := fileKey(d)
+	if err != nil {
+		return err
+	}
+	if key == fmt.Sprintf("%s/%s", d.GroupName, d.Name) {
+		return s.repository.Update(ctx, d)
+	}
+
 	fs, err := s.renamedFilestore(ctx, d)
 	if err != nil {
 		return err
@@ -424,9 +430,7 @@ func (s Service) renamedFilestore(ctx context.Context, d *model.Database) (*mode
 		return nil, err
 	}
 
-	newName := strings.TrimSuffix(d.Name, ".pgc")
-	newName = strings.TrimSuffix(newName, ".sql.gz")
-	fs.Name = newName + "-fs.tar.gz"
+	fs.Name = model.FilestoreName(d.Name)
 
 	return fs, nil
 }

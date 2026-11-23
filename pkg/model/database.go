@@ -31,6 +31,12 @@ type Database struct {
 	Size      int64     `json:"size"`
 }
 
+// FilestoreName names the file store of a database after its full name, extension included, so
+// databases that differ only in their extension do not get the same file store name.
+func FilestoreName(databaseName string) string {
+	return databaseName + "-fs.tar.gz"
+}
+
 // swagger:model
 type Lock struct {
 	DatabaseID uint               `json:"databaseId" gorm:"primaryKey"`

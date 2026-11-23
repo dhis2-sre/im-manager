@@ -258,7 +258,7 @@ func TestDatabaseHandler(t *testing.T) {
 		assert.Equal(t, "packages", filestore.GroupName)
 		assert.Equal(t, userID, filestore.UserID)
 
-		actualContent := s3.GetObject(t, "packages/path/copy-with-filestore.extension.fs.tar.gz")
+		actualContent := s3.GetObject(t, "packages/path/copy-with-filestore.extension-fs.tar.gz")
 		assert.Equal(t, "filestore contents", string(actualContent))
 	})
 
