@@ -939,12 +939,22 @@ definitions:
         x-go-package: github.com/dhis2-sre/im-manager/pkg/stack
     StackParameter:
         properties:
+            addOn:
+                description: |-
+                    AddOn says this 'true'/'false' parameter switches on an optional part of the instance, to be
+                    offered as something to add rather than as one more setting.
+                type: boolean
+                x-go-name: AddOn
             consumed:
                 type: boolean
                 x-go-name: Consumed
             defaultValue:
                 type: string
                 x-go-name: DefaultValue
+            description:
+                description: Description says what the parameter is for, in a sentence to show beside it.
+                type: string
+                x-go-name: Description
             displayName:
                 type: string
                 x-go-name: DisplayName

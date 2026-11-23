@@ -80,6 +80,14 @@ type StackParameter struct {
 	// empty means it can. The update path rejects a change to such a parameter and a client renders
 	// it read only with this as the explanation, so the two cannot disagree about what is editable.
 	ImmutableReason string `json:"immutableReason,omitempty"`
+	// Description says what the parameter is for in a sentence a client can show beside it; empty
+	// means the display name is all there is to say.
+	Description string `json:"description,omitempty"`
+	// AddOn says this 'true'/'false' parameter switches on an optional part of the instance, so a
+	// client can offer it as something to add rather than as one more setting. It is presentation
+	// only and nothing here reads it: what the parameter switches on is whatever the stack already
+	// gates on it, a companion, parameter groups, or nothing beyond what its own template renders.
+	AddOn bool `json:"addOn,omitempty"`
 	// NotRendered says the stack's own helmfile never reads this parameter, so changing it changes
 	// nothing about what the stack renders and an edit that touches only it leaves the instance
 	// alone. It is for the parameters whose only job is to decide whether a companion belongs to the

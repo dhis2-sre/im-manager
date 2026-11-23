@@ -261,3 +261,37 @@ func TestParameterGroupsAreConsistent(t *testing.T) {
 		}
 	}
 }
+
+// assert every parameter offered as an add-on is a 'true'/'false' switch that says what it adds,
+// since a client shows it as something to add with nothing but its name and description to go by.
+func TestAddOnParametersAreDescribedSwitches(t *testing.T) {
+	for _, s := range All {
+		for name, parameter := range s.Parameters {
+			if !parameter.AddOn {
+				continue
+			}
+			assert.NotEmptyf(t, parameter.Description, "stack %q add-on %q has no description", s.Name, name)
+			if assert.NotNilf(t, parameter.DefaultValue, "stack %q add-on %q has no default", s.Name, name) {
+				assert.Containsf(t, []string{"true", "false"}, *parameter.DefaultValue, "stack %q add-on %q is not a 'true'/'false' switch", s.Name, name)
+			}
+		}
+	}
+}
+
+// assert the stacks API serves what a client needs to offer an add-on, and serves neither for a
+// parameter that is an ordinary setting.
+func TestResponseServesAddOnAndDescription(t *testing.T) {
+	parameters := make(map[string]StackParameterResponse)
+	for _, parameter := range toResponseStack(DHIS2V2).Parameters {
+		parameters[parameter.ParameterName] = parameter
+	}
+
+	for _, name := range []string{"DEPLOY_CHAP", "ENABLE_DORIS", "ENABLE_PGADMIN", "DEPLOY_GLOWROOT"} {
+		assert.Truef(t, parameters[name].AddOn, "%q is not served as an add-on", name)
+		assert.Equalf(t, DHIS2V2.Parameters[name].Description, parameters[name].Description, "%q", name)
+		assert.NotEmptyf(t, parameters[name].Description, "%q is served without a description", name)
+	}
+
+	assert.False(t, parameters["ALLOW_SUSPEND"].AddOn)
+	assert.Empty(t, parameters["ALLOW_SUSPEND"].Description)
+}
