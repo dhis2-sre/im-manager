@@ -367,7 +367,85 @@ func filterDatabases(databases []model.Database, test func(database *model.Datab
 	return
 }
 
+// Update renames the database, and its file store with it, and stores its description. Both names
+// are checked before any file is moved, since a move onto a taken name overwrites the file of the
+// record holding it.
 func (s Service) Update(ctx context.Context, d *model.Database) error {
+	fs, err := s.renamedFilestore(ctx, d)
+	if err != nil {
+		return err
+	}
+
+	err = s.refuseTakenName(ctx, d)
+	if err != nil {
+		return err
+	}
+	if fs != nil {
+		err = s.refuseTakenName(ctx, fs)
+		if err != nil {
+			return err
+		}
+	}
+
+	err = s.moveFile(d)
+	if err != nil {
+		return err
+	}
+
+	err = s.repository.Update(ctx, d)
+	if err != nil {
+		return err
+	}
+
+	if fs == nil {
+		return nil
+	}
+
+	err = s.moveFile(fs)
+	if err != nil {
+		return err
+	}
+
+	return s.repository.Update(ctx, fs)
+}
+
+// renamedFilestore returns the file store of the database under the name it gets from the
+// database, or nil when the database has none.
+func (s Service) renamedFilestore(ctx context.Context, d *model.Database) (*model.Database, error) {
+	if d.FilestoreID == 0 {
+		return nil, nil
+	}
+
+	fs, err := s.repository.FindById(ctx, d.FilestoreID)
+	if err != nil {
+		if errdef.IsNotFound(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	newName := strings.TrimSuffix(d.Name, ".pgc")
+	newName = strings.TrimSuffix(newName, ".sql.gz")
+	fs.Name = newName + "-fs.tar.gz"
+
+	return fs, nil
+}
+
+func (s Service) refuseTakenName(ctx context.Context, d *model.Database) error {
+	taken, err := s.repository.NameTaken(ctx, d)
+	if err != nil {
+		return err
+	}
+	if taken {
+		return errdef.NewDuplicated("database named %q already exists", d.Name)
+	}
+
+	return nil
+}
+
+// moveFile moves the file of the record to the key its group and name give it. A file already
+// there stays untouched, since S3 refuses to copy an object onto itself.
+func (s Service) moveFile(d *model.Database) error {
 	sourceUrl, err := url.Parse(d.Url)
 	if err != nil {
 		return err
@@ -375,6 +453,10 @@ func (s Service) Update(ctx context.Context, d *model.Database) error {
 
 	sourceKey := strings.TrimPrefix(sourceUrl.Path, "/")
 	destination := fmt.Sprintf("%s/%s", d.GroupName, d.Name)
+	if sourceKey == destination {
+		return nil
+	}
+
 	err = s.s3Client.Move(s.s3Bucket, sourceKey, destination)
 	if err != nil {
 		return err
@@ -382,49 +464,7 @@ func (s Service) Update(ctx context.Context, d *model.Database) error {
 
 	d.Url = fmt.Sprintf("s3://%s/%s", s.s3Bucket, destination)
 
-	updateSlug(d)
-
-	err = s.repository.Update(ctx, d)
-	if err != nil {
-		return err
-	}
-
-	// TODO: This shouldn't be necessary... But without it I get the following error: {"time":"2025-07-04T00:03:05.942946078Z","level":"ERROR","msg":"record not found","error":"record not found","query":"SELECT * FROM \"databases\" WHERE \"databases\".\"id\" = 0 ORDER BY \"databases\".\"id\" LIMIT 1","duration": 602547,"rows":0,"file":"/src/pkg/database/repository.go:63","correlationId":"4c39fa85-d8fb-4e75-a0cb-1ad4732b7f47","user":12}
-	if d.FilestoreID == 0 {
-		return nil
-	}
-
-	return s.updateFS(ctx, d)
-}
-
-func (s Service) updateFS(ctx context.Context, d *model.Database) error {
-	fs, err := s.repository.FindById(ctx, d.FilestoreID)
-	if err != nil {
-		if errdef.IsNotFound(err) {
-			return nil
-		}
-		return err
-	}
-
-	newName := strings.TrimSuffix(d.Name, ".pgc")
-	newName = strings.TrimSuffix(newName, ".sql.gz")
-	fs.Name = newName + "-fs.tar.gz"
-
-	sourceUrl, err := url.Parse(fs.Url)
-	if err != nil {
-		return err
-	}
-
-	sourceKey := strings.TrimPrefix(sourceUrl.Path, "/")
-	destination := fmt.Sprintf("%s/%s", fs.GroupName, fs.Name)
-	err = s.s3Client.Move(s.s3Bucket, sourceKey, destination)
-	if err != nil {
-		return err
-	}
-
-	fs.Url = fmt.Sprintf("s3://%s/%s", s.s3Bucket, destination)
-
-	return s.repository.Update(ctx, fs)
+	return nil
 }
 
 func (s Service) CreateExternalDownload(ctx context.Context, databaseID uint, expiration uint) (*model.ExternalDownload, error) {

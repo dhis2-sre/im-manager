@@ -69,6 +69,19 @@ func (r repository) FindById(ctx context.Context, id uint) (*model.Database, err
 	return d, err
 }
 
+// NameTaken reports whether another record of the group holds the name of the given one.
+func (r repository) NameTaken(ctx context.Context, d *model.Database) (bool, error) {
+	var count int64
+	err := r.db.
+		WithContext(ctx).
+		Model(&model.Database{}).
+		Where("group_name = ? AND name = ? AND id <> ?", d.GroupName, d.Name, d.ID).
+		Count(&count).
+		Error
+
+	return count > 0, err
+}
+
 func (r repository) FilestoreInUse(ctx context.Context, filestoreID uint) (bool, error) {
 	var count int64
 	err := r.db.
