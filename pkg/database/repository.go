@@ -69,12 +69,18 @@ func (r repository) FindById(ctx context.Context, id uint) (*model.Database, err
 	return d, err
 }
 
-func (r repository) UpdateId(ctx context.Context, oldID, newID uint) error {
+// UpdateFile records where the file of a database is and how large it is, leaving every other
+// column to whoever changed it while the file was written.
+func (r repository) UpdateFile(ctx context.Context, id uint, url string, size int64) error {
+	// only use ctx for values (logging) and not cancellation signals on cud operations for now. ctx
+	// cancellation can lead to rollbacks which we should decide individually.
+	ctx = context.WithoutCancel(ctx)
+
 	return r.db.
 		WithContext(ctx).
 		Model(&model.Database{}).
-		Where("id = ?", oldID).
-		Update("id", newID).
+		Where("id = ?", id).
+		Updates(map[string]any{"url": url, "size": size}).
 		Error
 }
 
