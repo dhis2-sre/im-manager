@@ -5,6 +5,7 @@ import (
 	"cmp"
 	"compress/gzip"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -542,7 +543,7 @@ func (s Service) SaveLocked(ctx context.Context, database *model.Database, insta
 	s.publishSave(ctx, database.UserID, database, "started", "", 0)
 
 	temporaryKey := fmt.Sprintf("%s/%s", database.GroupName, uuid.New().String())
-	size, err := s.dumpToKey(ctx, instance, stack, getFormat(database), database.Name, temporaryKey)
+	size, err := s.dumpToKey(ctx, instance, stack, getFormat(database), temporaryKey)
 	if err != nil {
 		return nil, s.failSave(ctx, database.UserID, database, err)
 	}
@@ -650,7 +651,7 @@ func (s Service) Dump(ctx context.Context, userId uint, database *model.Database
 
 func (s Service) dumpIntoRecord(ctx context.Context, database *model.Database, instance *model.DeploymentInstance, stack *stack.Stack, format string) (*model.Database, error) {
 	key := fmt.Sprintf("%s/%s", database.GroupName, database.Name)
-	size, err := s.dumpToKey(ctx, instance, stack, format, database.Name, key)
+	size, err := s.dumpToKey(ctx, instance, stack, format, key)
 	if err != nil {
 		return nil, err
 	}
@@ -675,7 +676,7 @@ func (s Service) failSave(ctx context.Context, userId uint, database *model.Data
 
 // dumpToKey streams a pg_dump of the instance's database to the given S3 key and returns the
 // number of bytes stored. A failed dump aborts its upload, so it leaves no object behind.
-func (s Service) dumpToKey(ctx context.Context, instance *model.DeploymentInstance, stack *stack.Stack, format, databaseName, key string) (int64, error) {
+func (s Service) dumpToKey(ctx context.Context, instance *model.DeploymentInstance, stack *stack.Stack, format, key string) (int64, error) {
 	group, err := s.groupService.Find(ctx, instance.GroupName)
 	if err != nil {
 		return 0, err
@@ -722,7 +723,7 @@ func (s Service) dumpToKey(ctx context.Context, instance *model.DeploymentInstan
 			uploadDone <- uploadResult{size, err}
 		}()
 
-		if err := execPgDump(ctx, client, namespace, podName, container, command, pw, format, databaseName); err != nil {
+		if err := execPgDump(ctx, client, namespace, podName, container, command, pw, format); err != nil {
 			<-uploadDone
 			return 0, err
 		}
@@ -746,7 +747,12 @@ const (
 	pgDumpTailSize     = 4096
 )
 
-func execPgDump(ctx context.Context, executor PodExecutor, namespace, podName, container string, command []string, pw *io.PipeWriter, format string, databaseName string) error {
+// errDumpTruncated marks a dump whose tail did not arrive. A pod exec can report success having
+// delivered only part of the command's stdout: when the command exits, whatever the cluster still
+// buffers on the way to the client can be dropped.
+var errDumpTruncated = errors.New("pg_dump output is truncated")
+
+func execPgDump(ctx context.Context, executor PodExecutor, namespace, podName, container string, command []string, pw *io.PipeWriter, format string) error {
 	// Errors have to reach the reader through the pipe, otherwise the upload sees a clean EOF and
 	// stores the partial dump as if it were complete.
 	fail := func(err error) error {
@@ -755,33 +761,72 @@ func execPgDump(ctx context.Context, executor PodExecutor, namespace, podName, c
 	}
 
 	var execWriter io.Writer = pw
-	var gzWriter *gzip.Writer
-	var tail *tailWriter
+	var verifier *plainDumpVerifier
 	if format == "plain" {
-		gzWriter = gzip.NewWriter(pw)
-		gzWriter.Name = strings.TrimSuffix(databaseName, ".gz")
-		tail = &tailWriter{w: gzWriter, max: pgDumpTailSize}
-		execWriter = tail
+		verifier = newPlainDumpVerifier()
+		execWriter = io.MultiWriter(pw, verifier)
 	}
 
 	var stderrBuf strings.Builder
-	if err := executor.Exec(ctx, namespace, podName, container, command, execWriter, &stderrBuf); err != nil {
+	err := executor.Exec(ctx, namespace, podName, container, command, execWriter, &stderrBuf)
+	if verifier != nil {
+		verifyErr := verifier.Close()
+		if err == nil && verifyErr != nil {
+			return fail(fmt.Errorf("%w, %v: %s", errDumpTruncated, verifyErr, stderrBuf.String()))
+		}
+	}
+	if err != nil {
 		return fail(fmt.Errorf("%w: %s", err, stderrBuf.String()))
 	}
 
-	// A pod exec can report success having delivered only part of pg_dump's stdout, and closing the
-	// gzip writer then seals a valid gzip stream around a truncated dump.
-	if tail != nil && !tail.contains(pgDumpPlainTrailer) {
-		return fail(fmt.Errorf("pg_dump output is truncated, %q not found in the last %d bytes: %s", pgDumpPlainTrailer, pgDumpTailSize, stderrBuf.String()))
-	}
-
-	if gzWriter != nil {
-		if err := gzWriter.Close(); err != nil {
-			return fail(fmt.Errorf("close gzip writer: %v", err))
-		}
-	}
-
 	return pw.Close()
+}
+
+// plainDumpVerifier reads the gzip stream pg_dump produces for a plain dump while it is uploaded
+// and tells whether it is whole: the stream has to end as gzip does and the text has to end with
+// the line pg_dump writes last.
+type plainDumpVerifier struct {
+	writer *io.PipeWriter
+	done   chan error
+}
+
+func newPlainDumpVerifier() *plainDumpVerifier {
+	reader, writer := io.Pipe()
+	verifier := &plainDumpVerifier{writer: writer, done: make(chan error, 1)}
+
+	go func() {
+		tail := &tailWriter{w: io.Discard, max: pgDumpTailSize}
+		err := gunzip(tail, reader)
+		if err == nil && !tail.contains(pgDumpPlainTrailer) {
+			err = fmt.Errorf("%q not found in the last %d bytes", pgDumpPlainTrailer, pgDumpTailSize)
+		}
+		// Keep reading after a failure, so the exec writing to the pipe is never blocked.
+		_, _ = io.Copy(io.Discard, reader)
+		verifier.done <- err
+	}()
+
+	return verifier
+}
+
+func gunzip(w io.Writer, r io.Reader) error {
+	gzReader, err := gzip.NewReader(r)
+	if err != nil {
+		return err
+	}
+
+	_, err = io.Copy(w, gzReader) //nolint:gosec // the text is only checked while it passes, never kept
+
+	return err
+}
+
+func (v *plainDumpVerifier) Write(p []byte) (int, error) {
+	return v.writer.Write(p)
+}
+
+// Close ends the stream and reports whether it was a whole dump.
+func (v *plainDumpVerifier) Close() error {
+	_ = v.writer.Close()
+	return <-v.done
 }
 
 // tailWriter passes writes through while retaining up to max trailing bytes.
@@ -909,10 +954,16 @@ func redactPgPassword(command []string) []string {
 	return redacted
 }
 
+// buildPgDumpCommand builds the pg_dump command run in the database pod. A plain dump is compressed
+// there rather than here: the text is many times larger, and the more of it is still on its way
+// when pg_dump exits, the more likely the exec loses its tail.
 func buildPgDumpCommand(dump *pg.Dump, format string) []string {
 	options := dump.Options
 	options = append(options, dump.Postgres.Parse()...)
 	options = append(options, fmt.Sprintf("-F%s", format))
+	if format == "plain" {
+		options = append(options, "--compress=6")
+	}
 	options = append(options, dump.IgnoreTableDataToString()...)
 
 	return append([]string{"env", "PGPASSWORD=" + dump.Password, "pg_dump"}, options...)
