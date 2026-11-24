@@ -37,11 +37,11 @@ var DHIS2V2 = withGroupedParameters(Stack{
 			"GOOGLE_AUTH_PRIVATE_KEY_ID":      {Priority: 36, DisplayName: "Google auth private key id", DefaultValue: &coreDefaults.googleAuthPrivateKeyId, Sensitive: true},
 			"GOOGLE_AUTH_CLIENT_EMAIL":        {Priority: 37, DisplayName: "Google auth client email", DefaultValue: &coreDefaults.googleAuthClientEmail, Sensitive: true},
 			"GOOGLE_AUTH_CLIENT_ID":           {Priority: 38, DisplayName: "Google auth client id", DefaultValue: &coreDefaults.googleAuthClientId, Sensitive: true},
-			"DEPLOY_CHAP":                     {Priority: 39, DisplayName: "Deploy CHAP", DefaultValue: &coreDefaults.deployChap, Required: true},
-			"ENABLE_DORIS":                    {Priority: 40, DisplayName: "Use Doris as the analytics database", DefaultValue: &dhis2V2Defaults.enableDoris, Required: true},
+			"DEPLOY_CHAP":                     {Priority: 39, DisplayName: "CHAP", Description: "Climate and health modelling for DHIS2.", DefaultValue: &coreDefaults.deployChap, Required: true, AddOn: true},
+			"ENABLE_DORIS":                    {Priority: 40, DisplayName: "Doris", Description: "A separate database for analytics.", DefaultValue: &dhis2V2Defaults.enableDoris, Required: true, AddOn: true},
 			"ALLOW_SUSPEND":                   {Priority: 57, DisplayName: "Allow the application to be suspended", DefaultValue: &coreDefaults.allowSuspend, Required: true},
-			"DEPLOY_GLOWROOT":                 {Priority: 58, DisplayName: "Deploy Glowroot", DefaultValue: &coreDefaults.deployGlowroot, Required: true},
-			"ENABLE_PGADMIN":                  {Priority: 56, DisplayName: "Deploy pgAdmin", DefaultValue: &pgAdminDefaults.enabled, NotRendered: true},
+			"DEPLOY_GLOWROOT":                 {Priority: 58, DisplayName: "Glowroot", Description: "Performance monitoring for DHIS2.", DefaultValue: &coreDefaults.deployGlowroot, Required: true, AddOn: true},
+			"ENABLE_PGADMIN":                  {Priority: 56, DisplayName: "pgAdmin", Description: "Web console for the instance's database.", DefaultValue: &pgAdminDefaults.enabled, NotRendered: true, AddOn: true},
 		}},
 		{Name: "db", Title: "PostgreSQL", Parameters: StackParameters{
 			"DATABASE_ID":                  {Priority: 4, DisplayName: "Database", ImmutableReason: "the database is seeded once by a marker-guarded job, so pointing the instance at another database after it has been deployed has no effect", Required: true},
@@ -98,6 +98,10 @@ var DHIS2V2 = withGroupedParameters(Stack{
 		// pgAdmin consumes the database connection parameters this stack provides, so it can be
 		// deployed alongside one; ENABLE_PGADMIN is where the user says they want it.
 		{Stack: PgAdmin, When: whenPgAdminIsEnabled},
+	},
+	Endpoints: []Endpoint{
+		{PathSuffix: ""},
+		{PathSuffix: "-glowroot", When: whenGlowrootIsDeployed},
 	},
 	Components: []kube.Component{
 		DHIS2CoreComponent{BaseComponent: kube.BaseComponent{
@@ -191,6 +195,10 @@ var dhis2V2Defaults = struct {
 // Doris is bundled by the chart rather than being a stack of its own, the same way MinIO is, so the
 // condition gates both the parameters and the component.
 var whenDorisIsEnabled = &kube.Condition{Parameter: "ENABLE_DORIS", Equals: "true"}
+
+// Glowroot is an agent inside the core pod rather than a component, so all the condition gates is
+// the address the chart serves its interface at.
+var whenGlowrootIsDeployed = &kube.Condition{Parameter: "DEPLOY_GLOWROOT", Equals: "true"}
 
 // The storage conditions mirror the chart's own gating of each file store backend on STORAGE_TYPE.
 // The minio condition doubles as the minio component's presence predicate, so the deploy form's

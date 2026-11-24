@@ -24,6 +24,10 @@ type Stack struct {
 	Requires []Stack `json:"requires"`
 	// Companions are optional stacks that can be deployed alongside this stack. Certain parameters can require a companion stack.
 	Companions []Companion `json:"companions"`
+	// Endpoints are the addresses an instance of this stack is reached at, each the path the stack's
+	// helmfile gives an ingress. A stack reached only through another, as chap is through the route
+	// it registers in DHIS2, declares none.
+	Endpoints []Endpoint `json:"endpoints,omitempty"`
 	// Components are the addressable parts a deployed instance of this stack consists of. Their
 	// names equal the im-type label values the stack's helmfile applies.
 	Components []kube.Component `json:"-"`
@@ -41,6 +45,17 @@ func (s Stack) ReleaseName(instanceName string) string {
 type Companion struct {
 	Stack Stack           `json:"stack"`
 	When  *kube.Condition `json:"when,omitempty"`
+}
+
+// Endpoint is an address an instance is reached at: its hostname and path, followed by PathSuffix.
+// An empty suffix is the instance's own address. A condition means the address exists only while it
+// holds over the stack's parameters, as Glowroot's does while DEPLOY_GLOWROOT is on. The suffix is
+// data so a client builds and offers the address from the same declaration the helmfile is checked
+// against, rather than keeping a copy of the template's path.
+// swagger:model StackEndpoint
+type Endpoint struct {
+	PathSuffix string          `json:"pathSuffix"`
+	When       *kube.Condition `json:"when,omitempty"`
 }
 
 // ParameterGroup is a named section of a stack's parameters, naturally the component the
@@ -80,6 +95,14 @@ type StackParameter struct {
 	// empty means it can. The update path rejects a change to such a parameter and a client renders
 	// it read only with this as the explanation, so the two cannot disagree about what is editable.
 	ImmutableReason string `json:"immutableReason,omitempty"`
+	// Description says what the parameter is for in a sentence a client can show beside it; empty
+	// means the display name is all there is to say.
+	Description string `json:"description,omitempty"`
+	// AddOn says this 'true'/'false' parameter switches on an optional part of the instance, so a
+	// client can offer it as something to add rather than as one more setting. It is presentation
+	// only and nothing here reads it: what the parameter switches on is whatever the stack already
+	// gates on it, a companion, parameter groups, an endpoint, or nothing a client can show.
+	AddOn bool `json:"addOn,omitempty"`
 	// NotRendered says the stack's own helmfile never reads this parameter, so changing it changes
 	// nothing about what the stack renders and an edit that touches only it leaves the instance
 	// alone. It is for the parameters whose only job is to decide whether a companion belongs to the
