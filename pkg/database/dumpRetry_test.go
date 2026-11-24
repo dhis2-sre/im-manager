@@ -3,6 +3,7 @@ package database
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"testing"
 
@@ -51,6 +52,32 @@ func TestDumpWithRetries(t *testing.T) {
 
 		require.ErrorContains(t, err, "permission denied")
 		assert.Equal(t, 1, attempts, "a genuine dump error is reported immediately")
+	})
+
+	t.Run("RetriesADumpThatArrivedTruncated", func(t *testing.T) {
+		attempts := 0
+		size, err := service.dumpWithRetries(context.Background(), func() (int64, error) {
+			attempts++
+			if attempts < 3 {
+				return 0, fmt.Errorf("%w, unexpected EOF", errDumpTruncated)
+			}
+			return 4096, nil
+		})
+
+		require.NoError(t, err)
+		assert.Equal(t, int64(4096), size)
+		assert.Equal(t, 3, attempts)
+	})
+
+	t.Run("GivesUpOnADumpThatKeepsArrivingTruncated", func(t *testing.T) {
+		attempts := 0
+		_, err := service.dumpWithRetries(context.Background(), func() (int64, error) {
+			attempts++
+			return 0, fmt.Errorf("%w, unexpected EOF", errDumpTruncated)
+		})
+
+		require.ErrorIs(t, err, errDumpTruncated)
+		assert.Equal(t, truncatedDumpAttempts, attempts)
 	})
 
 	t.Run("StopsWhenTheContextIsCancelled", func(t *testing.T) {

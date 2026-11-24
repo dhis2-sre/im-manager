@@ -871,21 +871,34 @@ func isTransientPostgresState(err error) bool {
 }
 
 const (
-	dumpRetryBudget   = 2 * time.Minute
-	dumpRetryInterval = 5 * time.Second
+	dumpRetryBudget       = 2 * time.Minute
+	dumpRetryInterval     = 5 * time.Second
+	truncatedDumpAttempts = 3
 )
 
 // dumpWithRetries retries the dump while postgres reports a transient state, so a save issued
 // moments after a deploy waits for seeding to finish instead of failing with the server's
-// mid-restart message. Any other error fails immediately: retrying a genuine dump error would only
-// delay the report.
+// mid-restart message. A dump that arrived truncated is retried a few times as well, since the next
+// attempt usually arrives whole. Any other error fails immediately: retrying a genuine dump error
+// would only delay the report.
 func (s Service) dumpWithRetries(ctx context.Context, attempt func() (int64, error)) (int64, error) {
 	deadline := time.Now().Add(dumpRetryBudget)
+	truncated := 0
 	for {
 		size, err := attempt()
 		if err == nil {
 			return size, nil
 		}
+
+		if errors.Is(err, errDumpTruncated) {
+			truncated++
+			if truncated >= truncatedDumpAttempts {
+				return 0, err
+			}
+			s.logger.WarnContext(ctx, "the dump arrived truncated, retrying", "error", err, "attempt", truncated)
+			continue
+		}
+
 		if !isTransientPostgresState(err) || time.Now().After(deadline) {
 			return 0, err
 		}
