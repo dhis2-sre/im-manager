@@ -902,6 +902,11 @@ definitions:
                     $ref: '#/definitions/StackCompanion'
                 type: array
                 x-go-name: Companions
+            endpoints:
+                items:
+                    $ref: '#/definitions/StackEndpoint'
+                type: array
+                x-go-name: Endpoints
             name:
                 type: string
                 x-go-name: Name
@@ -936,6 +941,22 @@ definitions:
                 $ref: '#/definitions/Condition'
         type: object
         x-go-name: StackCompanionResponse
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/stack
+    StackEndpoint:
+        description: |-
+            An empty suffix is the instance's own address. A condition means the address exists only while it
+            holds over the stack's parameters, as Glowroot's does while DEPLOY_GLOWROOT is on. The suffix is
+            data so a client builds and offers the address from the same declaration the helmfile is checked
+            against, rather than keeping a copy of the template's path.
+        properties:
+            pathSuffix:
+                type: string
+                x-go-name: PathSuffix
+            when:
+                $ref: '#/definitions/Condition'
+        title: 'Endpoint is an address an instance is reached at: its hostname and path, followed by PathSuffix.'
+        type: object
+        x-go-name: Endpoint
         x-go-package: github.com/dhis2-sre/im-manager/pkg/stack
     StackParameter:
         properties:

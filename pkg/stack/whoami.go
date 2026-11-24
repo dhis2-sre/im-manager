@@ -12,6 +12,7 @@ var WhoamiGo = Stack{
 		"REPLICA_COUNT":     {Priority: 4, DisplayName: "Replica Count", DefaultValue: &whoamiGoDefaults.replicaCount, Required: true},
 		"CHART_VERSION":     {Priority: 5, DisplayName: "Chart Version", DefaultValue: &whoamiGoDefaults.chartVersion, Required: true},
 	},
+	Endpoints: []Endpoint{{PathSuffix: ""}},
 	Components: []kube.Component{
 		WhoamiComponent{BaseComponent: kube.BaseComponent{Name: "whoami"}},
 	},

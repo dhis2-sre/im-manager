@@ -40,7 +40,7 @@ var DHIS2V2 = withGroupedParameters(Stack{
 			"DEPLOY_CHAP":                     {Priority: 39, DisplayName: "CHAP", Description: "Climate and health modelling for DHIS2.", DefaultValue: &coreDefaults.deployChap, Required: true, AddOn: true},
 			"ENABLE_DORIS":                    {Priority: 40, DisplayName: "Doris", Description: "A separate database for analytics.", DefaultValue: &dhis2V2Defaults.enableDoris, Required: true, AddOn: true},
 			"ALLOW_SUSPEND":                   {Priority: 57, DisplayName: "Allow the application to be suspended", DefaultValue: &coreDefaults.allowSuspend, Required: true},
-			"DEPLOY_GLOWROOT":                 {Priority: 58, DisplayName: "Glowroot", Description: "Performance monitoring for DHIS2, served at the instance's address followed by -glowroot.", DefaultValue: &coreDefaults.deployGlowroot, Required: true, AddOn: true},
+			"DEPLOY_GLOWROOT":                 {Priority: 58, DisplayName: "Glowroot", Description: "Performance monitoring for DHIS2.", DefaultValue: &coreDefaults.deployGlowroot, Required: true, AddOn: true},
 			"ENABLE_PGADMIN":                  {Priority: 56, DisplayName: "pgAdmin", Description: "Web console for the instance's database.", DefaultValue: &pgAdminDefaults.enabled, NotRendered: true, AddOn: true},
 		}},
 		{Name: "db", Title: "PostgreSQL", Parameters: StackParameters{
@@ -98,6 +98,10 @@ var DHIS2V2 = withGroupedParameters(Stack{
 		// pgAdmin consumes the database connection parameters this stack provides, so it can be
 		// deployed alongside one; ENABLE_PGADMIN is where the user says they want it.
 		{Stack: PgAdmin, When: whenPgAdminIsEnabled},
+	},
+	Endpoints: []Endpoint{
+		{PathSuffix: ""},
+		{PathSuffix: "-glowroot", When: whenGlowrootIsDeployed},
 	},
 	Components: []kube.Component{
 		DHIS2CoreComponent{BaseComponent: kube.BaseComponent{
@@ -191,6 +195,10 @@ var dhis2V2Defaults = struct {
 // Doris is bundled by the chart rather than being a stack of its own, the same way MinIO is, so the
 // condition gates both the parameters and the component.
 var whenDorisIsEnabled = &kube.Condition{Parameter: "ENABLE_DORIS", Equals: "true"}
+
+// Glowroot is an agent inside the core pod rather than a component, so all the condition gates is
+// the address the chart serves its interface at.
+var whenGlowrootIsDeployed = &kube.Condition{Parameter: "DEPLOY_GLOWROOT", Equals: "true"}
 
 // The storage conditions mirror the chart's own gating of each file store backend on STORAGE_TYPE.
 // The minio condition doubles as the minio component's presence predicate, so the deploy form's

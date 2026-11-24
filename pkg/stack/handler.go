@@ -67,6 +67,7 @@ func toResponseStack(stack Stack) StackResponse {
 	}
 
 	s.ParameterGroups = stack.ParameterGroups
+	s.Endpoints = stack.Endpoints
 
 	for parameterName, parameter := range stack.Parameters {
 		s.Parameters = append(s.Parameters, StackParameterResponse{
@@ -115,6 +116,7 @@ type StackResponse struct {
 	ParameterGroups []ParameterGroup         `json:"parameterGroups,omitempty"`
 	Requires        []StackResponse          `json:"requires,omitempty"`
 	Companions      []StackCompanionResponse `json:"companions,omitempty"`
+	Endpoints       []Endpoint               `json:"endpoints,omitempty"`
 }
 
 // StackCompanionResponse names a stack that can be deployed alongside this one. Like Requires it
