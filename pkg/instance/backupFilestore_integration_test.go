@@ -1,6 +1,8 @@
 package instance
 
 import (
+	"bytes"
+	"compress/gzip"
 	"context"
 	"fmt"
 	"io"
@@ -21,10 +23,36 @@ import (
 	"gorm.io/gorm"
 )
 
+// tarballOf streams its content compressed, as the archive of a file store is.
 type tarballOf string
 
 func (content tarballOf) stream(_ context.Context, w io.Writer) error {
-	_, err := io.WriteString(w, string(content))
+	_, err := w.Write(compressed(string(content)))
+	return err
+}
+
+func compressed(content string) []byte {
+	var buffer bytes.Buffer
+	writer := gzip.NewWriter(&buffer)
+	_, _ = io.WriteString(writer, content)
+	_ = writer.Close()
+
+	return buffer.Bytes()
+}
+
+// cutShortFor streams an archive whose tail is missing the given number of times, then whole.
+type cutShortFor struct {
+	times    int
+	attempts *int
+}
+
+func (c cutShortFor) stream(_ context.Context, w io.Writer) error {
+	*c.attempts++
+	archive := compressed("files of the retry")
+	if *c.attempts <= c.times {
+		archive = archive[:len(archive)-6]
+	}
+	_, err := w.Write(archive)
 	return err
 }
 
@@ -84,6 +112,18 @@ func (f backupFixture) filestores(t *testing.T) []model.Database {
 	return filestores
 }
 
+// archive returns the content of the compressed archive stored under the key.
+func (f backupFixture) archive(t *testing.T, key string) string {
+	t.Helper()
+
+	reader, err := gzip.NewReader(bytes.NewReader(f.s3.GetObject(t, key)))
+	require.NoError(t, err)
+	content, err := io.ReadAll(reader)
+	require.NoError(t, err)
+
+	return string(content)
+}
+
 func (f backupFixture) reload(t *testing.T, id uint) model.Database {
 	t.Helper()
 
@@ -103,12 +143,12 @@ func TestBackupFilestore(t *testing.T) {
 
 		require.NoError(t, f.service.backupFilestore(context.Background(), tarballOf("files"), "fresh-fs.tar.gz", database))
 
-		assert.Equal(t, "files", string(f.s3.GetObject(t, "group-name/fresh-fs.tar.gz")))
+		assert.Equal(t, "files", f.archive(t, "group-name/fresh-fs.tar.gz"))
 		filestores := f.filestores(t)
 		require.Len(t, filestores, 1)
 		assert.Equal(t, "fresh-fs.tar.gz", filestores[0].Name)
 		assert.Equal(t, fmt.Sprintf("s3://%s/group-name/fresh-fs.tar.gz", f.s3.Bucket), filestores[0].Url)
-		assert.Equal(t, int64(len("files")), filestores[0].Size)
+		assert.Equal(t, int64(len(compressed("files"))), filestores[0].Size)
 		assert.Equal(t, f.user.ID, filestores[0].UserID)
 		assert.Equal(t, filestores[0].ID, f.reload(t, database.ID).FilestoreID)
 		assert.Equal(t, filestores[0].ID, database.FilestoreID)
@@ -123,7 +163,7 @@ func TestBackupFilestore(t *testing.T) {
 
 		require.NoError(t, f.service.backupFilestore(context.Background(), tarballOf("files"), "elsewhere-fs.tar.gz", database))
 
-		assert.Equal(t, "files", string(f.s3.GetObject(t, "other-group/elsewhere-fs.tar.gz")))
+		assert.Equal(t, "files", f.archive(t, "other-group/elsewhere-fs.tar.gz"))
 		filestores := f.filestores(t)
 		require.Len(t, filestores, 1)
 		assert.Equal(t, "other-group", filestores[0].GroupName)
@@ -139,14 +179,14 @@ func TestBackupFilestore(t *testing.T) {
 
 		require.NoError(t, f.service.backupFilestore(context.Background(), tarballOf("after the save"), "copy-fs.tar.gz", database))
 
-		assert.Equal(t, "after the save", string(f.s3.GetObject(t, "group-name/copy.fs.tar.gz")))
+		assert.Equal(t, "after the save", f.archive(t, "group-name/copy.fs.tar.gz"))
 		_, err := f.s3.TryGetObject("group-name/copy-fs.tar.gz")
 		assert.Error(t, err, "nothing is written under the name a backup would pick for a new file store")
 		filestores := f.filestores(t)
 		require.Len(t, filestores, 1)
 		assert.Equal(t, filestore.ID, filestores[0].ID)
 		assert.Equal(t, "copy.fs.tar.gz", filestores[0].Name)
-		assert.Equal(t, int64(len("after the save")), filestores[0].Size)
+		assert.Equal(t, int64(len(compressed("after the save"))), filestores[0].Size)
 		assert.Equal(t, filestore.ID, f.reload(t, database.ID).FilestoreID)
 	})
 
@@ -177,10 +217,39 @@ func TestBackupFilestore(t *testing.T) {
 
 		require.NoError(t, f.service.backupFilestore(context.Background(), tarballOf("files after the save"), "saved-fs.tar.gz", database))
 
-		assert.Equal(t, "files after the save", string(f.s3.GetObject(t, "group-name/shared-fs.tar.gz")))
+		assert.Equal(t, "files after the save", f.archive(t, "group-name/shared-fs.tar.gz"))
 		require.Len(t, f.filestores(t), 1)
 		assert.Equal(t, shared.ID, f.reload(t, database.ID).FilestoreID)
 		assert.Equal(t, shared.ID, f.reload(t, other.ID).FilestoreID)
+	})
+
+	// A pod exec can report success having delivered only part of the archive.
+	t.Run("StreamsAnArchiveAgainThatArrivedTruncated", func(t *testing.T) {
+		t.Parallel()
+		f := setupBackupFixture(t)
+		database := f.createDatabase(t, "retried.sql.gz", 0)
+		attempts := 0
+
+		require.NoError(t, f.service.backupFilestore(context.Background(), cutShortFor{times: 1, attempts: &attempts}, "retried-fs.tar.gz", database))
+
+		assert.Equal(t, 2, attempts)
+		assert.Equal(t, "files of the retry", f.archive(t, "group-name/retried-fs.tar.gz"))
+		assert.NotZero(t, f.reload(t, database.ID).FilestoreID)
+	})
+
+	t.Run("KeepsTheFilestoreWhenTheArchiveKeepsArrivingTruncated", func(t *testing.T) {
+		t.Parallel()
+		f := setupBackupFixture(t)
+		filestore := f.createFilestore(t, "kept-fs.tar.gz", "files of the last good save")
+		database := f.createDatabase(t, "kept.sql.gz", filestore.ID)
+		attempts := 0
+
+		err := f.service.backupFilestore(context.Background(), cutShortFor{times: 10, attempts: &attempts}, "kept-fs.tar.gz", database)
+
+		require.ErrorIs(t, err, errArchiveTruncated)
+		assert.Equal(t, truncatedArchiveAttempts, attempts)
+		assert.Equal(t, "files of the last good save", string(f.s3.GetObject(t, "group-name/kept-fs.tar.gz")), "a truncated archive must not replace the one already stored")
+		assert.Equal(t, int64(len("files of the last good save")), f.filestores(t)[0].Size)
 	})
 
 	// A backup can run for minutes, and the database it was started with is a copy from before.

@@ -3,7 +3,6 @@ package database
 import (
 	"bytes"
 	"cmp"
-	"compress/gzip"
 	"context"
 	"errors"
 	"fmt"
@@ -770,7 +769,7 @@ func execPgDump(ctx context.Context, executor PodExecutor, namespace, podName, c
 	var stderrBuf strings.Builder
 	err := executor.Exec(ctx, namespace, podName, container, command, execWriter, &stderrBuf)
 	if verifier != nil {
-		verifyErr := verifier.Close()
+		verifyErr := verifier.close()
 		if err == nil && verifyErr != nil {
 			return fail(fmt.Errorf("%w, %v: %s", errDumpTruncated, verifyErr, stderrBuf.String()))
 		}
@@ -786,47 +785,26 @@ func execPgDump(ctx context.Context, executor PodExecutor, namespace, podName, c
 // and tells whether it is whole: the stream has to end as gzip does and the text has to end with
 // the line pg_dump writes last.
 type plainDumpVerifier struct {
-	writer *io.PipeWriter
-	done   chan error
+	*storage.GzipVerifier
+	tail *tailWriter
 }
 
 func newPlainDumpVerifier() *plainDumpVerifier {
-	reader, writer := io.Pipe()
-	verifier := &plainDumpVerifier{writer: writer, done: make(chan error, 1)}
+	tail := &tailWriter{w: io.Discard, max: pgDumpTailSize}
 
-	go func() {
-		tail := &tailWriter{w: io.Discard, max: pgDumpTailSize}
-		err := gunzip(tail, reader)
-		if err == nil && !tail.contains(pgDumpPlainTrailer) {
-			err = fmt.Errorf("%q not found in the last %d bytes", pgDumpPlainTrailer, pgDumpTailSize)
-		}
-		// Keep reading after a failure, so the exec writing to the pipe is never blocked.
-		_, _ = io.Copy(io.Discard, reader)
-		verifier.done <- err
-	}()
-
-	return verifier
+	return &plainDumpVerifier{GzipVerifier: storage.NewGzipVerifier(tail), tail: tail}
 }
 
-func gunzip(w io.Writer, r io.Reader) error {
-	gzReader, err := gzip.NewReader(r)
+func (v *plainDumpVerifier) close() error {
+	err := v.Close()
 	if err != nil {
 		return err
 	}
+	if !v.tail.contains(pgDumpPlainTrailer) {
+		return fmt.Errorf("%q not found in the last %d bytes", pgDumpPlainTrailer, pgDumpTailSize)
+	}
 
-	_, err = io.Copy(w, gzReader) //nolint:gosec // the text is only checked while it passes, never kept
-
-	return err
-}
-
-func (v *plainDumpVerifier) Write(p []byte) (int, error) {
-	return v.writer.Write(p)
-}
-
-// Close ends the stream and reports whether it was a whole dump.
-func (v *plainDumpVerifier) Close() error {
-	_ = v.writer.Close()
-	return <-v.done
+	return nil
 }
 
 // tailWriter passes writes through while retaining up to max trailing bytes.
