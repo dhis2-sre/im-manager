@@ -979,7 +979,7 @@ func buildPgDumpCommand(dump *pg.Dump, format string) []string {
 	}
 	options = append(options, dump.IgnoreTableDataToString()...)
 
-	return append([]string{"env", "PGPASSWORD=" + dump.Password, "pg_dump"}, options...)
+	return append([]string{"env", "PGPASSWORD=" + dump.Password}, kube.Lingering(append([]string{"pg_dump"}, options...)...)...)
 }
 
 func (s Service) StreamUpload(ctx context.Context, database model.Database, group *model.Group, body io.Reader, contentType string, contentLength int64) (model.Database, error) {

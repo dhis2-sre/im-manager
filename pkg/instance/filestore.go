@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/dhis2-sre/im-manager/pkg/kube"
 	"github.com/dhis2-sre/im-manager/pkg/model"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
@@ -282,12 +283,12 @@ func (m minioExecSource) stream(ctx context.Context, w io.Writer) error {
 	if err := m.run(ctx, io.Discard, "env", minioClientHostEnv, "mc", "mirror", "--quiet", "backup/dhis2", tmpDir); err != nil {
 		return err
 	}
-	return m.run(ctx, w, "tar", "-C", tmpDir, "-czf", "-", ".")
+	return m.run(ctx, w, kube.Lingering("tar", "-C", tmpDir, "-czf", "-", ".")...)
 }
 
 func filesystemTarCommand(dhis2Home string) []string {
 	files := strings.TrimRight(dhis2Home, "/") + "/files"
-	return []string{"tar", "-C", files, "-czf", "-", "."}
+	return kube.Lingering("tar", "-C", files, "-czf", "-", ".")
 }
 
 func storageType(core *model.DeploymentInstance) string {
