@@ -1,4 +1,32 @@
 
+<a name="0.79.2"></a>
+## [0.79.2](https://github.com/dhis2-sre/im-manager/compare/0.79.1...0.79.2)
+
+> 2026-11-24
+
+### Fix
+
+* reject a file store archive that arrived truncated and stream it again
+* keep the exec open a moment after a dump or archive is written
+* retry a dump that arrived truncated
+* compress a plain dump in the pod so the exec keeps its tail
+* refuse a copy onto a taken name before copying files
+* name a file store after the full name of its database
+* refuse a rename onto a taken name before moving files
+* refuse saving over a database from an instance deployed without one
+* remove the rows failed saves left behind
+* keep a file store that another database still points at
+* remove the record of a save as whose dump failed
+* save a database in place instead of swapping its record
+* resolve the file store of a save before uploading over it
+* store a file store and its link to the database in one transaction
+* relink the file stores databases lost on save
+* reuse a file store no database points at instead of failing the save
+* keep the file store and description of a database across saves
+* give a copied file store its owner so copying a database with one succeeds ([#1838](https://github.com/dhis2-sre/im-manager/issues/1838))
+* keep the source size when copying a database ([#1830](https://github.com/dhis2-sre/im-manager/issues/1830))
+
+
 <a name="0.79.1"></a>
 ## [0.79.1](https://github.com/dhis2-sre/im-manager/compare/0.79.0...0.79.1)
 
@@ -483,7 +511,7 @@
 
 
 <a name="v0.67.0"></a>
-## [v0.67.0](https://github.com/dhis2-sre/im-manager/compare/v0.66.0...v0.67.0)
+## [v0.67.0](https://github.com/dhis2-sre/im-manager/compare/0.66.0...v0.67.0)
 
 > 2026-05-07
 
@@ -508,21 +536,16 @@
 * add SaveAs and BackupService integration tests ([#1375](https://github.com/dhis2-sre/im-manager/issues/1375))
 
 
-<a name="v0.66.0"></a>
-## [v0.66.0](https://github.com/dhis2-sre/im-manager/compare/0.66.0...v0.66.0)
-
-> 2026-04-22
-
-
 <a name="0.66.0"></a>
-## [0.66.0](https://github.com/dhis2-sre/im-manager/compare/v0.65.3...0.66.0)
+## [0.66.0](https://github.com/dhis2-sre/im-manager/compare/v0.66.0...0.66.0)
 
 > 2026-04-22
 
-### Chore
 
-* replace (Bitnami) Redis with Valkey ([#1444](https://github.com/dhis2-sre/im-manager/issues/1444))
-* generate change log
+<a name="v0.66.0"></a>
+## [v0.66.0](https://github.com/dhis2-sre/im-manager/compare/0.65.3...v0.66.0)
+
+> 2026-04-22
 
 ### Docs
 
@@ -535,27 +558,27 @@
 ### Fix
 
 * persist group namespace in findOrCreate ([#1465](https://github.com/dhis2-sre/im-manager/issues/1465))
-* use group-ID-qualified name in PVC label selector ([#1452](https://github.com/dhis2-sre/im-manager/issues/1452))
-
-
-<a name="v0.65.3"></a>
-## [v0.65.3](https://github.com/dhis2-sre/im-manager/compare/0.65.3...v0.65.3)
-
-> 2026-04-16
-
-### Fix
-
-* use group-ID-qualified name in PVC label selector ([#1452](https://github.com/dhis2-sre/im-manager/issues/1452))
 
 
 <a name="0.65.3"></a>
-## [0.65.3](https://github.com/dhis2-sre/im-manager/compare/0.65.2...0.65.3)
+## [0.65.3](https://github.com/dhis2-sre/im-manager/compare/v0.65.3...0.65.3)
 
 > 2026-04-16
 
 ### Chore
 
 * replace (Bitnami) Redis with Valkey ([#1444](https://github.com/dhis2-sre/im-manager/issues/1444))
+* generate change log
+
+### Fix
+
+* use group-ID-qualified name in PVC label selector ([#1452](https://github.com/dhis2-sre/im-manager/issues/1452))
+
+
+<a name="v0.65.3"></a>
+## [v0.65.3](https://github.com/dhis2-sre/im-manager/compare/0.65.2...v0.65.3)
+
+> 2026-04-16
 
 ### Fix
 
@@ -1112,7 +1135,7 @@
 
 
 <a name="v0.45.0"></a>
-## [v0.45.0](https://github.com/dhis2-sre/im-manager/compare/v0.43.0...v0.45.0)
+## [v0.45.0](https://github.com/dhis2-sre/im-manager/compare/v0.44.0...v0.45.0)
 
 > 2024-11-27
 
@@ -1122,14 +1145,14 @@
 * order public instances as stable, development and nightly
 
 
-<a name="v0.43.0"></a>
-## [v0.43.0](https://github.com/dhis2-sre/im-manager/compare/v0.44.0...v0.43.0)
+<a name="v0.44.0"></a>
+## [v0.44.0](https://github.com/dhis2-sre/im-manager/compare/v0.43.0...v0.44.0)
 
 > 2024-11-27
 
 
-<a name="v0.44.0"></a>
-## [v0.44.0](https://github.com/dhis2-sre/im-manager/compare/v0.42.0...v0.44.0)
+<a name="v0.43.0"></a>
+## [v0.43.0](https://github.com/dhis2-sre/im-manager/compare/v0.42.0...v0.43.0)
 
 > 2024-11-27
 
@@ -2370,22 +2393,13 @@
 
 
 <a name="v0.5.10"></a>
-## [v0.5.10](https://github.com/dhis2-sre/im-manager/compare/v0.5.9...v0.5.10)
+## [v0.5.10](https://github.com/dhis2-sre/im-manager/compare/v0.5.8...v0.5.10)
 
 > 2022-04-11
 
 ### Fix
 
 * Only change the ownership of generate_uid() func [DEVOPS-102]
-
-
-<a name="v0.5.9"></a>
-## [v0.5.9](https://github.com/dhis2-sre/im-manager/compare/v0.5.8...v0.5.9)
-
-> 2022-04-11
-
-### Fix
-
 * Use func names with argument signatures to change ownership [DEVOPS-102]
 
 
@@ -2420,7 +2434,17 @@
 
 
 <a name="v0.5.5"></a>
-## [v0.5.5](https://github.com/dhis2-sre/im-manager/compare/v0.5.4...v0.5.5)
+## [v0.5.5](https://github.com/dhis2-sre/im-manager/compare/v0.5.9...v0.5.5)
+
+> 2022-04-11
+
+### Fix
+
+* Use func names with argument signatures to change ownership [DEVOPS-102]
+
+
+<a name="v0.5.9"></a>
+## [v0.5.9](https://github.com/dhis2-sre/im-manager/compare/v0.5.4...v0.5.9)
 
 > 2022-04-11
 
