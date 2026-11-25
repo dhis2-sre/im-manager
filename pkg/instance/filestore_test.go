@@ -229,7 +229,7 @@ func TestMinioExecSourceMirrorsTarsAndCleansUp(t *testing.T) {
 	require.Len(t, exec.calls, 4)
 	assert.Equal(t, []string{"mktemp", "-d", "/tmp/im-filestore-backup-XXXXXXXX"}, exec.calls[0])
 	assert.Equal(t, []string{"env", "MC_HOST_backup=http://dhisdhis:dhisdhis@127.0.0.1:9000", "mc", "mirror", "--quiet", "backup/dhis2", "/tmp/im-filestore-backup-abc123"}, exec.calls[1])
-	assert.Equal(t, []string{"tar", "-C", "/tmp/im-filestore-backup-abc123", "-czf", "-", "."}, exec.calls[2])
+	assert.Equal(t, kube.Lingering("tar", "-C", "/tmp/im-filestore-backup-abc123", "-czf", "-", "."), exec.calls[2])
 	assert.Equal(t, []string{"rm", "-rf", "/tmp/im-filestore-backup-abc123"}, exec.calls[3])
 }
 
@@ -278,7 +278,7 @@ func TestMinioExecSourceEmptyMktempPathErrors(t *testing.T) {
 
 func TestFilesystemTarCommand(t *testing.T) {
 	cmd := filesystemTarCommand("/opt/dhis2/")
-	assert.Equal(t, []string{"tar", "-C", "/opt/dhis2/files", "-czf", "-", "."}, cmd)
+	assert.Equal(t, kube.Lingering("tar", "-C", "/opt/dhis2/files", "-czf", "-", "."), cmd)
 }
 
 func TestGetPodByLabels(t *testing.T) {

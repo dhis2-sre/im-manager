@@ -69,12 +69,43 @@ func (r repository) FindById(ctx context.Context, id uint) (*model.Database, err
 	return d, err
 }
 
-func (r repository) UpdateId(ctx context.Context, oldID, newID uint) error {
+// NameTaken reports whether another record of the group holds the name of the given one.
+func (r repository) NameTaken(ctx context.Context, d *model.Database) (bool, error) {
+	var count int64
+	err := r.db.
+		WithContext(ctx).
+		Model(&model.Database{}).
+		Where("group_name = ? AND name = ? AND id <> ?", d.GroupName, d.Name, d.ID).
+		Count(&count).
+		Error
+
+	return count > 0, err
+}
+
+func (r repository) FilestoreInUse(ctx context.Context, filestoreID uint) (bool, error) {
+	var count int64
+	err := r.db.
+		WithContext(ctx).
+		Model(&model.Database{}).
+		Where("filestore_id = ?", filestoreID).
+		Count(&count).
+		Error
+
+	return count > 0, err
+}
+
+// UpdateFile records where the file of a database is and how large it is, leaving every other
+// column to whoever changed it while the file was written.
+func (r repository) UpdateFile(ctx context.Context, id uint, url string, size int64) error {
+	// only use ctx for values (logging) and not cancellation signals on cud operations for now. ctx
+	// cancellation can lead to rollbacks which we should decide individually.
+	ctx = context.WithoutCancel(ctx)
+
 	return r.db.
 		WithContext(ctx).
 		Model(&model.Database{}).
-		Where("id = ?", oldID).
-		Update("id", newID).
+		Where("id = ?", id).
+		Updates(map[string]any{"url": url, "size": size}).
 		Error
 }
 

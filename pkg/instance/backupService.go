@@ -2,6 +2,7 @@ package instance
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -37,15 +38,42 @@ type BackupService struct {
 	uploader *storage.S3Client
 }
 
+// errArchiveTruncated marks a file store archive whose tail did not arrive. A pod exec can report
+// success having delivered only part of the command's stdout.
+var errArchiveTruncated = errors.New("file store archive is truncated")
+
+const truncatedArchiveAttempts = 3
+
 // PerformBackup uploads the streamer's output to key in s3Bucket and returns the number of bytes
-// written, which the caller records on the file store so its size is known.
+// written, which the caller records on the file store so its size is known. An archive that
+// arrived truncated is not stored, and is streamed again a few times before the backup fails.
 func (s *BackupService) PerformBackup(ctx context.Context, streamer filestoreStreamer, s3Bucket, key string) (int64, error) {
 	start := time.Now()
+
+	for attempt := 1; ; attempt++ {
+		uploaded, err := s.upload(ctx, streamer, s3Bucket, key)
+		if err == nil {
+			s.logger.InfoContext(ctx, "Filestore backup completed", "key", key, "duration", time.Since(start), "bytesUploaded", uploaded)
+			return uploaded, nil
+		}
+		if !errors.Is(err, errArchiveTruncated) || attempt >= truncatedArchiveAttempts {
+			return 0, fmt.Errorf("backup failed: %w", err)
+		}
+
+		s.logger.WarnContext(ctx, "the file store archive arrived truncated, retrying", "key", key, "attempt", attempt, "error", err)
+	}
+}
+
+func (s *BackupService) upload(ctx context.Context, streamer filestoreStreamer, s3Bucket, key string) (int64, error) {
 	pr, pw := io.Pipe()
 
 	g, ctx := errgroup.WithContext(ctx)
 	g.Go(func() error {
-		err := streamer.stream(ctx, pw)
+		verifier := storage.NewGzipVerifier(io.Discard)
+		err := streamer.stream(ctx, io.MultiWriter(pw, verifier))
+		if verifyErr := verifier.Close(); err == nil && verifyErr != nil {
+			err = fmt.Errorf("%w: %v", errArchiveTruncated, verifyErr)
+		}
 		pw.CloseWithError(err)
 		return err
 	})
@@ -58,9 +86,8 @@ func (s *BackupService) PerformBackup(ctx context.Context, streamer filestoreStr
 	})
 
 	if err := g.Wait(); err != nil {
-		return 0, fmt.Errorf("backup failed: %v", err)
+		return 0, err
 	}
 
-	s.logger.InfoContext(ctx, "Filestore backup completed", "key", key, "duration", time.Since(start), "bytesUploaded", uploaded)
 	return uploaded, nil
 }

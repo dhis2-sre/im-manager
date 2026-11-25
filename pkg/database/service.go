@@ -3,8 +3,8 @@ package database
 import (
 	"bytes"
 	"cmp"
-	"compress/gzip"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -94,6 +94,8 @@ func (s Service) FindByIdentifier(ctx context.Context, identifier string) (*mode
 	return database, nil
 }
 
+// Copy copies the database and its file store under a new name. Both names are checked before any
+// file is copied, since a copy onto a taken name overwrites the file of the record holding it.
 func (s Service) Copy(ctx context.Context, id uint, d *model.Database, group *model.Group) error {
 	source, err := s.FindById(ctx, id)
 	if err != nil {
@@ -105,6 +107,17 @@ func (s Service) Copy(ctx context.Context, id uint, d *model.Database, group *mo
 	}
 	if strings.HasSuffix(source.Name, ".sql.gz") && !strings.HasSuffix(d.Name, ".sql.gz") {
 		d.Name += ".sql.gz"
+	}
+
+	err = s.refuseTakenName(ctx, d)
+	if err != nil {
+		return err
+	}
+	if source.FilestoreID != 0 {
+		err = s.refuseTakenName(ctx, &model.Database{Name: model.FilestoreName(d.Name), GroupName: group.Name})
+		if err != nil {
+			return err
+		}
 	}
 
 	u, err := url.Parse(source.Url)
@@ -141,9 +154,7 @@ func (s Service) copyFS(ctx context.Context, d *model.Database, group *model.Gro
 		return err
 	}
 
-	newName := strings.TrimSuffix(d.Name, ".pgc")
-	newName = strings.TrimSuffix(newName, ".sql.gz")
-	newName += ".fs.tar.gz"
+	newName := model.FilestoreName(d.Name)
 
 	fsUrl, err := url.Parse(fs.Url)
 	if err != nil {
@@ -273,6 +284,7 @@ func (s Service) Delete(ctx context.Context, id uint) error {
 	return s.deleteFS(ctx, d)
 }
 
+// deleteFS removes the file store of a deleted database, unless another database still points at it.
 func (s Service) deleteFS(ctx context.Context, d *model.Database) error {
 	fs, err := s.repository.FindById(ctx, d.FilestoreID)
 	if err != nil {
@@ -280,6 +292,14 @@ func (s Service) deleteFS(ctx context.Context, d *model.Database) error {
 			return nil
 		}
 		return err
+	}
+
+	inUse, err := s.repository.FilestoreInUse(ctx, fs.ID)
+	if err != nil {
+		return err
+	}
+	if inUse {
+		return nil
 	}
 
 	fsUrl, err := url.Parse(fs.Url)
@@ -358,7 +378,91 @@ func filterDatabases(databases []model.Database, test func(database *model.Datab
 	return
 }
 
+// Update renames the database, and its file store with it, and stores its description. Both names
+// are checked before any file is moved, since a move onto a taken name overwrites the file of the
+// record holding it. A database that keeps its name keeps its file store as it is.
 func (s Service) Update(ctx context.Context, d *model.Database) error {
+	key, err := fileKey(d)
+	if err != nil {
+		return err
+	}
+	if key == fmt.Sprintf("%s/%s", d.GroupName, d.Name) {
+		return s.repository.Update(ctx, d)
+	}
+
+	fs, err := s.renamedFilestore(ctx, d)
+	if err != nil {
+		return err
+	}
+
+	err = s.refuseTakenName(ctx, d)
+	if err != nil {
+		return err
+	}
+	if fs != nil {
+		err = s.refuseTakenName(ctx, fs)
+		if err != nil {
+			return err
+		}
+	}
+
+	err = s.moveFile(d)
+	if err != nil {
+		return err
+	}
+
+	err = s.repository.Update(ctx, d)
+	if err != nil {
+		return err
+	}
+
+	if fs == nil {
+		return nil
+	}
+
+	err = s.moveFile(fs)
+	if err != nil {
+		return err
+	}
+
+	return s.repository.Update(ctx, fs)
+}
+
+// renamedFilestore returns the file store of the database under the name it gets from the
+// database, or nil when the database has none.
+func (s Service) renamedFilestore(ctx context.Context, d *model.Database) (*model.Database, error) {
+	if d.FilestoreID == 0 {
+		return nil, nil
+	}
+
+	fs, err := s.repository.FindById(ctx, d.FilestoreID)
+	if err != nil {
+		if errdef.IsNotFound(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	fs.Name = model.FilestoreName(d.Name)
+
+	return fs, nil
+}
+
+func (s Service) refuseTakenName(ctx context.Context, d *model.Database) error {
+	taken, err := s.repository.NameTaken(ctx, d)
+	if err != nil {
+		return err
+	}
+	if taken {
+		return errdef.NewDuplicated("database named %q already exists", d.Name)
+	}
+
+	return nil
+}
+
+// moveFile moves the file of the record to the key its group and name give it. A file already
+// there stays untouched, since S3 refuses to copy an object onto itself.
+func (s Service) moveFile(d *model.Database) error {
 	sourceUrl, err := url.Parse(d.Url)
 	if err != nil {
 		return err
@@ -366,6 +470,10 @@ func (s Service) Update(ctx context.Context, d *model.Database) error {
 
 	sourceKey := strings.TrimPrefix(sourceUrl.Path, "/")
 	destination := fmt.Sprintf("%s/%s", d.GroupName, d.Name)
+	if sourceKey == destination {
+		return nil
+	}
+
 	err = s.s3Client.Move(s.s3Bucket, sourceKey, destination)
 	if err != nil {
 		return err
@@ -373,49 +481,7 @@ func (s Service) Update(ctx context.Context, d *model.Database) error {
 
 	d.Url = fmt.Sprintf("s3://%s/%s", s.s3Bucket, destination)
 
-	updateSlug(d)
-
-	err = s.repository.Update(ctx, d)
-	if err != nil {
-		return err
-	}
-
-	// TODO: This shouldn't be necessary... But without it I get the following error: {"time":"2025-07-04T00:03:05.942946078Z","level":"ERROR","msg":"record not found","error":"record not found","query":"SELECT * FROM \"databases\" WHERE \"databases\".\"id\" = 0 ORDER BY \"databases\".\"id\" LIMIT 1","duration": 602547,"rows":0,"file":"/src/pkg/database/repository.go:63","correlationId":"4c39fa85-d8fb-4e75-a0cb-1ad4732b7f47","user":12}
-	if d.FilestoreID == 0 {
-		return nil
-	}
-
-	return s.updateFS(ctx, d)
-}
-
-func (s Service) updateFS(ctx context.Context, d *model.Database) error {
-	fs, err := s.repository.FindById(ctx, d.FilestoreID)
-	if err != nil {
-		if errdef.IsNotFound(err) {
-			return nil
-		}
-		return err
-	}
-
-	newName := strings.TrimSuffix(d.Name, ".pgc")
-	newName = strings.TrimSuffix(newName, ".sql.gz")
-	fs.Name = newName + "-fs.tar.gz"
-
-	sourceUrl, err := url.Parse(fs.Url)
-	if err != nil {
-		return err
-	}
-
-	sourceKey := strings.TrimPrefix(sourceUrl.Path, "/")
-	destination := fmt.Sprintf("%s/%s", fs.GroupName, fs.Name)
-	err = s.s3Client.Move(s.s3Bucket, sourceKey, destination)
-	if err != nil {
-		return err
-	}
-
-	fs.Url = fmt.Sprintf("s3://%s/%s", s.s3Bucket, destination)
-
-	return s.repository.Update(ctx, fs)
+	return nil
 }
 
 func (s Service) CreateExternalDownload(ctx context.Context, databaseID uint, expiration uint) (*model.ExternalDownload, error) {
@@ -460,9 +526,9 @@ func (s Service) EnsureLocked(ctx context.Context, database *model.Database, ins
 	return database, isLocked, nil
 }
 
-// SaveLocked overwrites the given locked database with a fresh dump from the instance: it dumps
-// into a temporary record, moves the dump over the original in S3 and re-points the record to the
-// original name and id. It blocks until done and returns the finalized record.
+// SaveLocked overwrites the file of the given locked database with a fresh dump from the instance.
+// The dump is written next to the file and moved over it once complete, so a failed save leaves the
+// database as it was. It blocks until done and returns the saved record.
 func (s Service) SaveLocked(ctx context.Context, database *model.Database, instance *model.DeploymentInstance, stack *stack.Stack, wasLocked bool) (*model.Database, error) {
 	if !wasLocked {
 		defer func() {
@@ -473,75 +539,69 @@ func (s Service) SaveLocked(ctx context.Context, database *model.Database, insta
 		}()
 	}
 
-	tmpName := uuid.New().String()
-	format := getFormat(database)
+	s.publishSave(ctx, database.UserID, database, "started", "", 0)
 
-	created, err := s.CreateDatabase(ctx, database.UserID, instance.GroupName, tmpName)
+	temporaryKey := fmt.Sprintf("%s/%s", database.GroupName, uuid.New().String())
+	size, err := s.dumpToKey(ctx, instance, stack, getFormat(database), temporaryKey)
 	if err != nil {
-		return nil, err
+		return nil, s.failSave(ctx, database.UserID, database, err)
 	}
 
-	saved, err := s.Dump(ctx, database.UserID, created, instance, stack, format)
+	saved, err := s.finalizeSave(ctx, database, temporaryKey, size)
 	if err != nil {
-		return nil, err
+		return nil, s.failSave(ctx, database.UserID, database, err)
 	}
 
-	return s.finalizeSave(ctx, database, saved)
-}
-
-// finalizeSave moves the freshly dumped temporary record over the original database: S3 move,
-// delete the original row, rename the new row and swap its id back to the original's.
-func (s Service) finalizeSave(ctx context.Context, database *model.Database, saved *model.Database) (*model.Database, error) {
-	u, err := url.Parse(saved.Url)
-	if err != nil {
-		return nil, err
-	}
-
-	sourceKey := strings.TrimPrefix(u.Path, "/")
-	destinationKey := fmt.Sprintf("%s/%s", database.GroupName, database.Name)
-	err = s.s3Client.Move(s.s3Bucket, sourceKey, destinationKey)
-	if err != nil {
-		return nil, fmt.Errorf("moving database failed: %v", err)
-	}
-
-	err = s.repository.Unlock(ctx, database.ID)
-	if err != nil {
-		s.logError(ctx, fmt.Errorf("unlock database failed: %v", err))
-	}
-
-	err = s.repository.Delete(ctx, database.ID)
-	if err != nil {
-		return nil, err
-	}
-
-	saved.Name = database.Name
-	saved.GroupName = database.GroupName
-	saved.Url = database.Url
-	saved.Slug = database.Slug
-	saved.CreatedAt = database.CreatedAt
-
-	// Use the repository Update method, since the service Update method also performs an S3 move.
-	err = s.repository.Update(ctx, saved)
-	if err != nil {
-		return nil, err
-	}
-
-	err = s.repository.UpdateId(ctx, saved.ID, database.ID)
-	if err != nil {
-		return nil, err
-	}
-	// Align in-memory saved with the now-renamed/ID-swapped row so callers receive the record
-	// under its final identity.
-	saved.ID = database.ID
-
-	if database.Lock != nil {
-		_, err := s.repository.Lock(ctx, database.ID, database.Lock.InstanceID, database.Lock.UserID)
-		if err != nil {
-			return nil, err
-		}
-	}
+	s.publishSave(ctx, database.UserID, database, "success", "", size)
 
 	return saved, nil
+}
+
+// finalizeSave moves the fresh dump over the file of the database and records its size. The
+// database keeps its record, and with it everything a dump does not produce. The record is read
+// again first, since the database can be renamed while the dump runs.
+func (s Service) finalizeSave(ctx context.Context, database *model.Database, temporaryKey string, size int64) (*model.Database, error) {
+	key, err := s.currentFileKey(ctx, database.ID)
+	if err == nil {
+		err = s.s3Client.Move(s.s3Bucket, temporaryKey, key)
+	}
+	if err != nil {
+		if deleteErr := s.s3Client.Delete(s.s3Bucket, temporaryKey); deleteErr != nil {
+			s.logger.ErrorContext(ctx, "failed to delete the dump that could not be moved", "key", temporaryKey, "error", deleteErr)
+		}
+		return nil, fmt.Errorf("moving database failed: %w", err)
+	}
+
+	err = s.repository.UpdateFile(ctx, database.ID, fmt.Sprintf("s3://%s/%s", s.s3Bucket, key), size)
+	if err != nil {
+		return nil, err
+	}
+
+	return s.repository.FindById(ctx, database.ID)
+}
+
+func (s Service) currentFileKey(ctx context.Context, id uint) (string, error) {
+	current, err := s.repository.FindById(ctx, id)
+	if err != nil {
+		return "", err
+	}
+
+	return fileKey(current)
+}
+
+// fileKey returns the S3 key of the file of the database. The url is what downloads and seeds
+// read, so a save has to write there even when the key does not match the group and name.
+func fileKey(database *model.Database) (string, error) {
+	if database.Url == "" {
+		return fmt.Sprintf("%s/%s", database.GroupName, database.Name), nil
+	}
+
+	u, err := url.Parse(database.Url)
+	if err != nil {
+		return "", err
+	}
+
+	return strings.TrimPrefix(u.Path, "/"), nil
 }
 
 func getFormat(database *model.Database) string {
@@ -569,50 +629,81 @@ func (s Service) CreateDatabase(ctx context.Context, userId uint, groupName, nam
 	return newDatabase, nil
 }
 
-// Dump streams a pg_dump of the instance's database into S3 and updates the given record with the
-// resulting url and size. It blocks until the dump completes and publishes database-save events
-// along the way.
+// Dump streams a pg_dump of the instance's database into the file of the given record, which
+// CreateDatabase made for it, and records the url and size. A record whose dump fails has no file
+// and is removed. It blocks until the dump completes and publishes database-save events.
 func (s Service) Dump(ctx context.Context, userId uint, database *model.Database, instance *model.DeploymentInstance, stack *stack.Stack, format string) (*model.Database, error) {
-	publish := func(status, errMsg string, size int64) {
-		s.publisher.Publish(ctx, userId, database.GroupName, kindDatabaseSave, newDatabaseEvent(database, status, errMsg, size))
+	s.publishSave(ctx, userId, database, "started", "", 0)
+
+	saved, err := s.dumpIntoRecord(ctx, database, instance, stack, format)
+	if err != nil {
+		if deleteErr := s.repository.Delete(ctx, database.ID); deleteErr != nil {
+			s.logger.ErrorContext(ctx, "failed to remove the record of a failed dump", "databaseId", database.ID, "error", deleteErr)
+		}
+		return nil, s.failSave(ctx, userId, database, err)
 	}
-	fail := func(err error) (*model.Database, error) {
-		s.logError(ctx, err)
-		publish("error", err.Error(), 0)
+
+	s.publishSave(ctx, userId, database, "success", "", saved.Size)
+
+	return saved, nil
+}
+
+func (s Service) dumpIntoRecord(ctx context.Context, database *model.Database, instance *model.DeploymentInstance, stack *stack.Stack, format string) (*model.Database, error) {
+	key := fmt.Sprintf("%s/%s", database.GroupName, database.Name)
+	size, err := s.dumpToKey(ctx, instance, stack, format, key)
+	if err != nil {
 		return nil, err
 	}
 
+	err = s.repository.UpdateFile(ctx, database.ID, fmt.Sprintf("s3://%s/%s", s.s3Bucket, key), size)
+	if err != nil {
+		return nil, err
+	}
+
+	return s.repository.FindById(ctx, database.ID)
+}
+
+func (s Service) publishSave(ctx context.Context, userId uint, database *model.Database, status, errorMessage string, size int64) {
+	s.publisher.Publish(ctx, userId, database.GroupName, kindDatabaseSave, newDatabaseEvent(database, status, errorMessage, size))
+}
+
+func (s Service) failSave(ctx context.Context, userId uint, database *model.Database, err error) error {
+	s.logError(ctx, err)
+	s.publishSave(ctx, userId, database, "error", err.Error(), 0)
+	return err
+}
+
+// dumpToKey streams a pg_dump of the instance's database to the given S3 key and returns the
+// number of bytes stored. A failed dump aborts its upload, so it leaves no object behind.
+func (s Service) dumpToKey(ctx context.Context, instance *model.DeploymentInstance, stack *stack.Stack, format, key string) (int64, error) {
 	group, err := s.groupService.Find(ctx, instance.GroupName)
 	if err != nil {
-		return fail(err)
+		return 0, err
 	}
 
 	dump, err := newPgDumpConfig(instance, stack)
 	if err != nil {
-		return fail(err)
+		return 0, err
 	}
 	dump.Host = "localhost"
 	command := buildPgDumpCommand(dump, format)
 
 	client, err := s.podExecutor(group.Cluster)
 	if err != nil {
-		return fail(err)
+		return 0, err
 	}
 
 	access, err := kube.FindPostgresAccess(stack.Components)
 	if err != nil {
-		return fail(errdef.NewBadRequest("stack %q does not support database save", stack.Name))
+		return 0, errdef.NewBadRequest("stack %q does not support database save", stack.Name)
 	}
 	podName, container, err := access.PostgresPod(ctx, client, instance)
 	if err != nil {
-		return fail(err)
+		return 0, err
 	}
 	namespace := instance.Group.Namespace
 
-	key := fmt.Sprintf("%s/%s", group.Name, database.Name)
-
 	s.logger.InfoContext(ctx, "starting pg_dump", "pod", podName, "container", container, "namespace", namespace, "command", strings.Join(redactPgPassword(command), " "))
-	publish("started", "", 0)
 
 	// One attempt of the whole pipeline: pg_dump in the pod writing into a pipe that is streamed to
 	// S3. Retried as a unit, since a failed attempt leaves a partial object behind that the next
@@ -631,7 +722,7 @@ func (s Service) Dump(ctx context.Context, userId uint, database *model.Database
 			uploadDone <- uploadResult{size, err}
 		}()
 
-		if err := execPgDump(ctx, client, namespace, podName, container, command, pw, format, database.Name); err != nil {
+		if err := execPgDump(ctx, client, namespace, podName, container, command, pw, format); err != nil {
 			<-uploadDone
 			return 0, err
 		}
@@ -642,26 +733,12 @@ func (s Service) Dump(ctx context.Context, userId uint, database *model.Database
 
 	size, err := s.dumpWithRetries(ctx, attempt)
 	if err != nil {
-		s.logger.ErrorContext(ctx, "failed to exec pg_dump", "error", err)
-		publish("error", err.Error(), 0)
-		return nil, err
-	}
-	result := uploadOutcome{size: size}
-
-	saved, err := s.repository.FindById(ctx, database.ID)
-	if err != nil {
-		return fail(err)
-	}
-	saved.Url = fmt.Sprintf("s3://%s/%s", s.s3Bucket, key)
-	saved.Size = result.size
-	if err := s.repository.Save(ctx, saved); err != nil {
-		return fail(err)
+		return 0, fmt.Errorf("failed to exec pg_dump: %w", err)
 	}
 
-	s.logger.InfoContext(ctx, "pg_dump completed successfully", "key", key, "size", result.size)
-	publish("success", "", result.size)
+	s.logger.InfoContext(ctx, "pg_dump completed successfully", "key", key, "size", size)
 
-	return saved, nil
+	return size, nil
 }
 
 const (
@@ -669,7 +746,12 @@ const (
 	pgDumpTailSize     = 4096
 )
 
-func execPgDump(ctx context.Context, executor PodExecutor, namespace, podName, container string, command []string, pw *io.PipeWriter, format string, databaseName string) error {
+// errDumpTruncated marks a dump whose tail did not arrive. A pod exec can report success having
+// delivered only part of the command's stdout: when the command exits, whatever the cluster still
+// buffers on the way to the client can be dropped.
+var errDumpTruncated = errors.New("pg_dump output is truncated")
+
+func execPgDump(ctx context.Context, executor PodExecutor, namespace, podName, container string, command []string, pw *io.PipeWriter, format string) error {
 	// Errors have to reach the reader through the pipe, otherwise the upload sees a clean EOF and
 	// stores the partial dump as if it were complete.
 	fail := func(err error) error {
@@ -678,33 +760,51 @@ func execPgDump(ctx context.Context, executor PodExecutor, namespace, podName, c
 	}
 
 	var execWriter io.Writer = pw
-	var gzWriter *gzip.Writer
-	var tail *tailWriter
+	var verifier *plainDumpVerifier
 	if format == "plain" {
-		gzWriter = gzip.NewWriter(pw)
-		gzWriter.Name = strings.TrimSuffix(databaseName, ".gz")
-		tail = &tailWriter{w: gzWriter, max: pgDumpTailSize}
-		execWriter = tail
+		verifier = newPlainDumpVerifier()
+		execWriter = io.MultiWriter(pw, verifier)
 	}
 
 	var stderrBuf strings.Builder
-	if err := executor.Exec(ctx, namespace, podName, container, command, execWriter, &stderrBuf); err != nil {
+	err := executor.Exec(ctx, namespace, podName, container, command, execWriter, &stderrBuf)
+	if verifier != nil {
+		verifyErr := verifier.close()
+		if err == nil && verifyErr != nil {
+			return fail(fmt.Errorf("%w, %v: %s", errDumpTruncated, verifyErr, stderrBuf.String()))
+		}
+	}
+	if err != nil {
 		return fail(fmt.Errorf("%w: %s", err, stderrBuf.String()))
 	}
 
-	// A pod exec can report success having delivered only part of pg_dump's stdout, and closing the
-	// gzip writer then seals a valid gzip stream around a truncated dump.
-	if tail != nil && !tail.contains(pgDumpPlainTrailer) {
-		return fail(fmt.Errorf("pg_dump output is truncated, %q not found in the last %d bytes: %s", pgDumpPlainTrailer, pgDumpTailSize, stderrBuf.String()))
-	}
-
-	if gzWriter != nil {
-		if err := gzWriter.Close(); err != nil {
-			return fail(fmt.Errorf("close gzip writer: %v", err))
-		}
-	}
-
 	return pw.Close()
+}
+
+// plainDumpVerifier reads the gzip stream pg_dump produces for a plain dump while it is uploaded
+// and tells whether it is whole: the stream has to end as gzip does and the text has to end with
+// the line pg_dump writes last.
+type plainDumpVerifier struct {
+	*storage.GzipVerifier
+	tail *tailWriter
+}
+
+func newPlainDumpVerifier() *plainDumpVerifier {
+	tail := &tailWriter{w: io.Discard, max: pgDumpTailSize}
+
+	return &plainDumpVerifier{GzipVerifier: storage.NewGzipVerifier(tail), tail: tail}
+}
+
+func (v *plainDumpVerifier) close() error {
+	err := v.Close()
+	if err != nil {
+		return err
+	}
+	if !v.tail.contains(pgDumpPlainTrailer) {
+		return fmt.Errorf("%q not found in the last %d bytes", pgDumpPlainTrailer, pgDumpTailSize)
+	}
+
+	return nil
 }
 
 // tailWriter passes writes through while retaining up to max trailing bytes.
@@ -729,10 +829,6 @@ func (t *tailWriter) contains(s string) bool {
 	return bytes.Contains(t.tail, []byte(s))
 }
 
-type uploadOutcome struct {
-	size int64
-}
-
 // transientPostgresStates are the messages postgres returns while it is not accepting connections
 // yet or no longer is. Bitnami's chart runs a temporary server to execute the initdb scripts, which
 // seeding uses, and stops it once they finish; a dump that lands in that transition sees one of
@@ -753,21 +849,34 @@ func isTransientPostgresState(err error) bool {
 }
 
 const (
-	dumpRetryBudget   = 2 * time.Minute
-	dumpRetryInterval = 5 * time.Second
+	dumpRetryBudget       = 2 * time.Minute
+	dumpRetryInterval     = 5 * time.Second
+	truncatedDumpAttempts = 3
 )
 
 // dumpWithRetries retries the dump while postgres reports a transient state, so a save issued
 // moments after a deploy waits for seeding to finish instead of failing with the server's
-// mid-restart message. Any other error fails immediately: retrying a genuine dump error would only
-// delay the report.
+// mid-restart message. A dump that arrived truncated is retried a few times as well, since the next
+// attempt usually arrives whole. Any other error fails immediately: retrying a genuine dump error
+// would only delay the report.
 func (s Service) dumpWithRetries(ctx context.Context, attempt func() (int64, error)) (int64, error) {
 	deadline := time.Now().Add(dumpRetryBudget)
+	truncated := 0
 	for {
 		size, err := attempt()
 		if err == nil {
 			return size, nil
 		}
+
+		if errors.Is(err, errDumpTruncated) {
+			truncated++
+			if truncated >= truncatedDumpAttempts {
+				return 0, err
+			}
+			s.logger.WarnContext(ctx, "the dump arrived truncated, retrying", "error", err, "attempt", truncated)
+			continue
+		}
+
 		if !isTransientPostgresState(err) || time.Now().After(deadline) {
 			return 0, err
 		}
@@ -836,13 +945,19 @@ func redactPgPassword(command []string) []string {
 	return redacted
 }
 
+// buildPgDumpCommand builds the pg_dump command run in the database pod. A plain dump is compressed
+// there rather than here: the text is many times larger, and the more of it is still on its way
+// when pg_dump exits, the more likely the exec loses its tail.
 func buildPgDumpCommand(dump *pg.Dump, format string) []string {
 	options := dump.Options
 	options = append(options, dump.Postgres.Parse()...)
 	options = append(options, fmt.Sprintf("-F%s", format))
+	if format == "plain" {
+		options = append(options, "--compress=6")
+	}
 	options = append(options, dump.IgnoreTableDataToString()...)
 
-	return append([]string{"env", "PGPASSWORD=" + dump.Password, "pg_dump"}, options...)
+	return append([]string{"env", "PGPASSWORD=" + dump.Password}, kube.Lingering(append([]string{"pg_dump"}, options...)...)...)
 }
 
 func (s Service) StreamUpload(ctx context.Context, database model.Database, group *model.Group, body io.Reader, contentType string, contentLength int64) (model.Database, error) {

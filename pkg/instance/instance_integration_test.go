@@ -355,7 +355,7 @@ func TestInstanceHandler(t *testing.T) {
 				assert.NoError(c, instanceService.FilestoreBackup(context.Background(), &coreInstance, target.Name, target))
 			}, 90*time.Second, 3*time.Second, "filestore backup should succeed once minio is serving")
 
-			content := s3.GetObject(t, "group-name/fs-backup-target-fs.tar.gz")
+			content := s3.GetObject(t, "group-name/fs-backup-target.sql.gz-fs.tar.gz")
 			require.NotEmpty(t, content)
 			entries := extractTarGzEntries(t, content)
 			assert.Equal(t, "hello-filestore", string(entries["seeded/marker.txt"]))
@@ -379,7 +379,7 @@ func TestInstanceHandler(t *testing.T) {
 			require.NoError(t, db.Where("type = ? AND group_name = ?", "fs", "group-name").Find(&filestores).Error)
 			var matching int
 			for _, filestore := range filestores {
-				if filestore.Name == "fs-backup-target-fs.tar.gz" {
+				if filestore.Name == "fs-backup-target.sql.gz-fs.tar.gz" {
 					matching++
 				}
 			}
@@ -501,7 +501,7 @@ func TestInstanceHandler(t *testing.T) {
 
 		require.NoError(t, instanceService.FilestoreBackup(context.Background(), &coreInstance, target.Name, target))
 
-		content := s3.GetObject(t, "group-name/fsstore-backup-target-fs.tar.gz")
+		content := s3.GetObject(t, "group-name/fsstore-backup-target.sql.gz-fs.tar.gz")
 		require.NotEmpty(t, content)
 		entries := extractTarGzEntries(t, content)
 		assert.Equal(t, "hello-filestore", string(entries["seeded/marker.txt"]))

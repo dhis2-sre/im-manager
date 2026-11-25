@@ -45,49 +45,68 @@ func drainPipe(t *testing.T, pr *io.PipeReader) (<-chan []byte, <-chan error) {
 	return dataCh, errCh
 }
 
+// gzipped compresses the text the way pg_dump does for a plain dump run with --compress.
+func gzipped(t *testing.T, text string) string {
+	t.Helper()
+
+	var compressed strings.Builder
+	writer := gzip.NewWriter(&compressed)
+	_, err := io.WriteString(writer, text)
+	require.NoError(t, err)
+	require.NoError(t, writer.Close())
+
+	return compressed.String()
+}
+
 func TestExecPgDumpRejectsTruncatedPlainDump(t *testing.T) {
+	whole := gzipped(t, completeDump)
+
 	// A pod exec can report success having delivered only part of pg_dump's stdout.
-	truncated := completeDump[:len(completeDump)/2]
-	executor := writerExecutor{payload: truncated}
+	payloads := map[string]string{
+		"TheGzipStreamIsCutShort":        whole[:len(whole)-4],
+		"NothingArrived":                 "",
+		"TheTextEndsBeforeItsLastLine":   gzipped(t, completeDump[:len(completeDump)/2]),
+		"TheOutputIsNotGzip":             completeDump,
+		"OnlyTheStartOfTheStreamArrived": whole[:len(whole)/2],
+	}
+	for name, payload := range payloads {
+		t.Run(name, func(t *testing.T) {
+			pr, pw := io.Pipe()
+			_, uploadErrCh := drainPipe(t, pr)
 
-	pr, pw := io.Pipe()
-	_, uploadErrCh := drainPipe(t, pr)
+			err := execPgDump(context.Background(), writerExecutor{payload: payload}, "ns", "pod", "postgresql", []string{"pg_dump"}, pw, "plain")
 
-	err := execPgDump(context.Background(), executor, "ns", "pod", "postgresql", []string{"pg_dump"}, pw, "plain", "db.gz")
-
-	require.Error(t, err, "a truncated dump must not be reported as a successful save")
-	assert.Contains(t, err.Error(), "truncated")
-	assert.Error(t, <-uploadErrCh, "the upload must see an error rather than a clean EOF, so it aborts")
+			require.ErrorIs(t, err, errDumpTruncated, "a truncated dump must not be reported as a successful save")
+			assert.Error(t, <-uploadErrCh, "the upload must see an error rather than a clean EOF, so it aborts")
+		})
+	}
 }
 
 func TestExecPgDumpAcceptsCompletePlainDump(t *testing.T) {
-	executor := writerExecutor{payload: completeDump}
+	whole := gzipped(t, completeDump)
+	executor := writerExecutor{payload: whole}
 
 	pr, pw := io.Pipe()
 	dataCh, uploadErrCh := drainPipe(t, pr)
 
-	err := execPgDump(context.Background(), executor, "ns", "pod", "postgresql", []string{"pg_dump"}, pw, "plain", "db.gz")
+	err := execPgDump(context.Background(), executor, "ns", "pod", "postgresql", []string{"pg_dump"}, pw, "plain")
 
 	require.NoError(t, err)
 	require.NoError(t, <-uploadErrCh)
-
-	gzReader, err := gzip.NewReader(strings.NewReader(string(<-dataCh)))
-	require.NoError(t, err)
-	restored, err := io.ReadAll(gzReader)
-	require.NoError(t, err)
-	assert.Equal(t, completeDump, string(restored))
+	assert.Equal(t, whole, string(<-dataCh), "the compressed dump is uploaded as pg_dump produced it")
 }
 
 func TestExecPgDumpPropagatesExecError(t *testing.T) {
-	executor := writerExecutor{payload: completeDump, execErr: fmt.Errorf("connection lost")}
+	executor := writerExecutor{payload: gzipped(t, completeDump), execErr: fmt.Errorf("connection lost")}
 
 	pr, pw := io.Pipe()
 	_, uploadErrCh := drainPipe(t, pr)
 
-	err := execPgDump(context.Background(), executor, "ns", "pod", "postgresql", []string{"pg_dump"}, pw, "plain", "db.gz")
+	err := execPgDump(context.Background(), executor, "ns", "pod", "postgresql", []string{"pg_dump"}, pw, "plain")
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "connection lost")
+	assert.NotErrorIs(t, err, errDumpTruncated, "a failed exec is reported as what it is, not retried as a truncated dump")
 	assert.Error(t, <-uploadErrCh)
 }
 
@@ -98,7 +117,7 @@ func TestExecPgDumpSkipsTrailerCheckForArchiveFormat(t *testing.T) {
 	pr, pw := io.Pipe()
 	dataCh, uploadErrCh := drainPipe(t, pr)
 
-	err := execPgDump(context.Background(), executor, "ns", "pod", "postgresql", []string{"pg_dump"}, pw, "custom", "db")
+	err := execPgDump(context.Background(), executor, "ns", "pod", "postgresql", []string{"pg_dump"}, pw, "custom")
 
 	require.NoError(t, err)
 	require.NoError(t, <-uploadErrCh)
@@ -134,8 +153,12 @@ func TestPodDumpDoesNotRequireHostPgDump(t *testing.T) {
 	dump, err := newPgDumpConfig(instance, &stack.Stack{HostnamePattern: "%s.%s"})
 	require.NoError(t, err)
 	command := buildPgDumpCommand(dump, "custom")
-	require.GreaterOrEqual(t, len(command), 3)
-	assert.Equal(t, []string{"env", "PGPASSWORD=test-password", "pg_dump"}, command[:3])
+	require.GreaterOrEqual(t, len(command), 7)
+	assert.Equal(t, []string{"env", "PGPASSWORD=test-password", "sh", "-c"}, command[:4])
+	assert.Equal(t, []string{"sh", "pg_dump"}, command[5:7], "pg_dump and its options are arguments of the wrapper, never part of its script")
 	assert.Contains(t, command, "--dbname=dhis2")
 	assert.Contains(t, command, "--exclude-table=dhis2_chart_seed_complete")
+	assert.NotContains(t, command, "--compress=6", "a custom format archive is compressed by pg_dump already")
+
+	assert.Contains(t, buildPgDumpCommand(dump, "plain"), "--compress=6", "a plain dump is compressed in the pod")
 }

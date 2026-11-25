@@ -2,7 +2,6 @@ package database
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"mime"
 	"net/http"
@@ -296,10 +295,10 @@ func (h Handler) Save(c *gin.Context) {
 		return
 	}
 
-	parameter := "DATABASE_ID"
-	databaseId, exists := instance.Parameters[parameter]
-	if !exists {
-		_ = c.Error(fmt.Errorf("parameter %q not found", parameter))
+	databaseId, exists := instance.Parameters["DATABASE_ID"]
+	if !exists || databaseId.Value == "" || databaseId.Value == "0" {
+		_ = c.Error(errdef.NewBadRequest("instance %d was not deployed from a database, use save as to save its database", instance.ID))
+		return
 	}
 
 	database, err := h.databaseService.FindByIdentifier(ctx, databaseId.Value)

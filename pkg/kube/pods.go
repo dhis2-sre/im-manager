@@ -107,6 +107,13 @@ func (c *Client) Exec(ctx context.Context, namespace, podName, container string,
 	})
 }
 
+// Lingering wraps a command so its exec stays open three seconds after the command ends and then
+// exits with the command's status. An exec that ends while output is still on its way to the
+// client can lose the last megabytes of it. The command is passed as arguments, never as script.
+func Lingering(command ...string) []string {
+	return append([]string{"sh", "-c", `"$@"; status=$?; sleep 3; exit $status`, "sh"}, command...)
+}
+
 func (c *Client) GetPod(ctx context.Context, instanceID uint, typeSelector string) (v1.Pod, error) {
 	selector, err := labelSelector(instanceID, typeSelector)
 	if err != nil {
