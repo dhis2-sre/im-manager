@@ -261,3 +261,77 @@ func TestParameterGroupsAreConsistent(t *testing.T) {
 		}
 	}
 }
+
+// assert every parameter offered as an add-on is a 'true'/'false' switch that says what it adds,
+// since a client shows it as something to add with nothing but its name and description to go by.
+func TestAddOnParametersAreDescribedSwitches(t *testing.T) {
+	for _, s := range All {
+		for name, parameter := range s.Parameters {
+			if !parameter.AddOn {
+				continue
+			}
+			assert.NotEmptyf(t, parameter.Description, "stack %q add-on %q has no description", s.Name, name)
+			if assert.NotNilf(t, parameter.DefaultValue, "stack %q add-on %q has no default", s.Name, name) {
+				assert.Containsf(t, []string{"true", "false"}, *parameter.DefaultValue, "stack %q add-on %q is not a 'true'/'false' switch", s.Name, name)
+			}
+		}
+	}
+}
+
+// assert the stacks API serves what a client needs to offer an add-on, and serves neither for a
+// parameter that is an ordinary setting.
+func TestResponseServesAddOnAndDescription(t *testing.T) {
+	parameters := make(map[string]StackParameterResponse)
+	for _, parameter := range toResponseStack(DHIS2V2).Parameters {
+		parameters[parameter.ParameterName] = parameter
+	}
+
+	for _, name := range []string{"DEPLOY_CHAP", "ENABLE_DORIS", "ENABLE_PGADMIN", "DEPLOY_GLOWROOT"} {
+		assert.Truef(t, parameters[name].AddOn, "%q is not served as an add-on", name)
+		assert.Equalf(t, DHIS2V2.Parameters[name].Description, parameters[name].Description, "%q", name)
+		assert.NotEmptyf(t, parameters[name].Description, "%q is served without a description", name)
+	}
+
+	assert.False(t, parameters["ALLOW_SUSPEND"].AddOn)
+	assert.Empty(t, parameters["ALLOW_SUSPEND"].Description)
+}
+
+// ingressPath matches the path a helmfile gives an ingress, capturing what follows the instance's
+// own path in it. Probe and context paths are spelled the same way, so they only ever repeat a
+// suffix an ingress already has.
+var ingressPath = regexp.MustCompile(`(?m)\bpath: /\{\{ requiredEnv "INSTANCE_PATH_NAME" \}\}(\S*)\s*$`)
+
+// assert the endpoints a stack declares are exactly the paths its helmfile serves, so the address a
+// client builds is one the chart answers on and no served address goes undeclared.
+func TestEndpointsAreInSyncWithHelmfile(t *testing.T) {
+	for _, s := range All {
+		helmfile, err := os.ReadFile(fmt.Sprintf("../../stacks/%s/helmfile.yaml.gotmpl", s.Name))
+		require.NoError(t, err)
+
+		served := map[string]bool{}
+		for _, match := range ingressPath.FindAllStringSubmatch(string(helmfile), -1) {
+			served[match[1]] = true
+		}
+
+		declared := map[string]bool{}
+		for _, endpoint := range s.Endpoints {
+			assert.Falsef(t, declared[endpoint.PathSuffix], "stack %q declares the endpoint %q twice", s.Name, endpoint.PathSuffix)
+			declared[endpoint.PathSuffix] = true
+
+			if endpoint.When != nil {
+				_, ok := s.Parameters[endpoint.When.Parameter]
+				assert.Truef(t, ok, "stack %q endpoint %q condition references unknown parameter %q", s.Name, endpoint.PathSuffix, endpoint.When.Parameter)
+			}
+		}
+
+		assert.Equalf(t, served, declared, "stack %q endpoints differ from the paths its helmfile serves", s.Name)
+	}
+}
+
+// assert the stacks API serves a stack's endpoints with their conditions, and none for a stack that
+// is reached only through another.
+func TestResponseServesEndpoints(t *testing.T) {
+	assert.Equal(t, []Endpoint{{PathSuffix: ""}, {PathSuffix: "-glowroot", When: whenGlowrootIsDeployed}}, toResponseStack(DHIS2V2).Endpoints)
+	assert.Equal(t, []Endpoint{{PathSuffix: "-pgadmin"}}, toResponseStack(PgAdmin).Endpoints)
+	assert.Empty(t, toResponseStack(Chap).Endpoints)
+}

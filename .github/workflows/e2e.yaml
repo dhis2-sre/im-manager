@@ -47,6 +47,10 @@ jobs:
             # the rest of the chars up to the limit are saved for the static part of the release names
             SANITIZED_HEAD_BRANCH=${HEAD_BRANCH_LOWERCASE_NO_NONALPHANUMERIC::25}
 
+            # trim last "-" if there is one, as the build and the deploy do when they name the
+            # environment, or a branch whose 25th char is a hyphen gets a hostname nothing serves
+            SANITIZED_HEAD_BRANCH=${SANITIZED_HEAD_BRANCH%-}
+
             echo "TARGET_URL=https://$SANITIZED_HEAD_BRANCH.api.im-feat.dhis2.org" >> $GITHUB_ENV
           else
             # Dev environment

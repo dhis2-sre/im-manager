@@ -67,6 +67,7 @@ func toResponseStack(stack Stack) StackResponse {
 	}
 
 	s.ParameterGroups = stack.ParameterGroups
+	s.Endpoints = stack.Endpoints
 
 	for parameterName, parameter := range stack.Parameters {
 		s.Parameters = append(s.Parameters, StackParameterResponse{
@@ -78,6 +79,8 @@ func toResponseStack(stack Stack) StackResponse {
 			Sensitive:       parameter.Sensitive,
 			Required:        parameter.Required,
 			ImmutableReason: parameter.ImmutableReason,
+			Description:     parameter.Description,
+			AddOn:           parameter.AddOn,
 			Group:           parameter.Group,
 		})
 	}
@@ -98,7 +101,12 @@ type StackParameterResponse struct {
 	// ImmutableReason says why the parameter cannot be changed once the instance has been deployed;
 	// empty means it can.
 	ImmutableReason string `json:"immutableReason,omitempty"`
-	Group           string `json:"group,omitempty"`
+	// Description says what the parameter is for, in a sentence to show beside it.
+	Description string `json:"description,omitempty"`
+	// AddOn says this 'true'/'false' parameter switches on an optional part of the instance, to be
+	// offered as something to add rather than as one more setting.
+	AddOn bool   `json:"addOn,omitempty"`
+	Group string `json:"group,omitempty"`
 }
 
 // swagger:model Stack
@@ -108,6 +116,7 @@ type StackResponse struct {
 	ParameterGroups []ParameterGroup         `json:"parameterGroups,omitempty"`
 	Requires        []StackResponse          `json:"requires,omitempty"`
 	Companions      []StackCompanionResponse `json:"companions,omitempty"`
+	Endpoints       []Endpoint               `json:"endpoints,omitempty"`
 }
 
 // StackCompanionResponse names a stack that can be deployed alongside this one. Like Requires it

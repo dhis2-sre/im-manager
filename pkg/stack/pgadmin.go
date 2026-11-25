@@ -20,6 +20,9 @@ var PgAdmin = withGroupedParameters(Stack{
 			"DATABASE_USERNAME": {Priority: 0, DisplayName: "Database Username", Consumed: true, Sensitive: true},
 		}},
 	},
+	// Served beside the instance it belongs to rather than at its name, since a companion shares the
+	// name of the deployment.
+	Endpoints: []Endpoint{{PathSuffix: "-pgadmin"}},
 	Components: []kube.Component{
 		PgAdminComponent{BaseComponent: kube.BaseComponent{Name: "pgadmin"}},
 	},
