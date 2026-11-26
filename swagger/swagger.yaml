@@ -79,6 +79,15 @@ definitions:
         x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
     BulkDeploymentNameAvailability:
         properties:
+            firstAvailable:
+                description: FirstAvailable is the first of prefix-1 to prefix-maxCount that is a valid name and free in the group, whatever the count, so a client can suggest a numbered name. It is left out when there is none.
+                type: string
+                x-go-name: FirstAvailable
+            maxCount:
+                description: MaxCount is the most deployments one bulk deploy creates
+                format: uint64
+                type: integer
+                x-go-name: MaxCount
             names:
                 items:
                     type: string
@@ -2041,7 +2050,7 @@ paths:
             summary: Bulk deploy
     /deployments/bulk/availability:
         get:
-            description: List the names a bulk deploy with the given prefix and count would create and which of them are taken. The bulk deploy checks again when it creates them.
+            description: List the names a bulk deploy with the given prefix and count would create and which of them are taken, the most deployments a bulk deploy creates, and the first free name with the prefix. The bulk deploy checks again when it creates them.
             operationId: bulkDeploymentNameAvailability
             parameters:
                 - in: query

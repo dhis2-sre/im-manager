@@ -615,6 +615,37 @@ func TestInstanceHandler(t *testing.T) {
 		destroyDeployment(t, client, deployment.ID, tokens.AccessToken)
 	})
 
+	t.Run("BulkDeploymentNameSuggestion", func(t *testing.T) {
+		t.Parallel()
+		availability := func(prefix string, count int) instance.BulkDeploymentNameAvailability {
+			var availability instance.BulkDeploymentNameAvailability
+			client.GetJSON(t, fmt.Sprintf("/deployments/bulk/availability?group=group-name&prefix=%s&count=%d", prefix, count), &availability, inttest.WithAuthToken(tokens.AccessToken))
+			return availability
+		}
+
+		free := availability("suggest", 1)
+		assert.Equal(t, uint(instance.MaxBulkDeployments), free.MaxCount)
+		assert.Equal(t, "suggest-1", free.FirstAvailable)
+
+		first := createDeployment(t, client, "suggest-1", tokens.AccessToken)
+		second := createDeployment(t, client, "suggest-2", tokens.AccessToken)
+		taken := availability("suggest", 1)
+		assert.Equal(t, []string{"suggest-1"}, taken.Taken)
+		assert.Equal(t, "suggest-3", taken.FirstAvailable, "the first free name is found beyond the count")
+
+		tooLong := availability(strings.Repeat("c", 29), 10)
+		assert.NotEmpty(t, tooLong.Reason)
+		assert.Equal(t, strings.Repeat("c", 29)+"-1", tooLong.FirstAvailable, "a name too long to suggest is skipped, not the whole prefix")
+
+		invalid := availability("Not-valid", 1)
+		assert.NotEmpty(t, invalid.Reason)
+		assert.Empty(t, invalid.FirstAvailable)
+		assert.Equal(t, uint(instance.MaxBulkDeployments), invalid.MaxCount)
+
+		destroyDeployment(t, client, first.ID, tokens.AccessToken)
+		destroyDeployment(t, client, second.ID, tokens.AccessToken)
+	})
+
 	t.Run("BulkDeploy", func(t *testing.T) {
 		t.Parallel()
 		post := func(body string, status int) []byte {

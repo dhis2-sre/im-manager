@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"slices"
 	"strconv"
 
 	"github.com/dhis2-sre/im-manager/pkg/stack"
@@ -555,6 +556,10 @@ type BulkDeploymentNameAvailability struct {
 	Names  []string `json:"names"`
 	Taken  []string `json:"taken"`
 	Reason string   `json:"reason,omitempty"`
+	// MaxCount is the most deployments one bulk deploy creates
+	MaxCount uint `json:"maxCount"`
+	// FirstAvailable is the first of prefix-1 to prefix-maxCount that is a valid name and free in the group, whatever the count, so a client can suggest a numbered name. It is left out when there is none.
+	FirstAvailable string `json:"firstAvailable,omitempty"`
 }
 
 func (h Handler) BulkDeploymentNameAvailability(c *gin.Context) {
@@ -562,7 +567,7 @@ func (h Handler) BulkDeploymentNameAvailability(c *gin.Context) {
 	//
 	// Bulk deployment name availability
 	//
-	// List the names a bulk deploy with the given prefix and count would create and which of them are taken. The bulk deploy checks again when it creates them.
+	// List the names a bulk deploy with the given prefix and count would create and which of them are taken, the most deployments a bulk deploy creates, and the first free name with the prefix. The bulk deploy checks again when it creates them.
 	//
 	// Security:
 	//	oauth2:
@@ -612,18 +617,41 @@ func (h Handler) BulkDeploymentNameAvailability(c *gin.Context) {
 		return
 	}
 
-	if reason := invalidBulkNamesReason(names, group); reason != "" {
-		c.JSON(http.StatusOK, BulkDeploymentNameAvailability{Names: names, Taken: []string{}, Reason: reason})
-		return
-	}
-
-	taken, err := h.instanceService.TakenDeploymentNames(ctx, group.Name, names)
+	// Every name with the prefix a bulk deploy could create is looked up at once, so the first free one is found whatever the count.
+	candidates, err := bulkDeploymentNames(request.Prefix, MaxBulkDeployments)
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
+	candidates = slices.DeleteFunc(candidates, func(name string) bool { return deploymentNameReason(name, group) != "" })
 
-	c.JSON(http.StatusOK, BulkDeploymentNameAvailability{Names: names, Taken: taken})
+	takenCandidates := []string{}
+	if len(candidates) > 0 {
+		takenCandidates, err = h.instanceService.TakenDeploymentNames(ctx, group.Name, candidates)
+		if err != nil {
+			_ = c.Error(err)
+			return
+		}
+	}
+
+	response := BulkDeploymentNameAvailability{Names: names, Taken: []string{}, MaxCount: MaxBulkDeployments}
+	if index := slices.IndexFunc(candidates, func(name string) bool { return !slices.Contains(takenCandidates, name) }); index != -1 {
+		response.FirstAvailable = candidates[index]
+	}
+
+	if reason := invalidBulkNamesReason(names, group); reason != "" {
+		response.Reason = reason
+		c.JSON(http.StatusOK, response)
+		return
+	}
+
+	for _, name := range names {
+		if slices.Contains(takenCandidates, name) {
+			response.Taken = append(response.Taken, name)
+		}
+	}
+
+	c.JSON(http.StatusOK, response)
 }
 
 // FindDeploymentById deployment
