@@ -740,6 +740,12 @@ definitions:
             read:
                 type: boolean
                 x-go-name: Read
+            subjectExists:
+                description: |-
+                    SubjectExists reports whether the deployment or database the notification is about still
+                    exists and the requesting user may open it. It is left out for a kind without such a subject.
+                type: boolean
+                x-go-name: SubjectExists
             userId:
                 format: uint64
                 type: integer
@@ -2784,7 +2790,7 @@ paths:
             summary: User details
     /notifications:
         get:
-            description: List notifications for the authenticated user, ordered newest first.
+            description: List notifications for the authenticated user, ordered newest first. A notification about a deployment or a database carries subjectExists, which is true while it still exists and the user may open it.
             operationId: listNotifications
             responses:
                 "200":
