@@ -852,6 +852,12 @@ definitions:
             group:
                 type: string
                 x-go-name: Group
+            instances:
+                description: Instances are created with the deployment in one transaction, each validated the way saving an instance validates it, so a refused instance leaves no deployment behind. Without them the deployment is created empty.
+                items:
+                    $ref: '#/definitions/SaveInstanceRequest'
+                type: array
+                x-go-name: Instances
             name:
                 type: string
                 x-go-name: Name
@@ -1672,7 +1678,7 @@ paths:
                 - oauth2: []
             summary: Find deployments
         post:
-            description: Save a deployment...
+            description: 'Save a deployment, or with instances, the deployment and all its instances in one request: either everything is created or nothing is. The deployment is created, not deployed.'
             operationId: saveDeployment
             parameters:
                 - description: Save deployment request body parameter
@@ -1686,11 +1692,15 @@ paths:
                     description: OK
                     schema:
                         $ref: '#/definitions/Deployment'
+                "400":
+                    $ref: '#/responses/Error'
                 "401":
                     $ref: '#/responses/Error'
                 "403":
                     $ref: '#/responses/Error'
                 "404":
+                    $ref: '#/responses/Error'
+                "409":
                     $ref: '#/responses/Error'
                 "415":
                     $ref: '#/responses/Error'

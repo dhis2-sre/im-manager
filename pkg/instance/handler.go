@@ -144,6 +144,8 @@ type SaveDeploymentRequest struct {
 	Description string `json:"description"`
 	Group       string `json:"group" binding:"required"`
 	TTL         uint   `json:"ttl"`
+	// Instances are created with the deployment in one transaction, each validated the way saving an instance validates it, so a refused instance leaves no deployment behind. Without them the deployment is created empty.
+	Instances []SaveInstanceRequest `json:"instances" binding:"omitempty,dive"`
 }
 
 func (h Handler) SaveDeployment(c *gin.Context) {
@@ -151,19 +153,26 @@ func (h Handler) SaveDeployment(c *gin.Context) {
 	//
 	// Save a deployment
 	//
-	// Save a deployment...
+	// Save a deployment, or with instances, the deployment and all its instances in one request: either everything is created or nothing is. The deployment is created, not deployed.
 	//
 	// Security:
 	//	oauth2:
 	//
 	// responses:
 	//	200: Deployment
+	//	400: Error
 	//	401: Error
 	//	403: Error
 	//	404: Error
+	//	409: Error
 	//	415: Error
 	var request SaveDeploymentRequest
 	if err := handler.DataBinder(c, &request); err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	if err := rejectRepeatedStacks(request.Instances); err != nil {
 		_ = c.Error(err)
 		return
 	}
@@ -211,7 +220,12 @@ func (h Handler) SaveDeployment(c *gin.Context) {
 		return
 	}
 
-	err = h.instanceService.SaveDeployment(ctx, deployment)
+	if len(request.Instances) > 0 {
+		deployment.Instances = newInstances(deployment.Name, group, request.Instances, "")
+		err = h.instanceService.SaveDeployments(ctx, group.Name, []*model.Deployment{deployment})
+	} else {
+		err = h.instanceService.SaveDeployment(ctx, deployment)
+	}
 	if err != nil {
 		_ = c.Error(err)
 		return

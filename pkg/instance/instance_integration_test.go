@@ -538,6 +538,46 @@ func TestInstanceHandler(t *testing.T) {
 		client.Do(t, http.MethodGet, "/deployments/availability?group=group-name&name=free-name&user=non-member", nil, http.StatusUnauthorized, inttest.WithAuthToken(tokens.AccessToken))
 	})
 
+	t.Run("SaveDeploymentWithInstances", func(t *testing.T) {
+		t.Parallel()
+		post := func(body string, status int) []byte {
+			return client.Do(t, http.MethodPost, "/deployments", strings.NewReader(body), status, inttest.WithAuthToken(tokens.AccessToken), inttest.WithHeader("Content-Type", "application/json"))
+		}
+		available := func(name string) bool {
+			var availability instance.DeploymentNameAvailability
+			client.GetJSON(t, "/deployments/availability?group=group-name&name="+name, &availability, inttest.WithAuthToken(tokens.AccessToken))
+			return availability.Available
+		}
+
+		post(`{"name":"with-instances-refused","group":"group-name","instances":[{"stackName":"whoami-go","parameters":{"IMAGE_PULL_POLICY":{"value":"Sometimes"}}}]}`, http.StatusBadRequest)
+		assert.True(t, available("with-instances-refused"), "a refused instance leaves no deployment behind")
+		post(`{"name":"with-instances-refused","group":"group-name","instances":[{"stackName":"pgadmin"}]}`, http.StatusBadRequest)
+		assert.True(t, available("with-instances-refused"), "an instance without the instance it consumes from leaves no deployment behind")
+		post(`{"name":"with-instances-refused","group":"group-name","instances":[{"stackName":"whoami-go"},{"stackName":"whoami-go"}]}`, http.StatusBadRequest)
+		assert.True(t, available("with-instances-refused"))
+
+		var deployment model.Deployment
+		require.NoError(t, json.Unmarshal(post(`{"name":"with-instances","group":"group-name","description":"all at once","instances":[{"stackName":"whoami-go","public":true,"parameters":{"IMAGE_PULL_POLICY":{"value":"Always"}}}]}`, http.StatusCreated), &deployment))
+		assert.Equal(t, "all at once", deployment.Description)
+		assert.Equal(t, twoDayTTL, deployment.TTL)
+		require.Len(t, deployment.Instances, 1)
+		created := deployment.Instances[0]
+		assert.NotZero(t, created.ID)
+		assert.Equal(t, deployment.ID, created.DeploymentID)
+		assert.Equal(t, "with-instances", created.Name)
+		assert.True(t, created.Public)
+		assert.Empty(t, created.DeployStatus, "the deployment is created, not deployed")
+		assert.Equal(t, "Always", created.Parameters["IMAGE_PULL_POLICY"].Value)
+		assert.Equal(t, "1", created.Parameters["REPLICA_COUNT"].Value, "stack defaults are filled in the way saving an instance fills them")
+
+		post(`{"name":"with-instances","group":"group-name","instances":[{"stackName":"whoami-go"}]}`, http.StatusConflict)
+
+		deployDeployment(t, client, deployment.ID, tokens.AccessToken)
+		awaitDeployed(t, client, deployment.ID, tokens.AccessToken)
+		k8sClient.AssertPodIsReady(t, created.Group.Namespace, created.Name, 60, created.Group.ID)
+		destroyDeployment(t, client, deployment.ID, tokens.AccessToken)
+	})
+
 	t.Run("BulkDeploy", func(t *testing.T) {
 		t.Parallel()
 		post := func(body string, status int) []byte {
