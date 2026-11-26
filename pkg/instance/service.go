@@ -148,11 +148,19 @@ func (s Service) validateNewDeployment(deployment *model.Deployment, stacksByNam
 		instance.Parameters = withoutConsumedParameters(instance.Parameters, stack)
 	}
 
-	if _, err := s.validateNoCycles(deployment.Instances); err != nil {
+	deploymentGraph, err := s.validateNoCycles(deployment.Instances)
+	if err != nil {
 		return errdef.NewBadRequest("failed to validate instance: %v", err)
 	}
 
-	if err := s.resolveParameters(deployment); err != nil {
+	// A consumer takes the value its provider holds once the provider's defaults are filled in, so
+	// providers are resolved first whatever order the instances were given in. The deployment keeps
+	// that order.
+	order, err := deploymentOrder(deployment, deploymentGraph)
+	if err != nil {
+		return errdef.NewBadRequest("failed to validate instance: %v", err)
+	}
+	if err := s.resolveParameters(&model.Deployment{Instances: order}); err != nil {
 		return errdef.NewBadRequest("failed to resolve parameters: %v", err)
 	}
 

@@ -292,6 +292,27 @@ func TestProviderBasedRequirements(t *testing.T) {
 		assert.Equal(t, "db.svc", deployment.Instances[1].Parameters["HOST"].Value)
 	})
 
+	t.Run("ANewDeploymentResolvesTheDefaultOfAProviderListedAfterTheConsumer", func(t *testing.T) {
+		defaulted := stack.Stack{
+			Name:       "provider",
+			Parameters: map[string]stack.StackParameter{"HOST": {DefaultValue: ptr("db.svc")}},
+		}
+		stackService := stack.NewService(stack.Stacks{"consumer": consumer, "provider": defaulted})
+		service := NewService(nil, nil, nil, stackService, nil, nil, "", kube.NewClients(slog.Default()))
+		deployment := &model.Deployment{
+			Instances: []*model.DeploymentInstance{
+				{StackName: "consumer", Parameters: map[string]model.DeploymentInstanceParameter{}},
+				{StackName: "provider", Parameters: map[string]model.DeploymentInstanceParameter{}},
+			},
+		}
+
+		err := service.validateNewDeployment(deployment, map[string]*stack.Stack{})
+
+		require.NoError(t, err)
+		assert.Equal(t, "db.svc", deployment.Instances[0].Parameters["HOST"].Value)
+		assert.Equal(t, []string{"consumer", "provider"}, stackNames(deployment.Instances), "the instances keep the order they were given in")
+	})
+
 	t.Run("MissingProvider", func(t *testing.T) {
 		stackService := stack.NewService(stack.Stacks{"consumer": consumer})
 		service := NewService(nil, nil, nil, stackService, nil, nil, "", kube.NewClients(slog.Default()))
