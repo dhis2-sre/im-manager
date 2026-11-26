@@ -769,6 +769,7 @@ definitions:
     Parameters:
         additionalProperties:
             $ref: '#/definitions/Parameter'
+        title: Parameters are instance parameter values keyed by name. A parameter the stack consumes from another instance is resolved from that instance, so a value sent for one is ignored.
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
     PublicInstance:

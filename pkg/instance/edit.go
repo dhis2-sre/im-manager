@@ -250,14 +250,17 @@ func (s Service) applyInstanceEdits(byStack map[string]*model.DeploymentInstance
 			continue
 		}
 
-		if err := s.rejectConsumedParameters(stackName, maps.Keys(edit.Parameters)); err != nil {
-			return errdef.NewBadRequest("%v", err)
+		instanceStack, err := s.stackService.Find(stackName)
+		if err != nil {
+			return err
 		}
-		if err := s.rejectImmutableParameters(deploymentInstance, edit.Parameters); err != nil {
+		parameters := withoutConsumedParameters(edit.Parameters, instanceStack)
+
+		if err := s.rejectImmutableParameters(deploymentInstance, parameters); err != nil {
 			return err
 		}
 
-		for name, parameter := range edit.Parameters {
+		for name, parameter := range parameters {
 			deploymentInstance.Parameters[name] = model.DeploymentInstanceParameter{ParameterName: name, Value: parameter.Value}
 		}
 
@@ -310,10 +313,7 @@ func (s Service) newCompanionInstance(deployment *model.Deployment, host *model.
 	}
 
 	parameters := make(model.DeploymentInstanceParameters, len(edit.Parameters))
-	for name, parameter := range edit.Parameters {
-		if companionStack.Parameters[name].Consumed {
-			return nil, errdef.NewBadRequest("consumed parameters can't be supplied by the user: %s", name)
-		}
+	for name, parameter := range withoutConsumedParameters(edit.Parameters, companionStack) {
 		parameters[name] = model.DeploymentInstanceParameter{ParameterName: name, Value: parameter.Value}
 	}
 

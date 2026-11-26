@@ -615,6 +615,28 @@ func TestInstanceHandler(t *testing.T) {
 		destroyDeployment(t, client, deployment.ID, tokens.AccessToken)
 	})
 
+	t.Run("ConsumedParametersAreIgnoredOnWrite", func(t *testing.T) {
+		t.Parallel()
+		send := func(method, path, body string, status int) model.Deployment {
+			var deployment model.Deployment
+			response := client.Do(t, method, path, strings.NewReader(body), status, inttest.WithAuthToken(tokens.AccessToken), inttest.WithHeader("Content-Type", "application/json"))
+			require.NoError(t, json.Unmarshal(response, &deployment))
+			return deployment
+		}
+		resolved := "consumed-ignored-1-dhis2-postgresql-rw.group-name.svc"
+
+		preset := send(http.MethodPost, "/presets", `{"name":"consumed-ignored","group":"group-name","instances":[
+			{"stackName":"dhis2-v2","parameters":{"DATABASE_ID":{"value":"1"},"ENABLE_PGADMIN":{"value":"true"}}},
+			{"stackName":"pgadmin","parameters":{"PGADMIN_USERNAME":{"value":"admin@dhis2.org"},"PGADMIN_PASSWORD":{"value":"secret"},"DATABASE_HOSTNAME":{"value":"elsewhere"}}}
+		]}`, http.StatusCreated)
+		assert.Equal(t, resolved, findInstanceByStack(preset, "pgadmin").Parameters["DATABASE_HOSTNAME"].Value, "a consumed value is resolved from its provider whatever is sent")
+
+		edited := send(http.MethodPatch, fmt.Sprintf("/presets/%d", preset.ID), `{"instances":{"pgadmin":{"parameters":{"DATABASE_HOSTNAME":{"value":"elsewhere"}}}}}`, http.StatusOK)
+		assert.Equal(t, resolved, findInstanceByStack(edited, "pgadmin").Parameters["DATABASE_HOSTNAME"].Value)
+
+		client.Do(t, http.MethodDelete, fmt.Sprintf("/presets/%d", preset.ID), nil, http.StatusNoContent, inttest.WithAuthToken(tokens.AccessToken))
+	})
+
 	t.Run("BulkDeploymentNameSuggestion", func(t *testing.T) {
 		t.Parallel()
 		availability := func(prefix string, count int) instance.BulkDeploymentNameAvailability {

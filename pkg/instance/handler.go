@@ -709,6 +709,7 @@ type Parameter struct {
 	Value string `json:"value"`
 }
 
+// Parameters are instance parameter values keyed by name. A parameter the stack consumes from another instance is resolved from that instance, so a value sent for one is ignored.
 type Parameters map[string]Parameter
 
 type SaveInstanceRequest struct {

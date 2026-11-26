@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"iter"
 	"log/slog"
 	"maps"
 	"net/url"
@@ -146,9 +145,7 @@ func (s Service) validateNewDeployment(deployment *model.Deployment, stacksByNam
 		}
 		stacksByName[instance.StackName] = stack
 
-		if err := s.rejectConsumedParameters(instance.StackName, maps.Keys(instance.Parameters)); err != nil {
-			return errdef.NewBadRequest("failed to validate instance: %v", err)
-		}
+		instance.Parameters = withoutConsumedParameters(instance.Parameters, stack)
 	}
 
 	if _, err := s.validateNoCycles(deployment.Instances); err != nil {
@@ -210,10 +207,12 @@ func (s Service) FindDecryptedDeploymentInstanceById(ctx context.Context, id uin
 }
 
 func (s Service) SaveInstance(ctx context.Context, instance *model.DeploymentInstance) error {
-	err := s.rejectConsumedParameters(instance.StackName, maps.Keys(instance.Parameters))
+	stack, err := s.stackService.Find(instance.StackName)
 	if err != nil {
 		return err
 	}
+
+	instance.Parameters = withoutConsumedParameters(instance.Parameters, stack)
 
 	deployment, err := s.FindDeploymentById(ctx, instance.DeploymentID)
 	if err != nil {
@@ -237,11 +236,6 @@ func (s Service) SaveInstance(ctx context.Context, instance *model.DeploymentIns
 		return errdef.NewBadRequest("failed to resolve parameters: %v", err)
 	}
 
-	stack, err := s.stackService.Find(instance.StackName)
-	if err != nil {
-		return err
-	}
-
 	if err := rejectMissingRequiredParameters(instance, stack); err != nil {
 		return err
 	}
@@ -249,19 +243,17 @@ func (s Service) SaveInstance(ctx context.Context, instance *model.DeploymentIns
 	return s.instanceRepository.SaveInstance(ctx, instance, stack)
 }
 
-func (s Service) rejectConsumedParameters(stackName string, paramNames iter.Seq[string]) error {
-	stack, err := s.stackService.Find(stackName)
-	if err != nil {
-		return err
-	}
-
-	var errs []error
-	for name := range paramNames {
-		if stack.Parameters[name].Consumed {
-			errs = append(errs, fmt.Errorf("consumed parameters can't be supplied by the user: %s", name))
+// withoutConsumedParameters leaves out the parameters the stack consumes from another instance. Their
+// values are always resolved from the instance providing them, and reads return them, so a client
+// sending back what it read gets the same result as one leaving them out rather than a refusal.
+func withoutConsumedParameters[V any](parameters map[string]V, stack *stack.Stack) map[string]V {
+	kept := make(map[string]V, len(parameters))
+	for name, value := range parameters {
+		if !stack.Parameters[name].Consumed {
+			kept[name] = value
 		}
 	}
-	return errors.Join(errs...)
+	return kept
 }
 
 // rejectImmutableParameters refuses a change to a parameter the stack declares immutable, once the
@@ -1443,9 +1435,12 @@ func (s Service) UpdateInstanceParameters(ctx context.Context, deploymentId, ins
 		instance.Public = *public
 	}
 
-	if err := s.rejectConsumedParameters(instance.StackName, maps.Keys(parameters)); err != nil {
+	instanceStack, err := s.stackService.Find(instance.StackName)
+	if err != nil {
 		return nil, err
 	}
+
+	parameters = withoutConsumedParameters(parameters, instanceStack)
 
 	if err := s.rejectImmutableParameters(instance, parameters); err != nil {
 		return nil, err
