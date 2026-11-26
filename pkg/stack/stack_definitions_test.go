@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 	"testing"
@@ -508,4 +509,72 @@ func TestResponseServesFormLayout(t *testing.T) {
 	assert.Equal(t, map[string]groupLayout{
 		"pgadmin": {Primary: []string{"PGADMIN_PASSWORD", "PGADMIN_USERNAME"}, Advanced: []sectionLayout{{Parameters: []string{"CHART_VERSION"}}}},
 	}, layoutOf(toResponseStack(PgAdmin)))
+}
+
+// assert every parameter that switches something on or off is validated as one, which is what has
+// the stacks API serve it as a boolean. A default of 'true' or 'false' is what gives it away.
+func TestSwitchesAreValidatedAsBooleans(t *testing.T) {
+	for _, s := range All {
+		for name, parameter := range s.Parameters {
+			if parameter.DefaultValue == nil || !slices.Contains(switchValues, *parameter.DefaultValue) {
+				continue
+			}
+			assert.IsTypef(t, switchValidator{}, parameter.Validator, "stack %q parameter %q defaults to %q but is not validated as a boolean", s.Name, name, *parameter.DefaultValue)
+		}
+	}
+}
+
+// assert every default passes its parameter's validator, so a form seeded with the defaults is
+// accepted and the allowed values served for a parameter always include its default.
+func TestDefaultValuesAreValid(t *testing.T) {
+	for _, s := range All {
+		for name, parameter := range s.Parameters {
+			if parameter.Validator == nil || parameter.DefaultValue == nil {
+				continue
+			}
+			assert.NoErrorf(t, parameter.Validator.Validate(*parameter.DefaultValue), "stack %q parameter %q", s.Name, name)
+		}
+	}
+}
+
+// assert the stacks API serves the type and allowed values the web client used to keep as its own
+// lists, and serves them from the validator, so every value offered is one the backend accepts.
+func TestResponseServesTypeAndAllowedValues(t *testing.T) {
+	served := func(s Stack) map[string]StackParameterResponse {
+		parameters := make(map[string]StackParameterResponse)
+		for _, parameter := range toResponseStack(s).Parameters {
+			parameters[parameter.ParameterName] = parameter
+		}
+		return parameters
+	}
+	dhis2, chap := served(DHIS2V2), served(Chap)
+
+	switches := []StackParameterResponse{chap["DHIS2_REGISTER"]}
+	for _, name := range []string{"FLYWAY_MIGRATE_OUT_OF_ORDER", "FLYWAY_REPAIR_BEFORE_MIGRATION", "ENABLE_QUERY_LOGGING", "DEPLOY_CHAP", "ENABLE_DORIS", "ENABLE_PGADMIN", "ALLOW_SUSPEND", "DEPLOY_GLOWROOT"} {
+		switches = append(switches, dhis2[name])
+	}
+	for _, parameter := range switches {
+		assert.Equalf(t, "boolean", parameter.Type, "%q", parameter.ParameterName)
+		assert.Equalf(t, []string{"true", "false"}, parameter.AllowedValues, "%q", parameter.ParameterName)
+	}
+
+	assert.Equal(t, []string{"strict", "lax", "none"}, dhis2["SAME_SITE_COOKIES"].AllowedValues)
+	assert.Equal(t, []string{"minio", "s3", "filesystem"}, dhis2["STORAGE_TYPE"].AllowedValues)
+	assert.Equal(t, []string{"Always", "Never", "IfNotPresent"}, dhis2["IMAGE_PULL_POLICY"].AllowedValues)
+	assert.Equal(t, []string{"Always", "Never", "IfNotPresent"}, chap["WORKER_IMAGE_PULL_POLICY"].AllowedValues)
+	for _, parameter := range []StackParameterResponse{dhis2["SAME_SITE_COOKIES"], dhis2["IMAGE_REPOSITORY"], dhis2["IMAGE_TAG"], dhis2["DATABASE_ID"]} {
+		assert.Emptyf(t, parameter.Type, "%q", parameter.ParameterName)
+	}
+	// A pattern is no list of values, and an image tag or a database is offered from /integrations.
+	assert.Empty(t, dhis2["IMAGE_REPOSITORY"].AllowedValues)
+	assert.Empty(t, dhis2["IMAGE_TAG"].AllowedValues)
+	assert.Empty(t, dhis2["DATABASE_ID"].AllowedValues)
+
+	for _, s := range All {
+		for _, parameter := range toResponseStack(s).Parameters {
+			for _, value := range parameter.AllowedValues {
+				assert.NoErrorf(t, s.Parameters[parameter.ParameterName].Validator.Validate(value), "stack %q parameter %q", s.Name, parameter.ParameterName)
+			}
+		}
+	}
 }

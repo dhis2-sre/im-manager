@@ -96,8 +96,10 @@ type StackParameter struct {
 	DefaultValue *string `json:"defaultValue,omitempty"`
 	// Consumed signals that this parameter is provided by another stack i.e. one of the stacks required stacks.
 	Consumed bool `json:"consumed"`
-	// Validator ensures that the actual stack parameters are valid according to its rules.
-	Validator func(value string) error `json:"-"`
+	// Validator ensures that the actual stack parameters are valid according to its rules. A
+	// Choice or the boolean validator also decides the type and allowed values the stacks API
+	// serves, so a form offers exactly the values accepted here.
+	Validator Validator `json:"-"`
 	// Priority determines the order in which the parameter is shown.
 	Priority  uint `json:"priority"`
 	Sensitive bool `json:"sensitive"`

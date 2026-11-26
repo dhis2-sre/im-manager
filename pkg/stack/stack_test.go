@@ -386,19 +386,19 @@ func TestNew(t *testing.T) {
 func TestValidatorOneOf(t *testing.T) {
 	validator := stack.OneOf("ok", "not_ok")
 
-	assert.NoError(t, validator("ok"))
-	assert.NoError(t, validator("not_ok"))
-	assert.ErrorContains(t, validator("maybe"), `"maybe" is not valid, only "ok", "not_ok" are allowed`)
+	assert.NoError(t, validator.Validate("ok"))
+	assert.NoError(t, validator.Validate("not_ok"))
+	assert.ErrorContains(t, validator.Validate("maybe"), `"maybe" is not valid, only "ok", "not_ok" are allowed`)
 }
 
 func TestDHIS2ImageRepositoryValidator(t *testing.T) {
 	validator := stack.DHIS2V2.Parameters["IMAGE_REPOSITORY"].Validator
 
 	for _, valid := range []string{"core", "core-dev", "core-pr", "ghcr.io/dhis2/example"} {
-		assert.NoError(t, validator(valid), valid)
+		assert.NoError(t, validator.Validate(valid), valid)
 	}
 	for _, invalid := range []string{"", "Core", "other/core", "ghcr.io/other/core", "docker.io/dhis2/core", "ghcr.io/dhis2/a/b"} {
-		assert.Error(t, validator(invalid), invalid)
+		assert.Error(t, validator.Validate(invalid), invalid)
 	}
 }
 

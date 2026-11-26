@@ -966,6 +966,14 @@ definitions:
                     offered as something to add rather than as one more setting.
                 type: boolean
                 x-go-name: AddOn
+            allowedValues:
+                description: |-
+                    AllowedValues are the only values the parameter accepts, the same ones deploying or updating
+                    an instance validates it against; empty means it is not limited to a list.
+                items:
+                    type: string
+                type: array
+                x-go-name: AllowedValues
             consumed:
                 type: boolean
                 x-go-name: Consumed
@@ -1014,6 +1022,12 @@ definitions:
             sensitive:
                 type: boolean
                 x-go-name: Sensitive
+            type:
+                description: |-
+                    Type says what the parameter's value stands for beyond a string: "boolean" is 'true' or
+                    'false', switching something on or off. Empty means any other value.
+                type: string
+                x-go-name: Type
         type: object
         x-go-name: StackParameterResponse
         x-go-package: github.com/dhis2-sre/im-manager/pkg/stack

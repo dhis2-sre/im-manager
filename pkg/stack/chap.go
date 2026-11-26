@@ -20,7 +20,7 @@ var Chap = withGroupedParameters(Stack{
 			"IMAGE_TAG":         {Priority: 1, DisplayName: "Image Tag", DefaultValue: &chapDefaults.imageTag, Required: true, Primary: true},
 			"IMAGE_PULL_POLICY": {Priority: 2, DisplayName: "Image Pull Policy", DefaultValue: &chapDefaults.imagePullPolicy, Validator: imagePullPolicy, Required: true},
 			"CHART_VERSION":     {Priority: 3, DisplayName: "Chart Version", DefaultValue: &chapDefaults.chartVersion, Required: true},
-			"DHIS2_REGISTER":    {Priority: 4, DisplayName: "Register as a route in DHIS 2", DefaultValue: &chapDefaults.dhis2Register, Required: true, Primary: true},
+			"DHIS2_REGISTER":    {Priority: 4, DisplayName: "Register as a route in DHIS 2", DefaultValue: &chapDefaults.dhis2Register, Validator: boolean, Required: true, Primary: true},
 		}},
 		{Name: "worker", Title: "CHAP Worker", Parameters: StackParameters{
 			"WORKER_IMAGE_TAG":         {Priority: 13, DisplayName: "Image Tag", DefaultValue: &chapDefaults.imageTag, Required: true, Primary: true},
