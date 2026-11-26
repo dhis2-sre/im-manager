@@ -335,3 +335,177 @@ func TestResponseServesEndpoints(t *testing.T) {
 	assert.Equal(t, []Endpoint{{PathSuffix: "-pgadmin"}}, toResponseStack(PgAdmin).Endpoints)
 	assert.Empty(t, toResponseStack(Chap).Endpoints)
 }
+
+// assert the layout a stack declares for a form is one a client can follow: sections with unique
+// names and titles, every parameter's section declared by its own group and named only by an
+// advanced parameter, no section left empty, and every parameter that cannot be tucked away under
+// the advanced settings declared primary.
+func TestParameterLayoutIsConsistent(t *testing.T) {
+	for _, s := range All {
+		used := make(map[string]map[string]bool, len(s.ParameterGroups))
+		for _, group := range s.ParameterGroups {
+			used[group.Name] = make(map[string]bool, len(group.Sections))
+			titles := make(map[string]bool, len(group.Sections))
+			for _, section := range group.Sections {
+				assert.NotEmptyf(t, section.Name, "stack %q group %q declares a section without a name", s.Name, group.Name)
+				assert.NotEmptyf(t, section.Title, "stack %q group %q section %q has no title", s.Name, group.Name, section.Name)
+				_, declared := used[group.Name][section.Name]
+				assert.Falsef(t, declared, "stack %q group %q declares section %q twice", s.Name, group.Name, section.Name)
+				assert.Falsef(t, titles[section.Title], "stack %q group %q declares two sections titled %q", s.Name, group.Name, section.Title)
+				used[group.Name][section.Name] = false
+				titles[section.Title] = true
+			}
+		}
+
+		for name, parameter := range s.Parameters {
+			if parameter.Section != "" {
+				assert.Falsef(t, parameter.Primary, "stack %q parameter %q is primary and in section %q, which only lists advanced parameters", s.Name, name, parameter.Section)
+				_, declared := used[parameter.Group][parameter.Section]
+				assert.Truef(t, declared, "stack %q parameter %q names section %q, which its group %q does not declare", s.Name, name, parameter.Section, parameter.Group)
+				used[parameter.Group][parameter.Section] = true
+			}
+			if parameter.Required && parameter.DefaultValue == nil && !parameter.Consumed {
+				assert.Truef(t, parameter.Primary, "stack %q parameter %q is required with no default, so it has to be filled in and has to be primary", s.Name, name)
+			}
+		}
+
+		// A conditional group is shown beside the choice it depends on when that choice lives in
+		// another group, so the choice and the group's own parameters are up front. An add-on's
+		// switch is offered as something to add instead, and the groups it gates make its own card.
+		for _, group := range s.ParameterGroups {
+			if group.When == nil {
+				continue
+			}
+			choice := s.Parameters[group.When.Parameter]
+			if choice.Group == group.Name || choice.AddOn {
+				continue
+			}
+			assert.Truef(t, choice.Primary, "stack %q parameter %q, which group %q depends on, is not primary", s.Name, group.When.Parameter, group.Name)
+			for name, parameter := range group.Parameters {
+				assert.Truef(t, parameter.Primary, "stack %q parameter %q is not primary, though its group %q is shown beside the choice it depends on", s.Name, name, group.Name)
+			}
+		}
+
+		for group, sections := range used {
+			for section, hasParameters := range sections {
+				assert.Truef(t, hasParameters, "stack %q group %q section %q has no parameters", s.Name, group, section)
+			}
+		}
+	}
+}
+
+// sectionLayout is a titled list of a group's advanced parameters. An empty title is the list
+// after the group's sections.
+type sectionLayout struct {
+	Title      string
+	Parameters []string
+}
+
+// groupLayout is where a client following the served layout puts a group's parameters.
+type groupLayout struct {
+	Primary  []string
+	Advanced []sectionLayout
+}
+
+// layoutOf lays out a stack's served parameters the way a client does: primary parameters up front,
+// advanced ones under the group's sections in order and then the rest, consumed ones nowhere since
+// the server fills them. Names are sorted, since within a list a client orders by priority.
+func layoutOf(response StackResponse) map[string]groupLayout {
+	byGroup := make(map[string][]StackParameterResponse)
+	for _, parameter := range response.Parameters {
+		if !parameter.Consumed {
+			byGroup[parameter.Group] = append(byGroup[parameter.Group], parameter)
+		}
+	}
+
+	names := func(parameters []StackParameterResponse, keep func(StackParameterResponse) bool) []string {
+		var result []string
+		for _, parameter := range parameters {
+			if keep(parameter) {
+				result = append(result, parameter.ParameterName)
+			}
+		}
+		sort.Strings(result)
+		return result
+	}
+
+	layout := make(map[string]groupLayout, len(response.ParameterGroups))
+	for _, group := range response.ParameterGroups {
+		parameters := byGroup[group.Name]
+		var advanced []sectionLayout
+		for _, section := range group.Sections {
+			advanced = append(advanced, sectionLayout{Title: section.Title, Parameters: names(parameters, func(p StackParameterResponse) bool {
+				return !p.Primary && p.Section == section.Name
+			})})
+		}
+		if rest := names(parameters, func(p StackParameterResponse) bool { return !p.Primary && p.Section == "" }); len(rest) > 0 {
+			advanced = append(advanced, sectionLayout{Parameters: rest})
+		}
+		layout[group.Name] = groupLayout{
+			Primary:  names(parameters, func(p StackParameterResponse) bool { return p.Primary }),
+			Advanced: advanced,
+		}
+	}
+	return layout
+}
+
+// assert the stacks API serves the form layout the web client used to keep as its own tables of
+// parameter names, so moving those tables here changes nothing a user sees. Parameters of a group
+// shown beside the choice it depends on, such as the file store's, were always all shown.
+func TestResponseServesFormLayout(t *testing.T) {
+	addOns := sectionLayout{Parameters: []string{"DEPLOY_CHAP", "DEPLOY_GLOWROOT", "ENABLE_DORIS", "ENABLE_PGADMIN"}}
+
+	assert.Equal(t, map[string]groupLayout{
+		"dhis2": {
+			Primary: []string{"IMAGE_REPOSITORY", "IMAGE_TAG", "STORAGE_TYPE"},
+			Advanced: []sectionLayout{
+				{"Image and resources", []string{"CHART_VERSION", "CORE_RESOURCES_REQUESTS_CPU", "CORE_RESOURCES_REQUESTS_MEMORY", "DHIS2_HOME", "IMAGE_PULL_POLICY", "JAVA_OPTS"}},
+				{"Health checks", []string{"LIVENESS_PROBE_TIMEOUT_SECONDS", "MIN_READY_SECONDS", "READINESS_PROBE_TIMEOUT_SECONDS", "STARTUP_PROBE_FAILURE_THRESHOLD", "STARTUP_PROBE_PERIOD_SECONDS"}},
+				{"Configuration", []string{"ALLOW_SUSPEND", "CUSTOM_DHIS2_CONFIG", "SAME_SITE_COOKIES"}},
+				{"Google sign-in", []string{"GOOGLE_AUTH_CLIENT_EMAIL", "GOOGLE_AUTH_CLIENT_ID", "GOOGLE_AUTH_PRIVATE_KEY", "GOOGLE_AUTH_PRIVATE_KEY_ID", "GOOGLE_AUTH_PROJECT_ID"}},
+				{"Database migrations", []string{"ENABLE_QUERY_LOGGING", "FLYWAY_MIGRATE_OUT_OF_ORDER", "FLYWAY_REPAIR_BEFORE_MIGRATION"}},
+				// The add-on switches, which a client offers as tiles rather than as settings.
+				addOns,
+			},
+		},
+		"db": {
+			Primary: []string{"DATABASE_ID", "DATABASE_SIZE"},
+			Advanced: []sectionLayout{
+				{"Connection", []string{"DATABASE_NAME", "DATABASE_PASSWORD", "DATABASE_USERNAME"}},
+				{"Resources", []string{"DB_RESOURCES_REQUESTS_CPU", "DB_RESOURCES_REQUESTS_MEMORY"}},
+			},
+		},
+		"minio":      {Primary: []string{"MINIO_STORAGE_SIZE"}},
+		"s3":         {Primary: []string{"S3_BUCKET", "S3_IDENTITY", "S3_REGION", "S3_SECRET"}},
+		"filesystem": {Primary: []string{"FILESYSTEM_VOLUME_SIZE"}},
+		"doris-fe": {
+			Primary: []string{"DORIS_FRONTEND_VERSION"},
+			Advanced: []sectionLayout{{Parameters: []string{
+				"DORIS_DATABASE", "DORIS_FRONTEND_REPLICAS",
+				"DORIS_FRONTEND_RESOURCES_LIMITS_CPU", "DORIS_FRONTEND_RESOURCES_LIMITS_MEMORY",
+				"DORIS_FRONTEND_RESOURCES_REQUESTS_CPU", "DORIS_FRONTEND_RESOURCES_REQUESTS_MEMORY",
+				"DORIS_PASSWORD", "DORIS_USERNAME",
+			}}},
+		},
+		"doris-be": {
+			Primary: []string{"DORIS_BACKEND_VERSION"},
+			Advanced: []sectionLayout{{Parameters: []string{
+				"DORIS_BACKEND_REPLICAS",
+				"DORIS_BACKEND_RESOURCES_LIMITS_CPU", "DORIS_BACKEND_RESOURCES_LIMITS_MEMORY",
+				"DORIS_BACKEND_RESOURCES_REQUESTS_CPU", "DORIS_BACKEND_RESOURCES_REQUESTS_MEMORY",
+			}}},
+		},
+	}, layoutOf(toResponseStack(DHIS2V2)))
+
+	assert.Equal(t, map[string]groupLayout{
+		"api":      {Primary: []string{"DHIS2_REGISTER", "IMAGE_TAG"}, Advanced: []sectionLayout{{Parameters: []string{"CHART_VERSION", "IMAGE_PULL_POLICY"}}}},
+		"worker":   {Primary: []string{"WORKER_IMAGE_TAG"}, Advanced: []sectionLayout{{Parameters: []string{"WORKER_IMAGE_PULL_POLICY"}}}},
+		"register": {Primary: []string{"DHIS2_PASSWORD", "DHIS2_USERNAME"}},
+		"db":       {Primary: []string{"DATABASE_SIZE"}, Advanced: []sectionLayout{{Parameters: []string{"DATABASE_NAME", "DATABASE_PASSWORD", "DATABASE_VERSION"}}}},
+		"valkey":   {Advanced: []sectionLayout{{Parameters: []string{"REDIS_PASSWORD", "REDIS_STORAGE_SIZE"}}}},
+	}, layoutOf(toResponseStack(Chap)))
+
+	assert.Equal(t, map[string]groupLayout{
+		"pgadmin": {Primary: []string{"PGADMIN_PASSWORD", "PGADMIN_USERNAME"}, Advanced: []sectionLayout{{Parameters: []string{"CHART_VERSION"}}}},
+	}, layoutOf(toResponseStack(PgAdmin)))
+}

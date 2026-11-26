@@ -81,6 +81,8 @@ func toResponseStack(stack Stack) StackResponse {
 			ImmutableReason: parameter.ImmutableReason,
 			Description:     parameter.Description,
 			AddOn:           parameter.AddOn,
+			Primary:         parameter.Primary,
+			Section:         parameter.Section,
 			Group:           parameter.Group,
 		})
 	}
@@ -105,8 +107,14 @@ type StackParameterResponse struct {
 	Description string `json:"description,omitempty"`
 	// AddOn says this 'true'/'false' parameter switches on an optional part of the instance, to be
 	// offered as something to add rather than as one more setting.
-	AddOn bool   `json:"addOn,omitempty"`
-	Group string `json:"group,omitempty"`
+	AddOn bool `json:"addOn,omitempty"`
+	// Primary says the parameter is shown up front rather than under the advanced settings of its
+	// group, which is where a parameter without it goes.
+	Primary bool `json:"primary,omitempty"`
+	// Section names the one of its group's sections the parameter is listed under among the
+	// advanced settings; empty means after them.
+	Section string `json:"section,omitempty"`
+	Group   string `json:"group,omitempty"`
 }
 
 // swagger:model Stack
