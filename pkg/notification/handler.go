@@ -12,6 +12,7 @@ import (
 
 type notificationService interface {
 	FindByUserID(ctx context.Context, userID uint) ([]model.Notification, error)
+	FindSubjects(ctx context.Context, notifications []model.Notification) (Subjects, error)
 	MarkRead(ctx context.Context, id, userID uint) error
 	MarkAllRead(ctx context.Context, userID uint) error
 }
@@ -31,7 +32,7 @@ func (h Handler) List(c *gin.Context) {
 	//
 	// List notifications
 	//
-	// List notifications for the authenticated user, ordered newest first.
+	// List notifications for the authenticated user, ordered newest first. A notification about a deployment or a database carries subjectExists, which is true while it still exists and the user may open it.
 	//
 	// Security:
 	//	oauth2:
@@ -53,7 +54,34 @@ func (h Handler) List(c *gin.Context) {
 		return
 	}
 
+	subjects, err := h.service.FindSubjects(ctx, notifications)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	for i := range notifications {
+		notifications[i].SubjectExists = subjectExists(user, subjects, notifications[i])
+	}
+
 	c.JSON(http.StatusOK, notifications)
+}
+
+// subjectExists decides access the way GET /deployments/{id} and GET /databases/{id} do, since
+// those are what a notification about a deployment or a database leads to.
+func subjectExists(user *model.User, subjects Subjects, n model.Notification) *bool {
+	var exists bool
+	switch subject := subjectOf(n); subject.kind {
+	case deploymentSubject:
+		deployment, ok := subjects.deployments[subject.id]
+		exists = ok && handler.CanReadDeployment(user, deployment)
+	case databaseSubject:
+		database, ok := subjects.databases[subject.id]
+		exists = ok && handler.CanAccess(user, database)
+	default:
+		return nil
+	}
+	return &exists
 }
 
 // MarkRead marks a notification as read
