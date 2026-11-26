@@ -1984,7 +1984,7 @@ paths:
             summary: Update a Deployment Instance
     /deployments/availability:
         get:
-            description: Check whether a deployment name is free to use in a group.
+            description: Check whether a deployment name is free to use in a group and short enough to deploy there. The longest name depends on the group, and the reason states it.
             operationId: deploymentNameAvailability
             parameters:
                 - in: query
