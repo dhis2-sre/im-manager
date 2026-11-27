@@ -329,15 +329,29 @@ func TestPlanEdit(t *testing.T) {
 		assert.True(t, errdef.IsBadRequest(err))
 	})
 
-	t.Run("AConsumedParameterCannotBeSupplied", func(t *testing.T) {
+	t.Run("ASuppliedConsumedParameterIsIgnored", func(t *testing.T) {
 		edit := Edit{Instances: map[string]InstanceEdit{
 			"sidecar": {Parameters: Parameters{"SHARED_PASSWORD": {Value: "mine"}}},
 		}}
 
-		_, err := editTestService().planEdit(editTestDeployment(true), edit)
+		changes, err := editTestService().planEdit(editTestDeployment(true), edit)
 
-		require.ErrorContains(t, err, "consumed parameters can't be supplied by the user: SHARED_PASSWORD")
-		assert.True(t, errdef.IsBadRequest(err))
+		require.NoError(t, err)
+		assert.Empty(t, changes.Redeploy, "an edit of nothing but a consumed parameter changes nothing")
+		assert.Empty(t, changes.Save)
+		assert.Equal(t, "secret", findInstanceByStackName("sidecar", changes.Deployment).Parameters["SHARED_PASSWORD"].Value)
+	})
+
+	t.Run("ASuppliedConsumedParameterOfANewCompanionIsIgnored", func(t *testing.T) {
+		edit := Edit{Instances: map[string]InstanceEdit{
+			"host":    {Parameters: Parameters{"ENABLE_SIDECAR": {Value: "true"}}},
+			"sidecar": {Parameters: Parameters{"SHARED_PASSWORD": {Value: "mine"}}},
+		}}
+
+		changes, err := editTestService().planEdit(editTestDeployment(false), edit)
+
+		require.NoError(t, err)
+		assert.Equal(t, "secret", findInstanceByStackName("sidecar", changes.Deployment).Parameters["SHARED_PASSWORD"].Value)
 	})
 
 	t.Run("AnUnknownParameterIsRejected", func(t *testing.T) {

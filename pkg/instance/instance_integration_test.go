@@ -538,6 +538,136 @@ func TestInstanceHandler(t *testing.T) {
 		client.Do(t, http.MethodGet, "/deployments/availability?group=group-name&name=free-name&user=non-member", nil, http.StatusUnauthorized, inttest.WithAuthToken(tokens.AccessToken))
 	})
 
+	t.Run("DeploymentNameLength", func(t *testing.T) {
+		t.Parallel()
+		post := func(path, body string, status int) []byte {
+			return client.Do(t, http.MethodPost, path, strings.NewReader(body), status, inttest.WithAuthToken(tokens.AccessToken), inttest.WithHeader("Content-Type", "application/json"))
+		}
+		availability := func(path string) instance.DeploymentNameAvailability {
+			var availability instance.DeploymentNameAvailability
+			client.GetJSON(t, path, &availability, inttest.WithAuthToken(tokens.AccessToken))
+			return availability
+		}
+		longest := "name-of-the-longest-length-" + strings.Repeat("a", 4)
+		tooLong := longest + "a"
+		require.Len(t, longest, 31)
+
+		assert.True(t, availability("/deployments/availability?group=group-name&name="+longest).Available)
+		refused := availability("/deployments/availability?group=group-name&name=" + tooLong)
+		assert.False(t, refused.Available)
+		assert.Equal(t, `name must be at most 31 characters in group "group-name"`, refused.Reason)
+		assert.True(t, availability("/presets/availability?group=group-name&name="+tooLong).Available, "a preset deploys nothing, so its name is only held to the DNS label rule")
+
+		assert.Contains(t, string(post("/deployments", `{"name":"`+tooLong+`","group":"group-name"}`, http.StatusBadRequest)), "at most 31 characters")
+		deployment := createDeployment(t, client, longest, tokens.AccessToken)
+		destroyDeployment(t, client, deployment.ID, tokens.AccessToken)
+
+		prefix := strings.Repeat("b", 29)
+		var bulk instance.BulkDeploymentNameAvailability
+		client.GetJSON(t, "/deployments/bulk/availability?group=group-name&prefix="+prefix+"&count=10", &bulk, inttest.WithAuthToken(tokens.AccessToken))
+		assert.Equal(t, fmt.Sprintf(`"%s-10" isn't a valid name: name must be at most 31 characters in group "group-name"`, prefix), bulk.Reason)
+		post("/deployments/bulk", `{"prefix":"`+prefix+`","count":10,"group":"group-name","instances":[{"stackName":"whoami-go"}]}`, http.StatusBadRequest)
+
+		var preset model.Deployment
+		require.NoError(t, json.Unmarshal(post("/presets", `{"name":"`+tooLong+`","group":"group-name","instances":[{"stackName":"whoami-go"}]}`, http.StatusCreated), &preset))
+		post(fmt.Sprintf("/presets/%d/deployments", preset.ID), `{"name":"`+tooLong+`"}`, http.StatusBadRequest)
+		post(fmt.Sprintf("/presets/%d/deployments/bulk", preset.ID), `{"prefix":"`+prefix+`","count":10}`, http.StatusBadRequest)
+		client.Do(t, http.MethodDelete, fmt.Sprintf("/presets/%d", preset.ID), nil, http.StatusNoContent, inttest.WithAuthToken(tokens.AccessToken))
+	})
+
+	t.Run("SaveDeploymentWithInstances", func(t *testing.T) {
+		t.Parallel()
+		post := func(body string, status int) []byte {
+			return client.Do(t, http.MethodPost, "/deployments", strings.NewReader(body), status, inttest.WithAuthToken(tokens.AccessToken), inttest.WithHeader("Content-Type", "application/json"))
+		}
+		available := func(name string) bool {
+			var availability instance.DeploymentNameAvailability
+			client.GetJSON(t, "/deployments/availability?group=group-name&name="+name, &availability, inttest.WithAuthToken(tokens.AccessToken))
+			return availability.Available
+		}
+
+		post(`{"name":"with-instances-refused","group":"group-name","instances":[{"stackName":"whoami-go","parameters":{"IMAGE_PULL_POLICY":{"value":"Sometimes"}}}]}`, http.StatusBadRequest)
+		assert.True(t, available("with-instances-refused"), "a refused instance leaves no deployment behind")
+		post(`{"name":"with-instances-refused","group":"group-name","instances":[{"stackName":"pgadmin"}]}`, http.StatusBadRequest)
+		assert.True(t, available("with-instances-refused"), "an instance without the instance it consumes from leaves no deployment behind")
+		post(`{"name":"with-instances-refused","group":"group-name","instances":[{"stackName":"whoami-go"},{"stackName":"whoami-go"}]}`, http.StatusBadRequest)
+		assert.True(t, available("with-instances-refused"))
+
+		var deployment model.Deployment
+		require.NoError(t, json.Unmarshal(post(`{"name":"with-instances","group":"group-name","description":"all at once","instances":[{"stackName":"whoami-go","public":true,"parameters":{"IMAGE_PULL_POLICY":{"value":"Always"}}}]}`, http.StatusCreated), &deployment))
+		assert.Equal(t, "all at once", deployment.Description)
+		assert.Equal(t, twoDayTTL, deployment.TTL)
+		require.Len(t, deployment.Instances, 1)
+		created := deployment.Instances[0]
+		assert.NotZero(t, created.ID)
+		assert.Equal(t, deployment.ID, created.DeploymentID)
+		assert.Equal(t, "with-instances", created.Name)
+		assert.True(t, created.Public)
+		assert.Empty(t, created.DeployStatus, "the deployment is created, not deployed")
+		assert.Equal(t, "Always", created.Parameters["IMAGE_PULL_POLICY"].Value)
+		assert.Equal(t, "1", created.Parameters["REPLICA_COUNT"].Value, "stack defaults are filled in the way saving an instance fills them")
+
+		post(`{"name":"with-instances","group":"group-name","instances":[{"stackName":"whoami-go"}]}`, http.StatusConflict)
+
+		deployDeployment(t, client, deployment.ID, tokens.AccessToken)
+		awaitDeployed(t, client, deployment.ID, tokens.AccessToken)
+		k8sClient.AssertPodIsReady(t, created.Group.Namespace, created.Name, 60, created.Group.ID)
+		destroyDeployment(t, client, deployment.ID, tokens.AccessToken)
+	})
+
+	t.Run("ConsumedParametersAreIgnoredOnWrite", func(t *testing.T) {
+		t.Parallel()
+		send := func(method, path, body string, status int) model.Deployment {
+			var deployment model.Deployment
+			response := client.Do(t, method, path, strings.NewReader(body), status, inttest.WithAuthToken(tokens.AccessToken), inttest.WithHeader("Content-Type", "application/json"))
+			require.NoError(t, json.Unmarshal(response, &deployment))
+			return deployment
+		}
+		resolved := "consumed-ignored-1-dhis2-postgresql-rw.group-name.svc"
+
+		preset := send(http.MethodPost, "/presets", `{"name":"consumed-ignored","group":"group-name","instances":[
+			{"stackName":"dhis2-v2","parameters":{"DATABASE_ID":{"value":"1"},"ENABLE_PGADMIN":{"value":"true"}}},
+			{"stackName":"pgadmin","parameters":{"PGADMIN_USERNAME":{"value":"admin@dhis2.org"},"PGADMIN_PASSWORD":{"value":"secret"},"DATABASE_HOSTNAME":{"value":"elsewhere"}}}
+		]}`, http.StatusCreated)
+		assert.Equal(t, resolved, findInstanceByStack(preset, "pgadmin").Parameters["DATABASE_HOSTNAME"].Value, "a consumed value is resolved from its provider whatever is sent")
+
+		edited := send(http.MethodPatch, fmt.Sprintf("/presets/%d", preset.ID), `{"instances":{"pgadmin":{"parameters":{"DATABASE_HOSTNAME":{"value":"elsewhere"}}}}}`, http.StatusOK)
+		assert.Equal(t, resolved, findInstanceByStack(edited, "pgadmin").Parameters["DATABASE_HOSTNAME"].Value)
+
+		client.Do(t, http.MethodDelete, fmt.Sprintf("/presets/%d", preset.ID), nil, http.StatusNoContent, inttest.WithAuthToken(tokens.AccessToken))
+	})
+
+	t.Run("BulkDeploymentNameSuggestion", func(t *testing.T) {
+		t.Parallel()
+		availability := func(prefix string, count int) instance.BulkDeploymentNameAvailability {
+			var availability instance.BulkDeploymentNameAvailability
+			client.GetJSON(t, fmt.Sprintf("/deployments/bulk/availability?group=group-name&prefix=%s&count=%d", prefix, count), &availability, inttest.WithAuthToken(tokens.AccessToken))
+			return availability
+		}
+
+		free := availability("suggest", 1)
+		assert.Equal(t, uint(instance.MaxBulkDeployments), free.MaxCount)
+		assert.Equal(t, "suggest-1", free.FirstAvailable)
+
+		first := createDeployment(t, client, "suggest-1", tokens.AccessToken)
+		second := createDeployment(t, client, "suggest-2", tokens.AccessToken)
+		taken := availability("suggest", 1)
+		assert.Equal(t, []string{"suggest-1"}, taken.Taken)
+		assert.Equal(t, "suggest-3", taken.FirstAvailable, "the first free name is found beyond the count")
+
+		tooLong := availability(strings.Repeat("c", 29), 10)
+		assert.NotEmpty(t, tooLong.Reason)
+		assert.Equal(t, strings.Repeat("c", 29)+"-1", tooLong.FirstAvailable, "a name too long to suggest is skipped, not the whole prefix")
+
+		invalid := availability("Not-valid", 1)
+		assert.NotEmpty(t, invalid.Reason)
+		assert.Empty(t, invalid.FirstAvailable)
+		assert.Equal(t, uint(instance.MaxBulkDeployments), invalid.MaxCount)
+
+		destroyDeployment(t, client, first.ID, tokens.AccessToken)
+		destroyDeployment(t, client, second.ID, tokens.AccessToken)
+	})
+
 	t.Run("BulkDeploy", func(t *testing.T) {
 		t.Parallel()
 		post := func(body string, status int) []byte {
@@ -770,7 +900,7 @@ func TestInstanceHandler(t *testing.T) {
 
 		send(http.MethodPost, fmt.Sprintf("/presets/%d/deployments?user=other-member", preset.ID), map[string]any{"name": "test-from-preset-elsewhere", "group": "other-group-name"}, http.StatusForbidden, nil)
 		var byOtherMember model.Deployment
-		send(http.MethodPost, fmt.Sprintf("/presets/%d/deployments?user=other-member", preset.ID), map[string]any{"name": "test-from-preset-by-other-member"}, http.StatusCreated, &byOtherMember)
+		send(http.MethodPost, fmt.Sprintf("/presets/%d/deployments?user=other-member", preset.ID), map[string]any{"name": "test-from-preset-by-other"}, http.StatusCreated, &byOtherMember)
 		assert.Equal(t, "group-name", byOtherMember.GroupName, "a member who doesn't own the preset still deploys it in its own group")
 		client.Do(t, http.MethodDelete, fmt.Sprintf("/deployments/%d?user=other-member", byOtherMember.ID), nil, http.StatusAccepted, inttest.WithAuthToken(tokens.AccessToken))
 
@@ -816,7 +946,7 @@ func TestInstanceHandler(t *testing.T) {
 
 	t.Run("UpdateDeploymentInstancePreservesOtherParameters", func(t *testing.T) {
 		t.Parallel()
-		deployment := createDeployment(t, client, "test-deployment-instance-preserve", tokens.AccessToken, WithDescription("some description"))
+		deployment := createDeployment(t, client, "test-instance-preserve", tokens.AccessToken, WithDescription("some description"))
 
 		deploymentInstance := createWhoamiInstance(t, client, deployment.ID, tokens.AccessToken,
 			WithParameter("IMAGE_TAG", "0.6.0"),
@@ -892,7 +1022,7 @@ func TestInstanceHandler(t *testing.T) {
 
 	t.Run("UpdateDeploymentInstancePublicOnly", func(t *testing.T) {
 		t.Parallel()
-		deployment := createDeployment(t, client, "test-deployment-instance-public-only", tokens.AccessToken, WithDescription("some description"))
+		deployment := createDeployment(t, client, "test-instance-public-only", tokens.AccessToken, WithDescription("some description"))
 
 		deploymentInstance := createWhoamiInstance(t, client, deployment.ID, tokens.AccessToken,
 			WithParameter("IMAGE_TAG", "0.6.0"),

@@ -1,7 +1,6 @@
 package instance
 
 import (
-	"context"
 	"fmt"
 	"log/slog"
 	"testing"
@@ -49,33 +48,23 @@ func TestRejectMissingRequiredParameters(t *testing.T) {
 }
 
 func TestResolveParameters(t *testing.T) {
-	t.Run("PreventUserFromOverwritingConsumedParameters", func(t *testing.T) {
-		s := stack.Stack{
-			Name: "stack",
-			Parameters: map[string]stack.StackParameter{
-				"parameter": {
-					Consumed: true,
-				},
-			},
-		}
-		stacks := stack.Stacks{
-			"stack": s,
-		}
-		stackService := stack.NewService(stacks)
+	t.Run("IgnoreConsumedParametersSuppliedByTheUser", func(t *testing.T) {
+		stackService := stack.NewService(stack.Stacks{
+			"provider": {Name: "provider", Parameters: map[string]stack.StackParameter{"HOST": {}}},
+			"consumer": {Name: "consumer", Parameters: map[string]stack.StackParameter{"HOST": {Consumed: true}}},
+		})
 		service := NewService(nil, nil, nil, stackService, nil, nil, "", kube.NewClients(slog.Default()))
-		instance := &model.DeploymentInstance{
-			StackName: "stack",
-			Parameters: map[string]model.DeploymentInstanceParameter{
-				"parameter": {
-					ParameterName: "parameter",
-					Value:         "user overwrite",
-				},
+		deployment := &model.Deployment{
+			Instances: []*model.DeploymentInstance{
+				{StackName: "provider", Parameters: map[string]model.DeploymentInstanceParameter{"HOST": {ParameterName: "HOST", Value: "db.svc"}}},
+				{StackName: "consumer", Parameters: map[string]model.DeploymentInstanceParameter{"HOST": {ParameterName: "HOST", Value: "user overwrite"}}},
 			},
 		}
 
-		err := service.SaveInstance(context.Background(), instance)
+		err := service.validateNewDeployment(deployment, map[string]*stack.Stack{})
 
-		require.ErrorContains(t, err, "consumed parameters can't be supplied by the user: parameter")
+		require.NoError(t, err)
+		assert.Equal(t, "db.svc", deployment.Instances[1].Parameters["HOST"].Value, "the provider's value is what the consumer gets")
 	})
 
 	t.Run("RejectNonExistingParameter", func(t *testing.T) {
@@ -301,6 +290,27 @@ func TestProviderBasedRequirements(t *testing.T) {
 		err = service.resolveParameters(deployment)
 		require.NoError(t, err)
 		assert.Equal(t, "db.svc", deployment.Instances[1].Parameters["HOST"].Value)
+	})
+
+	t.Run("ANewDeploymentResolvesTheDefaultOfAProviderListedAfterTheConsumer", func(t *testing.T) {
+		defaulted := stack.Stack{
+			Name:       "provider",
+			Parameters: map[string]stack.StackParameter{"HOST": {DefaultValue: ptr("db.svc")}},
+		}
+		stackService := stack.NewService(stack.Stacks{"consumer": consumer, "provider": defaulted})
+		service := NewService(nil, nil, nil, stackService, nil, nil, "", kube.NewClients(slog.Default()))
+		deployment := &model.Deployment{
+			Instances: []*model.DeploymentInstance{
+				{StackName: "consumer", Parameters: map[string]model.DeploymentInstanceParameter{}},
+				{StackName: "provider", Parameters: map[string]model.DeploymentInstanceParameter{}},
+			},
+		}
+
+		err := service.validateNewDeployment(deployment, map[string]*stack.Stack{})
+
+		require.NoError(t, err)
+		assert.Equal(t, "db.svc", deployment.Instances[0].Parameters["HOST"].Value)
+		assert.Equal(t, []string{"consumer", "provider"}, stackNames(deployment.Instances), "the instances keep the order they were given in")
 	})
 
 	t.Run("MissingProvider", func(t *testing.T) {

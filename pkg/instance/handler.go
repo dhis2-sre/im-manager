@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"slices"
 	"strconv"
 
 	"github.com/dhis2-sre/im-manager/pkg/stack"
@@ -144,6 +145,8 @@ type SaveDeploymentRequest struct {
 	Description string `json:"description"`
 	Group       string `json:"group" binding:"required"`
 	TTL         uint   `json:"ttl"`
+	// Instances are created with the deployment in one transaction, each validated the way saving an instance validates it, so a refused instance leaves no deployment behind. Without them the deployment is created empty.
+	Instances []SaveInstanceRequest `json:"instances" binding:"omitempty,dive"`
 }
 
 func (h Handler) SaveDeployment(c *gin.Context) {
@@ -151,19 +154,26 @@ func (h Handler) SaveDeployment(c *gin.Context) {
 	//
 	// Save a deployment
 	//
-	// Save a deployment...
+	// Save a deployment, or with instances, the deployment and all its instances in one request: either everything is created or nothing is. The deployment is created, not deployed.
 	//
 	// Security:
 	//	oauth2:
 	//
 	// responses:
 	//	200: Deployment
+	//	400: Error
 	//	401: Error
 	//	403: Error
 	//	404: Error
+	//	409: Error
 	//	415: Error
 	var request SaveDeploymentRequest
 	if err := handler.DataBinder(c, &request); err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	if err := rejectRepeatedStacks(request.Instances); err != nil {
 		_ = c.Error(err)
 		return
 	}
@@ -183,6 +193,11 @@ func (h Handler) SaveDeployment(c *gin.Context) {
 
 	if err := kube.Reachable(group.Cluster); err != nil {
 		_ = c.Error(errdef.NewBadRequest("group %q can't be deployed to: %v", group.Name, err))
+		return
+	}
+
+	if reason := deploymentNameReason(request.Name, group); reason != "" {
+		_ = c.Error(errdef.NewBadRequest("%s", reason))
 		return
 	}
 
@@ -211,7 +226,12 @@ func (h Handler) SaveDeployment(c *gin.Context) {
 		return
 	}
 
-	err = h.instanceService.SaveDeployment(ctx, deployment)
+	if len(request.Instances) > 0 {
+		deployment.Instances = newInstances(deployment.Name, group, request.Instances, "")
+		err = h.instanceService.SaveDeployments(ctx, group.Name, []*model.Deployment{deployment})
+	} else {
+		err = h.instanceService.SaveDeployment(ctx, deployment)
+	}
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -237,7 +257,7 @@ func (h Handler) DeploymentNameAvailability(c *gin.Context) {
 	//
 	// Deployment name availability
 	//
-	// Check whether a deployment name is free to use in a group.
+	// Check whether a deployment name is free to use in a group and short enough to deploy there. The longest name depends on the group, and the reason states it.
 	//
 	// Security:
 	//	oauth2:
@@ -304,7 +324,12 @@ func (h Handler) nameAvailability(c *gin.Context, preset bool) {
 		return
 	}
 
-	if v, ok := binding.Validator.Engine().(*validator.Validate); ok && v.Var(request.Name, "dns_rfc1035_label") != nil {
+	if !preset {
+		if reason := deploymentNameReason(request.Name, group); reason != "" {
+			c.JSON(http.StatusOK, DeploymentNameAvailability{Reason: reason})
+			return
+		}
+	} else if v, ok := binding.Validator.Engine().(*validator.Validate); ok && v.Var(request.Name, "dns_rfc1035_label") != nil {
 		c.JSON(http.StatusOK, DeploymentNameAvailability{Reason: "name must be at most 63 characters of lowercase letters, digits and '-', start with a letter and end with a letter or digit"})
 		return
 	}
@@ -348,14 +373,10 @@ func bulkDeploymentNames(prefix string, count uint) ([]string, error) {
 	return names, nil
 }
 
-func invalidBulkNamesReason(names []string) string {
-	v, ok := binding.Validator.Engine().(*validator.Validate)
-	if !ok {
-		return ""
-	}
+func invalidBulkNamesReason(names []string, group *model.Group) string {
 	for _, name := range names {
-		if v.Var(name, "dns_rfc1035_label") != nil {
-			return fmt.Sprintf("%q isn't a valid name: names must be at most 63 characters of lowercase letters, digits and '-' and start with a letter", name)
+		if reason := deploymentNameReason(name, group); reason != "" {
+			return fmt.Sprintf("%q isn't a valid name: %s", name, reason)
 		}
 	}
 	return ""
@@ -394,11 +415,6 @@ func (h Handler) BulkDeploy(c *gin.Context) {
 		return
 	}
 
-	if reason := invalidBulkNamesReason(names); reason != "" {
-		_ = c.Error(errdef.NewBadRequest("%s", reason))
-		return
-	}
-
 	if err := rejectRepeatedStacks(request.Instances); err != nil {
 		_ = c.Error(err)
 		return
@@ -408,6 +424,11 @@ func (h Handler) BulkDeploy(c *gin.Context) {
 	group, err := h.groupService.Find(ctx, request.Group)
 	if err != nil {
 		_ = c.Error(err)
+		return
+	}
+
+	if reason := invalidBulkNamesReason(names, group); reason != "" {
+		_ = c.Error(errdef.NewBadRequest("%s", reason))
 		return
 	}
 
@@ -535,6 +556,10 @@ type BulkDeploymentNameAvailability struct {
 	Names  []string `json:"names"`
 	Taken  []string `json:"taken"`
 	Reason string   `json:"reason,omitempty"`
+	// MaxCount is the most deployments one bulk deploy creates
+	MaxCount uint `json:"maxCount"`
+	// FirstAvailable is the first of prefix-1 to prefix-maxCount that is a valid name and free in the group, whatever the count, so a client can suggest a numbered name. It is left out when there is none.
+	FirstAvailable string `json:"firstAvailable,omitempty"`
 }
 
 func (h Handler) BulkDeploymentNameAvailability(c *gin.Context) {
@@ -542,7 +567,7 @@ func (h Handler) BulkDeploymentNameAvailability(c *gin.Context) {
 	//
 	// Bulk deployment name availability
 	//
-	// List the names a bulk deploy with the given prefix and count would create and which of them are taken. The bulk deploy checks again when it creates them.
+	// List the names a bulk deploy with the given prefix and count would create and which of them are taken, the most deployments a bulk deploy creates, and the first free name with the prefix. The bulk deploy checks again when it creates them.
 	//
 	// Security:
 	//	oauth2:
@@ -592,18 +617,41 @@ func (h Handler) BulkDeploymentNameAvailability(c *gin.Context) {
 		return
 	}
 
-	if reason := invalidBulkNamesReason(names); reason != "" {
-		c.JSON(http.StatusOK, BulkDeploymentNameAvailability{Names: names, Taken: []string{}, Reason: reason})
-		return
-	}
-
-	taken, err := h.instanceService.TakenDeploymentNames(ctx, group.Name, names)
+	// Every name with the prefix a bulk deploy could create is looked up at once, so the first free one is found whatever the count.
+	candidates, err := bulkDeploymentNames(request.Prefix, MaxBulkDeployments)
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
+	candidates = slices.DeleteFunc(candidates, func(name string) bool { return deploymentNameReason(name, group) != "" })
 
-	c.JSON(http.StatusOK, BulkDeploymentNameAvailability{Names: names, Taken: taken})
+	takenCandidates := []string{}
+	if len(candidates) > 0 {
+		takenCandidates, err = h.instanceService.TakenDeploymentNames(ctx, group.Name, candidates)
+		if err != nil {
+			_ = c.Error(err)
+			return
+		}
+	}
+
+	response := BulkDeploymentNameAvailability{Names: names, Taken: []string{}, MaxCount: MaxBulkDeployments}
+	if index := slices.IndexFunc(candidates, func(name string) bool { return !slices.Contains(takenCandidates, name) }); index != -1 {
+		response.FirstAvailable = candidates[index]
+	}
+
+	if reason := invalidBulkNamesReason(names, group); reason != "" {
+		response.Reason = reason
+		c.JSON(http.StatusOK, response)
+		return
+	}
+
+	for _, name := range names {
+		if slices.Contains(takenCandidates, name) {
+			response.Taken = append(response.Taken, name)
+		}
+	}
+
+	c.JSON(http.StatusOK, response)
 }
 
 // FindDeploymentById deployment
@@ -661,6 +709,7 @@ type Parameter struct {
 	Value string `json:"value"`
 }
 
+// Parameters are instance parameter values keyed by name. A parameter the stack consumes from another instance is resolved from that instance, so a value sent for one is ignored.
 type Parameters map[string]Parameter
 
 type SaveInstanceRequest struct {
@@ -1703,6 +1752,11 @@ func (h Handler) CreateDeploymentFromPreset(c *gin.Context) {
 		return
 	}
 
+	if reason := deploymentNameReason(request.Name, group); reason != "" {
+		_ = c.Error(errdef.NewBadRequest("%s", reason))
+		return
+	}
+
 	deployment, err := h.instanceService.CreateDeploymentFromPreset(c.Request.Context(), preset.ID, request.Name, DeploymentFromPreset{
 		UserID:      user.ID,
 		Group:       group,
@@ -1770,13 +1824,13 @@ func (h Handler) BulkDeployFromPreset(c *gin.Context) {
 		return
 	}
 
-	if reason := invalidBulkNamesReason(names); reason != "" {
-		_ = c.Error(errdef.NewBadRequest("%s", reason))
+	group, ok := h.presetDeploymentGroup(c, preset, user, request.Group)
+	if !ok {
 		return
 	}
 
-	group, ok := h.presetDeploymentGroup(c, preset, user, request.Group)
-	if !ok {
+	if reason := invalidBulkNamesReason(names, group); reason != "" {
+		_ = c.Error(errdef.NewBadRequest("%s", reason))
 		return
 	}
 

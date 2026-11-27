@@ -79,6 +79,15 @@ definitions:
         x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
     BulkDeploymentNameAvailability:
         properties:
+            firstAvailable:
+                description: FirstAvailable is the first of prefix-1 to prefix-maxCount that is a valid name and free in the group, whatever the count, so a client can suggest a numbered name. It is left out when there is none.
+                type: string
+                x-go-name: FirstAvailable
+            maxCount:
+                description: MaxCount is the most deployments one bulk deploy creates
+                format: uint64
+                type: integer
+                x-go-name: MaxCount
             names:
                 items:
                     type: string
@@ -760,6 +769,7 @@ definitions:
     Parameters:
         additionalProperties:
             $ref: '#/definitions/Parameter'
+        title: Parameters are instance parameter values keyed by name. A parameter the stack consumes from another instance is resolved from that instance, so a value sent for one is ignored.
         type: object
         x-go-package: github.com/dhis2-sre/im-manager/pkg/instance
     PublicInstance:
@@ -852,6 +862,12 @@ definitions:
             group:
                 type: string
                 x-go-name: Group
+            instances:
+                description: Instances are created with the deployment in one transaction, each validated the way saving an instance validates it, so a refused instance leaves no deployment behind. Without them the deployment is created empty.
+                items:
+                    $ref: '#/definitions/SaveInstanceRequest'
+                type: array
+                x-go-name: Instances
             name:
                 type: string
                 x-go-name: Name
@@ -1672,7 +1688,7 @@ paths:
                 - oauth2: []
             summary: Find deployments
         post:
-            description: Save a deployment...
+            description: 'Save a deployment, or with instances, the deployment and all its instances in one request: either everything is created or nothing is. The deployment is created, not deployed.'
             operationId: saveDeployment
             parameters:
                 - description: Save deployment request body parameter
@@ -1686,11 +1702,15 @@ paths:
                     description: OK
                     schema:
                         $ref: '#/definitions/Deployment'
+                "400":
+                    $ref: '#/responses/Error'
                 "401":
                     $ref: '#/responses/Error'
                 "403":
                     $ref: '#/responses/Error'
                 "404":
+                    $ref: '#/responses/Error'
+                "409":
                     $ref: '#/responses/Error'
                 "415":
                     $ref: '#/responses/Error'
@@ -1974,7 +1994,7 @@ paths:
             summary: Update a Deployment Instance
     /deployments/availability:
         get:
-            description: Check whether a deployment name is free to use in a group.
+            description: Check whether a deployment name is free to use in a group and short enough to deploy there. The longest name depends on the group, and the reason states it.
             operationId: deploymentNameAvailability
             parameters:
                 - in: query
@@ -2031,7 +2051,7 @@ paths:
             summary: Bulk deploy
     /deployments/bulk/availability:
         get:
-            description: List the names a bulk deploy with the given prefix and count would create and which of them are taken. The bulk deploy checks again when it creates them.
+            description: List the names a bulk deploy with the given prefix and count would create and which of them are taken, the most deployments a bulk deploy creates, and the first free name with the prefix. The bulk deploy checks again when it creates them.
             operationId: bulkDeploymentNameAvailability
             parameters:
                 - in: query
