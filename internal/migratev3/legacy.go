@@ -239,7 +239,7 @@ func MergedParameters(d LegacyDeployment) (map[string]string, error) {
 			continue
 		}
 		if parameter.Validator != nil {
-			if err := parameter.Validator(value); err != nil {
+			if err := parameter.Validator.Validate(value); err != nil {
 				errs = append(errs, fmt.Sprintf("dhis2-v2 parameter %s: %v", name, err))
 			}
 		}

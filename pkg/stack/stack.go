@@ -254,28 +254,60 @@ const (
 // sameSiteCookies validates the value is one of our same site cookie types.
 var sameSiteCookies = OneOf(strict, lax, none)
 
+// boolean validates the value is 'true' or 'false', the way every on/off parameter is kept.
+var boolean = switchValidator{}
+
 var imageRepositoryPattern = regexp.MustCompile(`^(ghcr\.io/dhis2/)?[a-z0-9]+([._-][a-z0-9]+)*$`)
 
 // imageRepository validates the value is a dhis2 Docker Hub repository or a ghcr.io/dhis2 repository.
-func imageRepository(value string) error {
+var imageRepository = validatorFunc(func(value string) error {
 	if !imageRepositoryPattern.MatchString(value) {
 		return fmt.Errorf("%q is not valid, only a dhis2 Docker Hub repository or ghcr.io/dhis2/<repository> is allowed", value)
 	}
 	return nil
+})
+
+// Validator rejects a value a stack parameter cannot take, before it reaches the helmfile.
+type Validator interface {
+	Validate(value string) error
 }
 
-// OneOf creates a function returning an error when called with a value that is not any of the given
-// validValues.
-func OneOf(validValues ...string) func(value string) error {
-	fmtErrorArg := quoteStrings(validValues)
+// validatorFunc is a Validator for a rule that is not a closed set of values, such as a pattern,
+// which a client can only check by sending the value.
+type validatorFunc func(value string) error
 
-	return func(value string) error {
-		if slices.Contains(validValues, value) {
-			return nil
-		}
+func (f validatorFunc) Validate(value string) error {
+	return f(value)
+}
 
-		return fmt.Errorf("%q is not valid, only %s are allowed", value, fmtErrorArg)
+// Choice is a Validator accepting only the values it lists. The stacks API serves them as the
+// parameter's allowed values, so the options a client offers are the values accepted here and the
+// two cannot disagree.
+type Choice []string
+
+// OneOf creates a Choice of the given validValues, rejecting any other value.
+func OneOf(validValues ...string) Choice {
+	return validValues
+}
+
+func (c Choice) Validate(value string) error {
+	if slices.Contains(c, value) {
+		return nil
 	}
+	return fmt.Errorf("%q is not valid, only %s are allowed", value, quoteStrings(c))
+}
+
+// switchValues are the values of a parameter that switches something on or off.
+var switchValues = OneOf("true", "false")
+
+// switchValidator is the Validator of a parameter that switches something on or off. The helmfiles
+// read such a parameter either as a YAML boolean or by comparing it with "true", so a value like
+// "True" would mean on to one and off to the other. The stacks API serves the parameter as a
+// boolean, so a client renders a checkbox, which only ever produces the two values accepted here.
+type switchValidator struct{}
+
+func (switchValidator) Validate(value string) error {
+	return switchValues.Validate(value)
 }
 
 // quoteStrings quotes values and comma separates them into a joint string.

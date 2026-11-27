@@ -3,6 +3,7 @@ package stack
 import (
 	"fmt"
 	"net/http"
+	"slices"
 
 	"github.com/dhis2-sre/im-manager/internal/errdef"
 	"github.com/dhis2-sre/im-manager/pkg/kube"
@@ -70,6 +71,7 @@ func toResponseStack(stack Stack) StackResponse {
 	s.Endpoints = stack.Endpoints
 
 	for parameterName, parameter := range stack.Parameters {
+		parameterType, allowedValues := typeOf(parameter.Validator)
 		s.Parameters = append(s.Parameters, StackParameterResponse{
 			ParameterName:   parameterName,
 			DisplayName:     parameter.DisplayName,
@@ -81,11 +83,31 @@ func toResponseStack(stack Stack) StackResponse {
 			ImmutableReason: parameter.ImmutableReason,
 			Description:     parameter.Description,
 			AddOn:           parameter.AddOn,
+			Primary:         parameter.Primary,
+			Section:         parameter.Section,
+			Type:            parameterType,
+			AllowedValues:   allowedValues,
 			Group:           parameter.Group,
 		})
 	}
 
 	return s
+}
+
+// parameterTypeBoolean is the type served for a parameter that switches something on or off.
+const parameterTypeBoolean = "boolean"
+
+// typeOf derives the type and allowed values served for a parameter from its validator, so a form
+// offers the values the backend accepts from the one declaration that decides what it accepts.
+func typeOf(validator Validator) (string, []string) {
+	switch v := validator.(type) {
+	case switchValidator:
+		return parameterTypeBoolean, slices.Clone(switchValues)
+	case Choice:
+		return "", slices.Clone(v)
+	default:
+		return "", nil
+	}
 }
 
 // swagger:model StackParameter
@@ -105,8 +127,20 @@ type StackParameterResponse struct {
 	Description string `json:"description,omitempty"`
 	// AddOn says this 'true'/'false' parameter switches on an optional part of the instance, to be
 	// offered as something to add rather than as one more setting.
-	AddOn bool   `json:"addOn,omitempty"`
-	Group string `json:"group,omitempty"`
+	AddOn bool `json:"addOn,omitempty"`
+	// Primary says the parameter is shown up front rather than under the advanced settings of its
+	// group, which is where a parameter without it goes.
+	Primary bool `json:"primary,omitempty"`
+	// Section names the one of its group's sections the parameter is listed under among the
+	// advanced settings; empty means after them.
+	Section string `json:"section,omitempty"`
+	// Type says what the parameter's value stands for beyond a string: "boolean" is 'true' or
+	// 'false', switching something on or off. Empty means any other value.
+	Type string `json:"type,omitempty"`
+	// AllowedValues are the only values the parameter accepts, the same ones deploying or updating
+	// an instance validates it against; empty means it is not limited to a list.
+	AllowedValues []string `json:"allowedValues,omitempty"`
+	Group         string   `json:"group,omitempty"`
 }
 
 // swagger:model Stack

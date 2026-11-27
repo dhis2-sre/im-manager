@@ -71,6 +71,19 @@ type ParameterGroup struct {
 	// parameter map, stamping each parameter's Group, so membership follows from where a parameter
 	// is declared. Not serialized: the API serves the flat list where each parameter names its group.
 	Parameters StackParameters `json:"-"`
+	// Sections are the titled sub-sections a client sorts the group's advanced parameters into, in
+	// the order it shows them. A parameter names its section, and one naming none is listed after
+	// them, so a new parameter shows up without anyone having to place it. Empty means the group's
+	// advanced parameters are one list.
+	Sections []ParameterSection `json:"sections,omitempty"`
+}
+
+// ParameterSection is a titled sub-section of a group's advanced parameters, such as the health
+// checks of DHIS 2 core. Like the group it is presentation only, and nothing here reads it.
+// swagger:model StackParameterSection
+type ParameterSection struct {
+	Name  string `json:"name"`
+	Title string `json:"title"`
 }
 
 // swagger:model StackDetailParameters
@@ -83,8 +96,10 @@ type StackParameter struct {
 	DefaultValue *string `json:"defaultValue,omitempty"`
 	// Consumed signals that this parameter is provided by another stack i.e. one of the stacks required stacks.
 	Consumed bool `json:"consumed"`
-	// Validator ensures that the actual stack parameters are valid according to its rules.
-	Validator func(value string) error `json:"-"`
+	// Validator ensures that the actual stack parameters are valid according to its rules. A
+	// Choice or the boolean validator also decides the type and allowed values the stacks API
+	// serves, so a form offers exactly the values accepted here.
+	Validator Validator `json:"-"`
 	// Priority determines the order in which the parameter is shown.
 	Priority  uint `json:"priority"`
 	Sensitive bool `json:"sensitive"`
@@ -103,6 +118,17 @@ type StackParameter struct {
 	// only and nothing here reads it: what the parameter switches on is whatever the stack already
 	// gates on it, a companion, parameter groups, an endpoint, or nothing a client can show.
 	AddOn bool `json:"addOn,omitempty"`
+	// Primary says a client shows this parameter up front rather than among its group's advanced
+	// settings. Most parameters have a default nobody needs to look at, so advanced is the zero
+	// value and a new parameter lands there until someone decides it belongs up front. A parameter
+	// that has to be filled in, being required with no default, is primary. So is the choice a
+	// conditional group of another group depends on, along with that group's own parameters, since
+	// the group is shown beside the choice rather than tucked away. It is presentation only and
+	// nothing here reads it.
+	Primary bool `json:"primary,omitempty"`
+	// Section names the section of the parameter's group it is listed under among the advanced
+	// settings; empty means after the group's sections. A primary parameter has none.
+	Section string `json:"section,omitempty"`
 	// NotRendered says the stack's own helmfile never reads this parameter, so changing it changes
 	// nothing about what the stack renders and an edit that touches only it leaves the instance
 	// alone. It is for the parameters whose only job is to decide whether a companion belongs to the

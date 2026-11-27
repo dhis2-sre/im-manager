@@ -966,6 +966,14 @@ definitions:
                     offered as something to add rather than as one more setting.
                 type: boolean
                 x-go-name: AddOn
+            allowedValues:
+                description: |-
+                    AllowedValues are the only values the parameter accepts, the same ones deploying or updating
+                    an instance validates it against; empty means it is not limited to a list.
+                items:
+                    type: string
+                type: array
+                x-go-name: AllowedValues
             consumed:
                 type: boolean
                 x-go-name: Consumed
@@ -991,6 +999,12 @@ definitions:
             parameterName:
                 type: string
                 x-go-name: ParameterName
+            primary:
+                description: |-
+                    Primary says the parameter is shown up front rather than under the advanced settings of its
+                    group, which is where a parameter without it goes.
+                type: boolean
+                x-go-name: Primary
             priority:
                 format: uint64
                 type: integer
@@ -999,9 +1013,21 @@ definitions:
                 description: Required says the parameter must have a value for the stack to deploy.
                 type: boolean
                 x-go-name: Required
+            section:
+                description: |-
+                    Section names the one of its group's sections the parameter is listed under among the
+                    advanced settings; empty means after them.
+                type: string
+                x-go-name: Section
             sensitive:
                 type: boolean
                 x-go-name: Sensitive
+            type:
+                description: |-
+                    Type says what the parameter's value stands for beyond a string: "boolean" is 'true' or
+                    'false', switching something on or off. Empty means any other value.
+                type: string
+                x-go-name: Type
         type: object
         x-go-name: StackParameterResponse
         x-go-package: github.com/dhis2-sre/im-manager/pkg/stack
@@ -1013,6 +1039,16 @@ definitions:
             name:
                 type: string
                 x-go-name: Name
+            sections:
+                description: |-
+                    Sections are the titled sub-sections a client sorts the group's advanced parameters into, in
+                    the order it shows them. A parameter names its section, and one naming none is listed after
+                    them, so a new parameter shows up without anyone having to place it. Empty means the group's
+                    advanced parameters are one list.
+                items:
+                    $ref: '#/definitions/StackParameterSection'
+                type: array
+                x-go-name: Sections
             title:
                 type: string
                 x-go-name: Title
@@ -1020,6 +1056,20 @@ definitions:
                 $ref: '#/definitions/Condition'
         type: object
         x-go-name: ParameterGroup
+        x-go-package: github.com/dhis2-sre/im-manager/pkg/stack
+    StackParameterSection:
+        description: |-
+            ParameterSection is a titled sub-section of a group's advanced parameters, such as the health
+            checks of DHIS 2 core. Like the group it is presentation only, and nothing here reads it.
+        properties:
+            name:
+                type: string
+                x-go-name: Name
+            title:
+                type: string
+                x-go-name: Title
+        type: object
+        x-go-name: ParameterSection
         x-go-package: github.com/dhis2-sre/im-manager/pkg/stack
     UpdateClusterRequest:
         properties:

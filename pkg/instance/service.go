@@ -455,7 +455,7 @@ func validateParameters(instanceParameters model.DeploymentInstanceParameters, s
 	for name, parameter := range instanceParameters {
 		stackParameter := stack.Parameters[name]
 		if stackParameter.Validator != nil {
-			err := stackParameter.Validator(parameter.Value)
+			err := stackParameter.Validator.Validate(parameter.Value)
 			if err != nil {
 				errs = append(errs, fmt.Errorf("validation failed for parameter %s: %v", name, err))
 			}
